@@ -6281,6 +6281,39 @@
       "astHash": "48b676a02ce774411068c968e250ee2981be32814df86c00e1abeceeee259f22",
       "signatureHash": "be550348426f567891744803ba258a437a2d3963c0fbcd104796c8aa89a158c4",
       "reviewDate": "2026-11-08"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.ts",
+      "symbol": "createBookendPreviewFrameQueue",
+      "astHash": "89be73b1ebc0fa393e11a6e96cbac55f13ab103d92b47eb23e86b87a0c16fe84",
+      "signatureHash": "fb13a3dbf82075dca3e25026f119b93eead3fa78bc6c933683230e6bc6c31926",
+      "rule": "structural-function-risk",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: One serial source snapshot and latest-request lifetime owns capture, cancellation, GPU completion, stale output rejection and retirement. Borrowed pixels cannot close before completion. Splitting these transitions would distribute this invariant. GPU composition and destination visibility are already separate owners. The measured cohesion is one; the closure length causes this finding. Independent read-only structural diagnosis confirmed Keep. Controlled completion proof covers replacement, cancellation, disposal, reuse, retry and stale errors. Fresh candidate review must validate this exact binding. Review correction applies the same current-input admission to success and failure; source, queue and retirement authority remain unchanged. Fresh corrected-candidate review is required.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any separate source, queue, completion, publication, retirement, failure/retry or authoring authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-08"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.tsx",
+      "symbol": "SceneBookendPreview",
+      "astHash": "4e94e4ed84106fc25da80d014776309f08d8b22cf881ac5acf89843c2b8bf8f3",
+      "signatureHash": "c1b179b0a7171c4ce71357d0495e9187860329d5d923cded058167067f8dc925",
+      "rule": "structural-function-risk",
+      "owner": "extension:video-editor:workspace",
+      "reason": "tool-noise: One mounted disposable media surface owns source URL/readiness, DOM refs, queue and presenter binding, resize and fixed failure/retry UI. The current-prop refs bridge one asynchronous preview rather than independent project writers. Source fingerprint policy, GPU composition, queue lifetime and publication already have separate concrete owners. Another extraction would pass the same media refs and readiness across an extra boundary. Independent read-only structural diagnosis confirmed Keep. Mounted and real inspector proof check selection, edits, failure and source isolation. Fresh candidate review must validate this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any separate source, queue, completion, publication, retirement, failure/retry or authoring authority. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-08"
+    },
+    {
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-bookend-preview-gpu.spec.ts",
+      "symbol": "test callback",
+      "astHash": "c54652d04d42ce520d7949871d6dac3d6c09aba1f35aca00acc96915571735e8",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
+      "rule": "structural-function-risk",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One Native preset session proves image selection, fit/pan draft, Escape restoration, commit/Undo, replacement with video and private trim. A single seeded project, pinned main transport, saved baseline, inspector surface and cleanup connect these transitions. Splitting fixtures would lose same-session source replacement proof. The synthetic pixel attachment belongs to that comparison. Reported state authorities are viewport and timeout configuration rather than product writers. Independent read-only structural diagnosis confirmed Keep. Fresh candidate review must validate this exact binding.",
+      "removalCondition": "Remove when AST or signature changes. Reassess independent fixtures, scenario state, transport ownership or cleanup lifetimes. Remove when the analyzer models this cohesive acceptance session.",
+      "reviewDate": "2026-11-08"
     }
   ]
 }

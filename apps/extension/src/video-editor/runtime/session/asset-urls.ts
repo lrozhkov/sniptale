@@ -16,7 +16,10 @@ interface LoadedVideoEditorAssetUrl extends VideoEditorAssetUrlEntry {
 
 type VideoEditorAssetUrlCache = Record<string, VideoEditorAssetUrlEntry>;
 
-function getVideoEditorAssetSourceFingerprint(asset: VideoProject['assets'][number]): string {
+/** Stable source identity for URL and preview-pixel owners. */
+export function getVideoEditorAssetSourceFingerprint(
+  asset: VideoProject['assets'][number]
+): string {
   if (asset.source.kind === 'library-asset') return `library-asset:${asset.source.mediaId}`;
   if (asset.source.kind === 'recording') {
     return `recording:${asset.source.recordingId}`;

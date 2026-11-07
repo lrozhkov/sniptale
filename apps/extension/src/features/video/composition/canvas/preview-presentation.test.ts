@@ -478,3 +478,36 @@ it('retains the inspector surface bound while the stage permits two pending fram
   expect(() => f.session.acquire(size, f.renderer)).toThrow('busy');
   pending.release();
 });
+
+it('publishes GPU over a DOM fallback without marking the DOM as a canvas and restores its styles', () => {
+  const f = fixture('inspector', 'transparent');
+  const fallback = document.createElement('div');
+  fallback.style.opacity = '0.7';
+  fallback.style.pointerEvents = 'auto';
+  f.host.append(fallback);
+  const session = createPreviewPresentationSession({
+    fallback: () => fallback,
+    host: () => f.host,
+    role: 'inspector',
+    background: 'transparent',
+  });
+  sessions.push(session);
+  session.mount();
+  expect(fallback.style.opacity).toBe('1');
+  expect(fallback.hasAttribute('data-preview-inspector-canvas')).toBe(false);
+  const output = session.acquire(size, f.renderer);
+  session.publish(output, () => {
+    expect(output.canvas.style.opacity).toBe('1');
+    expect(fallback.style.opacity).toBe('0');
+    expect(fallback.style.pointerEvents).toBe('none');
+  });
+  session.publish(null, () => {
+    expect(fallback.style.opacity).toBe('1');
+    expect(fallback.style.pointerEvents).toBe('auto');
+    expect(output.canvas.style.opacity).toBe('0');
+  });
+  expect(f.host.querySelectorAll('[data-preview-inspector-canvas]')).toHaveLength(0);
+  session.dispose();
+  expect(fallback.style.opacity).toBe('0.7');
+  expect(fallback.style.pointerEvents).toBe('auto');
+});

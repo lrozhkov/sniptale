@@ -68,6 +68,52 @@ const spatialResourceMappings = [
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   {
+    owner: 'shared-bookend-preview-gpu',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/bookend-preview-gpu.ts',
+    allowCrossOwner: true,
+    reason:
+      'The borrowed media GPU producer is exercised through its own lifetime and both Native frontend adapters.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/bookend-preview-gpu.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-bookend-preview-frame-queue',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.ts',
+    reason:
+      'The source snapshot and latest frame queue share controlled capture and mounted readiness proof.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-bookend-preview-source-and-recipe',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.tsx',
+    reason:
+      'Native mini-preview source identity and recipe drafts are exercised through mounted and authoring proof.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preset.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-asset-source-preview-identity',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/asset-urls.ts',
+    allowCrossOwner: true,
+    reason:
+      'The canonical asset source identity serves existing URL owners and the disposable bookend inspector.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/asset-urls.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/asset-urls.sync-replica.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+    ],
+  },
+  {
     owner: 'shared-camera-crop-gpu',
     productionFile: 'apps/extension/src/features/video/composition/canvas/camera-crop-gpu.ts',
     allowCrossOwner: true,
@@ -93,6 +139,8 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx',
       'apps/extension/src/gallery/video-review/webcam-crop-preview.test.tsx',
       'apps/extension/src/gallery/video-review/webcam-crop-paint.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.test.ts',
     ],
   },
   {

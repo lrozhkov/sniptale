@@ -24,7 +24,7 @@ export interface GpuPreviewFramePresenter {
 }
 
 interface PresentationOptions {
-  fallback: () => HTMLCanvasElement | null;
+  fallback: () => HTMLElement | null;
   host: () => HTMLDivElement | null;
   role?: 'stage' | 'inspector';
   background?: 'black' | 'transparent';
@@ -47,7 +47,7 @@ class PreviewPresentationSession implements GpuPreviewFramePresenter {
   private mounted = false;
   private disposed = false;
   private host: HTMLDivElement | null = null;
-  private fallback: HTMLCanvasElement | null = null;
+  private fallback: HTMLElement | null = null;
   private originalFallback: { opacity: string; pointerEvents: string; active: boolean } | null =
     null;
   private front: GpuPreviewOutput | null = null;
@@ -106,8 +106,8 @@ class PreviewPresentationSession implements GpuPreviewFramePresenter {
     if (fallback) {
       fallback.style.opacity = output ? '0' : '1';
       fallback.style.pointerEvents = output ? 'none' : (this.originalFallback?.pointerEvents ?? '');
-      if (output) fallback.removeAttribute(this.marker);
-      else fallback.setAttribute(this.marker, '');
+      if (!output && fallback.tagName === 'CANVAS') fallback.setAttribute(this.marker, '');
+      else fallback.removeAttribute(this.marker);
     }
     for (const destination of this.destinations) {
       const visible = output?.canvas === destination.canvas;
