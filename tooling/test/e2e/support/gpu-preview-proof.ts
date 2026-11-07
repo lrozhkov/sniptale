@@ -1,3 +1,4 @@
+import { installEffectGpuPlanCompletionObserver } from './effect-gpu-plan-completion';
 import { expect, test, type ConsoleMessage, type Page } from '@playwright/test';
 
 const COMPLETED_GPU_WORK = 'sniptale-test:completed-preview-gpu-work';
@@ -6,14 +7,49 @@ const EFFECT_GPU_PLAN = 'sniptale-test:effect-gpu-plan';
 const EFFECT_GPU_FAILURE = 'sniptale-test:effect-failure:';
 const EFFECT_GPU_FRAME = 'sniptale-test:completed-effect-gpu-frame';
 const effectFailures = new WeakMap<Page, string[]>();
+const effectEvidence = new WeakMap<Page, Record<string, number>>();
 
 /** Install the raw-image guard before the first request reaches each inline effect Worker. */
 export async function observeEffectGpuPlans(
   page: Page,
-  options: { rejectProcessedCanvas?: boolean } = {}
+  options: { rejectProcessedCanvas?: boolean; requireParentScene?: boolean } = {}
 ): Promise<() => number> {
   const plans = new Set<string>();
   const completedFrames = new Set<string>();
+  const parentScenes = new Set<string>();
+  await page.exposeBinding('sniptaleTestCompletedEffectPlan', (source, ids: unknown) => {
+    if (source.frame !== page.mainFrame()) return;
+    if (Array.isArray(ids))
+      for (const id of ids)
+        if (typeof id === 'string') {
+          completedFrames.add(id);
+          parentScenes.add(id);
+        }
+  });
+  await page.exposeBinding('sniptaleTestCompletedEffectPlanProgress', (source, value: unknown) => {
+    if (source.frame !== page.mainFrame()) return;
+    if (!value || typeof value !== 'object') return;
+    const counters: Record<string, number> = {};
+    for (const key of [
+      'plans',
+      'uploads',
+      'videos',
+      'groups',
+      'draws',
+      'submittedPlans',
+      'submittedVideo',
+      'completed',
+    ]) {
+      const count: unknown = Reflect.get(value, key);
+      if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) return;
+      counters[key] = count;
+    }
+    effectEvidence.set(page, counters);
+  });
+  await page.addInitScript(
+    installEffectGpuPlanCompletionObserver,
+    'sniptaleTestCompletedEffectPlan'
+  );
   const failures: string[] = [];
   effectFailures.set(page, failures);
   if (options.rejectProcessedCanvas)
@@ -34,7 +70,8 @@ export async function observeEffectGpuPlans(
                   if (
                     result &&
                     typeof result === 'object' &&
-                    Reflect.get(result, 'kind') === 'frame' &&
+                    (Reflect.get(result, 'kind') === 'frame' ||
+                      Reflect.get(result, 'kind') === 'gpu-plan') &&
                     typeof Reflect.get(result, 'effectInstanceId') === 'string'
                   ) {
                     for (const element of document.querySelectorAll(
@@ -51,6 +88,19 @@ export async function observeEffectGpuPlans(
                       bitmap instanceof ImageBitmap
                     )
                       processed.add(bitmap);
+                    const resources: unknown = Reflect.get(result, 'resources');
+                    if (
+                      typeof instanceId === 'string' &&
+                      liveInstances.has(instanceId) &&
+                      Array.isArray(resources)
+                    )
+                      for (const resource of resources) {
+                        const raster: unknown =
+                          resource && typeof resource === 'object'
+                            ? Reflect.get(resource, 'bitmap')
+                            : undefined;
+                        if (raster instanceof ImageBitmap) processed.add(raster);
+                      }
                   }
                   Reflect.apply(listener, this, [event]);
                 }
@@ -107,56 +157,61 @@ export async function observeEffectGpuPlans(
   );
   page.on('worker', (worker) => {
     if (!worker.url().startsWith('blob:null/')) return;
-    void worker.evaluate(
-      ({ ready, plan }) => {
-        let gpuMode = false;
-        globalThis.addEventListener(
-          'message',
-          (event: MessageEvent<unknown>) => {
-            const value = event.data;
-            gpuMode =
-              !!value &&
-              typeof value === 'object' &&
-              Reflect.get(value, 'renderTarget') === 'gpu-plan';
-          },
-          { capture: true }
-        );
-        const draw = OffscreenCanvasRenderingContext2D.prototype.drawImage;
-        Reflect.set(
-          OffscreenCanvasRenderingContext2D.prototype,
-          'drawImage',
-          function (this: OffscreenCanvasRenderingContext2D, ...args: unknown[]) {
-            const source = args[0];
-            if (
-              gpuMode &&
-              (source instanceof ImageBitmap ||
-                (typeof VideoFrame !== 'undefined' && source instanceof VideoFrame))
-            )
-              throw new Error('Effect GPU proof rejected a Canvas raw-image composition.');
-            Reflect.apply(draw, this, args);
-          }
-        );
-        const post = Reflect.get(globalThis, 'postMessage');
-        if (typeof post !== 'function') throw new Error('Worker message port is unavailable.');
-        Reflect.set(globalThis, 'postMessage', function (...args: unknown[]) {
-          const envelope = args[0];
-          if (envelope && typeof envelope === 'object') {
-            const result: unknown = Reflect.get(envelope, 'result');
-            if (
-              result &&
-              typeof result === 'object' &&
-              Reflect.get(result, 'kind') === 'gpu-plan'
-            ) {
-              const requestId: unknown = Reflect.get(result, 'requestId');
-              if (typeof requestId === 'string') console.debug(plan + ':' + requestId);
+    void worker
+      .evaluate(
+        ({ ready, plan }) => {
+          let gpuMode = false;
+          globalThis.addEventListener(
+            'message',
+            (event: MessageEvent<unknown>) => {
+              const value = event.data;
+              gpuMode =
+                !!value &&
+                typeof value === 'object' &&
+                Reflect.get(value, 'renderTarget') === 'gpu-plan';
+            },
+            { capture: true }
+          );
+          const draw = OffscreenCanvasRenderingContext2D.prototype.drawImage;
+          Reflect.set(
+            OffscreenCanvasRenderingContext2D.prototype,
+            'drawImage',
+            function (this: OffscreenCanvasRenderingContext2D, ...args: unknown[]) {
+              const source = args[0];
+              if (
+                gpuMode &&
+                (source instanceof ImageBitmap ||
+                  (typeof VideoFrame !== 'undefined' && source instanceof VideoFrame))
+              )
+                throw new Error('Effect GPU proof rejected a Canvas raw-image composition.');
+              Reflect.apply(draw, this, args);
             }
-          }
-          return Reflect.apply(post, globalThis, args);
-        });
-        Reflect.apply(post, globalThis, [ready]);
-      },
-      { ready: EFFECT_GPU_READY, plan: EFFECT_GPU_PLAN }
-    );
+          );
+          const post = Reflect.get(globalThis, 'postMessage');
+          if (typeof post !== 'function') throw new Error('Worker message port is unavailable.');
+          Reflect.set(globalThis, 'postMessage', function (...args: unknown[]) {
+            const envelope = args[0];
+            if (envelope && typeof envelope === 'object') {
+              const result: unknown = Reflect.get(envelope, 'result');
+              if (
+                result &&
+                typeof result === 'object' &&
+                Reflect.get(result, 'kind') === 'gpu-plan'
+              ) {
+                const requestId: unknown = Reflect.get(result, 'requestId');
+                if (typeof requestId === 'string') console.debug(plan + ':' + requestId);
+              }
+            }
+            return Reflect.apply(post, globalThis, args);
+          });
+          Reflect.apply(post, globalThis, [ready]);
+        },
+        { ready: EFFECT_GPU_READY, plan: EFFECT_GPU_PLAN }
+      )
+      .catch(() => {
+        if (!page.isClosed() && page.workers().includes(worker))
+          failures.push(EFFECT_GPU_FAILURE + 'workerInstrumentation');
+      });
   });
   await page.addInitScript((ready) => {
     if (!location.pathname.endsWith('/effect-runtime-sandbox/index.html')) return;
@@ -183,7 +238,9 @@ export async function observeEffectGpuPlans(
       }
     };
   }, EFFECT_GPU_READY);
-  return () => [...plans].filter((id) => completedFrames.has(id)).length;
+  return () =>
+    [...plans].filter((id) => (options.requireParentScene ? parentScenes : completedFrames).has(id))
+      .length;
 }
 
 /** Run actual editor interactions on WebGPU; Linux software proves behavior, not hardware FPS. */
@@ -237,6 +294,12 @@ export function enableGpuPreviewProof() {
   test.afterEach(async ({ page }, info) => {
     const witness = witnesses.get(page);
     try {
+      const evidence = effectEvidence.get(page);
+      if (info.status !== 'passed' && evidence)
+        await info.attach('effect-gpu-evidence', {
+          body: JSON.stringify(evidence),
+          contentType: 'application/json',
+        });
       const failures = effectFailures.get(page);
       if (failures?.length)
         await info.attach('effect-runtime-errors', {
@@ -254,6 +317,7 @@ export function enableGpuPreviewProof() {
       if (witness) page.off('console', witness.listener);
       witnesses.delete(page);
       effectFailures.delete(page);
+      effectEvidence.delete(page);
     }
   });
 }

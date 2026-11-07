@@ -1,13 +1,13 @@
 import { EFFECT_V1_GRAPH_LIMITS } from '@sniptale/runtime-contracts/effect-v1';
-import { EFFECT_SVG_VECTOR_LIMITS } from '../../contracts/effect-runtime/svg-vector';
-import { isImageBitmap } from '../../contracts/effect-runtime/bitmap-lifetime';
+import { EFFECT_SVG_VECTOR_LIMITS } from '../../../../../contracts/effect-runtime/svg-vector';
+import { isImageBitmap } from '../../../../../contracts/effect-runtime/bitmap-lifetime';
 import {
   hasExactKeys,
   isRecord,
   parseEffectRuntimeIdentity,
   sameEffectRuntimeIdentity,
-} from '../../contracts/effect-runtime/identity';
-import { isEffectRuntimeImmutableId } from '../../contracts/effect-runtime/immutable-refs';
+} from '../../../../../contracts/effect-runtime/identity';
+import { isEffectRuntimeImmutableId } from '../../../../../contracts/effect-runtime/immutable-refs';
 import type {
   EffectRuntimeGpuOperation,
   EffectRuntimeGpuPass,
@@ -17,15 +17,26 @@ import type {
   EffectRuntimeGpuFilter,
   EffectRuntimeGpuShadow,
   EffectRuntimeGpuSource,
-} from '../../contracts/effect-runtime/gpu-plan';
+} from '../../../../../contracts/effect-runtime/gpu-plan';
 import type {
   EffectRuntimeGpuPlanResult,
   EffectRuntimeWorkerMessage,
-} from '../../contracts/effect-runtime/types';
-import {
-  assertEffectDecodedRaster,
-  EFFECT_RUNTIME_RESOURCE_LIMITS,
-} from '../../features/video/composition/effect-runtime/runtime/resource-limits';
+  EffectRuntimeRenderMessage,
+} from '../../../../../contracts/effect-runtime/types';
+import { assertEffectDecodedRaster, EFFECT_RUNTIME_RESOURCE_LIMITS } from './resource-limits';
+
+type PlanExpectation = Pick<
+  EffectRuntimeWorkerMessage,
+  | 'effectInstanceId'
+  | 'requestId'
+  | 'snapshotId'
+  | 'sequenceId'
+  | 'width'
+  | 'height'
+  | 'renderWidth'
+  | 'renderHeight'
+  | 'inputFrames'
+> & { renderTarget?: 'gpu-plan'; documentRef: { id: string }; assetSelectionRef: { id: string } };
 
 // Scalar commands can emit fill and stroke for every admitted SVG part.
 const MAX_NATIVE_PAINTS =
@@ -40,7 +51,7 @@ const MAX_PLAN_RESOURCES =
 /** Parse evaluated, closed GPU data without acquiring ownership of transferred resources. */
 export function parseEffectRuntimeGpuPlan(
   value: unknown,
-  expected: EffectRuntimeWorkerMessage
+  expected: PlanExpectation
 ): EffectRuntimeGpuPlanResult | null {
   if (
     expected.renderTarget !== 'gpu-plan' ||
@@ -151,7 +162,7 @@ function parseResources(value: unknown): EffectRuntimeGpuResource[] | null {
 function parseInputs(
   value: unknown,
   resources: readonly EffectRuntimeGpuResource[],
-  expected: EffectRuntimeWorkerMessage
+  expected: PlanExpectation
 ): EffectRuntimeGpuPlanResult['inputResources'] | null {
   if (!isRecord(value) || !hasExactKeys(value, Object.keys(expected.inputFrames))) return null;
   const inputs: EffectRuntimeGpuPlanResult['inputResources'] = {};
@@ -355,14 +366,31 @@ function source(value: unknown): value is EffectRuntimeGpuSource {
   );
 }
 
-/** Close every flat-table handle once, even when malformed metadata prevents parsing. */
-export function closeEffectRuntimeGpuPlanResources(value: unknown): void {
-  if (!isRecord(value) || !Array.isArray(value['resources'])) return;
-  const closed = new Set<ImageBitmap>();
-  for (const resource of value['resources']) {
-    if (!isRecord(resource) || !isImageBitmap(resource['bitmap']) || closed.has(resource['bitmap']))
-      continue;
-    closed.add(resource['bitmap']);
-    resource['bitmap'].close();
+/** Bound synchronous parent admission before walking any received operation table. */
+export function fitsEffectRuntimeGpuSceneTransport(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value['resources']) ||
+    value['resources'].length > 512 ||
+    !Array.isArray(value['passes']) ||
+    value['passes'].length > 64
+  )
+    return false;
+  let operations = 0;
+  for (const pass of value['passes']) {
+    if (!isRecord(pass) || !Array.isArray(pass['operations'])) return false;
+    operations += pass['operations'].length;
+    if (operations > 512) return false;
   }
+  return true;
+}
+
+/** Admit a drawing plan only for an explicitly negotiated scene preparation request. */
+export function parseEffectRuntimeGpuScenePlan(
+  value: unknown,
+  expected: EffectRuntimeRenderMessage
+): EffectRuntimeGpuPlanResult | null {
+  if (expected.kind !== 'prepareGpuFrame' || !fitsEffectRuntimeGpuSceneTransport(value))
+    return null;
+  return parseEffectRuntimeGpuPlan(value, { ...expected, renderTarget: 'gpu-plan' });
 }

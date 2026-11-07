@@ -1,3 +1,4 @@
+import { prepareEffectRuntimeGpuScene } from '../../../../features/video/composition/effect-runtime/render/gpu-plan';
 import { createNativeGpuPreviewMaterials } from './gpu-preview-materials';
 import type { PreviewRendererStatus } from '../../../../features/video/preview/preferences';
 import {
@@ -190,6 +191,7 @@ export function createNativeGpuPreviewRenderer(
       let bitmap: ImageBitmap | undefined;
       let staging: HTMLCanvasElement | undefined;
       let acquiredOutput: NativePreviewGpuTarget | undefined;
+      let preparedEffects: Awaited<ReturnType<typeof prepareEffectRuntimeGpuScene>> | undefined;
       try {
         preparation ??= createBackend();
         const resolved = await preparation;
@@ -460,10 +462,15 @@ export function createNativeGpuPreviewRenderer(
             },
           ];
         }
+        preparedEffects = await prepareEffectRuntimeGpuScene({
+          layers: presentationLayers,
+          gpu: backend,
+          signal: input.signal ?? new AbortController().signal,
+        });
         const request = {
           output: layout.backing,
           logical,
-          layers: presentationLayers,
+          layers: preparedEffects.layers,
           signal: input.signal ?? new AbortController().signal,
         };
         if (input.acquireGpuOutput) {
@@ -527,6 +534,7 @@ export function createNativeGpuPreviewRenderer(
           try {
             bitmap?.close();
             for (const frame of captured.values()) frame.close();
+            preparedEffects?.release();
             plan?.release();
             if (artwork) artwork.width = artwork.height = 0;
             if (bordersArtwork) bordersArtwork.width = bordersArtwork.height = 0;

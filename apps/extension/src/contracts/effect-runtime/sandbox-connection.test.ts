@@ -14,6 +14,8 @@ it.each([
   ['', 'canvas'],
   ['?', 'canvas'],
   ['?composition=gpu-preview', 'gpu-preview'],
+  ['?composition=gpu-scene', 'gpu-scene'],
+  ['?composition=gpu-scene&composition=gpu-preview', null],
   ['?composition=canvas', null],
   ['?composition=unknown', null],
   ['?composition=gpu-preview&composition=gpu-preview', null],

@@ -1,8 +1,10 @@
+export type { ProjectCameraConflict } from './prepared-project-camera';
 import {
   preparedProjectCamera,
   projectCameraGeometryKey,
   projectCameraOutputKey,
   type PreparedProjectCamera,
+  type ProjectCameraConflict,
 } from './prepared-project-camera';
 import { projectCursorLinkSettings, smoothCursorCameraPreferences } from './cursor-orientation';
 import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../project/types/export';
@@ -533,13 +535,6 @@ export function resolveProjectCursorCameraPlan(
     return entry.plan;
   }
   return resolvePlanEntry(project, region, output).plan;
-}
-
-export interface ProjectCameraConflict {
-  regionId: string;
-  time: number;
-  interval: { start: number; end: number };
-  reason: Extract<WorkingZoneCameraPlan, { status: 'conflict' }>['reason'];
 }
 
 /** Preserve admission diagnostics locally; runtime responses retain the stable message code. */

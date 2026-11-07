@@ -1,3 +1,8 @@
+import {
+  closeEffectRuntimeGpuPlanResources,
+  closeEffectRuntimeGpuSceneResources,
+  createEffectRuntimeGpuFrameLedger,
+} from './resource-limits';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -153,4 +158,71 @@ describe('EffectV1 atomic raster admission', () => {
     expect(ledger.snapshot()).toEqual({ liveDecodedRasterBytes: 0, liveRasterResources: 0 });
     expect(bitmap.close).toHaveBeenCalledOnce();
   });
+});
+
+it('closes malformed GPU plan flat-table handles once without traversing operation metadata', () => {
+  class Bitmap {
+    width = 10;
+    height = 10;
+    close = vi.fn();
+  }
+  vi.stubGlobal('ImageBitmap', Bitmap);
+  try {
+    const bitmap = new Bitmap();
+    closeEffectRuntimeGpuPlanResources({
+      resources: [{ bitmap }, { bitmap }, null],
+      passes: Array.from({ length: 2000 }, () => ({ operations: [] })),
+    });
+    expect(bitmap.close).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps wire raster admission atomic when the preview reservation refuses it', () => {
+  const release = vi.fn();
+  const reserve = vi
+    .fn()
+    .mockImplementationOnce(() => {
+      throw new EffectRuntimeResourceError();
+    })
+    .mockReturnValue({ release });
+  const ledger = createEffectRuntimeGpuFrameLedger(reserve);
+  const bitmap = { width: 20, height: 10 } as ImageBitmap;
+  expect(() => ledger.reserve([bitmap])).toThrow(EffectRuntimeResourceError);
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+  const admitted = ledger.reserve([bitmap]);
+  expect(reserve).toHaveBeenLastCalledWith(800);
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(800);
+  admitted.release();
+  admitted.release();
+  expect(release).toHaveBeenCalledOnce();
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+});
+
+it('yields rejected oversized scene cleanup and deduplicates handles across tasks', () => {
+  class Bitmap {
+    width = 1;
+    height = 1;
+    close = vi.fn();
+  }
+  vi.stubGlobal('ImageBitmap', Bitmap);
+  vi.useFakeTimers();
+  try {
+    const bitmaps = Array.from({ length: 513 }, () => new Bitmap());
+    closeEffectRuntimeGpuSceneResources({
+      resources: [...bitmaps.slice(0, 512), bitmaps[0], bitmaps[512]].map((bitmap) => ({ bitmap })),
+    });
+    expect(bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 0)).toBe(true);
+    vi.runOnlyPendingTimers();
+    expect(bitmaps.slice(0, 512).every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(
+      true
+    );
+    expect(bitmaps[512]!.close).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
+  } finally {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  }
 });

@@ -1,4 +1,5 @@
-import { closeEffectRuntimeGpuPlanResources, parseEffectRuntimeGpuPlan } from './gpu-plan-boundary';
+import { closeEffectRuntimeGpuPlanResources } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
+import { parseEffectRuntimeGpuPlan } from '../../features/video/composition/effect-runtime/runtime/gpu-plan-boundary';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import { hasExactKeys, isRecord } from '../../contracts/effect-runtime/identity';
 import { parseEffectRuntimeFrameResult } from '../../contracts/effect-runtime/result-boundary';

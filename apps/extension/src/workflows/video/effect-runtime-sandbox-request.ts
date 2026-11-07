@@ -1,3 +1,5 @@
+import { parseEffectRuntimeGpuScenePlan } from '../../features/video/composition/effect-runtime/runtime/gpu-plan-boundary';
+import { closeEffectRuntimeGpuSceneResources } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import { matchesEffectRuntimeRetryInputs } from '../../contracts/effect-runtime/retry-inputs';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import {
@@ -8,6 +10,7 @@ import { parseEffectRuntimeFrameResult } from '../../contracts/effect-runtime/re
 import {
   EFFECT_RUNTIME_SANDBOX_RENDER_MESSAGE,
   type EffectRuntimeFrameResult,
+  type EffectRuntimeSceneResult,
   type EffectRuntimeRenderMessage,
 } from '../../contracts/effect-runtime/types';
 
@@ -17,7 +20,7 @@ export interface EffectRuntimeSandboxConnection {
 
 export class PendingEffectRuntimeRequest {
   private readonly channel = new MessageChannel();
-  private resolve!: (result: EffectRuntimeFrameResult) => void;
+  private resolve!: (result: EffectRuntimeSceneResult) => void;
   private settled = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -35,8 +38,8 @@ export class PendingEffectRuntimeRequest {
     return this.args.request;
   }
 
-  start(): Promise<EffectRuntimeFrameResult> {
-    const promise = new Promise<EffectRuntimeFrameResult>((resolve) => {
+  start(): Promise<EffectRuntimeSceneResult> {
+    const promise = new Promise<EffectRuntimeSceneResult>((resolve) => {
       this.resolve = resolve;
     });
     this.args.active.add(this);
@@ -54,9 +57,9 @@ export class PendingEffectRuntimeRequest {
     return promise;
   }
 
-  finish(result: EffectRuntimeFrameResult): void {
+  finish(result: EffectRuntimeSceneResult): void {
     if (this.settled) {
-      closeEffectRuntimeBitmaps(result);
+      closeEffectRuntimeGpuSceneResources(result);
       return;
     }
     this.settled = true;
@@ -71,18 +74,20 @@ export class PendingEffectRuntimeRequest {
   private handleMessage(event: MessageEvent<unknown>): void {
     if (event.ports.length !== 0) {
       for (const port of event.ports) port.close();
-      closeEffectRuntimeBitmaps(event.data);
+      closeEffectRuntimeGpuSceneResources(event.data);
       this.finish(createEffectRuntimeFailure(this.request, 'malformed'));
       return;
     }
-    const result = parseEffectRuntimeFrameResult(event.data);
+    const result =
+      parseEffectRuntimeFrameResult(event.data) ??
+      parseEffectRuntimeGpuScenePlan(event.data, this.request);
     if (!result) {
-      closeEffectRuntimeBitmaps(event.data);
+      closeEffectRuntimeGpuSceneResources(event.data);
       this.finish(createEffectRuntimeFailure(this.request, 'malformed'));
       return;
     }
     if (!sameEffectRuntimeIdentity(this.request, result)) {
-      closeEffectRuntimeBitmaps(result);
+      closeEffectRuntimeGpuSceneResources(result);
       this.finish(createEffectRuntimeFailure(this.request, 'stale'));
       return;
     }
@@ -90,7 +95,7 @@ export class PendingEffectRuntimeRequest {
       !matchesEffectRuntimeRetryInputs(this.request.inputFrames, result) ||
       (result.kind === 'frame' && !hasExpectedDimensions(this.request, result))
     ) {
-      closeEffectRuntimeBitmaps(result);
+      closeEffectRuntimeGpuSceneResources(result);
       this.finish(createEffectRuntimeFailure(this.request, 'outputRejected'));
       return;
     }

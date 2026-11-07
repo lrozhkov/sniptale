@@ -1,3 +1,5 @@
+import { prepareEffectRuntimeGpuFramePlans } from '../../features/video/composition/effect-runtime/runtime/gpu-driver';
+import { createEffectRuntimeGpuFrameLedger } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import {
   resolveEffectV1ObjectRenderBounds,
   type EffectV1Document,
@@ -226,10 +228,71 @@ export async function createReviewAnnotationRenderer(
           : [];
       });
   };
-  return {
+  const gpuLedger = createEffectRuntimeGpuFrameLedger((bytes) =>
+    deps.resources.bytes('annotation-gpu-plan-resources', bytes)
+  );
+  const owner = {
     describe,
     counters: ledger.snapshot,
     dispose,
+    async prepareGpu(
+      time: number,
+      density: Record<Plane, Size>,
+      fps: number,
+      signal: AbortSignal,
+      instances?: readonly ReviewAnnotationEffect[]
+    ) {
+      signal.throwIfAborted();
+      const planned = describe(time, density, fps, instances);
+      executor ??= (deps.createExecutor ?? createEffectRuntimeSandboxExecutor)();
+      if (!executor.prepareGpuFrame) {
+        const legacy = await owner.render(time, density, fps, signal, instances);
+        return {
+          ...legacy,
+          independent: false,
+          entries: legacy.entries.map((entry) => ({ ...entry, source: entry.bitmap })),
+        };
+      }
+      const frames = await prepareEffectRuntimeGpuFramePlans({
+        executor,
+        plans: planned.map((entry) => entry.plan),
+        ledger: gpuLedger,
+        signal,
+      });
+      let released = false;
+      const release = () => {
+        if (released) return;
+        released = true;
+        releases.delete(release);
+        for (const frame of frames.values()) frame.dispose();
+      };
+      releases.add(release);
+      try {
+        signal.throwIfAborted();
+        if (disposed) throw new Error('Annotation renderer is disposed.');
+        return {
+          independent: true,
+          entries: planned.map((entry) => {
+            const frame = frames.get(entry.instance.id);
+            if (!frame) throw new Error('Annotation GPU frame is unavailable.');
+            return { ...entry, source: frame.source };
+          }),
+          release,
+          retain() {
+            if (released || disposed) throw new Error('Annotation GPU batch is released.');
+            const borrows = [...frames.values()].map((frame) => frame.retain());
+            return {
+              release() {
+                for (const borrow of borrows.splice(0)) borrow.release();
+              },
+            };
+          },
+        };
+      } catch (error) {
+        release();
+        throw error;
+      }
+    },
     /** A consumer can borrow a batch through its GPU fence; disposal waits for those borrows. */
     async render(
       time: number,
@@ -325,6 +388,7 @@ export async function createReviewAnnotationRenderer(
       }
     },
   };
+  return owner;
 }
 
 /** Draws body and external handle bounds in the chosen unprojected plane; the common scene owns clipping/projection. */

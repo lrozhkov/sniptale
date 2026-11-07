@@ -1,3 +1,8 @@
+import {
+  canPrepareEffectRuntimeGpuComposition,
+  prepareEffectRuntimeGpuComposition,
+} from '../../../../features/video/composition/effect-runtime/render/gpu-wave';
+import type { EffectRuntimeGpuPreparedComposition } from '../../../../features/video/composition/effect-runtime/runtime/types';
 import type { PreviewScenePresentation } from './types';
 import type { EffectRuntimeInputComposer } from '../../../../features/video/composition/effect-runtime/frame/inputs';
 import { VideoSample } from 'mediabunny';
@@ -235,6 +240,7 @@ async function renderPreparedPreviewScene(
   };
   for (const video of videos) video.addEventListener('seeking', invalidate);
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
+  let gpuEffectFrames: EffectRuntimeGpuPreparedComposition | undefined;
   let capture: ReturnType<typeof capturePreviewSceneVideos> | undefined;
   try {
     if (params.previewRenderer !== 'legacy' && params.gpuPreview) {
@@ -268,13 +274,16 @@ async function renderPreparedPreviewScene(
           ),
         () => mediaChanged,
         async (composeInput) => {
-          effectRuntimeFrames = await resolvePreviewEffectRuntimeFrames(
+          const prepared = await resolvePreviewEffectRuntimeFrames(
             params,
             renderPasses,
             clipMediaElements,
-            composeInput
+            composeInput,
+            true
           );
-          return effectRuntimeFrames;
+          if (prepared && 'kind' in prepared) gpuEffectFrames = prepared;
+          else effectRuntimeFrames = prepared;
+          return prepared;
         },
         captions.plan.cues.length > 0 ||
           Boolean(watermark) ||
@@ -308,6 +317,8 @@ async function renderPreparedPreviewScene(
           ...(output ? { output } : {}),
         };
       }
+      gpuEffectFrames?.dispose();
+      gpuEffectFrames = undefined;
       disposeEffectRuntimeComposition(effectRuntimeFrames);
       effectRuntimeFrames = undefined;
     }
@@ -363,6 +374,8 @@ async function renderPreparedPreviewScene(
   } finally {
     for (const video of videos) video.removeEventListener('seeking', invalidate);
     try {
+      gpuEffectFrames?.dispose();
+      gpuEffectFrames = undefined;
       disposeEffectRuntimeComposition(effectRuntimeFrames);
     } finally {
       capture?.release();
@@ -598,12 +611,26 @@ function drawResolvedPreviewSceneOverlays(
     );
 }
 
-async function resolvePreviewEffectRuntimeFrames(
+function resolvePreviewEffectRuntimeFrames(
   params: PreviewSceneRenderInput,
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>,
   clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>,
   composeInput?: EffectRuntimeInputComposer
-): Promise<EffectRuntimeRenderedComposition | undefined> {
+): Promise<EffectRuntimeRenderedComposition | undefined>;
+function resolvePreviewEffectRuntimeFrames(
+  params: PreviewSceneRenderInput,
+  renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>,
+  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>,
+  composeInput: EffectRuntimeInputComposer | undefined,
+  prepareGpu: true
+): Promise<EffectRuntimeRenderedComposition | EffectRuntimeGpuPreparedComposition | undefined>;
+async function resolvePreviewEffectRuntimeFrames(
+  params: PreviewSceneRenderInput,
+  renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>,
+  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>,
+  composeInput?: EffectRuntimeInputComposer,
+  prepareGpu = false
+): Promise<EffectRuntimeRenderedComposition | EffectRuntimeGpuPreparedComposition | undefined> {
   const hasPlans =
     (renderPasses.overlayFrame.effectRuntimePlans ?? []).length > 0 ||
     renderPasses.visualPasses.some(({ frame }) => (frame.effectRuntimePlans ?? []).length > 0);
@@ -613,6 +640,28 @@ async function resolvePreviewEffectRuntimeFrames(
       ? params.effectRuntimeExecutor()
       : params.effectRuntimeExecutor;
   if (!executor) throw new Error('EFFECT_RUNTIME_PREVIEW_EXECUTOR_MISSING');
+  if (
+    prepareGpu &&
+    executor.prepareGpuFrame &&
+    canPrepareEffectRuntimeGpuComposition([
+      renderPasses.overlayFrame,
+      ...renderPasses.visualPasses.map((pass) => pass.frame),
+    ])
+  ) {
+    return prepareEffectRuntimeGpuComposition({
+      executor,
+      overlayFrame: renderPasses.overlayFrame,
+      overlayTime: params.currentTime,
+      visualPasses: renderPasses.visualPasses,
+      rasterScale: resolvePreviewEffectRuntimeRasterScale({
+        canvas: params.canvas,
+        ...(params.previewRasterSize ? { previewRasterSize: params.previewRasterSize } : {}),
+        project: params.project,
+        stage: params.stage,
+      }),
+      ...(params.signal ? { signal: params.signal } : {}),
+    });
+  }
   return renderEffectRuntimeComposition({
     project: params.project,
     streamVisualPasses: true,

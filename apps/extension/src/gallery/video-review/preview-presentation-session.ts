@@ -154,7 +154,7 @@ class ManualPresentationSession {
       maximumInFlight: this.rendererPreference === 'gpu' ? 2 : 1,
       annotationExecutor: () =>
         createEffectRuntimeSandboxExecutor(
-          this.rendererPreference === 'gpu' ? { compositionBackend: 'gpu-preview' } : {}
+          this.rendererPreference === 'gpu' ? { compositionBackend: 'gpu-scene' } : {}
         ),
       ...(readAsset ? { readAsset } : {}),
       allocation: { describe: graph, replaceLimits: (limits) => resources.replaceLimits(limits) },

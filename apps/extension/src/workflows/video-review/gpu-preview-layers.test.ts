@@ -128,7 +128,7 @@ it('admits annotation payloads before rasterization and releases completed bitma
   const batchRelease = vi.fn();
   const annotations = {
     describe: vi.fn(() => [{ plan: { renderDimensions: { width: 100, height: 80 } } }]),
-    render: vi.fn(async () => {
+    prepareGpu: vi.fn(async () => {
       order.push('render');
       return { entries: [], release: batchRelease, retain: () => ({ release() {} }) };
     }),
@@ -170,12 +170,12 @@ it('clips source-cropped content to the visible video while preserving its annot
       attachment: 'content',
       transform: { x: 0.2, y: 0.2, width: 0.3, height: 0.3, rotation: 0 },
     },
-    bitmap: { width: 100, height: 80 },
+    source: { width: 100, height: 80 },
     bitmapBounds: { x: 0, y: 0, width: 1, height: 1 },
   };
   const annotations = {
     describe: () => [],
-    render: async () => ({ retain: () => ({ release() {} }), entries: [entry], release() {} }),
+    prepareGpu: async () => ({ retain: () => ({ release() {} }), entries: [entry], release() {} }),
   } as unknown as Parameters<typeof reviewGpuContentLayers>[0]['annotations'];
   const result = await reviewGpuContentLayers({
     scene,
@@ -219,7 +219,7 @@ it('keeps a source-attached annotation inside the fixed window after inner zoom'
   const sourceClip = { rect: plane.sourceClip, radius: 0 };
   const annotations = {
     describe: () => [],
-    render: async () => ({
+    prepareGpu: async () => ({
       retain: () => ({ release() {} }),
       entries: [
         {
@@ -228,7 +228,7 @@ it('keeps a source-attached annotation inside the fixed window after inner zoom'
             attachment: 'content',
             transform: { x: 0.2, y: 0.2, width: 0.3, height: 0.3, rotation: 0 },
           },
-          bitmap: { width: 100, height: 80 },
+          source: { width: 100, height: 80 },
           bitmapBounds: { x: 0, y: 0, width: 1, height: 1 },
         },
       ],
@@ -280,7 +280,7 @@ it.each(['circle', 'rounded'] as const)(
     const release = vi.fn();
     const annotations = {
       describe: () => [],
-      render: async () => ({
+      prepareGpu: async () => ({
         retain: () => ({ release() {} }),
         entries: [
           {
@@ -289,7 +289,7 @@ it.each(['circle', 'rounded'] as const)(
               attachment: 'viewport',
               transform: { x: 0.2, y: 0.2, width: 0.3, height: 0.3, rotation: 0 },
             },
-            bitmap: { width: 100, height: 80 },
+            source: { width: 100, height: 80 },
             bitmapBounds: { x: 0, y: 0, width: 1, height: 1 },
           },
         ],
@@ -352,7 +352,7 @@ it('releases annotation payloads when its GPU borrower cannot be retained', asyn
   const release = vi.fn();
   const annotations = {
     describe: () => [],
-    render: async () => ({
+    prepareGpu: async () => ({
       retain: () => ({ release() {} }),
       entries: [
         {
@@ -361,7 +361,7 @@ it('releases annotation payloads when its GPU borrower cannot be retained', asyn
             attachment: 'viewport',
             transform: { x: 0.2, y: 0.2, width: 0.3, height: 0.3, rotation: 0 },
           },
-          bitmap: { width: 100, height: 80 },
+          source: { width: 100, height: 80 },
           bitmapBounds: { x: 0, y: 0, width: 1, height: 1 },
         },
       ],
@@ -399,14 +399,14 @@ it('borrows raw processed annotation bitmaps directly without a Canvas image cop
   const bitmap = { width: 100, height: 80, close };
   const annotations = {
     describe: () => [],
-    render: async () => ({
+    prepareGpu: async () => ({
       entries: [
         {
           instance: {
             attachment: 'content',
             transform: { x: 0.2, y: 0.3, width: 0.4, height: 0.2, rotation: 0.3 },
           },
-          bitmap,
+          source: bitmap,
           bitmapBounds: { x: -0.2, y: 0, width: 1.4, height: 1 },
         },
       ],
@@ -442,7 +442,7 @@ it('preserves annotation and comment order with shared per-draw coverage and fre
   const bitmaps = Array.from({ length: 3 }, () => ({ width: 100, height: 80 }));
   const annotations = {
     describe: () => [],
-    render: async () => ({
+    prepareGpu: async () => ({
       retain: () => ({ release() {} }),
       release() {},
       entries: bitmaps.map((bitmap, index) => ({

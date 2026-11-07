@@ -210,3 +210,76 @@ it('accepts only an identity-bound response on the per-request message port', as
   controlChannel.port1.close();
   controlChannel.port2.close();
 });
+
+it.each(['renderFrame', 'prepareGpuFrame'] as const)(
+  'admits a parent GPU plan only for %s negotiation',
+  async (kind) => {
+    installSynchronousMessageChannel();
+    const channel = new MessageChannel(),
+      request = { ...createWireRequest(), kind };
+    const bitmap = new FakeImageBitmap(8, 8);
+    channel.port2.onmessage = (event) => {
+      event.ports[0]!.postMessage({
+        kind: 'gpu-plan',
+        effectInstanceId: request.effectInstanceId,
+        requestId: request.requestId,
+        sequenceId: request.sequenceId,
+        snapshotId: request.snapshotId,
+        acknowledged: {
+          documentId: request.documentRef.id,
+          assetSelectionId: request.assetSelectionRef.id,
+        },
+        width: request.renderWidth,
+        height: request.renderHeight,
+        logicalWidth: request.width,
+        logicalHeight: request.height,
+        resources: [{ id: 0, kind: 'primitive', bitmap, width: 8, height: 8 }],
+        inputResources: {},
+        rootPass: 0,
+        passes: [
+          {
+            id: 0,
+            width: request.renderWidth,
+            height: request.renderHeight,
+            logicalWidth: request.width,
+            logicalHeight: request.height,
+            operations: [],
+          },
+        ],
+      });
+    };
+    const pending = new PendingEffectRuntimeRequest({
+      active: new Set(),
+      clearSession: vi.fn(),
+      current: { controlPort: channel.port1 },
+      request,
+      timeoutMs: 100,
+    });
+    const result = await pending.start();
+    if (kind === 'prepareGpuFrame') {
+      expect(result.kind).toBe('gpu-plan');
+      expect(bitmap.close).not.toHaveBeenCalled();
+      bitmap.close();
+    } else {
+      expect(result).toMatchObject({ kind: 'error', code: 'malformed' });
+      expect(bitmap.close).toHaveBeenCalledOnce();
+    }
+    channel.port1.close();
+    channel.port2.close();
+  }
+);
+
+it('rejects GPU preparation before creating an unnegotiated parent session', async () => {
+  const bitmap = createInputBitmap(),
+    manager = new EffectRuntimeSandboxSessionManager(document, {
+      loadTimeoutMs: 100,
+      requestTimeoutMs: 100,
+    });
+  await expect(manager.prepareGpuFrame(createRequest(bitmap))).resolves.toMatchObject({
+    kind: 'error',
+    code: 'inputRejected',
+  });
+  expect(document.querySelector('iframe')).toBeNull();
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  manager.dispose();
+});

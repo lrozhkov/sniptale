@@ -1,3 +1,9 @@
+import {
+  closeEffectRuntimeBitmaps,
+  isImageBitmap,
+} from '../../../../../contracts/effect-runtime/bitmap-lifetime';
+import { isRecord } from '../../../../../contracts/effect-runtime/identity';
+
 export const EFFECT_RUNTIME_RESOURCE_LIMITS = {
   maxAggregateCanvasPixelsPerFrame: 4 * 3840 * 2160,
   maxConsecutiveFailures: 3,
@@ -207,4 +213,76 @@ export function assertEffectDecodedAudio(args: {
     throw new EffectRuntimeResourceError();
   }
   return bytes;
+}
+
+/** Close every flat-table handle once, even when malformed metadata prevents parsing. */
+export function closeEffectRuntimeGpuPlanResources(value: unknown): void {
+  if (!isRecord(value) || !Array.isArray(value['resources'])) return;
+  const closed = new Set<ImageBitmap>();
+  for (const resource of value['resources']) {
+    if (!isRecord(resource) || !isImageBitmap(resource['bitmap']) || closed.has(resource['bitmap']))
+      continue;
+    closed.add(resource['bitmap']);
+    resource['bitmap'].close();
+  }
+}
+
+/** Release scene output; oversized rejected tables yield between bounded cleanup tasks. */
+export function closeEffectRuntimeGpuSceneResources(value: unknown): void {
+  if (!isRecord(value) || !Array.isArray(value['resources'])) {
+    closeEffectRuntimeBitmaps(value);
+    return;
+  }
+  const resources = value['resources'];
+  if (resources.length <= 512) {
+    closeEffectRuntimeGpuPlanResources(value);
+    return;
+  }
+  const closed = new Set<ImageBitmap>();
+  let offset = 0;
+  const release = () => {
+    const end = Math.min(offset + 512, resources.length);
+    for (; offset < end; offset += 1) {
+      const resource: unknown = resources[offset];
+      if (
+        !isRecord(resource) ||
+        !isImageBitmap(resource['bitmap']) ||
+        closed.has(resource['bitmap'])
+      )
+        continue;
+      closed.add(resource['bitmap']);
+      resource['bitmap'].close();
+    }
+    if (offset < resources.length) setTimeout(release, 0);
+  };
+  setTimeout(release, 0);
+}
+
+/** One composition accounts for all live wire rasters, including retired but GPU-borrowed poses. */
+export function createEffectRuntimeGpuFrameLedger(
+  reserveBytes?: (bytes: number) => { release(): void }
+) {
+  let bytes = 0;
+  return {
+    reserve(rasters: readonly ImageBitmap[]) {
+      const cost = rasters.reduce(
+        (sum, raster) => sum + assertEffectDecodedRaster(raster.width, raster.height),
+        0
+      );
+      if (bytes + cost > EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes)
+        throw new EffectRuntimeResourceError();
+      const reservation = reserveBytes?.(cost);
+      bytes += cost;
+      let released = false;
+      return {
+        release() {
+          if (released) return;
+          released = true;
+          bytes -= cost;
+          reservation?.release();
+        },
+      };
+    },
+    snapshot: () => ({ liveDecodedRasterBytes: bytes }),
+  };
 }

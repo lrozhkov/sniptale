@@ -166,7 +166,9 @@ export async function reviewGpuContentLayers(args: {
   signal: AbortSignal;
   sourceClip?: GpuPreviewLayer['clip'];
   retainAnnotationBatch?(
-    batch: Awaited<ReturnType<Awaited<ReturnType<typeof createReviewAnnotationRenderer>>['render']>>
+    batch: Awaited<
+      ReturnType<Awaited<ReturnType<typeof createReviewAnnotationRenderer>>['prepareGpu']>
+    >
   ): void;
 }) {
   const { scene, dimensions, geometry, base, primitives } = args;
@@ -194,7 +196,7 @@ export async function reviewGpuContentLayers(args: {
       scene.annotationEffects?.lane.instances
     ) ?? [];
   args.admit(plans.map(({ plan }) => plan.renderDimensions));
-  const annotations = await args.annotations?.render(
+  const annotations = await args.annotations?.prepareGpu(
     geometry.resultTime,
     density,
     args.fps,
@@ -376,7 +378,7 @@ export async function reviewGpuContentLayers(args: {
       // Scene coverage applies to each draw, so overlapping edge pixels retain Canvas clip semantics.
       const annotationGroup = group(
         content.map((entry) => ({
-          ...reviewGpuAnnotationLayer(entry, base.videoRect),
+          ...reviewGpuAnnotationLayer(entry, base.videoRect, entry.source),
           operationClip,
         })),
         { canonical: dimensions.canonical, backing: dimensions.canonical }
@@ -415,7 +417,9 @@ export async function reviewGpuContentLayers(args: {
       });
       viewportLayers.push(texture(raster, full));
     }
-    viewportLayers.push(...viewport.map((entry) => reviewGpuAnnotationLayer(entry, full)));
+    viewportLayers.push(
+      ...viewport.map((entry) => reviewGpuAnnotationLayer(entry, full, entry.source))
+    );
     const sourceClip = args.sourceClip;
     return {
       contentLayers: sourceClip

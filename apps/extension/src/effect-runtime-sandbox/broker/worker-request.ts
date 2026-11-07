@@ -1,3 +1,4 @@
+import { fitsEffectRuntimeGpuSceneTransport } from '../../features/video/composition/effect-runtime/runtime/gpu-plan-boundary';
 import { matchesEffectRuntimeRetryInputs } from '../../contracts/effect-runtime/retry-inputs';
 import { isImageBitmap } from '../../contracts/effect-runtime/bitmap-lifetime';
 import {
@@ -8,6 +9,7 @@ import type {
   EffectRuntimeErrorCode,
   EffectRuntimeFrameInputs,
   EffectRuntimeFrameResult,
+  EffectRuntimeSceneResult,
   EffectRuntimeGpuPlanResult,
   EffectRuntimeWorkerMessage,
 } from '../../contracts/effect-runtime/types';
@@ -46,6 +48,10 @@ interface EffectRuntimeWorkerLease {
 }
 interface EffectRuntimeWorkerSession {
   execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
+  execute(
+    request: EffectRuntimeWorkerMessage,
+    output: 'gpu-scene'
+  ): Promise<EffectRuntimeSceneResult>;
 }
 
 /** The queue follows GPU settlement; a timed-out publication cannot admit another retained plan. */
@@ -57,18 +63,27 @@ export function createEffectRuntimeWorkerSession(
     worker: null,
   };
   let queue = Promise.resolve();
-  return {
-    execute(request) {
-      const operation = queue.then(() => startWorkerOperation(request, options, lease, false));
-      queue = operation
-        .then(({ drained }) => drained)
-        .then(
-          () => undefined,
-          () => undefined
-        );
-      return operation.then(({ result }) => result);
-    },
-  };
+  function execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
+  function execute(
+    request: EffectRuntimeWorkerMessage,
+    output: 'gpu-scene'
+  ): Promise<EffectRuntimeSceneResult>;
+  function execute(
+    request: EffectRuntimeWorkerMessage,
+    output: 'bitmap' | 'gpu-scene' = 'bitmap'
+  ): Promise<EffectRuntimeSceneResult> {
+    const operation = queue.then(() =>
+      startWorkerOperation(request, options, lease, false, output)
+    );
+    queue = operation
+      .then(({ drained }) => drained)
+      .then(
+        () => undefined,
+        () => undefined
+      );
+    return operation.then(({ result }) => result);
+  }
+  return { execute };
 }
 
 export async function executeEffectRuntimeWorker(
@@ -84,10 +99,24 @@ function startWorkerOperation(
   options: WorkerOptions,
   lease: EffectRuntimeWorkerLease,
   terminateAfterResult: boolean
+): { result: Promise<EffectRuntimeFrameResult>; drained: Promise<void> };
+function startWorkerOperation(
+  original: EffectRuntimeWorkerMessage,
+  options: WorkerOptions,
+  lease: EffectRuntimeWorkerLease,
+  terminateAfterResult: boolean,
+  output: 'bitmap' | 'gpu-scene'
+): { result: Promise<EffectRuntimeSceneResult>; drained: Promise<void> };
+function startWorkerOperation(
+  original: EffectRuntimeWorkerMessage,
+  options: WorkerOptions,
+  lease: EffectRuntimeWorkerLease,
+  terminateAfterResult: boolean,
+  output: 'bitmap' | 'gpu-scene' = 'bitmap'
 ) {
-  let publish!: (result: EffectRuntimeFrameResult) => void;
+  let publish!: (result: EffectRuntimeSceneResult) => void;
   let releaseDrain!: () => void;
-  const result = new Promise<EffectRuntimeFrameResult>((resolve) => {
+  const result = new Promise<EffectRuntimeSceneResult>((resolve) => {
     publish = resolve;
   });
   const drained = new Promise<void>((resolve) => {
@@ -111,7 +140,7 @@ function startWorkerOperation(
   const checkDrain = () => {
     if (settled && pending === 0) releaseDrain();
   };
-  const finish = (value: EffectRuntimeFrameResult, terminate = terminateAfterResult) => {
+  const finish = (value: EffectRuntimeSceneResult, terminate = terminateAfterResult) => {
     if (settled) {
       closeEffectRuntimeWorkerResponse(value);
       return;
@@ -273,8 +302,10 @@ function startWorkerOperation(
       fail('outputRejected');
       return;
     }
-    if (response.kind === 'gpu-plan') void renderPlan(response);
-    else finish(response);
+    if (response.kind === 'gpu-plan') {
+      if (output === 'gpu-scene' && fitsEffectRuntimeGpuSceneTransport(response)) finish(response);
+      else void renderPlan(response);
+    } else finish(response);
   };
   const start = () => {
     if (settled || !worker) return;
@@ -286,7 +317,10 @@ function startWorkerOperation(
     worker.onerror = () => fail('crashed');
     worker.onmessageerror = () => fail('malformed');
     worker.onmessage = onMessage;
-    if (options.gpu) {
+    if (output === 'gpu-scene') {
+      request = { ...initialFields, renderTarget: 'gpu-plan' };
+      start();
+    } else if (options.gpu) {
       pending += 1;
       void (async () => {
         try {

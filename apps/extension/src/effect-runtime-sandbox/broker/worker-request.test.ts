@@ -720,3 +720,51 @@ it('enforces the elapsed deadline before an overdue timer callback despite a bac
   expect(worker.postMessage).toHaveBeenCalledOnce();
   monotonic.mockRestore();
 });
+
+it('forwards a bounded scene plan without creating or waiting for the sandbox GPU', async () => {
+  const worker = new FakeWorker(),
+    posted = deferred<EffectRuntimeWorkerMessage>();
+  worker.postMessage.mockImplementation((value: EffectRuntimeWorkerMessage) =>
+    posted.resolve(value)
+  );
+  const isAvailable = vi.fn(() => new Promise<boolean>(() => {}));
+  const render = vi.fn(async () => new FakeImageBitmap(1280, 720));
+  const session = createEffectRuntimeWorkerSession({
+    workerFactory: () => worker,
+    gpu: { isAvailable, render },
+  });
+  const pending = session.execute(createRequest(), 'gpu-scene');
+  const sent = await posted.promise;
+  expect(sent.renderTarget).toBe('gpu-plan');
+  const primitive = new FakeImageBitmap(8, 8),
+    plan = gpuPlan(sent, [primitive]);
+  emitGpuPlan(worker, plan);
+  await expect(pending).resolves.toEqual(plan);
+  expect(isAvailable).not.toHaveBeenCalled();
+  expect(render).not.toHaveBeenCalled();
+  expect(primitive.close).not.toHaveBeenCalled();
+});
+
+it('materializes valid oversized scene plans through the existing GPU representation', async () => {
+  const worker = new FakeWorker(),
+    posted = deferred<EffectRuntimeWorkerMessage>();
+  worker.postMessage.mockImplementation((value: EffectRuntimeWorkerMessage) =>
+    posted.resolve(value)
+  );
+  const bitmap = new FakeImageBitmap(1280, 720),
+    render = vi.fn(async () => bitmap);
+  const session = createEffectRuntimeWorkerSession({
+    workerFactory: () => worker,
+    gpu: { isAvailable: async () => true, render },
+  });
+  const pending = session.execute(createRequest(), 'gpu-scene');
+  const sent = await posted.promise;
+  const plan = gpuPlan(
+    sent,
+    Array.from({ length: 513 }, () => new FakeImageBitmap(1, 1))
+  );
+  emitGpuPlan(worker, plan);
+  await expect(pending).resolves.toMatchObject({ kind: 'frame', bitmap });
+  expect(render).toHaveBeenCalledOnce();
+  for (const resource of plan.resources) expect(resource.bitmap.close).toHaveBeenCalledOnce();
+});

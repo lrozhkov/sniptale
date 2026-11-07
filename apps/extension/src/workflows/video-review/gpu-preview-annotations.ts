@@ -5,11 +5,14 @@ import type { ReviewAnnotationEffect } from '../../features/video/review/annotat
 export function reviewGpuAnnotationLayer(
   entry: {
     instance: Pick<ReviewAnnotationEffect, 'transform'>;
-    bitmap: ImageBitmap;
+    bitmap?: ImageBitmap;
     bitmapBounds: { x: number; y: number; width: number; height: number };
   },
-  target: { x: number; y: number; width: number; height: number }
+  target: { x: number; y: number; width: number; height: number },
+  source?: GpuPreviewLayer['source']
 ): GpuPreviewLayer {
+  const raster = source ?? entry.bitmap;
+  if (!raster) throw new Error('Annotation GPU source is unavailable.');
   const { transform } = entry.instance;
   const width = transform.width * target.width;
   const height = transform.height * target.height;
@@ -18,7 +21,7 @@ export function reviewGpuAnnotationLayer(
   const cosine = Math.cos(transform.rotation),
     sine = Math.sin(transform.rotation);
   return {
-    source: entry.bitmap,
+    source: raster,
     rect: {
       x: (entry.bitmapBounds.x - 0.5) * width,
       y: (entry.bitmapBounds.y - 0.5) * height,

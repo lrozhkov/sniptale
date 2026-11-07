@@ -1,3 +1,4 @@
+import { prepareEffectRuntimeGpuScene } from '../../features/video/composition/effect-runtime/render/gpu-plan';
 import { createRetainedRasterMaterialOwner } from '../../features/video/composition/canvas/retained-raster-material';
 import type { PreviewGpuCanvasFactory, PreviewGpuCanvasLease } from './preview-render-resources';
 import { buildReviewGpuScene, reviewGpuStaticBackgroundDrift } from './gpu-preview-scene';
@@ -217,8 +218,9 @@ export function createReviewGpuPreview(args: {
     );
     const ownedFrames: VideoFrame[] = [];
     const endpointOutputs: { bitmap: ImageBitmap; release(): void }[] = [];
-    const annotationHolds: { release(): void }[] = [];
+    const annotationHolds: { release(): void; independent: boolean }[] = [];
     let acquiredOutput: PreviewGpuCanvasLease | null = null;
+    let preparedEffects: Awaited<ReturnType<typeof prepareEffectRuntimeGpuScene>> | undefined;
     const releaseAnnotations = (start: number) => {
       for (const hold of annotationHolds.splice(start)) hold.release();
     };
@@ -394,9 +396,9 @@ export function createReviewGpuPreview(args: {
         fps: input.fps,
         annotations: input.annotations,
         retainAnnotationBatch(
-          batch: Awaited<ReturnType<NonNullable<typeof input.annotations>['render']>>
+          batch: Awaited<ReturnType<NonNullable<typeof input.annotations>['prepareGpu']>>
         ) {
-          annotationHolds.push(batch.retain());
+          annotationHolds.push({ ...batch.retain(), independent: batch.independent });
         },
         admit: input.admit,
         signal,
@@ -439,7 +441,8 @@ export function createReviewGpuPreview(args: {
                 ? undefined
                 : { rotation: side.sample.rotation ?? 0, flip: side.sample.flip ?? false },
           });
-          if (annotationHolds.length === firstHold) sources.push(endpoint);
+          if (annotationHolds.slice(firstHold).every((hold) => hold.independent))
+            sources.push(endpoint);
           else {
             const reservation = args.resources.bytes(
               'preview-gpu-annotation-endpoint',
@@ -525,10 +528,11 @@ export function createReviewGpuPreview(args: {
             }
           : {}),
       });
+      preparedEffects = await prepareEffectRuntimeGpuScene({ layers, gpu: renderer, signal });
       const request = {
         output: dimensions.backing,
         logical: dimensions.canonical,
-        layers,
+        layers: preparedEffects.layers,
         signal,
       };
       if (output.kind === 'presentation') {
@@ -585,6 +589,7 @@ export function createReviewGpuPreview(args: {
       lifetime.abort();
       return false;
     } finally {
+      preparedEffects?.release();
       try {
         acquiredOutput?.release();
       } finally {

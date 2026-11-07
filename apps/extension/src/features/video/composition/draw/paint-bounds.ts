@@ -2,10 +2,7 @@ import { cameraShadowLocalOffset } from '../../project/camera/shadow-direction';
 import { MAX_VIDEO_PROJECT_DIMENSION } from '../../project/validation/primitives';
 import type { CameraSpatialRect as Rect } from '../../project/motion/spatial';
 import type { VideoCompositionVisualLayer } from '../types';
-import type {
-  EffectRuntimeRenderedFrame,
-  EffectRuntimeRenderedFrameMap,
-} from '../effect-runtime/runtime/types';
+import type { EffectRuntimeFrameMetadata } from '../effect-runtime/runtime/types';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types';
 import { resolveVideoMediaShadowParams } from '../canvas/media-shadow';
 import { resolveTextCompositionLayout } from './overlays';
@@ -84,7 +81,7 @@ const matrixScale = (m: Matrix) => Math.max(1, Math.hypot(m[0], m[1]), Math.hypo
 /** Capture bounds use the same raster scale as painting, including minimum-size text and raw strokes. */
 export function resolveCompositionPaintBounds(args: {
   context: CanvasRenderingContext2D;
-  frames?: EffectRuntimeRenderedFrameMap;
+  frames?: ReadonlyMap<string, EffectRuntimeFrameMetadata>;
   layers: readonly VideoCompositionVisualLayer[];
   output: { width: number; height: number };
   rasterScale: number;
@@ -389,7 +386,7 @@ function layerEffectBounds(
   bounds: Rect,
   frame: Rect,
   scale: number,
-  frames?: EffectRuntimeRenderedFrameMap
+  frames?: ReadonlyMap<string, EffectRuntimeFrameMetadata>
 ) {
   let source = bounds;
   let viewport: Rect | null = null;
@@ -403,7 +400,7 @@ function layerEffectBounds(
 }
 
 function effectRasterBounds(
-  effect: EffectRuntimeRenderedFrame,
+  effect: EffectRuntimeFrameMetadata,
   clipId: string,
   frame: Rect
 ): Rect | null {
@@ -419,7 +416,7 @@ function effectRasterBounds(
 }
 
 function effectTransitionBounds(
-  effect: EffectRuntimeRenderedFrame,
+  effect: EffectRuntimeFrameMetadata,
   clipId: string,
   scale: number
 ): Rect | null {

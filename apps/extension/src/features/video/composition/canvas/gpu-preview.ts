@@ -1,10 +1,12 @@
-import {
-  createGpuPreviewPresentationOwner,
-  type GpuPreviewPresentationSurface,
-} from './gpu-preview-presentation';
-export type { GpuPreviewPresentationSurface } from './gpu-preview-presentation';
-import type { CameraSpatialFrame, CameraSpatialRect } from '../../project/motion/spatial';
-import type { QuickEditHomography } from '../motion/spatial-geometry';
+import { createGpuPreviewPresentationOwner } from './gpu-preview-presentation';
+import type { GpuPreviewGroup, GpuPreviewLayer, GpuPreviewRenderer } from './gpu-preview-types';
+export type {
+  GpuPreviewGroup,
+  GpuPreviewLayer,
+  GpuPreviewRenderer,
+  GpuPreviewPresentationSurface,
+} from './gpu-preview-types';
+import type { CameraSpatialRect } from '../../project/motion/spatial';
 import { quickEditRotationMatrix } from '../motion/spatial-geometry';
 import { gpuPreviewShader } from './gpu-preview-shaders';
 import { createGpuPreviewDrawBounds } from './gpu-preview-bounds';
@@ -21,79 +23,9 @@ export class GpuPreviewDeviceError extends Error {
   override name = 'GpuPreviewDeviceError';
 }
 
-/** A retained scene description becomes a GPU render target, never a CPU-composited screenshot. */
-export interface GpuPreviewGroup {
-  kind: 'group';
-  output: Size;
-  logical: Size;
-  layers: readonly GpuPreviewLayer[];
-}
-
-/** A layer borrows its source through completion; inverse maps output logical points to its plane. */
-export interface GpuPreviewLayer {
-  source: Raster | VideoFrame | GpuPreviewGroup;
-  rect: CameraSpatialRect;
-  inverse: QuickEditHomography;
-  /** Hard rectangles partition adjoining source planes; exterior contours retain antialiasing. */
-  clip?: { rect: CameraSpatialRect; radius: number; shape?: 'ellipse' | 'hard-rect' };
-  lens?: {
-    bounds: CameraSpatialRect;
-    scale: number;
-    optics: 'flat' | 'optical';
-    edgeWidth: number;
-    corner: number | 'circle';
-  };
-  blur?: number;
-  depth?: {
-    frame: CameraSpatialFrame;
-    window: CameraSpatialRect;
-    planeInverse?: QuickEditHomography;
-  };
-  opacity?: number;
-  orientation?: { rotation: 0 | 90 | 180 | 270; flip: boolean };
-  /** Raster texel edges adjoining another plane; retain sampled alpha without transparent padding. */
-  clampSourceEdges?: readonly ('left' | 'top' | 'right' | 'bottom')[];
-  /** Fuses an RGBA8 source write and destination-in raster mask in the source plane. */
-  alphaMask?: {
-    source: Raster;
-    rect: CameraSpatialRect;
-    cache?: { key: string; revision: object | string | number };
-  };
-  blend?: 'over' | 'add' | 'mask' | 'erase' | 'screen' | 'atop';
-  cssFilter?: { blur?: number; brightness?: number; saturate?: number };
-  tint?: readonly [number, number, number, number];
-  /** Coverage of the destination operation, not a mask in the source plane. */
-  operationClip?: {
-    source: Raster;
-    cache?: { key: string; revision: object | string | number };
-  };
-  cache?: { key: string; revision: object | string | number };
-}
-
-/** The caller retains frame/publication authority and closes each returned bitmap. */
-export interface GpuPreviewRenderer {
-  readonly allocatedBytes: number;
-  /**
-   * The caller leases a nonfront canvas and publishes matching geometry after completion.
-   * Offscreen mode moves completed GPU images into a fixed-size HTML bitmaprenderer.
-   * Callers release each transferred image when their output lease ends. They must not resize
-   * or select a context on that canvas. The default preserves caller-owned HTML WebGPU resize.
-   */
-  createSurface?(
-    canvas: HTMLCanvasElement,
-    options?: { offscreen?: boolean }
-  ): GpuPreviewPresentationSurface;
-  render(args: {
-    output: Size;
-    logical: Size;
-    layers: readonly GpuPreviewLayer[];
-    signal: AbortSignal;
-  }): Promise<ImageBitmap>;
-  dispose(): void;
-}
-
-const MAX_LAYERS = 64;
-const MAX_RENDER_LAYERS = 512;
+export const GPU_PREVIEW_LIMITS = { layersPerPass: 64, totalLayers: 512, groupDepth: 16 } as const;
+const MAX_LAYERS = GPU_PREVIEW_LIMITS.layersPerPass;
+const MAX_RENDER_LAYERS = GPU_PREVIEW_LIMITS.totalLayers;
 const MAX_TEXTURE_BYTES = 256 * 1024 * 1024;
 /** Explicit per-layer GPU storage, also used by preview admission before allocation. */
 export const GPU_PREVIEW_UNIFORM_BYTES = 336;
@@ -393,6 +325,7 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
   const targetKeys = new Set<string>();
   const visiting = new Set<GpuPreviewGroup>();
   const validatedGroups = new Set<GpuPreviewGroup>();
+  let hasCssFilter = false;
   let hasEffects = false;
   let hasMasked = false;
   let hasMaskedEffects = false;
@@ -423,7 +356,7 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
   ) => {
     if (
       layers.length > MAX_LAYERS ||
-      depth > 16 ||
+      depth > GPU_PREVIEW_LIMITS.groupDepth ||
       (layerCount += layers.length) > MAX_RENDER_LAYERS
     )
       throw new Error('GPU preview layer budget exceeded.');
@@ -432,6 +365,7 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
     layers.forEach((layer, index) => {
       const path = `${prefix}/${index}`;
       layerValues(layer, output, logical);
+      hasCssFilter ||= !!layer.cssFilter;
       const effects = !!layer.lens || requiresGpuPreviewFilter(layer);
       if (layer.operationClip || layer.tint) operations.set(operationKey(layer), layer);
       if (layer.operationClip) retainRaster(layer.operationClip, `${path}/operation-clip`);
@@ -462,19 +396,13 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
   return {
     retainedKeys,
     targetKeys,
+    hasCssFilter,
     hasEffects,
     hasMasked,
     hasMaskedEffects,
     operations,
     nativeFrames,
   };
-}
-
-function requestHasCssFilter(layers: readonly GpuPreviewLayer[]): boolean {
-  return layers.some(
-    (layer) =>
-      !!layer.cssFilter || (isGroup(layer.source) && requestHasCssFilter(layer.source.layers))
-  );
 }
 
 function isNeutralFullLayer(layer: GpuPreviewLayer, logical: Size) {
@@ -1077,7 +1005,7 @@ export async function createGpuPreviewRenderer(
               }
               operations.set(key, await promise);
             }
-            if (!cssFilter && requestHasCssFilter(request.layers))
+            if (!cssFilter && plan.hasCssFilter)
               cssFilter = await createGpuPreviewCssFilter(device, reserve).catch(
                 (error: unknown) => {
                   if (

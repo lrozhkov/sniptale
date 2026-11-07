@@ -1,4 +1,9 @@
-import { preparedProjectCamera, projectCameraGeometryKey } from './prepared-project-camera';
+import {
+  preparedProjectCamera,
+  projectCameraGeometryKey,
+  type CursorOrientationPlan,
+} from './prepared-project-camera';
+export type { CursorOrientationPlan } from './prepared-project-camera';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import {
   resolveMotionWindowCameraParts,
@@ -37,11 +42,6 @@ import {
   type CameraPanPoint,
 } from './camera-trajectory';
 
-/** Disposable output-clock Euler offsets; every span has continuous position and two derivatives. */
-export interface CursorOrientationPlan {
-  spans: readonly CameraTrajectory[];
-  breaks: readonly number[];
-}
 interface CursorOrientationObservation extends CameraPanPoint {
   time: number;
   segmentId?: string;

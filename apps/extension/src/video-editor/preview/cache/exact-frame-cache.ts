@@ -1,4 +1,4 @@
-import type { PreviewScenePresentation } from '../stage/scene/types';
+import type { PreviewScenePresentation } from '../../contracts/preview-runtime';
 export const VIDEO_PREVIEW_EXACT_FRAME_CACHE_MAX_BYTES = 320 * 1024 * 1024;
 const VIDEO_PREVIEW_EXACT_FRAME_CACHE_KEY_VERSION = 1;
 

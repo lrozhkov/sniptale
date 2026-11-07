@@ -275,3 +275,11 @@ async function createSvgAmplificationMessage(): Promise<EffectRuntimeRenderMessa
     snapshotId: `effect:${documentSha256}`,
   };
 }
+
+it('rejects scene preparation before worker or document work on an unnegotiated connection', async () => {
+  const workerFactory = vi.fn(() => new ReplyWorker());
+  const session = createEffectRuntimeBrokerSession({ workerFactory });
+  const result = await session.execute({ ...(await createMessage()), kind: 'prepareGpuFrame' });
+  expect(result).toMatchObject({ kind: 'error', code: 'inputRejected' });
+  expect(workerFactory).not.toHaveBeenCalled();
+});

@@ -5110,22 +5110,22 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One Native graph transaction preserves ordered layers, source coordinates and request cleanup. Borrowed video and attached-annotation materials join its existing release ledger. Shared raster lifetime policy stays in the renderer primitive; allocation and painting stay in the Native adapter. Capture, submission and publication remain outside this builder. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-06",
-      "astHash": "b23599c4d743f7f0bef8c7bdde0129bf9a2647aced3c148878d1e8b86fe1665e",
-      "signatureHash": "50dc315adc73e3dee9e483c3b3c6208ca2ad662555f18670fdadcdd69dbd0189"
+      "reason": "tool-noise: One editor graph adapter owns construction and material leases. GPU annotations join its existing borrow ledger. Source capture, submission and publication stay outside this owner.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "bfa82b2d2d5bbace0be0e346c91ca42a2df962a99ce7c21307ffbe29c39095c0",
+      "signatureHash": "a6e6c165841fa14bef1f7df2c0ac0a9b318bf6c460c8d0b61e32b6d0bc18060e"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
       "symbol": "buildNativeGpuPreviewLayers",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One Native graph transaction preserves ordered layers, source coordinates and request cleanup. Borrowed video and attached-annotation materials join its existing release ledger. Shared raster lifetime policy stays in the renderer primitive; allocation and painting stay in the Native adapter. Capture, submission and publication remain outside this builder. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any independent state, resource, publication, queue or writer authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-06",
-      "astHash": "aa37e7f4484a0794125c8767d495c468da755dff6960e82737d0b9dbc2592993",
-      "signatureHash": "87545e27dced6082ff3957d11d44e88497b77b709cefbef905c2d9736051646e"
+      "reason": "tool-noise: One graph builder owns masks, ordered layers and pose borrows. GPU sources use the existing placement boundary. Submission and publication remain outside this operation.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "e772a2f9f03d291a8b84a258fb5871dbef9cea2d62f45d38182c7c8acc66e822",
+      "signatureHash": "14f0d9a40a93889cc39c657e8125627fbcd460d88ee5551c15f7cec3797e9dc6"
     },
     {
       "rule": "structural-function-risk",
@@ -5143,10 +5143,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One Native preview session owns its GPU provider and material owner. Each frame passes optional immutable material providers into the existing graph transaction. The session drains active work before material retirement. Capture, effect evaluation, completion and frontend publication retain their existing contracts. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-06",
-      "astHash": "a7bd5ffa0d73aabf7238f1149e26eb66656771011ee5ca53a3987ef44f515919",
+      "reason": "tool-noise: One preview session owns provider availability, materials, cancellation and retirement. Factory length includes the existing render transaction. No separate device authority appears.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "58bfb3c3ec16326f4733f5d1188d9ecb97350fd07c52a1d4d7eedccdbb5ae95c",
       "signatureHash": "7d9a217fc23fc3f6a09d3c448ae47b3c7039b7957a843146613711295e84297a"
     },
     {
@@ -5154,10 +5154,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer.render",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One Native preview session owns its GPU provider and material owner. Each frame passes optional immutable material providers into the existing graph transaction. The session drains active work before material retirement. Capture, effect evaluation, completion and frontend publication retain their existing contracts. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-06",
-      "astHash": "650ec358896a6ceb026ce8c7c66a619573055b3fdca357b7c7f2ac4e8d5762b6",
+      "reason": "tool-noise: One frame transaction owns captures, checked effects and publication. Same-provider compaction precedes final submission. Its outer cleanup releases prepared resources after awaited completion or failure.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "b9e0576736e5a936cd7caee7a1445105d39271a23ca3d8aed8f6adaf9fb56805",
       "signatureHash": "7fbf6998a3988df89e02a05370e5486d9adf627b6e933b9dcfaf360518055ae2"
     },
     {
@@ -5173,69 +5173,47 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/effect-runtime-sandbox/broker/gpu-plan-boundary.ts",
+      "file": "apps/extension/src/features/video/composition/effect-runtime/runtime/gpu-plan-boundary.ts",
       "symbol": "parseEffectRuntimeGpuPlan",
-      "owner": "extension:effect-runtime-sandbox:broker",
-      "reason": "tool-noise: One receiving boundary checks the closed GPU message before the renderer borrows resources. Identity, acknowledgement, dimensions, resources and the root pass share admission. Existing predicates separate field shapes from envelope checks.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes identity or resource admission. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One pure receiving boundary checks identity, acknowledgement, dimensions and root admission. Its body stays unchanged. Its expected-input signature narrows to fields required by both receiving runtimes.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
       "astHash": "b8691cd2e92357024ec78df19d679dc828e42250d4cfc572af61b463c32ac201",
-      "signatureHash": "c6f0f3c4ef4522648831e3c2e50fb54e359da7e4b6502dcbc78fb71dea82f9e2"
+      "signatureHash": "7921f56d9caf886018cd2d49c13a91403edfa2e95369f16b804165320fe8ed89"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/effect-runtime-sandbox/broker/gpu-plan-boundary.ts",
+      "file": "apps/extension/src/features/video/composition/effect-runtime/runtime/gpu-plan-boundary.ts",
       "symbol": "parsePasses",
-      "owner": "extension:effect-runtime-sandbox:broker",
-      "reason": "tool-noise: One DAG admission loop checks topological order, coverage dimensions, resource references and graph depth. Shared counters enforce decoded bytes, scalar commands and primitive uniqueness. Separate counter owners would obscure the same admission invariant.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes graph or budget admission. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One DAG admission traversal checks order, primitive uniqueness, coverage, depth and aggregate budgets. The move preserves its exact AST and signature.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
       "astHash": "c40faae6139576f72a89f046addb5df216113c0f48cdea8fd674b9874886c81b",
       "signatureHash": "1841af63c1db50b860830f3674e66a95eb0bafeea317e14a32fb438c0e8709e7"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/effect-runtime-sandbox/broker/gpu-plan-layers.ts",
+      "file": "apps/extension/src/features/video/composition/effect-runtime/render/gpu-plan-layers.ts",
       "symbol": "buildEffectRuntimeGpuOperationLayers",
-      "owner": "extension:effect-runtime-sandbox:broker",
+      "owner": "extension:app-core:features",
       "reason": "tool-noise: One adapter converts an evaluated operation into ordered GPU layers. Crop, transform, coverage, CSS filter, shadow and blend share operation semantics. The adapter neither submits work nor closes borrowed resources.",
       "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes operation semantics. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
+      "reviewDate": "2026-11-07",
       "astHash": "62eb5bad8c4b649436f80245323f8dcd35e149d88e7c65da5f7a18031fb7094f",
       "signatureHash": "1ed596d2769b8a426f8aba2d01f1ab7cd7902bb91b07671d3863cb604cef9348"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/effect-runtime-sandbox/broker/gpu-plan-renderer.ts",
-      "symbol": "createEffectRuntimeGpuPlanRenderer",
-      "owner": "extension:effect-runtime-sandbox:broker",
-      "reason": "tool-noise: One factory owns backend availability, the busy guard and cancellation. Its span includes the render method. Completed pass resources share that backend lifetime.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes backend or cancellation lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "906ac0bfe2eb8cff00a556c707f5db36e3df6ca44da184de725e538af6bec118",
-      "signatureHash": "32f11d7f738b41e4ac329ec5de8a0b737b1f045f87c02f8af1af3342388d15f0"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/effect-runtime-sandbox/broker/gpu-plan-renderer.ts",
-      "symbol": "createEffectRuntimeGpuPlanRenderer.render",
-      "owner": "extension:effect-runtime-sandbox:broker",
-      "reason": "tool-noise: One asynchronous transaction owns pass execution and chunk flushes. Last-use checks, accumulated bitmap replacement and root transfer share one cleanup boundary. The separate layer adapter owns operation semantics.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes chunk or bitmap lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "a3c7275cf975d4fb992ea16a2009c30d6bebd5de06122da061a4e8899dc477c3",
-      "signatureHash": "9d2cf1d2dd8f9f238150088996d5e0124dc98a34779e008f1369c30cd13a8dc9"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/effect-runtime-sandbox/broker/worker-request.ts",
-      "symbol": "startWorkerOperation",
+      "symbol": "startWorkerOperation#3",
       "owner": "extension:effect-runtime-sandbox:broker",
-      "reason": "tool-noise: One request transaction owns Worker transfer, response admission, publication, device retry and GPU drain. The monotonic deadline shares this transaction. Separate transport owners would divide ownership of transferred inputs.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes request transfer or deadline. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "52c93addeb710ac99833310ca18990d588942907e6b536bc2a3a831ddd2e6350",
-      "signatureHash": "736f88d8689c9105ac3d97664fe8db62374247b5329649e9bf7529099ef547fe"
+      "reason": "tool-noise: One request transaction owns transfer, identity admission, deadline, publication and drain. Mode selection chooses checked-plan delivery or existing materialization without dividing transferred-input ownership.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "30616cf5be1b5c9f8a170c3bd61d2ffe99c18d6b7045d2d0c9f7092f0caf3d4a",
+      "signatureHash": "9c0dc7928a0b02e29aea3b14229fdc03ce9956a8db5901ae3cdac013a3866b5f"
     },
     {
       "rule": "structural-function-risk",
@@ -5271,17 +5249,6 @@
       "signatureHash": "63f4a7da1007b99911a05339a6f3eb9a3e2f936827f4e37b35abf8f6d03037b8"
     },
     {
-      "rule": "structural-file-risk",
-      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
-      "symbol": "<file>",
-      "owner": "extension:app-core:features",
-      "reason": "tool-noise: One backend retains device, slot, encoding and completion authority. Conservative draw bounds limit fragment work inside the same encoding transaction. The private geometry helper has no device or publication authority. Fresh independent review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-07",
-      "astHash": "1b623b2ab5a473240fc38394b580c9897be2efc3511c5c7ebbc56fe52ed56806",
-      "signatureHash": "2c1bbc47f797f1ee4934821615dc99b96d755a7a4474a1c7af10301f1bdbec5f"
-    },
-    {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot.render",
@@ -5297,11 +5264,11 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
       "symbol": "buildNativeGpuPreviewLayers.paintLayers",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One visual-layer loop selects effect rasters, resolves source attachments and orders sharp actions. Attached annotation coverage uses the existing request release ledger. Pixel invalidation follows resolved window geometry and crop; annotation pose and bitmap contents retain their existing owners. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes visual selection or sharp-feedback ordering. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-06",
-      "astHash": "2cec7ca9248a487a68ce58caa001e6dd8c9d6016c597dfd04bff11bc2632cee4",
-      "signatureHash": "1aaa7e061ffc894e1109006cdacb59daecf1d81c4c4428a8220e5e83c69e7336"
+      "reason": "tool-noise: One visual-layer loop selects, deduplicates and places effects. It retains each GPU frame before graph insertion. The graph release returns the same borrow.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "9319b08090a4daa4503198d0449ffccc23c8eff6ce320c36e83311118a337cce",
+      "signatureHash": "1f2f6333324874ebfb6aed947829c03a2c0be4c0e108c96f767cbec8861a293f"
     },
     {
       "rule": "structural-file-risk",
@@ -5374,11 +5341,11 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview-layers.ts",
       "symbol": "reviewGpuContentLayers",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Gallery content operation orders source and viewport layers. Content coverage borrows immutable raster pixels through the existing primitive lease ledger. Its pixel signature depends on canonical dimensions, window and crop. The caller retains GPU completion and publication authority. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes annotation borrow or overlay order. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-06",
-      "astHash": "f55adf40752a1564580bc4b6db70f65dea497a053d43d6af8ed244ada0ba324c",
-      "signatureHash": "e5883e63d84fbde34307868357d06b0c385b565c72b95a21656c1e66fb4dd865"
+      "reason": "tool-noise: One content-plane operation orders source, annotation and cursor layers. It borrows the annotation batch before producer retirement. Its caller retains that borrow through final GPU completion.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "9a14b707ddb2f9de0203d67fa6f19415b944b93c8bcedd1107a0c1b9f054ea72",
+      "signatureHash": "729d1f4ed97c7634518ab617e5e33e35df130f23ec7e829236afdbdeb4f75225"
     },
     {
       "rule": "structural-function-risk",
@@ -5396,10 +5363,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Gallery session owns its GPU provider, artwork slots and source coverage. Coverage borrows end with the existing GPU frame transaction. Scene retirement disposes the raster owner and waits for readers; output publication holds retain the existing provider lifetime. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-06",
-      "astHash": "bb0c4e4d007e69a783900e60175f8010416d498dcfcea215cf56f187767d3a49",
+      "reason": "tool-noise: One preview session owns the provider, slots and retirement. Factory length includes the existing frame transaction. No independent state authority appears.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "0dca88657106ff2033df7fd337901ab5e6edce52578da13f07fe3df68be2fe4e",
       "signatureHash": "58e4f800820af68fba971b9d7a7b89f698765e9c8560ee0de826a02c4ba84ae5"
     },
     {
@@ -5407,10 +5374,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview.execute#3",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Gallery session owns its GPU provider, artwork slots and source coverage. Coverage borrows end with the existing GPU frame transaction. Scene retirement disposes the raster owner and waits for readers; output publication holds retain the existing provider lifetime. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-06",
-      "astHash": "60e581c452e7104d3aeec849bf44bd40b5b1dfb766802de635fed669e772df63",
+      "reason": "tool-noise: One frame transaction owns endpoint composition, annotation holds and publication. Independently leased GPU sources avoid the legacy endpoint snapshot. The same outer cleanup releases holds after completion or failure.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "adfd2c6edf249f0240eb062aae1d2761c34a79cf5fbfe04917828f9c841432d8",
       "signatureHash": "b5cd7d268fb693d447a010fcf0557093562a1539e5eb864e3b0fa48378b7800f"
     },
     {
@@ -5418,10 +5385,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Gallery adapter fixture controls source frames, GPU barriers and request release. Content coverage reuse uses the existing annotation batch fixture. The new case checks material identity and revision without another fixture lifetime or publication owner. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-06",
-      "astHash": "d6922525d00753e31e701b6d39bbe7584f539eb97d7ea233d69e44933611c549",
+      "reason": "tool-noise: One preview session fixture tests publication, cancellation and borrowed annotation lifetime. The candidate extends that same fixture with GPU preparation. No independent fixture or product authority appears.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "6d2b8966de317733a864b3690f41a0c39dede038f3d556112a597355913ed17d",
       "signatureHash": "c3512e4a412e4b2f46c6c725df28dc7125dbd78b7c8c80b1e93fb13a1a6f9464"
     },
     {
@@ -5979,11 +5946,11 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.ts",
       "symbol": "renderPreparedPreviewScene",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One scene transaction retains sources and checks readiness before returning its camera receipt. Direct output carries an owned destination with that same receipt. Invalidated outputs release without publication. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state owner. Remove when the analyzer models this cohesive transaction.",
-      "astHash": "24b61f68c0fa1a8055c08aeee977334305be3cb6cbd583468b38072f28b5f797",
+      "reason": "tool-noise: One scene transaction selects the concrete effect representation. It disposes results before fallback and on final exit. Existing media readiness, invalidation and publication authority remain intact.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "astHash": "e18cab3f4e6985fdeafb5964609abba9236ac66d492f2bb8b7dcfdbed306c91b",
       "signatureHash": "084a1b2312c4568a47f85b4608e3ec489241a489cc4774c140accadc29612e03",
-      "reviewDate": "2026-11-06"
+      "reviewDate": "2026-11-07"
     },
     {
       "rule": "structural-function-risk",
@@ -6160,6 +6127,39 @@
       "reviewDate": "2026-11-06",
       "astHash": "11b02b0ff479d7d934ce89b929ad8a31b7eaa076e9a56d5048aec462b516c1b1",
       "signatureHash": "127986f5ba2739ee9762331f6500d12f697af50a68cf0cd5b78c43f3e9075d86"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/effect-runtime/render/gpu-plan.ts",
+      "symbol": "materializeEffectRuntimeGpuPlan",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One borrowed-provider transaction owns pass and chunk outputs, last-use retirement and failure cleanup. It cannot dispose the provider or close wire resources. This is a behavioral extraction, not an unchanged move.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "7125662b7e7ad37864b927e3190faf730128ad14cf66575ef0b379453ffc9e0d",
+      "signatureHash": "deb50fb8ca2e0ea4659a4c7fe5e570f2876eaa805788e4ef077cd640f935984b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/effect-runtime/runtime/gpu-driver.ts",
+      "symbol": "prepareEffectRuntimeGpuFramePlans",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One preparation transaction owns checked results, byte reservations, borrows and partial failure cleanup. Retired, borrowers and closed describe one resource lifetime. Focused tests establish retirement after the last borrow.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "90b4ca1d19fe3930358a50f2a2a6b464838b22256af6cd39848a70650403b62a",
+      "signatureHash": "33293cdd305f305e2a2c712c8fcda2673d78a8ec13ee1041725b6c0472af8aa6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/annotation-renderer.ts",
+      "symbol": "createReviewAnnotationRenderer",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One annotation session owns verified definitions, executor lifetime and released batches. GPU batches expose independent borrows through the shared resource owner. No device or publication authority appears.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-07",
+      "astHash": "4b38f380a0aa6f410bdd1b9bc7ebd3d25d6dfeaaa3f9e6edcc54ab33badcb060",
+      "signatureHash": "c65bd33fa4d5a8723e012cbe26a6106f358cce4e6521dd86dc842502389ccf4f"
     }
   ]
 }

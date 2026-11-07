@@ -4,16 +4,13 @@ import type {
   EffectRuntimeGpuRect,
   EffectRuntimeGpuSource,
   EffectRuntimeGpuTransform,
-} from '../../contracts/effect-runtime/gpu-plan';
-import type {
-  GpuPreviewGroup,
-  GpuPreviewLayer,
-} from '../../features/video/composition/canvas/gpu-preview';
-import type { QuickEditHomography } from '../../features/video/composition/motion/spatial-geometry';
+} from '../../../../../contracts/effect-runtime/gpu-plan';
+import type { GpuPreviewGroup, GpuPreviewLayer } from '../../canvas/gpu-preview';
+import type { QuickEditHomography } from '../../motion/spatial-geometry';
 import {
   EFFECT_RUNTIME_RESOURCE_LIMITS,
   EffectRuntimeResourceError,
-} from '../../features/video/composition/effect-runtime/runtime/resource-limits';
+} from '../runtime/resource-limits';
 
 type Size = { width: number; height: number };
 interface EffectRuntimeGpuLayerSource extends Size {

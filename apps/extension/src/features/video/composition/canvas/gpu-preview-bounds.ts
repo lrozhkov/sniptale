@@ -1,5 +1,5 @@
 import { invertQuickEditProjection, projectQuickEditPoint } from '../motion/spatial-geometry';
-import type { GpuPreviewGroup, GpuPreviewLayer } from './gpu-preview';
+import type { GpuPreviewGroup, GpuPreviewLayer } from './gpu-preview-types';
 
 type Size = { width: number; height: number };
 type Rect = Size & { x: number; y: number };

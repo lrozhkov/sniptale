@@ -162,7 +162,7 @@ it('selects the Gallery GPU annotation sandbox and preserves retry teardown', ()
   expect(args.readAsset).toBe(readAsset);
   expect(args.annotationExecutor).toBeTypeOf('function');
   args.annotationExecutor!();
-  expect(io.executor).toHaveBeenCalledWith({ compositionBackend: 'gpu-preview' });
+  expect(io.executor).toHaveBeenCalledWith({ compositionBackend: 'gpu-scene' });
   owner.dispose();
   owner.dispose();
   expect(io.dispose).toHaveBeenCalledOnce();

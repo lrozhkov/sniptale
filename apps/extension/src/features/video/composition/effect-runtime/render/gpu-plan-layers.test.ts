@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import type { EffectRuntimeGpuDraw } from '../../contracts/effect-runtime/gpu-plan';
-import type {
-  GpuPreviewGroup,
-  GpuPreviewLayer,
-} from '../../features/video/composition/canvas/gpu-preview';
+import type { EffectRuntimeGpuDraw } from '../../../../../contracts/effect-runtime/gpu-plan';
+import type { GpuPreviewGroup, GpuPreviewLayer } from '../../canvas/gpu-preview';
 import { buildEffectRuntimeGpuOperationLayers } from './gpu-plan-layers';
 
 function fixture() {

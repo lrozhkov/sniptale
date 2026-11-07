@@ -1039,7 +1039,18 @@ function borrowedAnnotations(attachment: 'viewport' | 'content' = 'viewport') {
       },
     };
   });
-  const annotations = { describe: () => [], render } as unknown as NonNullable<
+  const annotations = {
+    describe: () => [],
+    render,
+    prepareGpu: async (...args: Parameters<typeof render>) => {
+      const batch = await render(...args);
+      return {
+        ...batch,
+        independent: false,
+        entries: batch.entries.map((entry) => ({ ...entry, source: entry.bitmap })),
+      };
+    },
+  } as unknown as NonNullable<
     Parameters<ReturnType<typeof createReviewGpuPreview>['render']>[0]['annotations']
   >;
   return { annotations, bitmaps, render };

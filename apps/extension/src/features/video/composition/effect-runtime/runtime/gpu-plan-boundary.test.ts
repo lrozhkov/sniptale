@@ -1,20 +1,20 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { EffectRuntimeGpuPass } from '../../contracts/effect-runtime/gpu-plan';
-import { EFFECT_SVG_VECTOR_LIMITS } from '../../contracts/effect-runtime/svg-vector';
+import type { EffectRuntimeGpuPass } from '../../../../../contracts/effect-runtime/gpu-plan';
+import { EFFECT_SVG_VECTOR_LIMITS } from '../../../../../contracts/effect-runtime/svg-vector';
 import { EFFECT_V1_GRAPH_LIMITS } from '@sniptale/runtime-contracts/effect-v1';
-import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from './resource-limits';
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
   EFFECT_RUNTIME_WORKER_REQUEST,
-  EFFECT_RUNTIME_WORKER_RESPONSE,
   type EffectRuntimeGpuPlanResult,
   type EffectRuntimeWorkerMessage,
-} from '../../contracts/effect-runtime/types';
-import { closeEffectRuntimeGpuPlanResources, parseEffectRuntimeGpuPlan } from './gpu-plan-boundary';
+} from '../../../../../contracts/effect-runtime/types';
 import {
-  closeEffectRuntimeWorkerResponse,
-  parseEffectRuntimeWorkerResponse,
-} from './worker-message-boundary';
+  fitsEffectRuntimeGpuSceneTransport,
+  parseEffectRuntimeGpuScenePlan,
+  parseEffectRuntimeGpuPlan,
+} from './gpu-plan-boundary';
+
 class Bitmap implements ImageBitmap {
   close = vi.fn();
   constructor(
@@ -92,12 +92,6 @@ it('keeps neutral resources borrowed and validates detached request metadata', (
   const p = plan();
   expect(parseEffectRuntimeGpuPlan(p, request())).toEqual(p);
   expect(p.resources[0]!.bitmap.close).not.toHaveBeenCalled();
-  expect(
-    parseEffectRuntimeWorkerResponse({ type: EFFECT_RUNTIME_WORKER_RESPONSE, result: p }, request())
-  ).toEqual(p);
-  expect(
-    parseEffectRuntimeWorkerResponse({ type: EFFECT_RUNTIME_WORKER_RESPONSE, result: p })
-  ).toBeNull();
 });
 it.each([
   'identity',
@@ -220,54 +214,6 @@ it('bounds graph operations, depth, resource entries and aggregate raster alloca
   }));
   expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
 });
-it('directly closes malformed and metadata-heavy flat tables exactly once per bitmap', () => {
-  const bitmap = new Bitmap();
-  const p = {
-    kind: 'gpu-plan',
-    resources: [{ bitmap }, { bitmap }, null],
-    passes: Array.from({ length: 2000 }, () => ({ operations: [] })),
-  };
-  closeEffectRuntimeGpuPlanResources(p);
-  expect(bitmap.close).toHaveBeenCalledOnce();
-  bitmap.close.mockClear();
-  closeEffectRuntimeWorkerResponse({ type: 'malformed', result: p });
-  expect(bitmap.close).toHaveBeenCalledOnce();
-});
-it('preserves ordinary frame and retry response parsing and cleanup', () => {
-  const p = plan();
-  const bitmap = new Bitmap();
-  const {
-    resources: _resources,
-    inputResources: _inputs,
-    rootPass: _root,
-    passes: _passes,
-    logicalWidth: _lw,
-    logicalHeight: _lh,
-    ...base
-  } = p;
-  const frame = { ...base, kind: 'frame', bitmap };
-  expect(
-    parseEffectRuntimeWorkerResponse({ type: EFFECT_RUNTIME_WORKER_RESPONSE, result: frame })
-  ).toEqual(frame);
-  closeEffectRuntimeWorkerResponse(frame);
-  expect(bitmap.close).toHaveBeenCalledOnce();
-  const retry = {
-    effectInstanceId: p.effectInstanceId,
-    requestId: p.requestId,
-    snapshotId: p.snapshotId,
-    sequenceId: p.sequenceId,
-    kind: 'error',
-    code: 'cacheMiss',
-    missingRef: 'document',
-    retryInputs: { source: { bitmap: new Bitmap(), width: 10, height: 10 } },
-  };
-  expect(
-    parseEffectRuntimeWorkerResponse({ type: EFFECT_RUNTIME_WORKER_RESPONSE, result: retry })
-  ).toEqual(retry);
-  closeEffectRuntimeWorkerResponse(retry);
-  expect(retry.retryInputs.source.bitmap.close).toHaveBeenCalledOnce();
-});
-
 it('rejects forward references, duplicate pass IDs, excessive depth and noncoverage masks', () => {
   const p = plan();
   const initial = p.passes[0]!;
@@ -375,4 +321,23 @@ it('rejects repeated primitive operands and bounds shared scalar operations at c
   expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
   p.passes[0]!.operations = [initial];
   expect(parseEffectRuntimeGpuPlan(p, request())).not.toBeNull();
+});
+
+it('admits parent plans only for explicit preparation with bounded synchronous tables', () => {
+  const p = plan(),
+    r = request();
+  const expected = {
+    ...r,
+    kind: 'prepareGpuFrame' as const,
+    documentRef: { id: r.documentRef.id },
+    assetSelectionRef: { id: r.assetSelectionRef.id },
+  };
+  expect(parseEffectRuntimeGpuScenePlan(p, expected)).toEqual(p);
+  expect(parseEffectRuntimeGpuScenePlan(p, { ...expected, kind: 'renderFrame' })).toBeNull();
+  expect(parseEffectRuntimeGpuScenePlan({ ...p, requestId: 'wrong' }, expected)).toBeNull();
+  expect(fitsEffectRuntimeGpuSceneTransport({ ...p, resources: Array(513) })).toBe(false);
+  expect(fitsEffectRuntimeGpuSceneTransport({ ...p, passes: Array(65) })).toBe(false);
+  expect(fitsEffectRuntimeGpuSceneTransport({ ...p, passes: [{ operations: Array(513) }] })).toBe(
+    false
+  );
 });

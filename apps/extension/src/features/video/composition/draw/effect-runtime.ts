@@ -1,6 +1,7 @@
 import type {
   EffectRuntimeRenderedFrame,
   EffectRuntimeRenderedFrameMap,
+  EffectRuntimeFrameMetadata,
 } from '../effect-runtime/runtime/types';
 import type { VideoCompositionVisualLayer } from '../types';
 import { drawCompositionVisualLayerBitmap } from './visual';
@@ -45,7 +46,7 @@ export function drawEffectRuntimeVisualLayer(args: {
 }
 
 export function hasEffectRuntimeTransitionFrame(
-  frames: EffectRuntimeRenderedFrameMap | undefined,
+  frames: ReadonlyMap<string, EffectRuntimeFrameMetadata> | undefined,
   transitionId: string
 ): boolean {
   for (const frame of frames?.values() ?? []) {
@@ -56,30 +57,30 @@ export function hasEffectRuntimeTransitionFrame(
   return false;
 }
 
-function findTargetFrame(
-  frames: EffectRuntimeRenderedFrameMap | undefined,
+function findTargetFrame<T extends EffectRuntimeFrameMetadata>(
+  frames: ReadonlyMap<string, T> | undefined,
   clipId: string
-): EffectRuntimeRenderedFrame | null {
+): T | null {
   for (const frame of frames?.values() ?? []) {
     if (frame.target.kind === 'clip' && frame.target.clipId === clipId) return frame;
   }
   return null;
 }
 
-function findStandaloneFrame(
-  frames: EffectRuntimeRenderedFrameMap | undefined,
+function findStandaloneFrame<T extends EffectRuntimeFrameMetadata>(
+  frames: ReadonlyMap<string, T> | undefined,
   clipId: string
-): EffectRuntimeRenderedFrame | null {
+): T | null {
   for (const frame of frames?.values() ?? []) {
     if (frame.target.kind === 'scene' && frame.target.clipId === clipId) return frame;
   }
   return null;
 }
 
-function findTransitionFrame(
-  frames: EffectRuntimeRenderedFrameMap | undefined,
+function findTransitionFrame<T extends EffectRuntimeFrameMetadata>(
+  frames: ReadonlyMap<string, T> | undefined,
   clipId: string
-): EffectRuntimeRenderedFrame | null {
+): T | null {
   for (const frame of frames?.values() ?? []) {
     if (
       frame.target.kind === 'transition' &&
@@ -117,8 +118,11 @@ function drawFullFrame(
   }
 }
 
-function findGroupFrame(frames: EffectRuntimeRenderedFrameMap | undefined, clipId: string) {
-  let track: EffectRuntimeRenderedFrame | undefined;
+function findGroupFrame<T extends EffectRuntimeFrameMetadata>(
+  frames: ReadonlyMap<string, T> | undefined,
+  clipId: string
+) {
+  let track: T | undefined;
   for (const frame of frames?.values() ?? []) {
     if (
       (frame.target.kind === 'video-group' || frame.target.kind === 'track') &&
@@ -134,7 +138,7 @@ function findGroupFrame(frames: EffectRuntimeRenderedFrameMap | undefined, clipI
 /** Keep selection geometry in the frame model; only the final draw projection is flattened. */
 export function resolveEffectRuntimeVisualLayers(
   layers: VideoCompositionVisualLayer[],
-  frames: EffectRuntimeRenderedFrameMap | undefined
+  frames: ReadonlyMap<string, EffectRuntimeFrameMetadata> | undefined
 ): VideoCompositionVisualLayer[] {
   const seen = new Set<string>();
   return layers.flatMap((layer) => {
@@ -153,10 +157,10 @@ export function resolveEffectRuntimeVisualLayers(
 }
 
 /** Resolves draw precedence only; full-frame transition rasters are not implicitly viewport-locked. */
-export function resolveEffectRuntimeVisualLayerFrame(
-  frames: EffectRuntimeRenderedFrameMap | undefined,
+export function resolveEffectRuntimeVisualLayerFrame<T extends EffectRuntimeFrameMetadata>(
+  frames: ReadonlyMap<string, T> | undefined,
   layer: VideoCompositionVisualLayer
-): { frame: EffectRuntimeRenderedFrame; fullFrame: boolean; deduplicationKey?: string } | null {
+): { frame: T; fullFrame: boolean; deduplicationKey?: string } | null {
   if (layer.effectActionsOnly) return null;
   const group = findGroupFrame(frames, layer.clipId);
   if (group)

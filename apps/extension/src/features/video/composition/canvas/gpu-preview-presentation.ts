@@ -1,16 +1,8 @@
-import type { GpuPreviewRenderer } from './gpu-preview';
+import type { GpuPreviewRenderer, GpuPreviewPresentationSurface } from './gpu-preview-types';
+export type { GpuPreviewPresentationSurface } from './gpu-preview-types';
 
 type Request = Parameters<GpuPreviewRenderer['render']>[0];
 type Reservation = { release(): void };
-
-/** The frontend owns placement and publication; this surface borrows inputs until execution settles. */
-export interface GpuPreviewPresentationSurface {
-  readonly canvas: HTMLCanvasElement;
-  present(request: Request): Promise<void>;
-  /** End the frontend lease; retain the bounded idle image until replacement or retirement. */
-  releaseImage?(): void;
-  dispose(): void;
-}
 
 interface SurfaceEntry {
   canvas: HTMLCanvasElement;

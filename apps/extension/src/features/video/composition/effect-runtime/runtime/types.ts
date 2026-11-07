@@ -1,3 +1,4 @@
+import type { GpuPreviewLayer } from '../../canvas/gpu-preview';
 import type {
   VideoProjectEffectSnapshotAsset,
   VideoProjectEffectTarget,
@@ -89,4 +90,19 @@ export function isSameEffectTarget(
     right.kind === 'transition' &&
     left.transitionId === right.transitionId
   );
+}
+
+/** Placement is independent of the concrete CPU bitmap or checked GPU scene representation. */
+export type EffectRuntimeFrameMetadata = Omit<EffectRuntimeRenderedFrame, 'bitmap'>;
+export interface EffectRuntimeGpuPreparedFrame extends EffectRuntimeFrameMetadata {
+  source: GpuPreviewLayer['source'];
+  retain(): { release(): void };
+  dispose(): void;
+}
+export interface EffectRuntimeGpuPreparedComposition {
+  kind: 'gpu-scene';
+  framesByTime: ReadonlyMap<number, ReadonlyMap<string, EffectRuntimeGpuPreparedFrame>>;
+  overlayFrames: ReadonlyMap<string, EffectRuntimeGpuPreparedFrame>;
+  prepareVisualPass?(time: number): Promise<void>;
+  dispose(): void;
 }

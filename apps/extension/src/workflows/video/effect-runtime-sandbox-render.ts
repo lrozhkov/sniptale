@@ -1,9 +1,11 @@
+import { closeEffectRuntimeGpuSceneResources } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import { createEffectRuntimeFailure } from '../../contracts/effect-runtime/identity';
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
   type EffectRuntimeFrameInputs,
   type EffectRuntimeFrameResult,
+  type EffectRuntimeSceneResult,
   type EffectRuntimeRenderCommand,
   type EffectRuntimeRenderMessage,
 } from '../../contracts/effect-runtime/types';
@@ -39,6 +41,7 @@ function failUntransferredRequest(command: EffectRuntimeRenderCommand): EffectRu
 async function createRenderMessage(
   command: EffectRuntimeRenderCommand,
   options: {
+    kind: EffectRuntimeRenderMessage['kind'];
     inputFrames: EffectRuntimeFrameInputs;
     sendFullAssets: boolean;
     sendFullDocument: boolean;
@@ -64,7 +67,7 @@ async function createRenderMessage(
     frameIndex: command.frameIndex,
     height: command.height,
     inputFrames: options.inputFrames,
-    kind: 'renderFrame',
+    kind: options.kind,
     progress: command.progress,
     protocolVersion: EFFECT_RUNTIME_PROTOCOL_VERSION,
     renderHeight: command.renderHeight,
@@ -81,7 +84,7 @@ function sendRenderRequest(
   authority: EffectRuntimeSandboxRenderAuthority,
   current: EffectRuntimeSandboxSession,
   request: EffectRuntimeRenderMessage
-): Promise<EffectRuntimeFrameResult> {
+): Promise<EffectRuntimeSceneResult> {
   return new PendingEffectRuntimeRequest({
     active: authority.active,
     clearSession: () => authority.clearSession(current),
@@ -95,10 +98,10 @@ function rejectStaleSessionResult(
   authority: EffectRuntimeSandboxRenderAuthority,
   current: EffectRuntimeSandboxSession,
   command: EffectRuntimeRenderCommand,
-  result: EffectRuntimeFrameResult
-): EffectRuntimeFrameResult | null {
+  result: EffectRuntimeSceneResult
+): EffectRuntimeSceneResult | null {
   if (authority.isCurrentSession(current)) return null;
-  closeEffectRuntimeBitmaps(result);
+  closeEffectRuntimeGpuSceneResources(result);
   return createEffectRuntimeFailure(command, 'stale');
 }
 
@@ -119,13 +122,15 @@ function forgetMissingRef(
 async function requestFrameWithCacheRetry(
   authority: EffectRuntimeSandboxRenderAuthority,
   current: EffectRuntimeSandboxSession,
-  command: EffectRuntimeRenderCommand
-): Promise<EffectRuntimeFrameResult> {
+  command: EffectRuntimeRenderCommand,
+  kind: EffectRuntimeRenderMessage['kind']
+): Promise<EffectRuntimeSceneResult> {
   const sendFullDocument = !authority.acknowledgedDocuments.has(command.documentRef.id);
   const sendFullAssets = !authority.acknowledgedAssetSelections.has(command.assetSelectionRef.id);
   let retryInputs: EffectRuntimeFrameInputs | null = null;
   try {
     const request = await createRenderMessage(command, {
+      kind,
       inputFrames: command.inputFrames,
       sendFullAssets,
       sendFullDocument,
@@ -137,6 +142,7 @@ async function requestFrameWithCacheRetry(
       retryInputs = result.retryInputs ?? {};
       forgetMissingRef(authority, command, result.missingRef);
       const retry = await createRenderMessage(command, {
+        kind,
         inputFrames: retryInputs ?? {},
         sendFullAssets: true,
         sendFullDocument: true,
@@ -146,7 +152,7 @@ async function requestFrameWithCacheRetry(
       const staleRetry = rejectStaleSessionResult(authority, current, command, result);
       if (staleRetry) return staleRetry;
       if (result.kind === 'error' && result.code === 'cacheMiss') {
-        closeEffectRuntimeBitmaps(result);
+        closeEffectRuntimeGpuSceneResources(result);
         authority.clearSession(current);
         return createEffectRuntimeFailure(command, 'inputRejected');
       }
@@ -171,14 +177,14 @@ function acceptRenderResult(
   authority: EffectRuntimeSandboxRenderAuthority,
   current: EffectRuntimeSandboxSession,
   command: EffectRuntimeRenderCommand,
-  result: EffectRuntimeFrameResult
-): EffectRuntimeFrameResult {
-  if (result.kind === 'frame') {
+  result: EffectRuntimeSceneResult
+): EffectRuntimeSceneResult {
+  if (result.kind !== 'error') {
     const expected =
       result.acknowledged.documentId === command.documentRef.id &&
       result.acknowledged.assetSelectionId === command.assetSelectionRef.id;
     if (!expected) {
-      result.bitmap.close();
+      closeEffectRuntimeGpuSceneResources(result);
       authority.clearSession(current);
       return createEffectRuntimeFailure(command, 'outputRejected');
     }
@@ -196,10 +202,20 @@ function acceptRenderResult(
   return result;
 }
 
-export async function renderEffectRuntimeSandboxFrame(
+export function renderEffectRuntimeSandboxFrame(
   authority: EffectRuntimeSandboxRenderAuthority,
   command: EffectRuntimeRenderCommand
-): Promise<EffectRuntimeFrameResult> {
+): Promise<EffectRuntimeFrameResult>;
+export function renderEffectRuntimeSandboxFrame(
+  authority: EffectRuntimeSandboxRenderAuthority,
+  command: EffectRuntimeRenderCommand,
+  kind: 'prepareGpuFrame'
+): Promise<EffectRuntimeSceneResult>;
+export async function renderEffectRuntimeSandboxFrame(
+  authority: EffectRuntimeSandboxRenderAuthority,
+  command: EffectRuntimeRenderCommand,
+  kind: EffectRuntimeRenderMessage['kind'] = 'renderFrame'
+): Promise<EffectRuntimeSceneResult> {
   if (authority.isDisposed()) return failUntransferredRequest(command);
   try {
     const current = authority.ensureSession();
@@ -207,7 +223,7 @@ export async function renderEffectRuntimeSandboxFrame(
     if (authority.isDisposed() || !authority.isCurrentSession(current)) {
       return failUntransferredRequest(command);
     }
-    const result = await requestFrameWithCacheRetry(authority, current, command);
+    const result = await requestFrameWithCacheRetry(authority, current, command, kind);
     const stale = rejectStaleSessionResult(authority, current, command, result);
     if (stale) return stale;
     return acceptRenderResult(authority, current, command, result);

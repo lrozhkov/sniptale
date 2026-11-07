@@ -4,8 +4,19 @@ import { isVideoProjectUtilityLaneVisible } from '../../project/utility-lanes';
 import type { VideoProject, VideoProjectMotionRegion } from '../../project/types';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import type { WorkingZoneCameraPlan } from './follow-cursor';
-import type { CursorOrientationPlan } from './cursor-orientation';
-import type { ProjectCameraConflict } from './project-follow';
+import type { CameraTrajectory } from './camera-trajectory';
+
+/** Disposable output-clock Euler offsets; every span has continuous position and two derivatives. */
+export interface CursorOrientationPlan {
+  spans: readonly CameraTrajectory[];
+  breaks: readonly number[];
+}
+export interface ProjectCameraConflict {
+  regionId: string;
+  time: number;
+  interval: { start: number; end: number };
+  reason: Extract<WorkingZoneCameraPlan, { status: 'conflict' }>['reason'];
+}
 
 export interface PreparedProjectCamera {
   readonly signature: string;

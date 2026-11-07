@@ -17,7 +17,8 @@ if (connectionNonce && compositionBackend) {
     window,
     createEffectRuntimeBrokerSession({
       workerFactory: () => new EffectRuntimeWorker(),
-      ...(compositionBackend === 'gpu-preview'
+      ...(compositionBackend === 'gpu-scene' ? { compositionBackend } : {}),
+      ...(compositionBackend === 'gpu-preview' || compositionBackend === 'gpu-scene'
         ? { gpu: createEffectRuntimeGpuPlanRenderer() }
         : {}),
     }),

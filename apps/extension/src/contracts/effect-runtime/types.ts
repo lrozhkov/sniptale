@@ -6,7 +6,7 @@ import type {
 import type { SerializedSvgVector } from './svg-vector';
 import type { EffectRuntimeGpuResource, EffectRuntimeGpuPass } from './gpu-plan';
 
-export const EFFECT_RUNTIME_PROTOCOL_VERSION = 4 as const;
+export const EFFECT_RUNTIME_PROTOCOL_VERSION = 5 as const;
 export const EFFECT_RUNTIME_SANDBOX_CONNECTION_FRAGMENT_KEY = 'connectionNonce' as const;
 export const EFFECT_RUNTIME_SANDBOX_CONNECT_MESSAGE = 'sniptale:effect-runtime:connect' as const;
 export const EFFECT_RUNTIME_SANDBOX_READY_MESSAGE = 'sniptale:effect-runtime:ready' as const;
@@ -94,11 +94,11 @@ export interface EffectRuntimeRenderCommand extends EffectRuntimeFrameRequestFie
   materializeImmutablePayloads(): Promise<EffectRuntimeImmutablePayloads>;
 }
 
-/** Exact protocol-v4 message crossing from the parent into the sandbox. */
+/** Exact protocol-v5 message crossing from the parent into the sandbox. */
 export interface EffectRuntimeRenderMessage extends EffectRuntimeFrameRequestFields {
   assetSelectionRef: EffectRuntimeAssetSelectionReference;
   documentRef: EffectRuntimeDocumentReference;
-  kind: 'renderFrame';
+  kind: 'renderFrame' | 'prepareGpuFrame';
   protocolVersion: typeof EFFECT_RUNTIME_PROTOCOL_VERSION;
 }
 
@@ -110,7 +110,7 @@ export interface EffectRuntimeRenderRequest extends EffectRuntimeFrameRequestFie
   document: EffectV1Document;
   documentId: string;
   documentPayloadIncluded: boolean;
-  kind: 'renderFrame';
+  kind: 'renderFrame' | 'prepareGpuFrame';
   protocolVersion: typeof EFFECT_RUNTIME_PROTOCOL_VERSION;
 }
 
@@ -146,7 +146,7 @@ export interface EffectRuntimeWorkerDocumentReference {
   id: string;
 }
 
-/** Exact protocol-v4 broker-to-worker message. */
+/** Exact protocol-v5 broker-to-worker message. */
 export interface EffectRuntimeWorkerMessage extends EffectRuntimeFrameRequestFields {
   renderTarget?: 'gpu-plan';
   assetSelectionRef: EffectRuntimeWorkerAssetSelectionReference;
@@ -193,6 +193,7 @@ export type EffectRuntimeFrameResult =
 
 export interface EffectRuntimeSandboxExecutor {
   dispose(): void;
+  prepareGpuFrame?(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult>;
   renderFrame(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeFrameResult>;
 }
 
@@ -201,10 +202,11 @@ export interface EffectRuntimeWorkerResponseEnvelope {
   type: typeof EFFECT_RUNTIME_WORKER_RESPONSE;
 }
 
-/** The evaluated GPU plan is consumed inside the sandbox and never crosses the parent boundary. */
-export type EffectRuntimeWorkerResult = EffectRuntimeFrameResult | EffectRuntimeGpuPlanResult;
+/** Worker output. The broker forwards bounded plans only on a negotiated scene connection. */
+export type EffectRuntimeSceneResult = EffectRuntimeFrameResult | EffectRuntimeGpuPlanResult;
+export type EffectRuntimeWorkerResult = EffectRuntimeSceneResult;
 
-/** Internal worker result only. The privileged host continues to receive an ordinary frame result. */
+/** Closed evaluated data. Each receiver checks identity, dimensions, operations and resources. */
 export interface EffectRuntimeGpuPlanResult extends EffectRuntimeFrameIdentity {
   kind: 'gpu-plan';
   acknowledged: EffectRuntimeImmutableAcknowledgement;

@@ -10,7 +10,7 @@ export function createEffectRuntimeSandboxExecutor(
   args: {
     ownerDocument?: Document;
     timeoutMs?: number;
-    compositionBackend?: 'gpu-preview';
+    compositionBackend?: 'gpu-preview' | 'gpu-scene';
   } = {}
 ): EffectRuntimeSandboxExecutor {
   const ownerDocument = args.ownerDocument ?? document;
@@ -29,6 +29,12 @@ export function createEffectRuntimeSandboxExecutor(
   });
   return {
     dispose: () => manager.dispose(),
+    ...(args.compositionBackend === 'gpu-scene'
+      ? {
+          prepareGpuFrame: (request: Parameters<EffectRuntimeSandboxExecutor['renderFrame']>[0]) =>
+            manager.prepareGpuFrame(request),
+        }
+      : {}),
     renderFrame: (request) => manager.renderFrame(request),
   };
 }

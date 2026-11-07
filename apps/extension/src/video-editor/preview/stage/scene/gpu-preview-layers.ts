@@ -1,3 +1,8 @@
+import type {
+  EffectRuntimeGpuPreparedComposition,
+  EffectRuntimeGpuPreparedFrame,
+  EffectRuntimeRenderedFrame,
+} from '../../../../features/video/composition/effect-runtime/runtime/types';
 import {
   assertEffectRasterDimensions,
   EFFECT_RUNTIME_RESOURCE_LIMITS,
@@ -27,11 +32,7 @@ import {
   type VideoCompositionMediaSource,
 } from '../../../../features/video/composition/draw/media-source';
 import { resolveVideoSourceLensPaintBounds } from '../../../../features/video/composition/draw/video';
-import type {
-  EffectRuntimeRenderedComposition,
-  EffectRuntimeRenderedFrameMap,
-} from '../../../../features/video/composition/effect-runtime';
-import { getEffectRuntimeVisualPassFrames } from '../../../../features/video/composition/effect-runtime';
+import type { EffectRuntimeRenderedComposition } from '../../../../features/video/composition/effect-runtime';
 import {
   drawCompositionVisualLayer,
   drawTransitionOverlay,
@@ -110,7 +111,7 @@ export async function buildNativeGpuPreviewLayers(args: {
   passes: Passes;
   sources: ReadonlyMap<string, VideoFrame>;
   media: ReadonlyMap<string, VideoCompositionMediaSource>;
-  effects?: EffectRuntimeRenderedComposition;
+  effects?: EffectRuntimeRenderedComposition | EffectRuntimeGpuPreparedComposition;
   background: GpuPreviewLayer;
   viewportBorders?: GpuPreviewLayer;
 }) {
@@ -466,7 +467,9 @@ export async function buildNativeGpuPreviewLayers(args: {
   };
   const paintLayers = (
     layers: readonly Layer[],
-    frames: EffectRuntimeRenderedFrameMap | undefined,
+    frames:
+      | ReadonlyMap<string, EffectRuntimeRenderedFrame | EffectRuntimeGpuPreparedFrame>
+      | undefined,
     frameActionOwners?: ReadonlySet<string>
   ) => {
     const drawn = new Set<string>();
@@ -477,17 +480,20 @@ export async function buildNativeGpuPreviewLayers(args: {
       ...layers.filter((layer) => layer.effectActionsOnly).map((layer) => layer.clipId),
     ]);
     for (const layer of layers) {
-      const selected = resolveEffectRuntimeVisualLayerFrame(frames, layer);
+      const selected = resolveEffectRuntimeVisualLayerFrame<
+        EffectRuntimeRenderedFrame | EffectRuntimeGpuPreparedFrame
+      >(frames, layer);
       const repeated = selected?.deduplicationKey && drawn.has(selected.deduplicationKey);
       if (selected?.deduplicationKey) drawn.add(selected.deduplicationKey);
       let body: GpuPreviewLayer[];
       if (selected) {
         const frame = selected.frame;
+        if ('retain' in frame && !repeated) retained.push(frame.retain());
         if (repeated) body = [];
         else if (selected.fullFrame)
           body = [
             {
-              source: frame.bitmap,
+              source: 'source' in frame ? frame.source : frame.bitmap,
               rect: { x: 0, y: 0, width: frame.logicalWidth, height: frame.logicalHeight },
               inverse: IDENTITY,
             },
@@ -495,7 +501,7 @@ export async function buildNativeGpuPreviewLayers(args: {
         else {
           const bounds = frame.bitmapBounds ?? { x: 0, y: 0, width: 1, height: 1 };
           const local: GpuPreviewLayer = {
-            source: frame.bitmap,
+            source: 'source' in frame ? frame.source : frame.bitmap,
             rect: {
               x: layer.x + bounds.x * layer.width,
               y: layer.y + bounds.y * layer.height,
@@ -742,7 +748,7 @@ export async function buildNativeGpuPreviewLayers(args: {
             await args.effects?.prepareVisualPass?.(pass.time);
             const frameLayers = paintLayers(
               resolveOrderedVisualPassLayers(part.layers, pass.frame.visualLayers),
-              getEffectRuntimeVisualPassFrames(args.effects, pass.time),
+              args.effects?.framesByTime.get(pass.time),
               frameActionOwners
             );
             const projected = cameraLayers(frameLayers.content, pass.frame.camera);
@@ -757,6 +763,7 @@ export async function buildNativeGpuPreviewLayers(args: {
               };
               if (
                 args.effects?.prepareVisualPass &&
+                !('kind' in args.effects) &&
                 passes.visualPasses.length > 1 &&
                 pass.time !== input.currentTime
               ) {
@@ -782,7 +789,7 @@ export async function buildNativeGpuPreviewLayers(args: {
           for (const overlay of pass.transitionOverlays)
             if (
               !hasEffectRuntimeTransitionFrame(
-                getEffectRuntimeVisualPassFrames(args.effects, pass.time),
+                args.effects?.framesByTime.get(pass.time),
                 overlay.transitionId
               )
             )

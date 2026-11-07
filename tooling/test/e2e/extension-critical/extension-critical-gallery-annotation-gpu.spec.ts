@@ -17,7 +17,10 @@ for (const variant of [
     page,
   }, info) => {
     test.setTimeout(120000);
-    const completedEffects = await observeEffectGpuPlans(page, { rejectProcessedCanvas: true });
+    const completedEffects = await observeEffectGpuPlans(page, {
+      rejectProcessedCanvas: true,
+      requireParentScene: true,
+    });
     await page.setViewportSize({ width: variant.width, height: variant.height });
     const host = await startHostServer();
     const errors: string[] = [];

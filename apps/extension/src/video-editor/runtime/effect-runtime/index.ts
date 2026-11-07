@@ -15,7 +15,7 @@ export function createVideoEditorEffectRuntime(args: {
 }): VideoEditorEffectRuntime {
   const executor = createEffectRuntimeSandboxExecutor({
     ownerDocument: args.ownerDocument,
-    ...(args.renderer === 'legacy' ? {} : { compositionBackend: 'gpu-preview' }),
+    ...(args.renderer === 'legacy' ? {} : { compositionBackend: 'gpu-scene' }),
   });
   return {
     renderer: args.renderer ?? 'gpu',

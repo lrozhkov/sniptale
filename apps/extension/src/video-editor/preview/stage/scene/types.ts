@@ -1,3 +1,4 @@
+import type { EffectRuntimeGpuPreparedComposition } from '../../../../features/video/composition/effect-runtime/runtime/types';
 import type { EffectRuntimeInputComposer } from '../../../../features/video/composition/effect-runtime/frame/inputs';
 import type { EffectRuntimeRenderedComposition } from '../../../../features/video/composition/effect-runtime';
 import type { VideoCompositionFrame } from '../../../../features/video/composition/types';
@@ -22,7 +23,14 @@ import type {
 import type { PreviewStageVideoRefs } from '../types';
 import type { PreviewEffectRuntimeFeedback } from '../types';
 import type { VideoEditorPreviewRasterSize } from '../sizing/raster';
-import type { VideoEditorPreviewMode } from '../../../contracts/preview-runtime';
+import type {
+  VideoEditorPreviewMode,
+  NativePreviewGpuOutput,
+} from '../../../contracts/preview-runtime';
+export type {
+  NativePreviewGpuOutput,
+  PreviewScenePresentation,
+} from '../../../contracts/preview-runtime';
 import type { VideoPreviewExactFrameCache } from '../../cache/exact-frame-cache';
 import type {
   PreviewRendererStatus,
@@ -56,12 +64,6 @@ export interface PreviewStageCanvasSceneParams {
   videoRefs: PreviewStageVideoRefs;
 }
 
-/** A completed destination retains its GPU provider until the frontend releases it. */
-export interface NativePreviewGpuOutput {
-  readonly canvas: HTMLCanvasElement;
-  release(): void;
-}
-
 /** The producer exclusively owns this destination through GPU completion. */
 export interface NativePreviewGpuTarget extends NativePreviewGpuOutput {
   readonly surface: GpuPreviewPresentationSurface;
@@ -82,14 +84,6 @@ export interface NativePreviewFramePresenter {
 type PreviewEffectRuntimeExecutorInput =
   | EffectRuntimeSandboxExecutor
   | (() => EffectRuntimeSandboxExecutor);
-
-/** Camera evaluated for one completed frame; the outer caller owns visible publication. */
-export interface PreviewScenePresentation {
-  camera: VideoCompositionCameraState;
-  time: number;
-  renderer?: PreviewRendererStatus;
-  output?: NativePreviewGpuOutput;
-}
 
 export type PreviewSceneRenderInput = {
   previewRenderer?: VideoPreviewRenderer;
@@ -139,9 +133,12 @@ export interface NativeGpuPreviewRenderer {
     isInvalidated: () => boolean,
     effects?:
       | EffectRuntimeRenderedComposition
+      | EffectRuntimeGpuPreparedComposition
       | ((
           composeInput: EffectRuntimeInputComposer
-        ) => Promise<EffectRuntimeRenderedComposition | undefined>),
+        ) => Promise<
+          EffectRuntimeRenderedComposition | EffectRuntimeGpuPreparedComposition | undefined
+        >),
     /** Omission conservatively retains the raster for callers without producer admission. */
     finalArtworkRequired?: boolean
   ): Promise<boolean | NativePreviewGpuOutput | undefined>;

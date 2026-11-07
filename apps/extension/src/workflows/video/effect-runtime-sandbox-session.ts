@@ -10,6 +10,7 @@ import {
 import {
   EFFECT_RUNTIME_SANDBOX_CONNECT_MESSAGE,
   type EffectRuntimeFrameResult,
+  type EffectRuntimeSceneResult,
   type EffectRuntimeRenderCommand,
 } from '../../contracts/effect-runtime/types';
 import type { PendingEffectRuntimeRequest } from './effect-runtime-sandbox-request';
@@ -34,7 +35,7 @@ export class EffectRuntimeSandboxSessionManager {
     private readonly configuration: {
       loadTimeoutMs: number;
       requestTimeoutMs: number;
-      compositionBackend?: 'gpu-preview';
+      compositionBackend?: 'gpu-preview' | 'gpu-scene';
     }
   ) {}
 
@@ -49,6 +50,18 @@ export class EffectRuntimeSandboxSessionManager {
 
   async renderFrame(command: EffectRuntimeRenderCommand): Promise<EffectRuntimeFrameResult> {
     return renderEffectRuntimeSandboxFrame(this.createRenderAuthority(), command);
+  }
+
+  async prepareGpuFrame(command: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult> {
+    if (this.configuration.compositionBackend !== 'gpu-scene') {
+      closeEffectRuntimeBitmaps(command.inputFrames);
+      return createEffectRuntimeFailure(command, 'inputRejected');
+    }
+    return renderEffectRuntimeSandboxFrame(
+      this.createRenderAuthority(),
+      command,
+      'prepareGpuFrame'
+    );
   }
 
   private createRenderAuthority(): EffectRuntimeSandboxRenderAuthority {
@@ -109,7 +122,7 @@ export class EffectRuntimeSandboxSessionManager {
 function createSandboxIframe(
   ownerDocument: Document,
   connectionNonce: string,
-  compositionBackend?: 'gpu-preview'
+  compositionBackend?: 'gpu-preview' | 'gpu-scene'
 ): HTMLIFrameElement {
   const iframe = ownerDocument.createElement('iframe');
   iframe.hidden = true;
