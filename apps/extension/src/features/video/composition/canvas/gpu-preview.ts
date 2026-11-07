@@ -426,7 +426,7 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
   };
 }
 
-function isNeutralFullLayer(layer: GpuPreviewLayer, logical: Size) {
+function isNeutralFullLayer(layer: GpuPreviewLayer, logical: Size, origin = { x: 0, y: 0 }) {
   const effects = [
     'lens',
     'blur',
@@ -439,12 +439,14 @@ function isNeutralFullLayer(layer: GpuPreviewLayer, logical: Size) {
     'operationClip',
   ] as const;
   return (
-    layer.rect.x === 0 &&
-    layer.rect.y === 0 &&
+    layer.rect.x === origin.x &&
+    layer.rect.y === origin.y &&
     layer.rect.width === logical.width &&
     layer.rect.height === logical.height &&
     layer.inverse.length === 9 &&
-    layer.inverse.every((value, index) => value === [1, 0, 0, 0, 1, 0, 0, 0, 1][index]) &&
+    layer.inverse.every(
+      (value, index) => value === [1, 0, origin.x, 0, 1, origin.y, 0, 0, 1][index]
+    ) &&
     (layer.opacity ?? 1) === 1 &&
     (layer.blend ?? 'over') === 'over' &&
     effects.every((key) => layer[key] === undefined)
@@ -457,13 +459,23 @@ function canOmitLeadingGroupCopy(
 ) {
   if (!isGroup(layer.source)) return false;
   const group = layer.source;
+  // A bounded integer offset cancels exactly on a native-density pixel grid.
+  const origin =
+    parent.output.width === parent.logical.width &&
+    parent.output.height === parent.logical.height &&
+    Number.isSafeInteger(layer.rect.x) &&
+    Number.isSafeInteger(layer.rect.y) &&
+    Math.abs(layer.rect.x) <= parent.logical.width &&
+    Math.abs(layer.rect.y) <= parent.logical.height
+      ? layer.rect
+      : undefined;
   return (
     group.output.width === parent.output.width &&
     group.output.height === parent.output.height &&
     group.logical.width === parent.logical.width &&
     group.logical.height === parent.logical.height &&
     layer.clip === undefined &&
-    isNeutralFullLayer(layer, parent.logical)
+    isNeutralFullLayer(layer, parent.logical, origin)
   );
 }
 
@@ -498,8 +510,37 @@ function coversOpaqueDestination(
   );
 }
 
+/** An isolated same-grid copy can borrow its source target even when that source is shared. */
+function aliasCopiedGroups(request: GpuPreviewRequest): GpuPreviewRequest {
+  const completed = new Map<GpuPreviewGroup, GpuPreviewGroup>();
+  const normalize = (layers: readonly GpuPreviewLayer[]): readonly GpuPreviewLayer[] => {
+    const mapped = layers.map((layer) => {
+      if (!isGroup(layer.source)) return layer;
+      const source = layer.source;
+      let group = completed.get(source);
+      if (!group) {
+        const children = normalize(source.layers);
+        const copy = children.length === 1 ? children[0] : undefined;
+        group =
+          copy && isGroup(copy.source) && canOmitLeadingGroupCopy(copy, source)
+            ? copy.source
+            : children === source.layers
+              ? source
+              : { ...source, layers: children };
+        completed.set(source, group);
+      }
+      return group === source ? layer : { ...layer, source: group };
+    });
+    return mapped.every((layer, index) => layer === layers[index]) ? layers : mapped;
+  };
+  const layers = normalize(request.layers);
+  return layers === request.layers ? request : { ...request, layers };
+}
+
 /** Only leading draws share the same transparent destination as their isolated group. */
 function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRequest {
+  // Count readers after aliases so expanding a formerly private source cannot duplicate shared work.
+  request = aliasCopiedGroups(request);
   const references = new Map<GpuPreviewGroup, number>();
   const visited = new Set<GpuPreviewGroup>();
   const count = (layers: readonly GpuPreviewLayer[]) => {

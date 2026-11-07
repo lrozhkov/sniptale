@@ -1228,6 +1228,72 @@ it('removes nested private leading copies without changing the source graph', as
   expect(outer.layers[0]!.source).toBe(inner);
 });
 
+it('omits a same-grid leading group copy with cancelling integer source-plane offsets', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const inner = group([layer()]);
+  const copy: GpuPreviewLayer = {
+    ...fullGroup(inner),
+    rect: { x: -8, y: -12, width: 64, height: 36 },
+    inverse: [1, 0, -8, 0, 1, -12, 0, 0, 1],
+  };
+  const outer = group([copy]);
+  await renderer.render(request([layer(), fullGroup(outer)]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(2);
+  expect(g.pass.draw).toHaveBeenCalledTimes(3);
+  expect(outer.layers[0]).toBe(copy);
+  expect(copy.source).toBe(inner);
+});
+
+it.each<{ name: string; inverse: GpuPreviewLayer['inverse']; x: number }>([
+  { name: 'uncancelled offset', inverse: [1, 0, -7, 0, 1, -12, 0, 0, 1], x: -8 },
+  { name: 'fractional offset', inverse: [1, 0, -8.25, 0, 1, -12, 0, 0, 1], x: -8.25 },
+])('retains a group with $name', async ({ inverse, x }) => {
+  const g = graphics();
+  const renderer = await owner();
+  const inner = group([layer()]);
+  const outer = group([
+    {
+      ...fullGroup(inner),
+      rect: { x, y: -12, width: 64, height: 36 },
+      inverse,
+    },
+  ]);
+  await renderer.render(request([layer(), fullGroup(outer)]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(3);
+});
+
+it('retains cancelling source offsets when logical and physical pixel grids differ', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const inner = { ...group([layer()]), logical: { width: 32, height: 18 } };
+  const copy: GpuPreviewLayer = {
+    ...layer(inner),
+    rect: { x: -8, y: -12, width: 32, height: 18 },
+    inverse: [1, 0, -8, 0, 1, -12, 0, 0, 1],
+  };
+  const outer = { ...group([copy]), logical: inner.logical };
+  await renderer.render(request([layer(), fullGroup(outer)]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(3);
+});
+
+it('aliases a pixel-copy wrapper without expanding its shared source group', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const shared = group([layer()]);
+  const copy: GpuPreviewLayer = {
+    ...fullGroup(shared),
+    rect: { x: -8, y: -12, width: 64, height: 36 },
+    inverse: [1, 0, -8, 0, 1, -12, 0, 0, 1],
+  };
+  const wrapper = group([copy]);
+  await renderer.render(request([layer(), fullGroup(wrapper), fullGroup(shared)]));
+  expect(g.commands.filter((command) => command === 'begin')).toHaveLength(2);
+  expect(g.pass.draw).toHaveBeenCalledTimes(4);
+  expect(wrapper.layers[0]).toBe(copy);
+  expect(copy.source).toBe(shared);
+});
+
 it('retains a group after an existing backdrop', async () => {
   const g = graphics();
   const renderer = await owner();

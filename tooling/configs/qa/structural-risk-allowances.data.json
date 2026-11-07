@@ -5762,7 +5762,7 @@
       "reason": "tool-noise: One GPU adapter fixture controls device failures, queue fences, validation and source release. Shared raster cases use the same fixture and resource lifetime. The additional cases do not introduce a separate fixture owner.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "904ac3b9490ba1e5af8fe843f41e81b9966d2b477a65cc8fcb439ee6618df1f5",
+      "astHash": "899638b1fd002329afed251b9a0f3413503f95f9c3df91c8a5cfa3a73a6332a5",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {
@@ -6169,7 +6169,7 @@
       "reason": "tool-noise: One GPU backend owns slot resources, source uploads, command encoding and completion. A lookup reuses one raster texture within one frame. It does not retain raster content across frames. Resource owners and completion barriers remain unchanged. Separate helpers would distribute one resource transaction.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "dbe34a72a3b90bf7647767964af4fd1865897b58588b552f404dd370543ffd49",
+      "astHash": "9b14a2d5c17e5ed978cfbae9e0f5398ac7c4ed939841c95d4c99128161c529ff",
       "signatureHash": "f2cedc19aea17ca74edd24dde4169bfe2a379a549e4c64af11c1cdcf087fe5ce"
     }
   ]
