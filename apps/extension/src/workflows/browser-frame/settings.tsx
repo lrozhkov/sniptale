@@ -16,10 +16,12 @@ export function WindowHeaderSettings({
   titleField,
   addressField,
   faviconControls,
+  renderGroup,
 }: WindowHeaderSettingsProps & {
   titleField?: ReactNode;
   addressField?: ReactNode;
   faviconControls?: ReactNode;
+  renderGroup?: (kind: 'appearance' | 'content', children: ReactNode) => ReactNode;
 }) {
   useAppLocale();
   const inspector = useInspectorLayout();
@@ -43,6 +45,7 @@ export function WindowHeaderSettings({
     >
       <HeaderSegments<'none' | WindowHeader['kind']>
         label={translate('windowHeader.type')}
+        hideLabel
         value={header?.kind ?? 'none'}
         options={[
           ...(allowNone ? [{ id: 'none' as const, label: translate('windowHeader.none') }] : []),
@@ -53,50 +56,63 @@ export function WindowHeaderSettings({
       />
       {header ? (
         <>
-          <HeaderSegments
-            label={translate('windowHeader.style')}
-            value={header.style}
-            options={[
-              { id: 'windows', label: translate('windowHeader.windows') },
-              { id: 'macos', label: translate('windowHeader.macos') },
-              { id: 'linux', label: translate('windowHeader.linux') },
-            ]}
-            onChange={(style) => editing.patch({ style })}
-          />
-          <HeaderSegments
-            label={translate('windowHeader.theme')}
-            value={header.theme}
-            options={[
-              { id: 'light', label: translate('windowHeader.light') },
-              { id: 'dark', label: translate('windowHeader.dark') },
-            ]}
-            onChange={(theme) => editing.patch({ theme })}
-          />
-          {titleField ?? (
-            <HeaderTextField
-              label={translate(
-                header.kind === 'browser' ? 'windowHeader.tabTitle' : 'windowHeader.windowTitle'
-              )}
-              value={header.title}
-              maxLength={512}
-              onCommit={(title) => editing.patch({ title })}
+          <HeaderGroup
+            render={renderGroup ? (children) => renderGroup('appearance', children) : undefined}
+          >
+            <HeaderSegments
+              label={translate('windowHeader.style')}
+              value={header.style}
+              options={[
+                { id: 'windows', label: translate('windowHeader.windows') },
+                { id: 'macos', label: translate('windowHeader.macos') },
+                { id: 'linux', label: translate('windowHeader.linux') },
+              ]}
+              onChange={(style) => editing.patch({ style })}
             />
-          )}
-          {header.kind === 'browser' ? (
-            <div className={inspector ? 'min-w-0' : 'flex min-w-0 items-end gap-1.5'}>
-              {addressField ?? (
-                <HeaderTextField
-                  label={translate('windowHeader.address')}
-                  value={header.url}
-                  maxLength={2048}
-                  placeholder="example.com"
-                  onCommit={editing.changeAddress}
-                  trailingActions={inspector ? iconControls : undefined}
-                />
-              )}
-              {inspector && !addressField ? null : iconControls}
-            </div>
-          ) : null}
+            <HeaderSegments
+              label={translate('windowHeader.theme')}
+              value={header.theme}
+              options={[
+                { id: 'light', label: translate('windowHeader.light') },
+                { id: 'dark', label: translate('windowHeader.dark') },
+              ]}
+              onChange={(theme) => editing.patch({ theme })}
+            />
+          </HeaderGroup>
+          <HeaderGroup
+            render={renderGroup ? (children) => renderGroup('content', children) : undefined}
+          >
+            {titleField ?? (
+              <HeaderTextField
+                label={translate(
+                  header.kind === 'browser' ? 'windowHeader.tabTitle' : 'windowHeader.windowTitle'
+                )}
+                value={header.title}
+                placeholder={translate(
+                  header.kind === 'browser'
+                    ? 'windowHeader.tabTitlePlaceholder'
+                    : 'windowHeader.windowTitlePlaceholder'
+                )}
+                maxLength={512}
+                onCommit={(title) => editing.patch({ title })}
+              />
+            )}
+            {header.kind === 'browser' ? (
+              <div className={inspector ? 'min-w-0' : 'flex min-w-0 items-end gap-1.5'}>
+                {addressField ?? (
+                  <HeaderTextField
+                    label={translate('windowHeader.address')}
+                    value={header.url}
+                    maxLength={2048}
+                    placeholder="example.com"
+                    onCommit={editing.changeAddress}
+                    trailingActions={inspector ? iconControls : undefined}
+                  />
+                )}
+                {inspector && !addressField ? null : iconControls}
+              </div>
+            ) : null}
+          </HeaderGroup>
         </>
       ) : null}
       {editing.error ? (
@@ -113,7 +129,9 @@ function HeaderSegments<T extends string>({
   value,
   options,
   onChange,
+  hideLabel = false,
 }: {
+  hideLabel?: boolean;
   label: string;
   value: T;
   options: { id: T; label: string }[];
@@ -123,7 +141,7 @@ function HeaderSegments<T extends string>({
   if (inspector)
     return (
       <SegmentedRow
-        label={label}
+        label={hideLabel ? undefined : label}
         layout="stacked"
         columns={options.length === 2 ? 2 : 3}
         ariaLabel={label}
@@ -135,6 +153,7 @@ function HeaderSegments<T extends string>({
   return (
     <div className="min-w-0 space-y-1.5">
       <span
+        hidden={hideLabel}
         className={[
           'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
           'text-[color:var(--sniptale-color-text-secondary)]',
@@ -174,6 +193,7 @@ function HeaderTextField({
   return (
     <TextField
       label={label}
+      stacked
       value={draft}
       maxLength={maxLength}
       placeholder={placeholder}
@@ -198,4 +218,11 @@ function HeaderTextField({
       }}
     />
   );
+}
+
+function HeaderGroup(props: {
+  children: ReactNode;
+  render?: ((children: ReactNode) => ReactNode) | undefined;
+}) {
+  return <>{props.render ? props.render(props.children) : props.children}</>;
 }

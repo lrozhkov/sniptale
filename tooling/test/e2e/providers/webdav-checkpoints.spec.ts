@@ -436,6 +436,8 @@ async function imageControls(page: Page) {
     label('editor.compact.frameBackgroundModeColor')
   );
   await expect(panel.locator('[data-ui="editor.frame.source-basics"]')).toBeVisible();
+  await disclosure(page, 'editor.scene.sourceShadow');
+  await disclosure(page, 'editor.scene.borderAdvanced');
   const padding = panel.locator('[data-ui="editor.frame.padding-fields"]');
   for (const axis of ['all', 'horizontal', 'vertical']) {
     const toggle = padding.locator(`[data-padding-link="${axis}"]`);
@@ -457,8 +459,8 @@ function imageEdits(page: Page): Edit[] {
       ['highlighter.editor.paddingLeft', '18'],
       ['editor.compact.cornerRadius', '4'],
       ['editor.compact.cornerRadius', '6'],
-      ['editor.scene.glowSize', '25'],
-      ['editor.scene.glowSize', '40'],
+      ['editor.compact.size', '25'],
+      ['editor.compact.size', '40'],
       ['editor.compact.blurStrokeWidth', '2'],
     ] as const
   ).map(([key, value]) => ({ name: `${key}:${value}`, apply: () => number(owner, key, value) }));
@@ -757,7 +759,7 @@ async function verifyControls(page: Page, fixture: Fixture, kind: Kind) {
       owner.getByRole('textbox', { name: label('editor.compact.cornerRadius'), exact: true })
     ).toHaveValue('6');
     await expect(
-      owner.getByRole('textbox', { name: label('editor.scene.glowSize'), exact: true })
+      owner.getByRole('textbox', { name: label('editor.compact.size'), exact: true })
     ).toHaveValue('40');
     await expect(
       owner.getByRole('textbox', { name: label('editor.compact.blurStrokeWidth'), exact: true })

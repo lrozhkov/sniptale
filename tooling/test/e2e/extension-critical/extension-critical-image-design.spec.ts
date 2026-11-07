@@ -181,6 +181,10 @@ async function inspectBrowserAndSizes(page: Page, locale: Locale, info: TestInfo
   await title.scrollIntoViewIfNeeded();
   await screenshot(page, info, 'browser-header');
   await chooseMode(page, 'meta');
+  await page
+    .locator('summary')
+    .filter({ hasText: label('editor.compact.technicalDataTextSettings') })
+    .click();
   const font = ui(page, 'editor.technical-data.font-serif');
   await font.click();
   await expect(font).toHaveAttribute('aria-pressed', 'true');
@@ -558,7 +562,7 @@ for (const theme of ['light', 'dark'] as const) {
       await ui(page, 'editor.floating.view-controls.workspace').click();
       const row = ui(page, 'editor.workspace.background-default-row');
       const saveDefault = row.getByRole('button', {
-        name: translate('editor.compact.workspaceMakeDefault', 'ru'),
+        name: translate('editor.compact.workspaceResetColor', 'ru'),
         exact: true,
       });
       await expect(saveDefault).toHaveText('');
@@ -788,8 +792,8 @@ for (const theme of ['light', 'dark'] as const) {
         translate('editor.compact.frameBackgroundModeColor', 'ru')
       );
       const names = [
-        'editor.scene.placementSection',
-        'highlighter.editor.paddingLabel',
+        'editor.compact.canvasSize',
+        'editor.scene.paddingAroundImage',
         'editor.compact.cornerRadius',
       ] as const;
       const geometry = await Promise.all(
@@ -815,15 +819,9 @@ for (const theme of ['light', 'dark'] as const) {
         expect.soft(item.lineHeight).toBe('18px');
         expect.soft(Math.abs(item.x - geometry[0]!.x)).toBeLessThanOrEqual(1);
       }
-      expect
-        .soft(
-          Math.abs(geometry[1]!.y - geometry[0]!.y - (geometry[2]!.y - geometry[1]!.y)),
-          JSON.stringify(geometry)
-        )
-        .toBeLessThanOrEqual(1);
       const padding = ui(page, 'editor.frame.padding-fields');
       await padding
-        .getByText(translate('highlighter.editor.paddingLabel', 'ru'), { exact: true })
+        .getByText(translate('editor.scene.paddingAroundImage', 'ru'), { exact: true })
         .hover();
       const range = padding.getByRole('slider');
       await expect(range).toBeVisible();

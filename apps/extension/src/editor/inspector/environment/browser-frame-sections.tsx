@@ -1,10 +1,7 @@
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import React, { useState } from 'react';
+import React from 'react';
 import { translate } from '../../../platform/i18n';
-import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
-import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
+import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import { SelectField, type CompactSelectOption } from '../../chrome/ui';
-import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from '../chrome';
 
 interface BrowserFrameState {
   canvasMode: 'resize' | 'keep-size';
@@ -20,7 +17,7 @@ export const BrowserFrameBehaviorSections: React.FC<{
   <fieldset className="sniptale-parameter-stack">
     <legend className="sr-only">{translate('editor.compact.browserFrameLayout')}</legend>
     <SelectField
-      label={translate('editor.compact.canvasBehavior')}
+      label={translate('editor.compact.canvasSize')}
       options={browserCanvasModeOptions}
       value={browserFrame.canvasMode}
       onChange={(value) =>
@@ -30,7 +27,7 @@ export const BrowserFrameBehaviorSections: React.FC<{
       }
     />
     <SelectField
-      label={translate('editor.compact.sceneBehavior')}
+      label={translate('windowHeader.imageBelowHeader')}
       options={browserContentModeOptions}
       value={browserFrame.contentMode}
       onChange={(value) =>
@@ -41,55 +38,3 @@ export const BrowserFrameBehaviorSections: React.FC<{
     />
   </fieldset>
 );
-
-export const BrowserFrameResetSection: React.FC<{
-  disabled?: boolean;
-  resetBrowserFrame: () => Promise<void> | void;
-}> = ({ disabled = false, resetBrowserFrame }) => {
-  const [pending, setPending] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const handleReset = async () => {
-    if (disabled || pending) return;
-
-    setPending(true);
-    setActionError(null);
-    try {
-      await runAndReportEditorAction('browser-frame-reset', resetBrowserFrame, {
-        fallbackKey: 'editor.compact.browserFrameApplyFailed',
-        notify: false,
-      });
-    } catch (error) {
-      setActionError(
-        createUserFacingErrorMessage({
-          cause: error,
-          detail: 'unexpected',
-          summaryKey: 'editor.compact.browserFrameApplyFailed',
-        })
-      );
-    } finally {
-      setPending(false);
-    }
-  };
-
-  return (
-    <div className="space-y-2">
-      {actionError ? (
-        <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
-          {actionError}
-        </p>
-      ) : null}
-      <ProductActionButton
-        compact
-        tone="secondary"
-        type="button"
-        className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
-        disabled={disabled || pending}
-        aria-busy={pending}
-        onClick={() => void handleReset()}
-      >
-        {pending ? translate('common.states.loading') : translate('windowHeader.reset')}
-      </ProductActionButton>
-    </div>
-  );
-};

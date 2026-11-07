@@ -84,3 +84,20 @@
   width: 100%;
   justify-content: space-between;
 }
+
+.editor-inspector-surface .editor-size-dimensions::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  inset-inline-end: 12px;
+  top: 16px;
+  bottom: 24px;
+  width: 12px;
+  border: 1px solid var(--sniptale-color-border-strong);
+  border-inline-start: 0;
+  border-radius: 0 4px 4px 0;
+}
+.editor-inspector-surface .editor-size-dimensions > div:last-child {
+  z-index: 1;
+  background: var(--sniptale-color-surface-panel);
+}

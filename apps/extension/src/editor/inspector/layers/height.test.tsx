@@ -142,7 +142,14 @@ function getPanelFrame() {
   return container?.querySelector<HTMLDivElement>('[data-ui="editor.layers.panel-frame"]') ?? null;
 }
 
-function renderExpandedPanel(layerIds: string[], props: { maxExpandedHeightRatio?: number } = {}) {
+function renderExpandedPanel(
+  layerIds: string[],
+  props: {
+    maxExpandedHeightRatio?: number;
+    initialScrollOffset?: number;
+    onScrollOffsetChange?: (offset: number) => void;
+  } = {}
+) {
   renderPanel(
     <EditorInspectorLayersPanel
       expanded
@@ -277,4 +284,27 @@ it('allocates the remaining height below floating panel controls to the scrollab
   expect(frame?.className).not.toContain('h-full');
   expect(frame?.className).not.toContain('shrink-0');
   expectLastListViewport({ reserveScrollbarGutter: true, scrollable: true });
+});
+
+it('restores the workspace list offset, records native scrolling and releases the detached listener', () => {
+  setOverflowLayerMetrics();
+  const remember = vi.fn();
+  renderExpandedPanel(['a', 'b', 'c'], { initialScrollOffset: 64, onScrollOffsetChange: remember });
+  const list = container!.querySelector<HTMLDivElement>('[data-ui="editor.layers.list-viewport"]')!;
+  expect(list.scrollTop).toBe(64);
+  act(() => {
+    list.scrollTop = 90;
+    list.dispatchEvent(new Event('scroll'));
+  });
+  expect(remember).toHaveBeenCalledExactlyOnceWith(90);
+  renderPanel(null);
+  act(() => {
+    list.scrollTop = 100;
+    list.dispatchEvent(new Event('scroll'));
+  });
+  expect(remember).toHaveBeenCalledTimes(1);
+  renderExpandedPanel(['a', 'b', 'c'], { initialScrollOffset: 90, onScrollOffsetChange: remember });
+  expect(
+    container!.querySelector<HTMLDivElement>('[data-ui="editor.layers.list-viewport"]')!.scrollTop
+  ).toBe(90);
 });

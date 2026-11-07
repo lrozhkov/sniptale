@@ -75,7 +75,7 @@ export function FramePaddingFields(props: {
       <ProductGlassLinkedPaddingFields
         fieldLayout="full-row"
         labels={{
-          padding: translate('highlighter.editor.paddingLabel'),
+          padding: translate('editor.scene.paddingAroundImage'),
           top: translate('highlighter.editor.paddingTop'),
           right: translate('highlighter.editor.paddingRight'),
           bottom: translate('highlighter.editor.paddingBottom'),
@@ -98,7 +98,7 @@ export function FramePaddingFields(props: {
           >
             <PaddingRange
               active={rangeActive}
-              label={translate('highlighter.editor.paddingLabel')}
+              label={translate('editor.scene.paddingAroundImage')}
               onActiveChange={setRangeActive}
               onPreview={onPreview}
               onChange={onChange}

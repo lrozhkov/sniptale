@@ -1,6 +1,7 @@
+import { Plus } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
-import { SegmentedRow } from '../../ui/compact-inspector-controls';
+import { CheckboxField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import React, { useMemo } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
@@ -91,22 +92,14 @@ function TechnicalDataLayoutToggle(props: {
 
 function TechnicalDataOptionRow({ checked, onToggle, option }: TechnicalDataOptionRowProps) {
   return (
-    <label
-      className={cx(
-        'flex min-h-8 cursor-pointer items-center gap-2.5 rounded-[4px] px-2 text-[13px] font-medium leading-[18px]',
-        'text-[color:var(--sniptale-color-text-secondary)]',
-        'hover:bg-[var(--sniptale-color-surface-hover)]'
-      )}
-    >
-      <input
-        type="checkbox"
-        checked={checked}
+    <div className={cx('min-w-0', 'text-[color:var(--sniptale-color-text-secondary)]', 'w-full')}>
+      <CheckboxField
+        dataUi={`editor.technical-data.field-${option.kind}`}
+        label={translate(option.labelKey)}
+        value={checked}
         onChange={onToggle}
-        className="sniptale-parameter-check m-0! shrink-0"
-        data-ui={`editor.technical-data.field-${option.kind}`}
       />
-      <span>{translate(option.labelKey)}</span>
-    </label>
+    </div>
   );
 }
 
@@ -157,34 +150,26 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
     <InspectorDisclosurePreferences scope="editor:technical-data">
       <div className="space-y-2">
         <EditorInspectorDetails
-          label={translate('editor.compact.technicalDataTextSettings')}
-          preferenceId="text-settings"
-          initiallyOpen
-          level="section"
-        >
-          <EditorTechnicalDataTextSettings />
-        </EditorInspectorDetails>
-        <EditorInspectorDetails
           label={translate('editor.compact.technicalDataFields')}
           preferenceId="fields"
           initiallyOpen
           level="section"
         >
-          <div className="sniptale-parameter-stack">
-            <TechnicalDataOptionList selectedKinds={selectedKinds} onToggleKind={toggleKind} />
-            {orderedKinds.length > 1 ? (
-              <TechnicalDataLayoutToggle layout={layout} onSelectLayout={selectLayout} />
-            ) : null}
-          </div>
+          <TechnicalDataOptionList selectedKinds={selectedKinds} onToggleKind={toggleKind} />
         </EditorInspectorDetails>
+        <EditorInspectorDetails
+          label={translate('editor.compact.technicalDataTextSettings')}
+          preferenceId="text-settings"
+          level="section"
+        >
+          <EditorTechnicalDataTextSettings />
+        </EditorInspectorDetails>
+        {orderedKinds.length > 1 ? (
+          <TechnicalDataLayoutToggle layout={layout} onSelectLayout={selectLayout} />
+        ) : null}
         {saveError ? (
           <p role="alert" className="text-xs text-[color:var(--sniptale-color-text-primary)]">
             {translate('editor.compact.technicalDataPreferenceSaveFailed')}
-          </p>
-        ) : null}
-        {!canInsert ? (
-          <p role="status" className="text-xs text-[color:var(--sniptale-color-text-secondary)]">
-            {translate('editor.compact.technicalDataPreviewEmpty')}
           </p>
         ) : null}
         <ProductActionButton
@@ -199,6 +184,7 @@ export const EditorTechnicalDataPicker: React.FC<EditorTechnicalDataPickerProps>
             pickerButtonClassName[variant]
           )}
         >
+          <Plus size={16} aria-hidden="true" />
           {translate('editor.compact.technicalDataInsert')}
         </ProductActionButton>
       </div>

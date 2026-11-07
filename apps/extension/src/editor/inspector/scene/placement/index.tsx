@@ -17,7 +17,7 @@ export function EditorInspectorFramePlacementSection(
     >
       <div className="sniptale-parameter-stack">
         <EditorInspectorSelectInput
-          label={translate('editor.scene.placementSection')}
+          label={translate('editor.compact.canvasSize')}
           value={props.frameDraft.layoutMode}
           options={props.frameLayoutModeOptions}
           onChange={props.setLayoutMode}

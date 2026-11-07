@@ -139,28 +139,33 @@ function SourceImageShadowSection(args: {
   const { props, settings } = args;
   return (
     <section className="sniptale-parameter-stack" data-ui="editor.frame.source-glow">
-      <SourceImageRangeControl
-        label={translate('editor.scene.glowSize')}
-        max={100}
-        value={settings.shadow}
-        valueText={`${settings.shadow}%`}
-        onPreview={
-          props.previewFramePatch
-            ? (shadow) => patchSourceImage(props, { shadow }, true)
-            : undefined
-        }
-        onChange={(shadow) => patchSourceImage(props, { shadow })}
-      />
-      <ColorField
-        title={translate('editor.compact.shadowColor')}
-        label={translate('editor.compact.shadowColor')}
-        value={settings.shadowColor ?? settings.strokeColor}
-        recentColors={props.recentColors}
-        palette={props.shapeStrokePalette ?? []}
-        onPreviewChange={(shadowColor) => patchSourceImage(props, { shadowColor }, true)}
-        onPreviewReset={(shadowColor) => patchSourceImage(props, { shadowColor }, true)}
-        onChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
-      />
+      <EditorInspectorDetails
+        preferenceId="frame:source-image-shadow"
+        label={`${translate('editor.scene.sourceShadow')} · ${settings.shadow}%`}
+      >
+        <SourceImageRangeControl
+          label={translate('editor.compact.size')}
+          max={100}
+          value={settings.shadow}
+          valueText={`${settings.shadow}%`}
+          onPreview={
+            props.previewFramePatch
+              ? (shadow) => patchSourceImage(props, { shadow }, true)
+              : undefined
+          }
+          onChange={(shadow) => patchSourceImage(props, { shadow })}
+        />
+        <ColorField
+          title={translate('editor.compact.shadowColor')}
+          label={translate('editor.compact.shadowColor')}
+          value={settings.shadowColor ?? settings.strokeColor}
+          recentColors={props.recentColors}
+          palette={props.shapeStrokePalette ?? []}
+          onPreviewChange={(shadowColor) => patchSourceImage(props, { shadowColor }, true)}
+          onPreviewReset={(shadowColor) => patchSourceImage(props, { shadowColor }, true)}
+          onChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
+        />
+      </EditorInspectorDetails>
     </section>
   );
 }
@@ -170,12 +175,16 @@ function SourceImageBorderSection(args: {
   settings: EditorImageSettings;
 }) {
   const { props, settings } = args;
+  const summary =
+    settings.strokeWidth > 0 && settings.strokeOpacity > 0
+      ? `${settings.strokeWidth}px`
+      : translate('editor.scene.borderNone');
   return (
     <section className="sniptale-parameter-stack" data-ui="editor.frame.source-border">
       <EditorInspectorDetails
         preferenceId="frame:source-image-border"
         level="group"
-        label={translate('editor.scene.borderAdvanced')}
+        label={`${translate('editor.scene.borderAdvanced')} · ${summary}`}
       >
         <div className="sniptale-parameter-stack">
           <SourceImageRangeControl

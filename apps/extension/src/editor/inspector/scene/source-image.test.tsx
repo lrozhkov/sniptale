@@ -186,7 +186,7 @@ it('uses the native 0–100 shadow intensity without scaling it as fractional op
   );
   const shadow = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('[data-testid="range"]') ?? []
-  ).find((element) => element.getAttribute('aria-label') === translate('editor.scene.glowSize'));
+  ).find((element) => element.getAttribute('aria-label') === translate('editor.compact.size'));
   expect(shadow?.dataset['value']).toBe('35');
   expect(shadow?.dataset['max']).toBe('100');
   await act(async () => shadow?.click());
@@ -195,7 +195,7 @@ it('uses the native 0–100 shadow intensity without scaling it as fractional op
   );
 });
 
-it('shows shadow controls directly and keeps only border details collapsible', async () => {
+it('keeps shadow and border initially collapsed with current values', async () => {
   await renderUi(
     <EditorInspectorFrameSourceImageFields
       applyFramePatch={vi.fn()}
@@ -205,11 +205,12 @@ it('shows shadow controls directly and keeps only border details collapsible', a
   );
 
   const groups = Array.from(container?.querySelectorAll('details') ?? []);
-  expect(groups).toHaveLength(1);
+  expect(groups).toHaveLength(2);
   expect(groups.map((group) => group.querySelector('summary')?.textContent)).toEqual([
-    translate('editor.scene.borderAdvanced'),
+    `${translate('editor.scene.sourceShadow')} · 0%`,
+    `${translate('editor.scene.borderAdvanced')} · ${translate('editor.scene.borderNone')}`,
   ]);
-  expect(container?.textContent).not.toContain(translate('editor.scene.glowLabel'));
+  expect(groups.every((group) => !group.open)).toBe(true);
   expect(container?.querySelector('[data-testid="color"]')).not.toBeNull();
   expect(
     container?.querySelector('[aria-label="' + translate('editor.compact.shadowBlur') + '"]')

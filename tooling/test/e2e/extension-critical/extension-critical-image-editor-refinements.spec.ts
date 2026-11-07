@@ -75,6 +75,20 @@ for (const locale of ['en', 'ru'] as const) {
       const menu = page.locator('[data-ui="editor.floating.view-controls.popover.workspace"]');
       const viewport = page.locator('[data-ui="editor.canvas.viewport"]');
       const before = await viewport.evaluate((element) => element.scrollLeft);
+      const snap = menu.getByRole('button', {
+        name: translate('editor.compact.enableGridSnap', locale),
+        exact: true,
+      });
+      await expect(snap).toBeVisible();
+      const sizeField = menu.getByRole('textbox', {
+        name: translate('editor.compact.gridSize', locale),
+        exact: true,
+      });
+      await expect(sizeField).toHaveCount(0);
+      await snap.click();
+      await expect(sizeField).toBeVisible();
+      await snap.click();
+      await expect(sizeField).toHaveCount(0);
       const toggle = menu.getByRole('button', {
         name: translate('editor.compact.showGrid', locale),
         exact: true,
@@ -272,4 +286,210 @@ test('image refinements toolbar breakpoints and narrow outer scroll', async ({
   });
   expect(await outer.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
   await page.screenshot({ path: info.outputPath('narrow-outer-scroll.png'), fullPage: false });
+});
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`inspector aligned controls and window-header states ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    const mode = (value: string) =>
+      page.locator(`[data-ui="editor.floating.layers.mode.${value}"]`);
+    await mode('frame').click();
+    const panel = page.locator('[data-ui="editor.frame-panel"]');
+    const insets = await panel.evaluate((element) => {
+      const outer = element
+        .closest('.editor-inspector-surface')!
+        .parentElement!.getBoundingClientRect();
+      const inner = element.getBoundingClientRect();
+      return { left: inner.left - outer.left, right: outer.right - inner.right };
+    });
+    expect(Math.abs(insets.left - insets.right)).toBeLessThanOrEqual(1);
+    await panel
+      .locator('[data-ui="editor.frame.background-mode"]')
+      .getByRole('button')
+      .nth(1)
+      .click();
+    const groups = panel.locator('details[data-level="section"]');
+    await expect(groups).toHaveCount(3);
+    expect(
+      await groups.evaluateAll((nodes) => nodes.every((node) => node.hasAttribute('open')))
+    ).toBe(true);
+    await expect(
+      panel
+        .locator('summary')
+        .filter({ hasText: translate('editor.scene.backgroundAdvanced', 'en') })
+    ).toHaveCount(0);
+    for (const kind of ['glow', 'border'])
+      await expect(
+        panel.locator(`[data-ui="editor.frame.source-${kind}"] details`)
+      ).not.toHaveAttribute('open');
+    const scroller = page.locator('[data-ui="editor.floating.inspector-scroll"]');
+    await scroller.hover();
+    await page.mouse.wheel(0, 80);
+    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    const scrollPosition = await scroller.evaluate((element) => element.scrollTop);
+    await mode('meta').click();
+    await mode('frame').click();
+    await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(scrollPosition);
+    await mode('browser-frame').click();
+    const header = page.locator('[data-ui="window-header-settings"]');
+    await header
+      .getByRole('button', { name: translate('windowHeader.none', 'en'), exact: true })
+      .click();
+    await expect(
+      page.getByRole('button', { name: translate('windowHeader.reset', 'en'), exact: true })
+    ).toHaveCount(0);
+    await expect(
+      page.locator('summary').filter({ hasText: translate('editor.scene.placementSection', 'en') })
+    ).toHaveCount(0);
+    await header
+      .getByRole('button', { name: translate('windowHeader.browser', 'en'), exact: true })
+      .click();
+    const headerGroups = header.locator('details');
+    await expect(headerGroups).toHaveCount(2);
+    expect(
+      await headerGroups.evaluateAll((nodes) => nodes.every((node) => node.hasAttribute('open')))
+    ).toBe(true);
+    await expect(
+      page.locator('[data-ui="editor.inspector.disclosure"]').filter({
+        has: page
+          .locator('summary')
+          .filter({ hasText: translate('editor.scene.placementSection', 'en') }),
+      })
+    ).not.toHaveAttribute('open');
+    const title = header.getByRole('textbox', {
+      name: translate('windowHeader.tabTitle', 'en'),
+      exact: true,
+    });
+    await expect(title).toHaveAttribute(
+      'placeholder',
+      translate('windowHeader.tabTitlePlaceholder', 'en')
+    );
+    const stacked = await title.evaluate((input) => {
+      const row = input.closest('.sniptale-parameter-row')!;
+      const label = row.querySelector('.sniptale-parameter-name')!.getBoundingClientRect();
+      return input.getBoundingClientRect().top >= label.bottom;
+    });
+    expect(stacked).toBe(true);
+    const address = header.getByRole('textbox', {
+      name: translate('windowHeader.address', 'en'),
+      exact: true,
+    });
+    await address.fill('');
+    await address.press('Enter');
+    await expect(
+      header.getByRole('button', { name: translate('windowHeader.favicon', 'en'), exact: true })
+    ).toBeDisabled();
+    await mode('meta').click();
+    const checks = page.locator('.sniptale-boolean-parameter input[type="checkbox"]');
+    await expect(checks).toHaveCount(3);
+    const content = page.locator('[data-ui="editor.inspector.disclosure"]').filter({
+      has: page
+        .locator('summary')
+        .filter({ hasText: translate('editor.compact.technicalDataFields', 'en') }),
+    });
+    const appearance = page.locator('[data-ui="editor.inspector.disclosure"]').filter({
+      has: page
+        .locator('summary')
+        .filter({ hasText: translate('editor.compact.technicalDataTextSettings', 'en') }),
+    });
+    await expect(content).toHaveAttribute('open');
+    await expect(appearance).not.toHaveAttribute('open');
+    for (let index = 0; index < 3; index++) await checks.nth(index).uncheck();
+    await expect(
+      page.getByRole('button', {
+        name: translate('editor.compact.technicalDataInsert', 'en'),
+        exact: true,
+      })
+    ).toBeDisabled();
+    await checks.nth(0).check();
+    await checks.nth(1).check();
+    await expect(
+      page.getByRole('group', {
+        name: translate('editor.compact.technicalDataLayout', 'en'),
+        exact: true,
+      })
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole('status')
+        .filter({ hasText: translate('editor.compact.technicalDataPreviewEmpty', 'en') })
+    ).toHaveCount(0);
+    await expect(
+      page
+        .getByRole('button', {
+          name: translate('editor.compact.technicalDataInsert', 'en'),
+          exact: true,
+        })
+        .locator('svg')
+    ).toHaveCount(1);
+    await page.screenshot({ path: info.outputPath('inspector-controls.png'), fullPage: false });
+    await page.locator('[data-ui="editor.floating.tool-rail.history.reset"]').click();
+    const history = page.locator('[data-ui="editor.floating.tool-rail.history.reset-choices"]');
+    const overflow = await history.locator('button').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const button = node.getBoundingClientRect();
+        const content = node.querySelector('span.block')!.getBoundingClientRect();
+        return Math.max(content.bottom - button.bottom, button.top - content.top);
+      })
+    );
+    expect(Math.max(...overflow)).toBeLessThanOrEqual(0.5);
+    await page.screenshot({ path: info.outputPath('history-reset-layout.png'), fullPage: false });
+    await page.keyboard.press('Escape');
+    await expect(history).toHaveCount(0);
+  });
+}
+
+test('inspector keeps settings and layer-list scroll through tabs and collapse', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await openEditor(page, hostOrigin, 'en');
+  const mode = (name: string) => page.locator(`[data-ui="editor.floating.layers.mode.${name}"]`);
+  await mode('meta').click();
+  await page.locator('[data-ui="editor.technical-data.field-date"]').check();
+  await page
+    .getByRole('button', {
+      name: translate('editor.compact.technicalDataInsert', 'en'),
+      exact: true,
+    })
+    .click();
+  await mode('layers').click();
+  const list = page.locator('[data-ui="editor.layers.list-viewport"]');
+  const duplicate = list
+    .getByRole('button', {
+      name: translate('editor.toolbar.duplicateLayer', 'en'),
+      exact: true,
+      disabled: false,
+    })
+    .first();
+  for (let index = 0; index < 8; index++) {
+    await list.locator(':scope > div').first().hover();
+    await duplicate.click();
+  }
+  await list.hover();
+  await page.mouse.wheel(0, 90);
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  const layerPosition = await list.evaluate((element) => element.scrollTop);
+  await mode('frame').click();
+  await mode('layers').click();
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBe(layerPosition);
+  await page.locator('[data-ui="editor.floating.layers.collapse-button"]').click();
+  await mode('layers').click();
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBe(layerPosition);
+  await mode('frame').click();
+  await page.locator('[data-ui="editor.frame.background-mode"]').getByRole('button').nth(1).click();
+  const scroller = page.locator('[data-ui="editor.floating.inspector-scroll"]');
+  await scroller.hover();
+  await page.mouse.wheel(0, 90);
+  await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  const settingsPosition = await scroller.evaluate((element) => element.scrollTop);
+  await page.locator('[data-ui="editor.floating.layers.collapse-button"]').click();
+  await mode('meta').click();
+  await mode('frame').click();
+  await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(settingsPosition);
 });

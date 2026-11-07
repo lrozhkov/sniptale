@@ -176,7 +176,7 @@ function BackgroundAcquisitionCommands(props: {
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]!' : ''}`}
+        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]! border-0!' : ''}`}
         {...uploadPress.props}
         aria-disabled={props.busy}
         aria-busy={props.busy}
@@ -192,7 +192,7 @@ function BackgroundAcquisitionCommands(props: {
       </button>
       <button
         type="button"
-        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]!' : ''}`}
+        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]! border-0!' : ''}`}
         {...libraryPress.props}
         aria-disabled={props.busy}
         aria-busy={props.busy}

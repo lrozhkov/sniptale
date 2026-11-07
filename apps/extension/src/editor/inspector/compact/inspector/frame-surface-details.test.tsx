@@ -50,7 +50,7 @@ it('hides compact Reset in None and preserves image mode through the active rese
     backgroundBlurAmount: 0,
   });
 });
-it('uses shared first-image acquisition, Advanced fit controls and reset through compact content', async () => {
+it('uses shared first-image acquisition, Background fit controls and reset through compact content', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   resources.read.mockResolvedValue({ file: new File(['x'], 'background.png') });
   const host = document.createElement('div');
@@ -103,12 +103,12 @@ it('uses shared first-image acquisition, Advanced fit controls and reset through
         .querySelectorAll<HTMLButtonElement>('[data-ui="editor.frame.background-mode"] button')[2]!
         .getAttribute('aria-pressed')
     ).toBe('true');
-    const advanced = [...host.querySelectorAll('details')].find((item) =>
-      item.textContent?.includes('Дополнительно')
+    const advanced = [...host.querySelectorAll('details')].find(
+      (item) => item.querySelector('summary')?.textContent === 'Фон'
     )!;
-    expect(advanced.textContent).toContain('Размещение фона');
+    expect(advanced.textContent).toContain('Заполнение фона');
     await act(async () =>
-      advanced.querySelector<HTMLButtonElement>('button[aria-label="Размещение фона"]')!.click()
+      advanced.querySelector<HTMLButtonElement>('button[aria-label="Заполнение фона"]')!.click()
     );
     const contain = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((item) =>
       item.textContent?.includes('Contain')

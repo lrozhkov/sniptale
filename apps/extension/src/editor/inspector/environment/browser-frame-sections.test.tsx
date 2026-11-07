@@ -49,7 +49,7 @@ vi.mock('./shared', () => ({
   panelButtonClassName: 'panel-button',
 }));
 
-import { BrowserFrameBehaviorSections, BrowserFrameResetSection } from './browser-frame-sections';
+import { BrowserFrameBehaviorSections } from './browser-frame-sections';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -116,51 +116,4 @@ it('renders alternate labels for keep-size and fit-content browser behavior', ()
 
   expect(container?.textContent).toContain('Keep');
   expect(container?.textContent).toContain('Fit');
-});
-
-it('routes insert or update through the async action boundary', async () => {
-  const resetBrowserFrame = vi.fn();
-
-  act(() => {
-    root?.render(<BrowserFrameResetSection resetBrowserFrame={resetBrowserFrame} />);
-  });
-
-  await act(async () => {
-    container?.querySelector('button')?.click();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-
-  expect(resetBrowserFrame).toHaveBeenCalledOnce();
-  expect(container?.textContent).not.toContain('editor.compact.browserFrameAction');
-  expect(container?.textContent).toContain('windowHeader.reset');
-});
-
-it('keeps disabled apply inert and exposes a localized async failure', async () => {
-  const resetBrowserFrame = vi.fn(async () => {
-    throw new Error('Frame failed');
-  });
-
-  act(() => {
-    root?.render(<BrowserFrameResetSection disabled resetBrowserFrame={resetBrowserFrame} />);
-  });
-
-  expect(container?.querySelector('button')?.disabled).toBe(true);
-  expect(container?.querySelector('[role="alert"]')).toBeNull();
-
-  act(() => {
-    root?.render(<BrowserFrameResetSection resetBrowserFrame={resetBrowserFrame} />);
-  });
-
-  await act(async () => {
-    container?.querySelector('button')?.click();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-
-  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
-    'editor.compact.browserFrameApplyFailed. common.errors.unexpectedDetail'
-  );
-  expect(container?.querySelector('[role="alert"]')?.textContent).not.toContain('boom');
-  expect(container?.querySelector('button')?.disabled).toBe(false);
 });

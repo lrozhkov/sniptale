@@ -150,6 +150,7 @@ for (const { name, size } of [
         await expect(fillMode).toHaveAttribute('aria-pressed', 'true');
       }
       const glow = page.locator('[data-ui="editor.frame.source-glow"]');
+      await glow.locator('summary').click();
       const range = await revealRange(glow);
       const before = await canvasFingerprint(page);
       const acceptedHistory = await historyIndex(page);

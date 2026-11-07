@@ -377,7 +377,8 @@ it('keeps the address and icon actions in one inspector value owner', async () =
       host.querySelector<HTMLInputElement>(
         `input[aria-label="${translate('windowHeader.tabTitle')}"]`
       )?.placeholder
-    ).toBe(translate('windowHeader.tabTitle'));
+    ).toBe(translate('windowHeader.tabTitlePlaceholder'));
+    expect(host.querySelectorAll('details')).toHaveLength(0);
   } finally {
     await act(async () => root.unmount());
   }
@@ -394,7 +395,10 @@ it.each(['favicon', 'fileIcon'] as const)(
       await act(async () =>
         root.render(
           <CommandPressScope value={true}>
-            <WindowHeaderSettings header={DEFAULT_WINDOW_HEADER} onChange={vi.fn()} />
+            <WindowHeaderSettings
+              header={{ ...DEFAULT_WINDOW_HEADER, url: 'example.test' }}
+              onChange={vi.fn()}
+            />
           </CommandPressScope>
         )
       );

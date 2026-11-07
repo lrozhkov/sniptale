@@ -1,5 +1,6 @@
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { SegmentedRow } from '../../../ui/compact-inspector-controls';
+import { Check } from 'lucide-react';
 import React from 'react';
 import { translate } from '../../../platform/i18n';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
@@ -21,7 +22,10 @@ import {
   type SizeDraft,
 } from './resize-tool-options';
 import { useCanvasResizePreview } from './resize-tool-preview';
-import { INSPECTOR_SECTION_SURFACE_CLASS_NAME } from '../chrome';
+import {
+  INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
+  INSPECTOR_SECTION_SURFACE_CLASS_NAME,
+} from '../chrome';
 import { useEditorStore } from '../../state/useEditorStore';
 
 type ResizeToolMode = 'canvas' | 'image';
@@ -86,6 +90,11 @@ function CanvasCropModeSwitch(props: {
       columns={2}
       options={(['crop', 'expand'] as const).map((value) => ({
         value,
+        description: translate(
+          value === 'crop'
+            ? 'editor.compact.cropWithinCanvasDescription'
+            : 'editor.compact.expandCanvasDescription'
+        ),
         label: translate(
           value === 'crop' ? 'editor.compact.cropWithinCanvas' : 'editor.compact.expandCanvas'
         ),
@@ -161,20 +170,7 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
             }}
           />
         ) : null}
-        {isCanvasMode ? (
-          <p
-            aria-live="polite"
-            className="text-xs leading-5 text-[color:var(--sniptale-color-text-secondary)]"
-          >
-            {translate(
-              canvasCropMode === 'expand'
-                ? 'editor.compact.expandCanvasDescription'
-                : props.cropReady
-                  ? 'editor.compact.cropReadyDescription'
-                  : 'editor.compact.cropWithinCanvasDescription'
-            )}
-          </p>
-        ) : null}
+        {!isCanvasMode && <ResizeToolSizePresetField active={active} />}
         <ResizeToolSizePanel
           active={active}
           bounds={isCanvasMode && canvasCropMode === 'crop' ? props.canvasSize : undefined}
@@ -191,7 +187,10 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
             {translate('editor.compact.cropSizeExceedsCanvas')}
           </p>
         ) : null}
-        <div className="flex flex-wrap justify-end gap-2 px-2">
+        <div
+          data-ui="editor.resize.actions"
+          className={isCanvasMode ? 'grid grid-cols-2 gap-2' : 'grid'}
+        >
           {isCanvasMode ? (
             <ProductActionButton
               compact
@@ -204,11 +203,13 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
           ) : null}
           <ProductActionButton
             compact
-            tone="primary"
+            tone="secondary"
+            className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
             type="button"
             disabled={applyDisabled}
             onClick={() => applyResizeToolMode(props, mode, canvasCropMode)}
           >
+            <Check size={16} aria-hidden="true" />
             {translate(
               mode === 'image'
                 ? 'editor.compact.applyImageSize'
@@ -260,13 +261,15 @@ function ResizeToolSizePanel(props: {
 
   return (
     <section aria-label={label} className={INSPECTOR_SECTION_SURFACE_CLASS_NAME}>
+      <h3 className="m-0 px-2 text-[13px] font-medium leading-[32px]">
+        {translate('editor.compact.size')}
+      </h3>
       <div className="sniptale-parameter-stack">
         <ResizeToolDimensionRow
           active={props.active}
           bounds={props.bounds}
           updateLockedDraft={props.updateLockedDraft}
         />
-        {props.isCanvasMode ? null : <ResizeToolSizePresetField active={props.active} />}
         <ResizeToolAspectRatioField active={props.active} bounds={props.bounds} />
       </div>
     </section>
@@ -279,7 +282,10 @@ function ResizeToolDimensionRow(props: {
   updateLockedDraft: ResizeToolSectionProps['updateLockedDraft'];
 }) {
   return (
-    <div data-size-panel-dimensions className="sniptale-parameter-stack relative">
+    <div
+      data-size-panel-dimensions
+      className="sniptale-parameter-stack relative pr-8 editor-size-dimensions"
+    >
       {(['width', 'height'] as const).map((field) => {
         const label = translate(
           field === 'width' ? 'editor.compact.widthDimension' : 'editor.compact.heightDimension'
@@ -302,7 +308,7 @@ function ResizeToolDimensionRow(props: {
           </InspectorParameterRow>
         );
       })}
-      <div className="absolute right-28 top-1/2 -translate-y-1/2 [&>button]:h-6 [&>button]:w-6 [&_svg]:size-3">
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 [&>button]:h-6 [&>button]:w-6 [&_svg]:size-3">
         <AspectToggle
           compact
           checked={props.active.locked}

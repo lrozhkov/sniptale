@@ -1,6 +1,6 @@
 [data-ui='editor.inspector.content']:has([data-ui='editor.frame-panel']) {
   padding: 0;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: stable both-edges;
 }
 
 [data-ui='editor.frame.padding-fields'] [data-padding-link] {
@@ -17,4 +17,20 @@
   > [data-padding-hover='all']:first-child {
   min-height: 32px;
   padding-bottom: 0;
+}
+
+/* Each parameter already owns its 8px content inset. */
+[data-ui='editor.frame-panel'] > .sniptale-parameter-stack {
+  padding-inline: 0;
+}
+[data-ui='editor.frame-panel'] [data-ui='background.image.picker'] {
+  margin-inline: 8px;
+}
+
+[data-ui='editor.frame-panel'] .sniptale-numeric-entry {
+  padding-inline-end: 0;
+}
+
+[data-ui='editor.frame-panel'] > .sniptale-parameter-stack > details > .sniptale-parameter-stack {
+  padding-inline: 0;
 }

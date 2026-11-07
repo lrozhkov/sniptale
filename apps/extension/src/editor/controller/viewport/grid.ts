@@ -6,12 +6,7 @@ export function applyEditorGridSnap(
   object: FabricObject,
   workspace: EditorWorkspaceSettings
 ): void {
-  if (
-    !workspace.gridEnabled ||
-    !workspace.gridSnapEnabled ||
-    !isUserObject(object) ||
-    isSourceObject(object)
-  ) {
+  if (!workspace.gridSnapEnabled || !isUserObject(object) || isSourceObject(object)) {
     return;
   }
 

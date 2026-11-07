@@ -27,7 +27,12 @@ export function WindowHeaderIconControls(props: {
   const input = useRef<HTMLInputElement>(null);
   const scoped = useContext(CommandPressScope);
   const fileActive = props.header.faviconEnabled && props.header.faviconSource === 'file';
-  const websitePress = useCommandPress({ enabled: scoped, onClick: props.onWebsite });
+  const websiteDisabled = !props.header.url.trim();
+  const websitePress = useCommandPress({
+    enabled: scoped,
+    disabled: websiteDisabled,
+    onClick: props.onWebsite,
+  });
   const filePress = useCommandPress({
     enabled: scoped,
     disabled: props.busy === 'file',
@@ -38,6 +43,7 @@ export function WindowHeaderIconControls(props: {
       <button
         type="button"
         className={buttonClass}
+        disabled={websiteDisabled}
         aria-label={translate('windowHeader.favicon')}
         title={translate(props.busy === 'site' ? 'windowHeader.loading' : 'windowHeader.favicon')}
         aria-pressed={props.header.faviconEnabled && !fileActive}

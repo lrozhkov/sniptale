@@ -226,7 +226,7 @@ it('previews a crop area after the user changes its aspect ratio', () => {
   const controller = createController();
   renderResizeTool(controller);
 
-  const applyButton = getButton(translate('editor.compact.applyCropCanvas'));
+  const applyButton = getActionButton(translate('editor.compact.applyCropCanvas'));
   expect(applyButton.disabled).toBe(true);
   expect(controller.previewCanvasSize).not.toHaveBeenCalled();
 
@@ -271,7 +271,7 @@ it('settles oversized manual crop dimensions at the image limits', () => {
 
   editDimension(translate('editor.compact.heightDimension'), '1800');
   expect(getInput(translate('editor.compact.heightDimension')).value).toBe('900');
-  expect(getButton(translate('editor.compact.applyCropCanvas')).disabled).toBe(true);
+  expect(getActionButton(translate('editor.compact.applyCropCanvas')).disabled).toBe(true);
 });
 
 it('keeps both dimensions within the image when aspect lock is on', () => {
@@ -317,7 +317,7 @@ it('leaves crop mode from the secondary cancel action', () => {
   renderResizeTool(controller);
 
   const cancel = getButton(translate('common.actions.cancel'));
-  expect(cancel.parentElement?.className).toContain('flex-wrap');
+  expect(cancel.parentElement?.className).toContain('grid-cols-2');
   expect(cancel.className).toContain('border-none');
 
   act(() => {
@@ -334,8 +334,11 @@ it('applies a selected crop through the crop controller path', async () => {
     cropSelection: { height: 600, width: 800 },
   });
 
-  expect(container?.textContent).toContain(translate('editor.compact.cropReadyDescription'));
-  await act(async () => getButton(translate('editor.compact.applyCropCanvas')).click());
+  expect(container?.textContent).not.toContain(translate('editor.compact.cropReadyDescription'));
+  expect(getButton(translate('editor.compact.cropWithinCanvas')).title).toBe(
+    translate('editor.compact.cropWithinCanvasDescription')
+  );
+  await act(async () => getActionButton(translate('editor.compact.applyCropCanvas')).click());
   expect(controller.applyCropSelection).toHaveBeenCalledOnce();
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
 });
@@ -457,3 +460,12 @@ it('keeps a selected preset ratio during locked dimension edits', () => {
   expect(getInput(translate('editor.compact.heightDimension')).value).toBe('540');
   expect(getSelect(translate('editor.compact.aspectRatioPreset')).value).toBe('16:9');
 });
+
+function getActionButton(label: string): HTMLButtonElement {
+  const buttons = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('[data-ui="editor.resize.actions"] button') ?? []
+  );
+  const button = buttons.find((button) => button.textContent?.trim() === label);
+  if (!button) throw new Error(`Missing action: ${label}`);
+  return button;
+}

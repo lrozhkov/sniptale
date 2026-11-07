@@ -39,8 +39,13 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
   return (
     <InspectorLayout>
       <div data-ui="editor.frame-panel" className="min-w-0">
-        <div className="sniptale-parameter-stack px-2 pt-2">
-          <div className="sniptale-parameter-stack">
+        <div className="sniptale-parameter-stack pt-2">
+          <EditorInspectorDetails
+            preferenceId="frame:background"
+            label={translate('editor.scene.backgroundSection')}
+            level="section"
+            initiallyOpen
+          >
             <EditorInspectorFrameBackgroundModeControl
               frameDraft={props.frameDraft}
               lastFillModeRef={props.lastFillModeRef}
@@ -65,20 +70,31 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
                   recentColors={props.recentColors}
                   toNumber={props.toNumber}
                 />
-                {props.frameDraft.backgroundMode !== 'color' ||
-                props.frameDraft.backgroundBlurAmount > 0 ? (
+                {props.frameDraft.backgroundMode === 'image' && (
+                  <EditorInspectorFrameBackgroundImageMode
+                    frameDraft={props.frameDraft}
+                    applyFramePatch={props.applyFramePatch}
+                    frameBackgroundImageFitOptions={props.frameBackgroundImageFitOptions}
+                  />
+                )}
+                {props.frameDraft.backgroundMode !== 'color' && (
                   <EditorInspectorBackgroundBlurControl
                     frameDraft={props.frameDraft}
                     applyFramePatch={props.applyFramePatch}
                     previewFramePatch={props.previewFramePatch}
                   />
-                ) : null}
+                )}
               </>
             )}
-          </div>
+          </EditorInspectorDetails>
           {!isFrameBackgroundNone(props.frameDraft) && (
             <>
-              <div className="sniptale-parameter-stack">
+              <EditorInspectorDetails
+                preferenceId="frame:composition"
+                label={translate('editor.scene.placementSection')}
+                level="section"
+                initiallyOpen
+              >
                 <FramePaddingSection
                   frameDraft={props.frameDraft}
                   framePaddingSummary={props.framePaddingSummary}
@@ -86,30 +102,22 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
                   setFrameDraft={props.setFrameDraft}
                   previewFrameDraft={props.previewFrameDraft}
                 />
-              </div>
-              <div className="sniptale-parameter-stack">
+                <EditorInspectorFramePlacementSection
+                  hideHeader
+                  frameDraft={props.frameDraft}
+                  frameLayoutModeOptions={props.frameLayoutModeOptions}
+                  setLayoutMode={props.setLayoutMode}
+                />
+              </EditorInspectorDetails>
+              <EditorInspectorDetails
+                preferenceId="frame:image"
+                label={translate('editor.compact.image')}
+                level="section"
+                initiallyOpen
+              >
                 <EditorInspectorFrameSourceImageBasics {...sourceImageProps(props)} />
                 <EditorInspectorFrameSourceImageEffects {...sourceImageProps(props)} />
-                <EditorInspectorDetails
-                  preferenceId="frame:advanced"
-                  label={translate('editor.scene.backgroundAdvanced')}
-                >
-                  {props.frameDraft.backgroundMode === 'image' &&
-                    props.frameDraft.backgroundImageData && (
-                      <EditorInspectorFrameBackgroundImageMode
-                        frameDraft={props.frameDraft}
-                        applyFramePatch={props.applyFramePatch}
-                        frameBackgroundImageFitOptions={props.frameBackgroundImageFitOptions}
-                      />
-                    )}
-                  <EditorInspectorFramePlacementSection
-                    hideHeader
-                    frameDraft={props.frameDraft}
-                    frameLayoutModeOptions={props.frameLayoutModeOptions}
-                    setLayoutMode={props.setLayoutMode}
-                  />
-                </EditorInspectorDetails>
-              </div>
+              </EditorInspectorDetails>
             </>
           )}
         </div>

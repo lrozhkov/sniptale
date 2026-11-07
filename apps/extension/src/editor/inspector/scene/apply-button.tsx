@@ -13,6 +13,7 @@ export function FrameApplyButton(props: {
         compact
         disabled={props.disabled}
         tone="secondary"
+        title={translate('editor.scene.resetBackgroundHint')}
         className={`${INSPECTOR_SECONDARY_BUTTON_CLASS_NAME} justify-center px-3.5`}
         onClick={props.onApplyFrame}
         type="button"

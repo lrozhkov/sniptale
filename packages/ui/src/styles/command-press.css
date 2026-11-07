@@ -61,6 +61,13 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
     color: var(--sniptale-color-text-primary) !important;
   }
 
+  button[data-command-press][data-command-tone][data-command-layout='multiline'] {
+    height: auto !important;
+    padding-block: 8px !important;
+    white-space: normal;
+    align-items: flex-start;
+  }
+
   button[data-command-press][data-command-tone='primary'],
   button[data-command-press][data-command-tone='toggle'][data-command-active='true'] {
     background: var(--sniptale-color-surface-hover) !important;
