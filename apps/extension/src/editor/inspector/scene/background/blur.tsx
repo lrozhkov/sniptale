@@ -5,6 +5,7 @@ import { EditorInspectorRangeField } from '../shared';
 
 export function EditorInspectorBackgroundBlurControl(props: {
   frameDraft: EditorFrameSettings;
+  previewFramePatch?: ((patch: Partial<EditorFrameSettings>) => void) | undefined;
   applyFramePatch: (patch: Partial<EditorFrameSettings>) => void;
 }) {
   return (
@@ -15,6 +16,11 @@ export function EditorInspectorBackgroundBlurControl(props: {
       step={1}
       unit="px"
       value={props.frameDraft.backgroundBlurAmount}
+      onPreview={
+        props.previewFramePatch
+          ? (backgroundBlurAmount) => props.previewFramePatch?.({ backgroundBlurAmount })
+          : undefined
+      }
       onChange={(backgroundBlurAmount) => props.applyFramePatch({ backgroundBlurAmount })}
     />
   );

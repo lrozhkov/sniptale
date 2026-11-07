@@ -63,6 +63,7 @@ vi.mock('./shared', async (importOriginal) => ({
     value: number;
     max: number;
     onChange: (value: number) => void;
+    onPreview?: (value: number) => void;
   }) => (
     <button
       type="button"
@@ -70,6 +71,7 @@ vi.mock('./shared', async (importOriginal) => ({
       aria-label={props.label}
       data-value={String(props.value)}
       data-max={String(props.max)}
+      onPointerMove={() => props.onPreview?.(50)}
       onClick={() => props.onChange(50)}
     >
       range
@@ -214,11 +216,13 @@ it('shows shadow controls directly and keeps only border details collapsible', a
 for (const colorIndex of [0, 1]) {
   it(`keeps source color ${colorIndex} previews and cancellation out of document commits`, async () => {
     const applyFramePatch = vi.fn();
+    const previewFramePatch = vi.fn();
     await renderUi(
       <EditorInspectorFrameSourceImageFields
         frameDraft={DEFAULT_EDITOR_FRAME_SETTINGS}
         recentColors={[]}
         applyFramePatch={applyFramePatch}
+        previewFramePatch={previewFramePatch}
       />
     );
     const click = (name: string) => {
@@ -229,10 +233,49 @@ for (const colorIndex of [0, 1]) {
       act(() => button?.click());
     };
     click('color-preview');
+    expect(previewFramePatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sourceImage: expect.objectContaining({
+          [colorIndex === 0 ? 'shadowColor' : 'strokeColor']: '#abcdef',
+        }),
+      })
+    );
     expect(applyFramePatch).not.toHaveBeenCalled();
     click('color-cancel');
+    expect(previewFramePatch).toHaveBeenCalledTimes(2);
     expect(applyFramePatch).not.toHaveBeenCalled();
     click('color');
     expect(applyFramePatch).toHaveBeenCalledTimes(1);
   });
 }
+
+it('routes all source sliders to live previews with native units and commits separately', async () => {
+  const applyFramePatch = vi.fn();
+  const previewFramePatch = vi.fn();
+  await renderUi(
+    <EditorInspectorFrameSourceImageFields
+      frameDraft={DEFAULT_EDITOR_FRAME_SETTINGS}
+      recentColors={[]}
+      applyFramePatch={applyFramePatch}
+      previewFramePatch={previewFramePatch}
+    />
+  );
+  const ranges = container!.querySelectorAll<HTMLButtonElement>('[data-testid="range"]');
+  expect(ranges).toHaveLength(4);
+  for (const range of ranges) {
+    act(() => range.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  }
+  expect(applyFramePatch).not.toHaveBeenCalled();
+  for (const patch of [
+    { radius: 50 },
+    { shadow: 50 },
+    { strokeWidth: 50 },
+    { strokeOpacity: 0.5 },
+  ]) {
+    expect(previewFramePatch).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceImage: expect.objectContaining(patch) })
+    );
+  }
+  for (const range of ranges) act(() => range.click());
+  expect(applyFramePatch).toHaveBeenCalledTimes(4);
+});

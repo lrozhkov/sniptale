@@ -9,6 +9,12 @@ import type {
 } from '../../../features/editor/document/types';
 import { helperMocks } from './controller.instance-delegation.test-support';
 import { createImageEditorController } from './controller';
+import { reportEditorActionFailure } from '../../runtime/async-actions';
+
+vi.mock('../../runtime/async-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/async-actions')>()),
+  reportEditorActionFailure: vi.fn(),
+}));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -271,4 +277,21 @@ it('reports export readiness only when both canvas and source authorities exist'
     visible: true,
   };
   expect(controller.isDocumentReadyForExport()).toBe(true);
+});
+
+it('reports legacy frame mutation failures while retaining a rejected completion promise', async () => {
+  const { controller, frame } = createControllerScenario();
+  const error = new Error('Background decode failed');
+  helperMocks.applyFrameSettingsForController.mockRejectedValueOnce(error);
+  const completion = controller.applyFrameSettings(frame);
+  await expect(completion).rejects.toBe(error);
+  expect(reportEditorActionFailure).toHaveBeenCalledWith('scene-mutation', error);
+});
+
+it('leaves scheduled preview failure reporting to its transaction owner', async () => {
+  const { controller, frame } = createControllerScenario();
+  const error = new Error('Background decode failed');
+  helperMocks.applyFrameSettingsForController.mockRejectedValueOnce(error);
+  await expect(controller.applyFrameSettings(frame, { preview: true })).rejects.toBe(error);
+  expect(reportEditorActionFailure).not.toHaveBeenCalled();
 });

@@ -193,7 +193,10 @@ it('renders the solid color branch and forwards color updates', async () => {
     )?.click();
   });
 
-  expect(previewFramePatch).not.toHaveBeenCalled();
+  expect(previewFramePatch).toHaveBeenCalledWith({
+    backgroundColor: '#111111ff',
+    backgroundMode: 'color',
+  });
   expect(applyFramePatch).toHaveBeenCalledWith({
     backgroundColor: '#222222ff',
     backgroundMode: 'color',

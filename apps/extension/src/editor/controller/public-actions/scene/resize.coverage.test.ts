@@ -22,6 +22,7 @@ import {
 } from './resize';
 
 function createBaseOptions() {
+  const browserFrame = { enabled: false };
   const frame = {
     backgroundColor: '#fff',
     layoutMode: 'expand-canvas',
@@ -32,14 +33,14 @@ function createBaseOptions() {
   };
 
   return {
-    canvas: { setDimensions: vi.fn() },
+    canvas: { setDimensions: vi.fn(), getObjects: () => [], requestRenderAll: vi.fn() },
     commitHistory: vi.fn(),
     ensureReachableObjects: vi.fn(() => false),
     getCanvasDocumentSize: () => ({ height: 500, width: 800 }),
     rebuildFrameDecorations: vi.fn(async () => undefined),
     source: { dataUrl: 'data:image/png;base64,abc' } as { dataUrl: string },
     store: {
-      getBrowserFrame: vi.fn(() => ({ enabled: false })),
+      getBrowserFrame: vi.fn(() => browserFrame),
       getFrame: vi.fn(() => frame),
       updateFrame: vi.fn(),
     },
@@ -126,13 +127,11 @@ function registerSourceAndFrameTests() {
   it('applies frame settings only when canvas and source exist', () => {
     const options = createBaseOptions();
     const relayoutScene = vi.fn();
-    const frame = { backgroundColor: '#000' };
+    const frame = { ...options.store.getFrame(), backgroundColor: '#000' };
 
     applyEditorFrameSceneSettings({ ...options, frame, relayoutScene } as never);
     expect(options.store.updateFrame).toHaveBeenCalledWith(frame);
-    expect(mocks.finalizeEditorSceneMutationMock).toHaveBeenCalledWith(
-      expect.objectContaining({ viewportDevicePixelRatioBaseline: 1 })
-    );
+    expect(options.commitHistory).toHaveBeenCalledOnce();
 
     applyEditorFrameSceneSettings({
       ...options,
@@ -161,7 +160,7 @@ function registerBackgroundOnlyFrameTest() {
 
     expect(relayoutScene).not.toHaveBeenCalled();
     expect(options.store.updateFrame).toHaveBeenCalledWith(frame);
-    expect(mocks.finalizeEditorSceneMutationMock).toHaveBeenCalledOnce();
+    expect(options.commitHistory).toHaveBeenCalledOnce();
   });
 }
 

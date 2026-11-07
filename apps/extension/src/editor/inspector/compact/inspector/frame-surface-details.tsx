@@ -47,7 +47,7 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
                 toNumber={params.toNumber}
                 applyGradientPreset={params.applyGradientPreset}
                 previewFramePatch={(patch: Partial<typeof params.frameDraft>) => {
-                  params.setFrameDraft((state) => ({ ...state, ...patch }));
+                  params.previewFrameDraft?.((state) => ({ ...state, ...patch }));
                 }}
                 applyFramePatch={(patch: Partial<typeof params.frameDraft>) => {
                   params.setFrameDraft((state) => ({ ...state, ...patch }));
@@ -56,6 +56,11 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
                 onClearBackgroundImage={params.clearBackgroundImage}
               />
               <EditorInspectorBackgroundBlurControl
+                previewFramePatch={
+                  params.previewFrameDraft
+                    ? (patch) => params.previewFrameDraft?.((state) => ({ ...state, ...patch }))
+                    : undefined
+                }
                 frameDraft={params.frameDraft}
                 applyFramePatch={(patch) =>
                   params.setFrameDraft((state) => ({ ...state, ...patch }))
@@ -81,7 +86,11 @@ function buildFramePaddingCommand(params: InspectorCommandParams): CompactComman
         label={translate('editor.compact.scenePadding')}
         value={params.framePaddingSummary}
       >
-        <FramePaddingFields frameDraft={params.frameDraft} setFrameDraft={params.setFrameDraft} />
+        <FramePaddingFields
+          frameDraft={params.frameDraft}
+          setFrameDraft={params.setFrameDraft}
+          previewFrameDraft={params.previewFrameDraft}
+        />
       </CompactCommandField>
     ),
   };

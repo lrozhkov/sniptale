@@ -17,10 +17,15 @@ function getPercentValue(value: number): string {
 }
 
 function patchSourceImage(
-  props: Pick<EditorInspectorFrameSourceImageFieldsProps, 'applyFramePatch' | 'frameDraft'>,
-  patch: Partial<EditorImageSettings>
+  props: Pick<
+    EditorInspectorFrameSourceImageFieldsProps,
+    'applyFramePatch' | 'previewFramePatch' | 'frameDraft'
+  >,
+  patch: Partial<EditorImageSettings>,
+  preview = false
 ) {
-  props.applyFramePatch({
+  const apply = preview ? props.previewFramePatch : props.applyFramePatch;
+  apply?.({
     sourceImage: {
       ...normalizeEditorImageSettings(props.frameDraft.sourceImage),
       ...patch,
@@ -38,6 +43,7 @@ function SourceImageRangeControl(props: {
   valueText: string;
   fractionalPercent?: boolean;
   onChange: (value: number) => void;
+  onPreview?: ((value: number) => void) | undefined;
 }) {
   const percent = props.fractionalPercent ?? false;
   const min = props.min ?? 0;
@@ -52,6 +58,11 @@ function SourceImageRangeControl(props: {
       min={percent ? Math.round(min * 100) : min}
       max={percent ? Math.round(props.max * 100) : props.max}
       {...(step === undefined ? {} : { step })}
+      onPreview={
+        props.onPreview
+          ? (nextValue) => props.onPreview?.(percent ? nextValue / 100 : nextValue)
+          : undefined
+      }
       onChange={(nextValue) => props.onChange(percent ? nextValue / 100 : nextValue)}
     />
   );
@@ -100,6 +111,11 @@ export function EditorInspectorFrameSourceImageBasics(
         max={80}
         value={settings.radius}
         valueText={`${settings.radius}px`}
+        onPreview={
+          props.previewFramePatch
+            ? (radius) => patchSourceImage(props, { radius }, true)
+            : undefined
+        }
         onChange={(radius) => patchSourceImage(props, { radius })}
       />
     </div>
@@ -130,6 +146,11 @@ function SourceImageShadowSection(args: {
         max={100}
         value={settings.shadow}
         valueText={`${settings.shadow}%`}
+        onPreview={
+          props.previewFramePatch
+            ? (shadow) => patchSourceImage(props, { shadow }, true)
+            : undefined
+        }
         onChange={(shadow) => patchSourceImage(props, { shadow })}
       />
       <ColorField
@@ -138,6 +159,8 @@ function SourceImageShadowSection(args: {
         value={settings.shadowColor ?? settings.strokeColor}
         recentColors={props.recentColors}
         palette={props.shapeStrokePalette ?? []}
+        onPreviewChange={(shadowColor) => patchSourceImage(props, { shadowColor }, true)}
+        onPreviewReset={(shadowColor) => patchSourceImage(props, { shadowColor }, true)}
         onChange={(shadowColor) => patchSourceImage(props, { shadowColor })}
       />
     </section>
@@ -156,6 +179,11 @@ function SourceImageBorderSection(args: {
         max={24}
         value={settings.strokeWidth}
         valueText={`${settings.strokeWidth}px`}
+        onPreview={
+          props.previewFramePatch
+            ? (strokeWidth) => patchSourceImage(props, { strokeWidth }, true)
+            : undefined
+        }
         onChange={(strokeWidth) => patchSourceImage(props, { strokeWidth })}
       />
       <EditorInspectorDetails
@@ -192,6 +220,8 @@ function SourceImageBorderColor(args: {
         value={settings.strokeColor}
         recentColors={props.recentColors}
         palette={props.shapeStrokePalette ?? []}
+        onPreviewChange={(strokeColor) => patchSourceImage(props, { strokeColor }, true)}
+        onPreviewReset={(strokeColor) => patchSourceImage(props, { strokeColor }, true)}
         onChange={(strokeColor) => patchSourceImage(props, { strokeColor })}
       />
       <SourceImageRangeControl
@@ -201,6 +231,11 @@ function SourceImageBorderColor(args: {
         value={settings.strokeOpacity}
         valueText={getPercentValue(settings.strokeOpacity)}
         fractionalPercent
+        onPreview={
+          props.previewFramePatch
+            ? (strokeOpacity) => patchSourceImage(props, { strokeOpacity }, true)
+            : undefined
+        }
         onChange={(strokeOpacity) => patchSourceImage(props, { strokeOpacity })}
       />
     </>
@@ -208,6 +243,7 @@ function SourceImageBorderColor(args: {
 }
 
 interface EditorInspectorFrameSourceImageFieldsProps {
+  previewFramePatch?: ((patch: Partial<EditorFrameSettings>) => void) | undefined;
   applyFramePatch: (patch: Partial<EditorFrameSettings>) => void;
   frameDraft: EditorFrameSettings;
   lineStyleOptions?: CompactSelectOption<EditorImageSettings['strokeStyle']>[] | undefined;

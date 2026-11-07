@@ -5,8 +5,12 @@ import type {
 import type { RelayoutOptions } from '../../public-actions/scene/helpers';
 import { applyEditorFrameSceneSettings, resizeEditorCanvasScene } from '../../public-actions';
 import { createEditorSceneMutationCallbacks } from './callbacks';
+import { prepareEditorBackgroundLayer } from '../../background/sync';
+import type { FrameSceneMutationOptions } from '../../public-actions/scene/resize/types';
 import type { EditorSceneCanvasResizeApi, EditorSceneResizeApi } from './contracts';
 import { createEditorSceneStoreBridge } from './store';
+import { getSourceObject } from '../../document/layers';
+import { enqueueEditorSceneMutation } from './scene-mutation-queue';
 
 function createEditorSceneResizeArgs(controller: EditorSceneResizeApi) {
   return {
@@ -40,10 +44,30 @@ export function resizeEditorControllerCanvas(
 
 export function applyEditorControllerFrame(
   controller: EditorSceneResizeApi,
-  frame: EditorFrameSettings
-): void {
-  applyEditorFrameSceneSettings({
-    frame,
-    ...createEditorSceneResizeArgs(controller),
+  frame: EditorFrameSettings,
+  options: FrameSceneMutationOptions = {}
+): Promise<boolean> {
+  const canvas = controller.canvas;
+  const sourceObject = getSourceObject(canvas);
+  return enqueueEditorSceneMutation(canvas, () => {
+    const isCurrent = () =>
+      controller.canvas === canvas &&
+      getSourceObject(canvas) === sourceObject &&
+      !options.signal?.aborted;
+    return applyEditorFrameSceneSettings({
+      frame,
+      ...createEditorSceneResizeArgs(controller),
+      ...options,
+      isCurrent,
+      prepareBackground: (canvasSize) =>
+        prepareEditorBackgroundLayer({
+          canvas,
+          canvasSize,
+          frame,
+          preview: options.preview === true && options.quality !== 'final',
+          prepareObject: (object) => controller.prepareObject(object),
+          isCurrent,
+        }),
+    });
   });
 }

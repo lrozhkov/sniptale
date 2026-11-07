@@ -345,7 +345,15 @@ export function bindEditorAutosaveActivity(
   let composing = false;
   let inputTimer = 0;
   const sync = () =>
-    service.setInteractionActive(pointers.size > 0 || composing || inputTimer !== 0);
+    service.setInteractionActive(
+      pointers.size > 0 ||
+        composing ||
+        inputTimer !== 0 ||
+        useEditorStore.getState().framePreviewActive
+    );
+  const unsubscribePreview = useEditorStore.subscribe((state, previous) => {
+    if (state.framePreviewActive !== previous.framePreviewActive) sync();
+  });
   const pulse = () => {
     window.clearTimeout(inputTimer);
     inputTimer = window.setTimeout(() => {
@@ -385,7 +393,9 @@ export function bindEditorAutosaveActivity(
   window.addEventListener('compositionstart', compositionStart, true);
   window.addEventListener('compositionend', compositionEnd, true);
   window.addEventListener('blur', reset);
+  sync();
   return () => {
+    unsubscribePreview();
     window.removeEventListener('pointerdown', down, true);
     window.removeEventListener('pointerup', up, true);
     window.removeEventListener('pointercancel', up, true);
@@ -394,6 +404,7 @@ export function bindEditorAutosaveActivity(
     window.removeEventListener('compositionstart', compositionStart, true);
     window.removeEventListener('compositionend', compositionEnd, true);
     window.removeEventListener('blur', reset);
-    reset();
+    window.clearTimeout(inputTimer);
+    service.setInteractionActive(false);
   };
 }

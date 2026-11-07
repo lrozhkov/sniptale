@@ -57,6 +57,7 @@ interface EditorUiState {
   frameAnnotationCreationKind: 'callout' | 'step-badge' | null;
   inspector: EditorInspector;
   freshImageBackgroundPending: boolean;
+  framePreviewActive: boolean;
   inspectorCollapsed: boolean;
   layerEffectsCategory: EditorLayerEffectCategory;
   viewportPreviewOpen: boolean;

@@ -32,6 +32,10 @@ declare global {
       getCanvasObjects: () => Array<Record<string, unknown>>;
       getInteractionState: () => {
         historyIndex: number;
+        historyReady: boolean;
+        historyMuted: number;
+        frame: ReturnType<typeof useEditorStore.getState>['frame'];
+        framePreviewActive: boolean;
         transform: { action: string; actionPerformed: boolean; corner: string } | null;
       };
       setZoomLevel: (value: number) => void;
@@ -150,6 +154,10 @@ function HarnessEditorDebugBridge() {
         const transform = controller.canvas?._currentTransform;
         return {
           historyIndex: useEditorStore.getState().history.index,
+          historyReady: controller.history !== null,
+          historyMuted: controller.historyMuted,
+          frame: useEditorStore.getState().frame,
+          framePreviewActive: useEditorStore.getState().framePreviewActive,
           transform: transform
             ? {
                 action: transform.action,

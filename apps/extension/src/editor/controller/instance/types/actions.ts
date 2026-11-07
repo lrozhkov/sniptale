@@ -1,3 +1,4 @@
+import type { FrameSceneMutationOptions } from '../../public-actions/scene/resize/types';
 import type { FabricObject, Point, Rect } from 'fabric';
 
 import type {
@@ -106,7 +107,10 @@ export interface EditorControllerInstanceLayerActions {
 export interface EditorControllerInstanceSceneActions {
   resizeCanvas(width: number, height: number): void;
   resizeImage(width: number, height: number): void;
-  applyFrameSettings(frame: EditorFrameSettings): void;
+  applyFrameSettings(
+    frame: EditorFrameSettings,
+    options?: FrameSceneMutationOptions
+  ): Promise<boolean>;
   applyBrowserFrame(browserFrame: BrowserFrameState): Promise<void>;
   previewBrowserFrame(browserFrame: BrowserFrameState): Promise<void>;
   removeBrowserFrame(): Promise<void>;

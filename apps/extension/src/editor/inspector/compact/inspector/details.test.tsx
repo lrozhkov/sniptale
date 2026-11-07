@@ -169,7 +169,7 @@ it('builds frame-surface commands with explicit icons and routes background acti
   commands[2]?.onClick?.();
 
   expect(params.applyGradientPreset).toHaveBeenCalledWith({ angle: 180 });
-  expect(params.setFrameDraft).toHaveBeenCalledTimes(6);
+  expect(params.setFrameDraft).toHaveBeenCalledTimes(5);
   for (const [update] of params.setFrameDraft.mock.calls) {
     if (typeof update === 'function') update(params.frameDraft);
   }

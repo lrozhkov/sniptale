@@ -1,4 +1,5 @@
 import type { Canvas } from 'fabric';
+import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../../features/editor/document/constants';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EditorControllerInstance, EditorControllerPublicApiAdapter } from '../types';
 
@@ -231,4 +232,27 @@ describe('editor-controller-instance-scene-actions', () => {
   registerSceneNavigationTest();
   registerZoomConvenienceTest();
   registerSceneMutationTest();
+});
+
+it('forwards preview cancellation and final-quality restoration through the instance action', async () => {
+  const controller = createController();
+  const options = {
+    preview: true,
+    quality: 'final' as const,
+    signal: new AbortController().signal,
+  };
+  const completion = Promise.resolve(true);
+  mocks.applyEditorControllerFrameMock.mockReturnValueOnce(completion);
+  const result = applyFrameSettingsForController(
+    controller as EditorControllerInstance,
+    DEFAULT_EDITOR_FRAME_SETTINGS,
+    options
+  );
+  expect(result).toBe(completion);
+  await result;
+  expect(mocks.applyEditorControllerFrameMock).toHaveBeenLastCalledWith(
+    { id: 'adapter' },
+    DEFAULT_EDITOR_FRAME_SETTINGS,
+    options
+  );
 });

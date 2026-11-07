@@ -1,4 +1,5 @@
 import { Rect } from 'fabric';
+import { createFabricCanvasFixture } from '../../../testing/fabric-canvas.test-support';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -46,6 +47,12 @@ import { createEditorSceneMutationCallbacks } from './callbacks';
 import type { EditorBrowserFrameApi, EditorSceneCanvasResizeApi } from './contracts';
 import { applyEditorControllerFrame, resizeEditorControllerCanvas } from './resize';
 import { createEditorSceneStoreBridge } from './store';
+import * as backgroundSync from '../../background/sync';
+import type {
+  CanvasResizeSceneOptions,
+  FrameSceneSettingsOptions,
+  FrameSceneMutationOptions,
+} from '../../public-actions/scene/resize/types';
 
 function createSceneController() {
   return {
@@ -193,4 +200,97 @@ describe('public scene action role owners', () => {
     expect(apply.isMutationCurrent()).toBe(false);
     expect(remove.isMutationCurrent()).toBe(false);
   });
+});
+
+it.each<FrameSceneMutationOptions & { expectedPreview: boolean }>([
+  { preview: true, expectedPreview: true },
+  { preview: true, quality: 'preview', expectedPreview: true },
+  { preview: true, quality: 'final', expectedPreview: false },
+  { preview: false, expectedPreview: false },
+  { preview: false, quality: 'preview', expectedPreview: false },
+])(
+  'keeps raster quality independent of no-history restoration: %j',
+  async ({ expectedPreview, ...options }) => {
+    const prepare = vi.spyOn(backgroundSync, 'prepareEditorBackgroundLayer').mockResolvedValue({
+      apply: () => true,
+      dispose: () => undefined,
+    });
+    mocks.applyFrameMock.mockImplementationOnce(async (args: FrameSceneSettingsOptions) => {
+      if (!args.prepareBackground) throw new Error('Background preparation is required');
+      await args.prepareBackground({ width: 6000, height: 4000 });
+    });
+    try {
+      await applyEditorControllerFrame(
+        createSceneController(),
+        DEFAULT_EDITOR_FRAME_SETTINGS,
+        options
+      );
+      expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ preview: expectedPreview }));
+    } finally {
+      prepare.mockRestore();
+    }
+  }
+);
+
+it.each(['abort', 'token', 'canvas'] as const)(
+  'checks frame lifetime after %s independently of unrelated asset tokens',
+  async (cause) => {
+    const initialCanvas = createFabricCanvasFixture({ getObjects: () => [] });
+    let token = 0;
+    const controller: EditorSceneCanvasResizeApi = {
+      ...createSceneController(),
+      canvas: initialCanvas,
+      createLayerMutationToken: () => ++token,
+      isLayerMutationTokenCurrent: (candidate) => candidate === token,
+    };
+    const mutations: FrameSceneSettingsOptions[] = [];
+    mocks.applyFrameMock.mockImplementationOnce(async (args: FrameSceneSettingsOptions) => {
+      mutations.push(args);
+    });
+    const prepare = vi.spyOn(backgroundSync, 'prepareEditorBackgroundLayer').mockResolvedValue({
+      apply: () => true,
+      dispose: () => undefined,
+    });
+    const abort = new AbortController();
+    try {
+      await applyEditorControllerFrame(
+        controller,
+        DEFAULT_EDITOR_FRAME_SETTINGS,
+        cause === 'abort' ? { preview: true, signal: abort.signal } : undefined
+      );
+      const mutation = mutations[0];
+      if (!mutation?.isCurrent || !mutation.prepareBackground)
+        throw new Error('Missing frame lifecycle');
+      expect(mutation.isCurrent()).toBe(true);
+      await mutation.prepareBackground({ width: 6000, height: 4000 });
+      const background = prepare.mock.calls[0]?.[0];
+      if (!background?.isCurrent) throw new Error('Missing background lifecycle');
+      const object = new Rect({ width: 100, height: 50 });
+      background.prepareObject(object);
+      expect(controller.prepareObject).toHaveBeenCalledWith(object);
+      expect(background.isCurrent()).toBe(true);
+      if (cause === 'abort') abort.abort();
+      else if (cause === 'token') controller.createLayerMutationToken();
+      else controller.canvas = createFabricCanvasFixture({ getObjects: () => [] });
+      expect(mutation.isCurrent()).toBe(cause === 'token');
+      expect(background.isCurrent()).toBe(cause === 'token');
+    } finally {
+      prepare.mockRestore();
+    }
+  }
+);
+
+it('reads live canvas dimensions and delegates scene relayout and canvas-size ownership', () => {
+  const controller = createSceneController();
+  const frame = { ...DEFAULT_EDITOR_FRAME_SETTINGS, paddingTop: 40 };
+  const layout = { preserveCanvasSize: true };
+  mocks.resizeCanvasMock.mockImplementationOnce((args: CanvasResizeSceneOptions) => {
+    controller.canvasDocumentSize = { width: 640, height: 480 };
+    expect(args.getCanvasDocumentSize()).toEqual({ width: 640, height: 480 });
+    args.relayoutScene(frame, DEFAULT_BROWSER_FRAME_STATE, layout);
+    args.setCanvasDocumentSize({ width: 800, height: 600 });
+  });
+  resizeEditorControllerCanvas(controller, 800, 600);
+  expect(controller.relayoutScene).toHaveBeenCalledWith(frame, DEFAULT_BROWSER_FRAME_STATE, layout);
+  expect(controller.setCanvasDocumentSize).toHaveBeenCalledWith({ width: 800, height: 600 });
 });

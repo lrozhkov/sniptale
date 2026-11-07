@@ -57,7 +57,9 @@ function updateFramePadding(
 export function FramePaddingFields(props: {
   frameDraft: EditorFrameSettings;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
+  previewFrameDraft?: React.Dispatch<React.SetStateAction<EditorFrameSettings>> | undefined;
 }) {
+  const previewFrameDraft = props.previewFrameDraft;
   const [hoveredSide, setHoveredSide] = useState<PaddingHoverSide | null>(null);
   const [focusedSide, setFocusedSide] = useState<PaddingHoverSide | null>(null);
   const [rangeActive, setRangeActive] = useState(false);
@@ -82,8 +84,13 @@ export function FramePaddingFields(props: {
           unlink: translate('highlighter.editor.paddingSeparate'),
         }}
         padding={selectFramePadding(props.frameDraft)}
+        onPreviewChange={
+          previewFrameDraft
+            ? (padding) => updateFramePadding(previewFrameDraft, padding)
+            : undefined
+        }
         onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
-        renderUniformField={({ onChange, value }) => (
+        renderUniformField={({ onChange, onPreview, value }) => (
           <div
             className="pointer-events-none relative h-2"
             data-ui="editor.frame.padding-slider"
@@ -93,6 +100,7 @@ export function FramePaddingFields(props: {
               active={rangeActive}
               label={translate('highlighter.editor.paddingLabel')}
               onActiveChange={setRangeActive}
+              onPreview={onPreview}
               onChange={onChange}
               value={value}
               visible={
@@ -104,12 +112,13 @@ export function FramePaddingFields(props: {
             />
           </div>
         )}
-        renderValueField={({ compact, label, onChange, side, value }) => (
+        renderValueField={({ compact, label, onChange, onPreview, side, value }) => (
           <div className="min-w-0" data-padding-side={side}>
             <PaddingValue
               compact={compact}
               label={label}
               value={value}
+              onPreview={onPreview}
               onChange={onChange}
               side={side}
               revealSlider={hoveredSide === side || focusedSide === side}
@@ -126,10 +135,11 @@ function PaddingRange(props: {
   label: string;
   onActiveChange: (active: boolean) => void;
   onChange: (value: number) => void;
+  onPreview?: ((value: number) => void) | undefined;
   value: number;
   visible: boolean;
 }) {
-  const draft = useInspectorNumericDraft(props.value, props.onChange);
+  const draft = useInspectorNumericDraft(props.value, props.onChange, props.onPreview);
   return <NumericRangeScrub {...props} {...draft} scrub={{ min: 0, max: 256, step: 1 }} />;
 }
 
@@ -138,10 +148,11 @@ function PaddingValue(props: {
   label: string;
   value: number;
   onChange: (value: number) => void;
+  onPreview?: ((value: number) => void) | undefined;
   side: PaddingHoverSide;
   revealSlider: boolean;
 }) {
-  const draft = useInspectorNumericDraft(props.value, props.onChange);
+  const draft = useInspectorNumericDraft(props.value, props.onChange, props.onPreview);
   return (
     <div className="min-w-0" data-padding-hover={props.side}>
       {props.compact ? (
@@ -174,13 +185,18 @@ export function FramePaddingSection(props: {
   framePaddingSummary?: string;
   hideHeader?: boolean;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
+  previewFrameDraft?: React.Dispatch<React.SetStateAction<EditorFrameSettings>> | undefined;
 }) {
   return (
     <PanelSection
       label={translate('editor.scene.scenePaddingSection')}
       hideHeader={props.hideHeader ?? false}
     >
-      <FramePaddingFields frameDraft={props.frameDraft} setFrameDraft={props.setFrameDraft} />
+      <FramePaddingFields
+        frameDraft={props.frameDraft}
+        setFrameDraft={props.setFrameDraft}
+        previewFrameDraft={props.previewFrameDraft}
+      />
     </PanelSection>
   );
 }

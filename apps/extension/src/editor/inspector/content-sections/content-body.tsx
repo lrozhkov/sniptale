@@ -39,6 +39,7 @@ export interface EditorInspectorContentBodyProps extends EditorInspectorContentS
   setImageSizeLocked: React.Dispatch<React.SetStateAction<boolean>>;
   setCanvasSizeLocked: React.Dispatch<React.SetStateAction<boolean>>;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
+  previewFrameDraft?: React.Dispatch<React.SetStateAction<EditorFrameSettings>> | undefined;
   setUniformPadding: (value: number) => void;
   applyGradientPreset: (preset: BackgroundGradientPreset) => void;
   clearBackgroundImage: () => void;

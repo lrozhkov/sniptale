@@ -1,3 +1,4 @@
+import type { FrameSceneMutationOptions } from '../../public-actions/scene/resize/types';
 import type {
   BrowserFrameState,
   EditorFrameSettings,
@@ -33,9 +34,12 @@ export function resizeImageForController(
 
 export function applyFrameSettingsForController(
   controller: EditorControllerInstance,
-  frame: EditorFrameSettings
-): void {
-  applyEditorControllerFrame(controller.getPublicApiAdapter(), frame);
+  frame: EditorFrameSettings,
+  options?: FrameSceneMutationOptions
+): Promise<boolean> {
+  return options === undefined
+    ? applyEditorControllerFrame(controller.getPublicApiAdapter(), frame)
+    : applyEditorControllerFrame(controller.getPublicApiAdapter(), frame, options);
 }
 
 export async function applyBrowserFrameForController(

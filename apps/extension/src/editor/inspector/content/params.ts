@@ -49,6 +49,7 @@ function selectEditorInspectorContentActions(props: EditorInspectorContentProps)
     setCanvasSizeLocked: props.setCanvasSizeLocked,
     setLayerSizeLocked: props.setLayerSizeLocked,
     setFrameDraft: props.setFrameDraft,
+    previewFrameDraft: props.previewFrameDraft,
     previewColor: props.previewColor,
     updateColor: props.updateColor,
     ...selectEditorInspectorContentToolActions(props),

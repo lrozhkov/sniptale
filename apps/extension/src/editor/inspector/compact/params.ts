@@ -143,6 +143,7 @@ function buildCompactEditorActions(
     setCanvasSizeLocked: params.setCanvasSizeLocked,
     setLayerSizeLocked: params.setLayerSizeLocked,
     setFrameDraft: params.setFrameDraft,
+    previewFrameDraft: params.previewFrameDraft,
     applyWorkspaceColor: params.applyWorkspaceColor,
     saveWorkspaceColorAsDefault: params.saveWorkspaceColorAsDefault,
     syncBrowserFrame: params.syncBrowserFrame,

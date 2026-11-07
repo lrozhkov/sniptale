@@ -16,6 +16,7 @@ import './panel.css';
 function sourceImageProps(props: EditorInspectorFramePanelProps) {
   return {
     applyFramePatch: props.applyFramePatch,
+    previewFramePatch: props.previewFramePatch,
     frameDraft: props.frameDraft,
     recentColors: props.recentColors,
     ...(props.lineStyleOptions === undefined ? {} : { lineStyleOptions: props.lineStyleOptions }),
@@ -56,6 +57,7 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
                   <EditorInspectorBackgroundBlurControl
                     frameDraft={props.frameDraft}
                     applyFramePatch={props.applyFramePatch}
+                    previewFramePatch={props.previewFramePatch}
                   />
                 ) : null}
               </>
@@ -75,6 +77,7 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
                   framePaddingSummary={props.framePaddingSummary}
                   hideHeader
                   setFrameDraft={props.setFrameDraft}
+                  previewFrameDraft={props.previewFrameDraft}
                 />
               </div>
               <div className="sniptale-parameter-stack">

@@ -1,4 +1,5 @@
 import type { Canvas } from 'fabric';
+import type { PreparedBackgroundLayer } from '../../../background/sync';
 
 import type {
   BrowserFrameState,
@@ -38,8 +39,21 @@ export type SourceResizeSceneOptions = SceneResizeOptions & {
   relayoutScene: RelayoutScene;
 };
 
-export type FrameSceneSettingsOptions = Omit<SceneResizeOptions, 'store' | 'width' | 'height'> & {
-  frame: EditorFrameSettings;
-  store: Pick<EditorSceneStoreBridge, 'getBrowserFrame' | 'getFrame' | 'updateFrame'>;
-  relayoutScene: RelayoutScene;
+/** Transient scene previews do not change accepted settings, history, or autosave. */
+export type FrameSceneMutationOptions = {
+  preview?: boolean;
+  quality?: 'final' | 'preview';
+  signal?: AbortSignal;
 };
+
+export type FrameSceneSettingsOptions = Omit<SceneResizeOptions, 'store' | 'width' | 'height'> &
+  FrameSceneMutationOptions & {
+    frame: EditorFrameSettings;
+    isCurrent?: () => boolean;
+    prepareBackground?: (size: {
+      width: number;
+      height: number;
+    }) => Promise<PreparedBackgroundLayer>;
+    store: Pick<EditorSceneStoreBridge, 'getBrowserFrame' | 'getFrame' | 'updateFrame'>;
+    relayoutScene: RelayoutScene;
+  };

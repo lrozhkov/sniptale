@@ -37,6 +37,7 @@ type ResetDocumentState = Pick<
   | 'frameAnnotationCreationKind'
   | 'inspector'
   | 'freshImageBackgroundPending'
+  | 'framePreviewActive'
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
@@ -189,6 +190,7 @@ function createResetDocumentUiState(
   | 'frameAnnotationCreationKind'
   | 'inspector'
   | 'freshImageBackgroundPending'
+  | 'framePreviewActive'
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
@@ -208,6 +210,7 @@ function createResetDocumentUiState(
     frameAnnotationCreationKind: null,
     inspector: 'file',
     freshImageBackgroundPending: false,
+    framePreviewActive: false,
     inspectorCollapsed: false,
     layerEffectsCategory: 'adjustments',
     viewportPreviewOpen: state.viewportPreviewAutomationBlockedInSession

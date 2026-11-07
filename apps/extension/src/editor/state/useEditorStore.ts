@@ -57,6 +57,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   frameAnnotationCreationKind: null,
   inspector: 'file',
   freshImageBackgroundPending: false,
+  framePreviewActive: false,
   inspectorCollapsed: false,
   layerEffectsCategory: 'adjustments',
   viewportPreviewOpen: false,
