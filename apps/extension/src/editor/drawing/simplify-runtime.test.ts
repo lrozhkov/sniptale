@@ -234,47 +234,62 @@ it('removes a failed new region and lets a subsequent region retry normally', as
   expect(f.commitHistory).toHaveBeenCalledTimes(1);
 });
 
-it('recaptures changed lower pixels as a derived update and preserves cache for upper-only changes', async () => {
+it('keeps accepted Simplify pixels stable across unrelated lower and upper edits', async () => {
+  const f = fixture();
+  setEditorEditingSurfaceDimensions(f.canvas, { width: 100, height: 100 });
+  const lower = new Rect({ width: 100, height: 100, fill: '#ff0000' });
+  f.canvas.insertAt(0, lower);
+  const accepted = f.object.sniptaleDrawingJson;
+  for (const mutate of [
+    () => lower.set({ fill: '#0000ff' }),
+    () => lower.set({ left: 20 }),
+    () => lower.set({ visible: false }),
+    () => f.canvas.add(new Rect({ width: 20, height: 20 })),
+    () => f.canvas.remove(lower),
+  ]) {
+    mutate();
+    notifyEditorSimplifyDocumentCommit(f.canvas);
+    await settled();
+    expect(f.compute.render).not.toHaveBeenCalled();
+    expect(f.object.sniptaleDrawingJson).toBe(accepted);
+    expect(f.canvas.getObjects()).toContain(f.object);
+    expect(f.canvas.wrapperEl.querySelector('[data-ui="editor.simplify.pending"]')).toBeNull();
+  }
+  expect(f.commitHistory).not.toHaveBeenCalled();
+  expect(f.publishDerived).not.toHaveBeenCalled();
+});
+
+it('recaptures changed lower pixels when the user explicitly rebuilds a stable region', async () => {
   const f = fixture();
   setEditorEditingSurfaceDimensions(f.canvas, { width: 100, height: 100 });
   const lower = new Rect({
     left: 0,
     top: 0,
-    originX: 'left',
-    originY: 'top',
     width: 100,
     height: 100,
-    fill: '#ff0000',
+    originX: 'left',
+    originY: 'top',
     strokeWidth: 0,
+    fill: '#0000ff',
   });
   f.canvas.insertAt(0, lower);
+  notifyEditorSimplifyDocumentCommit(f.canvas);
+  await settled();
+  expect(f.compute.render).not.toHaveBeenCalled();
   requestEditorSimplify(f.canvas, f.object);
-  f.result.resolve({ ...f.snapshot, version: 'first' });
   await settled();
-  expect(f.compute.render).toHaveBeenCalledTimes(1);
-  const upper = new Rect({ width: 100, height: 100, fill: '#00ff00' });
-  f.canvas.add(upper);
-  notifyEditorSimplifyDocumentCommit(f.canvas);
-  await settled();
-  expect(f.compute.render).toHaveBeenCalledTimes(1);
-  const next = deferred<typeof f.snapshot & { version: string }>();
-  vi.mocked(f.compute.render).mockReturnValueOnce(next.promise);
-  lower.set({ fill: '#0000ff' });
-  notifyEditorSimplifyDocumentCommit(f.canvas);
-  await settled();
-  expect(f.compute.render).toHaveBeenCalledTimes(2);
-  const input = vi.mocked(f.compute.render).mock.calls[1]![0];
   const expected = document.createElement('canvas');
   expected.width = 100;
   expected.height = 100;
   const context = expected.getContext('2d')!;
   context.fillStyle = '#0000ff';
   context.fillRect(0, 0, 100, 100);
-  expect(input.source.dataUrl).toBe(expected.toDataURL('image/png'));
-  next.resolve({ ...f.snapshot, version: 'derived' });
+  expect(vi.mocked(f.compute.render).mock.calls[0]![0].source.dataUrl).toBe(
+    expected.toDataURL('image/png')
+  );
+  f.result.resolve({ ...f.snapshot, version: 'rebuilt' });
   await settled();
   expect(f.commitHistory).toHaveBeenCalledTimes(1);
-  expect(f.publishDerived).toHaveBeenCalledTimes(1);
 });
 
 it('persists dirty intermediate history and enriches recomputed Undo state without losing Redo', async () => {
@@ -314,10 +329,16 @@ it('persists dirty intermediate history and enriches recomputed Undo state witho
         }),
     })
   );
-  lower.set({ fill: '#0000ff' });
+  f.object.set({ scaleX: f.object.scaleX / 2 });
+  canonicalizeModifiedEditorDrawingSelection({
+    canvas: f.canvas,
+    object: f.object,
+    source: null,
+    prepareObject: () => undefined,
+  });
   notifyEditorSimplifyDocumentCommit(f.canvas);
   pushEditorSnapshotHistory({ history, muted: false, exportDocument });
-  expect(readEditorDrawingObject(f.object)).toMatchObject({ sourceDirty: true });
+  expect(readEditorDrawingObject(f.canvas.getObjects()[1]!)).toMatchObject({ sourceDirty: true });
   await settled();
   const upper = new Rect({ width: 10, height: 10, fill: '#00ff00' });
   upper.sniptaleId = 'upper';
@@ -444,7 +465,13 @@ it('Undo cancels derived work and still undoes its originating user action', asy
       syncRuntimeState: () => undefined,
     })
   );
-  lower.set({ fill: '#0000ff' });
+  f.object.set({ scaleX: f.object.scaleX / 2 });
+  canonicalizeModifiedEditorDrawingSelection({
+    canvas: f.canvas,
+    object: f.object,
+    source: null,
+    prepareObject: () => undefined,
+  });
   notifyEditorSimplifyDocumentCommit(f.canvas);
   pushEditorSnapshotHistory({ history, muted: false, exportDocument });
   await settled();

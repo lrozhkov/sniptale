@@ -11,7 +11,7 @@ import {
   sampleEditorSimplifyRegion,
   setEditorSimplifyGeometryPreview,
 } from './object/simplify';
-import { readEditorDrawingObject, writeEditorDrawingObject } from './object/metadata';
+import { readEditorDrawingObject } from './object/metadata';
 
 export interface EditorSimplifyCompute {
   render(input: {
@@ -360,27 +360,14 @@ export function carryEditorSimplifySourceContext(
   if (runtime && context !== undefined) runtime.sourceContexts.set(next, context);
 }
 
-/** Marks stale output before its user operation is serialized; processing starts after commit. */
+/** Rebuilds only Simplify objects invalidated by their own geometry or settings edit. */
 export function notifyEditorSimplifyDocumentCommit(canvas: Canvas): void {
   const runtime = runtimes.get(canvas);
   if (!runtime) return;
   for (const object of canvas.getObjects()) {
     const drawing = readEditorDrawingObject(object);
-    if (
-      drawing?.kind !== 'simplify' ||
-      (!drawing.settings.automatic &&
-        drawing.settings.manualKind === 'image' &&
-        !drawing.sourceDirty)
-    )
-      continue;
+    if (drawing?.kind !== 'simplify' || !drawing.sourceDirty) continue;
     const context = lowerContext(runtime, object);
-    const previous = runtime.sourceContexts.get(object);
-    if (previous === undefined && !drawing.sourceDirty) {
-      runtime.sourceContexts.set(object, context);
-      continue;
-    }
-    if (!drawing.sourceDirty && previous === context) continue;
-    if (!drawing.sourceDirty) writeEditorDrawingObject(object, { ...drawing, sourceDirty: true });
     if (runtime.jobs.get(object)?.sourceContext === context || runtime.pendingRefresh.has(object))
       continue;
     runtime.pendingRefresh.add(object);

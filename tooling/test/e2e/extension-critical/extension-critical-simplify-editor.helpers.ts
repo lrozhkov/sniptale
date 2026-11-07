@@ -223,6 +223,59 @@ export async function assertEditorAutomaticSimplify(
         value.operation === 'render'
     )
   ).toBe(true);
+  const installed = await accepted();
+  const renderCount = () =>
+    commands.filter(
+      (value) =>
+        typeof value === 'object' &&
+        value !== null &&
+        'operation' in value &&
+        value.operation === 'render'
+    ).length;
+  const computations = renderCount();
+  const historyBefore = await editor.evaluate(
+    () => window.__sniptaleEditorHarness!.getInteractionState().historyIndex
+  );
+  await editor.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
+  await editor
+    .locator('[data-ui="editor.frame.background-mode"]')
+    .getByRole('button')
+    .nth(1)
+    .click();
+  await expect
+    .poll(() =>
+      editor.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
+    )
+    .toBe(historyBefore + 1);
+  await expect
+    .poll(() =>
+      editor.evaluate(
+        () => window.__sniptaleEditorHarness!.getInteractionState().framePreviewActive
+      )
+    )
+    .toBe(false);
+  await editor.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+  );
+  expect(renderCount()).toBe(computations);
+  expect((await accepted()).map((object) => object['src'])).toEqual(
+    installed.map((object) => object['src'])
+  );
+  await expect(editor.locator('[data-ui="editor.simplify.pending"]')).toHaveCount(0);
+  await editor.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+  await expect
+    .poll(() =>
+      editor.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
+    )
+    .toBe(historyBefore);
+  await editor.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
+  await editor
+    .locator('[data-ui="editor.layers.list-viewport"] button[aria-pressed]')
+    .first()
+    .click();
   await editor.screenshot({ path: info.outputPath('simplify-automatic.png'), fullPage: false });
   return { originalExport, start };
 }
