@@ -4244,7 +4244,7 @@
       "reason": "tool-noise: One prepared scene owner controls cancellation, scene assets and frame admission. Its two output methods share one transaction and return distinct typed contracts. It does not choose the visible frontend frame. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "47b0a53fdb81fc9a09019966e55cb66166e4f91c0721d8142c8c09f3859ca7f6",
+      "astHash": "25501999f86aab17cdcfeb7628a61cc8aee6c05392731437ce9b3477ca614715",
       "signatureHash": "1e14adff13052e9a8ffe49867ce685fa017cdb746ca17d96cd31972e5c1baf6b"
     },
     {
@@ -4254,8 +4254,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One preparation transaction loads scene assets under the existing cancellation owner. It counts the retained GPU front once while preserving other provider allocations. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-05",
-      "astHash": "611e8656620ae2bc8770ef56d2afbfb260f0bfa43175d93e5e3aa352ee6c834c",
+      "reviewDate": "2026-11-07",
+      "astHash": "5dc611b4f8bd146a42d42ea6ed30866ae8193e39d442d4c3ffbbf1f48e02e97e",
       "signatureHash": "7f6156d16770269261aac61f2e56e18eb91a74fa4164c7da762118782484b733"
     },
     {
@@ -5399,7 +5399,7 @@
       "reason": "tool-noise: One scene fixture checks asset admission, frame generations and output cleanup. New cases preserve the default export context and exercise lazy direct output. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "d03f4837afc6fb874777755d4969e69b16462a46afac8278fe5acf34ca25ca4a",
+      "astHash": "df9e6d24f3207fa9b9c04c8c3db6cd9c0c8b3d7c46d90822120d21e7a89b77fc",
       "signatureHash": "a2043057597679bfc0100ba49606decb9cf0c2abf4fb8f569029b0e27e5489eb"
     },
     {
@@ -5693,20 +5693,20 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One prepared scene owner admits frames and checks their generation before returning a completed receipt. Both output methods use the same transaction. Canvas fallback acquires a separate raster lease. Fresh independent architecture review must check this exact binding.",
+      "reason": "tool-noise: One prepared scene owner admits frames and checks their generation before returning a completed receipt. Both output methods use the same transaction. Canvas fallback uses exclusive frame execution. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "376a2fab2c895e648a17e35cece9350ee671af6c33a654da9e760cab035b5714",
-      "signatureHash": "6e7d2508e646bdf687ee84c011b57a2ce73f536d0507917df77b0c858446f8dc"
+      "astHash": "24d458be8faa05e239948107b277d6671806ab6db33c5e467898d2642c8f4782",
+      "signatureHash": "d88b9d102074866e01a79c3a849c6c831dd35b9678a723946274b0683b0998ae"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "drawPreparedCanvasFrame",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: The existing Canvas backend is now a private operation under the asset-owned serial gate. One output transaction retains source, annotation, enhancement and transition leases through its draw. Each lease keeps its existing cleanup owner. This extraction adds no public contract or independent lifecycle. Fresh independent architecture review must validate this exact binding.",
+      "reason": "tool-noise: One Canvas operation draws under the renderer execution lease. The output transaction retains source, annotation, enhancement and transition leases through its draw. Each lease keeps its existing cleanup owner. This private operation adds no publication authority. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when this AST or signature changes. Reassess a new independent owner, lifecycle, publication authority, writer or unrelated operation. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-05",
+      "reviewDate": "2026-11-07",
       "astHash": "e01b0041e73c45d43b40e5b19bf57d6200a8302314791c7952aadc0c59c4c57a",
       "signatureHash": "de931ea4ec1734341ad68bf2ac980b9c11b4b1bcddc2c83804f998f075092e07"
     },

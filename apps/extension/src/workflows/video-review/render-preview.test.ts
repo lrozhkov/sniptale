@@ -2295,3 +2295,206 @@ it.each(['gpu', 'legacy', 'disabled'] as const)(
     expect(observed[1]!.rendering - observed[0]!.rendering).toBe(extra);
   }
 );
+
+async function cutExecutionFixture() {
+  const { resources, leases } = setup();
+  const gates = Array.from({ length: 6 }, () => Promise.withResolvers<boolean>());
+  const started = gates.map(() => Promise.withResolvers<void>());
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn((_input: unknown) => {
+      const index = gpu.render.mock.calls.length - 1;
+      started[index]!.resolve();
+      return gates[index]!.promise;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({ resources, maximumInFlight: 2 });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const input = () => ({
+    ...frame(),
+    source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+  });
+  const transition = () => {
+    const value = input();
+    const blend = reviewCutTransitionAt(2, [
+      {
+        id: 'cut',
+        type: 'dissolve',
+        seam: 2,
+        before: 0.5,
+        after: 0.5,
+        left: { start: 0, end: 1 },
+        right: { start: 3, end: 5 },
+      },
+    ])!;
+    const endpoint = { timestamp: 0.99, draw: vi.fn(), close: vi.fn() };
+    return {
+      ...value,
+      transition: { blend, frames: { left: endpoint, right: { ...endpoint, timestamp: 3 } } },
+    };
+  };
+  const requests: Promise<
+    { ok: true; value: Awaited<ReturnType<typeof renderer.render>> } | { ok: false; error: unknown }
+  >[] = [];
+  const render = (value: ReturnType<typeof input>, control?: AbortSignal) => {
+    let settled = false;
+    const result = renderer.render(prepared, value, control ?? signal).then(
+      (value) => {
+        settled = true;
+        return { ok: true as const, value };
+      },
+      (error) => {
+        settled = true;
+        return { ok: false as const, error };
+      }
+    );
+    requests.push(result);
+    return {
+      result,
+      get settled() {
+        return settled;
+      },
+    };
+  };
+  return {
+    renderer,
+    prepared,
+    gpu,
+    gates,
+    started,
+    input,
+    transition,
+    render,
+    leases,
+    async close() {
+      for (const gate of gates) gate.resolve(true);
+      for (const result of await Promise.all(requests)) if (result.ok) result.value.release();
+      prepared.release();
+      renderer.dispose();
+    },
+  };
+}
+
+// Drain the finite promise-only renderer path without a timer or a GPU completion.
+async function flushCutExecution() {
+  for (let step = 0; step < 24; step++) await Promise.resolve();
+}
+
+it.each(['normal-to-transition', 'transition-to-normal'] as const)(
+  'waits for the held actual frame at the %s execution boundary',
+  async (direction) => {
+    const f = await cutExecutionFixture();
+    try {
+      const first = f.render(direction === 'normal-to-transition' ? f.input() : f.transition());
+      await f.started[0]!.promise;
+      const second = f.render(direction === 'normal-to-transition' ? f.transition() : f.input());
+      await flushCutExecution();
+      expect(second.settled).toBe(false);
+      expect(f.gpu.render).toHaveBeenCalledTimes(1);
+      f.gates[0]!.resolve(true);
+      expect((await first.result).ok).toBe(true);
+      await f.started[1]!.promise;
+      f.gates[1]!.resolve(true);
+      expect((await second.result).ok).toBe(true);
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it('resumes two independent normal GPU frames after the exclusive transition drains', async () => {
+  const f = await cutExecutionFixture();
+  try {
+    const transition = f.render(f.transition());
+    await f.started[0]!.promise;
+    f.gates[0]!.resolve(true);
+    expect((await transition.result).ok).toBe(true);
+    const first = f.render(f.input());
+    const second = f.render({ ...f.input(), sourceTime: 3 });
+    await Promise.all([f.started[1]!.promise, f.started[2]!.promise]);
+    expect(f.gpu.render).toHaveBeenCalledTimes(3);
+    expect(first.settled).toBe(false);
+    expect(second.settled).toBe(false);
+    const third = await f.render(f.input()).result;
+    expect(third.ok).toBe(false);
+    if (!third.ok)
+      expect(third.error).toEqual(
+        expect.objectContaining({ message: 'Preview frame is already admitted.' })
+      );
+    f.gates[1]!.resolve(true);
+    f.gates[2]!.resolve(true);
+    expect((await first.result).ok).toBe(true);
+    expect((await second.result).ok).toBe(true);
+  } finally {
+    await f.close();
+  }
+});
+
+it('removes an aborted queued frame without letting its replacement bypass the held transition', async () => {
+  const f = await cutExecutionFixture();
+  const queuedController = new AbortController();
+  try {
+    const active = f.render(f.transition());
+    await f.started[0]!.promise;
+    const queued = f.render({ ...f.input(), sourceTime: 3 }, queuedController.signal);
+    queuedController.abort();
+    await flushCutExecution();
+    expect(queued.settled).toBe(true);
+    const refused = await queued.result;
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error).toMatchObject({ name: 'AbortError' });
+    const replacement = f.render({ ...f.input(), sourceTime: 4 });
+    await flushCutExecution();
+    expect(f.gpu.render).toHaveBeenCalledTimes(1);
+    expect(replacement.settled).toBe(false);
+    f.gates[0]!.resolve(true);
+    expect((await active.result).ok).toBe(true);
+    await f.started[1]!.promise;
+    f.gates[1]!.resolve(true);
+    const completed = await replacement.result;
+    expect(completed.ok).toBe(true);
+    if (completed.ok) expect(completed.value.sourceTime).toBe(4);
+  } finally {
+    await f.close();
+  }
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'holds an executing GPU lease through its fence on %s while a transition waits',
+  async (operation) => {
+    const f = await cutExecutionFixture();
+    const controller = new AbortController();
+    try {
+      const active = f.render(f.input(), controller.signal);
+      await f.started[0]!.promise;
+      const queued = f.render(f.transition());
+      if (operation === 'abort') controller.abort();
+      else f.renderer.dispose();
+      await flushCutExecution();
+      expect(active.settled).toBe(false);
+      expect(f.gpu.render).toHaveBeenCalledTimes(1);
+      expect(f.leases[0]!.release).not.toHaveBeenCalled();
+      if (operation === 'abort') expect(queued.settled).toBe(false);
+      f.gates[0]!.resolve(true);
+      const cancelled = await active.result;
+      expect(cancelled.ok).toBe(false);
+      if (operation === 'abort') {
+        if (!cancelled.ok) expect(cancelled.error).toMatchObject({ name: 'AbortError' });
+        await f.started[1]!.promise;
+        f.gates[1]!.resolve(true);
+        expect((await queued.result).ok).toBe(true);
+      } else {
+        expect((await queued.result).ok).toBe(false);
+        expect(f.gpu.render).toHaveBeenCalledTimes(1);
+        expect(f.gpu.dispose).toHaveBeenCalledOnce();
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);
