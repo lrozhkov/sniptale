@@ -48,6 +48,7 @@ import {
 } from '../../runtime/controller/composition/hooks';
 import {
   useVideoEditorEffectEditingPort,
+  useVideoEditorPlaybackPort,
   useVideoEditorProjectLifecyclePort,
   useVideoEditorTimelineEditingPort,
 } from '../../runtime/controller/store';
@@ -143,7 +144,7 @@ function VideoEditorWorkspaceUpper(
   const recordingLayout = useVideoEditorLayoutController();
   const recording = useContext(RuntimeProjectContext)?.recordingLeave;
   const header = useVideoEditorHeaderController();
-  const preview = useVideoEditorPreviewController();
+  const preview = useVideoEditorPreviewController(false);
   const viewer = useWorkspacePreviewContext();
   const blocking = useVideoEditorBlockingOverlayContext();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -228,7 +229,7 @@ function VideoEditorWorkspaceUpper(
         data-ui="video-editor.workspace.viewer"
         data-viewer={sourceActive ? 'source' : 'montage'}
       >
-        <PreviewStage
+        <WorkspacePreviewStage
           mutePreviewAudio={
             recordingLayout.audioRecordingDialogOpen || (recording?.capturing ?? false)
           }
@@ -364,14 +365,21 @@ function WorkspaceLibraryPanel(
   );
 }
 
+/** Keep high-frequency time updates inside the montage stage instead of its materials owner. */
+function WorkspacePreviewStage(
+  props: Omit<React.ComponentProps<typeof PreviewStage>, 'currentTime'>
+) {
+  const currentTime = useVideoEditorPlaybackPort((port) => port.currentTime);
+  return <PreviewStage {...props} currentTime={currentTime} />;
+}
+
 function createWorkspacePreviewProps(
   props: VideoEditorWorkspaceCanvasProps,
   preview: NonNullable<ReturnType<typeof useVideoEditorPreviewController>>
-): React.ComponentProps<typeof PreviewStage> {
+): Omit<React.ComponentProps<typeof PreviewStage>, 'currentTime'> {
   return {
     activeInsertKind: props.activeInsertKind,
     assetUrls: preview.assetUrls,
-    currentTime: preview.transport.currentTime,
     grid: preview.grid,
     isPlaying: preview.transport.isPlaying,
     playbackRange: preview.transport.playbackRange,

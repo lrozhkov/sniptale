@@ -18,7 +18,7 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   isOpen: boolean;
   kind: 'standalone' | 'targetEffect' | 'transition';
 }): React.JSX.Element | null {
-  const preview = useVideoEditorPreviewController();
+  const preview = useVideoEditorPreviewController(props.isOpen);
   const selections = useVideoEditorSelectionsContext();
   const editorSelection = useVideoEditorClipSelectionPort((port) => port.selection);
   const onApplyEffect = useVideoEditorEffectEditingPort((port) => port.applyEffectDocument);

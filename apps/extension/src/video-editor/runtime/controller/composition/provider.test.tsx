@@ -246,7 +246,7 @@ vi.mock('../store', async (importOriginal) => ({
   useVideoEditorHistoryPort: (selector: (port: typeof mocks.history) => unknown) =>
     selector(mocks.history),
   useVideoEditorPlaybackPort: (selector: (port: typeof mocks.playback) => unknown) => {
-    const selectSnapshot = useShallow(selector);
+    const selectSnapshot = useShallow((port: typeof mocks.playback) => selector({ ...port }));
     return useSyncExternalStore(subscribeMockPlayback, () => selectSnapshot(mocks.playback));
   },
   useVideoEditorProjectLifecyclePort: (selector: (port: typeof mocks.lifecycle) => unknown) =>
@@ -662,4 +662,39 @@ it('keeps selected action placement tied to the live playhead', () => {
     for (const listener of mocks.playbackListeners) listener();
   });
   expect(snapshots).toEqual([0, 1]);
+});
+
+it('keeps a non-following preview controller idle while time queries and following consumers stay current', () => {
+  mocks.lifecycle.project = createEmptyVideoProject('Preview clock isolation');
+  let snapshotController: ReturnType<typeof useVideoEditorPreviewController> = null;
+  const snapshotRenders = vi.fn();
+  const followingTimes: number[] = [];
+  function SnapshotConsumer() {
+    snapshotController = useVideoEditorPreviewController(false);
+    snapshotRenders();
+    return null;
+  }
+  function FollowingConsumer() {
+    const controller = useVideoEditorPreviewController();
+    if (controller) followingTimes.push(controller.transport.currentTime);
+    return null;
+  }
+  act(() =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <SnapshotConsumer />
+        <FollowingConsumer />
+      </VideoEditorCompositionProvider>
+    )
+  );
+  const renders = snapshotRenders.mock.calls.length;
+  const readSnapshotController = () => snapshotController;
+  const retained = readSnapshotController();
+  act(() => {
+    mocks.playback.currentTime = 3.5;
+    mocks.playbackListeners.forEach((listener) => listener());
+  });
+  expect(followingTimes.at(-1)).toBe(3.5);
+  expect(snapshotRenders).toHaveBeenCalledTimes(renders);
+  expect(retained?.transport.currentTime).toBe(3.5);
 });

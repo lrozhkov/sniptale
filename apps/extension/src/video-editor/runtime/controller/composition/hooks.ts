@@ -284,11 +284,15 @@ function usePresentedProject() {
   ]);
 }
 
-export function useVideoEditorPreviewController() {
+/** Clock-free containers query current time on demand; only visible time consumers subscribe. */
+export function useVideoEditorPreviewController(followPlaybackTime = true) {
   const updateEffectInstance = useVideoEditorEffectEditingPort((port) => port.updateEffectInstance);
   const project = usePresentedProject();
   const lifecycleProject = useVideoEditorProjectLifecyclePort((port) => port.project);
-  const playback = useVideoEditorPlaybackPort((port) => port);
+  const playback = useVideoEditorPlaybackPort(({ currentTime, isPlaying }) => ({
+    isPlaying,
+    ...(followPlaybackTime ? { currentTime } : {}),
+  }));
   const selection = useVideoEditorClipSelectionPort((port) => port);
   const annotation = useVideoEditorAnnotationEditingPort((port) => port);
   const session = useVideoEditorRuntimeSessionPort((port) => port);
@@ -329,6 +333,9 @@ export function useVideoEditorPreviewController() {
         ...session,
         ...timeline,
         updateEffectInstance,
+        get currentTime() {
+          return getCurrentVideoEditorCurrentTime();
+        },
       },
       workspace,
     },

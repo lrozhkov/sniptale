@@ -2,7 +2,8 @@
 import { VideoTrackKind } from '../../../features/video/project/types';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useVideoEditorStore } from '../../state/store';
 import {
   createEmptyVideoProject,
   createVideoProjectTrack,
@@ -11,11 +12,7 @@ import { DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS } from '../../persistence/track-
 import { WorkspaceTrackPresentation, useWorkspaceTrackPresentation } from './track-presentation';
 import { TrackLayoutFields } from '../sidebar/selection/track/sections';
 
-const mocks = vi.hoisted(() => ({ controller: null as unknown, load: vi.fn(), save: vi.fn() }));
-vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
-  useVideoEditorTimelineController: () => mocks.controller,
-}));
+const mocks = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }));
 vi.mock('../../persistence/track-panel', async (original) => ({
   ...(await original<typeof import('../../persistence/track-panel')>()),
   loadVideoEditorTrackPanelPrefs: mocks.load,
@@ -25,7 +22,14 @@ vi.mock('../../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  useVideoEditorStore.setState({ ...useVideoEditorStore.getInitialState() }, true);
+  mocks.load.mockReset().mockResolvedValue(DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS);
+  mocks.save.mockReset().mockResolvedValue(undefined);
+});
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -35,8 +39,8 @@ it('shares restored heights with the track inspector and routes order to the exi
   const project = createEmptyVideoProject('Track presentation');
   const track = createVideoProjectTrack('Overlay', 2, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
-  const move = vi.fn();
-  mocks.controller = { state: { project }, actions: { onMoveTrack: move } };
+  useVideoEditorStore.getState().setProject(project);
+  const move = vi.spyOn(useVideoEditorStore.getState(), 'moveTrack');
   mocks.load.mockResolvedValue({
     ...DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS,
     trackHeightByTrackId: { [track.id]: 1.5 },
@@ -86,7 +90,7 @@ it('shares restored heights with the track inspector and routes order to the exi
 
 it('keeps the empty workspace available without starting project preference persistence', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  mocks.controller = null;
+  useVideoEditorStore.setState({ project: null });
   const container = document.createElement('div');
   const root = createRoot(container);
   function EmptyWorkspace() {
@@ -125,7 +129,7 @@ it('keeps a manually entered fractional height consistent through real preferenc
   mocks.save.mockImplementation(persistence.saveVideoEditorTrackPanelPrefs);
   const project = createEmptyVideoProject('Fractional height');
   const track = project.tracks[0]!;
-  mocks.controller = { state: { project }, actions: { onMoveTrack: vi.fn() } };
+  useVideoEditorStore.getState().setProject(project);
   function TimelineConsumer() {
     return (
       <output>
@@ -168,5 +172,103 @@ it('keeps a manually entered fractional height consistent through real preferenc
     act(() => root.unmount());
     get.mockRestore();
     set.mockRestore();
+  }
+});
+
+it('keeps the actual track context consumer idle across time-only store updates', async () => {
+  const project = createEmptyVideoProject('Clock isolation');
+  project.duration = 10;
+  useVideoEditorStore.setState({ project });
+  const rendered = vi.fn();
+  function Consumer() {
+    rendered();
+    const presentation = useWorkspaceTrackPresentation();
+    return <output>{presentation?.tracks.map((track) => track.id).join(',')}</output>;
+  }
+  const container = document.createElement('div'),
+    root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        <WorkspaceTrackPresentation>
+          <Consumer />
+        </WorkspaceTrackPresentation>
+      )
+    );
+    const before = rendered.mock.calls.length;
+    for (let frame = 1; frame <= 8; frame++)
+      act(() => useVideoEditorStore.getState().setCurrentTime(frame / 60));
+    expect(useVideoEditorStore.getState().currentTime).toBe(8 / 60);
+    expect(rendered).toHaveBeenCalledTimes(before);
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+it('publishes real order and preference changes and resets context after project removal and replacement', async () => {
+  const project = createEmptyVideoProject('First project');
+  const extra = createVideoProjectTrack('Overlay', 2, VideoTrackKind.PRIMARY);
+  project.tracks.push(extra);
+  useVideoEditorStore.getState().setProject(project);
+  const observed: { current: ReturnType<typeof useWorkspaceTrackPresentation> } = { current: null };
+  const read = () => {
+    const presentation = observed.current;
+    if (!presentation) throw new Error('Expected track presentation');
+    return presentation;
+  };
+  function Consumer() {
+    const presentation = useWorkspaceTrackPresentation();
+    observed.current = presentation;
+    return (
+      <output>
+        {presentation
+          ? presentation.tracks
+              .map(
+                (track) =>
+                  `${track.id}:${presentation.panelPrefs.prefs.trackHeightByTrackId[track.id] ?? 1}`
+              )
+              .join(',')
+          : 'empty'}
+      </output>
+    );
+  }
+  const container = document.createElement('div'),
+    root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        <WorkspaceTrackPresentation>
+          <Consumer />
+        </WorkspaceTrackPresentation>
+      )
+    );
+    const before = read().tracks.map((track) => track.id);
+    act(() => read().onMoveTrack(extra.id, 'up'));
+    expect(read().tracks.map((track) => track.id)).not.toEqual(before);
+    expect(read().tracks.map((track) => track.id)).toEqual(
+      useVideoEditorStore
+        .getState()
+        .project!.tracks.toSorted((a, b) => a.order - b.order)
+        .map((track) => track.id)
+    );
+    act(() => read().panelPrefs.setTrackHeight(extra.id, 2));
+    expect(read().panelPrefs.prefs.trackHeightByTrackId[extra.id]).toBe(2);
+    act(() => useVideoEditorStore.getState().selectTrack(extra.id));
+    expect(read().panelPrefs.prefs.trackHeightByTrackId[extra.id]).toBe(2);
+    await act(async () => useVideoEditorStore.setState({ project: null }));
+    expect(observed.current).toBeNull();
+    expect(container.querySelector('output')?.textContent).toBe('empty');
+    const replacement = createEmptyVideoProject('Replacement');
+    await act(async () => useVideoEditorStore.getState().setProject(replacement));
+    expect(read().tracks.map((track) => track.id)).toEqual(
+      replacement.tracks.map((track) => track.id)
+    );
+    expect(read().panelPrefs.prefs.trackHeightByTrackId[extra.id]).toBeUndefined();
+    expect(mocks.load.mock.calls.map(([projectId]) => projectId)).toEqual([
+      project.id,
+      replacement.id,
+    ]);
+  } finally {
+    act(() => root.unmount());
   }
 });

@@ -1,41 +1,48 @@
 import { createContext, useContext, type ReactNode } from 'react';
-import { useVideoEditorTimelineController } from '../../runtime/controller/composition/hooks';
+import {
+  useVideoEditorProjectLifecyclePort,
+  useVideoEditorTimelineEditingPort,
+} from '../../runtime/controller/store';
+import type { TimelineEditingPort } from '../../contracts/controller-store';
+import type { VideoProject } from '../../../features/video/project/types';
 import { useProjectTimelinePanelPrefs } from '../../timeline/project/panel/prefs';
 import { getSortedTracks } from '../../../features/video/project/timeline';
 import { isVideoEditorPresentedTrack } from '../../project/operations/presented-tracks';
 
-type TimelineController = NonNullable<ReturnType<typeof useVideoEditorTimelineController>>;
 const TrackPresentationContext = createContext<{
   panelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
-  tracks: TimelineController['state']['project']['tracks'];
-  onMoveTrack: TimelineController['actions']['onMoveTrack'];
+  tracks: VideoProject['tracks'];
+  onMoveTrack: TimelineEditingPort['moveTrack'];
 } | null>(null);
 
 /** One per-project presentation owner serves the timeline and its track inspector. */
 export function WorkspaceTrackPresentation({ children }: { children: ReactNode }) {
-  const controller = useVideoEditorTimelineController();
-  if (!controller) return children;
+  const project = useVideoEditorProjectLifecyclePort((port) => port.project);
+  const moveTrack = useVideoEditorTimelineEditingPort((port) => port.moveTrack);
+  if (!project) return children;
   return (
-    <ProjectTrackPresentation key={controller.state.project.id} controller={controller}>
+    <ProjectTrackPresentation key={project.id} project={project} onMoveTrack={moveTrack}>
       {children}
     </ProjectTrackPresentation>
   );
 }
 
 function ProjectTrackPresentation({
-  controller,
+  project,
+  onMoveTrack,
   children,
 }: {
-  controller: TimelineController;
+  project: VideoProject;
+  onMoveTrack: TimelineEditingPort['moveTrack'];
   children: ReactNode;
 }) {
-  const panelPrefs = useProjectTimelinePanelPrefs(controller.state.project);
+  const panelPrefs = useProjectTimelinePanelPrefs(project);
   return (
     <TrackPresentationContext.Provider
       value={{
         panelPrefs,
-        tracks: getSortedTracks(controller.state.project).filter(isVideoEditorPresentedTrack),
-        onMoveTrack: controller.actions.onMoveTrack,
+        tracks: getSortedTracks(project).filter(isVideoEditorPresentedTrack),
+        onMoveTrack,
       }}
     >
       {children}

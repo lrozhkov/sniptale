@@ -146,12 +146,15 @@ function createWorkspacePreviewTransport(
   runtime: VideoEditorRuntimeController
 ) {
   return {
-    currentTime: args.store.currentTime,
+    get currentTime() {
+      return args.store.currentTime;
+    },
     isPlaying: args.store.isPlaying,
     onPausePlayback: runtime.pausePlayback,
     playbackRange: args.workspace.playbackRange,
     onSeek: runtime.seekTo,
     onTogglePlay: runtime.togglePlayback,
+    registerPreviewRuntime: runtime.registerPreviewRuntime,
   };
 }
 
@@ -242,10 +245,7 @@ export function createWorkspacePreviewController(
     },
     preferences: createWorkspacePreviewPreferences(args.workspace),
     project,
-    transport: {
-      ...createWorkspacePreviewTransport(args, runtime),
-      registerPreviewRuntime: runtime.registerPreviewRuntime,
-    },
+    transport: createWorkspacePreviewTransport(args, runtime),
     selection: {
       ...createWorkspacePreviewSelection(args),
       onSelectClip: (clipId: string | null) => selectPreviewClip(args, clipId),
