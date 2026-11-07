@@ -1,8 +1,5 @@
-import type {
-  NativePreviewFramePresenter,
-  PreviewScenePresentation,
-  PreviewScenePreparedFrame,
-} from './types';
+import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
+import type { PreviewScenePresentation, PreviewScenePreparedFrame } from './types';
 import { resolvePreviewCompositionFrameSize } from './canvas';
 import type { renderPreviewScene } from './render-preview';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
@@ -11,7 +8,7 @@ export type PreviewSceneRenderJob = Parameters<typeof renderPreviewScene>[0] & {
   controller: AbortController;
   effectPreparationProject?: Parameters<typeof renderPreviewScene>[0]['project'] | undefined;
   /** The mounted frontend receives the completed output; the producer receives only acquisition. */
-  framePresenter?: NativePreviewFramePresenter;
+  framePresenter?: GpuPreviewFramePresenter;
   onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   isEffectRuntimeFrame: boolean;
   isPlaybackFrame: boolean;

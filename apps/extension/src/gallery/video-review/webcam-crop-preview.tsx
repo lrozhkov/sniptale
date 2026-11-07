@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { cameraContentFrame } from '../../features/video/project/camera/appearance';
 import type {
   QuickEditWebcam,
   QuickEditWebcamCrop,
 } from '../../features/video/review/advanced/webcam';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
-import { drawReviewWebcam } from '../../workflows/video-review/render-webcam';
+import { createPreviewPresentationSession } from '../../features/video/composition/canvas/preview-presentation';
+import { ReviewPreviewRendererContext } from './use-preview-preferences';
+import { createWebcamCropPaintOwner } from './webcam-crop-paint';
 import { translate } from '../../platform/i18n';
 import { ReviewButton } from './controls';
 
@@ -30,7 +32,7 @@ export function ReviewWebcamCropPreview(props: {
     value: QuickEditWebcamCrop;
   } | null>(null);
   const crop = draft ?? props.crop;
-  const { video, canvas, ready, failed, retry } = useWebcamCropFrame(props, crop);
+  const { video, canvas, gpuHost, ready, failed, retry } = useWebcamCropFrame(props, crop);
   const clamp = (value: number) => Math.max(-1, Math.min(1, value));
   const cancel = () => {
     const current = gesture.current;
@@ -141,6 +143,11 @@ export function ReviewWebcamCropPreview(props: {
         }}
       >
         <canvas ref={canvas} className="pointer-events-none block h-full w-full" />
+        <div
+          ref={gpuHost}
+          data-ui="gallery.videoReview.webcamCrop.gpuHost"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        />
         {!ready ? (
           <span className="absolute inset-0 flex items-center justify-center p-2 text-xs">
             {translate(
@@ -164,34 +171,76 @@ function useWebcamCropFrame(
   crop: QuickEditWebcamCrop
 ) {
   const video = useRef<HTMLVideoElement>(null),
-    canvas = useRef<HTMLCanvasElement>(null);
-  const [ready, setReady] = useState(false),
-    [failed, setFailed] = useState(false);
+    canvas = useRef<HTMLCanvasElement>(null),
+    gpuHost = useRef<HTMLDivElement>(null);
+  const renderer = useContext(ReviewPreviewRendererContext);
+  const [source, setSource] = useState<{ assetId: string; attempt: number; time: number } | null>(
+    null
+  );
+  const [failed, setFailed] = useState(false);
   const [revision, setRevision] = useState(0),
     [attempt, setAttempt] = useState(0);
-  const framing = useMemo(
-    () => ({ zoom: crop.zoom, panX: crop.panX, panY: crop.panY }),
-    [crop.zoom, crop.panX, crop.panY]
-  );
+  const paint = useRef<ReturnType<typeof createWebcamCropPaintOwner> | null>(null);
+  useLayoutEffect(() => {
+    const target = canvas.current,
+      media = video.current;
+    if (!target || !media) return;
+    const presenter = createPreviewPresentationSession({
+      fallback: () => canvas.current,
+      host: () => gpuHost.current,
+      role: 'inspector',
+      background: 'transparent',
+    });
+    presenter.mount();
+    const owner = createWebcamCropPaintOwner({
+      target,
+      media,
+      presenter,
+      fail: () => setFailed(true),
+    });
+    paint.current = owner;
+    return () => {
+      paint.current = null;
+      owner.dispose();
+      presenter.dispose();
+    };
+  }, []);
   const time = Math.max(0, props.time - props.camera.offsetSeconds);
   const latestTime = useRef(time);
   latestTime.current = time;
+  const ready =
+    source?.assetId === props.camera.assetId &&
+    source.attempt === attempt &&
+    source.time === time &&
+    !failed;
   useEffect(() => {
     const media = video.current!;
     let disposed = false,
       url: string | undefined;
-    setReady(false);
+    paint.current?.cancel();
+    setSource(null);
     setFailed(false);
     const seek = () => {
       media.currentTime = Math.min(Math.max(0, media.duration - 0.001), latestTime.current);
     };
     const loaded = () => {
-      setReady(media.readyState >= 2);
+      if (
+        disposed ||
+        !url ||
+        (media.currentSrc || media.src) !== url ||
+        media.seeking ||
+        media.readyState < 2
+      )
+        return;
+      const expected = Math.min(Math.max(0, media.duration - 0.001), latestTime.current);
+      if (!Number.isFinite(expected) || Math.abs(media.currentTime - expected) > 0.001) return;
+      setSource({ assetId: props.camera.assetId, attempt, time: latestTime.current });
       setRevision((value) => value + 1);
     };
     const error = () => {
       if (!disposed) {
-        setReady(false);
+        paint.current?.cancel();
+        setSource(null);
         setFailed(true);
       }
     };
@@ -213,6 +262,7 @@ function useWebcamCropFrame(
       .catch(error);
     return () => {
       disposed = true;
+      paint.current?.cancel();
       media.removeEventListener('loadedmetadata', seek);
       media.removeEventListener('loadeddata', loaded);
       media.removeEventListener('seeked', loaded);
@@ -225,37 +275,56 @@ function useWebcamCropFrame(
   }, [props.camera.assetId, attempt]);
   useEffect(() => {
     const media = video.current;
-    if (media && Number.isFinite(media.duration))
-      media.currentTime = Math.min(Math.max(0, media.duration - 0.001), time);
-  }, [time]);
+    paint.current?.cancel();
+    if (media && media.readyState >= 1 && !Number.isNaN(media.duration)) {
+      const target = Math.min(Math.max(0, media.duration - 0.001), time);
+      if (media.currentTime !== target) {
+        setSource(null);
+        media.currentTime = target;
+      } else if (!media.seeking && media.readyState >= 2) {
+        setSource((current) =>
+          current?.assetId === props.camera.assetId && current.attempt === attempt
+            ? { ...current, time }
+            : current
+        );
+      }
+    }
+  }, [time, props.camera.assetId, attempt]);
   useEffect(() => {
-    const target = canvas.current,
-      media = video.current;
-    if (!target || !media || !ready) return;
-    const draw = () => {
-      const box = target.getBoundingClientRect();
-      target.width = Math.max(1, Math.round(box.width * Math.min(2, window.devicePixelRatio || 1)));
-      target.height = Math.max(
-        1,
-        Math.round(box.height * Math.min(2, window.devicePixelRatio || 1))
-      );
-      const context = target.getContext('2d');
-      if (!context) return;
-      context.clearRect(0, 0, target.width, target.height);
-      drawReviewWebcam(
-        context,
-        target,
-        { ...props.camera, shadow: { intensity: 0, color: '#000000ff' } },
-        { x: 0, y: 0, width: 1, height: 1 },
-        { width: media.videoWidth, height: media.videoHeight },
-        { draw: (ctx, x, y, w, h) => ctx.drawImage(media, x, y, w, h) },
-        framing
-      );
-    };
+    const target = canvas.current;
+    if (!target || !ready) {
+      paint.current?.cancel();
+      return;
+    }
+    const framing = { zoom: crop.zoom, panX: crop.panX, panY: crop.panY };
+    const draw = () => paint.current?.request({ camera: props.camera, crop: framing, renderer });
     draw();
     const observer = new ResizeObserver(draw);
     observer.observe(target);
-    return () => observer.disconnect();
-  }, [ready, revision, props.camera, framing, props.width, props.height]);
-  return { video, canvas, ready, failed, retry: () => setAttempt((value) => value + 1) };
+    return () => {
+      observer.disconnect();
+      paint.current?.cancel();
+    };
+  }, [
+    ready,
+    revision,
+    props.camera,
+    crop.zoom,
+    crop.panX,
+    crop.panY,
+    props.width,
+    props.height,
+    renderer,
+  ]);
+  return {
+    video,
+    canvas,
+    gpuHost,
+    ready,
+    failed,
+    retry: () => {
+      paint.current?.reset();
+      setAttempt((value) => value + 1);
+    },
+  };
 }

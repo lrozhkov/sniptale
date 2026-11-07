@@ -1,3 +1,8 @@
+import type {
+  GpuPreviewOutput,
+  GpuPreviewFramePresenter,
+  GpuPreviewTargetFactory,
+} from '../../../../features/video/composition/canvas/preview-presentation';
 import type { EffectRuntimeGpuPreparedComposition } from '../../../../features/video/composition/effect-runtime/runtime/types';
 import type { EffectRuntimeInputComposer } from '../../../../features/video/composition/effect-runtime/frame/inputs';
 import type { EffectRuntimeRenderedComposition } from '../../../../features/video/composition/effect-runtime';
@@ -9,10 +14,6 @@ import type { ReviewSpatialRenderer } from '../../../../features/video/compositi
 import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
 import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 import type { PreparedPreviewSceneCanvas } from './canvas';
-import type {
-  GpuPreviewRenderer,
-  GpuPreviewPresentationSurface,
-} from '../../../../features/video/composition/canvas/gpu-preview';
 import type React from 'react';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 
@@ -23,14 +24,8 @@ import type {
 import type { PreviewStageVideoRefs } from '../types';
 import type { PreviewEffectRuntimeFeedback } from '../types';
 import type { VideoEditorPreviewRasterSize } from '../sizing/raster';
-import type {
-  VideoEditorPreviewMode,
-  NativePreviewGpuOutput,
-} from '../../../contracts/preview-runtime';
-export type {
-  NativePreviewGpuOutput,
-  PreviewScenePresentation,
-} from '../../../contracts/preview-runtime';
+import type { VideoEditorPreviewMode } from '../../../contracts/preview-runtime';
+export type { PreviewScenePresentation } from '../../../contracts/preview-runtime';
 import type { VideoPreviewExactFrameCache } from '../../cache/exact-frame-cache';
 import type {
   PreviewRendererStatus,
@@ -44,7 +39,7 @@ export interface PreviewStageCanvasSceneParams {
   assetUrls?: Record<string, string>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   /** The mounted frontend owns this presenter; each render job captures its current lifetime. */
-  framePresenterRef?: React.RefObject<NativePreviewFramePresenter | null>;
+  framePresenterRef?: React.RefObject<GpuPreviewFramePresenter | null>;
   currentTime: number;
   /** Borrows the mounted renderer's playback request until its cleanup runs. */
   registerPlaybackRequest?: ((request: (time: number) => void) => () => void) | undefined;
@@ -64,23 +59,6 @@ export interface PreviewStageCanvasSceneParams {
   renderGenerationRef?: React.MutableRefObject<number> | undefined;
   stageRef: React.RefObject<HTMLDivElement | null>;
   videoRefs: PreviewStageVideoRefs;
-}
-
-/** The producer exclusively owns this destination through GPU completion. */
-export interface NativePreviewGpuTarget extends NativePreviewGpuOutput {
-  readonly surface: GpuPreviewPresentationSurface;
-}
-
-/** Acquires a hidden exclusive destination bound to the supplied backend. */
-export type NativePreviewGpuTargetFactory = (
-  size: { width: number; height: number },
-  renderer: GpuPreviewRenderer
-) => NativePreviewGpuTarget;
-
-/** Visibility and matching geometry commit together in the mounted frontend. */
-export interface NativePreviewFramePresenter {
-  acquire: NativePreviewGpuTargetFactory;
-  publish(output: NativePreviewGpuOutput | null, acceptGeometry: () => void): void;
 }
 
 type PreviewEffectRuntimeExecutorInput =
@@ -121,7 +99,7 @@ export type PreviewSceneRenderInput = {
   gpuPreview?: NativeGpuPreviewRenderer;
   /** An admitted GPU job must drain before the scheduler can retry Canvas fallback. */
   gpuOnly?: boolean;
-  acquireGpuOutput?: NativePreviewGpuTargetFactory;
+  acquireGpuOutput?: GpuPreviewTargetFactory;
   /** UI publication sends the frame event after pixels and geometry commit. */
   deferFrameEvent?: boolean;
   /** Held composition samples exclude outer fades; their caller applies presentation once. */
@@ -180,6 +158,6 @@ export interface NativeGpuPreviewRenderer {
         >),
     /** Omission conservatively retains the raster for callers without producer admission. */
     finalArtworkRequired?: boolean
-  ): Promise<boolean | NativePreviewGpuOutput | undefined>;
+  ): Promise<boolean | GpuPreviewOutput | undefined>;
   dispose(): void;
 }

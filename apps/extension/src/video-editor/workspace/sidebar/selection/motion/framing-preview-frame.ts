@@ -1,5 +1,6 @@
-import { createNativePreviewPresentationSession } from '../../../../preview/stage/canvas/presentation-session';
-import type { NativePreviewGpuOutput } from '../../../../preview/stage/scene/types';
+import type { GpuPreviewOutput } from '../../../../../features/video/composition/canvas/preview-presentation';
+import { createPreviewPresentationSession } from '../../../../../features/video/composition/canvas/preview-presentation';
+
 import { useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
 import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
@@ -26,7 +27,7 @@ interface FramingRequest {
   key: string;
 }
 interface FramingResult {
-  output?: NativePreviewGpuOutput;
+  output?: GpuPreviewOutput;
   canvas: HTMLCanvasElement;
   nominalScale: number;
   viewport?: VideoCompositionCameraState;
@@ -61,13 +62,11 @@ export function useFramingFrame(
     plan?: ReturnType<typeof resolveProjectCursorCameraPlan> | null | undefined;
   } | null>(null);
   const [hasPresentedFrame, setHasPresentedFrame] = useState(false);
-  const presenterRef = useRef<ReturnType<typeof createNativePreviewPresentationSession> | null>(
-    null
-  );
+  const presenterRef = useRef<ReturnType<typeof createPreviewPresentationSession> | null>(null);
   const activeGeneration = useRef<AbortController | null>(null);
   const previousTransaction = useRef<Promise<void>>(Promise.resolve());
   useLayoutEffect(() => {
-    const presenter = createNativePreviewPresentationSession({
+    const presenter = createPreviewPresentationSession({
       fallback: () => canvasRef.current,
       host: () => gpuHostRef.current,
       role: 'inspector',

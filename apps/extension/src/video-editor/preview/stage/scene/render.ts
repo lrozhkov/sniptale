@@ -1,3 +1,4 @@
+import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 import { createVideoPreviewCompositionJoinRenderer } from './joins';
 import { createVideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
 import { loadVideoEditorAssetBlob } from '../../../runtime/session/asset-urls';
@@ -15,7 +16,7 @@ import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
 import { prepareNativePreviewSceneFrame } from './frame-plan';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import type { PreviewSceneRenderJob } from './render-scheduler';
-import type { NativePreviewFramePresenter, PreviewStageCanvasSceneParams } from './types';
+import type { PreviewStageCanvasSceneParams } from './types';
 import { createVideoPreviewRenderRevision } from '../../cache/revision';
 import { renderPreviewSceneWithExactCache } from '../../cache/render';
 import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
@@ -196,7 +197,7 @@ function createPreviewStageCanvasRenderJob(args: {
   canvas: HTMLCanvasElement;
   currentTime: number;
   onCameraPresented: PreviewStageCanvasSceneParams['onCameraPresented'];
-  framePresenter?: NativePreviewFramePresenter;
+  framePresenter?: GpuPreviewFramePresenter;
   assetUrls?: Record<string, string>;
   effectRuntimeRef: MutableRefObject<VideoEditorEffectRuntime | null>;
   imageBank: PreviewStageCanvasSceneParams['imageBank'];

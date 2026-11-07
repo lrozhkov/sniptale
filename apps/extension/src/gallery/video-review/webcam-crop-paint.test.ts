@@ -1,0 +1,313 @@
+// @vitest-environment jsdom
+import { afterEach, expect, it, vi } from 'vitest';
+import { createWebcamCropPaintOwner } from './webcam-crop-paint';
+import { createCameraCropGpuRenderer } from '../../features/video/composition/canvas/camera-crop-gpu';
+import {
+  createPreviewPresentationSession,
+  type GpuPreviewOutput,
+} from '../../features/video/composition/canvas/preview-presentation';
+import {
+  GpuPreviewDeviceError,
+  type GpuPreviewRenderer,
+  type createGpuPreviewRenderer,
+} from '../../features/video/composition/canvas/gpu-preview';
+import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
+import { drawReviewWebcam } from '../../workflows/video-review/render-webcam';
+
+vi.mock('../../workflows/video-review/render-webcam', () => ({ drawReviewWebcam: vi.fn() }));
+
+type CropRenderer = ReturnType<typeof createCameraCropGpuRenderer>;
+type CropInput = Parameters<CropRenderer['render']>[0];
+type CropResult = Awaited<ReturnType<CropRenderer['render']>>;
+const cleanups: (() => void)[] = [];
+afterEach(() => {
+  for (const dispose of cleanups.splice(0)) dispose();
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+  document.body.replaceChildren();
+});
+
+function fixture(factory?: typeof createCameraCropGpuRenderer) {
+  const target = document.createElement('canvas'),
+    host = document.createElement('div');
+  host.append(target);
+  document.body.append(host);
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 120, 90));
+  const context = target.getContext('2d');
+  if (!context) throw new Error('Expected Canvas test context');
+  vi.spyOn(context, 'clearRect');
+  const getContext = vi.spyOn(target, 'getContext');
+  const media = document.createElement('video');
+  const source = { readyState: 2, seeking: false };
+  Object.defineProperties(media, {
+    readyState: { get: () => source.readyState },
+    seeking: { get: () => source.seeking },
+    videoWidth: { value: 640 },
+    videoHeight: { value: 360 },
+  });
+  media.currentTime = 1;
+  media.src = 'blob:camera';
+  const session = createPreviewPresentationSession({
+    fallback: () => target,
+    host: () => host,
+    role: 'inspector',
+    background: 'transparent',
+  });
+  session.mount();
+  const publish = vi.spyOn(session, 'publish');
+  const backend = {
+    allocatedBytes: 0,
+    dispose: vi.fn(),
+    render: vi.fn<GpuPreviewRenderer['render']>(),
+    createSurface: vi.fn<NonNullable<GpuPreviewRenderer['createSurface']>>((canvas) => ({
+      canvas,
+      present: vi.fn(async () => {}),
+      dispose: vi.fn(),
+    })),
+  } satisfies GpuPreviewRenderer;
+  const records: {
+    input: CropInput;
+    resolve(value: CropResult): void;
+    reject(reason: unknown): void;
+  }[] = [];
+  const adapters: CropRenderer[] = [];
+  let active = 0,
+    maximumActive = 0;
+  const createRenderer = vi.fn<typeof createCameraCropGpuRenderer>(() => {
+    const adapter: CropRenderer = {
+      fallbackReason: undefined,
+      dispose: vi.fn(),
+      render: vi.fn<CropRenderer['render']>((input) => {
+        const completion = Promise.withResolvers<CropResult>();
+        active++;
+        maximumActive = Math.max(maximumActive, active);
+        records.push({ input, resolve: completion.resolve, reject: completion.reject });
+        return completion.promise.finally(() => {
+          active--;
+        });
+      }),
+    };
+    adapters.push(adapter);
+    return adapter;
+  });
+  const fail = vi.fn();
+  const owner = createWebcamCropPaintOwner({
+    target,
+    media,
+    presenter: session,
+    fail,
+    createRenderer: factory ?? createRenderer,
+  });
+  cleanups.push(() => {
+    owner.dispose();
+    session.dispose();
+  });
+  const camera = createQuickEditWebcam(
+    'project-asset:camera',
+    { width: 640, height: 360 },
+    { width: 1920, height: 1080 }
+  );
+  const input = { camera, crop: { zoom: 2, panX: 0.25, panY: -0.5 }, renderer: 'gpu' as const };
+  const output = (index: number, complete = true) => {
+    const record = records[index];
+    if (!record) throw new Error('Expected admitted request');
+    const lease = record.input.acquire(record.input.size, backend);
+    const completed = {
+      canvas: lease.canvas,
+      release: vi.fn(() => lease.release()),
+    } satisfies GpuPreviewOutput;
+    if (complete) record.resolve(completed);
+    return completed;
+  };
+  return {
+    owner,
+    session,
+    publish,
+    target,
+    getContext,
+    context,
+    host,
+    media,
+    source,
+    backend,
+    records,
+    adapters,
+    createRenderer,
+    fail,
+    input,
+    output,
+    maximumActive: () => maximumActive,
+  };
+}
+
+it('publishes GPU output without Canvas and retains frontend ownership', async () => {
+  const f = fixture(),
+    time = f.media.currentTime,
+    url = f.media.src;
+  f.owner.request(f.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(1));
+  const request = f.records[0]!.input;
+  expect(request.media).toBe(f.media);
+  expect(request.size).toEqual({ width: 120, height: 90 });
+  expect(request.appearance).toMatchObject(f.input.crop);
+  expect(request.fitMode).toBe('COVER');
+  expect(request.mirrored).toBe(f.input.camera.mirrored);
+  const completed = f.output(0);
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledWith(completed, expect.any(Function)));
+  expect(drawReviewWebcam).not.toHaveBeenCalled();
+  expect(f.getContext).not.toHaveBeenCalled();
+  expect(completed.canvas.hasAttribute('data-preview-inspector-canvas')).toBe(true);
+  expect(f.target.style.opacity).toBe('0');
+  f.owner.dispose();
+  expect(completed.release).not.toHaveBeenCalled();
+  f.session.dispose();
+  expect(completed.release).toHaveBeenCalledOnce();
+  expect(f.media.currentTime).toBe(time);
+  expect(f.media.src).toBe(url);
+});
+
+it.each(['unavailable', 'device-error'] as const)(
+  'uses Canvas only when the actual GPU adapter permits fallback (%s)',
+  async (reason) => {
+    vi.stubGlobal('VideoFrame', class {});
+    const backend = vi.fn<typeof createGpuPreviewRenderer>(async () => null);
+    if (reason === 'device-error')
+      backend.mockRejectedValue(new GpuPreviewDeviceError('device failed'));
+    const adapter = createCameraCropGpuRenderer(backend);
+    const f = fixture(() => adapter);
+    f.owner.request(f.input);
+    await vi.waitFor(() => expect(f.publish).toHaveBeenCalledWith(null, expect.any(Function)));
+    expect(adapter.fallbackReason).toBe(reason === 'unavailable' ? 'unavailable' : 'device-failed');
+    expect(f.context.clearRect).toHaveBeenCalledWith(0, 0, 120, 90);
+    expect(drawReviewWebcam).toHaveBeenCalledOnce();
+    expect(f.fail).not.toHaveBeenCalled();
+    expect(f.target.style.opacity).toBe('1');
+  }
+);
+
+it('keeps the legacy painter independent from the GPU factory', async () => {
+  const f = fixture();
+  f.owner.request({ ...f.input, renderer: 'legacy' });
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledWith(null, expect.any(Function)));
+  expect(f.createRenderer).not.toHaveBeenCalled();
+  expect(drawReviewWebcam).toHaveBeenCalledOnce();
+  expect(f.fail).not.toHaveBeenCalled();
+});
+
+it('keeps the latest pending crop and waits for canceled work before rendering again', async () => {
+  const f = fixture();
+  f.owner.request(f.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(1));
+  f.owner.request({ ...f.input, crop: { ...f.input.crop, panX: 0.5 } });
+  f.owner.request({ ...f.input, crop: { ...f.input.crop, panX: 0.75 } });
+  expect(f.records[0]!.input.signal.aborted).toBe(true);
+  expect(f.records).toHaveLength(1);
+  const stale = f.output(0);
+  await vi.waitFor(() => expect(f.records).toHaveLength(2));
+  expect(stale.release).toHaveBeenCalledOnce();
+  expect(f.records[1]!.input.appearance.panX).toBe(0.75);
+  expect(f.maximumActive()).toBe(1);
+  const completed = f.output(1);
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledOnce());
+  expect(f.publish.mock.calls[0]![0]).toBe(completed);
+  expect(completed.release).not.toHaveBeenCalled();
+  expect(drawReviewWebcam).not.toHaveBeenCalled();
+});
+
+it.each(['cancel', 'seek', 'time', 'source', 'not-ready', 'unmount'] as const)(
+  'releases a late GPU output without replacing accepted pixels after %s',
+  async (reason) => {
+    const f = fixture();
+    f.owner.request(f.input);
+    await vi.waitFor(() => expect(f.records).toHaveLength(1));
+    const front = f.output(0);
+    await vi.waitFor(() => expect(f.publish).toHaveBeenCalledOnce());
+    f.owner.request(f.input);
+    await vi.waitFor(() => expect(f.records).toHaveLength(2));
+    const late = f.output(1, false);
+    if (reason === 'cancel') f.owner.cancel();
+    if (reason === 'seek') f.source.seeking = true;
+    if (reason === 'time') f.media.currentTime = 2;
+    if (reason === 'source') f.media.src = 'blob:replacement';
+    if (reason === 'not-ready') f.source.readyState = 1;
+    if (reason === 'unmount') {
+      f.owner.dispose();
+      f.session.dispose();
+    }
+    f.records[1]!.resolve(late);
+    await vi.waitFor(() => expect(late.release).toHaveBeenCalledOnce());
+    expect(f.publish).toHaveBeenCalledOnce();
+    if (reason !== 'unmount') {
+      expect(front.release).not.toHaveBeenCalled();
+      expect(front.canvas.hasAttribute('data-preview-inspector-canvas')).toBe(true);
+    }
+    expect(drawReviewWebcam).not.toHaveBeenCalled();
+    expect(f.fail).not.toHaveBeenCalled();
+  }
+);
+
+it('keeps unavailable source requests out of the GPU queue and accepts a later ready request', async () => {
+  const f = fixture();
+  f.source.seeking = true;
+  f.owner.request(f.input);
+  await Promise.resolve();
+  expect(f.createRenderer).not.toHaveBeenCalled();
+  f.source.seeking = false;
+  f.source.readyState = 1;
+  f.owner.request(f.input);
+  await Promise.resolve();
+  expect(f.createRenderer).not.toHaveBeenCalled();
+  f.source.readyState = 2;
+  f.owner.request(f.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(1));
+  f.output(0);
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledOnce());
+});
+
+it('reports ordinary errors without a false fallback and creates a fresh renderer on explicit retry', async () => {
+  const f = fixture();
+  f.owner.request(f.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(1));
+  f.records[0]!.reject(new Error('invalid crop'));
+  await vi.waitFor(() => expect(f.fail).toHaveBeenCalledOnce());
+  expect(f.publish).not.toHaveBeenCalled();
+  expect(drawReviewWebcam).not.toHaveBeenCalled();
+  f.owner.reset();
+  f.owner.request(f.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(2));
+  expect(f.createRenderer).toHaveBeenCalledTimes(2);
+  expect(f.adapters[0]!.dispose).toHaveBeenCalledOnce();
+  const completed = f.output(1);
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledWith(completed, expect.any(Function)));
+  expect(f.fail).toHaveBeenCalledOnce();
+});
+
+it('silently retires an ordinary rejection from canceled work', async () => {
+  const f = fixture();
+  f.owner.request(f.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(1));
+  f.owner.cancel();
+  f.records[0]!.reject(new Error('canceled input'));
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(f.fail).not.toHaveBeenCalled();
+  expect(drawReviewWebcam).not.toHaveBeenCalled();
+});
+
+it('preserves the accepted GPU front when the adapter skips a stale request', async () => {
+  const f = fixture();
+  f.owner.request(f.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(1));
+  const front = f.output(0);
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledOnce());
+  f.owner.request(f.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(2));
+  f.records[1]!.resolve(false);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(f.publish).toHaveBeenCalledOnce();
+  expect(front.release).not.toHaveBeenCalled();
+  expect(front.canvas.hasAttribute('data-preview-inspector-canvas')).toBe(true);
+  expect(drawReviewWebcam).not.toHaveBeenCalled();
+});

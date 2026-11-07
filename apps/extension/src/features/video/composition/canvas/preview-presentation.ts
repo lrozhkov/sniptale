@@ -1,12 +1,27 @@
-import type {
-  GpuPreviewRenderer,
-  GpuPreviewPresentationSurface,
-} from '../../../../features/video/composition/canvas/gpu-preview';
-import type {
-  NativePreviewFramePresenter,
-  NativePreviewGpuOutput,
-  NativePreviewGpuTargetFactory,
-} from '../scene/types';
+import type { GpuPreviewRenderer, GpuPreviewPresentationSurface } from './gpu-preview';
+
+/** A completed destination retains its GPU provider until the frontend releases it. */
+export interface GpuPreviewOutput {
+  readonly canvas: HTMLCanvasElement;
+  release(): void;
+}
+
+/** The producer exclusively owns this destination through GPU completion. */
+export interface GpuPreviewTarget extends GpuPreviewOutput {
+  readonly surface: GpuPreviewPresentationSurface;
+}
+
+/** Acquires a hidden exclusive destination bound to the supplied backend. */
+export type GpuPreviewTargetFactory = (
+  size: { width: number; height: number },
+  renderer: GpuPreviewRenderer
+) => GpuPreviewTarget;
+
+/** Visibility and matching geometry commit together in the mounted frontend. */
+export interface GpuPreviewFramePresenter {
+  acquire: GpuPreviewTargetFactory;
+  publish(output: GpuPreviewOutput | null, acceptGeometry: () => void): void;
+}
 
 interface PresentationOptions {
   fallback: () => HTMLCanvasElement | null;
@@ -25,7 +40,7 @@ interface Destination {
 }
 
 /** Owns frontend destinations and accepted publication, never the GPU device or project model. */
-class NativePreviewPresentationSession implements NativePreviewFramePresenter {
+class PreviewPresentationSession implements GpuPreviewFramePresenter {
   private readonly destinations = new Set<Destination>();
   private readonly role: 'stage' | 'inspector';
   private readonly marker: 'data-preview-stage-canvas' | 'data-preview-inspector-canvas';
@@ -35,7 +50,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
   private fallback: HTMLCanvasElement | null = null;
   private originalFallback: { opacity: string; pointerEvents: string; active: boolean } | null =
     null;
-  private front: NativePreviewGpuOutput | null = null;
+  private front: GpuPreviewOutput | null = null;
 
   constructor(private options: PresentationOptions) {
     this.role = options.role ?? 'stage';
@@ -86,7 +101,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     if (!destination.leased) this.clear(destination);
   }
 
-  private show(output: NativePreviewGpuOutput | null): void {
+  private show(output: GpuPreviewOutput | null): void {
     const fallback = this.fallback;
     if (fallback) {
       fallback.style.opacity = output ? '0' : '1';
@@ -103,7 +118,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     }
   }
 
-  acquire: NativePreviewGpuTargetFactory = (size, renderer) => {
+  acquire: GpuPreviewTargetFactory = (size, renderer) => {
     const host = this.currentHost();
     if (
       !renderer.createSurface ||
@@ -185,7 +200,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
     };
   };
 
-  publish = (output: NativePreviewGpuOutput | null, acceptGeometry: () => void): void => {
+  publish = (output: GpuPreviewOutput | null, acceptGeometry: () => void): void => {
     const host = this.currentHost();
     if (
       output &&
@@ -237,6 +252,6 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
 }
 
 /** Construction is inert; the mounted stage explicitly begins and ends this owner lifetime. */
-export function createNativePreviewPresentationSession(options: PresentationOptions) {
-  return new NativePreviewPresentationSession(options);
+export function createPreviewPresentationSession(options: PresentationOptions) {
+  return new PreviewPresentationSession(options);
 }

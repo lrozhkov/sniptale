@@ -1,3 +1,4 @@
+import type { GpuPreviewTarget } from '../../../../features/video/composition/canvas/preview-presentation';
 import { createNativeEffectPreparation } from './effect-preparation';
 import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
 import { prepareEffectRuntimeGpuScene } from '../../../../features/video/composition/effect-runtime/render/gpu-plan';
@@ -28,11 +29,7 @@ import {
 
 import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
-import type {
-  PreviewSceneRenderInput as Input,
-  NativeGpuPreviewRenderer,
-  NativePreviewGpuTarget,
-} from './types';
+import type { PreviewSceneRenderInput as Input, NativeGpuPreviewRenderer } from './types';
 import {
   publishCompletedPreviewFrame,
   resolvePreparedPreviewSceneCanvas,
@@ -208,7 +205,7 @@ export function createNativeGpuPreviewRenderer(
       let bordersArtwork: HTMLCanvasElement | undefined;
       let bitmap: ImageBitmap | undefined;
       let staging: HTMLCanvasElement | undefined;
-      let acquiredOutput: NativePreviewGpuTarget | undefined;
+      let acquiredOutput: GpuPreviewTarget | undefined;
       let preparedEffects: Awaited<ReturnType<typeof prepareEffectRuntimeGpuScene>> | undefined;
       try {
         preparation ??=

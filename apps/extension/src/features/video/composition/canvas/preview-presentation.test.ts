@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import type { GpuPreviewRenderer } from '../../../../features/video/composition/canvas/gpu-preview';
-import { createNativePreviewPresentationSession } from './presentation-session';
+import type { GpuPreviewRenderer } from './gpu-preview';
+import { createPreviewPresentationSession } from './preview-presentation';
 
-const sessions: ReturnType<typeof createNativePreviewPresentationSession>[] = [];
+const sessions: ReturnType<typeof createPreviewPresentationSession>[] = [];
 afterEach(() => {
   sessions.splice(0).forEach((session) => session.dispose());
   document.body.replaceChildren();
@@ -33,7 +33,7 @@ function fixture(role?: 'stage' | 'inspector', background?: 'black' | 'transpare
       }),
     })),
   } satisfies GpuPreviewRenderer;
-  const session = createNativePreviewPresentationSession({
+  const session = createPreviewPresentationSession({
     fallback: () => fallback,
     host: () => host,
     ...(role ? { role } : {}),
@@ -247,7 +247,7 @@ it('allows a fresh mounted owner after cleanup without reviving the disposed ses
   const lease = f.session.acquire(size, f.renderer);
   f.session.publish(lease, () => {});
   f.session.dispose();
-  const next = createNativePreviewPresentationSession({
+  const next = createPreviewPresentationSession({
     fallback: () => f.fallback,
     host: () => f.host,
   });

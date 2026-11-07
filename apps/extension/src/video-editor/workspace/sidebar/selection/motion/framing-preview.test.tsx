@@ -1,8 +1,9 @@
-import * as inspectorPresentation from '../../../../preview/stage/canvas/presentation-session';
 import type {
-  NativePreviewGpuOutput,
-  NativePreviewGpuTargetFactory,
-} from '../../../../preview/stage/scene/types';
+  GpuPreviewOutput,
+  GpuPreviewTargetFactory,
+} from '../../../../../features/video/composition/canvas/preview-presentation';
+import * as inspectorPresentation from '../../../../../features/video/composition/canvas/preview-presentation';
+
 import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 import type { MaterializedPreviewFrame } from '../../../../preview/cache/materializer';
 // @vitest-environment jsdom
@@ -36,8 +37,8 @@ let root: Root;
 let host: HTMLDivElement;
 const draw = vi.fn();
 const pending: {
-  resolve: (canvas: HTMLCanvasElement, output?: NativePreviewGpuOutput) => void;
-  factory?: NativePreviewGpuTargetFactory;
+  resolve: (canvas: HTMLCanvasElement, output?: GpuPreviewOutput) => void;
+  factory?: GpuPreviewTargetFactory;
   reject: (error: Error) => void;
   signal: AbortSignal;
   camera: { scale: number; overlayZoomMode?: string };
@@ -80,7 +81,7 @@ beforeEach(() => {
       _time: number,
       signal: AbortSignal,
       camera: VideoCompositionCameraState,
-      factory?: NativePreviewGpuTargetFactory
+      factory?: GpuPreviewTargetFactory
     ) =>
       new Promise<MaterializedPreviewFrame>((resolve, reject) =>
         pending.push({
@@ -1100,9 +1101,9 @@ it('releases superseded GPU camera results before admitting the latest request',
   expect(next.release).not.toHaveBeenCalled();
 });
 it('releases an output rejected by publication without replacing its accepted front', async () => {
-  const create = inspectorPresentation.createNativePreviewPresentationSession;
+  const create = inspectorPresentation.createPreviewPresentationSession;
   let owner: ReturnType<typeof create> | undefined;
-  vi.spyOn(inspectorPresentation, 'createNativePreviewPresentationSession').mockImplementation(
+  vi.spyOn(inspectorPresentation, 'createPreviewPresentationSession').mockImplementation(
     (options) => {
       owner = create(options);
       return owner;
@@ -1122,8 +1123,8 @@ it('releases an output rejected by publication without replacing its accepted fr
   expect(host.querySelector('[data-preview-inspector-canvas]')).toBe(first.canvas);
 });
 it('aborts before UI-session disposal and releases a late GPU result after unmount', async () => {
-  const create = inspectorPresentation.createNativePreviewPresentationSession;
-  vi.spyOn(inspectorPresentation, 'createNativePreviewPresentationSession').mockImplementation(
+  const create = inspectorPresentation.createPreviewPresentationSession;
+  vi.spyOn(inspectorPresentation, 'createPreviewPresentationSession').mockImplementation(
     (options) => {
       const owner = create(options),
         dispose = owner.dispose;

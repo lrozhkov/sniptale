@@ -1,3 +1,4 @@
+import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 import { PreviewEffectEditorRegion } from './editor-region';
 import { PreviewEffectHandles } from './effect-handles';
 import React from 'react';
@@ -17,8 +18,7 @@ import { getCompositionRectStageStyle } from './geometry';
 import type { PreviewStageCanvasProps } from '../types';
 import { PreviewStageCanvasLayer, PreviewStageOverlayLayer } from './layers';
 import type { PreviewStageRootProps, PreviewStageRootSurfaceProps } from './types';
-import { createNativePreviewPresentationSession } from './presentation-session';
-import type { NativePreviewFramePresenter } from '../scene/types';
+import { createPreviewPresentationSession } from '../../../../features/video/composition/canvas/preview-presentation';
 
 export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
   const canvasInteractionActive = usePreviewCanvasInteractionFocus(params.stageRef);
@@ -190,9 +190,9 @@ function PreviewStageInsertPreviewOverlay(params: {
 export function PreviewStageRoot(params: PreviewStageRootProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const gpuHostRef = React.useRef<HTMLDivElement | null>(null);
-  const framePresenterRef = React.useRef<NativePreviewFramePresenter | null>(null);
+  const framePresenterRef = React.useRef<GpuPreviewFramePresenter | null>(null);
   React.useLayoutEffect(() => {
-    const presenter = createNativePreviewPresentationSession({
+    const presenter = createPreviewPresentationSession({
       fallback: () => canvasRef.current,
       host: () => gpuHostRef.current,
     });

@@ -1,21 +1,18 @@
+import type {
+  GpuPreviewOutput,
+  GpuPreviewTarget,
+  GpuPreviewTargetFactory,
+} from './preview-presentation';
 import {
   createGpuPreviewRenderer,
   GpuPreviewDeviceError,
   type GpuPreviewRenderer,
-} from '../../../../../features/video/composition/canvas/gpu-preview';
-import { getFittedMediaContentFrame } from '../../../../../features/video/composition/draw/fitted-media';
-import { traceCameraShape } from '../../../../../features/video/composition/draw/media-shadow';
-import {
-  cameraWindowFrame,
-  type CameraAppearance,
-} from '../../../../../features/video/project/camera/appearance';
-import type { VideoMediaFitMode } from '../../../../../features/video/project/types';
-import type { PreviewRendererStatus } from '../../../../../features/video/preview/preferences';
-import type {
-  NativePreviewGpuOutput,
-  NativePreviewGpuTarget,
-  NativePreviewGpuTargetFactory,
-} from '../../../../preview/stage/scene/types';
+} from './gpu-preview';
+import { getFittedMediaContentFrame } from '../draw/fitted-media';
+import { traceCameraShape } from '../draw/media-shadow';
+import { cameraWindowFrame, type CameraAppearance } from '../../project/camera/appearance';
+import type { VideoMediaFitMode } from '../../project/types';
+import type { PreviewRendererStatus } from '../../preview/preferences';
 
 interface CameraCropGpuInput {
   media: HTMLVideoElement;
@@ -24,7 +21,7 @@ interface CameraCropGpuInput {
   mirrored: boolean;
   fitMode: VideoMediaFitMode;
   signal: AbortSignal;
-  acquire: NativePreviewGpuTargetFactory;
+  acquire: GpuPreviewTargetFactory;
 }
 
 /** Owns source capture, retained silhouette and GPU completion without choosing visible pixels. */
@@ -103,7 +100,7 @@ export function createCameraCropGpuRenderer(
       settleRetirement();
     },
     /** Undefined permits Canvas fallback; false skips stale work without replacing the front. */
-    async render(input: CameraCropGpuInput): Promise<NativePreviewGpuOutput | undefined | false> {
+    async render(input: CameraCropGpuInput): Promise<GpuPreviewOutput | undefined | false> {
       if (disposed || input.signal.aborted || !ready(input.media)) return false;
       if (unavailable || typeof VideoFrame === 'undefined') {
         unavailable = true;
@@ -123,7 +120,7 @@ export function createCameraCropGpuRenderer(
         throw new Error('Camera crop dimensions are invalid.');
       const signal = AbortSignal.any([input.signal, lifetime.signal]);
       let source: VideoFrame | undefined;
-      let target: NativePreviewGpuTarget | undefined;
+      let target: GpuPreviewTarget | undefined;
       active = true;
       try {
         preparation ??= createBackend();

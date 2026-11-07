@@ -1,7 +1,8 @@
+import type { GpuPreviewOutput } from '../../../../../features/video/composition/canvas/preview-presentation';
 import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
-import { createNativePreviewPresentationSession } from '../../../../preview/stage/canvas/presentation-session';
-import type { NativePreviewGpuOutput } from '../../../../preview/stage/scene/types';
-import { createCameraCropGpuRenderer } from './camera-crop-gpu';
+import { createPreviewPresentationSession } from '../../../../../features/video/composition/canvas/preview-presentation';
+
+import { createCameraCropGpuRenderer } from '../../../../../features/video/composition/canvas/camera-crop-gpu';
 import type { VideoMediaFitMode } from '../../../../../features/video/project/types';
 import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
@@ -220,7 +221,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
     const target = canvas.current,
       media = video.current;
     if (!target || !media) return;
-    const presenter = createNativePreviewPresentationSession({
+    const presenter = createPreviewPresentationSession({
       fallback: () => canvas.current,
       host: () => gpuHost.current,
       role: 'inspector',
@@ -339,7 +340,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
 function createCameraCropFrameQueue(options: {
   target: HTMLCanvasElement;
   media: HTMLVideoElement;
-  presenter: ReturnType<typeof createNativePreviewPresentationSession>;
+  presenter: ReturnType<typeof createPreviewPresentationSession>;
   read: () => CropFrameInput;
   fail: () => void;
 }) {
@@ -371,7 +372,7 @@ function createCameraCropFrameQueue(options: {
           width: Math.max(1, Math.round(rect.width * window.devicePixelRatio)),
           height: Math.max(1, Math.round(rect.height * window.devicePixelRatio)),
         };
-        let output: NativePreviewGpuOutput | undefined | false;
+        let output: GpuPreviewOutput | undefined | false;
         let accepted = false;
         try {
           if (reset) {

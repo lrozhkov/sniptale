@@ -1,7 +1,8 @@
+import type { GpuPreviewTargetFactory } from '../../../features/video/composition/canvas/preview-presentation';
 // @vitest-environment jsdom
 import * as nativeGpu from '../stage/scene/gpu-preview';
 import { createVideoEditorEffectPreparationExecutor } from '../../runtime/effect-runtime';
-import type { NativePreviewGpuTargetFactory, PreviewScenePresentation } from '../stage/scene/types';
+import type { PreviewScenePresentation } from '../stage/scene/types';
 import type { GpuPreviewRenderer } from '../../../features/video/composition/canvas/gpu-preview';
 import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 import { drawVideoProjectSceneEdges } from '../../../features/video/composition/canvas/scene-edges';
@@ -994,7 +995,7 @@ function uiOutputFixture() {
   canvas.width = 480;
   canvas.height = 270;
   const release = vi.fn();
-  const acquire = vi.fn<NativePreviewGpuTargetFactory>(() => ({
+  const acquire = vi.fn<GpuPreviewTargetFactory>(() => ({
     canvas,
     release,
     surface: { canvas, present: vi.fn(async () => {}), dispose: vi.fn() },

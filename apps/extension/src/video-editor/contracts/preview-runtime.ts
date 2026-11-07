@@ -1,3 +1,4 @@
+import type { GpuPreviewOutput } from '../../features/video/composition/canvas/preview-presentation';
 import type { VideoCompositionCameraState } from '../../features/video/composition/types';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import type { VideoEditorPreviewMode } from '../../features/video/preview/preferences';
@@ -65,16 +66,10 @@ export interface VideoEditorPreviewRuntimePort {
 
 export type { VideoEditorPreviewFrameRate } from '../../features/video/preview/preferences';
 
-/** A completed destination retains its GPU provider until the frontend releases it. */
-export interface NativePreviewGpuOutput {
-  readonly canvas: HTMLCanvasElement;
-  release(): void;
-}
-
 /** Camera evaluated for one completed frame; the outer caller owns visible publication. */
 export interface PreviewScenePresentation {
   camera: VideoCompositionCameraState;
   time: number;
   renderer?: PreviewRendererStatus;
-  output?: NativePreviewGpuOutput;
+  output?: GpuPreviewOutput;
 }

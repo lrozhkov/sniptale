@@ -1,3 +1,4 @@
+import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 // @vitest-environment jsdom
 import { createVideoEditorEffectPreparationExecutor } from '../../../runtime/effect-runtime';
 import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
@@ -16,7 +17,7 @@ import {
   createProject,
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import type { NativePreviewFramePresenter, PreviewStageCanvasSceneParams } from './types';
+import type { PreviewStageCanvasSceneParams } from './types';
 
 const schedulerMocks = vi.hoisted(() => ({
   disposeMock: vi.fn(),
@@ -62,7 +63,7 @@ function RenderHarness({
   framePresenterRef,
 }: {
   retryVersion?: number;
-  framePresenterRef?: React.RefObject<NativePreviewFramePresenter | null>;
+  framePresenterRef?: React.RefObject<GpuPreviewFramePresenter | null>;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
@@ -271,11 +272,11 @@ it('publishes the accepted job time with its camera receipt', async () => {
 });
 
 it('captures the mounted presenter in the render job and defers its frame event', async () => {
-  const presenter: NativePreviewFramePresenter = {
-    acquire: vi.fn<NativePreviewFramePresenter['acquire']>(),
+  const presenter: GpuPreviewFramePresenter = {
+    acquire: vi.fn<GpuPreviewFramePresenter['acquire']>(),
     publish: vi.fn(),
   };
-  const framePresenterRef = React.createRef<NativePreviewFramePresenter>();
+  const framePresenterRef = React.createRef<GpuPreviewFramePresenter>();
   framePresenterRef.current = presenter;
   await act(async () => root?.render(<RenderHarness framePresenterRef={framePresenterRef} />));
   expect(schedulerMocks.enqueueMock).toHaveBeenLastCalledWith(
@@ -301,8 +302,8 @@ it.each([true, false])(
     const fallback = document.createElement('canvas');
     fallback.width = 17;
     fallback.height = 19;
-    const framePresenter: NativePreviewFramePresenter = {
-      acquire: vi.fn<NativePreviewFramePresenter['acquire']>(),
+    const framePresenter: GpuPreviewFramePresenter = {
+      acquire: vi.fn<GpuPreviewFramePresenter['acquire']>(),
       publish: vi.fn((_output, accept) => {
         expect(onCameraPresented).not.toHaveBeenCalled();
         expect(fallback.width).toBe(17);

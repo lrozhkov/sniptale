@@ -1,13 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createCameraCropGpuRenderer } from './camera-crop-gpu';
-import { DEFAULT_CAMERA_APPEARANCE } from '../../../../../features/video/project/camera/appearance';
-import { VideoMediaFitMode } from '../../../../../features/video/project/types';
-import {
-  GpuPreviewDeviceError,
-  type GpuPreviewRenderer,
-} from '../../../../../features/video/composition/canvas/gpu-preview';
-import * as cameraShape from '../../../../../features/video/composition/draw/media-shadow';
+import { DEFAULT_CAMERA_APPEARANCE } from '../../project/camera/appearance';
+import { VideoMediaFitMode } from '../../project/types';
+import { GpuPreviewDeviceError, type GpuPreviewRenderer } from './gpu-preview';
+import * as cameraShape from '../draw/media-shadow';
 
 const owned: ReturnType<typeof createCameraCropGpuRenderer>[] = [];
 const captures: { close: ReturnType<typeof vi.fn> }[] = [];

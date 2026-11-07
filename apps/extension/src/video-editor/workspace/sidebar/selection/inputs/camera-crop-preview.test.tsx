@@ -1,10 +1,13 @@
-import * as presentation from '../../../../preview/stage/canvas/presentation-session';
+import type { GpuPreviewTargetFactory } from '../../../../../features/video/composition/canvas/preview-presentation';
+import * as presentation from '../../../../../features/video/composition/canvas/preview-presentation';
 import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
 import { DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES } from '../../../../../composition/persistence/video-editor-preview-preferences/model';
-import type { NativePreviewGpuTargetFactory } from '../../../../preview/stage/scene/types';
+
 import type { CameraAppearance } from '../../../../../features/video/project/camera/appearance';
 const gpu = vi.hoisted(() => ({ create: vi.fn() }));
-vi.mock('./camera-crop-gpu', () => ({ createCameraCropGpuRenderer: gpu.create }));
+vi.mock('../../../../../features/video/composition/canvas/camera-crop-gpu', () => ({
+  createCameraCropGpuRenderer: gpu.create,
+}));
 // @vitest-environment jsdom
 import { act, useLayoutEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -259,7 +262,7 @@ it('uses transparent direct GPU output at CSS size times DPR without a final2D c
     size: { width: number; height: number };
     appearance: CameraAppearance;
     signal: AbortSignal;
-    acquire: NativePreviewGpuTargetFactory;
+    acquire: GpuPreviewTargetFactory;
   };
   const backend = {
     allocatedBytes: 0,
@@ -289,14 +292,16 @@ it('uses transparent direct GPU output at CSS size times DPR without a final2D c
 });
 
 type CropGpuInput = Parameters<
-  ReturnType<typeof import('./camera-crop-gpu').createCameraCropGpuRenderer>['render']
+  ReturnType<
+    typeof import('../../../../../features/video/composition/canvas/camera-crop-gpu').createCameraCropGpuRenderer
+  >['render']
 >[0];
 function pendingGpu() {
   const calls: {
     input: CropGpuInput;
     resolve: (
       output:
-        | import('../../../../preview/stage/scene/types').NativePreviewGpuOutput
+        | import('../../../../../features/video/composition/canvas/preview-presentation').GpuPreviewOutput
         | false
         | undefined
     ) => void;
@@ -317,7 +322,9 @@ function pendingGpu() {
     render: vi.fn(
       (input: CropGpuInput) =>
         new Promise<
-          import('../../../../preview/stage/scene/types').NativePreviewGpuOutput | false | undefined
+          | import('../../../../../features/video/composition/canvas/preview-presentation').GpuPreviewOutput
+          | false
+          | undefined
         >((resolve, reject) => calls.push({ input, resolve, reject }))
     ),
   };
@@ -526,8 +533,8 @@ it('rejects a pending GPU result resolved from the newer visual commit layout ph
   const g = pendingGpu(),
     p = props(),
     published: HTMLCanvasElement[] = [];
-  const create = presentation.createNativePreviewPresentationSession;
-  vi.spyOn(presentation, 'createNativePreviewPresentationSession').mockImplementation((options) => {
+  const create = presentation.createPreviewPresentationSession;
+  vi.spyOn(presentation, 'createPreviewPresentationSession').mockImplementation((options) => {
     const owner = create(options),
       publish = owner.publish;
     vi.spyOn(owner, 'publish').mockImplementation((output, geometry) => {

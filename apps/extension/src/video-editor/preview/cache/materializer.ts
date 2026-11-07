@@ -1,11 +1,10 @@
+import type {
+  GpuPreviewOutput,
+  GpuPreviewTargetFactory,
+} from '../../../features/video/composition/canvas/preview-presentation';
 import { hasCursorFollowingCameraAt } from '../../../features/video/composition/motion/camera-interval';
 import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
-import type {
-  NativePreviewGpuOutput,
-  PreviewSceneRenderInput,
-  NativePreviewGpuTargetFactory,
-  PreviewScenePresentation,
-} from '../stage/scene/types';
+import type { PreviewSceneRenderInput, PreviewScenePresentation } from '../stage/scene/types';
 import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 import { createMaterializerGpuComposer } from './materializer-gpu';
 import { createRecordingEventsRenderer } from '../../../workflows/video-review/recording-events';
@@ -70,7 +69,7 @@ export interface VideoPreviewFrameMaterializer {
     time: number,
     signal: AbortSignal,
     cameraOverride?: VideoCompositionCameraState,
-    acquireGpuOutput?: NativePreviewGpuTargetFactory,
+    acquireGpuOutput?: GpuPreviewTargetFactory,
     effectPreparation?: PreviewSceneRenderInput['effectPreparation']
   ): Promise<MaterializedPreviewFrame>;
   /** Replaces composition only between frames; false requires a new resource owner. */
@@ -289,7 +288,7 @@ export function createVideoPreviewFrameMaterializer(params: {
     time: number,
     signal: AbortSignal,
     cameraOverride?: VideoCompositionCameraState,
-    acquireGpuOutput?: NativePreviewGpuTargetFactory,
+    acquireGpuOutput?: GpuPreviewTargetFactory,
     effectPreparation?: PreviewSceneRenderInput['effectPreparation']
   ): Promise<MaterializedPreviewFrame> => {
     if (busy) throw new Error('Composition frame is already being materialized.');
@@ -486,7 +485,7 @@ function createMaterializedJoinPresentation(
       time: number,
       signal: AbortSignal,
       nextCamera?: VideoCompositionCameraState,
-      acquireGpuOutput?: NativePreviewGpuTargetFactory
+      acquireGpuOutput?: GpuPreviewTargetFactory
     ) {
       throwIfAborted(signal);
       if (disposed || state.disposed)
@@ -713,7 +712,7 @@ async function renderMaterializedFrame(
   cameraOverride?: VideoCompositionCameraState,
   sceneEdges: 'apply' | 'omit' = 'apply',
   decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>,
-  acquireGpuOutput?: NativePreviewGpuTargetFactory
+  acquireGpuOutput?: GpuPreviewTargetFactory
 ): Promise<MaterializedPreviewFrame> {
   const assertActive = () => {
     throwIfAborted(signal);
@@ -722,7 +721,7 @@ async function renderMaterializedFrame(
   let sampled:
     | Awaited<ReturnType<ReturnType<typeof createCompositionCutSampleSource>['sample']>>
     | undefined;
-  let completedOutput: NativePreviewGpuOutput | undefined;
+  let completedOutput: GpuPreviewOutput | undefined;
   let handedOff = false;
   try {
     assertActive();

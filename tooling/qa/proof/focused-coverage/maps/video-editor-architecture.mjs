@@ -68,6 +68,34 @@ const spatialResourceMappings = [
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   {
+    owner: 'shared-camera-crop-gpu',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/camera-crop-gpu.ts',
+    allowCrossOwner: true,
+    reason: 'Both editors consume the shared source capture and completed crop output lifetime.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/camera-crop-gpu.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-crop-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-crop-paint.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-gpu-preview-presentation',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/preview-presentation.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both editors publish completed GPU outputs and retire stale destinations through one frontend owner.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/preview-presentation.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+      'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-crop-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-crop-paint.test.ts',
+    ],
+  },
+  {
     owner: 'video-editor-framing-preview-frame',
     productionFile:
       'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview-frame.ts',
