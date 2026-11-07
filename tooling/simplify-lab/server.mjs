@@ -4,6 +4,7 @@ import { resolve, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
+import { captureSite } from './capture.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const lab = join(root, 'tooling/simplify-lab');
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
@@ -107,9 +108,19 @@ window.addEventListener('pagehide', () => {compute.dispose();service.dispose();}
     },
   };
 }
-export async function startLab({ port = 0, corpus = null } = {}) {
+export async function startLab({ port = 0, corpus = null, targets, capture = captureSite } = {}) {
   const bundled = await bundleCurrent();
-  const fixtures = JSON.parse(await readFile(join(lab, 'fixtures.json'), 'utf8'));
+  const catalog = JSON.parse(await readFile(join(lab, 'sites.json'), 'utf8'));
+  const selected = targets
+    ? catalog.cases.filter((entry) => targets.includes(entry.id))
+    : corpus
+      ? []
+      : catalog.cases;
+  if (targets?.some((id) => !selected.some((entry) => entry.id === id)))
+    throw new Error('Unknown site identity');
+  const fixtures = {
+    cases: selected.map((entry) => ({ ...entry, roles: [], captureUrl: `/capture/${entry.id}` })),
+  };
   const privateCases = corpus ? await loadCorpus(corpus) : [];
   const routes = new Map();
   for (const file of ['index.html', 'app.mjs', 'style.css'])
@@ -121,12 +132,6 @@ export async function startLab({ port = 0, corpus = null } = {}) {
           ? 'text/css'
           : 'text/html',
     });
-  for (const entry of fixtures.cases) {
-    const bytes = await readFile(join(lab, 'fixtures', `${entry.id}.svg`));
-    entry.sourceHash = sha256(bytes);
-    entry.url = `/fixtures/${entry.id}.svg`;
-    routes.set(entry.url, { bytes, type: 'image/svg+xml' });
-  }
   for (const entry of privateCases) {
     routes.set(`/corpus/${entry.id}.png`, { bytes: entry.bytes, type: 'image/png' });
     fixtures.cases.push({ ...entry, bytes: undefined, url: `/corpus/${entry.id}.png` });
@@ -136,13 +141,15 @@ export async function startLab({ port = 0, corpus = null } = {}) {
     stamp: {
       ...bundled.stamp,
       generatedAt: new Date().toISOString(),
-      fixtureDigest: sha256(JSON.stringify(fixtures)),
+      catalogDigest: sha256(JSON.stringify(fixtures)),
     },
   };
   routes.set('/config.json', { bytes: JSON.stringify(config), type: 'application/json' });
   routes.set('/generated/worker.mjs', { bytes: bundled.worker, type: 'text/javascript' });
   routes.set('/generated/adapter.mjs', { bytes: bundled.adapter, type: 'text/javascript' });
-  const server = createServer((request, response) => {
+  const captures = new Map();
+  let captureQueue = Promise.resolve();
+  const server = createServer(async (request, response) => {
     const expectedHost = `127.0.0.1:${server.address().port}`;
     const route =
       request.headers.host === expectedHost && request.method === 'GET' && routes.get(request.url);
@@ -155,6 +162,41 @@ export async function startLab({ port = 0, corpus = null } = {}) {
         "style-src 'self'; script-src 'self'; connect-src 'self' data:",
       ].join(' ')
     );
+    const site = fixtures.cases.find((entry) => entry.captureUrl === request.url);
+    if (
+      site &&
+      request.method === 'POST' &&
+      request.headers.host === expectedHost &&
+      request.headers.origin === `http://${expectedHost}` &&
+      request.headers['content-type'] === 'application/json'
+    ) {
+      if (!captures.has(site.id)) {
+        const pending = captureQueue.then(() =>
+          capture(site, { out: join(root, '.tmp/simplify-lab-captures') })
+        );
+        captureQueue = pending.catch(() => undefined);
+        captures.set(site.id, pending);
+      }
+      try {
+        const captured = await captures.get(site.id);
+        if (captured.status !== 'PASS') captures.delete(site.id);
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            ...captured,
+            bytes: undefined,
+            dataUrl: captured.bytes
+              ? `data:image/png;base64,${captured.bytes.toString('base64')}`
+              : undefined,
+          })
+        );
+      } catch {
+        captures.delete(site.id);
+        response.writeHead(500, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ status: 'FAIL', reason: 'Site capture failed' }));
+      }
+      return;
+    }
     if (!route) {
       response.writeHead(404);
       response.end('Not found');
@@ -180,7 +222,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (
     args.some(
       (arg, index) =>
-        ['--port', '--corpus'].includes(arg) &&
+        ['--port', '--corpus', '--target'].includes(arg) &&
         (!args[index + 1] || args[index + 1].startsWith('--'))
     )
   )
@@ -188,13 +230,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (
     args.some(
       (arg, index) =>
-        !['--port', '--corpus'].includes(arg) && !['--port', '--corpus'].includes(args[index - 1])
+        !['--port', '--corpus', '--target'].includes(arg) &&
+        !['--port', '--corpus', '--target'].includes(args[index - 1])
     )
   )
     throw new Error('Unknown option');
   const port = value('--port') === undefined ? 4179 : Number(value('--port'));
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('Invalid port');
-  const instance = await startLab({ port, corpus: value('--corpus') });
+  const instance = await startLab({
+    port,
+    corpus: value('--corpus'),
+    targets: value('--target') ? [value('--target')] : undefined,
+  });
   console.log(`Simplify lab: ${instance.url}`);
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => void instance.close());
 }

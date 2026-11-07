@@ -2,6 +2,8 @@
 
 This document owns the local Web Snapshot visual-fidelity procedure. The smoke is outside QA and CI. It stores no external-site golden images.
 
+For Simplify algorithm checks, use the separate [Simplify laboratory](../../tooling/simplify-lab/README.md). Each tool owns its own website catalog.
+
 The command builds the extension before running. It does not typecheck. Use the [operator handbook](operator-handbook.md) for canonical QA and build commands.
 
 ## External targets

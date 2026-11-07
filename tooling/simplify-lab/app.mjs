@@ -4,7 +4,8 @@ const config = await (await fetch('/config.json')).json();
 let source = null,
   result = null,
   generation = 0,
-  sourceId = null;
+  sourceId = null,
+  sourceProvenance = null;
 const records = [];
 const judgments = {
   roles: 'Роли элементов',
@@ -83,12 +84,27 @@ async function digest(data) {
     .map((value) => value.toString(16).padStart(2, '0'))
     .join('');
 }
-async function load(url, id, annotations = []) {
+async function load(url, id, annotations = [], site = null) {
   invalidate();
   source = null;
+  sourceProvenance = null;
   busy(false);
   const own = generation;
   try {
+    let provenance = null;
+    if (site) {
+      $('status').textContent = 'Создаётся снимок выбранного сайта…';
+      const response = await fetch(site.captureUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) throw new Error(`FAIL: HTTP ${response.status}`);
+      const captured = await response.json();
+      if (captured.status !== 'PASS') throw new Error(`${captured.status}: ${captured.reason}`);
+      url = captured.dataUrl;
+      provenance = captured.provenance;
+    }
+    if (own !== generation) return;
     const image = await imageFrom(url);
     if (own !== generation) return;
     if (image.width * image.height > 16_777_216)
@@ -101,6 +117,7 @@ async function load(url, id, annotations = []) {
       height: image.height,
     };
     sourceId = id;
+    sourceProvenance = provenance;
     $('width').value = image.width;
     $('height').value = image.height;
     $('x').value = 0;
@@ -110,16 +127,22 @@ async function load(url, id, annotations = []) {
       ? `Эталонные роли: ${annotations.map((role) => `${role.role} [${role.box.join(', ')}]`).join('; ')}`
       : 'Нет разметки ролей. Оцените источник вручную.';
     $('status').textContent = 'Источник готов. Выберите область и параметры.';
+    return { status: 'PASS' };
   } catch (error) {
-    if (own === generation) $('status').textContent = `Источник не открыт: ${error.message}`;
+    if (own === generation) {
+      $('status').textContent =
+        `Источник не открыт: ${error.message}. Выберите другой сайт или загрузите изображение.`;
+      return { status: error.message.startsWith('SKIP:') ? 'SKIP' : 'FAIL', reason: error.message };
+    }
+  } finally {
+    if (own === generation) busy(false);
   }
-  if (own === generation) busy(false);
 }
 async function selectCase(id) {
   const entry = config.cases.find((item) => item.id === id);
   if (!entry) throw new Error('Unknown case');
   $('case').value = id;
-  await load(entry.url, entry.id, entry.roles);
+  return load(entry.url, entry.id, entry.roles, entry.captureUrl ? entry : null);
 }
 async function run() {
   if (!source) throw new Error('Источник не выбран');
@@ -140,6 +163,7 @@ async function run() {
     result = {
       caseId: sourceId,
       sourceHash,
+      provenance: sourceProvenance,
       settings: input.settings,
       region: input.region,
       version: output.version,
@@ -233,4 +257,5 @@ globalThis.window.simplifyLab = {
   },
   ready: true,
 };
-await selectCase(config.cases[0].id);
+if (config.cases.length) await selectCase(config.cases[0].id);
+else $('status').textContent = 'Загрузите изображение для проверки.';
