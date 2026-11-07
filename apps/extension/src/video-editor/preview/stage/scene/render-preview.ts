@@ -148,6 +148,14 @@ function drawPreviewSceneOverlays(params: {
   }
 }
 
+/** Internal signal: retry this request serially after all GPU jobs settle. */
+export class PreviewGpuSerialFallback extends Error {
+  constructor() {
+    super('Preview GPU jobs must drain before Canvas fallback.');
+    this.name = 'PreviewGpuSerialFallback';
+  }
+}
+
 export async function renderPreviewScene(
   params: PreviewSceneRenderInput
 ): Promise<PreviewScenePresentation | void | false> {
@@ -335,6 +343,7 @@ async function renderPreparedPreviewScene(
       disposeEffectRuntimeComposition(effectRuntimeFrames);
       effectRuntimeFrames = undefined;
     }
+    if (params.gpuOnly) throw new PreviewGpuSerialFallback();
     capture ??= capturePreviewSceneVideos(clipMediaElements, videos, params.signal);
     if (capture.ready) await capture.ready;
     if (params.prepareImages) {

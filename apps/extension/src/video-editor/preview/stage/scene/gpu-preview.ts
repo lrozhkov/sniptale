@@ -127,7 +127,8 @@ function layerInverse(layer: VideoLayer, passes: Passes): QuickEditHomography | 
 
 /** A preview session owns the backend, its immutable raster revisions and captured raw frames. */
 export function createNativeGpuPreviewRenderer(
-  createBackend: typeof createGpuPreviewRenderer = createGpuPreviewRenderer
+  createBackend: typeof createGpuPreviewRenderer = createGpuPreviewRenderer,
+  options: { maximumInFlight?: 1 | 2 } = {}
 ): NativeGpuPreviewRenderer {
   let backend: GpuPreviewRenderer | null = null;
   let preparation: Promise<GpuPreviewRenderer | null> | null = null;
@@ -138,12 +139,18 @@ export function createNativeGpuPreviewRenderer(
   let publicationHolds = 0;
   let materialsReleased = false;
   const lifetime = new AbortController();
-  const materials = createNativeGpuPreviewMaterials();
+  const maximumInFlight = options.maximumInFlight ?? 1;
+  const slots = Array.from({ length: maximumInFlight }, () => ({
+    materials: createNativeGpuPreviewMaterials(),
+    busy: false,
+    submitted: false,
+    exclusive: false,
+  }));
   const settleRetirement = () => {
     if (active) return;
     if ((disposed || unavailable) && !materialsReleased) {
       materialsReleased = true;
-      materials.dispose();
+      for (const slot of slots) slot.materials.dispose();
     }
     if (disposed && !publicationHolds) {
       const provider = backend;
@@ -167,7 +174,15 @@ export function createNativeGpuPreviewRenderer(
       const layer = admittedLayer(input, passes);
       const depthLayer = admittedLayer(input, passes, true);
       if (disposed || unavailable || typeof VideoFrame === 'undefined') return undefined;
-      if (active) throw new Error('Native GPU preview overlap is unavailable.');
+      const exclusive = Boolean(input.preparedFrame && input.acquireGpuOutput);
+      if (
+        active &&
+        (!exclusive || slots.some((slot) => slot.busy && (!slot.exclusive || !slot.submitted)))
+      )
+        throw new Error('Native GPU preview overlap is unavailable.');
+      const slot = slots.find((candidate) => !candidate.busy);
+      if (!slot) throw new Error('Native GPU preview overlap is unavailable.');
+      const materials = slot.materials;
       input = {
         ...input,
         signal: AbortSignal.any(input.signal ? [input.signal, lifetime.signal] : [lifetime.signal]),
@@ -176,6 +191,9 @@ export function createNativeGpuPreviewRenderer(
       const output = resolvePreviewCompositionFrameSize(input);
       if (!output) return false;
       active++;
+      slot.busy = true;
+      slot.submitted = false;
+      slot.exclusive = exclusive;
       let capturedSources: ReturnType<typeof captureNativePreviewSources> = null;
       let inputDeviceFailure: GpuPreviewDeviceError | undefined;
       let plan: Awaited<ReturnType<typeof buildNativeGpuPreviewLayers>> | undefined;
@@ -186,16 +204,19 @@ export function createNativeGpuPreviewRenderer(
       let acquiredOutput: NativePreviewGpuTarget | undefined;
       let preparedEffects: Awaited<ReturnType<typeof prepareEffectRuntimeGpuScene>> | undefined;
       try {
-        preparation ??= createBackend();
+        preparation ??=
+          maximumInFlight === 1 ? createBackend() : createBackend({ maximumInFlight });
         const resolved = await preparation;
+        if (unavailable) return false;
         backend = resolved;
         if (disposed) return false;
-        if (!backend) {
+        const provider = resolved;
+        if (!provider) {
           unavailable = true;
           fallbackReason = 'unavailable';
           return undefined;
         }
-        if (input.acquireGpuOutput && !backend.createSurface) {
+        if (input.acquireGpuOutput && !provider.createSurface) {
           unavailable = true;
           fallbackReason = 'unavailable';
           return undefined;
@@ -249,7 +270,7 @@ export function createNativeGpuPreviewRenderer(
                 background: backdrop,
                 inputComposition: request,
               });
-              completed = await backend!.render({
+              completed = await provider.render({
                 output: request.renderDimensions,
                 logical: request.dimensions,
                 layers: graph.layers,
@@ -350,7 +371,7 @@ export function createNativeGpuPreviewRenderer(
             sources: captured,
             media,
             snapshotGroup: async (group) => {
-              const bitmap = await backend!.render({
+              const bitmap = await provider.render({
                 output: group.output,
                 logical: group.logical,
                 layers: group.layers,
@@ -443,7 +464,7 @@ export function createNativeGpuPreviewRenderer(
         }
         preparedEffects = await prepareEffectRuntimeGpuScene({
           layers: presentationLayers,
-          gpu: backend,
+          gpu: provider,
           signal: input.signal ?? new AbortController().signal,
         });
         const request = {
@@ -451,10 +472,13 @@ export function createNativeGpuPreviewRenderer(
           logical,
           layers: preparedEffects.layers,
           signal: input.signal ?? new AbortController().signal,
-          ...(input.onGpuSubmitted ? { onSubmitted: () => input.onGpuSubmitted?.() } : {}),
+          onSubmitted() {
+            slot.submitted = true;
+            input.onGpuSubmitted?.();
+          },
         };
         if (input.acquireGpuOutput) {
-          const target = input.acquireGpuOutput(layout.backing, backend);
+          const target = input.acquireGpuOutput(layout.backing, provider);
           acquiredOutput = target;
           await target.surface.present(request);
           if (input.signal?.aborted || disposed || isInvalidated()) return false;
@@ -476,7 +500,7 @@ export function createNativeGpuPreviewRenderer(
           };
         }
         if (!prepared || !staging) return false;
-        bitmap = await backend.render(request);
+        bitmap = await provider.render(request);
         if (input.signal?.aborted || disposed || isInvalidated()) return false;
         prepared.context.save();
         try {
@@ -520,6 +544,7 @@ export function createNativeGpuPreviewRenderer(
             if (bordersArtwork) bordersArtwork.width = bordersArtwork.height = 0;
             if (staging && !input.stagingCanvas) staging.width = staging.height = 0;
           } finally {
+            slot.busy = false;
             active--;
             settleRetirement();
           }

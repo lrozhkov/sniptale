@@ -447,3 +447,34 @@ it('releases transferred image ownership only after the previous front is hidden
     { canvas: b.canvas, visible: false },
   ]);
 });
+
+it('retains the stage front while two exclusive outputs are pending and reuses all three canvases', () => {
+  const f = fixture();
+  f.session.mount();
+  const append = vi.spyOn(f.host, 'appendChild');
+  const front = f.session.acquire(size, f.renderer);
+  f.session.publish(front, () => {});
+  const first = f.session.acquire(size, f.renderer);
+  const second = f.session.acquire(size, f.renderer);
+  expect(new Set([front.canvas, first.canvas, second.canvas]).size).toBe(3);
+  expect(front.canvas.style.opacity).toBe('1');
+  expect(first.canvas.style.opacity).toBe('0');
+  expect(second.canvas.style.opacity).toBe('0');
+  expect(() => f.session.acquire(size, f.renderer)).toThrow('busy');
+  f.session.publish(first, () => {});
+  const next = f.session.acquire(size, f.renderer);
+  expect(next.canvas).toBe(front.canvas);
+  expect(append).toHaveBeenCalledTimes(3);
+  f.session.publish(second, () => {});
+  next.release();
+});
+
+it('retains the inspector surface bound while the stage permits two pending frames', () => {
+  const f = fixture('inspector');
+  f.session.mount();
+  const front = f.session.acquire(size, f.renderer);
+  f.session.publish(front, () => {});
+  const pending = f.session.acquire(size, f.renderer);
+  expect(() => f.session.acquire(size, f.renderer)).toThrow('busy');
+  pending.release();
+});

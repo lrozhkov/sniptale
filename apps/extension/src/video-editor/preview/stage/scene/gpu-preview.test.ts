@@ -27,7 +27,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function fixture() {
+function fixture(maximumInFlight: 1 | 2 = 1) {
   const clip = createVideoClip({
     transform: { x: 0, y: 0, width: 8, height: 4, rotation: 0, opacity: 1 },
   });
@@ -65,7 +65,7 @@ function fixture() {
   const render = vi.fn<GpuPreviewRenderer['render']>(async () => bitmap);
   const dispose = vi.fn();
   const create = vi.fn(async () => ({ render, dispose, allocatedBytes: 0 }));
-  const owner = createNativeGpuPreviewRenderer(create);
+  const owner = createNativeGpuPreviewRenderer(create, { maximumInFlight });
   owners.push(owner);
   const input: Parameters<typeof renderPreviewScene>[0] = {
     project,
@@ -1058,4 +1058,92 @@ it('forwards final submission notification to the shared GPU request', async () 
   });
   await f.owner.render(f.input, f.passes, f.finish, () => false);
   expect(submitted).toHaveBeenCalledOnce();
+});
+
+function preparedOutputFixture() {
+  const f = fixture(2);
+  const pending: Array<{
+    request: Parameters<GpuPreviewRenderer['render']>[0];
+    done: ReturnType<typeof Promise.withResolvers<void>>;
+  }> = [];
+  const backend = {
+    render: f.render,
+    dispose: f.dispose,
+    allocatedBytes: 0,
+    createSurface: vi.fn(),
+  };
+  f.create.mockResolvedValue(backend);
+  const acquire: NonNullable<typeof f.input.acquireGpuOutput> = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 8;
+    canvas.height = 4;
+    return {
+      canvas,
+      release: vi.fn(),
+      surface: {
+        canvas,
+        dispose: vi.fn(),
+        present: vi.fn((request) => {
+          const done = Promise.withResolvers<void>();
+          pending.push({ request, done });
+          return done.promise;
+        }),
+      },
+    };
+  };
+  f.input.acquireGpuOutput = acquire;
+  f.input.preparedFrame = {
+    passes: f.passes,
+    rasterScale: 1,
+    compositionTime: 1,
+    sourcePresentation: new Map(),
+  };
+  return { ...f, pending };
+}
+
+it('isolates mutable materials for two submitted GPU frames and retains both until their barriers settle', async () => {
+  const f = preparedOutputFixture();
+  const first = f.owner.render(f.input, f.passes, f.finish, () => false);
+  await vi.waitFor(() => expect(f.pending).toHaveLength(1));
+  f.pending[0]!.request.onSubmitted?.();
+  const second = f.owner.render({ ...f.input, currentTime: 2 }, f.passes, f.finish, () => false);
+  await vi.waitFor(() => expect(f.pending).toHaveLength(2));
+  f.pending[1]!.request.onSubmitted?.();
+  expect(f.create).toHaveBeenCalledExactlyOnceWith({ maximumInFlight: 2 });
+  const a = f.pending[0]!.request.layers[0]!.source;
+  const b = f.pending[1]!.request.layers[0]!.source;
+  expect(a).not.toBe(b);
+  expect(a).toBeInstanceOf(HTMLCanvasElement);
+  expect(b).toBeInstanceOf(HTMLCanvasElement);
+  expect(f.captured).toHaveLength(2);
+  for (const frame of f.captured) expect(frame.close).not.toHaveBeenCalled();
+  f.pending[0]!.done.resolve();
+  const outputA = await first;
+  expect(f.captured[0]!.close).toHaveBeenCalledOnce();
+  expect(f.captured[1]!.close).not.toHaveBeenCalled();
+  f.owner.dispose();
+  expect((b as HTMLCanvasElement).width).toBeGreaterThan(0);
+  expect(f.dispose).not.toHaveBeenCalled();
+  f.pending[1]!.done.resolve();
+  const outputB = await second;
+  expect(f.captured[1]!.close).toHaveBeenCalledOnce();
+  expect((a as HTMLCanvasElement).width).toBe(0);
+  expect((b as HTMLCanvasElement).width).toBe(0);
+  expect(outputB).toBe(false);
+  if (!outputA || typeof outputA !== 'object') throw new Error('Expected private output');
+  expect(f.dispose).not.toHaveBeenCalled();
+  outputA.release();
+  expect(f.dispose).toHaveBeenCalledOnce();
+});
+
+it('refuses another CPU encoding before the pending frame actually submits', async () => {
+  const f = preparedOutputFixture();
+  const first = f.owner.render(f.input, f.passes, f.finish, () => false);
+  await vi.waitFor(() => expect(f.pending).toHaveLength(1));
+  await expect(f.owner.render(f.input, f.passes, f.finish, () => false)).rejects.toThrow('overlap');
+  expect(f.captured).toHaveLength(1);
+  f.pending[0]!.request.onSubmitted?.();
+  f.pending[0]!.done.resolve();
+  const output = await first;
+  if (output && typeof output === 'object') output.release();
 });

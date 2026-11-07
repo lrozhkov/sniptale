@@ -16,6 +16,8 @@ export type PreviewSceneRenderJob = Parameters<typeof renderPreviewScene>[0] & {
   renderGeneration: number;
   /** The effect-runtime owner advances this value on retry. */
   runtimeVersion?: number;
+  /** Resize invalidates geometry without changing the project identity. */
+  layoutVersion?: number;
 };
 
 interface PreviewSceneRenderScheduler {
@@ -27,12 +29,21 @@ type Preparation =
   | { job: PreviewSceneRenderJob; kind: 'ready'; frame: PreviewScenePreparedFrame | undefined }
   | { job: PreviewSceneRenderJob; kind: 'failed'; error: unknown };
 
+type ActiveRender = {
+  job: PreviewSceneRenderJob;
+  independent: boolean;
+  submitted: boolean;
+  finished: boolean;
+  presentation?: Awaited<ReturnType<typeof renderPreviewScene>>;
+};
+
 interface PreviewSceneRenderSchedulerState {
   disposed: boolean;
   preparingJob: PreviewSceneRenderJob | null;
   prepared: Preparation | null;
-  activeJob: PreviewSceneRenderJob | null;
-  activeSubmitted: boolean;
+  active: ActiveRender[];
+  latestJob: PreviewSceneRenderJob | null;
+  failure: { error: unknown; retry: boolean } | null;
   lastPlaybackRenderStartedAt: number | null;
   pendingJob: PreviewSceneRenderJob | null;
   scheduledStartTimeout: ReturnType<typeof setTimeout> | null;
@@ -40,6 +51,9 @@ interface PreviewSceneRenderSchedulerState {
 }
 
 interface PreviewSceneRenderSchedulerOptions {
+  maximumInFlight?: 1 | 2;
+  /** Recognized GPU failure defers fallback until all admitted jobs drain. */
+  retrySerial?: (error: unknown) => boolean;
   /** Undefined retains serial admission. A promise owns at most one reserved playback frame. */
   prepare?: (
     input: Parameters<typeof renderPreviewScene>[0]
@@ -59,8 +73,9 @@ export function createPreviewSceneRenderScheduler(
     disposed: false,
     preparingJob: null,
     prepared: null,
-    activeJob: null,
-    activeSubmitted: false,
+    active: [],
+    latestJob: null,
+    failure: null,
     lastPlaybackRenderStartedAt: null,
     pendingJob: null,
     scheduledStartTimeout: null,
@@ -71,28 +86,25 @@ export function createPreviewSceneRenderScheduler(
     dispose() {
       state.disposed = true;
       clearScheduledStart(state);
-      state.activeJob?.controller.abort();
+      for (const active of state.active) active.job.controller.abort();
       state.preparingJob?.controller.abort();
       discardPendingFrame(state);
-      state.activeJob = null;
-      state.activeSubmitted = false;
+      flushCompleted(state, args);
     },
     enqueue(job) {
       if (state.disposed) {
         job.controller.abort();
         return () => undefined;
       }
+      state.latestJob = job;
       const reserved = state.prepared?.job ?? state.preparingJob;
       if (reserved && state.pendingJob === reserved && canRetainPreparation(reserved, job)) {
         if (reserved !== job) job.controller.abort();
         return () => undefined;
       }
-      if (
-        state.activeJob &&
-        state.activeJob !== job &&
-        shouldAbortActivePreviewJob(state.activeJob, job)
-      ) {
-        state.activeJob.controller.abort();
+      for (const active of state.active) {
+        if (active.job !== job && shouldAbortActivePreviewJob(active.job, job))
+          active.job.controller.abort();
       }
       if (state.pendingJob && state.pendingJob !== job) discardPendingFrame(state);
       state.pendingJob = job;
@@ -102,7 +114,7 @@ export function createPreviewSceneRenderScheduler(
       preparePendingFrame(state, args);
       scheduleNextPreviewSceneRender(state, args);
       return () => {
-        if (state.activeJob === job && !job.isPlaybackFrame) {
+        if (state.active.some((active) => active.job === job) && !job.isPlaybackFrame) {
           job.controller.abort();
         }
         if (state.pendingJob === job) {
@@ -118,19 +130,17 @@ function renderInput(job: PreviewSceneRenderJob): Parameters<typeof renderPrevie
     controller: _controller,
     framePresenter: _presenter,
     runtimeVersion: _runtime,
+    layoutVersion: _layout,
     ...input
   } = job;
-  return input;
+  return { ...input, signal: job.controller.signal };
 }
 
-function canRetainPreparation(previous: PreviewSceneRenderJob, next: PreviewSceneRenderJob) {
+function sameRenderingContext(previous: PreviewSceneRenderJob, next: PreviewSceneRenderJob) {
   return (
-    previous.isPlaybackFrame &&
-    next.isPlaybackFrame &&
-    next.currentTime >= previous.currentTime &&
-    next.currentTime - previous.currentTime <= 2 / previous.project.fps &&
     previous.renderGeneration === next.renderGeneration &&
     previous.runtimeVersion === next.runtimeVersion &&
+    previous.layoutVersion === next.layoutVersion &&
     previous.project === next.project &&
     previous.renderRevision === next.renderRevision &&
     previous.previewRenderer === next.previewRenderer &&
@@ -143,7 +153,18 @@ function canRetainPreparation(previous: PreviewSceneRenderJob, next: PreviewScen
     previous.acquireGpuOutput === next.acquireGpuOutput &&
     previous.onCameraPresented === next.onCameraPresented &&
     previous.videoRefs === next.videoRefs &&
-    previous.imageBank === next.imageBank
+    previous.imageBank === next.imageBank &&
+    previous.assetUrls === next.assetUrls
+  );
+}
+
+function canRetainPreparation(previous: PreviewSceneRenderJob, next: PreviewSceneRenderJob) {
+  return (
+    previous.isPlaybackFrame &&
+    next.isPlaybackFrame &&
+    next.currentTime >= previous.currentTime &&
+    next.currentTime - previous.currentTime <= 2 / previous.project.fps &&
+    sameRenderingContext(previous, next)
   );
 }
 
@@ -162,8 +183,8 @@ function preparePendingFrame(
   const job = state.pendingJob;
   if (
     state.disposed ||
-    !state.activeJob ||
-    !state.activeSubmitted ||
+    state.failure ||
+    !state.active.at(-1)?.submitted ||
     !job?.isPlaybackFrame ||
     state.preparingJob ||
     state.prepared ||
@@ -193,91 +214,154 @@ function preparePendingFrame(
     )
     .finally(() => {
       if (state.preparingJob === job) state.preparingJob = null;
+      flushCompleted(state, args);
       preparePendingFrame(state, args);
       scheduleNextPreviewSceneRender(state, args);
     });
 }
 
-function shouldAbortActivePreviewJob(
-  activeJob: PreviewSceneRenderJob,
-  nextJob: PreviewSceneRenderJob
-): boolean {
+function shouldAbortActivePreviewJob(active: PreviewSceneRenderJob, next: PreviewSceneRenderJob) {
+  return !sameRenderingContext(active, next) || !active.isPlaybackFrame || !next.isPlaybackFrame;
+}
+
+function canStart(
+  state: PreviewSceneRenderSchedulerState,
+  args: PreviewSceneRenderSchedulerOptions
+) {
+  const job = state.pendingJob;
+  if (state.disposed || state.failure || !job || state.preparingJob === job) return false;
+  if (!state.active.length) return true;
+  const preparation = state.prepared;
   return (
-    (activeJob.previewRenderer ?? 'gpu') !== (nextJob.previewRenderer ?? 'gpu') ||
-    activeJob.renderGeneration !== nextJob.renderGeneration ||
-    !activeJob.isPlaybackFrame ||
-    !nextJob.isPlaybackFrame
+    state.active.length < (args.maximumInFlight ?? 1) &&
+    preparation?.kind === 'ready' &&
+    Boolean(preparation.frame?.input.preparedFrame) &&
+    Boolean(job.acquireGpuOutput) &&
+    job.isPlaybackFrame &&
+    state.active.every(
+      (active) =>
+        active.independent &&
+        active.submitted &&
+        !active.job.controller.signal.aborted &&
+        sameRenderingContext(active.job, job)
+    )
   );
+}
+
+function failRender(
+  state: PreviewSceneRenderSchedulerState,
+  args: PreviewSceneRenderSchedulerOptions,
+  error: unknown
+) {
+  if (state.failure || state.disposed) return;
+  state.failure = { error, retry: args.retrySerial?.(error) === true };
+  clearScheduledStart(state);
+  for (const active of state.active) active.job.controller.abort();
+  if (state.preparingJob) {
+    state.preparingJob.controller.abort();
+    if (state.pendingJob === state.preparingJob) discardPendingFrame(state);
+  }
+}
+
+function flushCompleted(
+  state: PreviewSceneRenderSchedulerState,
+  args: PreviewSceneRenderSchedulerOptions
+) {
+  while (state.active[0]?.finished) {
+    const active = state.active.shift()!;
+    const presented = active.presentation;
+    let transferred = false;
+    try {
+      if (
+        !state.disposed &&
+        !state.failure &&
+        !active.job.controller.signal.aborted &&
+        presented !== false
+      )
+        transferred = args.onSuccess?.(active.job, presented || undefined) === true;
+    } catch (error) {
+      failRender(state, args, error);
+    } finally {
+      if (presented && !transferred) presented.output?.release();
+    }
+  }
+  if (state.active.length || state.preparingJob || !state.failure) return;
+  const failure = state.failure;
+  state.failure = null;
+  if (state.disposed) return;
+  if (failure.retry) {
+    const latest = state.latestJob;
+    discardPendingFrame(state);
+    if (latest) {
+      const controller = new AbortController();
+      state.pendingJob = { ...latest, controller, signal: controller.signal };
+    }
+  } else args.onError(failure.error);
 }
 
 function startNextPreviewSceneRender(
   state: PreviewSceneRenderSchedulerState,
   args: PreviewSceneRenderSchedulerOptions
 ): void {
-  if (
-    state.disposed ||
-    state.activeJob ||
-    !state.pendingJob ||
-    state.preparingJob === state.pendingJob
-  ) {
-    return;
-  }
-  const job = state.pendingJob;
+  if (!canStart(state, args)) return;
+  const job = state.pendingJob!;
   state.pendingJob = null;
   const prepared = state.prepared?.job === job ? state.prepared : null;
   state.prepared = null;
   if (prepared?.kind === 'failed') {
-    if (!job.controller.signal.aborted) args.onError(prepared.error);
+    if (!job.controller.signal.aborted) failRender(state, args, prepared.error);
+    flushCompleted(state, args);
     scheduleNextPreviewSceneRender(state, args);
     return;
   }
-  state.activeJob = job;
-  state.activeSubmitted = false;
-  if (job.isPlaybackFrame) {
-    state.lastPlaybackRenderStartedAt = Date.now();
-  }
-  const { controller } = job;
+  const active: ActiveRender = {
+    job,
+    submitted: false,
+    finished: false,
+    independent: Boolean(
+      prepared?.frame?.input.preparedFrame && job.acquireGpuOutput && job.isPlaybackFrame
+    ),
+  };
+  state.active.push(active);
+  if (job.isPlaybackFrame) state.lastPlaybackRenderStartedAt = Date.now();
   const renderJob = prepared?.frame?.input ?? renderInput(job);
-  void args
-    .render({
+  const finish = () => {
+    try {
+      prepared?.frame?.release();
+    } finally {
+      active.finished = true;
+      flushCompleted(state, args);
+      preparePendingFrame(state, args);
+      scheduleNextPreviewSceneRender(state, args);
+    }
+  };
+  let render: ReturnType<typeof args.render>;
+  try {
+    render = args.render({
       ...renderJob,
       onGpuSubmitted() {
-        if (state.activeJob !== job || controller.signal.aborted || state.disposed) return;
+        if (job.controller.signal.aborted || state.disposed) return;
         renderJob.onGpuSubmitted?.();
-        state.activeSubmitted = true;
+        active.submitted = true;
         preparePendingFrame(state, args);
+        scheduleNextPreviewSceneRender(state, args);
       },
-    })
+    });
+  } catch (error) {
+    failRender(state, args, error);
+    finish();
+    return;
+  }
+  void render
     .then(
       (presented) => {
-        let transferred = false;
-        try {
-          if (presented !== false && !controller.signal.aborted) {
-            transferred = args.onSuccess?.(job, presented || undefined) === true;
-          }
-        } catch (error) {
-          if (!controller.signal.aborted) args.onError(error);
-        } finally {
-          if (presented && !transferred) presented.output?.release();
-        }
+        active.presentation = presented;
       },
       (error: unknown) => {
-        if (!controller.signal.aborted) {
-          args.onError(error);
-        }
+        if (!job.controller.signal.aborted) failRender(state, args, error);
       }
     )
-    .finally(() => {
-      try {
-        prepared?.frame?.release();
-      } finally {
-        if (state.activeJob === job) {
-          state.activeJob = null;
-          state.activeSubmitted = false;
-        }
-        scheduleNextPreviewSceneRender(state, args);
-      }
-    });
+    .finally(finish);
 }
 
 function scheduleNextPreviewSceneRender(
@@ -285,17 +369,13 @@ function scheduleNextPreviewSceneRender(
   args: PreviewSceneRenderSchedulerOptions
 ): void {
   if (
-    state.disposed ||
-    state.activeJob ||
-    !state.pendingJob ||
-    state.preparingJob === state.pendingJob ||
+    !canStart(state, args) ||
     state.scheduledStartTimeout !== null ||
     state.scheduledStartFrame !== null
-  ) {
+  )
     return;
-  }
   const waitMs = resolveNextPreviewRenderDelay(state);
-  if (!state.pendingJob.isPlaybackFrame) {
+  if (!state.pendingJob!.isPlaybackFrame) {
     state.scheduledStartFrame = requestAnimationFrame(() => {
       state.scheduledStartFrame = null;
       state.scheduledStartTimeout = setTimeout(() => {

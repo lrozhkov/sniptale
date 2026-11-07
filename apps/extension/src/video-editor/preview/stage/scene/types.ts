@@ -104,6 +104,8 @@ export type PreviewSceneRenderInput = {
   onGpuSubmitted?: () => void;
   previewRenderer?: VideoPreviewRenderer;
   gpuPreview?: NativeGpuPreviewRenderer;
+  /** An admitted GPU job must drain before the scheduler can retry Canvas fallback. */
+  gpuOnly?: boolean;
   acquireGpuOutput?: NativePreviewGpuTargetFactory;
   /** UI publication sends the frame event after pixels and geometry commit. */
   deferFrameEvent?: boolean;

@@ -115,6 +115,10 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
       size.height > 0xffffffff
     )
       throw new Error('Preview presentation destination is unavailable.');
+    const pending = [...this.destinations].filter(
+      (destination) => destination.leased && destination.canvas !== this.front?.canvas
+    );
+    if (pending.length >= 2) throw new Error('Preview presentation destinations are busy.');
     for (const destination of this.destinations)
       if (
         !destination.leased &&
@@ -132,7 +136,7 @@ class NativePreviewPresentationSession implements NativePreviewFramePresenter {
         candidate.height === size.height
     );
     if (!destination) {
-      if (this.destinations.size >= 2)
+      if (this.destinations.size >= (this.role === 'stage' ? 3 : 2))
         throw new Error('Preview presentation destinations are busy.');
       const canvas = host.ownerDocument.createElement('canvas');
       let surface: GpuPreviewPresentationSurface | undefined;

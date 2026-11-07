@@ -33,8 +33,11 @@ vi.mock('./render-scheduler', async (importOriginal) => ({
   })),
 }));
 
-vi.mock('./render-preview', () => ({ renderPreviewScene: vi.fn().mockResolvedValue(undefined) }));
-import { renderPreviewScene } from './render-preview';
+vi.mock('./render-preview', async (original) => ({
+  ...(await original<typeof import('./render-preview')>()),
+  renderPreviewScene: vi.fn().mockResolvedValue(undefined),
+}));
+import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
 import * as nativeGpu from './gpu-preview';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import { createReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
@@ -663,13 +666,19 @@ it('connects reserved preparation only after the live GPU backend is available',
     };
     expect(options.prepare?.(input)).toBeUndefined();
     await options.render(input);
-    expect(createGpu).toHaveBeenCalledOnce();
+    expect(createGpu).toHaveBeenCalledExactlyOnceWith(undefined, { maximumInFlight: 2 });
+    expect(options.maximumInFlight).toBe(2);
     const prepared = await options.prepare?.(input);
     expect(prepared?.input.preparedFrame?.compositionTime).toBe(0);
     expect(prepared?.input.decodedVideoFrames?.size).toBe(0);
     prepared?.release();
     expect(options.prepare?.({ ...input, previewRenderer: 'legacy' })).toBeUndefined();
     expect(options.prepare?.({ ...input, previewMode: 'cache' })).toBeUndefined();
+    expect(options.retrySerial?.(new Error('Other'))).toBe(false);
+    expect(options.retrySerial?.(new PreviewGpuSerialFallback())).toBe(true);
+    expect(options.prepare?.(input)).toBeUndefined();
+    await options.render(input);
+    expect(vi.mocked(renderPreviewScene).mock.calls.at(-1)?.[0].gpuOnly).toBe(false);
   } finally {
     createGpu.mockRestore();
   }

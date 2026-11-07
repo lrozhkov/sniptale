@@ -10,7 +10,7 @@ import {
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { VideoProjectAssetType } from '../../../../features/video/project/types';
 import { drawPreviewVisualPasses } from './render-visual';
-import { renderPreviewScene } from './render-preview';
+import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
 import type { NativeGpuPreviewRenderer } from './types';
 const splitProof = vi.hoisted(() => ({
   resolve: vi.fn(() => null),
@@ -1036,4 +1036,13 @@ it('borrows the prepared geometry and effects without disposing their caller-own
   expect(dispose).not.toHaveBeenCalled();
   effects.dispose();
   expect(dispose).toHaveBeenCalledOnce();
+});
+
+it('defers Canvas fallback for an admitted GPU-only job before any legacy draw', async () => {
+  const { job } = setup();
+  const render = vi.fn<NativeGpuPreviewRenderer['render']>(async () => undefined);
+  await expect(
+    renderPreviewScene({ ...job, gpuOnly: true, gpuPreview: { render, dispose: vi.fn() } })
+  ).rejects.toBeInstanceOf(PreviewGpuSerialFallback);
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
 });

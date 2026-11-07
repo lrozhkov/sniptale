@@ -10,7 +10,7 @@ import {
   createVideoEditorEffectRuntime,
   type VideoEditorEffectRuntime,
 } from '../../../runtime/effect-runtime';
-import { renderPreviewScene } from './render-preview';
+import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
 import { prepareNativePreviewSceneFrame } from './frame-plan';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import type { PreviewSceneRenderJob } from './render-scheduler';
@@ -104,6 +104,7 @@ function usePreviewStageRenderEffect(
         project: current.project,
         renderGeneration: current.renderGenerationRef?.current ?? current.renderGeneration ?? 0,
         runtimeVersion: current.effectRuntimeFeedback.retryVersion,
+        layoutVersion: current.resizeVersion,
         renderRevision: revision,
         stage: current.stageRef.current,
         videoRefs: current.videoRefs,
@@ -204,6 +205,7 @@ function createPreviewStageCanvasRenderJob(args: {
   project: PreviewStageCanvasSceneParams['project'];
   renderGeneration: number;
   runtimeVersion: number;
+  layoutVersion: number;
   renderRevision: Promise<string>;
   stage: HTMLDivElement | null;
   videoRefs: PreviewStageCanvasSceneParams['videoRefs'];
@@ -243,6 +245,7 @@ function createPreviewStageCanvasRenderJob(args: {
     project: args.project,
     renderGeneration: args.renderGeneration,
     runtimeVersion: args.runtimeVersion,
+    layoutVersion: args.layoutVersion,
     renderRevision: args.renderRevision,
     signal: controller.signal,
     stage: args.stage,
@@ -272,14 +275,22 @@ function usePreviewRenderSchedulerRef(
   const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
   const gpuRef = useRef<ReturnType<typeof createNativeGpuPreviewRenderer> | null>(null);
   const retryRef = useRef({ version: retryVersion, renderer });
+  const serialFallbackRef = useRef(false);
   if (!schedulerRef.current) {
     const captionRenderer = createVideoProjectCaptionRenderer();
     captionsRef.current = captionRenderer;
     const watermarkRenderer = createVideoProjectWatermarkRenderer(loadVideoEditorAssetBlob);
     watermarkRef.current = watermarkRenderer;
     schedulerRef.current = createPreviewSceneRenderScheduler({
+      maximumInFlight: 2,
+      retrySerial(error) {
+        if (!(error instanceof PreviewGpuSerialFallback)) return false;
+        serialFallbackRef.current = true;
+        return true;
+      },
       prepare: (input) => {
         if (
+          serialFallbackRef.current ||
           input.previewRenderer === 'legacy' ||
           input.previewMode === 'cache' ||
           !gpuRef.current?.acceptsNativeFrames
@@ -330,10 +341,15 @@ function usePreviewRenderSchedulerRef(
             prepareNativePreviewSceneFrame
           );
           if (input.previewRenderer !== 'legacy')
-            gpuRef.current ??= createNativeGpuPreviewRenderer();
+            gpuRef.current ??= createNativeGpuPreviewRenderer(undefined, { maximumInFlight: 2 });
           return joinsRef.current.render({
             ...input,
             ...(gpuRef.current ? { gpuPreview: gpuRef.current } : {}),
+            gpuOnly:
+              input.previewRenderer !== 'legacy' &&
+              input.previewMode !== 'cache' &&
+              !serialFallbackRef.current &&
+              gpuRef.current?.acceptsNativeFrames === true,
             captionRenderer,
             watermarkRenderer,
             spatialRenderer: () => {
@@ -374,6 +390,7 @@ function usePreviewRenderSchedulerRef(
   useLayoutEffect(() => {
     if (retryRef.current.version === retryVersion && retryRef.current.renderer === renderer) return;
     retryRef.current = { version: retryVersion, renderer };
+    serialFallbackRef.current = false;
     watermarkRef.current?.clear();
     joinsRef.current?.clear();
     const spatial = spatialRef.current;
