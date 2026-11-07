@@ -16,6 +16,7 @@ import type {
   PreviewStageVideoRefs,
 } from '../../types';
 import { applyPreviewPitchPreservation } from './pitch';
+import { shouldRefreshPausedPreviewMediaTime } from '../../media/sync';
 
 const MEDIA_READY_FOR_CURRENT_FRAME = 2;
 const PREVIEW_STAGE_PRIMING_TIMEOUT_MS = 180;
@@ -29,7 +30,8 @@ export interface PreviewStagePlaybackPrepareState {
 }
 
 function setPreparedMediaTime(media: HTMLMediaElement, time: number): void {
-  if (!Number.isFinite(time)) return;
+  if (!Number.isFinite(time) || !shouldRefreshPausedPreviewMediaTime(media.currentTime, time))
+    return;
   try {
     media.currentTime = time;
   } catch {
