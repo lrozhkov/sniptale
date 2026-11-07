@@ -228,10 +228,12 @@ export async function createReviewAnnotationRenderer(
           : [];
       });
   };
-  const gpuLedger = createEffectRuntimeGpuFrameLedger((bytes) =>
-    deps.resources.bytes('annotation-gpu-plan-resources', bytes)
-  );
+  let gpuLedger: ReturnType<typeof createEffectRuntimeGpuFrameLedger> | undefined;
   const owner = {
+    /** Unknown executors remain serial until their explicit capability is available. */
+    get maximumInFlight(): 1 | 2 {
+      return executor?.prepareGpuFrame && executor.maximumGpuFramesInFlight === 2 ? 2 : 1;
+    },
     describe,
     counters: ledger.snapshot,
     dispose,
@@ -253,6 +255,10 @@ export async function createReviewAnnotationRenderer(
           entries: legacy.entries.map((entry) => ({ ...entry, source: entry.bitmap })),
         };
       }
+      gpuLedger ??= createEffectRuntimeGpuFrameLedger(
+        (bytes) => deps.resources.bytes('annotation-gpu-plan-resources', bytes),
+        owner.maximumInFlight
+      );
       const frames = await prepareEffectRuntimeGpuFramePlans({
         executor,
         plans: planned.map((entry) => entry.plan),

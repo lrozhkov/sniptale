@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createEffectRuntimeSandboxExecutor } from './effect-runtime-sandbox';
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -283,3 +284,19 @@ it('rejects GPU preparation before creating an unnegotiated parent session', asy
   expect(bitmap.close).toHaveBeenCalledOnce();
   manager.dispose();
 });
+
+it.each([undefined, 'gpu-preview', 'gpu-scene'] as const)(
+  'advertises independent preparation only for negotiated gpu-scene (%s)',
+  (compositionBackend) => {
+    const executor = createEffectRuntimeSandboxExecutor(
+      compositionBackend ? { compositionBackend } : {}
+    );
+    expect(executor.maximumGpuFramesInFlight).toBe(
+      compositionBackend === 'gpu-scene' ? 2 : undefined
+    );
+    expect(typeof executor.prepareGpuFrame).toBe(
+      compositionBackend === 'gpu-scene' ? 'function' : 'undefined'
+    );
+    executor.dispose();
+  }
+);

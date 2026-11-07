@@ -10,7 +10,7 @@ const io = vi.hoisted(() => ({
         args: Parameters<
           typeof import('../../workflows/video-review/render-preview').createReviewPreviewRenderer
         >[0]
-      ) => { dispose(): void }
+      ) => { dispose(): void; maximumInFlight(): 1 | 2 }
     >(),
   executor:
     vi.fn<
@@ -82,7 +82,9 @@ it('keeps GPU targets hidden until pixels and geometry are ready', async () => {
       };
     }
   );
-  io.renderer.mockReturnValue(Object.assign({ dispose: vi.fn() }, { renderPresentation }));
+  io.renderer.mockReturnValue(
+    Object.assign({ dispose: vi.fn(), maximumInFlight: () => 2 }, { renderPresentation })
+  );
   const latest = () => ({
     input: {
       video: { current: null },
@@ -146,7 +148,7 @@ it('keeps GPU targets hidden until pixels and geometry are ready', async () => {
   host.remove();
 });
 it('selects the Gallery GPU annotation sandbox and preserves retry teardown', () => {
-  io.renderer.mockReturnValue({ dispose: io.dispose });
+  io.renderer.mockReturnValue({ dispose: io.dispose, maximumInFlight: () => 2 });
   const readAsset = vi.fn();
   const latest = () => ({
     input: { video: { current: null }, readAsset, preferences: { renderer: 'gpu' } },
@@ -169,7 +171,7 @@ it('selects the Gallery GPU annotation sandbox and preserves retry teardown', ()
 });
 
 it('releases its original source clock on device failure and disposal after the latest source changes', () => {
-  io.renderer.mockReturnValue({ dispose: io.dispose });
+  io.renderer.mockReturnValue({ dispose: io.dispose, maximumInFlight: () => 2 });
   const active = vi.fn();
   const input = {
     sourceIdentity: 'first',
@@ -200,7 +202,7 @@ it('releases its original source clock on device failure and disposal after the 
 it('selects the Standard Gallery annotation path without GPU composition', () => {
   io.renderer.mockClear();
   io.executor.mockClear();
-  io.renderer.mockReturnValue({ dispose: vi.fn() });
+  io.renderer.mockReturnValue({ dispose: vi.fn(), maximumInFlight: () => 2 });
   const latest = () => ({
     input: { video: { current: null }, preferences: { renderer: 'legacy' } },
     placement: null,

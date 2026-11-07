@@ -28,7 +28,8 @@ export function createPresentationAdmission(
   transport: () => { playing: boolean; video: HTMLVideoElement | null },
   description: () => Description | null,
   time: () => number,
-  front: () => Front | null
+  front: () => Front | null,
+  maximumInFlight: (scene: Description['scene']) => 1 | 2 = reviewGpuPreviewConcurrency
 ) {
   const resources = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
   const sourceFrames = new Map<symbol, number>();
@@ -47,8 +48,7 @@ export function createPresentationAdmission(
       dimensions: current.dimensions,
       resultTime,
       ...(current.cameraTransform ? { cameraTransform: current.cameraTransform } : {}),
-      maximumInFlight:
-        current.renderer === 'legacy' ? 1 : reviewGpuPreviewConcurrency(current.scene),
+      maximumInFlight: current.renderer === 'legacy' ? 1 : maximumInFlight(current.scene),
       sourceAllocationBytes: sourceFrames.size
         ? [...sourceFrames.values()].reduce((sum, bytes) => sum + bytes, 0)
         : null,

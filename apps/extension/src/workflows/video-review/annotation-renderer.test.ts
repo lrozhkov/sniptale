@@ -9,6 +9,7 @@ import {
 } from '@sniptale/runtime-contracts/effect-v1';
 import type {
   EffectRuntimeFrameResult,
+  EffectRuntimeGpuPlanResult,
   EffectRuntimeRenderCommand,
   EffectRuntimeSandboxExecutor,
 } from '../../contracts/effect-runtime/types';
@@ -614,3 +615,112 @@ it('preserves the no-argument sandbox factory for default annotation consumers',
     factory.mockRestore();
   }
 });
+
+it.each([undefined, 2] as const)(
+  'uses only the explicit executor capability %s after lazy initialization',
+  async (maximumGpuFramesInFlight) => {
+    const f = await fixture();
+    const executor = {
+      ...f.executor,
+      ...(maximumGpuFramesInFlight ? { maximumGpuFramesInFlight } : {}),
+      prepareGpuFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => f.success(request)),
+    };
+    const renderer = await createReviewAnnotationRenderer(f.scene, {
+      ...f.deps,
+      createExecutor: () => executor,
+    });
+    expect(renderer.maximumInFlight).toBe(1);
+    const first = await renderer.prepareGpu(6, density, 30, f.deps.signal);
+    expect(renderer.maximumInFlight).toBe(maximumGpuFramesInFlight ?? 1);
+    const borrow = first.retain();
+    first.release();
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    borrow.release();
+    expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+    expect(f.managed()).toBe(0);
+  }
+);
+
+it.each([undefined, 2] as const)(
+  'keeps full-size packet budgets through the last GPU borrow for executor capacity %s',
+  async (maximumGpuFramesInFlight) => {
+    const f = await fixture();
+    const packets: { width: number; height: number; close: ReturnType<typeof vi.fn> }[][] = [];
+    const executor = {
+      ...f.executor,
+      ...(maximumGpuFramesInFlight ? { maximumGpuFramesInFlight } : {}),
+      prepareGpuFrame: async (
+        request: EffectRuntimeRenderCommand
+      ): Promise<EffectRuntimeGpuPlanResult> => {
+        const masks = Array.from({ length: 9 }, () => ({
+          width: 1904,
+          height: 1072,
+          close: vi.fn(),
+        }));
+        packets.push(masks);
+        return {
+          kind: 'gpu-plan',
+          effectInstanceId: request.effectInstanceId,
+          requestId: request.requestId,
+          sequenceId: request.sequenceId,
+          snapshotId: request.snapshotId,
+          acknowledged: {
+            documentId: request.documentRef.id,
+            assetSelectionId: request.assetSelectionRef.id,
+          },
+          width: request.renderWidth,
+          height: request.renderHeight,
+          logicalWidth: request.width,
+          logicalHeight: request.height,
+          inputResources: {},
+          rootPass: 0,
+          resources: masks.map((bitmap, id) => ({
+            bitmap,
+            id,
+            kind: 'coverage',
+            width: bitmap.width,
+            height: bitmap.height,
+          })),
+          passes: [
+            {
+              id: 0,
+              width: request.renderWidth,
+              height: request.renderHeight,
+              logicalWidth: request.width,
+              logicalHeight: request.height,
+              operations: [],
+            },
+          ],
+        };
+      },
+    };
+    const renderer = await createReviewAnnotationRenderer(f.scene, {
+      ...f.deps,
+      createExecutor: () => executor,
+    });
+    const immutableBytes = f.managed();
+    const first = await renderer.prepareGpu(6, density, 30, f.deps.signal);
+    const borrow = first.retain();
+    first.release();
+    const packetBytes = 9 * 1904 * 1072 * 4;
+    expect(f.managed()).toBe(immutableBytes + packetBytes);
+    if (maximumGpuFramesInFlight === 2) {
+      const second = await renderer.prepareGpu(7, density, 30, f.deps.signal);
+      expect(f.managed()).toBe(immutableBytes + packetBytes * 2);
+      second.release();
+    } else {
+      await expect(renderer.prepareGpu(7, density, 30, f.deps.signal)).rejects.toThrow();
+    }
+    expect(f.managed()).toBe(immutableBytes + packetBytes);
+    renderer.dispose();
+    expect(f.managed()).toBe(packetBytes);
+    for (const bitmap of packets[0]!) expect(bitmap.close).not.toHaveBeenCalled();
+    for (const bitmap of packets[1]!) expect(bitmap.close).toHaveBeenCalledOnce();
+    borrow.release();
+    expect(f.managed()).toBe(0);
+    for (const packet of packets)
+      for (const bitmap of packet) expect(bitmap.close).toHaveBeenCalledOnce();
+  }
+);

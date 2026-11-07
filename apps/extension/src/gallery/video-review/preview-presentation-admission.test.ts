@@ -87,3 +87,36 @@ it('accounts for both captured frames and releases only the frame whose lease se
   second.release();
   expect(admission.graph().admission.source).toBeNull();
 });
+
+it('uses prepared renderer capacity for annotated allocation and keeps legacy serial', () => {
+  const description: Description = {
+    renderer: 'gpu',
+    scene: {
+      source: { width: 10, height: 10 },
+      background: { enabled: false },
+      zoomRegions: [],
+      comments: [],
+      keys: [],
+      clicks: [],
+    },
+    dimensions: { canonical: { width: 10, height: 10 }, backing: { width: 10, height: 10 } },
+    sourceTime: 0,
+    cameraTransform: undefined,
+  };
+  let capacity: 1 | 2 = 1;
+  const maximumInFlight = vi.fn(() => capacity);
+  const admission = createPresentationAdmission(
+    () => ({ playing: true, video: null }),
+    () => description,
+    () => 0,
+    () => null,
+    maximumInFlight
+  );
+  expect(admission.graph().publication.maximumInFlight).toBe(1);
+  capacity = 2;
+  expect(admission.graph().publication.maximumInFlight).toBe(2);
+  expect(maximumInFlight).toHaveBeenLastCalledWith(description.scene);
+  description.renderer = 'legacy';
+  expect(admission.graph().publication.maximumInFlight).toBe(1);
+  admission.resources.dispose();
+});

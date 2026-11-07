@@ -270,6 +270,7 @@ it('admits authored camera, watermark and edge fades while excluding independent
     segments: [],
   };
   expect(reviewGpuPreviewConcurrency({ ...scene, annotationEffects })).toBe(1);
+  expect(reviewGpuPreviewConcurrency({ ...scene, annotationEffects }, 2)).toBe(2);
   expect(
     reviewGpuPreviewConcurrency({
       ...scene,
@@ -1750,3 +1751,61 @@ it('retains content annotation coverage pixels and revision between completed fr
   expect(annotation.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
   f.owner.dispose();
 });
+
+it.each(['complete', 'abort', 'device'] as const)(
+  'retains independent annotation packets for two pending GPU frames through %s',
+  async (outcome) => {
+    const f = fixture(2);
+    const packets: { close: ReturnType<typeof vi.fn>; release: ReturnType<typeof vi.fn> }[] = [];
+    const annotation = borrowedAnnotations();
+    const annotations = {
+      ...annotation.annotations,
+      maximumInFlight: 2 as const,
+      prepareGpu: vi.fn(async (...args: Parameters<typeof annotation.annotations.prepareGpu>) => {
+        const owned = borrowedAnnotations();
+        const batch = await owned.annotations.prepareGpu(...args);
+        packets.push({ close: owned.bitmaps[0]!.close, release: vi.spyOn(batch, 'release') });
+        return { ...batch, independent: true };
+      }),
+    };
+    const gates = [deferred<typeof f.bitmap>(), deferred<typeof f.bitmap>()];
+    const entered = [deferred<void>(), deferred<void>()];
+    io.render.mockImplementation(() => {
+      const index = io.render.mock.calls.length - 1;
+      entered[index]!.resolve();
+      return gates[index]!.promise;
+    });
+    const controller = new AbortController();
+    const input = { ...f.input, annotations, signal: controller.signal };
+    const a = f.owner.render(input);
+    await entered[0]!.promise;
+    const b = f.owner.render(input);
+    // Attach immediately so a rejected admission remains a deterministic failure.
+    const bObserved = b.then(
+      (value) => value,
+      (error: unknown) => error
+    );
+    await Promise.race([entered[1]!.promise, bObserved]);
+    expect(io.render).toHaveBeenCalledTimes(2);
+    expect(packets).toHaveLength(2);
+    await expect(f.owner.render(input)).rejects.toThrow('overlap');
+    for (const packet of packets) expect(packet.close).not.toHaveBeenCalled();
+    if (outcome === 'abort') controller.abort();
+    const aProof =
+      outcome === 'abort'
+        ? expect(a).rejects.toMatchObject({ name: 'AbortError' })
+        : expect(a).resolves.toBe(outcome === 'complete');
+    if (outcome === 'device') gates[0]!.reject(new GpuPreviewDeviceError('Device lost'));
+    else gates[0]!.resolve(f.bitmap);
+    await aProof;
+    expect(packets[0]!.close).toHaveBeenCalledOnce();
+    expect(packets[1]!.close).not.toHaveBeenCalled();
+    gates[1]!.resolve(f.bitmap);
+    const second = await bObserved;
+    if (outcome === 'abort') expect(second).toMatchObject({ name: 'AbortError' });
+    else expect(second).toBe(outcome === 'complete');
+    expect(packets[1]!.close).toHaveBeenCalledOnce();
+    for (const packet of packets) expect(packet.release).toHaveBeenCalledOnce();
+    f.owner.dispose();
+  }
+);

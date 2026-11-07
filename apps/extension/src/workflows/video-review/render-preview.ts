@@ -1004,6 +1004,7 @@ export function createReviewPreviewRenderer(args: {
     key: PreviewSceneKey;
     preparationKey: string;
   } | null = null;
+  let preparedSource: Scene | null = null;
   let preparation: AbortController | null = null;
   let captionRefresh: AbortController | null = null;
   let rendering = 0;
@@ -1012,6 +1013,7 @@ export function createReviewPreviewRenderer(args: {
   const clear = () => {
     if (current) disposeAssets(current.assets);
     current = null;
+    preparedSource = null;
   };
   const lease = (prepared: PreparedScene, assets: Assets, signal: AbortSignal): Prepared => {
     const handle: Prepared = {
@@ -1043,7 +1045,10 @@ export function createReviewPreviewRenderer(args: {
       !frame.camera &&
       !frame.cameraTransform &&
       !frame.transition &&
-      reviewGpuPreviewConcurrency(current.prepared.scene) === 2
+      reviewGpuPreviewConcurrency(
+        current.prepared.scene,
+        current.assets.annotations?.maximumInFlight
+      ) === 2
         ? (args.maximumInFlight ?? 1)
         : 1;
     if (rendering >= capacity) throw new Error('Preview frame is already admitted.');
@@ -1138,6 +1143,14 @@ export function createReviewPreviewRenderer(args: {
     }
   };
   return {
+    /** Report capacity from the prepared owner; the first publication initializes it serially. */
+    maximumInFlight(scene: Scene): 1 | 2 {
+      return scene === preparedSource &&
+        current?.assets.renderer === 'gpu' &&
+        args.maximumInFlight === 2
+        ? reviewGpuPreviewConcurrency(scene, current.assets.annotations?.maximumInFlight)
+        : 1;
+    },
     async prepare(
       sourceScene: Scene,
       dimensions: Dimensions,
@@ -1163,6 +1176,7 @@ export function createReviewPreviewRenderer(args: {
           false,
           args.exportEnhancer
         );
+        preparedSource = sourceScene;
         return lease(current.prepared, current.assets, signal);
       }
       const assetsKey = reviewPreviewPreparationKey(scene, dimensions, needsSpatialRenderer(scene));
@@ -1201,6 +1215,7 @@ export function createReviewPreviewRenderer(args: {
             );
           captured.assets.captions = captions;
           current = { ...captured, prepared, key };
+          preparedSource = sourceScene;
           return lease(prepared, current.assets, signal);
         } finally {
           signal.removeEventListener('abort', abort);
@@ -1316,6 +1331,7 @@ export function createReviewPreviewRenderer(args: {
         if (needsSpatialRenderer(prepared.scene) && !assets.gpu)
           assets.spatial = createReviewSpatialRenderer(args.onContextLost, args.resources);
         current = { prepared, assets, key, preparationKey: assetsKey };
+        preparedSource = sourceScene;
         return lease(prepared, assets, signal);
       } catch (failure) {
         disposeAssets(assets);

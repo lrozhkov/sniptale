@@ -1,7 +1,6 @@
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { createEffectRuntimeSandboxExecutor } from '../../workflows/video/effect-runtime-sandbox';
-import { reviewGpuPreviewConcurrency } from '../../workflows/video-review/gpu-preview';
 import { createReviewPreviewRenderer } from '../../workflows/video-review/render-preview';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import {
@@ -93,7 +92,8 @@ class ManualPresentationSession {
       () => ({ playing: this.latest().input.playing, video: this.latest().input.video.current }),
       () => this.current,
       () => this.resultTime,
-      () => this.front
+      () => this.front,
+      (scene) => this.renderer?.maximumInFlight(scene) ?? 1
     );
     this.rendererPreference = this.latest().input.preferences.renderer ?? 'gpu';
     this.renderer = this.createRenderer();
@@ -101,7 +101,7 @@ class ManualPresentationSession {
       ...createReviewPresentationPaintClock(),
       allowPreparedPlayingFrames: true,
       maximumInFlight: (description) =>
-        description.renderer === 'legacy' ? 1 : reviewGpuPreviewConcurrency(description.scene),
+        description.renderer === 'legacy' ? 1 : this.renderer.maximumInFlight(description.scene),
       now: () => performance.now(),
       sampleTime: this.sampleTime,
       prepare: this.prepare,

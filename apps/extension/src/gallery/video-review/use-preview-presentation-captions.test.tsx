@@ -143,6 +143,7 @@ beforeEach(() => {
     };
   });
   io.factory.mockImplementation(() => ({
+    maximumInFlight: () => 1,
     prepare: io.prepare,
     renderPresentation: io.render,
     dispose: io.dispose,

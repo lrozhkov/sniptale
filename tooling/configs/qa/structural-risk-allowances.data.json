@@ -4243,8 +4243,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One prepared scene owner controls cancellation, scene assets and frame admission. Its two output methods share one transaction and return distinct typed contracts. It does not choose the visible frontend frame. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-05",
-      "astHash": "3d19627b0b5a29392ef8afe9cad163f8384c63361c41835154e4b063fd56ae89",
+      "reviewDate": "2026-11-07",
+      "astHash": "ab7c9c2ccebc7ed8aa798bb4cc305667123c4c933af84aa56983f67d27a53d23",
       "signatureHash": "febf2983718798d6d1080f946f8e1e5299220705173dfc7b5c223e4e2f158556"
     },
     {
@@ -5388,7 +5388,7 @@
       "reason": "tool-noise: One preview session fixture tests publication, cancellation and borrowed annotation lifetime. The candidate extends that same fixture with GPU preparation. No independent fixture or product authority appears.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-07",
-      "astHash": "6d2b8966de317733a864b3690f41a0c39dede038f3d556112a597355913ed17d",
+      "astHash": "2ccb38c58f798a34c9216f9d1edb0bee76829b3b98f6553642940ce6ccf29a98",
       "signatureHash": "c3512e4a412e4b2f46c6c725df28dc7125dbd78b7c8c80b1e93fb13a1a6f9464"
     },
     {
@@ -5398,8 +5398,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One scene fixture checks asset admission, frame generations and output cleanup. New cases preserve the default export context and exercise lazy direct output. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-05",
-      "astHash": "17f854c12d9686ad8811511a8ef66e5e15edb9b08f6acdeda6d0ee99b2aebe8b",
+      "reviewDate": "2026-11-07",
+      "astHash": "965254394eb68c69e4bd8b5ff05cf3ff9e0b378d12c3a33eeeea9e6399022540",
       "signatureHash": "a2043057597679bfc0100ba49606decb9cf0c2abf4fb8f569029b0e27e5489eb"
     },
     {
@@ -5695,8 +5695,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One prepared scene owner admits frames and checks their generation before returning a completed receipt. Both output methods use the same transaction. Canvas fallback acquires a separate raster lease. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-05",
-      "astHash": "7ede594dbb8dcdb2d8eea36ca3c47f401a03617b4cdd13c099edd0f2b40112a8",
+      "reviewDate": "2026-11-07",
+      "astHash": "cff242c2fa308db296f3f2f2a2e133a8f448bc86ff07ea0b6769799627beefe6",
       "signatureHash": "dafed7a76445e6cc4c1b8a464b1554bd10412ed6867d9ade29d6ea98ac37c164"
     },
     {
@@ -6158,7 +6158,7 @@
       "reason": "tool-noise: One annotation session owns verified definitions, executor lifetime and released batches. GPU batches expose independent borrows through the shared resource owner. No device or publication authority appears.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-07",
-      "astHash": "4b38f380a0aa6f410bdd1b9bc7ebd3d25d6dfeaaa3f9e6edcc54ab33badcb060",
+      "astHash": "efa583147efcbf489c284b82aaf64f65f416f61d9c9056f38263571d41189cf2",
       "signatureHash": "c65bd33fa4d5a8723e012cbe26a6106f358cce4e6521dd86dc842502389ccf4f"
     },
     {

@@ -188,10 +188,11 @@ it('keeps wire raster admission atomic when the preview reservation refuses it',
     })
     .mockReturnValue({ release });
   const ledger = createEffectRuntimeGpuFrameLedger(reserve);
+  const scope = ledger.createFrameScope();
   const bitmap = { width: 20, height: 10 } as ImageBitmap;
-  expect(() => ledger.reserve([bitmap])).toThrow(EffectRuntimeResourceError);
+  expect(() => scope.reserve([bitmap])).toThrow(EffectRuntimeResourceError);
   expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
-  const admitted = ledger.reserve([bitmap]);
+  const admitted = scope.reserve([bitmap]);
   expect(reserve).toHaveBeenLastCalledWith(800);
   expect(ledger.snapshot().liveDecodedRasterBytes).toBe(800);
   admitted.release();
@@ -225,4 +226,18 @@ it('yields rejected oversized scene cleanup and deduplicates handles across task
     vi.useRealTimers();
     vi.unstubAllGlobals();
   }
+});
+
+it('bounds each packet at 128 MiB and qualified aggregate at 256 MiB', () => {
+  const ledger = createEffectRuntimeGpuFrameLedger(undefined, 2);
+  const masks = Array.from({ length: 16 }, () => ({ width: 1904, height: 1072 }) as ImageBitmap);
+  const firstScope = ledger.createFrameScope();
+  const first = firstScope.reserve(masks);
+  expect(() => firstScope.reserve([masks[0]!])).toThrow(EffectRuntimeResourceError);
+  const second = ledger.createFrameScope().reserve(masks);
+  expect(() => ledger.createFrameScope().reserve([masks[0]!])).toThrow(EffectRuntimeResourceError);
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(32 * 1904 * 1072 * 4);
+  first.release();
+  second.release();
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
 });

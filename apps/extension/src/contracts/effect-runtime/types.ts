@@ -192,6 +192,8 @@ export type EffectRuntimeFrameResult =
   | EffectRuntimeFrameSuccess;
 
 export interface EffectRuntimeSandboxExecutor {
+  /** Concurrent GPU preparations return independently owned resources, including bitmap fallback. */
+  readonly maximumGpuFramesInFlight?: 2;
   dispose(): void;
   prepareGpuFrame?(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult>;
   renderFrame(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeFrameResult>;

@@ -31,6 +31,7 @@ export function createEffectRuntimeSandboxExecutor(
     dispose: () => manager.dispose(),
     ...(args.compositionBackend === 'gpu-scene'
       ? {
+          maximumGpuFramesInFlight: 2 as const,
           prepareGpuFrame: (request: Parameters<EffectRuntimeSandboxExecutor['renderFrame']>[0]) =>
             manager.prepareGpuFrame(request),
         }

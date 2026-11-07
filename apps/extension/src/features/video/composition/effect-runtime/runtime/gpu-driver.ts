@@ -16,6 +16,7 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
   signal?: AbortSignal;
 }): Promise<ReadonlyMap<string, EffectRuntimeGpuPreparedFrame>> {
   const frames = new Map<string, EffectRuntimeGpuPreparedFrame>();
+  const scope = args.ledger.createFrameScope();
   try {
     if (!args.executor.prepareGpuFrame)
       throw new Error('EFFECT_RUNTIME_GPU_PREPARATION_UNAVAILABLE');
@@ -40,7 +41,7 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
         if (result.kind === 'error') throw new Error('EFFECT_RUNTIME_GPU_PREPARATION_FAILED');
         const source =
           result.kind === 'gpu-plan' ? buildEffectRuntimeGpuPlan(result) : result.bitmap;
-        const reservation = args.ledger.reserve(collectEffectRuntimeResultBitmaps(result));
+        const reservation = scope.reserve(collectEffectRuntimeResultBitmaps(result));
         let retired = false,
           closed = false,
           borrowers = 0;

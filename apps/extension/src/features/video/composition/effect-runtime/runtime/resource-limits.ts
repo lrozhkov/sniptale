@@ -258,28 +258,37 @@ export function closeEffectRuntimeGpuSceneResources(value: unknown): void {
   setTimeout(release, 0);
 }
 
-/** One composition accounts for all live wire rasters, including retired but GPU-borrowed poses. */
+/** Account for live packet rasters until the last GPU borrow returns. */
 export function createEffectRuntimeGpuFrameLedger(
-  reserveBytes?: (bytes: number) => { release(): void }
+  reserveBytes?: (bytes: number) => { release(): void },
+  maximumInFlight: 1 | 2 = 1
 ) {
   let bytes = 0;
   return {
-    reserve(rasters: readonly ImageBitmap[]) {
-      const cost = rasters.reduce(
-        (sum, raster) => sum + assertEffectDecodedRaster(raster.width, raster.height),
-        0
-      );
-      if (bytes + cost > EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes)
-        throw new EffectRuntimeResourceError();
-      const reservation = reserveBytes?.(cost);
-      bytes += cost;
-      let released = false;
+    createFrameScope() {
+      let frameBytes = 0;
       return {
-        release() {
-          if (released) return;
-          released = true;
-          bytes -= cost;
-          reservation?.release();
+        reserve(rasters: readonly ImageBitmap[]) {
+          const cost = rasters.reduce(
+            (sum, raster) => sum + assertEffectDecodedRaster(raster.width, raster.height),
+            0
+          );
+          const frameLimit = EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes;
+          if (frameBytes + cost > frameLimit || bytes + cost > frameLimit * maximumInFlight)
+            throw new EffectRuntimeResourceError();
+          const reservation = reserveBytes?.(cost);
+          frameBytes += cost;
+          bytes += cost;
+          let released = false;
+          return {
+            release() {
+              if (released) return;
+              released = true;
+              frameBytes -= cost;
+              bytes -= cost;
+              reservation?.release();
+            },
+          };
         },
       };
     },

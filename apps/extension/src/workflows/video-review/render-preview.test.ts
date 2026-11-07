@@ -1756,9 +1756,10 @@ it.each(['dispose', 'replace'] as const)(
 );
 
 it.each([false, true])(
-  'serializes simultaneous GPU fallback and preserves each captured clock (abort next: %s)',
+  'serializes simultaneous annotated GPU fallback and preserves each captured clock (abort next: %s)',
   async (abortNext) => {
     const { resources } = setup();
+    const annotations = await annotationsFixture();
     const gpuOne = Promise.withResolvers<boolean>(),
       gpuTwo = Promise.withResolvers<boolean>();
     const gpuStarted = Promise.withResolvers<void>();
@@ -1766,20 +1767,52 @@ it.each([false, true])(
     const gpu = {
       allocatedBytes: 0,
       fallbackReason: 'device-failed' as const,
-      render: vi.fn(() => {
-        gpuCalls++;
-        if (gpuCalls === 2) gpuStarted.resolve();
-        return gpuCalls === 1 ? gpuOne.promise : gpuTwo.promise;
-      }),
+      render: vi.fn(
+        (_input: {
+          annotations?: Awaited<
+            ReturnType<typeof import('./annotation-renderer').createReviewAnnotationRenderer>
+          > | null;
+          signal: AbortSignal;
+        }) => {
+          gpuCalls++;
+          if (gpuCalls === 2) gpuStarted.resolve();
+          return gpuCalls === 1 ? gpuOne.promise : gpuTwo.promise;
+        }
+      ),
       releaseScene: vi.fn(),
       dispose: vi.fn(),
     };
     io.gpu.mockReturnValue(gpu);
     vi.stubGlobal('navigator', { gpu: {} });
-    const renderer = createReviewPreviewRenderer({ resources, maximumInFlight: 2 });
+    const renderer = createReviewPreviewRenderer({
+      resources,
+      maximumInFlight: 2,
+      annotationExecutor: () => ({
+        ...annotations.executor,
+        maximumGpuFramesInFlight: 2,
+        prepareGpuFrame: async (request) => annotations.success(request),
+      }),
+    });
     const signal = new AbortController().signal;
     const nextController = new AbortController();
-    const prepared = await renderer.prepare(scene(), dimensions, signal);
+    const prepared = await renderer.prepare(annotations.input, dimensions, signal);
+    gpu.render.mockImplementationOnce(async (input) => {
+      const density = { content: { width: 1, height: 1 }, viewport: { width: 1, height: 1 } };
+      const batch = await input.annotations!.prepareGpu(2, density, 30, input.signal);
+      batch.release();
+      return true;
+    });
+    (
+      await renderer.render(
+        prepared,
+        {
+          ...frame(),
+          source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+        },
+        signal
+      )
+    ).release();
+    expect(renderer.maximumInFlight(annotations.input)).toBe(2);
     const one = Promise.withResolvers<void>(),
       two = Promise.withResolvers<void>();
     const beganOne = Promise.withResolvers<void>(),
@@ -2148,5 +2181,76 @@ it.each([
     });
     prepared.release();
     renderer.dispose();
+  }
+);
+
+it.each([undefined, 2] as const)(
+  'derives annotated frame admission from initialized executor capability %s',
+  async (maximumGpuFramesInFlight) => {
+    const f = await annotationsFixture();
+    const { resources } = setup();
+    vi.stubGlobal('navigator', { gpu: {} });
+    const executor = {
+      ...f.executor,
+      ...(maximumGpuFramesInFlight ? { maximumGpuFramesInFlight } : {}),
+      prepareGpuFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => f.success(request)),
+    };
+    let gate: Promise<void> | undefined;
+    const gpu = {
+      allocatedBytes: 0,
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+      render: vi.fn(
+        async (input: {
+          annotations: Awaited<
+            ReturnType<typeof import('./annotation-renderer').createReviewAnnotationRenderer>
+          >;
+          signal: AbortSignal;
+        }) => {
+          const density = { content: { width: 1, height: 1 }, viewport: { width: 1, height: 1 } };
+          const batch = await input.annotations.prepareGpu(2, density, 30, input.signal);
+          const borrow = batch.retain();
+          batch.release();
+          try {
+            await gate;
+            return true;
+          } finally {
+            borrow.release();
+          }
+        }
+      ),
+    };
+    io.gpu.mockReturnValue(gpu);
+    const renderer = createReviewPreviewRenderer({
+      resources,
+      maximumInFlight: 2,
+      annotationExecutor: () => executor,
+    });
+    const signal = new AbortController().signal;
+    const prepared = await renderer.prepare(f.input, dimensions, signal);
+    expect(renderer.maximumInFlight(f.input)).toBe(1);
+    const input = {
+      ...frame(),
+      source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+    };
+    (await renderer.render(prepared, input, signal)).release();
+    expect(renderer.maximumInFlight(f.input)).toBe(maximumGpuFramesInFlight ?? 1);
+    expect(renderer.maximumInFlight(structuredClone(f.input))).toBe(1);
+    const fence = Promise.withResolvers<void>();
+    gate = fence.promise;
+    const a = renderer.render(prepared, input, signal);
+    // Admission is synchronous before the first asynchronous GPU preparation.
+    if (maximumGpuFramesInFlight === 2) {
+      const b = renderer.render(prepared, input, signal);
+      await expect(renderer.render(prepared, input, signal)).rejects.toThrow('already admitted');
+      fence.resolve();
+      (await b).release();
+    } else {
+      await expect(renderer.render(prepared, input, signal)).rejects.toThrow('already admitted');
+      fence.resolve();
+    }
+    (await a).release();
+    renderer.dispose();
+    expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
   }
 );
