@@ -300,3 +300,57 @@ it.each([undefined, 'gpu-preview', 'gpu-scene'] as const)(
     executor.dispose();
   }
 );
+
+it.each([undefined, 'gpu-preview', 'gpu-scene'] as const)(
+  'preloads only the GPU scene transport without a frame request (%s)',
+  async (compositionBackend) => {
+    const executor = createEffectRuntimeSandboxExecutor(
+      compositionBackend ? { compositionBackend } : {}
+    );
+    expect(document.querySelectorAll('iframe')).toHaveLength(
+      compositionBackend === 'gpu-scene' ? 1 : 0
+    );
+    executor.dispose();
+    await Promise.resolve();
+    expect(document.querySelector('iframe')).toBeNull();
+  }
+);
+
+it('reuses preloaded transport and retries failed preload without recreating after disposal', async () => {
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  manager.preload();
+  const first = document.querySelector('iframe')!;
+  first.dispatchEvent(new Event('error'));
+  await Promise.resolve();
+  expect(document.querySelector('iframe')).toBeNull();
+  const request = manager.prepareGpuFrame(createRequest());
+  const replacement = document.querySelector('iframe');
+  expect(replacement).not.toBe(first);
+  expect(document.querySelectorAll('iframe')).toHaveLength(1);
+  expect(document.querySelector('iframe')).toBe(replacement);
+  manager.dispose();
+  await expect(request).resolves.toMatchObject({ kind: 'error', code: 'crashed' });
+  manager.preload();
+  expect(document.querySelector('iframe')).toBeNull();
+});
+
+it('authenticates a preloaded transport without posting a frame until requested', async () => {
+  installSynchronousMessageChannel();
+  const executor = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene' });
+  const iframe = document.querySelector('iframe')!;
+  const requests: EffectRuntimeRenderMessage[] = [],
+    ports: MessagePort[] = [];
+  installCacheRetryResponder(iframe, requests, ports);
+  iframe.dispatchEvent(new Event('load'));
+  await Promise.resolve();
+  expect(requests).toEqual([]);
+  await expect(executor.renderFrame(createRequest())).resolves.toMatchObject({ kind: 'frame' });
+  expect(document.querySelector('iframe')).toBe(iframe);
+  expect(requests).toHaveLength(1);
+  executor.dispose();
+  for (const port of ports) port.close();
+});

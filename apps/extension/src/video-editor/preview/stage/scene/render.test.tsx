@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
 import { useCursorTrajectoryProject } from '../runtime/cursor-trajectory';
 import { prepareCursorTrajectoryProject } from '../../../../features/video/project/cursor-trajectory/project-window';
 import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
@@ -682,4 +683,131 @@ it('connects reserved preparation only after the live GPU backend is available',
   } finally {
     createGpu.mockRestore();
   }
+});
+
+it.each(['enabled', 'disabled', 'hidden', 'unreferenced', 'bare', 'legacy', 'direct'] as const)(
+  'preloads only an admitted GPU job with an enabled referenced future effect (%s)',
+  async (mode) => {
+    await act(async () => {
+      root?.render(<RenderHarness />);
+    });
+    const options = vi.mocked(createPreviewSceneRenderScheduler).mock.calls.at(-1)![0];
+    const project = createEmptyVideoProject('Future annotation', 200, 100);
+    if (mode !== 'bare') {
+      project.effectInstances = [
+        {
+          id: 'future',
+          snapshotId: 'snapshot',
+          kind: 'standalone',
+          enabled: mode !== 'disabled',
+          controls: {},
+          duration: 2,
+          startTime: 10,
+          playbackRate: 1,
+          target: { kind: 'scene' },
+        },
+      ];
+      if (mode !== 'unreferenced')
+        project.clips.push(
+          createEffectHostClip({
+            effectInstanceId: 'future',
+            name: 'future',
+            trackId: project.tracks[0]!.id,
+            startTime: 10,
+            duration: 2,
+            projectWidth: 200,
+            projectHeight: 100,
+          })
+        );
+    }
+    if (mode === 'hidden') project.tracks[0]!.visible = false;
+    const executor = vi.fn();
+    const job = {
+      canvas: document.createElement('canvas'),
+      currentTime: 0,
+      imageBank: {},
+      project,
+      previewRenderer: mode === 'legacy' ? ('legacy' as const) : ('gpu' as const),
+      stage: null,
+      videoRefs: { current: {} },
+      effectRuntimeExecutor:
+        mode === 'direct' ? { dispose: vi.fn(), renderFrame: vi.fn() } : executor,
+    };
+    expect(executor).not.toHaveBeenCalled();
+    await options.render(job);
+    expect(executor).toHaveBeenCalledTimes(mode === 'enabled' ? 1 : 0);
+  }
+);
+
+it('starts future effect readiness only after the previous renderer context drains', async () => {
+  await act(async () => {
+    root?.render(<RenderHarness />);
+  });
+  const options = vi.mocked(createPreviewSceneRenderScheduler).mock.calls.at(-1)![0];
+  const actual = await vi.importActual<typeof import('./render-scheduler')>('./render-scheduler');
+  const scheduler = actual.createPreviewSceneRenderScheduler(options);
+  let finish!: () => void;
+  vi.mocked(renderPreviewScene).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const project = createEmptyVideoProject('Future effect', 200, 100);
+  project.effectInstances = [
+    {
+      id: 'future',
+      snapshotId: 'snapshot',
+      kind: 'standalone',
+      enabled: true,
+      controls: {},
+      duration: 2,
+      startTime: 10,
+      playbackRate: 1,
+      target: { kind: 'scene' },
+    },
+  ];
+  project.clips.push(
+    createEffectHostClip({
+      effectInstanceId: 'future',
+      name: 'future',
+      trackId: project.tracks[0]!.id,
+      startTime: 10,
+      duration: 2,
+      projectWidth: 200,
+      projectHeight: 100,
+    })
+  );
+  const controller = new AbortController(),
+    callback = vi.fn();
+  const first = {
+    canvas: document.createElement('canvas'),
+    currentTime: 0,
+    imageBank: {},
+    project,
+    previewRenderer: 'legacy' as const,
+    stage: null,
+    videoRefs: { current: {} },
+    effectRuntimeExecutor: callback,
+    controller,
+    signal: controller.signal,
+    isEffectRuntimeFrame: true,
+    isPlaybackFrame: true,
+    renderGeneration: 1,
+  };
+  scheduler.enqueue(first);
+  await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+  const nextController = new AbortController();
+  scheduler.enqueue({
+    ...first,
+    controller: nextController,
+    signal: nextController.signal,
+    previewRenderer: 'gpu',
+    renderGeneration: 2,
+  });
+  expect(controller.signal.aborted).toBe(true);
+  expect(callback).not.toHaveBeenCalled();
+  finish();
+  await vi.waitFor(() => expect(callback).toHaveBeenCalledOnce());
+  scheduler.dispose();
 });

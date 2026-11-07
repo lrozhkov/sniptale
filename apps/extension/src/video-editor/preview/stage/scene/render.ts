@@ -335,6 +335,23 @@ function usePreviewRenderSchedulerRef(
         return transferred;
       },
       render: (job) => {
+        if (
+          !job.signal?.aborted &&
+          typeof job.effectRuntimeExecutor === 'function' &&
+          job.previewRenderer !== 'legacy' &&
+          job.project.effectInstances?.some(
+            (instance) =>
+              instance.enabled &&
+              instance.kind === 'standalone' &&
+              job.project.clips.some(
+                (clip) =>
+                  clip.type === 'EFFECT' &&
+                  clip.effectInstanceId === instance.id &&
+                  job.project.tracks.some(({ id, visible }) => id === clip.trackId && visible)
+              )
+          )
+        )
+          job.effectRuntimeExecutor();
         const render = (input: Parameters<typeof renderPreviewScene>[0]) => {
           joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(
             renderPreviewScene,

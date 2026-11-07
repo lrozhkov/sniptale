@@ -237,16 +237,45 @@ function layerValues(layer: GpuPreviewLayer, output: Size, logical: Size) {
   return values;
 }
 
-async function createPreviewPipelines(
-  device: GPUDevice,
-  format: GPUTextureFormat,
-  effects: boolean,
-  masked = false,
-  operation: { clip: boolean; tint: boolean } = { clip: false, tint: false }
-) {
-  const modules = [false, true].map((external) =>
-    device.createShaderModule({ code: gpuPreviewShader(external, effects, masked, operation) })
-  );
+type PreviewPipelineVariant = {
+  blend: number;
+  external: boolean;
+  effects: boolean;
+  masked: boolean;
+  clip: boolean;
+  tint: boolean;
+};
+
+function previewPipelineVariant(layer: GpuPreviewLayer, external: boolean): PreviewPipelineVariant {
+  return {
+    blend:
+      layer.blend === 'atop'
+        ? 5
+        : layer.blend === 'screen'
+          ? 4
+          : layer.blend === 'erase'
+            ? 3
+            : layer.blend === 'mask'
+              ? 2
+              : layer.blend === 'add'
+                ? 1
+                : 0,
+    external,
+    effects: !!layer.lens || requiresGpuPreviewFilter(layer),
+    masked: !!layer.alphaMask,
+    clip: !!layer.operationClip,
+    tint: !!layer.tint,
+  };
+}
+
+function previewPipelineKey(variant: PreviewPipelineVariant) {
+  return JSON.stringify(variant);
+}
+
+/** One device shares only requested pipeline variants across all frame slots. */
+function createPreviewPipelineCache(device: GPUDevice, format: GPUTextureFormat) {
+  const modules = new Map<string, GPUShaderModule>();
+  const pipelines = new Map<string, Promise<GPURenderPipeline>>();
   const components: GPUBlendComponent[] = [
     { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
     { srcFactor: 'one', dstFactor: 'one' },
@@ -264,45 +293,51 @@ async function createPreviewPipelines(
       alpha: { srcFactor: 'dst-alpha', dstFactor: 'one-minus-src-alpha' },
     },
   ];
-  return Promise.all(
-    blends.flatMap((blend) =>
-      modules.map((module) =>
-        device.createRenderPipelineAsync({
-          layout: 'auto',
-          vertex: { module, entryPoint: 'vertex' },
-          fragment: {
-            module,
-            entryPoint: 'fragment',
-            targets: [{ format, blend }],
-          },
-          primitive: { topology: 'triangle-list' },
-        })
-      )
-    )
-  ).catch((error: unknown) => {
-    if (
-      typeof GPUPipelineError !== 'undefined' &&
-      error instanceof GPUPipelineError &&
-      error.reason === 'internal'
-    )
-      throw new GpuPreviewDeviceError('GPU preview pipeline device failure.', { cause: error });
-    throw error;
-  });
+  return async (variants: ReadonlyMap<string, PreviewPipelineVariant>) => {
+    const required = [...variants].map(async ([key, variant]) => {
+      let pipeline = pipelines.get(key);
+      if (!pipeline) {
+        const { blend: _blend, ...shader } = variant;
+        const shaderKey = JSON.stringify(shader);
+        let module = modules.get(shaderKey);
+        if (!module) {
+          module = device.createShaderModule({
+            code: gpuPreviewShader(variant.external, variant.effects, variant.masked, {
+              clip: variant.clip,
+              tint: variant.tint,
+            }),
+          });
+          modules.set(shaderKey, module);
+        }
+        const blend = blends[variant.blend];
+        if (!blend) throw new Error('GPU preview blend is unavailable.');
+        pipeline = device
+          .createRenderPipelineAsync({
+            layout: 'auto',
+            vertex: { module, entryPoint: 'vertex' },
+            fragment: { module, entryPoint: 'fragment', targets: [{ format, blend }] },
+            primitive: { topology: 'triangle-list' },
+          })
+          .catch((error: unknown) => {
+            if (
+              typeof GPUPipelineError !== 'undefined' &&
+              error instanceof GPUPipelineError &&
+              error.reason === 'internal'
+            )
+              throw new GpuPreviewDeviceError('GPU preview pipeline device failure.', {
+                cause: error,
+              });
+            throw error;
+          });
+        pipelines.set(key, pipeline);
+      }
+      return pipeline.then((value) => [key, value] as const);
+    });
+    return new Map(await Promise.all(required));
+  };
 }
 
 type GpuPreviewRequest = Parameters<GpuPreviewRenderer['render']>[0];
-type PreviewPipelineFamilies = {
-  effects: GPURenderPipeline[] | null;
-  masked: GPURenderPipeline[] | null;
-  maskedEffects: GPURenderPipeline[] | null;
-  operations: Map<string, GPURenderPipeline[]>;
-};
-
-function operationKey(layer: GpuPreviewLayer) {
-  const filtered = !!layer.lens || requiresGpuPreviewFilter(layer);
-  return `${filtered}:${!!layer.alphaMask}:${!!layer.operationClip}:${!!layer.tint}`;
-}
-
 function requiresRasterSource(layer: GpuPreviewLayer) {
   return requiresGpuPreviewFilter(layer) || !!layer.cssFilter;
 }
@@ -338,11 +373,8 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
   const visiting = new Set<GpuPreviewGroup>();
   const validatedGroups = new Set<GpuPreviewGroup>();
   let hasCssFilter = false;
-  let hasEffects = false;
-  let hasMasked = false;
-  let hasMaskedEffects = false;
   let layerCount = 0;
-  const operations = new Map<string, GpuPreviewLayer>();
+  const pipelines = new Map<string, PreviewPipelineVariant>();
   const nativeFrames = new Set<VideoFrame>();
   const retainRaster = (
     raster: { source: Raster; cache?: GpuPreviewLayer['cache'] },
@@ -378,14 +410,27 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
       const path = `${prefix}/${index}`;
       layerValues(layer, output, logical);
       hasCssFilter ||= !!layer.cssFilter;
-      const effects = !!layer.lens || requiresGpuPreviewFilter(layer);
-      if (layer.operationClip || layer.tint) operations.set(operationKey(layer), layer);
+      const native = layer.source instanceof VideoFrame;
+      const rasterized =
+        layer.source instanceof VideoFrame &&
+        (requiresRasterSource(layer) || needsNativeRgbSource(layer.source));
+      const variant = previewPipelineVariant(layer, native && !rasterized);
+      pipelines.set(previewPipelineKey(variant), variant);
+      if (rasterized) {
+        const conversion: PreviewPipelineVariant = {
+          blend: 0,
+          external: true,
+          effects: false,
+          masked: false,
+          clip: false,
+          tint: false,
+        };
+        pipelines.set(previewPipelineKey(conversion), conversion);
+      }
       if (layer.operationClip) retainRaster(layer.operationClip, `${path}/operation-clip`);
       if (layer.alphaMask) {
-        hasMasked ||= !effects;
-        hasMaskedEffects ||= effects;
         retainRaster(layer.alphaMask, `${path}/alpha-mask`);
-      } else hasEffects ||= effects;
+      }
       if (
         requiresRasterSource(layer) &&
         layer.source instanceof VideoFrame &&
@@ -418,10 +463,7 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
     retainedKeys,
     targetKeys,
     hasCssFilter,
-    hasEffects,
-    hasMasked,
-    hasMaskedEffects,
-    operations,
+    pipelines,
     nativeFrames,
   };
 }
@@ -612,11 +654,7 @@ export async function createGpuPreviewRenderer(
   }
   try {
     const format = navigator.gpu.getPreferredCanvasFormat();
-    const pipelines = await createPreviewPipelines(device, format, false);
-    let effectPipelines: Promise<GPURenderPipeline[]> | null = null;
-    let maskedPipelines: Promise<GPURenderPipeline[]> | null = null;
-    let maskedEffectPipelines: Promise<GPURenderPipeline[]> | null = null;
-    const operationPipelines = new Map<string, Promise<GPURenderPipeline[]>>();
+    const preparePipelines = createPreviewPipelineCache(device, format);
     const sampler = device.createSampler({
       minFilter: 'linear',
       magFilter: 'linear',
@@ -809,11 +847,10 @@ export async function createGpuPreviewRenderer(
       /** Encode child targets before their parent pass without changing frame lifetime authority. */
       const encodeFrame = (
         request: GpuPreviewRequest,
-        families: PreviewPipelineFamilies,
+        pipelines: ReadonlyMap<string, GPURenderPipeline>,
         nativeFrames: ReadonlySet<VideoFrame>,
         outputTexture?: () => GPUTexture
       ) => {
-        const { effects, masked, maskedEffects } = families;
         const drawBounds = createGpuPreviewDrawBounds();
         const encoder = device.createCommandEncoder();
         let uniformIndex = 0;
@@ -963,31 +1000,9 @@ export async function createGpuPreviewRenderer(
             );
             const external =
               layer.source instanceof VideoFrame && !preparedNative && !requiresRasterSource(layer);
-            const selectedPipelines = layer.alphaMask
-              ? layer.lens || requiresGpuPreviewFilter(layer)
-                ? maskedEffects
-                : masked
-              : layer.lens || requiresGpuPreviewFilter(layer)
-                ? effects
-                : pipelines;
-            const activePipelines =
-              layer.operationClip || layer.tint
-                ? families.operations.get(operationKey(layer))
-                : selectedPipelines;
-            const pipeline =
-              activePipelines?.[
-                (layer.blend === 'atop'
-                  ? 10
-                  : layer.blend === 'screen'
-                    ? 8
-                    : layer.blend === 'erase'
-                      ? 6
-                      : layer.blend === 'mask'
-                        ? 4
-                        : layer.blend === 'add'
-                          ? 2
-                          : 0) + (external ? 1 : 0)
-              ];
+            const pipeline = pipelines.get(
+              previewPipelineKey(previewPipelineVariant(layer, external))
+            );
             const pixels = sources[index];
             const mask = masks[index];
             if (!pipeline || !pixels) throw new Error('GPU preview pipeline is unavailable.');
@@ -1072,29 +1087,7 @@ export async function createGpuPreviewRenderer(
           device.pushErrorScope('validation');
           let scopeOpen = true;
           try {
-            if (plan.hasEffects) effectPipelines ??= createPreviewPipelines(device, format, true);
-            const effects = plan.hasEffects ? await effectPipelines : null;
-            if (plan.hasMasked)
-              maskedPipelines ??= createPreviewPipelines(device, format, false, true);
-            const masked = plan.hasMasked ? await maskedPipelines : null;
-            if (plan.hasMaskedEffects)
-              maskedEffectPipelines ??= createPreviewPipelines(device, format, true, true);
-            const maskedEffects = plan.hasMaskedEffects ? await maskedEffectPipelines : null;
-            const operations = new Map<string, GPURenderPipeline[]>();
-            for (const [key, layer] of plan.operations) {
-              let promise = operationPipelines.get(key);
-              if (!promise) {
-                promise = createPreviewPipelines(
-                  device,
-                  format,
-                  !!layer.lens || requiresGpuPreviewFilter(layer),
-                  !!layer.alphaMask,
-                  { clip: !!layer.operationClip, tint: !!layer.tint }
-                );
-                operationPipelines.set(key, promise);
-              }
-              operations.set(key, await promise);
-            }
+            const pipelines = await preparePipelines(plan.pipelines);
             if (!cssFilter && plan.hasCssFilter)
               cssFilter = await createGpuPreviewCssFilter(device, reserve).catch(
                 (error: unknown) => {
@@ -1135,12 +1128,7 @@ export async function createGpuPreviewRenderer(
                 entry.reservation.release();
               }
             device.queue.submit([
-              encodeFrame(
-                request,
-                { effects, masked, maskedEffects, operations },
-                plan.nativeFrames,
-                outputTexture
-              ),
+              encodeFrame(request, pipelines, plan.nativeFrames, outputTexture),
             ]);
             request.onSubmitted?.();
             scopeOpen = false;

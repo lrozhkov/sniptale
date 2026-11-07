@@ -9,6 +9,7 @@ import {
   type GpuPreviewRenderer,
 } from './gpu-preview';
 import { deferred, graphics } from './gpu-preview.test-support';
+import { gpuPreviewShader } from './gpu-preview-shaders';
 
 const owners: GpuPreviewRenderer[] = [];
 afterEach(() => {
@@ -394,6 +395,7 @@ it('does not publish an aborted frame after the GPU fence', async () => {
   const renderer = await owner();
   const controller = new AbortController();
   const pending = renderer.render(request(undefined, controller.signal));
+  await vi.waitFor(() => expect(queue.submit).toHaveBeenCalledOnce());
   controller.abort();
   const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
   fence.resolve();
@@ -408,6 +410,7 @@ it('drains a pending frame before disposal and releases all admitted resources o
   queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
   const renderer = await owner({ reserve });
   const pending = renderer.render(request());
+  await vi.waitFor(() => expect(queue.submit).toHaveBeenCalledOnce());
   renderer.dispose();
   renderer.dispose();
   expect(device.destroy).not.toHaveBeenCalled();
@@ -522,6 +525,7 @@ it('settles deferred disposal and ledger cleanup when a pending GPU fence reject
   const renderer = await owner({ reserve });
   const pending = renderer.render(request([layer(group([layer()]))]));
   const rejected = expect(pending).rejects.toBeInstanceOf(GpuPreviewDeviceError);
+  await vi.waitFor(() => expect(queue.submit).toHaveBeenCalledOnce());
   renderer.dispose();
   expect(device.destroy).not.toHaveBeenCalled();
   expect(renderer.allocatedBytes).toBeGreaterThan(0);
@@ -617,13 +621,24 @@ it('renders a shared group once and uses separate additive and source-over pipel
   expect(encoder?.beginRenderPass).toHaveBeenCalledTimes(2);
   expect(pass.draw).toHaveBeenCalledTimes(3);
   expect(device.queue.copyExternalImageToTexture).toHaveBeenCalledOnce();
+  const calls = device.createRenderPipelineAsync.mock.calls;
+  const over = calls.findIndex(([descriptor]) =>
+    Array.from(descriptor.fragment?.targets ?? []).some(
+      (target) => target?.blend?.color.dstFactor === 'one-minus-src-alpha'
+    )
+  );
+  const add = calls.findIndex(([descriptor]) =>
+    Array.from(descriptor.fragment?.targets ?? []).some(
+      (target) => target?.blend?.color.dstFactor === 'one'
+    )
+  );
   const pipelines = device.createRenderPipelineAsync.mock.results;
   expect(pass.setPipeline.mock.calls.map(([pipeline]) => pipeline)).toEqual([
-    await pipelines[0]?.value,
-    await pipelines[2]?.value,
-    await pipelines[0]?.value,
+    await pipelines[over]?.value,
+    await pipelines[add]?.value,
+    await pipelines[over]?.value,
   ]);
-  const descriptors = device.createRenderPipelineAsync.mock.calls.map(([descriptor]) => descriptor);
+  const descriptors = [calls[over]?.[0], calls[add]?.[0]];
   expect(descriptors[0]?.fragment?.targets).toEqual([
     expect.objectContaining({
       blend: {
@@ -632,7 +647,7 @@ it('renders a shared group once and uses separate additive and source-over pipel
       },
     }),
   ]);
-  expect(descriptors[2]?.fragment?.targets).toEqual([
+  expect(descriptors[1]?.fragment?.targets).toEqual([
     expect.objectContaining({
       blend: {
         color: { srcFactor: 'one', dstFactor: 'one' },
@@ -703,6 +718,7 @@ it('retains a group target during an in-flight frame and releases it after dispo
   queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
   const renderer = await owner({ reserve });
   const pending = renderer.render(request([layer(group([layer()]))]));
+  await vi.waitFor(() => expect(queue.submit).toHaveBeenCalledOnce());
   const target = device.createTexture.mock.results[0]?.value;
   renderer.dispose();
   expect(target?.destroy).not.toHaveBeenCalled();
@@ -905,6 +921,7 @@ it('retains alpha mask resources through a pending frame and releases them after
 it('keeps ordinary unmasked work on its existing pipeline family and bindings', async () => {
   const { device } = graphics();
   const renderer = await owner();
+  await renderer.render(request());
   const pipelineCount = device.createRenderPipelineAsync.mock.calls.length;
   await renderer.render(request());
   expect(device.createRenderPipelineAsync).toHaveBeenCalledTimes(pipelineCount);
@@ -959,10 +976,8 @@ it('uses screen RGB and source-atop alpha coefficients without changing source-o
       { ...layer(), blend: 'atop' },
     ])
   );
-  const targets = mock.device.createRenderPipelineAsync.mock.calls.map(
-    ([descriptor]) => descriptor.fragment?.targets
-  );
-  expect(targets[8]).toEqual([
+  const targets = mainPipelineCalls(mock).map(([descriptor]) => descriptor.fragment?.targets);
+  expect(targets[0]).toEqual([
     {
       format: 'bgra8unorm',
       blend: {
@@ -971,7 +986,7 @@ it('uses screen RGB and source-atop alpha coefficients without changing source-o
       },
     },
   ]);
-  expect(targets[10]).toEqual([
+  expect(targets[1]).toEqual([
     {
       format: 'bgra8unorm',
       blend: {
@@ -1078,8 +1093,7 @@ it.each(['scope-first', 'fence-first'] as const)(
       }
     );
     try {
-      await Promise.resolve();
-      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      await vi.waitFor(() => expect(device.popErrorScope).toHaveBeenCalledOnce());
       expect(queue.submit).toHaveBeenCalledOnce();
       if (order === 'scope-first') scope.resolve(null);
       else fence.resolve();
@@ -1128,8 +1142,7 @@ it.each(['fence-reject', 'scope-reject', 'validation', 'sync-pop', 'both-reject'
       }
     );
     try {
-      await Promise.resolve();
-      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      await vi.waitFor(() => expect(device.popErrorScope).toHaveBeenCalledOnce());
       if (mode === 'fence-reject' || mode === 'both-reject') fence.reject(fenceFailure);
       else if (mode === 'scope-reject') scope.reject(scopeFailure);
       else if (mode === 'validation') scope.resolve({ message: 'invalid submitted frame' });
@@ -1189,8 +1202,7 @@ it.each([
       }
     );
     try {
-      await Promise.resolve();
-      expect(device.popErrorScope).toHaveBeenCalledOnce();
+      await vi.waitFor(() => expect(device.popErrorScope).toHaveBeenCalledOnce());
       if (action === 'abort') controller.abort();
       else {
         renderer.dispose();
@@ -1268,10 +1280,11 @@ it('keeps child blend commands on a transparent destination before subsequent pa
   expect(g.commands.filter((command) => command === 'begin')).toHaveLength(1);
   expect(g.pass.draw).toHaveBeenCalledTimes(7);
   const pipelines = await Promise.all(
-    g.device.createRenderPipelineAsync.mock.results.map((result) => result.value)
+    g.device.createRenderPipelineAsync.mock.results.slice(1).map((result) => result.value)
   );
+  // Normalization visits the child blend commands in their preserved draw order.
   expect(g.pass.setPipeline.mock.calls.map((call) => call[0])).toEqual(
-    [0, 2, 4, 6, 8, 10, 0].map((index) => pipelines[index])
+    [0, 1, 2, 3, 4, 5, 0].map((index) => pipelines[index])
   );
 });
 
@@ -2034,3 +2047,191 @@ it('retains the backdrop when a mask follows the opaque plane', async () => {
     g.queue.copyExternalImageToTexture.mock.calls.some(([entry]) => entry.source === backdrop)
   ).toBe(true);
 });
+
+function mainPipelineCalls(g: ReturnType<typeof graphics>) {
+  return g.device.createRenderPipelineAsync.mock.calls.filter(([descriptor]) =>
+    Array.from(descriptor.fragment?.targets ?? []).some((target) => !!target?.blend)
+  );
+}
+
+it('creates only the used ordinary variant and reuses it across both pending slots', async () => {
+  const g = graphics();
+  const renderer = await owner({ maximumInFlight: 2 });
+  expect(mainPipelineCalls(g)).toHaveLength(0);
+  const fence = deferred<void>();
+  g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+  const submitted = deferred<void>();
+  const first = renderer.render({ ...request(), onSubmitted: () => submitted.resolve() });
+  await submitted.promise;
+  await renderer.render(request());
+  expect(mainPipelineCalls(g)).toHaveLength(1);
+  fence.resolve();
+  await first;
+  await renderer.render(request());
+  expect(mainPipelineCalls(g)).toHaveLength(1);
+});
+
+it('does not compile an unused failing blend and reports it only when requested', async () => {
+  const g = graphics();
+  const original = g.device.createRenderPipelineAsync.getMockImplementation()!;
+  const failure = new Error('unused atop variant');
+  g.device.createRenderPipelineAsync.mockImplementation((descriptor) => {
+    const targets = Array.from(descriptor.fragment?.targets ?? []);
+    return targets.some((target) => target?.blend?.color.srcFactor === 'dst-alpha')
+      ? Promise.reject(failure)
+      : original(descriptor);
+  });
+  const renderer = await owner();
+  await renderer.render(request());
+  expect(mainPipelineCalls(g)).toHaveLength(1);
+  await expect(renderer.render(request([{ ...layer(), blend: 'atop' }]))).rejects.toBe(failure);
+  await renderer.render(request());
+  expect(mainPipelineCalls(g)).toHaveLength(2);
+});
+
+it('starts all required variant compilations together before encoding', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const original = g.device.createRenderPipelineAsync.getMockImplementation()!;
+  const gates = [deferred<void>(), deferred<void>()];
+  const started = deferred<void>();
+  let calls = 0;
+  g.device.createRenderPipelineAsync.mockImplementation(async (descriptor) => {
+    const index = calls++;
+    if (calls === 2) started.resolve();
+    await gates[index]!.promise;
+    return original(descriptor);
+  });
+  const pending = renderer.render(
+    request([
+      layer(),
+      { ...layer(), alphaMask: { source: raster(), rect: { x: 0, y: 0, width: 32, height: 18 } } },
+    ])
+  );
+  await Promise.race([started.promise, pending]);
+  expect(calls).toBe(2);
+  expect(g.queue.submit).not.toHaveBeenCalled();
+  gates[1]!.resolve();
+  gates[0]!.resolve();
+  await pending;
+  expect(mainPipelineCalls(g)).toHaveLength(2);
+});
+
+it.each(['over', 'add', 'mask', 'erase', 'screen', 'atop'] as const)(
+  'keeps every used source and shader flag distinct for blend %s',
+  async (blend) => {
+    const g = graphics();
+    const renderer = await owner();
+    const expectedBlend: Record<typeof blend, GPUBlendState> = {
+      over: {
+        color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+      },
+      add: {
+        color: { srcFactor: 'one', dstFactor: 'one' },
+        alpha: { srcFactor: 'one', dstFactor: 'one' },
+      },
+      mask: {
+        color: { srcFactor: 'zero', dstFactor: 'src-alpha' },
+        alpha: { srcFactor: 'zero', dstFactor: 'src-alpha' },
+      },
+      erase: {
+        color: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha' },
+        alpha: { srcFactor: 'zero', dstFactor: 'one-minus-src-alpha' },
+      },
+      screen: {
+        color: { srcFactor: 'one', dstFactor: 'one-minus-src' },
+        alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
+      },
+      atop: {
+        color: { srcFactor: 'dst-alpha', dstFactor: 'one-minus-src-alpha' },
+        alpha: { srcFactor: 'dst-alpha', dstFactor: 'one-minus-src-alpha' },
+      },
+    };
+    for (let flags = 0; flags < 32; flags++) {
+      const external = !!(flags & 1),
+        effects = !!(flags & 2),
+        masked = !!(flags & 4),
+        clip = !!(flags & 8),
+        tint = !!(flags & 16);
+      const input = request([
+        {
+          ...layer(external ? new VideoFrame(raster()) : raster()),
+          blend,
+          ...(effects
+            ? {
+                lens: {
+                  bounds: { x: 0, y: 0, width: 32, height: 18 },
+                  scale: 2,
+                  optics: 'flat' as const,
+                  edgeWidth: 0,
+                  corner: 'circle' as const,
+                },
+              }
+            : {}),
+          ...(masked
+            ? { alphaMask: { source: raster(), rect: { x: 0, y: 0, width: 32, height: 18 } } }
+            : {}),
+          ...(clip ? { operationClip: { source: raster() } } : {}),
+          ...(tint ? { tint: [0.2, 0.4, 0.6, 0.5] as const } : {}),
+        },
+      ]);
+      await renderer.render(input);
+      const compiled = await Promise.all(
+        g.device.createRenderPipelineAsync.mock.results.map((result) => result.value)
+      );
+      const selected = g.pass.setPipeline.mock.lastCall![0];
+      const descriptor =
+        g.device.createRenderPipelineAsync.mock.calls[compiled.indexOf(selected)]![0];
+      expect(Array.from(descriptor.fragment!.targets)[0]!.blend).toEqual(expectedBlend[blend]);
+      const moduleIndex = g.device.createShaderModule.mock.results.findIndex(
+        (result) => result.value === descriptor.vertex.module
+      );
+      expect(g.device.createShaderModule.mock.calls[moduleIndex]![0].code).toBe(
+        gpuPreviewShader(external, effects, masked, { clip, tint })
+      );
+      const count = mainPipelineCalls(g).length;
+      await renderer.render(input);
+      expect(mainPipelineCalls(g)).toHaveLength(count);
+    }
+    expect(mainPipelineCalls(g)).toHaveLength(32);
+  }
+);
+
+it.each(['native', 'blur', 'depth', 'css'] as const)(
+  'compiles the external conversion and RGB sampling variants required by %s',
+  async (kind) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner();
+    const source = new VideoFrame(raster());
+    if (kind !== 'native') native.frames[0]!.codedHeight = 18;
+    const input = layer(source);
+    if (kind === 'blur') input.blur = 2;
+    if (kind === 'css') input.cssFilter = { brightness: 1.1 };
+    if (kind === 'depth')
+      input.depth = {
+        window: { x: 0, y: 0, width: 32, height: 18 },
+        frame: {
+          rotation: [0, 0, 0, 1],
+          perspective: 0,
+          windowMotion: 0,
+          lockBackground: false,
+          focus: [],
+        },
+      };
+    await renderer.render(request([input]));
+    const calls = mainPipelineCalls(g);
+    expect(calls).toHaveLength(2);
+    const shaders = calls.map(([descriptor]) => {
+      const index = g.device.createShaderModule.mock.results.findIndex(
+        (result) => result.value === descriptor.vertex.module
+      );
+      return g.device.createShaderModule.mock.calls[index]![0].code;
+    });
+    expect(shaders).toContain(gpuPreviewShader(true, false, false));
+    expect(shaders).toContain(gpuPreviewShader(false, kind === 'blur' || kind === 'depth', false));
+    expect(native.copy).not.toHaveBeenCalled();
+    expect(native.frames[0]!.close).not.toHaveBeenCalled();
+  }
+);

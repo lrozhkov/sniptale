@@ -27,6 +27,7 @@ export function createEffectRuntimeSandboxExecutor(
     requestTimeoutMs,
     ...(args.compositionBackend ? { compositionBackend: args.compositionBackend } : {}),
   });
+  if (args.compositionBackend === 'gpu-scene') manager.preload();
   return {
     dispose: () => manager.dispose(),
     ...(args.compositionBackend === 'gpu-scene'

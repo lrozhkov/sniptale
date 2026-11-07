@@ -39,6 +39,16 @@ export class EffectRuntimeSandboxSessionManager {
     }
   ) {}
 
+  /** Start transport readiness without admitting a frame; actual requests can retry a failed load. */
+  preload(): void {
+    if (this.disposed) return;
+    try {
+      this.ensureSession();
+    } catch {
+      this.clearSession();
+    }
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

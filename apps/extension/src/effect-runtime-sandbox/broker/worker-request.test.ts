@@ -768,3 +768,44 @@ it('materializes valid oversized scene plans through the existing GPU representa
   expect(render).toHaveBeenCalledOnce();
   for (const resource of plan.resources) expect(resource.bitmap.close).toHaveBeenCalledOnce();
 });
+
+it.each(['error', 'messageerror'] as const)(
+  'retries an idle preloaded worker after %s without sending speculative frames',
+  async (failure) => {
+    const first = new FakeWorker(),
+      replacement = new FakeWorker();
+    const workerFactory = vi.fn().mockReturnValueOnce(first).mockReturnValue(replacement);
+    const session = createEffectRuntimeWorkerSession({ workerFactory });
+    session.preload();
+    session.preload();
+    expect(workerFactory).toHaveBeenCalledOnce();
+    expect(first.postMessage).not.toHaveBeenCalled();
+    if (failure === 'error') first.onerror?.(new FakeErrorEvent('error'));
+    else first.onmessageerror?.(new MessageEvent('messageerror'));
+    expect(first.terminate).toHaveBeenCalledOnce();
+    const request = createRequest(),
+      pending = session.execute(request);
+    await Promise.resolve();
+    expect(workerFactory).toHaveBeenCalledTimes(2);
+    emitMatchingFrame(replacement, request, new FakeImageBitmap(1280, 720));
+    await expect(pending).resolves.toMatchObject({ kind: 'frame' });
+  }
+);
+
+it('treats preload construction failure as advisory and preserves the actual request', async () => {
+  const worker = new FakeWorker(),
+    workerFactory = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('startup');
+      })
+      .mockReturnValue(worker);
+  const session = createEffectRuntimeWorkerSession({ workerFactory });
+  expect(() => session.preload()).not.toThrow();
+  const request = createRequest(),
+    pending = session.execute(request);
+  await Promise.resolve();
+  emitMatchingFrame(worker, request, new FakeImageBitmap(1280, 720));
+  await expect(pending).resolves.toMatchObject({ kind: 'frame' });
+  expect(workerFactory).toHaveBeenCalledTimes(2);
+});

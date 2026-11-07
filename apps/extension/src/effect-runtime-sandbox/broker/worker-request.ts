@@ -47,6 +47,8 @@ interface EffectRuntimeWorkerLease {
   worker: EffectRuntimeWorkerLike | null;
 }
 interface EffectRuntimeWorkerSession {
+  /** Start trusted worker modules without posting a user frame or consuming queue admission. */
+  preload(): void;
   execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
   execute(
     request: EffectRuntimeWorkerMessage,
@@ -61,6 +63,26 @@ export function createEffectRuntimeWorkerSession(
   const lease: EffectRuntimeWorkerLease = {
     ...(options.onReset ? { onReset: options.onReset } : {}),
     worker: null,
+  };
+  const preload = () => {
+    if (lease.worker) return;
+    let worker: EffectRuntimeWorkerLike;
+    try {
+      worker = options.workerFactory();
+    } catch {
+      return;
+    }
+    lease.worker = worker;
+    const retire = () => {
+      if (lease.worker !== worker) return;
+      worker.onerror = null;
+      worker.onmessageerror = null;
+      worker.terminate();
+      lease.worker = null;
+      lease.onReset?.();
+    };
+    worker.onerror = retire;
+    worker.onmessageerror = retire;
   };
   let queue = Promise.resolve();
   function execute(request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
@@ -83,7 +105,7 @@ export function createEffectRuntimeWorkerSession(
       );
     return operation.then(({ result }) => result);
   }
-  return { execute };
+  return { execute, preload };
 }
 
 export async function executeEffectRuntimeWorker(

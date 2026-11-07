@@ -283,3 +283,38 @@ it('rejects scene preparation before worker or document work on an unnegotiated 
   expect(result).toMatchObject({ kind: 'error', code: 'inputRejected' });
   expect(workerFactory).not.toHaveBeenCalled();
 });
+
+it.each([undefined, 'gpu-scene'] as const)(
+  'preloads a worker only for GPU scene sessions (%s)',
+  (compositionBackend) => {
+    const worker = new ReplyWorker(),
+      post = vi.spyOn(worker, 'postMessage');
+    const workerFactory = vi.fn(() => worker);
+    const session = createEffectRuntimeBrokerSession({
+      workerFactory,
+      ...(compositionBackend ? { compositionBackend } : {}),
+    });
+    expect(workerFactory).toHaveBeenCalledTimes(compositionBackend === 'gpu-scene' ? 1 : 0);
+    expect(post).not.toHaveBeenCalled();
+    expect(session.snapshot()).toEqual({
+      activeRequests: 0,
+      consecutiveFailures: 0,
+      circuitOpen: false,
+    });
+  }
+);
+
+it('does not charge an idle GPU worker failure to request or failure admission', () => {
+  const worker = new ReplyWorker();
+  const session = createEffectRuntimeBrokerSession({
+    compositionBackend: 'gpu-scene',
+    workerFactory: () => worker,
+  });
+  worker.onmessageerror?.(new MessageEvent('messageerror'));
+  expect(worker.terminate).toHaveBeenCalledOnce();
+  expect(session.snapshot()).toEqual({
+    activeRequests: 0,
+    consecutiveFailures: 0,
+    circuitOpen: false,
+  });
+});

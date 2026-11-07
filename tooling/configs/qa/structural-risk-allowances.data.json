@@ -5762,8 +5762,8 @@
       "reason": "tool-noise: One GPU adapter fixture controls device failures, queue fences, validation and source release. Shared raster cases use the same fixture and resource lifetime. The additional cases do not introduce a separate fixture owner.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "a5cce6697ac7d5ff7e76cb811cb109dbd7c1d54f7b635e2de09f22fd737aede5",
-      "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
+      "astHash": "9477921704e28aeabaadbe2034426894bb609bc3ae61f74d2fff7eb1dfb78954",
+      "signatureHash": "715ffc809cd0ea56092816b7341ec3c8ae905925220a8c5501d6f101dec2bd50"
     },
     {
       "rule": "structural-function-risk",
@@ -6180,7 +6180,7 @@
       "reason": "tool-noise: One mounted preview session owns its scheduler, renderer and helper retirement. The scheduler owns bounded admission and drains GPU work before fallback or error cleanup. The hook supplies dependencies and publishes image with geometry.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "d2795107239fe6b16a886d0e5d7803b8c70466eb83c26b43e01e600650dfb8b2",
+      "astHash": "41aeb4a06c347aff4a30de604d562305658abe3bafb27d09c43826393cb399ef",
       "signatureHash": "2c629f4f939552b210db20350dffa3a44a616b1c0626c2fd6c9dd93d60a95705"
     },
     {
@@ -6226,6 +6226,28 @@
       "reviewDate": "2026-11-07",
       "astHash": "30aa3d280e1178fddc575efc21eaffc7802c7673381a6fbd358a8c8b408a5e56",
       "signatureHash": "52dec368e48e0dc5847c66a91a27a7cbf809cd0e55518d37298a3fb7dab2fbe2"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/effect-runtime-sandbox/broker/worker-request.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:effect-runtime-sandbox:broker",
+      "reason": "tool-noise: One worker session fixture checks startup, request admission, retry and GPU drain. New preload tests use the same controlled worker and queue. The candidate adds no separate fixture or state owner. A fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove this allowance when the AST or signature changes. Reassess any separate worker, queue, GPU drain or fixture owner. Remove it when the analyzer models this proof owner.",
+      "reviewDate": "2026-11-07",
+      "astHash": "e96c73f6ceb21877855d0c80cc399e5774a2afb05d92bd64ba38f8460b715c44",
+      "signatureHash": "6ec4497a4cd5132ee0a36217de843397ceebc8e6222ca2b2f57507bbe0c0094b"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/scene/render.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: One scheduler fixture checks admitted rendering and resource cleanup. New preload tests use the same controlled renderer and pending jobs. The candidate adds no separate fixture or state owner. A fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove this allowance when the AST or signature changes. Reassess any separate queue, runtime, resource or fixture owner. Remove it when the analyzer models this proof owner.",
+      "reviewDate": "2026-11-07",
+      "astHash": "bf2c80d0171e7a59eb095612a80115404ce0e7161ab0c65fd6864fe9978037ac",
+      "signatureHash": "108daa70125bb05f947861151ae858108345e0610cc580e5853bcfab39660765"
     }
   ]
 }

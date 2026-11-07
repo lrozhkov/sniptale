@@ -56,7 +56,7 @@ export function graphics() {
     queue,
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
-    createShaderModule: vi.fn(() => ({})),
+    createShaderModule: vi.fn((_descriptor: GPUShaderModuleDescriptor) => ({})),
     createRenderPipelineAsync: vi.fn(async (_descriptor: GPURenderPipelineDescriptor) => ({
       getBindGroupLayout: vi.fn(() => ({})),
     })),

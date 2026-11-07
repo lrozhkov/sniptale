@@ -49,6 +49,7 @@ export function createEffectRuntimeBrokerSession(
     },
     workerFactory: dependencies.workerFactory,
   });
+  if (dependencies.compositionBackend === 'gpu-scene') workerSession.preload();
   return {
     execute: (value) =>
       executeSessionRequest(
