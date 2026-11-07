@@ -650,3 +650,74 @@ it.each(['outline', 'arrow'])(
     expect(delta(53, 34, 16, 17)).toBe(0);
   }
 );
+
+for (const prefix of ['by', 'dy', 'py'])
+  for (const scale of [1, 2])
+    it(`keeps compact ${prefix} text in its paragraph at scale ${scale}`, () => {
+      const canvas = createCanvas(680 * scale, 150 * scale),
+        context = canvas.getContext('2d');
+      context.scale(scale, scale);
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, 680, 150);
+      context.font = '16px Arial';
+      context.textBaseline = 'alphabetic';
+      context.fillStyle = '#202122';
+      context.fillText('Readable paragraphs provide independent font evidence.', 8, 30);
+      context.fillText('Adjacent lines preserve their original spacing and structure.', 8, 56);
+      context.fillText(`${prefix} Author describes the subject in another paragraph line.`, 8, 82);
+      context.fillText('Following text supplies another regular baseline.', 8, 108);
+      const prefixWidth = Math.ceil(context.measureText(prefix).width),
+        input = context.getImageData(0, 0, canvas.width, canvas.height);
+      const boxes = prepare(input) as Array<{
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+        shape: string;
+      }>;
+      expect(
+        boxes.some(
+          (b) =>
+            b.shape === 'text' &&
+            b.x <= 9 * scale &&
+            b.x + b.w >= (8 + prefixWidth + 24) * scale &&
+            b.y <= 78 * scale &&
+            b.y + b.h >= 82 * scale
+        )
+      ).toBe(true);
+      expect(
+        execute(canvas)(8 * scale, 69 * scale, prefixWidth * scale, 17 * scale)
+      ).toBeGreaterThan(15 * scale);
+    });
+
+it.each(['outline', 'arrow'])('keeps an independent %s graphic beside paragraph text', (kind) => {
+  const canvas = createCanvas(680, 150),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 680, 150);
+  context.font = '16px Arial';
+  context.textBaseline = 'alphabetic';
+  context.fillStyle = '#202122';
+  context.fillText('Readable paragraphs provide independent font evidence.', 8, 30);
+  context.fillText('Adjacent lines preserve their original spacing and structure.', 8, 56);
+  context.fillText('Author describes the subject in another paragraph line.', 34, 82);
+  context.fillText('Following text supplies another regular baseline.', 8, 108);
+  context.strokeStyle = '#202122';
+  context.lineWidth = 1;
+  if (kind === 'outline') context.strokeRect(8.5, 68.5, 15, 15);
+  else {
+    context.beginPath();
+    context.moveTo(8, 72);
+    context.lineTo(17, 72);
+    context.lineTo(17, 68);
+    context.lineTo(25, 76);
+    context.lineTo(17, 84);
+    context.lineTo(17, 80);
+    context.lineTo(8, 80);
+    context.closePath();
+    context.fill();
+  }
+  const delta = execute(canvas);
+  expect(delta(7, 67, 19, 19)).toBe(0);
+  expect(delta(34, 69, 400, 17)).toBeGreaterThan(100);
+});

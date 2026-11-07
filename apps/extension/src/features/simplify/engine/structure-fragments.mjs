@@ -415,12 +415,33 @@ function textFlowContext(image, box, input, measure) {
 }
 
 export function fitsTextFlow(image, fragment, parent, input, measure) {
-  if (fragment.w < fragment.h * 1.1) return false;
   const context = textFlowContext(image, parent, input, measure);
   if (!context) return false;
   const parts = inkParts(image, fragment),
     xh = context.m.xHeight;
+  // Antialiased letter pairs can share a component. The paragraph font and
+  // independently measured glyphs establish text, not the component count.
+  if (parts.length === 1 || fragment.w < fragment.h * 1.1) {
+    const m = measure(image, fragment, 1),
+      font = context.m;
+    return (
+      confirmedText(m) &&
+      Math.abs(centerY(fragment) - centerY(context.box)) >=
+        Math.min(fragment.h, context.box.h) * 0.6 &&
+      Math.abs(centerY(fragment) - centerY(context.box)) <=
+        Math.max(fragment.h, context.box.h) * 3 &&
+      m.glyphs >= 2 &&
+      m.foregroundCoverage >= 0.9 &&
+      Math.min(m.upperHeight, font.upperHeight) >=
+        Math.max(m.upperHeight, font.upperHeight) * 0.75 &&
+      Math.min(m.stroke, font.stroke) >= Math.max(m.stroke, font.stroke) * 0.65 &&
+      fragment.h <= Math.max(m.upperHeight, font.upperHeight) * 1.5 &&
+      fragment.w <= m.glyphs * xh * 1.5 &&
+      parts.every((p) => p.n / (p.w * p.h) < 0.85)
+    );
+  }
   return (
+    fragment.w >= fragment.h * 1.1 &&
     parts.length >= 2 &&
     parts.some((p) => p.h >= xh * 0.6) &&
     parts.every((p) => p.w <= xh * 1.5 && p.h <= xh * 2 && (p.h <= 3 || p.n / (p.w * p.h) < 0.85))
