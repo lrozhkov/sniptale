@@ -55,6 +55,49 @@ function group(layers: readonly GpuPreviewLayer[]): GpuPreviewGroup {
   };
 }
 
+it('uploads one borrowed unkeyed raster once across layers groups and alpha masks', async () => {
+  const g = graphics();
+  const renderer = await owner({ reserve: g.reserve });
+  const source = raster();
+  const masked = {
+    ...layer(),
+    alphaMask: { source, rect: layer(source).rect },
+    operationClip: { source },
+  };
+  await renderer.render(request([layer(source), layer(group([layer(source)])), masked]));
+  expect(
+    g.queue.copyExternalImageToTexture.mock.calls.filter(([input]) => input.source === source)
+  ).toHaveLength(1);
+  expect(g.pass.draw).toHaveBeenCalledTimes(4);
+  renderer.dispose();
+  expect(renderer.allocatedBytes).toBe(0);
+});
+
+it('uploads a borrowed unkeyed raster again on the next frame', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const source = raster();
+  const input = request([layer(source), layer(source)]);
+  await renderer.render(input);
+  await renderer.render(input);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(2);
+});
+
+it('keeps explicit raster revisions separate from per-frame unkeyed sharing', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const source = raster();
+  const input = request([
+    layer(source),
+    layer(source),
+    { ...layer(source), cache: { key: 'retained-raster', revision: 1 } },
+  ]);
+  await renderer.render(input);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(2);
+  await renderer.render(input);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(3);
+});
+
 function nativeFrames() {
   const frames: NativeFrame[] = [];
   const layout = [

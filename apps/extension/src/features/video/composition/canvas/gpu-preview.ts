@@ -778,6 +778,14 @@ export async function createGpuPreviewRenderer(
         let uniformIndex = 0;
         const renderedGroups = new Map<GpuPreviewGroup, GPUTexture>();
         const preparedFrames = new Map<VideoFrame, GPUTexture>();
+        const frameRasters = new Map<GpuPreviewLayer['source'], GPUTexture>();
+        const rasterFor = (layer: Pick<GpuPreviewLayer, 'source' | 'cache'>, path: string) => {
+          const previous = !layer.cache && frameRasters.get(layer.source);
+          if (previous) return previous;
+          const texture = textureFor(layer, path);
+          if (!layer.cache) frameRasters.set(layer.source, texture);
+          return texture;
+        };
         const targetFor = (path: string, output: Size) => {
           let target = targets.get(path);
           if (
@@ -856,7 +864,7 @@ export async function createGpuPreviewRenderer(
                   source
                 );
               }
-            } else source = textureFor(layer, path);
+            } else source = rasterFor(layer, path);
             if (layer.cssFilter) {
               if (!cssFilter) throw new Error('GPU preview CSS filter is unavailable.');
               source = cssFilter.prepare(encoder, source, path, layer.cssFilter);
@@ -866,12 +874,12 @@ export async function createGpuPreviewRenderer(
           });
           const masks = layers.map((layer, index) =>
             layer.alphaMask
-              ? textureFor(layer.alphaMask, `${prefix}/${index}/alpha-mask`).createView()
+              ? rasterFor(layer.alphaMask, `${prefix}/${index}/alpha-mask`).createView()
               : null
           );
           const operationClips = layers.map((layer, index) =>
             layer.operationClip
-              ? textureFor(layer.operationClip, `${prefix}/${index}/operation-clip`).createView()
+              ? rasterFor(layer.operationClip, `${prefix}/${index}/operation-clip`).createView()
               : null
           );
           const pass = encoder.beginRenderPass({
