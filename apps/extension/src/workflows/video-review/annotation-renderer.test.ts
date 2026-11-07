@@ -105,7 +105,9 @@ async function fixture(names = ['title']) {
   };
   const bitmaps: { width: number; height: number; close: ReturnType<typeof vi.fn<() => void>> }[] =
     [];
-  const success = (request: EffectRuntimeRenderCommand): EffectRuntimeFrameResult => {
+  const success = (
+    request: EffectRuntimeRenderCommand
+  ): Extract<EffectRuntimeFrameResult, { kind: 'frame' }> => {
     const bitmap = {
       width: request.renderWidth,
       height: request.renderHeight,
@@ -128,7 +130,9 @@ async function fixture(names = ['title']) {
     };
   };
   const executor = {
-    renderFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => success(request)),
+    renderFrame: vi.fn<EffectRuntimeSandboxExecutor['renderFrame']>(async (request) =>
+      success(request)
+    ),
     dispose: vi.fn(),
   } satisfies EffectRuntimeSandboxExecutor;
   const deps = {
@@ -724,3 +728,171 @@ it.each([undefined, 2] as const)(
       for (const bitmap of packet) expect(bitmap.close).toHaveBeenCalledOnce();
   }
 );
+
+it('warms one isolated future plan and closes packet sources before asynchronous compilation settles', async () => {
+  const f = await fixture();
+  let finish!: () => void;
+  const compile = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const warm = {
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn(
+      async (request: EffectRuntimeRenderCommand): Promise<EffectRuntimeGpuPlanResult> => {
+        const frame = f.success(request);
+        return {
+          ...frame,
+          kind: 'gpu-plan',
+          logicalWidth: request.width,
+          logicalHeight: request.height,
+          inputResources: {},
+          rootPass: 0,
+          resources: [
+            {
+              id: 0,
+              kind: 'primitive',
+              bitmap: frame.bitmap,
+              width: frame.width,
+              height: frame.height,
+            },
+          ],
+          passes: [
+            {
+              id: 0,
+              width: frame.width,
+              height: frame.height,
+              logicalWidth: request.width,
+              logicalHeight: request.height,
+              operations: [],
+            },
+          ],
+        };
+      }
+    ),
+  };
+  const createWarmExecutor = vi.fn(() => warm);
+  const renderer = await createReviewAnnotationRenderer(f.scene, { ...f.deps, createWarmExecutor });
+  const held = f.managed(),
+    context = {};
+  const prepare = vi.fn(() => {
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    return compile;
+  });
+  const densityAt = vi.fn(() => density);
+  const args = { time: 1.5, fps: 30, context, signal: f.deps.signal, densityAt, prepare };
+  renderer.warmUpcomingGpu(args);
+  await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce());
+  expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+  expect(f.managed()).toBe(held);
+  renderer.warmUpcomingGpu({ ...args, time: 1.6 });
+  expect(createWarmExecutor).toHaveBeenCalledOnce();
+  expect(densityAt).toHaveBeenCalledOnce();
+  expect(f.executor.renderFrame).not.toHaveBeenCalled();
+  expect(warm.renderFrame).not.toHaveBeenCalled();
+  finish();
+  renderer.dispose();
+});
+
+it('does not speculate through a custom foreground executor without an explicit warm dependency', async () => {
+  const f = await fixture(),
+    renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
+  renderer.warmUpcomingGpu({
+    time: 1.5,
+    fps: 30,
+    context: {},
+    signal: f.deps.signal,
+    densityAt: () => density,
+    prepare: vi.fn(),
+  });
+  expect(f.deps.createExecutor).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('cancels isolated execution before foreground admission and closes a late warm packet', async () => {
+  const f = await fixture(['title', 'frame']);
+  f.scene.lane.instances[1]!.start = 4;
+  let deliver!: (result: EffectRuntimeGpuPlanResult) => void;
+  let command!: EffectRuntimeRenderCommand;
+  const warm = {
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn((request: EffectRuntimeRenderCommand) => {
+      command = request;
+      return new Promise<EffectRuntimeGpuPlanResult>((resolve) => {
+        deliver = resolve;
+      });
+    }),
+  };
+  const renderer = await createReviewAnnotationRenderer(f.scene, {
+    ...f.deps,
+    createWarmExecutor: () => warm,
+  });
+  const held = f.managed(),
+    prepare = vi.fn();
+  renderer.warmUpcomingGpu({
+    time: 3.5,
+    fps: 30,
+    context: {},
+    signal: f.deps.signal,
+    densityAt: () => density,
+    prepare,
+  });
+  await vi.waitFor(() => expect(warm.prepareGpuFrame).toHaveBeenCalledOnce());
+  const earlier = await renderer.prepareGpu(3.6, density, 30, f.deps.signal);
+  expect(warm.dispose).not.toHaveBeenCalled();
+  earlier.release();
+  const foreground = await renderer.prepareGpu(4.1, density, 30, f.deps.signal);
+  expect(warm.dispose).toHaveBeenCalledOnce();
+  foreground.release();
+  expect(f.managed()).toBe(held);
+  const late = f.success(command);
+  deliver({
+    ...late,
+    kind: 'gpu-plan',
+    logicalWidth: command.width,
+    logicalHeight: command.height,
+    resources: [
+      { id: 0, kind: 'primitive', bitmap: late.bitmap, width: late.width, height: late.height },
+    ],
+    inputResources: {},
+    rootPass: 0,
+    passes: [
+      {
+        id: 0,
+        width: late.width,
+        height: late.height,
+        logicalWidth: command.width,
+        logicalHeight: command.height,
+        operations: [],
+      },
+    ],
+  });
+  await vi.waitFor(() => expect(late.bitmap.close).toHaveBeenCalledOnce());
+  expect(warm.dispose).toHaveBeenCalledOnce();
+  expect(prepare).not.toHaveBeenCalled();
+  expect(f.managed()).toBe(held);
+  renderer.dispose();
+});
+
+it('contains advisory factory failure and attempts that event only once', async () => {
+  const f = await fixture(),
+    createWarmExecutor = vi.fn(() => {
+      throw new Error('startup');
+    });
+  const renderer = await createReviewAnnotationRenderer(f.scene, { ...f.deps, createWarmExecutor });
+  const args = {
+    time: 1.5,
+    fps: 30,
+    context: {},
+    signal: f.deps.signal,
+    densityAt: () => density,
+    prepare: vi.fn(),
+  };
+  expect(() => renderer.warmUpcomingGpu(args)).not.toThrow();
+  renderer.warmUpcomingGpu({ ...args, time: 1.7 });
+  expect(createWarmExecutor).toHaveBeenCalledOnce();
+  renderer.warmUpcomingGpu({ ...args, inputs: [{}] });
+  expect(createWarmExecutor).toHaveBeenCalledTimes(2);
+  renderer.dispose();
+});

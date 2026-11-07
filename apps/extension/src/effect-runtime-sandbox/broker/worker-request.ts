@@ -37,6 +37,8 @@ interface EffectRuntimeWorkerGpu {
   render(plan: EffectRuntimeGpuPlanResult, signal: AbortSignal): Promise<ImageBitmap>;
 }
 interface WorkerOptions {
+  /** Trusted session mode forbids bitmap production and oversized-plan materialization. */
+  planOnly?: boolean;
   onReset?(): void;
   timeoutMs?: number;
   gpu?: EffectRuntimeWorkerGpu;
@@ -326,13 +328,20 @@ function startWorkerOperation(
     }
     if (response.kind === 'gpu-plan') {
       if (output === 'gpu-scene' && fitsEffectRuntimeGpuSceneTransport(response)) finish(response);
-      else void renderPlan(response);
+      else if (options.planOnly) {
+        closeEffectRuntimeWorkerResponse(response);
+        fail('resourceLimit');
+      } else void renderPlan(response);
     } else finish(response);
   };
   const start = () => {
     if (settled || !worker) return;
     send(request);
   };
+  if (options.planOnly && output !== 'gpu-scene') {
+    fail('inputRejected');
+    return { result, drained };
+  }
   try {
     worker = lease.worker ?? options.workerFactory();
     lease.worker = worker;

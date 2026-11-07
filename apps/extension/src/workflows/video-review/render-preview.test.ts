@@ -2254,3 +2254,44 @@ it.each([undefined, 2] as const)(
     expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
   }
 );
+
+it.each(['gpu', 'legacy', 'disabled'] as const)(
+  'keeps a bounded advisory packet allowance separate from foreground admission (%s)',
+  async (mode) => {
+    const observed: { preparation: number; rendering: number }[] = [];
+    for (const explicitWarm of [false, true]) {
+      const f = await annotationsFixture(),
+        { resources } = setup(),
+        replaceLimits = vi.fn();
+      if (mode === 'disabled')
+        for (const instance of f.input.annotationEffects!.lane.instances) instance.enabled = false;
+      vi.stubGlobal('navigator', { gpu: {} });
+      io.gpu.mockReturnValue({
+        allocatedBytes: 0,
+        render: vi.fn(async () => true),
+        releaseScene: vi.fn(),
+        dispose: vi.fn(),
+      });
+      const renderer = createReviewPreviewRenderer({
+        resources,
+        renderer: mode === 'legacy' ? 'legacy' : 'gpu',
+        annotationExecutor: () => f.executor,
+        ...(explicitWarm ? { annotationWarmExecutor: () => f.executor } : {}),
+        allocation: { describe: allocationInput, replaceLimits },
+      });
+      const prepared = await renderer.prepare(f.input, dimensions, new AbortController().signal);
+      const preparation = replaceLimits.mock.calls.at(-1)![0].maximumManagedBytes;
+      const output = await renderer.render(prepared, frame());
+      observed.push({
+        preparation,
+        rendering: replaceLimits.mock.calls.at(-1)![0].maximumManagedBytes,
+      });
+      output.release();
+      prepared.release();
+      renderer.dispose();
+    }
+    const extra = mode === 'gpu' ? 128 * 1024 * 1024 + 4 : 0;
+    expect(observed[1]!.preparation - observed[0]!.preparation).toBe(extra);
+    expect(observed[1]!.rendering - observed[0]!.rendering).toBe(extra);
+  }
+);

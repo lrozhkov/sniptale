@@ -2235,3 +2235,154 @@ it.each(['native', 'blur', 'depth', 'css'] as const)(
     expect(native.frames[0]!.close).not.toHaveBeenCalled();
   }
 );
+
+function prepareOnly(renderer: GpuPreviewRenderer, input = request()) {
+  if (!renderer.preparePipelines) throw new Error('Expected nondrawing pipeline preparation.');
+  return renderer.preparePipelines(input);
+}
+
+it('prepares used pipelines without uploads, rendering, output, or source borrowing after return', async () => {
+  const g = graphics();
+  const renderer = await owner({ reserve: g.reserve });
+  const source = raster();
+  const input = request([{ ...layer(source), operationClip: { source } }]);
+  const pending = prepareOnly(renderer, input);
+  Object.defineProperty(source, 'width', {
+    get: () => {
+      throw new Error('source released');
+    },
+  });
+  await pending;
+  expect(mainPipelineCalls(g)).toHaveLength(1);
+  expect(g.device.createTexture).not.toHaveBeenCalled();
+  expect(g.device.createBuffer).not.toHaveBeenCalled();
+  expect(g.device.createCommandEncoder).not.toHaveBeenCalled();
+  expect(g.queue.copyExternalImageToTexture).not.toHaveBeenCalled();
+  expect(g.queue.submit).not.toHaveBeenCalled();
+  expect(g.queue.onSubmittedWorkDone).not.toHaveBeenCalled();
+  expect(g.context.configure).not.toHaveBeenCalled();
+  expect(g.transfer).not.toHaveBeenCalled();
+  expect(g.reserve).not.toHaveBeenCalled();
+  await renderer.render(request([{ ...layer(), operationClip: { source: raster() } }]));
+  expect(mainPipelineCalls(g)).toHaveLength(1);
+});
+
+it('allows unrelated foreground rendering while advisory pipeline compilation is pending', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const compile = deferred<void>();
+  const original = g.device.createRenderPipelineAsync.getMockImplementation()!;
+  g.device.createRenderPipelineAsync.mockImplementation(async (descriptor) => {
+    const module = g.device.createShaderModule.mock.calls.find(
+      (_, i) => g.device.createShaderModule.mock.results[i]!.value === descriptor.vertex.module
+    )?.[0];
+    if (module?.code === gpuPreviewShader(false, false, false, { clip: false, tint: true }))
+      await compile.promise;
+    return original(descriptor);
+  });
+  const pending = prepareOnly(renderer, request([{ ...layer(), tint: [1, 1, 1, 0.5] }]));
+  await vi.waitFor(() => expect(g.device.popErrorScope).toHaveBeenCalledOnce());
+  await renderer.render(request());
+  expect(g.queue.submit).toHaveBeenCalledOnce();
+  compile.resolve();
+  await pending;
+  await renderer.render(request([{ ...layer(), tint: [1, 1, 1, 0.5] }]));
+  expect(mainPipelineCalls(g)).toHaveLength(2);
+});
+
+it('retains the device through both advisory compilation and validation settlement after disposal', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const compile = deferred<void>(),
+    validation = deferred<{ message: string } | null>();
+  const original = g.device.createRenderPipelineAsync.getMockImplementation()!;
+  g.device.createRenderPipelineAsync.mockImplementation(async (descriptor) => {
+    await compile.promise;
+    return original(descriptor);
+  });
+  g.device.popErrorScope.mockReturnValue(validation.promise);
+  const pending = prepareOnly(renderer);
+  const result = expect(pending).rejects.toThrow('GPU preview is disposed.');
+  await vi.waitFor(() => expect(g.device.popErrorScope).toHaveBeenCalledOnce());
+  renderer.dispose();
+  expect(g.device.destroy).not.toHaveBeenCalled();
+  compile.resolve();
+  await Promise.resolve();
+  expect(g.device.destroy).not.toHaveBeenCalled();
+  validation.resolve(null);
+  await result;
+  expect(g.device.destroy).toHaveBeenCalledOnce();
+});
+
+it('keeps advisory validation failure isolated from unrelated foreground variants', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  g.device.popErrorScope.mockResolvedValueOnce({ message: 'invalid advisory shader' });
+  await expect(prepareOnly(renderer)).rejects.toThrow('invalid advisory shader');
+  await renderer.render(request([{ ...layer(), tint: [1, 1, 1, 0.5] }]));
+  expect(g.queue.submit).toHaveBeenCalledOnce();
+});
+
+it('rejects invalid and aborted advisory graphs before pipeline work', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const abort = new AbortController();
+  abort.abort();
+  expect(() => prepareOnly(renderer, request([], abort.signal))).toThrow();
+  expect(() => prepareOnly(renderer, { ...request(), output: { width: 0, height: 36 } })).toThrow();
+  expect(mainPipelineCalls(g)).toHaveLength(0);
+  expect(g.device.pushErrorScope).not.toHaveBeenCalled();
+});
+
+it('snapshots queued advisory sources and drops an aborted launch without GPU work', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const compile = deferred<void>();
+  const original = g.device.createRenderPipelineAsync.getMockImplementation()!;
+  g.device.createRenderPipelineAsync.mockImplementationOnce(async (descriptor) => {
+    await compile.promise;
+    return original(descriptor);
+  });
+  const foreground = renderer.render(request());
+  await vi.waitFor(() => expect(mainPipelineCalls(g)).toHaveLength(1));
+  const source = raster();
+  const abort = new AbortController();
+  const pending = prepareOnly(
+    renderer,
+    request([{ ...layer(source), tint: [1, 1, 1, 0.5] }], abort.signal)
+  );
+  const result = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  Object.defineProperty(source, 'width', {
+    get: () => {
+      throw new Error('released while queued');
+    },
+  });
+  abort.abort();
+  compile.resolve();
+  await foreground;
+  await result;
+  expect(mainPipelineCalls(g)).toHaveLength(1);
+  expect(g.queue.submit).toHaveBeenCalledOnce();
+});
+
+it('keeps advisory compilation owned when starting validation settlement throws', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const compile = deferred<void>();
+  const original = g.device.createRenderPipelineAsync.getMockImplementation()!;
+  g.device.createRenderPipelineAsync.mockImplementation(async (descriptor) => {
+    await compile.promise;
+    return original(descriptor);
+  });
+  const failure = new Error('validation settlement unavailable');
+  g.device.popErrorScope.mockImplementationOnce(() => {
+    throw failure;
+  });
+  const pending = prepareOnly(renderer);
+  const result = expect(pending).rejects.toBe(failure);
+  renderer.dispose();
+  expect(g.device.destroy).not.toHaveBeenCalled();
+  compile.resolve();
+  await result;
+  expect(g.device.destroy).toHaveBeenCalledOnce();
+});

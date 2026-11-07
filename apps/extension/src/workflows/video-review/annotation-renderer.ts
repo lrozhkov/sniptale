@@ -1,3 +1,4 @@
+import type { GpuPreviewLayer } from '../../features/video/composition/canvas/gpu-preview';
 import { prepareEffectRuntimeGpuFramePlans } from '../../features/video/composition/effect-runtime/runtime/gpu-driver';
 import { createEffectRuntimeGpuFrameLedger } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import {
@@ -14,6 +15,7 @@ import {
 import type {
   EffectRuntimeFramePlan,
   EffectRuntimeRenderedFrameMap,
+  EffectRuntimeGpuPreparedFrame,
 } from '../../features/video/composition/effect-runtime/runtime/types';
 import {
   resolveReviewAnnotationEffectBox,
@@ -22,6 +24,7 @@ import {
 import {
   projectReviewAnnotationEffect,
   sampleReviewAnnotationEffect,
+  resolveUpcomingReviewAnnotationEffectSlice,
 } from '../../features/video/review/annotation-effects/timing';
 import {
   reviewAnnotationEffectMatchesDocument,
@@ -142,6 +145,7 @@ export async function createReviewAnnotationRenderer(
     readAsset(reference: string, signal: AbortSignal): Promise<Blob | null>;
     signal: AbortSignal;
     createExecutor?: () => EffectRuntimeSandboxExecutor;
+    createWarmExecutor?: () => EffectRuntimeSandboxExecutor | undefined;
   }
 ) {
   const ids = scene.lane.enabled
@@ -169,9 +173,44 @@ export async function createReviewAnnotationRenderer(
   let disposed = false;
   let active = false;
   const releases = new Set<() => void>();
+  let warm:
+    | {
+        controller: AbortController;
+        executor: EffectRuntimeSandboxExecutor;
+        closed: boolean;
+        start: number;
+        frames: ReadonlyMap<string, EffectRuntimeGpuPreparedFrame> | undefined;
+      }
+    | undefined;
+  let attempted:
+    | {
+        key: string;
+        context: object;
+        signal: AbortSignal;
+        inputs: readonly object[];
+        instances: readonly ReviewAnnotationEffect[];
+        fps: number;
+        start: number;
+      }
+    | undefined;
+  const cancelWarm = (resetAttempt = false) => {
+    if (resetAttempt) attempted = undefined;
+    const flight = warm;
+    warm = undefined;
+    if (!flight) return;
+    flight.controller.abort();
+    if (flight.frames) for (const frame of flight.frames.values()) frame.dispose();
+    flight.frames = undefined;
+    if (!flight.closed) {
+      flight.closed = true;
+      flight.executor.dispose();
+    }
+  };
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    cancelWarm();
+    attempted = undefined;
     executor?.dispose();
     executor = undefined;
     for (const release of releases) release();
@@ -228,8 +267,156 @@ export async function createReviewAnnotationRenderer(
           : [];
       });
   };
+  type WarmGpuPreparation = {
+    time: number;
+    fps: number;
+    context: object;
+    inputs?: readonly object[];
+    signal: AbortSignal;
+    instances?: readonly ReviewAnnotationEffect[];
+    densityAt(time: number): Record<Plane, Size>;
+    prepare(
+      entry: ReturnType<typeof describe>[number] & { source: GpuPreviewLayer['source'] },
+      time: number
+    ): Promise<void> | void;
+  };
+  const matchesWarmInput = (
+    args: WarmGpuPreparation,
+    instances: readonly ReviewAnnotationEffect[]
+  ) =>
+    Boolean(
+      attempted &&
+      attempted.context === args.context &&
+      attempted.signal === args.signal &&
+      attempted.instances === instances &&
+      attempted.fps === args.fps &&
+      attempted.inputs.length === (args.inputs?.length ?? 0) &&
+      attempted.inputs.every((value, index) => value === args.inputs?.[index])
+    );
+  const runWarmPreparation = async (
+    args: WarmGpuPreparation,
+    flight: NonNullable<typeof warm>,
+    entry: ReturnType<typeof describe>[number],
+    time: number
+  ) => {
+    const cancel = () => {
+      if (warm === flight) cancelWarm();
+    };
+    args.signal.addEventListener('abort', cancel, { once: true });
+    const ledger = createEffectRuntimeGpuFrameLedger((bytes) =>
+      deps.resources.bytes('annotation-warm-plan-resources', bytes)
+    );
+    try {
+      const frames = await prepareEffectRuntimeGpuFramePlans({
+        executor: flight.executor,
+        plans: [entry.plan],
+        ledger,
+        signal: flight.controller.signal,
+      });
+      flight.frames = frames;
+      flight.controller.signal.throwIfAborted();
+      if (warm !== flight) return;
+      const frame = frames.get(entry.instance.id);
+      if (!frame || !('kind' in frame.source) || frame.source.kind !== 'group') return;
+      const compilation = args.prepare({ ...entry, source: frame.source }, time);
+      // preparePipelines captures descriptors synchronously; no bitmap stays borrowed while it compiles.
+      for (const prepared of frames.values()) prepared.dispose();
+      flight.frames = undefined;
+      await compilation;
+    } catch {
+      // Advisory execution does not change the foreground session or its failure policy.
+    } finally {
+      if (flight.frames) for (const prepared of flight.frames.values()) prepared.dispose();
+      flight.frames = undefined;
+      if (!flight.closed) {
+        flight.closed = true;
+        flight.executor.dispose();
+      }
+      args.signal.removeEventListener('abort', cancel);
+      if (warm === flight) warm = undefined;
+    }
+  };
   let gpuLedger: ReturnType<typeof createEffectRuntimeGpuFrameLedger> | undefined;
   const owner = {
+    cancelWarm,
+    warmUpcomingGpu(args: WarmGpuPreparation): void {
+      try {
+        if (
+          disposed ||
+          !captured ||
+          !captured.lane.enabled ||
+          !deps.createWarmExecutor ||
+          args.signal.aborted
+        )
+          return;
+        const instances = args.instances ?? captured.lane.instances;
+        const unchanged = matchesWarmInput(args, instances);
+        if (
+          unchanged &&
+          attempted &&
+          args.time < attempted.start &&
+          attempted.start <= args.time + 1
+        )
+          return;
+        const next = resolveUpcomingReviewAnnotationEffectSlice(
+          instances,
+          captured.segments,
+          args.time
+        );
+        if (!next || !(args.fps > 0) || !Number.isFinite(args.fps)) {
+          cancelWarm();
+          return;
+        }
+        // The first positive presentation tick avoids an exactly-zero authored reveal without scanning frames.
+        const first = Math.ceil(next.start * args.fps) / args.fps;
+        const time = first + 1 / args.fps < next.end ? first + 1 / args.fps : first;
+        if (time >= next.end) return;
+        const entry = describe(time, args.densityAt(time), args.fps, [next.instance])[0];
+        if (!entry) return;
+        const plan = entry.plan;
+        const key = JSON.stringify([
+          plan.documentSha256,
+          plan.snapshotId,
+          plan.effectInstanceId,
+          plan.controls,
+          plan.dimensions,
+          plan.renderDimensions,
+          plan.bitmapBounds,
+          plan.time,
+          plan.progress,
+          plan.fps,
+          entry.instance.attachment,
+        ]);
+        if (unchanged && attempted?.key === key) return;
+        cancelWarm();
+        attempted = {
+          key,
+          context: args.context,
+          signal: args.signal,
+          inputs: args.inputs ?? [],
+          instances,
+          fps: args.fps,
+          start: next.start,
+        };
+        const isolated = deps.createWarmExecutor();
+        if (!isolated?.prepareGpuFrame) {
+          if (!isolated) attempted = undefined;
+          isolated?.dispose();
+          return;
+        }
+        const flight: NonNullable<typeof warm> = {
+          controller: new AbortController(),
+          executor: isolated,
+          closed: false,
+          start: next.start,
+          frames: undefined,
+        };
+        warm = flight;
+        void runWarmPreparation(args, flight, entry, time);
+      } catch {
+        cancelWarm();
+      }
+    },
     /** Unknown executors remain serial until their explicit capability is available. */
     get maximumInFlight(): 1 | 2 {
       return executor?.prepareGpuFrame && executor.maximumGpuFramesInFlight === 2 ? 2 : 1;
@@ -246,6 +433,7 @@ export async function createReviewAnnotationRenderer(
     ) {
       signal.throwIfAborted();
       const planned = describe(time, density, fps, instances);
+      if (warm && time >= warm.start) cancelWarm();
       executor ??= (deps.createExecutor ?? createEffectRuntimeSandboxExecutor)();
       if (!executor.prepareGpuFrame) {
         const legacy = await owner.render(time, density, fps, signal, instances);

@@ -165,6 +165,7 @@ it('selects the Gallery GPU annotation sandbox and preserves retry teardown', ()
   expect(args.annotationExecutor).toBeTypeOf('function');
   args.annotationExecutor!();
   expect(io.executor).toHaveBeenCalledWith({ compositionBackend: 'gpu-scene' });
+  expect(args.annotationWarmExecutor).toBeTypeOf('function');
   owner.dispose();
   owner.dispose();
   expect(io.dispose).toHaveBeenCalledOnce();
@@ -215,7 +216,33 @@ it('selects the Standard Gallery annotation path without GPU composition', () =>
   );
   const args = io.renderer.mock.calls[0]![0];
   expect(args.renderer).toBe('legacy');
+  expect(args.annotationWarmExecutor).toBeUndefined();
   args.annotationExecutor!();
   expect(io.executor).toHaveBeenCalledExactlyOnceWith({});
+  owner.dispose();
+});
+
+it('uses the explicit plan-only factory only while GPU playback is active', () => {
+  io.renderer.mockReturnValue({ dispose: vi.fn(), maximumInFlight: () => 2 });
+  const input = {
+    video: { current: null },
+    playing: true,
+    preferences: { renderer: 'gpu', frameRate: 'current', pausedQuality: 'same' },
+    pausedResultTime: 0,
+  };
+  const owner = createManualPresentationOwner(
+    (() => ({ input, placement: null })) as unknown as Parameters<
+      typeof createManualPresentationOwner
+    >[0],
+    vi.fn(),
+    vi.fn(),
+    vi.fn()
+  );
+  const args = io.renderer.mock.lastCall![0];
+  args.annotationWarmExecutor!();
+  expect(io.executor).not.toHaveBeenCalled();
+  owner.update({} as Parameters<typeof owner.update>[0], 1, false);
+  args.annotationWarmExecutor!();
+  expect(io.executor).toHaveBeenCalledExactlyOnceWith({ compositionBackend: 'gpu-scene-plan' });
   owner.dispose();
 });

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { createEffectRuntimeSandboxExecutor } from './effect-runtime-sandbox';
+import * as sandboxRender from './effect-runtime-sandbox-render';
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -285,30 +286,32 @@ it('rejects GPU preparation before creating an unnegotiated parent session', asy
   manager.dispose();
 });
 
-it.each([undefined, 'gpu-preview', 'gpu-scene'] as const)(
+it.each([undefined, 'gpu-preview', 'gpu-scene', 'gpu-scene-plan'] as const)(
   'advertises independent preparation only for negotiated gpu-scene (%s)',
   (compositionBackend) => {
     const executor = createEffectRuntimeSandboxExecutor(
       compositionBackend ? { compositionBackend } : {}
     );
     expect(executor.maximumGpuFramesInFlight).toBe(
-      compositionBackend === 'gpu-scene' ? 2 : undefined
+      compositionBackend === 'gpu-scene' || compositionBackend === 'gpu-scene-plan' ? 2 : undefined
     );
     expect(typeof executor.prepareGpuFrame).toBe(
-      compositionBackend === 'gpu-scene' ? 'function' : 'undefined'
+      compositionBackend === 'gpu-scene' || compositionBackend === 'gpu-scene-plan'
+        ? 'function'
+        : 'undefined'
     );
     executor.dispose();
   }
 );
 
-it.each([undefined, 'gpu-preview', 'gpu-scene'] as const)(
+it.each([undefined, 'gpu-preview', 'gpu-scene', 'gpu-scene-plan'] as const)(
   'preloads only the GPU scene transport without a frame request (%s)',
   async (compositionBackend) => {
     const executor = createEffectRuntimeSandboxExecutor(
       compositionBackend ? { compositionBackend } : {}
     );
     expect(document.querySelectorAll('iframe')).toHaveLength(
-      compositionBackend === 'gpu-scene' ? 1 : 0
+      compositionBackend === 'gpu-scene' || compositionBackend === 'gpu-scene-plan' ? 1 : 0
     );
     executor.dispose();
     await Promise.resolve();
@@ -353,4 +356,61 @@ it('authenticates a preloaded transport without posting a frame until requested'
   expect(requests).toHaveLength(1);
   executor.dispose();
   for (const port of ports) port.close();
+});
+
+it('keeps plan-only parent requests on the negotiated path and refuses bitmap requests', async () => {
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene-plan',
+  });
+  const input = createInputBitmap();
+  await expect(manager.renderFrame(createRequest(input))).resolves.toMatchObject({
+    kind: 'error',
+    code: 'inputRejected',
+  });
+  expect(input.close).toHaveBeenCalledOnce();
+  expect(document.querySelector('iframe')).toBeNull();
+  const preparation = manager.prepareGpuFrame(createRequest());
+  const iframe = document.querySelector('iframe')!;
+  expect(new URL(iframe.src).searchParams.get('composition')).toBe('gpu-scene-plan');
+  manager.dispose();
+  await expect(preparation).resolves.toMatchObject({ kind: 'error', code: 'crashed' });
+});
+
+it('rejects a checked bitmap fallback returned to the plan-only parent', async () => {
+  const request = createRequest();
+  const bitmap = createInputBitmap();
+  const rendered = vi
+    .spyOn(sandboxRender, 'renderEffectRuntimeSandboxFrame')
+    .mockResolvedValueOnce({
+      kind: 'frame',
+      bitmap,
+      width: 1280,
+      height: 720,
+      effectInstanceId: request.effectInstanceId,
+      requestId: request.requestId,
+      snapshotId: request.snapshotId,
+      sequenceId: request.sequenceId,
+      acknowledged: {
+        documentId: request.documentRef.id,
+        assetSelectionId: request.assetSelectionRef.id,
+      },
+    });
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene-plan',
+  });
+  try {
+    await expect(manager.prepareGpuFrame(request)).resolves.toMatchObject({
+      kind: 'error',
+      code: 'outputRejected',
+    });
+    expect(rendered).toHaveBeenCalledWith(expect.any(Object), request, 'prepareGpuFrame');
+    expect(bitmap.close).toHaveBeenCalledOnce();
+  } finally {
+    manager.dispose();
+    rendered.mockRestore();
+  }
 });

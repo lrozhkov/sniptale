@@ -666,12 +666,14 @@ export async function createGpuPreviewRenderer(
     let destroyed = false;
     let presentation: ReturnType<typeof createGpuPreviewPresentationOwner> | null = null;
     let encodingTail: Promise<void> | null = null;
+    let pendingPreparations = 0;
     type Slot = Awaited<ReturnType<typeof createSlot>>;
     const slots: { busy: boolean; value?: Slot }[] = [{ busy: false }];
     const cleanAll = () => {
       if (
         destroyed ||
         !disposed ||
+        pendingPreparations > 0 ||
         slots.some((slot) => slot.busy) ||
         presentation?.pending ||
         presentation?.allocatedBytes
@@ -716,6 +718,41 @@ export async function createGpuPreviewRenderer(
       signal.throwIfAborted();
       if (disposed) throw new Error('GPU preview is disposed.');
       if (failure) throw failure;
+    };
+    const compilePreparedVariants = async (
+      variants: ReadonlyMap<string, PreviewPipelineVariant>,
+      signal: AbortSignal
+    ) => {
+      pendingPreparations++;
+      const encoding = enterEncoding();
+      try {
+        if (encoding.wait) await encoding.wait;
+        check(signal);
+        device.pushErrorScope('validation');
+        let compiling: ReturnType<typeof preparePipelines>;
+        let validation: Promise<GPUError | null>;
+        try {
+          compiling = preparePipelines(variants);
+        } finally {
+          try {
+            validation = device.popErrorScope();
+          } catch (error) {
+            validation = Promise.reject(error);
+          } finally {
+            // Only the synchronous launch uses the device error-scope stack.
+            encoding.release();
+          }
+        }
+        const [programs, checked] = await Promise.allSettled([compiling, validation]);
+        if (programs.status === 'rejected') throw programs.reason;
+        if (checked.status === 'rejected') throw checked.reason;
+        if (checked.value) throw new Error(checked.value.message);
+        check(signal);
+      } finally {
+        encoding.release();
+        pendingPreparations--;
+        cleanAll();
+      }
     };
     const drain = async () => {
       try {
@@ -1213,6 +1250,14 @@ export async function createGpuPreviewRenderer(
     return {
       get allocatedBytes() {
         return bytes + presentationOwner.allocatedBytes;
+      },
+      preparePipelines(request) {
+        check(request.signal);
+        let plan = validateGpuPreviewFrame(request, device.limits.maxTextureDimension2D);
+        const normalized = omitLeadingGroupCopies(request);
+        if (normalized !== request)
+          plan = validateGpuPreviewFrame(normalized, device.limits.maxTextureDimension2D);
+        return compilePreparedVariants(plan.pipelines, request.signal);
       },
       createSurface: (canvas, options) => presentationOwner.create(canvas, options),
       async render(request) {

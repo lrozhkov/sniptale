@@ -35,7 +35,7 @@ export class EffectRuntimeSandboxSessionManager {
     private readonly configuration: {
       loadTimeoutMs: number;
       requestTimeoutMs: number;
-      compositionBackend?: 'gpu-preview' | 'gpu-scene';
+      compositionBackend?: 'gpu-preview' | 'gpu-scene' | 'gpu-scene-plan';
     }
   ) {}
 
@@ -59,19 +59,31 @@ export class EffectRuntimeSandboxSessionManager {
   }
 
   async renderFrame(command: EffectRuntimeRenderCommand): Promise<EffectRuntimeFrameResult> {
+    if (this.configuration.compositionBackend === 'gpu-scene-plan') {
+      closeEffectRuntimeBitmaps(command.inputFrames);
+      return createEffectRuntimeFailure(command, 'inputRejected');
+    }
     return renderEffectRuntimeSandboxFrame(this.createRenderAuthority(), command);
   }
 
   async prepareGpuFrame(command: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult> {
-    if (this.configuration.compositionBackend !== 'gpu-scene') {
+    if (
+      this.configuration.compositionBackend !== 'gpu-scene' &&
+      this.configuration.compositionBackend !== 'gpu-scene-plan'
+    ) {
       closeEffectRuntimeBitmaps(command.inputFrames);
       return createEffectRuntimeFailure(command, 'inputRejected');
     }
-    return renderEffectRuntimeSandboxFrame(
+    const result = await renderEffectRuntimeSandboxFrame(
       this.createRenderAuthority(),
       command,
       'prepareGpuFrame'
     );
+    if (this.configuration.compositionBackend === 'gpu-scene-plan' && result.kind === 'frame') {
+      result.bitmap.close();
+      return createEffectRuntimeFailure(command, 'outputRejected');
+    }
+    return result;
   }
 
   private createRenderAuthority(): EffectRuntimeSandboxRenderAuthority {
@@ -132,7 +144,7 @@ export class EffectRuntimeSandboxSessionManager {
 function createSandboxIframe(
   ownerDocument: Document,
   connectionNonce: string,
-  compositionBackend?: 'gpu-preview' | 'gpu-scene'
+  compositionBackend?: 'gpu-preview' | 'gpu-scene' | 'gpu-scene-plan'
 ): HTMLIFrameElement {
   const iframe = ownerDocument.createElement('iframe');
   iframe.hidden = true;

@@ -1,3 +1,8 @@
+import {
+  reviewGpuAnnotationLayer,
+  reviewGpuAnnotationGroup,
+  reviewGpuAnnotationDensity,
+} from './gpu-preview-annotations';
 import { prepareEffectRuntimeGpuScene } from '../../features/video/composition/effect-runtime/render/gpu-plan';
 import { createRetainedRasterMaterialOwner } from '../../features/video/composition/canvas/retained-raster-material';
 import type { PreviewGpuCanvasFactory, PreviewGpuCanvasLease } from './preview-render-resources';
@@ -160,6 +165,74 @@ export function createReviewGpuPreview(args: {
     const provider = renderer;
     renderer = null;
     provider?.dispose();
+  };
+  const warmUpcoming = (input: ReviewGpuSceneInput, provider: GpuPreviewRenderer) => {
+    if (!provider.preparePipelines || !input.annotations || input.signal.aborted || disposed)
+      return;
+    try {
+      input.annotations.warmUpcomingGpu({
+        time: input.geometry.resultTime,
+        fps: input.fps ?? 30,
+        ...(input.scene.annotationEffects
+          ? { instances: input.scene.annotationEffects.lane.instances }
+          : {}),
+        context: provider,
+        inputs: [input.scene, input.dimensions],
+        signal: sceneLifetime.signal,
+        densityAt(time) {
+          const future = reviewPresentedGeometry(input.scene, input.dimensions, time);
+          return reviewGpuAnnotationDensity(
+            input.scene.source,
+            input.dimensions,
+            future.layout.videoTransform
+          );
+        },
+        prepare(entry, time) {
+          const future = reviewPresentedGeometry(input.scene, input.dimensions, time);
+          const base = computeQuickEditSceneLayout({
+            ...input.scene,
+            output: input.dimensions.canonical,
+            camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+          });
+          const marker = new OffscreenCanvas(1, 1);
+          let reservation: { release(): void } | undefined;
+          try {
+            reservation = args.resources.bytes('annotation-warm-coverage', 4);
+            const full = { x: 0, y: 0, ...input.dimensions.canonical };
+            const annotation =
+              entry.instance.attachment === 'content'
+                ? reviewGpuAnnotationGroup(
+                    [entry],
+                    base.videoRect,
+                    input.dimensions.canonical,
+                    future.inverse,
+                    { source: marker }
+                  )
+                : reviewGpuAnnotationLayer(entry, full, entry.source);
+            // Real annotations follow scene content. Keep their non-leading group topology without future media.
+            return provider.preparePipelines!({
+              output: input.dimensions.backing,
+              logical: input.dimensions.canonical,
+              layers: [
+                {
+                  source: marker,
+                  rect: { x: 0, y: 0, width: 1, height: 1 },
+                  inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+                },
+                annotation,
+              ],
+              signal: sceneLifetime.signal,
+            });
+          } finally {
+            marker.width = 0;
+            marker.height = 0;
+            reservation?.release();
+          }
+        },
+      });
+    } catch {
+      // Preparation is advisory; foreground publication already succeeded.
+    }
   };
   function execute(input: ReviewGpuSceneInput, output: BitmapOutput): Promise<boolean>;
   function execute(
@@ -545,6 +618,7 @@ export function createReviewGpuPreview(args: {
         acquiredOutput = lease;
         await lease.surface.present(request);
         signal.throwIfAborted();
+        warmUpcoming(input, provider);
         publicationHolds++;
         acquiredOutput = null;
         let released = false;
@@ -569,6 +643,7 @@ export function createReviewGpuPreview(args: {
       try {
         signal.throwIfAborted();
         output.context.drawImage(bitmap, 0, 0);
+        warmUpcoming(input, renderer);
       } finally {
         bitmap.close();
       }

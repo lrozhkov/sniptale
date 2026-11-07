@@ -50,3 +50,35 @@ it('uses the selected content or viewport plane without refitting a non-square r
   expect(content.source).toBe(entry.bitmap);
   expect(viewport.source).toBe(entry.bitmap);
 });
+
+it('shares the content wrapper and applies coverage to each annotation draw', async () => {
+  const { reviewGpuAnnotationGroup } = await import('./gpu-preview-annotations');
+  const source = {
+    kind: 'group' as const,
+    output: { width: 30, height: 20 },
+    logical: { width: 30, height: 20 },
+    layers: [],
+  };
+  const entry = {
+    instance: { transform: { x: 0.1, y: 0.2, width: 0.5, height: 0.4, rotation: 0.2 } },
+    source,
+    bitmapBounds: { x: 0, y: 0, width: 1, height: 1 },
+  };
+  const coverage = { source: { width: 1, height: 1 } as ImageBitmap };
+  const inverse = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
+  const layer = reviewGpuAnnotationGroup(
+    [entry],
+    { x: 0, y: 0, width: 100, height: 80 },
+    { width: 100, height: 80 },
+    inverse,
+    coverage
+  );
+  expect(layer.inverse).toBe(inverse);
+  if (!('kind' in layer.source) || layer.source.kind !== 'group') throw new Error('Expected group');
+  expect(layer.source.layers).toEqual([
+    {
+      ...reviewGpuAnnotationLayer(entry, { x: 0, y: 0, width: 100, height: 80 }, source),
+      operationClip: coverage,
+    },
+  ]);
+});

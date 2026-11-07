@@ -50,3 +50,28 @@ export function sampleReviewAnnotationEffect(
     playbackRate: documentDuration / projection.duration,
   };
 }
+
+/** Select one future result slice without evaluating a graph or reading media. */
+export function resolveUpcomingReviewAnnotationEffectSlice<
+  T extends Pick<ReviewAnnotationEffect, 'id' | 'enabled' | 'order' | 'start' | 'end'>,
+>(
+  instances: readonly T[],
+  segments: readonly ReviewTimeSegment[],
+  resultTime: number
+): { instance: T; start: number; end: number } | null {
+  if (!Number.isFinite(resultTime)) return null;
+  const candidates = instances
+    .filter((instance) => instance.enabled)
+    .flatMap((instance) =>
+      projectReviewAnnotationEffect(instance, segments)
+        .slices.filter((slice) => slice.start > resultTime && slice.start <= resultTime + 1)
+        .map(({ start, end }) => ({ instance, start, end }))
+    );
+  candidates.sort(
+    (a, b) =>
+      a.start - b.start ||
+      a.instance.order - b.instance.order ||
+      a.instance.id.localeCompare(b.instance.id)
+  );
+  return candidates[0] ?? null;
+}

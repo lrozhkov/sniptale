@@ -32,13 +32,15 @@ export function readEffectRuntimeSandboxConnectionNonce(hash: string): string | 
 /** The owned page query selects composition without changing the nonce capability. */
 export function readEffectRuntimeCompositionBackend(
   search: string
-): 'canvas' | 'gpu-preview' | 'gpu-scene' | null {
+): 'canvas' | 'gpu-preview' | 'gpu-scene' | 'gpu-scene-plan' | null {
   const fields = [...new URLSearchParams(search)];
   if (fields.length === 0) return 'canvas';
   if (
     fields.length === 1 &&
     fields[0]?.[0] === 'composition' &&
-    (fields[0][1] === 'gpu-preview' || fields[0][1] === 'gpu-scene')
+    (fields[0][1] === 'gpu-preview' ||
+      fields[0][1] === 'gpu-scene' ||
+      fields[0][1] === 'gpu-scene-plan')
   )
     return fields[0][1];
   return null;

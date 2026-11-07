@@ -45,7 +45,11 @@ import {
 } from '../../features/video/composition/draw/pointer-feedback';
 import { drawReviewKeys } from './render-key-animation';
 import { type createReviewAnnotationRenderer } from './annotation-renderer';
-import { reviewGpuAnnotationLayer } from './gpu-preview-annotations';
+import {
+  reviewGpuAnnotationLayer,
+  reviewGpuAnnotationGroup,
+  reviewGpuAnnotationDensity,
+} from './gpu-preview-annotations';
 import { reviewSplitScreenAt, reviewSplitCameraStyle } from './camera-split-screen';
 import type { createWatermarkRenderer } from '../../features/video/composition/canvas/watermark';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
@@ -173,21 +177,11 @@ export async function reviewGpuContentLayers(args: {
 }) {
   const { scene, dimensions, geometry, base, primitives } = args;
   const scale = dimensions.canonical.width / (scene.canvas?.width ?? scene.source.width);
-  const density = {
-    content: {
-      width:
-        ((geometry.layout.videoTransform.width / scene.source.width) * dimensions.backing.width) /
-        dimensions.canonical.width,
-      height:
-        ((geometry.layout.videoTransform.height / scene.source.height) *
-          dimensions.backing.height) /
-        dimensions.canonical.height,
-    },
-    viewport: {
-      width: dimensions.backing.width / dimensions.canonical.width,
-      height: dimensions.backing.height / dimensions.canonical.height,
-    },
-  };
+  const density = reviewGpuAnnotationDensity(
+    scene.source,
+    dimensions,
+    geometry.layout.videoTransform
+  );
   const plans =
     args.annotations?.describe(
       geometry.resultTime,
@@ -376,14 +370,15 @@ export async function reviewGpuContentLayers(args: {
           : {}),
       };
       // Scene coverage applies to each draw, so overlapping edge pixels retain Canvas clip semantics.
-      const annotationGroup = group(
-        content.map((entry) => ({
-          ...reviewGpuAnnotationLayer(entry, base.videoRect, entry.source),
-          operationClip,
-        })),
-        { canonical: dimensions.canonical, backing: dimensions.canonical }
+      contentLayers.push(
+        reviewGpuAnnotationGroup(
+          content.map((entry) => ({ ...entry, source: entry.source })),
+          base.videoRect,
+          dimensions.canonical,
+          geometry.inverse,
+          operationClip
+        )
       );
-      contentLayers.push({ source: annotationGroup, rect: full, inverse: geometry.inverse });
     }
     if (contentComments.length) {
       const raster = primitives.raster('preview-gpu-content', dimensions.canonical, (context) => {

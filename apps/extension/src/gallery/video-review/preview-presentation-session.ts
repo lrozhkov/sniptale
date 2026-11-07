@@ -156,6 +156,14 @@ class ManualPresentationSession {
         createEffectRuntimeSandboxExecutor(
           this.rendererPreference === 'gpu' ? { compositionBackend: 'gpu-scene' } : {}
         ),
+      ...(this.rendererPreference === 'gpu'
+        ? {
+            annotationWarmExecutor: () =>
+              this.playing
+                ? createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene-plan' })
+                : undefined,
+          }
+        : {}),
       ...(readAsset ? { readAsset } : {}),
       allocation: { describe: graph, replaceLimits: (limits) => resources.replaceLimits(limits) },
       onContextLost: () => {
@@ -388,6 +396,7 @@ class ManualPresentationSession {
   };
 
   private seeking = () => {
+    this.renderer.cancelWarmAnnotations?.();
     this.publications.length = 0;
     this.waiting = true;
     this.reportClock(false);
@@ -439,6 +448,13 @@ class ManualPresentationSession {
   }
 
   update(description: Description, generation: number, interacting: boolean, active = true) {
+    if (
+      this.current !== description ||
+      this.sequence !== generation ||
+      !active ||
+      !this.latest().input.playing
+    )
+      this.renderer.cancelWarmAnnotations?.();
     this.current = description;
     this.sequence = generation;
     const input = this.latest().input;

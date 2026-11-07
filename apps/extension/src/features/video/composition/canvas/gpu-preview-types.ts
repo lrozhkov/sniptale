@@ -58,6 +58,12 @@ export interface GpuPreviewLayer {
 export interface GpuPreviewRenderer {
   readonly allocatedBytes: number;
   /**
+   * Validates and snapshots pipeline requirements synchronously. Sources are borrowed only
+   * until this call returns, including when compilation is pending. No pixels are uploaded
+   * or drawn, and no frame slot or output surface is acquired.
+   */
+  preparePipelines?(args: Pick<Request, 'output' | 'logical' | 'layers' | 'signal'>): Promise<void>;
+  /**
    * The caller leases a nonfront canvas and publishes matching geometry after completion.
    * Offscreen mode moves completed GPU images into a fixed-size HTML bitmaprenderer.
    * Callers release each transferred image when their output lease ends. They must not resize

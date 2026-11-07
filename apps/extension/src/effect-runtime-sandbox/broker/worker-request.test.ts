@@ -809,3 +809,72 @@ it('treats preload construction failure as advisory and preserves the actual req
   await expect(pending).resolves.toMatchObject({ kind: 'frame' });
   expect(workerFactory).toHaveBeenCalledTimes(2);
 });
+
+it.each(['bounded', 'oversized', 'bitmap', 'bad-ack', 'stale'] as const)(
+  'keeps trusted plan-only preparation free of materialization for %s output',
+  async (output) => {
+    const worker = new FakeWorker();
+    const posted = deferred<EffectRuntimeWorkerMessage>();
+    worker.postMessage.mockImplementation((value: EffectRuntimeWorkerMessage) =>
+      posted.resolve(value)
+    );
+    const isAvailable = vi.fn(async () => true);
+    const render = vi.fn(async () => new FakeImageBitmap(1280, 720));
+    const session = createEffectRuntimeWorkerSession({
+      planOnly: true,
+      workerFactory: () => worker,
+      gpu: { isAvailable, render },
+    });
+    const pending = session.execute(createRequest(), 'gpu-scene');
+    const sent = await posted.promise;
+    expect(sent.renderTarget).toBe('gpu-plan');
+    const resources = Array.from(
+      { length: output === 'oversized' ? 513 : 1 },
+      () => new FakeImageBitmap(output === 'bitmap' ? 1280 : 1, output === 'bitmap' ? 720 : 1)
+    );
+    const plan = gpuPlan(sent, resources);
+    if (output === 'bitmap') emitMatchingFrame(worker, sent, resources[0]!);
+    else {
+      if (output === 'bad-ack') plan.acknowledged.documentId = 'f'.repeat(64);
+      if (output === 'stale') plan.requestId = 'stale';
+      emitGpuPlan(worker, plan);
+    }
+    if (output === 'bounded') {
+      await expect(pending).resolves.toEqual(plan);
+      expect(resources[0]!.close).not.toHaveBeenCalled();
+      resources[0]!.close();
+    } else {
+      const code =
+        output === 'oversized'
+          ? 'resourceLimit'
+          : output === 'bad-ack' || output === 'stale'
+            ? 'malformed'
+            : 'outputRejected';
+      await expect(pending).resolves.toMatchObject({ kind: 'error', code });
+      for (const bitmap of resources) expect(bitmap.close).toHaveBeenCalledOnce();
+    }
+    expect(isAvailable).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+    expect(worker.postMessage).toHaveBeenCalledOnce();
+  }
+);
+
+it('refuses a bitmap operation in trusted plan-only mode before touching worker or GPU', async () => {
+  const workerFactory = vi.fn(() => new FakeWorker());
+  const isAvailable = vi.fn(async () => true);
+  const render = vi.fn(async () => new FakeImageBitmap(1280, 720));
+  const bitmap = new FakeImageBitmap(1280, 720);
+  const request = createRequest();
+  request.inputFrames = { source: { bitmap, width: 1280, height: 720 } };
+  await expect(
+    executeEffectRuntimeWorker(request, {
+      workerFactory,
+      planOnly: true,
+      gpu: { isAvailable, render },
+    })
+  ).resolves.toMatchObject({ kind: 'error', code: 'inputRejected' });
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(workerFactory).not.toHaveBeenCalled();
+  expect(isAvailable).not.toHaveBeenCalled();
+  expect(render).not.toHaveBeenCalled();
+});

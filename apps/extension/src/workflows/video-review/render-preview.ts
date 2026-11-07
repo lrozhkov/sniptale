@@ -1,3 +1,4 @@
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import { planReviewExportSource } from './export-source-plan';
 import {
   createReviewGpuPreview,
@@ -159,6 +160,7 @@ type Assets = {
   lifetime: AbortController;
   canvasTail: Promise<void> | null;
   maximumInFlight: 1 | 2;
+  warmBudgetBytes: number;
   renderer: VideoPreviewRenderer;
   onContextLost: (() => void) | undefined;
   gpu: ReturnType<typeof createReviewGpuPreview> | null;
@@ -298,7 +300,8 @@ async function prepareAssets(
   signal: AbortSignal,
   readAsset: typeof resolveReviewAssetBytes,
   admit: (measurement: boolean) => void,
-  annotationExecutor: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor']
+  annotationExecutor: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor'],
+  annotationWarmExecutor: Parameters<typeof createReviewAnnotationRenderer>[1]['createWarmExecutor']
 ) {
   const { scene, dimensions } = prepared;
   const annotationScene = scene.annotationEffects
@@ -405,6 +408,7 @@ async function prepareAssets(
         return blob;
       },
       ...(annotationExecutor ? { createExecutor: annotationExecutor } : {}),
+      ...(annotationWarmExecutor ? { createWarmExecutor: annotationWarmExecutor } : {}),
     });
     signal.throwIfAborted();
   }
@@ -973,7 +977,8 @@ function admitRender(
     maximumManagedBytes:
       Math.max(...candidates.map((value) => value.maximumManagedBytes)) +
       (captionMeasurement ? 4 : 0) +
-      gpu.maximumManagedBytes,
+      gpu.maximumManagedBytes +
+      assets.warmBudgetBytes,
     maximumCanvases:
       Math.max(...candidates.map((value) => value.maximumCanvases)) +
       (captionMeasurement ? 1 : 0) +
@@ -994,6 +999,9 @@ export function createReviewPreviewRenderer(args: {
   readAsset?: (assetId: string, signal: AbortSignal) => Promise<Blob | null>;
   onContextLost?: () => void;
   annotationExecutor?: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor'];
+  annotationWarmExecutor?: Parameters<
+    typeof createReviewAnnotationRenderer
+  >[1]['createWarmExecutor'];
 }) {
   const captureScene = createReviewPreviewSceneCapture();
   let generation = 0;
@@ -1252,6 +1260,13 @@ export function createReviewPreviewRenderer(args: {
         lifetime: new AbortController(),
         canvasTail: null,
         maximumInFlight: args.maximumInFlight ?? 1,
+        warmBudgetBytes:
+          useGpu &&
+          args.annotationWarmExecutor &&
+          prepared.scene.annotationEffects?.lane.enabled &&
+          prepared.scene.annotationEffects.lane.instances.some((instance) => instance.enabled)
+            ? EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes + 4
+            : 0,
         renderer: args.exportEnhancer ? 'legacy' : (args.renderer ?? 'gpu'),
         onContextLost: args.onContextLost,
         gpu: useGpu ? gpu : null,
@@ -1313,10 +1328,13 @@ export function createReviewPreviewRenderer(args: {
               // The current provider already owns the GPU front storage counted by preparation.
               maximumManagedBytes:
                 limits.maximumManagedBytes +
+                // One isolated advisory packet must not reduce the two foreground packet budgets.
+                assets.warmBudgetBytes +
                 Math.max(0, (gpu?.allocatedBytes ?? 0) - sharedFrontBytes),
             });
           },
-          args.annotationExecutor
+          args.annotationExecutor,
+          args.annotationWarmExecutor
         );
         controller.signal.throwIfAborted();
         admitRender(
@@ -1371,6 +1389,9 @@ export function createReviewPreviewRenderer(args: {
       acquireOutput: PreviewGpuCanvasFactory
     ) {
       return renderFrame(prepared, frame, signal, acquireOutput);
+    },
+    cancelWarmAnnotations() {
+      current?.assets.annotations?.cancelWarm(true);
     },
     dispose() {
       if (disposed) return;

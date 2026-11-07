@@ -1809,3 +1809,107 @@ it.each(['complete', 'abort', 'device'] as const)(
     f.owner.dispose();
   }
 );
+
+it('prepares annotation descriptors after output and releases the marker before completion', async () => {
+  const f = fixture(),
+    order: string[] = [];
+  const preparePipelines = vi.fn<NonNullable<GpuPreviewRenderer['preparePipelines']>>(
+    async () => {}
+  );
+  const provider = { render: io.render, dispose: io.dispose, allocatedBytes: 0, preparePipelines };
+  io.create.mockResolvedValue(provider);
+  io.render.mockImplementation(async () => {
+    order.push('foreground');
+    return f.bitmap;
+  });
+  type WarmArgs = Parameters<
+    NonNullable<Parameters<typeof f.owner.render>[0]['annotations']>['warmUpcomingGpu']
+  >[0];
+  const warmUpcomingGpu = vi.fn((_args: WarmArgs) => {
+    order.push('warm');
+  });
+  const batch = () => ({ entries: [], release() {}, retain: () => ({ release() {} }) });
+  const annotations: NonNullable<Parameters<typeof f.owner.render>[0]['annotations']> = {
+    describe: () => [],
+    prepareGpu: async () => ({
+      entries: [],
+      release() {},
+      retain: () => ({ release() {} }),
+      independent: true,
+    }),
+    warmUpcomingGpu,
+    maximumInFlight: 1,
+    cancelWarm: vi.fn(),
+    counters: () => ({ liveDecodedRasterBytes: 0, liveRasterResources: 0 }),
+    dispose: vi.fn(),
+    render: async () => batch(),
+  };
+  await f.owner.render({ ...f.input, annotations });
+  expect(order).toEqual(['foreground', 'warm']);
+  const args = warmUpcomingGpu.mock.calls[0]![0];
+  expect(args.signal).not.toBe(f.input.signal);
+  const markerClass = class {
+    constructor(
+      public width: number,
+      public height: number
+    ) {}
+  };
+  vi.stubGlobal('OffscreenCanvas', markerClass);
+  try {
+    const entry: Parameters<WarmArgs['prepare']>[0] = {
+      instance: {
+        id: 'future',
+        snapshotId: 'snapshot',
+        enabled: true,
+        start: 2,
+        end: 3,
+        order: 0,
+        controls: {},
+        attachment: 'content',
+        transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
+      },
+      box: { x: 0, y: 0, width: 640, height: 360, rotation: 0 },
+      plan: {
+        assets: [],
+        controls: {},
+        dimensions: { width: 640, height: 360 },
+        renderDimensions: { width: 320, height: 180 },
+        documentSha256: 'a'.repeat(64),
+        documentSource: '',
+        duration: 1,
+        effectInstanceId: 'future',
+        fps: 30,
+        frameIndex: 1,
+        kind: 'standalone',
+        progress: 1 / 30,
+        snapshotId: 'snapshot',
+        target: { kind: 'scene', clipId: 'future' },
+        time: 1 / 30,
+      },
+      bitmapBounds: { x: 0, y: 0, width: 1, height: 1 },
+      source: {
+        kind: 'group',
+        output: { width: 4, height: 4 },
+        logical: { width: 4, height: 4 },
+        layers: [],
+      },
+    };
+    await args.prepare(entry, 2.1);
+    expect(preparePipelines).toHaveBeenCalledOnce();
+    const request = preparePipelines.mock.calls[0]![0];
+    expect(request.layers).toHaveLength(2);
+    const marker = request.layers[0]!.source;
+    expect('width' in marker && marker.width).toBe(0);
+    expect('height' in marker && marker.height).toBe(0);
+    const source = request.layers[1]!.source;
+    if (!('kind' in source) || source.kind !== 'group')
+      throw new Error('Expected annotation group');
+    expect(source.layers[0]!.operationClip?.source).toBe(marker);
+    expect(io.render).toHaveBeenCalledOnce();
+    f.owner.releaseScene();
+    expect(args.signal.aborted).toBe(true);
+  } finally {
+    vi.unstubAllGlobals();
+    f.owner.dispose();
+  }
+});
