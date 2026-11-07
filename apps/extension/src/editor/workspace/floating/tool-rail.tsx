@@ -101,6 +101,7 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
         dataUi="editor.floating.tool-rail"
       >
         <CanvasToolButtons actions={selectActions} dataUi="editor.floating.tool-rail" />
+        <CanvasToolButtons actions={drawingActions} dataUi="editor.floating.tool-rail" />
         <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-frame" />
         <div className="contents">
           <FrameAnnotationCreationControls
@@ -122,8 +123,6 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
             settings={annotationDefaults}
           />
         </div>
-        <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.after-frame" />
-        <CanvasToolButtons actions={drawingActions} dataUi="editor.floating.tool-rail" />
       </FloatingChromeToolbar>
       <EditorFloatingToolHistoryControls
         autosaveControl={<ImageHistoryAutosave hasImage={props.hasImage} />}

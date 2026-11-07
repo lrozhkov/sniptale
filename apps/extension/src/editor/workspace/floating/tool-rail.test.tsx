@@ -111,7 +111,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders the exact centered tool order with two vertical dividers', () => {
+it('renders cursor and drawing tools before the divided annotation group', () => {
   const props = createProps();
   renderToolRail(props);
 
@@ -121,6 +121,13 @@ it('renders the exact centered tool order with two vertical dividers', () => {
 
   expect(actionIds).toEqual([
     'editor.floating.tool-rail.select',
+    'editor.floating.tool-rail.pencil',
+    'editor.floating.tool-rail.marker',
+    'editor.floating.tool-rail.text',
+    'editor.floating.tool-rail.shape',
+    'editor.floating.tool-rail.arrow',
+    'editor.floating.tool-rail.blur',
+    'editor.floating.tool-rail.simplify',
     'content.toolbar.future-frame-style',
     'shared.ui.content-toolbar-button',
     'shared.ui.content-toolbar-button',
@@ -129,23 +136,14 @@ it('renders the exact centered tool order with two vertical dividers', () => {
     'content.toolbar.future-frame-callout.menu',
     'content.toolbar.future-frame-step-badge',
     'content.toolbar.future-frame-step-badge.menu',
-    'editor.floating.tool-rail.pencil',
-    'editor.floating.tool-rail.marker',
-    'editor.floating.tool-rail.text',
-    'editor.floating.tool-rail.shape',
-    'editor.floating.tool-rail.arrow',
-    'editor.floating.tool-rail.blur',
-    'editor.floating.tool-rail.simplify',
   ]);
   expect(queryUi('editor.floating.tool-rail.crop')).toBeNull();
   expect(queryUi('editor.floating.tool-rail.frame')).toBeNull();
   expect(queryUi('editor.floating.tool-rail.browser-frame')).toBeNull();
   expect(queryUi('editor.floating.tool-rail.meta')).toBeNull();
-  const dividers = [
-    queryUi('editor.floating.tool-rail.divider.before-frame'),
-    queryUi('editor.floating.tool-rail.divider.after-frame'),
-  ];
-  expect(dividers).toHaveLength(2);
+  const dividers = [queryUi('editor.floating.tool-rail.divider.before-frame')];
+  expect(dividers).toHaveLength(1);
+  expect(queryUi('editor.floating.tool-rail.divider.after-frame')).toBeNull();
   for (const divider of dividers) {
     expect(divider?.classList.contains('sniptale-glass-toolbar-divider')).toBe(true);
     expect(divider?.classList.contains('sniptale-divider')).toBe(true);
