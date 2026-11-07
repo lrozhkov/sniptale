@@ -933,6 +933,7 @@ export async function createGpuPreviewRenderer(
               },
             ],
           });
+          let destinationCoverage: [number, number, number, number] = [0, 0, 0, 0];
           layers.forEach((layer, index) => {
             const slot = uniformIndex++;
             let uniform = uniforms[slot];
@@ -1006,7 +1007,22 @@ export async function createGpuPreviewRenderer(
                 ],
               })
             );
-            pass.setScissorRect(...drawBounds(layer, output, logical));
+            const scissor = drawBounds(layer, output, logical, destinationCoverage);
+            pass.setScissorRect(...scissor);
+            if (layer.blend !== 'mask' && layer.blend !== 'erase' && layer.blend !== 'atop') {
+              const [x, y, width, height] = destinationCoverage;
+              if (width === 0 || height === 0) destinationCoverage = scissor;
+              else if (scissor[2] > 0 && scissor[3] > 0) {
+                const left = Math.min(x, scissor[0]),
+                  top = Math.min(y, scissor[1]);
+                destinationCoverage = [
+                  left,
+                  top,
+                  Math.max(x + width, scissor[0] + scissor[2]) - left,
+                  Math.max(y + height, scissor[1] + scissor[3]) - top,
+                ];
+              }
+            }
             pass.draw(3);
           });
           pass.end();

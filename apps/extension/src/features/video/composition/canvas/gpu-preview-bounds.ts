@@ -44,7 +44,14 @@ export function createGpuPreviewDrawBounds() {
       const group = layer.source;
       let content = groups.get(group);
       if (!content) {
-        content = union(group.layers.map((child) => bounds(child, group.logical, group.output)));
+        // These operations can remove or recolor destination pixels but cannot create alpha.
+        content = union(
+          group.layers
+            .filter(
+              (child) => child.blend !== 'mask' && child.blend !== 'erase' && child.blend !== 'atop'
+            )
+            .map((child) => bounds(child, group.logical, group.output))
+        );
         groups.set(group, content);
       }
       if (content.width === 0 || content.height === 0) return { x: 0, y: 0, width: 0, height: 0 };
@@ -82,8 +89,11 @@ export function createGpuPreviewDrawBounds() {
   return (
     layer: GpuPreviewLayer,
     output: Size,
-    logical: Size
+    logical: Size,
+    destination?: readonly [number, number, number, number]
   ): [number, number, number, number] => {
+    // A cleared pass has no destination outside the conservative prior paint bounds.
+    if (layer.blend === 'mask' && destination) return [...destination];
     const rect = bounds(layer, logical, output);
     const x = Math.min(
       output.width,

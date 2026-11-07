@@ -108,3 +108,68 @@ it('retains full coverage when a group changes texture orientation', () => {
     bounds({ ...smallLayer(), source, orientation: { rotation: 90, flip: true } }, size, size)
   ).toEqual([0, 0, 640, 360]);
 });
+
+it('limits a destination-in draw to prior content while clearing beyond the mask footprint', async () => {
+  const g = graphics();
+  renderer = await createGpuPreviewRenderer();
+  const size = { width: 640, height: 360 };
+  const annotation = { ...smallLayer(), source: document.createElement('canvas') };
+  const mask: GpuPreviewLayer = {
+    ...annotation,
+    rect: { x: 110, y: 84, width: 2, height: 2 },
+    blend: 'mask',
+  };
+  await renderer!.render({
+    output: size,
+    logical: size,
+    signal: new AbortController().signal,
+    layers: [
+      {
+        source: { kind: 'group', output: size, logical: size, layers: [annotation, mask] },
+        rect: { x: 0, y: 0, ...size },
+        inverse: annotation.inverse,
+        clip: { rect: { x: 0, y: 0, ...size }, radius: 0 },
+      },
+    ],
+  });
+  const [paint, masking, parent] = g.pass.setScissorRect.mock.calls;
+  expect(masking).toEqual(paint);
+  expect(masking![0]).toBeLessThan(mask.rect.x);
+  expect(masking![0] + masking![2]).toBeGreaterThan(mask.rect.x + mask.rect.width);
+  expect(parent![2] * parent![3]).toBeLessThan((size.width * size.height) / 100);
+});
+
+it.each(['mask', 'erase', 'atop'] as const)(
+  'does not expand parent content bounds for %s',
+  (blend) => {
+    const size = { width: 640, height: 360 };
+    const child = smallLayer();
+    const bounds = createGpuPreviewDrawBounds();
+    const result = bounds(
+      {
+        ...child,
+        source: {
+          kind: 'group',
+          logical: size,
+          output: size,
+          layers: [
+            child,
+            {
+              ...child,
+              rect: { x: 400, y: 200, width: 200, height: 100 },
+              blend,
+            },
+          ],
+        },
+        rect: { x: 0, y: 0, ...size },
+      },
+      size,
+      size
+    );
+    expect(result[0]).toBeLessThanOrEqual(100);
+    expect(result[1]).toBeLessThanOrEqual(80);
+    expect(result[0] + result[2]).toBeGreaterThanOrEqual(132);
+    expect(result[1] + result[3]).toBeGreaterThanOrEqual(98);
+    expect(result[2] * result[3]).toBeLessThan((size.width * size.height) / 100);
+  }
+);

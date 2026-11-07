@@ -5014,7 +5014,7 @@
       "reason": "tool-noise: One GPU backend owns slot resources, source uploads, command encoding and completion. A lookup reuses one raster texture within one frame. It does not retain raster content across frames. Resource owners and completion barriers remain unchanged. Separate helpers would distribute one resource transaction.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "b85e11764569363107c1d8cb621d0aef7f241d76198ae3a2efb77d394ee09fda",
+      "astHash": "30abd7789a97c7e61a18cde21b7c79e4e55b00cd7f7bdca84f37a4002090f634",
       "signatureHash": "64d03ee42b8e2898569c0c7c9d536c5d779c544b4c854fcfbad5ecf1994e59d0"
     },
     {
@@ -5025,7 +5025,7 @@
       "reason": "tool-noise: One GPU backend owns slot resources, source uploads, command encoding and completion. A lookup reuses one raster texture within one frame. It does not retain raster content across frames. Resource owners and completion barriers remain unchanged. Separate helpers would distribute one resource transaction.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "f01ef7443e5bcc64c80d2f1ff3255af324d46effb3795557ec19dcc58e630b62",
+      "astHash": "ceb08f3e56a419ccfda541abe7ead5f0e4e214351731addd93683006ed5ecd41",
       "signatureHash": "3699619d9599e7fa977a93004ec5ccf54bf36fd1cb5a4d53e6fb1c6c5f7f9681"
     },
     {
@@ -5982,7 +5982,7 @@
       "reason": "tool-noise: One GPU backend owns slot resources, source uploads, command encoding and completion. A lookup reuses one raster texture within one frame. It does not retain raster content across frames. Resource owners and completion barriers remain unchanged. Separate helpers would distribute one resource transaction.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "6523e96eac891cff1d6066f68f970f701c3541873e47cef9a2b86b00feb8a8ee",
+      "astHash": "051cb570d91510eb07518d7d3e3e2ff59c315adbdf383569150cf2cdc8fdc06a",
       "signatureHash": "50b7b6dfa55a91f0767233eb28825159abc77bd5595daebdd5d807e9251bebd0"
     },
     {
@@ -6169,7 +6169,7 @@
       "reason": "tool-noise: One GPU backend owns slot resources, source uploads, command encoding and completion. A lookup reuses one raster texture within one frame. It does not retain raster content across frames. Resource owners and completion barriers remain unchanged. Separate helpers would distribute one resource transaction.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "3fbe374551d2472b413ae040df71126f569a520362a9fa970c7be2d10f79ae56",
+      "astHash": "b1f7cde79a2eca0c34cb789b67c5a13cb4a6c9f9711a582bb7bf084a6c8f0e44",
       "signatureHash": "f2cedc19aea17ca74edd24dde4169bfe2a379a549e4c64af11c1cdcf087fe5ce"
     },
     {
@@ -6182,6 +6182,17 @@
       "reviewDate": "2026-11-07",
       "astHash": "018c36155a3d47f4d504cd97c352fc40e22e6b01cac1a7255e6d247d6d29b847",
       "signatureHash": "2c629f4f939552b210db20350dffa3a44a616b1c0626c2fd6c9dd93d60a95705"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
+      "symbol": "createGpuPreviewRenderer.createSlot.encodeFrame.renderLayers",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One recursive GPU pass transaction prepares child targets and inputs, clears its destination, binds uniforms and draws layers. Conservative destination coverage is local to this cleared pass. It changes no source, queue or completion owner. Separate fragments would distribute this encoding transaction.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independently retained coverage, target or publication authority. Remove when the analyzer models this cohesive encoding operation.",
+      "reviewDate": "2026-11-07",
+      "astHash": "adaae22413a93643b23e4184fd83fb17161da81a5db18c6347f60edab01c9450",
+      "signatureHash": "0f953dfa927e13f283213ce8c91dadaf090b7cdb4735945e650568c5b2065352"
     }
   ]
 }
