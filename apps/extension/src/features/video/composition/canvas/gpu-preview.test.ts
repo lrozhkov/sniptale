@@ -98,7 +98,7 @@ function nativeFrames() {
   return { frames, copy, layout };
 }
 
-it('packs one borrowed padded NV12 source before all imports and retains it through the GPU fence', async () => {
+it('converts one borrowed padded NV12 source once on GPU without CPU copies', async () => {
   const g = graphics();
   const native = nativeFrames();
   const renderer = await owner({ reserve: g.reserve });
@@ -107,23 +107,23 @@ it('packs one borrowed padded NV12 source before all imports and retains it thro
   g.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
   const drawing = renderer.render(request([layer(source), layer(group([layer(source)]))]));
   await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
-  const packed = native.frames[2];
-  expect(packed).toBeDefined();
-  expect(packed).not.toBe(source);
-  expect(packed).toMatchObject({ codedWidth: 32, codedHeight: 18, timestamp: 1_000_000 });
-  expect(g.device.importExternalTexture).toHaveBeenCalledTimes(2);
-  expect(g.device.importExternalTexture).toHaveBeenNthCalledWith(1, { source: packed });
-  expect(g.device.importExternalTexture).toHaveBeenNthCalledWith(2, { source: packed });
-  expect(native.copy).toHaveBeenCalledOnce();
-  expect(native.frames[0]!.clone).toHaveBeenCalledOnce();
+  expect(native.copy.mock.calls.length).toBe(0);
+  expect(native.frames).toHaveLength(1);
+  expect(native.frames[0]!.clone).not.toHaveBeenCalled();
+  expect(g.device.importExternalTexture).toHaveBeenCalledExactlyOnceWith({ source });
+  const nativeTarget = g.device.createTexture.mock.results.find(
+    (result) => result.type === 'return' && result.value.width === 32 && result.value.height === 18
+  )?.value;
+  expect(nativeTarget).toBeDefined();
+  expect(nativeTarget!.destroy).not.toHaveBeenCalled();
+  expect(g.reserve).toHaveBeenCalledWith(32 * 18 * 4);
   expect(native.frames[0]!.close).not.toHaveBeenCalled();
-  expect(native.frames[1]!.close).toHaveBeenCalledOnce();
-  expect(native.frames[2]!.close).not.toHaveBeenCalled();
-  expect(g.reserve).toHaveBeenCalledWith(1728);
   fence.resolve(undefined);
   expect(await drawing).toBe(g.bitmap);
-  expect(native.frames[2]!.close).toHaveBeenCalledOnce();
   expect(native.frames[0]!.close).not.toHaveBeenCalled();
+  renderer.dispose();
+  expect(nativeTarget!.destroy).toHaveBeenCalledOnce();
+  expect(renderer.allocatedBytes).toBe(0);
 });
 
 it.each(['NV12', 'I420'] as const)(
@@ -138,13 +138,13 @@ it.each(['NV12', 'I420'] as const)(
     await renderer.render(request([layer(source)]));
     expect(g.device.importExternalTexture).toHaveBeenCalledWith({ source });
     expect(native.frames[0]!.clone).not.toHaveBeenCalled();
-    expect(native.copy).not.toHaveBeenCalled();
+    expect(native.copy.mock.calls.length).toBe(0);
     expect(native.frames[0]!.close).not.toHaveBeenCalled();
   }
 );
 
 it.each(['abort', 'dispose', 'queue failure'] as const)(
-  'retains packed storage through GPU settlement after %s',
+  'retains native RGB storage through GPU settlement after %s',
   async (ending) => {
     const g = graphics();
     const native = nativeFrames();
@@ -157,68 +157,79 @@ it.each(['abort', 'dispose', 'queue failure'] as const)(
       .render(request([layer(source)], controller.signal))
       .catch((error: unknown) => error);
     await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+    const target = g.device.createTexture.mock.results.find(
+      (result) =>
+        result.type === 'return' && result.value.width === 32 && result.value.height === 18
+    )!.value;
     if (ending === 'abort') controller.abort();
     if (ending === 'dispose') renderer.dispose();
-    expect(native.frames[2]!.close).not.toHaveBeenCalled();
+    expect(target.destroy).not.toHaveBeenCalled();
     if (ending === 'queue failure') fence.reject(new Error('Lost queue'));
     else fence.resolve(undefined);
-    const error = await outcome;
-    expect(error).toBeInstanceOf(Error);
-    expect(native.frames[2]!.close).toHaveBeenCalledOnce();
+    expect(await outcome).toBeInstanceOf(Error);
+    expect(native.copy.mock.calls.length).toBe(0);
+    expect(native.frames).toHaveLength(1);
     expect(native.frames[0]!.close).not.toHaveBeenCalled();
+    expect(g.transfer).not.toHaveBeenCalled();
     renderer.dispose();
+    expect(target.destroy).toHaveBeenCalledOnce();
     expect(renderer.allocatedBytes).toBe(0);
   }
 );
 
-it.each(['abort', 'copy failure'] as const)(
-  'releases clone and storage after normalization %s',
+it.each(['abort', 'import failure'] as const)(
+  'preserves the borrowed native source on preparation %s',
   async (ending) => {
     const g = graphics();
     const native = nativeFrames();
     const renderer = await owner({ reserve: g.reserve });
     const source = new VideoFrame(raster());
     const controller = new AbortController();
-    const copied = deferred<PlaneLayout[]>();
-    native.copy.mockReturnValue(copied.promise);
-    const outcome = renderer
-      .render(request([layer(source)], controller.signal))
-      .catch((error: unknown) => error);
-    await vi.waitFor(() => expect(native.copy).toHaveBeenCalledOnce());
-    if (ending === 'abort') {
-      controller.abort();
-      copied.resolve(native.layout);
-    } else copied.reject(new Error('Native copy failed'));
-    expect(await outcome).toBeInstanceOf(Error);
-    expect(native.frames).toHaveLength(2);
-    expect(native.frames[1]!.close).toHaveBeenCalledOnce();
+    if (ending === 'abort') controller.abort();
+    else
+      g.device.importExternalTexture.mockImplementationOnce(() => {
+        throw new Error('Native import failed');
+      });
+    await expect(renderer.render(request([layer(source)], controller.signal))).rejects.toThrow();
+    expect(native.frames).toHaveLength(1);
+    expect(native.frames[0]!.clone).not.toHaveBeenCalled();
     expect(native.frames[0]!.close).not.toHaveBeenCalled();
-    expect(g.device.importExternalTexture).not.toHaveBeenCalled();
+    expect(native.copy.mock.calls.length).toBe(0);
+    expect(g.device.importExternalTexture).toHaveBeenCalledTimes(ending === 'abort' ? 0 : 1);
     expect(g.queue.submit).not.toHaveBeenCalled();
+    expect(g.transfer).not.toHaveBeenCalled();
     renderer.dispose();
     expect(renderer.allocatedBytes).toBe(0);
   }
 );
 
 it.each(['budget', 'reservation'] as const)(
-  'refuses native storage before copying on %s failure',
+  'refuses GPU native storage on %s failure without CPU allocation',
   async (failure) => {
     const g = graphics();
     const native = nativeFrames();
     const renderer = await owner({ reserve: g.reserve });
-    const source = new VideoFrame(raster());
-    if (failure === 'budget') native.frames[0]!.allocationSize.mockReturnValue(256 * 1024 * 1024);
+    const sources = [new VideoFrame(raster()), new VideoFrame(raster())];
+    if (failure === 'budget')
+      for (const frame of native.frames) {
+        frame.displayWidth = 8192;
+        frame.displayHeight = 8192;
+      }
     else
       g.reserve.mockImplementation(() => {
         throw new Error('Reservation refused');
       });
-    await expect(renderer.render(request([layer(source)]))).rejects.toThrow(
-      failure === 'budget' ? 'source budget' : 'Reservation refused'
+    await expect(renderer.render(request(sources.map((source) => layer(source))))).rejects.toThrow(
+      failure === 'budget' ? 'texture budget' : 'Reservation refused'
     );
-    expect(native.frames[0]!.clone).not.toHaveBeenCalled();
-    expect(native.copy).not.toHaveBeenCalled();
-    expect(native.frames[0]!.close).not.toHaveBeenCalled();
-    expect(g.device.importExternalTexture).not.toHaveBeenCalled();
+    expect(native.copy.mock.calls.length).toBe(0);
+    expect(native.frames).toHaveLength(2);
+    for (const frame of native.frames) {
+      expect(frame.clone).not.toHaveBeenCalled();
+      expect(frame.close).not.toHaveBeenCalled();
+    }
+    expect(g.queue.submit).not.toHaveBeenCalled();
+    expect(g.transfer).not.toHaveBeenCalled();
     renderer.dispose();
     expect(renderer.allocatedBytes).toBe(0);
   }
@@ -1462,14 +1473,28 @@ it.each(['abort', 'loss', 'dispose'] as const)(
   }
 );
 
-it('retains the device scope stack during asynchronous source preparation and cancels a waiting slot', async () => {
+it('retains the device scope stack during asynchronous pipeline preparation and cancels a waiting slot', async () => {
   const g = graphics();
   const native = nativeFrames();
-  const copy = deferred<Awaited<ReturnType<VideoFrame['copyTo']>>>();
-  native.copy.mockReturnValueOnce(copy.promise);
   const renderer = await owner({ maximumInFlight: 2 });
+  const readyPipeline = g.device.createRenderPipelineAsync.mock.results[0]!.value;
+  const pipeline = deferred<Awaited<typeof readyPipeline>>();
+  g.device.createRenderPipelineAsync.mockReturnValueOnce(pipeline.promise);
   const source = new VideoFrame(raster());
-  const first = renderer.render(request([layer(source)]));
+  const first = renderer.render(
+    request([
+      {
+        ...layer(source),
+        lens: {
+          bounds: { x: 0, y: 0, width: 32, height: 18 },
+          scale: 2,
+          optics: 'flat',
+          edgeWidth: 0,
+          corner: 'circle',
+        },
+      },
+    ])
+  );
   const controller = new AbortController();
   const second = renderer.render(request([], controller.signal));
   const secondOutcome = second.catch((error: unknown) => error);
@@ -1478,14 +1503,12 @@ it('retains the device scope stack during asynchronous source preparation and ca
   expect(g.device.popErrorScope).not.toHaveBeenCalled();
   expect(g.contexts).toHaveLength(1);
   controller.abort();
-  copy.resolve([
-    { offset: 0, stride: 32 },
-    { offset: 576, stride: 32 },
-  ]);
+  pipeline.resolve(await readyPipeline);
   await first;
   expect(await secondOutcome).toMatchObject({ name: 'AbortError' });
   expect(g.device.pushErrorScope).toHaveBeenCalledOnce();
   expect(g.contexts).toHaveLength(1);
+  expect(native.copy.mock.calls.length).toBe(0);
 });
 
 it('recovers slot capacity after lazy slot initialization fails without destroying the active device', async () => {
@@ -1533,7 +1556,7 @@ it('keeps the encoding lock until failure cleanup actually invokes popErrorScope
   expect(await first).toMatchObject({ message: 'upload failed' });
 });
 
-it('releases only the packed source belonging to the request whose two barriers have settled', async () => {
+it('reuses and evicts native RGB targets only after their own two barriers settle', async () => {
   const g = graphics();
   const native = nativeFrames();
   const fences = [deferred<void>(), deferred<void>()];
@@ -1545,27 +1568,34 @@ it('releases only the packed source belonging to the request whose two barriers 
   const first = renderer.render(request([layer(sources[0]!)]));
   const second = renderer.render(request([layer(sources[1]!)]));
   await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledTimes(2));
-  const packed = g.device.importExternalTexture.mock.calls.map((call) => {
-    const source = call[0].source;
-    if (!(source instanceof VideoFrame)) throw new Error('Expected a packed VideoFrame.');
-    return source;
-  });
-  expect(packed).toHaveLength(2);
-  expect(packed[0]).not.toBe(packed[1]);
-  expect(native.copy).toHaveBeenCalledTimes(2);
+  const targets = g.device.createTexture.mock.results
+    .filter(
+      (result) =>
+        result.type === 'return' && result.value.width === 32 && result.value.height === 18
+    )
+    .map((result) => result.value);
+  expect(targets).toHaveLength(2);
+  expect(targets[0]).not.toBe(targets[1]);
+  expect(
+    g.device.importExternalTexture.mock.calls.map(([descriptor]) => descriptor.source)
+  ).toEqual(sources);
+  expect(native.copy.mock.calls.length).toBe(0);
   const initialBytes = renderer.allocatedBytes;
   scopes[1]!.resolve(null);
   fences[1]!.resolve();
   await second;
-  expect(packed[1]!.close).toHaveBeenCalledOnce();
-  expect(packed[0]!.close).not.toHaveBeenCalled();
-  expect(renderer.allocatedBytes).toBe(initialBytes - 1728);
+  expect(targets[1]!.destroy).not.toHaveBeenCalled();
+  await renderer.render(request([]));
+  expect(targets[1]!.destroy).toHaveBeenCalledOnce();
+  expect(targets[0]!.destroy).not.toHaveBeenCalled();
+  expect(renderer.allocatedBytes).toBe(initialBytes - 32 * 18 * 4);
   fences[0]!.resolve();
   await Promise.resolve();
-  expect(packed[0]!.close).not.toHaveBeenCalled();
+  expect(targets[0]!.destroy).not.toHaveBeenCalled();
   scopes[0]!.resolve(null);
   await first;
-  expect(packed[0]!.close).toHaveBeenCalledOnce();
+  await renderer.render(request([]));
+  expect(targets[0]!.destroy).toHaveBeenCalledOnce();
   for (const source of sources) expect(source.close).not.toHaveBeenCalled();
   renderer.dispose();
   expect(renderer.allocatedBytes).toBe(0);

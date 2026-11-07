@@ -12,7 +12,6 @@ import { gpuPreviewShader } from './gpu-preview-shaders';
 import { createGpuPreviewDrawBounds } from './gpu-preview-bounds';
 import { createGpuPreviewFilter } from './gpu-preview-filter';
 import { createGpuPreviewCssFilter } from './gpu-preview-css-filter';
-import { prepareDecodedVideoFrame } from '../draw/decoded-sample';
 
 type Size = { width: number; height: number };
 type Reservation = { release(): void };
@@ -308,6 +307,19 @@ function requiresRasterSource(layer: GpuPreviewLayer) {
   return requiresGpuPreviewFilter(layer) || !!layer.cssFilter;
 }
 
+/** Preserve the packed path's native-size RGB sampling without reading decoded planes on CPU. */
+function needsNativeRgbSource(source: VideoFrame): boolean {
+  const visible = source.visibleRect;
+  return (
+    source.format === 'NV12' &&
+    !!visible &&
+    (visible.x !== 0 ||
+      visible.y !== 0 ||
+      visible.width !== source.codedWidth ||
+      visible.height !== source.codedHeight)
+  );
+}
+
 function requiresGpuPreviewFilter(layer: GpuPreviewLayer) {
   return !!layer.depth || (layer.blur ?? 0) > 0;
 }
@@ -374,7 +386,11 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
         hasMaskedEffects ||= effects;
         retainRaster(layer.alphaMask, `${path}/alpha-mask`);
       } else hasEffects ||= effects;
-      if (requiresRasterSource(layer) && layer.source instanceof VideoFrame)
+      if (
+        requiresRasterSource(layer) &&
+        layer.source instanceof VideoFrame &&
+        !needsNativeRgbSource(layer.source)
+      )
         targetKeys.add(`${path}/decoded`);
       if (isGroup(layer.source)) {
         const group = layer.source;
@@ -393,6 +409,11 @@ function validateGpuPreviewFrame(request: GpuPreviewRequest, maximumTextureDimen
     });
   };
   validateLayers(request.layers, request.output, request.logical, '', 0);
+  let nativeIndex = 0;
+  for (const source of nativeFrames) {
+    if (needsNativeRgbSource(source)) targetKeys.add(`native:${nativeIndex}`);
+    nativeIndex++;
+  }
   return {
     retainedKeys,
     targetKeys,
@@ -626,7 +647,6 @@ export async function createGpuPreviewRenderer(
       }
     };
     async function createSlot() {
-      let slotBytes = 0;
       const surface = new OffscreenCanvas(1, 1);
       const context = surface.getContext('webgpu');
       if (!context || !('configure' in context))
@@ -648,14 +668,12 @@ export async function createGpuPreviewRenderer(
       const reserve = (count: number): Reservation => {
         const admitted = args.reserve?.(count);
         bytes += count;
-        slotBytes += count;
         let released = false;
         return {
           release() {
             if (released) return;
             released = true;
             bytes -= count;
-            slotBytes -= count;
             admitted?.release();
           },
         };
@@ -751,7 +769,7 @@ export async function createGpuPreviewRenderer(
       const encodeFrame = (
         request: GpuPreviewRequest,
         families: PreviewPipelineFamilies,
-        packedFrames: ReadonlyMap<VideoFrame, VideoFrame>,
+        nativeFrames: ReadonlySet<VideoFrame>,
         outputTexture?: () => GPUTexture
       ) => {
         const { effects, masked, maskedEffects } = families;
@@ -759,6 +777,7 @@ export async function createGpuPreviewRenderer(
         const encoder = device.createCommandEncoder();
         let uniformIndex = 0;
         const renderedGroups = new Map<GpuPreviewGroup, GPUTexture>();
+        const preparedFrames = new Map<VideoFrame, GPUTexture>();
         const targetFor = (path: string, output: Size) => {
           let target = targets.get(path);
           if (
@@ -810,29 +829,33 @@ export async function createGpuPreviewRenderer(
                 renderedGroups.set(group, source);
               }
             } else if (layer.source instanceof VideoFrame) {
-              if (!requiresRasterSource(layer))
-                return device.importExternalTexture({
-                  source: packedFrames.get(layer.source) ?? layer.source,
-                });
-              const size = {
-                width: layer.source.displayWidth,
-                height: layer.source.displayHeight,
-              };
-              validSize(size, device.limits.maxTextureDimension2D);
-              source = targetFor(`${path}/decoded`, size);
-              renderLayers(
-                [
-                  {
+              const prepared = preparedFrames.get(layer.source);
+              if (prepared) source = prepared;
+              else {
+                if (!requiresRasterSource(layer))
+                  return device.importExternalTexture({
                     source: layer.source,
-                    rect: { x: 0, y: 0, ...size },
-                    inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-                  },
-                ],
-                size,
-                size,
-                `${path}/decoded`,
-                source
-              );
+                  });
+                const size = {
+                  width: layer.source.displayWidth,
+                  height: layer.source.displayHeight,
+                };
+                validSize(size, device.limits.maxTextureDimension2D);
+                source = targetFor(`${path}/decoded`, size);
+                renderLayers(
+                  [
+                    {
+                      source: layer.source,
+                      rect: { x: 0, y: 0, ...size },
+                      inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+                    },
+                  ],
+                  size,
+                  size,
+                  `${path}/decoded`,
+                  source
+                );
+              }
             } else source = textureFor(layer, path);
             if (layer.cssFilter) {
               if (!cssFilter) throw new Error('GPU preview CSS filter is unavailable.');
@@ -877,8 +900,19 @@ export async function createGpuPreviewRenderer(
                 throw error;
               }
             }
-            device.queue.writeBuffer(uniform.buffer, 0, layerValues(layer, output, logical));
-            const external = layer.source instanceof VideoFrame && !requiresRasterSource(layer);
+            const preparedNative =
+              layer.source instanceof VideoFrame && preparedFrames.has(layer.source);
+            const samplingLayer =
+              preparedNative && !requiresRasterSource(layer)
+                ? { ...layer, clampSourceEdges: ['left', 'top', 'right', 'bottom'] as const }
+                : layer;
+            device.queue.writeBuffer(
+              uniform.buffer,
+              0,
+              layerValues(samplingLayer, output, logical)
+            );
+            const external =
+              layer.source instanceof VideoFrame && !preparedNative && !requiresRasterSource(layer);
             const selectedPipelines = layer.alphaMask
               ? layer.lens || requiresGpuPreviewFilter(layer)
                 ? maskedEffects
@@ -928,6 +962,24 @@ export async function createGpuPreviewRenderer(
           });
           pass.end();
         };
+        let nativeIndex = 0;
+        for (const source of nativeFrames) {
+          if (needsNativeRgbSource(source)) {
+            const size = { width: source.displayWidth, height: source.displayHeight };
+            validSize(size, device.limits.maxTextureDimension2D);
+            const path = `native:${nativeIndex}`;
+            const target = targetFor(path, size);
+            renderLayers(
+              [{ source, rect: { x: 0, y: 0, ...size }, inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1] }],
+              size,
+              size,
+              path,
+              target
+            );
+            preparedFrames.set(source, target);
+          }
+          nativeIndex++;
+        }
         renderLayers(
           request.layers,
           request.output,
@@ -954,34 +1006,7 @@ export async function createGpuPreviewRenderer(
           }
           device.pushErrorScope('validation');
           let scopeOpen = true;
-          const packedFrames = new Map<VideoFrame, VideoFrame>();
-          const packedSources: { frame: VideoFrame; reservation: Reservation }[] = [];
           try {
-            for (const source of plan.nativeFrames) {
-              const visible = source.visibleRect;
-              if (
-                source.format !== 'NV12' ||
-                !visible ||
-                (visible.x === 0 &&
-                  visible.y === 0 &&
-                  visible.width === source.codedWidth &&
-                  visible.height === source.codedHeight)
-              )
-                continue;
-              // Native copy storage and the packed frame overlap during construction.
-              const count = source.allocationSize() * 2;
-              if (slotBytes + count > MAX_TEXTURE_BYTES)
-                throw new Error('GPU preview source budget exceeded.');
-              const reservation = reserve(count);
-              try {
-                const frame = await prepareDecodedVideoFrame(source.clone(), request.signal);
-                packedSources.push({ frame, reservation });
-                packedFrames.set(source, frame);
-              } catch (error) {
-                reservation.release();
-                throw error;
-              }
-            }
             if (plan.hasEffects) effectPipelines ??= createPreviewPipelines(device, format, true);
             const effects = plan.hasEffects ? await effectPipelines : null;
             if (plan.hasMasked)
@@ -1048,7 +1073,7 @@ export async function createGpuPreviewRenderer(
               encodeFrame(
                 request,
                 { effects, masked, maskedEffects, operations },
-                packedFrames,
+                plan.nativeFrames,
                 outputTexture
               ),
             ]);
@@ -1086,10 +1111,6 @@ export async function createGpuPreviewRenderer(
                   await validation;
                 }
               } finally {
-                for (const source of packedSources) {
-                  source.frame.close();
-                  source.reservation.release();
-                }
                 filter.endFrame();
                 cssFilter?.endFrame();
               }

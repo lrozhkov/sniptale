@@ -5011,10 +5011,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One backend retains device, slot, encoding and completion authority. Conservative draw bounds limit fragment work inside the same encoding transaction. The private geometry helper has no device or publication authority. Fresh independent review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One GPU backend owns source conversion, slot targets, encoding and completion. Native RGB conversion uses the same encoder and submission. Sources remain borrowed until completion. Separate helpers would distribute one resource transaction. Independent diagnosis confirmed Keep for this exact implementation.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "dda0a79062707072e1f3fc5dbf09b4f003539c3a6d48dd608b3619567ee7f45f",
+      "astHash": "05b407a4adf56d425cf6cc2474b91400752b07f787b5ce5d5d5ee9609085a832",
       "signatureHash": "64d03ee42b8e2898569c0c7c9d536c5d779c544b4c854fcfbad5ecf1994e59d0"
     },
     {
@@ -5022,11 +5022,11 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot.encodeFrame",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One backend retains device, slot, encoding and completion authority. Conservative draw bounds limit fragment work inside the same encoding transaction. The private geometry helper has no device or publication authority. Fresh independent review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One GPU backend owns source conversion, slot targets, encoding and completion. Native RGB conversion uses the same encoder and submission. Sources remain borrowed until completion. Separate helpers would distribute one resource transaction. Independent diagnosis confirmed Keep for this exact implementation.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "e09e0d42056fc80bd515e7337e1d4789a3996c6c889cea27ea3c93e0c67903b5",
-      "signatureHash": "f799385f7994330f3b39bb66daa8a62ae5d0692e8863cd847d7f2f5f01bb8458"
+      "astHash": "e87e148230762e06769da2969f1df5babab3aa262384109ae9571785eb54499e",
+      "signatureHash": "3699619d9599e7fa977a93004ec5ccf54bf36fd1cb5a4d53e6fb1c6c5f7f9681"
     },
     {
       "rule": "structural-function-risk",
@@ -5759,10 +5759,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One GPU adapter fixture controls device failures, queue fences, validation and borrowed frame release. Added cases prove explicit image transfer and device retirement. The fixture has one resource and completion model.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-06",
-      "astHash": "62c5ec3af862bb0c2d9977505150e4e9410ba7bd72c9ee0ec3d91c74535d6449",
+      "reason": "tool-noise: One GPU adapter fixture controls device failures, queue fences, validation and source release. Native source cases use the same fixture and resource lifetime. Independent diagnosis found no separate fixture owner.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-07",
+      "astHash": "05b1a017b9d009485d7ee3ca9aa3774f6a780fce3fdfb8b5418377aecd763cf4",
       "signatureHash": "20e3b5c154c41387fd256fe652164f38172e2372ee60cb65f7fa330ff50e1bd3"
     },
     {
@@ -5979,10 +5979,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One backend retains device, slot, encoding and completion authority. Conservative draw bounds limit fragment work inside the same encoding transaction. The private geometry helper has no device or publication authority. Fresh independent review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent device, queue, publication, writer or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: One GPU backend owns source conversion, slot targets, encoding and completion. Native RGB conversion uses the same encoder and submission. Sources remain borrowed until completion. Separate helpers would distribute one resource transaction. Independent diagnosis confirmed Keep for this exact implementation.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "76e1989b46d3905b24ae04899806c242845b5c7c90c034f18744198fab6ffc7b",
+      "astHash": "d0221c37d99db1e18cd42fcd2bb7995ae368f8145da2b077210c1374d65fd9f9",
       "signatureHash": "50b7b6dfa55a91f0767233eb28825159abc77bd5595daebdd5d807e9251bebd0"
     },
     {
@@ -6160,6 +6160,28 @@
       "reviewDate": "2026-11-07",
       "astHash": "4b38f380a0aa6f410bdd1b9bc7ebd3d25d6dfeaaa3f9e6edcc54ab33badcb060",
       "signatureHash": "c65bd33fa4d5a8723e012cbe26a6106f358cce4e6521dd86dc842502389ccf4f"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One GPU backend owns source conversion, slot targets, encoding and completion. Native RGB conversion uses the same encoder and submission. Sources remain borrowed until completion. Separate helpers would distribute one resource transaction. Independent diagnosis confirmed Keep for this exact implementation.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-07",
+      "astHash": "ccd8c818b3cc27c13b160f0aed91345112a4b9cfaba4704b0f2f7f0ef3af890b",
+      "signatureHash": "f2cedc19aea17ca74edd24dde4169bfe2a379a549e4c64af11c1cdcf087fe5ce"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
+      "symbol": "createGpuPreviewRenderer.createSlot.encodeFrame.renderLayers",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: One GPU backend owns source conversion, slot targets, encoding and completion. Native RGB conversion uses the same encoder and submission. Sources remain borrowed until completion. Separate helpers would distribute one resource transaction. Independent diagnosis confirmed Keep for this exact implementation.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any separate device, queue, publication or resource authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-07",
+      "astHash": "a69ae688f98b2c313114285900ac76ac6ef4227368fd16a840db80b62456e101",
+      "signatureHash": "0f953dfa927e13f283213ce8c91dadaf090b7cdb4735945e650568c5b2065352"
     }
   ]
 }
