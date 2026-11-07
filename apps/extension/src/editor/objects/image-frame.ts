@@ -92,7 +92,7 @@ function renderOuterSourceImageShadow(
   const radius = Math.min(Math.max(0, settings.radius), width / 2, height / 2);
   const margin = Math.max(
     256,
-    resolveEditorSourceImageGlowBlur(settings) * 4 + settings.strokeWidth
+    resolveEditorSourceImageGlowBlur(settings, Math.min(width, height)) * 4 + settings.strokeWidth
   );
 
   ctx.save();

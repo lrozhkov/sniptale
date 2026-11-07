@@ -247,7 +247,7 @@ test('image refinements toolbar breakpoints and narrow outer scroll', async ({
 }, info) => {
   await page.setViewportSize({ width: 1438, height: 560 });
   await openEditor(page, hostOrigin, 'ru');
-  for (const width of [1438, 1439, 1440, 1498, 1499, 1500]) {
+  for (const width of [1438, 1439, 1440, 1498, 1499, 1500, 1638, 1639, 1640]) {
     await page.setViewportSize({ width, height: 560 });
     const heights = await page
       .locator(
@@ -257,6 +257,10 @@ test('image refinements toolbar breakpoints and narrow outer scroll', async ({
       )
       .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
     expect(Math.max(...heights) - Math.min(...heights)).toBeLessThanOrEqual(1);
+    const pencil = page.locator('[data-ui="editor.floating.tool-rail.pencil"]');
+    await pencil.click();
+    await expect(pencil).toHaveAttribute('aria-pressed', 'true');
+    await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
   }
   await page.setViewportSize({ width: 1100, height: 560 });
   const outer = page.locator('.sniptale-image-page');

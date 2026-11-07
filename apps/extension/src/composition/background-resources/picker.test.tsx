@@ -239,6 +239,26 @@ it('keeps loading on the chosen thumbnail through acquisition and parent import'
   await act(async () => root.render(<BackgroundImagePicker onSelect={select} />));
   await click('Built');
   const chosen = host.querySelector('[aria-label="Built"]')!;
+  const upload = [...host.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes(translate('settings.editor.backgrounds.upload'))
+  )!;
+  const library = [...host.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes(translate('settings.editor.backgrounds.library'))
+  )!;
+  expect(upload.disabled).toBe(false);
+  expect(library.disabled).toBe(false);
+  expect(upload.getAttribute('aria-disabled')).toBe('true');
+  expect(library.getAttribute('aria-disabled')).toBe('true');
+  expect(upload.querySelector('.lucide-loader-circle')).toBeNull();
+  const inputClick = vi.spyOn(
+    host.querySelector('input[type="file"]') as HTMLInputElement,
+    'click'
+  );
+  await click(translate('settings.editor.backgrounds.upload'));
+  await click(translate('settings.editor.backgrounds.library'));
+  expect(inputClick).not.toHaveBeenCalled();
+  expect(document.querySelector('dialog[open]')).toBeNull();
+
   expect(chosen.getAttribute('aria-busy')).toBe('true');
   expect(chosen.querySelector('[role="status"]')).not.toBeNull();
   await click('Custom');

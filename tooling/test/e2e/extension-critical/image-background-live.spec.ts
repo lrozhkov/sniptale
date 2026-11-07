@@ -206,12 +206,8 @@ for (const { name, size } of [
       await page.screenshot({ path: info.outputPath('shadow-color-applied.png'), fullPage: false });
       await page.getByRole('button', { name: /^Undo/ }).click();
       await expect.poll(() => canvasFingerprint(page)).toBe(beforeColor);
+      const imageModeHistory = await historyIndex(page);
       await kinds.getByRole('button').nth(2).click();
-      await page.locator('[data-ui="editor.frame-panel"] input[type="file"]').setInputFiles({
-        name: 'background.jpg',
-        mimeType: 'image/jpeg',
-        buffer: Buffer.from(source.split(',')[1]!, 'base64'),
-      });
       await expect
         .poll(() =>
           page.evaluate(
@@ -219,6 +215,28 @@ for (const { name, size } of [
           )
         )
         .toBe(true);
+      await expect.poll(() => historyIndex(page)).toBe(imageModeHistory + 1);
+      await expect(page.locator('[data-ui="editor.frame-panel"] > img')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Clear', exact: true })).toHaveCount(0);
+      const previousBackground = await page.evaluate(
+        () => window.__sniptaleEditorHarness!.getInteractionState().frame.backgroundImageData
+      );
+      const uploadHistory = await historyIndex(page);
+      await page.locator('[data-ui="editor.frame-panel"] input[type="file"]').setInputFiles({
+        name: 'background.jpg',
+        mimeType: 'image/jpeg',
+        buffer: Buffer.from(source.split(',')[1]!, 'base64'),
+      });
+      await expect
+        .poll(() =>
+          page.evaluate((previous) => {
+            const current =
+              window.__sniptaleEditorHarness!.getInteractionState().frame.backgroundImageData;
+            return !!current && current !== previous;
+          }, previousBackground)
+        )
+        .toBe(true);
+      await expect.poll(() => historyIndex(page)).toBe(uploadHistory + 1);
       const blurRow = page
         .locator(
           '[data-ui="editor.frame-panel"] [data-ui="shared.ui.compact-inspector.numeric-row"]'
@@ -287,7 +305,18 @@ for (const { name, size } of [
         .locator('[data-ui="editor.frame.actions"]')
         .getByRole('button', { name: 'Reset', exact: true })
         .click();
+      await expect(kinds.getByRole('button').nth(2)).toHaveAttribute('aria-pressed', 'true');
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => window.__sniptaleEditorHarness!.getInteractionState().frame.backgroundBlurAmount
+          )
+        )
+        .toBe(0);
+      await expect(page.locator('[data-ui="editor.frame.actions"] button svg')).toHaveCount(1);
+      await kinds.getByRole('button').first().click();
       await expect(kinds.getByRole('button').first()).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('[data-ui="editor.frame.actions"]')).toHaveCount(0);
       await expect(page.locator('[data-ui="editor.frame.padding-fields"]')).toHaveCount(0);
       await expect(page.getByRole('alert')).toHaveCount(0);
     } finally {

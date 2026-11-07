@@ -3,7 +3,7 @@ import { isFrameBackgroundNone } from '../background/settings';
 import { translate } from '../../../../platform/i18n';
 import type { EditorInspectorFramePanelProps } from '../types';
 
-type BackgroundModeProps = Pick<
+type BackgroundModeProps = { imageDisabled?: boolean | undefined } & Pick<
   EditorInspectorFramePanelProps,
   'frameDraft' | 'lastFillModeRef' | 'setBackgroundMode'
 >;
@@ -27,7 +27,11 @@ export function EditorInspectorFrameBackgroundModeControl(props: BackgroundModeP
         options={[
           { value: 'none', label: translate('editor.scene.backgroundNone') },
           { value: 'color', label: translate('editor.compact.frameBackgroundModeColor') },
-          { value: 'image', label: translate('editor.compact.frameBackgroundModeImage') },
+          {
+            value: 'image',
+            label: translate('editor.compact.frameBackgroundModeImage'),
+            disabled: props.imageDisabled === true,
+          },
         ]}
       />
     </div>

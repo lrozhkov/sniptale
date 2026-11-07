@@ -28,8 +28,22 @@ vi.mock('../../chrome/ui', async (importOriginal) => ({
     onChange: (value: string) => void;
     onPreviewChange?: (value: string) => void;
     onPreviewReset?: (value: string) => void;
+    onOpenChange?: (open: boolean) => void;
   }) => (
     <>
+      <button type="button" data-testid="color-open" onClick={() => props.onOpenChange?.(true)}>
+        open
+      </button>
+      <button
+        type="button"
+        data-testid="alpha-preview"
+        onClick={() => props.onPreviewChange?.('#11223380')}
+      >
+        alpha
+      </button>
+      <button type="button" data-testid="alpha-apply" onClick={() => props.onChange('#11223380')}>
+        apply alpha
+      </button>
       <button
         type="button"
         data-testid="color"
@@ -261,21 +275,53 @@ it('routes all source sliders to live previews with native units and commits sep
     />
   );
   const ranges = container!.querySelectorAll<HTMLButtonElement>('[data-testid="range"]');
-  expect(ranges).toHaveLength(4);
+  expect(ranges).toHaveLength(3);
   for (const range of ranges) {
     act(() => range.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
   }
   expect(applyFramePatch).not.toHaveBeenCalled();
-  for (const patch of [
-    { radius: 50 },
-    { shadow: 50 },
-    { strokeWidth: 50 },
-    { strokeOpacity: 0.5 },
-  ]) {
+  for (const patch of [{ radius: 50 }, { shadow: 50 }, { strokeWidth: 50 }]) {
     expect(previewFramePatch).toHaveBeenCalledWith(
       expect.objectContaining({ sourceImage: expect.objectContaining(patch) })
     );
   }
   for (const range of ranges) act(() => range.click());
-  expect(applyFramePatch).toHaveBeenCalledTimes(4);
+  expect(applyFramePatch).toHaveBeenCalledTimes(3);
+});
+
+it('edits border opacity in the picker and restores the exact legacy fields on Cancel', async () => {
+  const applyFramePatch = vi.fn();
+  const previewFramePatch = vi.fn();
+  const frame = {
+    ...DEFAULT_EDITOR_FRAME_SETTINGS,
+    sourceImage: { ...DEFAULT_EDITOR_IMAGE_SETTINGS, strokeColor: '#123456', strokeOpacity: 0.35 },
+  };
+  const props = { frameDraft: frame, recentColors: [], applyFramePatch, previewFramePatch };
+  await renderUi(<EditorInspectorFrameSourceImageFields {...props} />);
+  const border = () => container!.querySelector('[data-ui="editor.frame.source-border"]')!;
+  expect(border().querySelector('[data-testid="color"]')?.getAttribute('data-value')).toBe(
+    '#12345659'
+  );
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="color-open"]')!.click());
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="alpha-preview"]')!.click());
+  expect(previewFramePatch).toHaveBeenLastCalledWith({
+    sourceImage: expect.objectContaining({ strokeColor: '#112233', strokeOpacity: 128 / 255 }),
+  });
+  const preview = previewFramePatch.mock.calls.at(-1)![0].sourceImage;
+  await renderUi(
+    <EditorInspectorFrameSourceImageFields
+      {...props}
+      frameDraft={{ ...frame, sourceImage: preview }}
+    />
+  );
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="color-open"]')!.click());
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="color-cancel"]')!.click());
+  expect(previewFramePatch).toHaveBeenLastCalledWith({ sourceImage: frame.sourceImage });
+  expect(applyFramePatch).not.toHaveBeenCalled();
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="alpha-apply"]')!.click());
+  expect(applyFramePatch).toHaveBeenCalledOnce();
+  expect(applyFramePatch).toHaveBeenLastCalledWith({
+    sourceImage: expect.objectContaining({ strokeColor: '#112233', strokeOpacity: 128 / 255 }),
+  });
+  expect(border().querySelectorAll('[data-testid="range"]')).toHaveLength(1);
 });

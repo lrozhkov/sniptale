@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { getColorAlpha, multiplyColorAlpha, setColorAlpha } from '@sniptale/foundation/color';
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import type { EditorImageSettings } from '../../../features/editor/document/image-types';
 import { normalizeEditorImageSettings } from '../../../features/editor/document/constants';
@@ -11,10 +13,6 @@ const DEFAULT_SOURCE_IMAGE_LINE_STYLE_OPTIONS = [
   { label: translate('editor.compact.lineStyleDash'), value: 'dash' },
   { label: translate('editor.compact.lineStyleDot'), value: 'dot' },
 ] satisfies CompactSelectOption<EditorImageSettings['strokeStyle']>[];
-
-function getPercentValue(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
 
 function patchSourceImage(
   props: Pick<
@@ -174,24 +172,24 @@ function SourceImageBorderSection(args: {
   const { props, settings } = args;
   return (
     <section className="sniptale-parameter-stack" data-ui="editor.frame.source-border">
-      <SourceImageRangeControl
-        label={translate('editor.compact.blurStrokeWidth')}
-        max={24}
-        value={settings.strokeWidth}
-        valueText={`${settings.strokeWidth}px`}
-        onPreview={
-          props.previewFramePatch
-            ? (strokeWidth) => patchSourceImage(props, { strokeWidth }, true)
-            : undefined
-        }
-        onChange={(strokeWidth) => patchSourceImage(props, { strokeWidth })}
-      />
       <EditorInspectorDetails
         preferenceId="frame:source-image-border"
         level="group"
         label={translate('editor.scene.borderAdvanced')}
       >
         <div className="sniptale-parameter-stack">
+          <SourceImageRangeControl
+            label={translate('editor.compact.blurStrokeWidth')}
+            max={24}
+            value={settings.strokeWidth}
+            valueText={`${settings.strokeWidth}px`}
+            onPreview={
+              props.previewFramePatch
+                ? (strokeWidth) => patchSourceImage(props, { strokeWidth }, true)
+                : undefined
+            }
+            onChange={(strokeWidth) => patchSourceImage(props, { strokeWidth })}
+          />
           <SelectField
             label={translate('highlighter.editor.styleLabel')}
             value={settings.strokeStyle}
@@ -212,33 +210,46 @@ function SourceImageBorderColor(args: {
   settings: EditorImageSettings;
 }) {
   const { props, settings } = args;
+  const original = useRef<Pick<EditorImageSettings, 'strokeColor' | 'strokeOpacity'> | null>(null);
+  const patchColor = (color: string, preview = false) =>
+    patchSourceImage(
+      props,
+      {
+        strokeColor: setColorAlpha(color, 1) ?? color,
+        strokeOpacity: getColorAlpha(color) ?? 1,
+      },
+      preview
+    );
   return (
-    <>
-      <ColorField
-        title={translate('editor.compact.color')}
-        label={translate('editor.compact.color')}
-        value={settings.strokeColor}
-        recentColors={props.recentColors}
-        palette={props.shapeStrokePalette ?? []}
-        onPreviewChange={(strokeColor) => patchSourceImage(props, { strokeColor }, true)}
-        onPreviewReset={(strokeColor) => patchSourceImage(props, { strokeColor }, true)}
-        onChange={(strokeColor) => patchSourceImage(props, { strokeColor })}
-      />
-      <SourceImageRangeControl
-        label={translate('editor.compact.opacity')}
-        max={1}
-        step={0.05}
-        value={settings.strokeOpacity}
-        valueText={getPercentValue(settings.strokeOpacity)}
-        fractionalPercent
-        onPreview={
-          props.previewFramePatch
-            ? (strokeOpacity) => patchSourceImage(props, { strokeOpacity }, true)
-            : undefined
-        }
-        onChange={(strokeOpacity) => patchSourceImage(props, { strokeOpacity })}
-      />
-    </>
+    <ColorField
+      title={translate('editor.compact.color')}
+      label={translate('editor.compact.color')}
+      value={
+        multiplyColorAlpha(settings.strokeColor, settings.strokeOpacity) ?? settings.strokeColor
+      }
+      recentColors={props.recentColors}
+      palette={props.shapeStrokePalette ?? []}
+      onOpenChange={(open) => {
+        if (open)
+          original.current ??= {
+            strokeColor: settings.strokeColor,
+            strokeOpacity: settings.strokeOpacity,
+          };
+        else original.current = null;
+      }}
+      onPreviewChange={(color) => patchColor(color, true)}
+      onPreviewReset={() =>
+        patchSourceImage(
+          props,
+          original.current ?? {
+            strokeColor: settings.strokeColor,
+            strokeOpacity: settings.strokeOpacity,
+          },
+          true
+        )
+      }
+      onChange={(color) => patchColor(color)}
+    />
   );
 }
 

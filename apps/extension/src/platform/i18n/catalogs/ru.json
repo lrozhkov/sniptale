@@ -3026,6 +3026,7 @@
       "previewRendererLegacy": "Стандартный",
       "previewRendererUnavailable": "WebGPU недоступен. Используется стандартный рендер. Проверьте аппаратное ускорение браузера и драйвер видеокарты.",
       "previewRendererFailed": "Сбой WebGPU. Используется стандартный рендер.",
+      "backgroundAdvanced": "Дополнительно",
       "resetBackground": "Сбросить",
       "backgroundNone": "Нет",
       "backgroundPanelSection": "Фон и изображение",

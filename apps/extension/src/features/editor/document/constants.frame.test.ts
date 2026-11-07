@@ -113,9 +113,9 @@ function registerEditorFrameDefaultTests() {
     expect(normalizeEditorImageSettings({ shadow: 20 }).shadowBlur).toBe(0);
     expect(normalizeEditorImageSettings({ shadowBlur: 12 }).shadowBlur).toBe(12);
     expect(resolveEditorSourceImageGlowBlur({ ...DEFAULT_EDITOR_IMAGE_SETTINGS, shadow: 20 })).toBe(
-      15
+      30
     );
-    expect(resolveEditorSourceImageGlowBlur(settingsWithoutBlur)).toBe(15);
+    expect(resolveEditorSourceImageGlowBlur(settingsWithoutBlur)).toBe(30);
   });
 
   it(

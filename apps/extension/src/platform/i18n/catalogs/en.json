@@ -3026,6 +3026,7 @@
       "previewRendererLegacy": "Standard",
       "previewRendererUnavailable": "WebGPU is unavailable. Standard rendering is active. Check browser hardware acceleration and your graphics driver.",
       "previewRendererFailed": "WebGPU failed. Standard rendering is active.",
+      "backgroundAdvanced": "Advanced",
       "resetBackground": "Reset",
       "backgroundNone": "None",
       "backgroundPanelSection": "Background and image",

@@ -30,10 +30,15 @@ export const DEFAULT_EDITOR_IMAGE_SETTINGS: EditorImageSettings = {
   strokeWidth: 0,
 };
 
-export function resolveEditorSourceImageGlowBlur(settings: EditorImageSettings): number {
+export function resolveEditorSourceImageGlowBlur(
+  settings: EditorImageSettings,
+  shortEdge = 1000
+): number {
   const blur = Math.max(0, settings.shadowBlur ?? 0);
   const size = Math.min(100, Math.max(0, settings.shadow));
-  return blur + size * 0.75;
+  // Scale the glow with the source so its full range stays visible when the image is fitted.
+  const extent = Number.isFinite(shortEdge) ? Math.max(1000, shortEdge) : 1000;
+  return blur + size * 0.0015 * extent;
 }
 
 function normalizeUnit(value: unknown, fallback: number): number {

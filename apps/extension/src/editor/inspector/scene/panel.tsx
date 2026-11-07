@@ -1,5 +1,13 @@
+import { translate } from '../../../platform/i18n';
+import { EditorInspectorDetails } from '../grouped';
+import { EditorInspectorFrameBackgroundImageMode } from './background/image-mode';
+import { useDefaultFrameBackgroundImage } from './background/default-image';
 import { InspectorLayout } from '../../../ui/compact-inspector-controls/layout';
-import { disableFrameBackground, isFrameBackgroundNone } from './background/settings';
+import {
+  resetFrameBackground,
+  isFrameBackgroundNone,
+  isFrameBackgroundDefault,
+} from './background/settings';
 import { EditorInspectorFrameBackgroundFillEditor } from './background';
 import { EditorInspectorFrameBackgroundModeControl } from './placement/background';
 import { EditorInspectorFramePlacementSection } from './placement';
@@ -27,6 +35,7 @@ function sourceImageProps(props: EditorInspectorFramePanelProps) {
 }
 
 export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps) {
+  const backgroundSelection = useDefaultFrameBackgroundImage(props);
   return (
     <InspectorLayout>
       <div data-ui="editor.frame-panel" className="min-w-0">
@@ -35,8 +44,12 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
             <EditorInspectorFrameBackgroundModeControl
               frameDraft={props.frameDraft}
               lastFillModeRef={props.lastFillModeRef}
-              setBackgroundMode={props.setBackgroundMode}
+              setBackgroundMode={backgroundSelection.select}
+              imageDisabled={backgroundSelection.pending}
             />
+            {backgroundSelection.failed && (
+              <p role="alert">{translate('settings.editor.backgrounds.failed')}</p>
+            )}
             {!isFrameBackgroundNone(props.frameDraft) && (
               <>
                 <EditorInspectorFrameBackgroundFillEditor
@@ -66,12 +79,6 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
           {!isFrameBackgroundNone(props.frameDraft) && (
             <>
               <div className="sniptale-parameter-stack">
-                <EditorInspectorFramePlacementSection
-                  hideHeader
-                  frameDraft={props.frameDraft}
-                  frameLayoutModeOptions={props.frameLayoutModeOptions}
-                  setLayoutMode={props.setLayoutMode}
-                />
                 <FramePaddingSection
                   frameDraft={props.frameDraft}
                   framePaddingSummary={props.framePaddingSummary}
@@ -83,13 +90,37 @@ export function EditorInspectorFramePanel(props: EditorInspectorFramePanelProps)
               <div className="sniptale-parameter-stack">
                 <EditorInspectorFrameSourceImageBasics {...sourceImageProps(props)} />
                 <EditorInspectorFrameSourceImageEffects {...sourceImageProps(props)} />
+                <EditorInspectorDetails
+                  preferenceId="frame:advanced"
+                  label={translate('editor.scene.backgroundAdvanced')}
+                >
+                  {props.frameDraft.backgroundMode === 'image' &&
+                    props.frameDraft.backgroundImageData && (
+                      <EditorInspectorFrameBackgroundImageMode
+                        frameDraft={props.frameDraft}
+                        applyFramePatch={props.applyFramePatch}
+                        frameBackgroundImageFitOptions={props.frameBackgroundImageFitOptions}
+                      />
+                    )}
+                  <EditorInspectorFramePlacementSection
+                    hideHeader
+                    frameDraft={props.frameDraft}
+                    frameLayoutModeOptions={props.frameLayoutModeOptions}
+                    setLayoutMode={props.setLayoutMode}
+                  />
+                </EditorInspectorDetails>
               </div>
             </>
           )}
         </div>
-        <div data-ui="editor.frame.actions" className="px-2 pb-2 pt-2">
-          <FrameApplyButton onApplyFrame={() => props.setFrameDraft(disableFrameBackground)} />
-        </div>
+        {!isFrameBackgroundNone(props.frameDraft) && (
+          <div data-ui="editor.frame.actions" className="px-2 pb-2 pt-2">
+            <FrameApplyButton
+              disabled={isFrameBackgroundDefault(props.frameDraft)}
+              onApplyFrame={() => props.setFrameDraft(resetFrameBackground)}
+            />
+          </div>
+        )}
       </div>
     </InspectorLayout>
   );

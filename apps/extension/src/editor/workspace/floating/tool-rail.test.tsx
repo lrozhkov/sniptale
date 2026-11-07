@@ -141,8 +141,11 @@ it('renders cursor and drawing tools before the divided annotation group', () =>
   expect(queryUi('editor.floating.tool-rail.frame')).toBeNull();
   expect(queryUi('editor.floating.tool-rail.browser-frame')).toBeNull();
   expect(queryUi('editor.floating.tool-rail.meta')).toBeNull();
-  const dividers = [queryUi('editor.floating.tool-rail.divider.before-frame')];
-  expect(dividers).toHaveLength(1);
+  const dividers = [
+    queryUi('editor.floating.tool-rail.divider.before-drawing'),
+    queryUi('editor.floating.tool-rail.divider.before-frame'),
+  ];
+  expect(dividers).toHaveLength(2);
   expect(queryUi('editor.floating.tool-rail.divider.after-frame')).toBeNull();
   for (const divider of dividers) {
     expect(divider?.classList.contains('sniptale-glass-toolbar-divider')).toBe(true);
@@ -302,14 +305,15 @@ it('uses a top-centered horizontal rail and a separate horizontal history panel'
 
   expect(stack?.className).toContain('left-1/2');
   expect(stack?.className).toContain('top-3');
-  expect(stack?.className).toContain('-translate-x-1/2');
+  expect(stack?.className).not.toContain('-translate-x-1/2');
+  expect(rail?.className).toContain('-translate-x-1/2');
   expect(stack?.className).not.toContain('max-[1439px]:!top-[4.75rem]');
   expect(rail?.className).toContain('flex-row');
   expect(rail?.getAttribute('aria-label')).toBe(translate('shared.ui.commandPaletteToolsSection'));
   const history = queryUi('editor.floating.tool-rail.history');
   expect(history?.className).toContain('flex-row');
   expect(history?.className).toContain('absolute');
-  expect(history?.className).toContain('left-[calc(100%+0.75rem)]');
+  expect(history?.className).toContain('left-[calc(50%+0.75rem)]');
   expect(stack?.firstElementChild).toBe(rail);
   expect(history?.parentElement).toBe(stack);
 });
@@ -327,7 +331,7 @@ it('centers the expanded frame toolbar at HD width while keeping history in the 
   const history = queryUi('editor.floating.tool-rail.history');
   expect(queryUi('content.toolbar.future-frame-callout')).not.toBeNull();
   expect(stack?.className).toContain('max-[1439px]:justify-center');
-  expect(stack?.className).toContain('max-[1439px]:!translate-none');
+  expect(rail?.className).toContain('max-[1439px]:!translate-none');
   expect(rail?.className).not.toContain('max-[1439px]:-translate-x-24');
   expect(history?.className).toContain('max-[1639px]:!fixed');
   expect(history?.className).toContain('max-[1639px]:!left-3');
