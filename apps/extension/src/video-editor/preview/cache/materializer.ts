@@ -2,6 +2,7 @@ import { hasCursorFollowingCameraAt } from '../../../features/video/composition/
 import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import type {
   NativePreviewGpuOutput,
+  PreviewSceneRenderInput,
   NativePreviewGpuTargetFactory,
   PreviewScenePresentation,
 } from '../stage/scene/types';
@@ -42,7 +43,10 @@ import {
   isVideoClip,
 } from '../../../features/video/project/timeline';
 import type { VideoProject } from '../../../features/video/project/types';
-import { createVideoEditorEffectRuntime } from '../../runtime/effect-runtime';
+import {
+  createVideoEditorEffectRuntime,
+  createVideoEditorEffectPreparationExecutor,
+} from '../../runtime/effect-runtime';
 import { renderPreviewScene } from '../stage/scene/render-preview';
 import { createNativeGpuPreviewRenderer } from '../stage/scene/gpu-preview';
 
@@ -66,7 +70,8 @@ export interface VideoPreviewFrameMaterializer {
     time: number,
     signal: AbortSignal,
     cameraOverride?: VideoCompositionCameraState,
-    acquireGpuOutput?: NativePreviewGpuTargetFactory
+    acquireGpuOutput?: NativePreviewGpuTargetFactory,
+    effectPreparation?: PreviewSceneRenderInput['effectPreparation']
   ): Promise<MaterializedPreviewFrame>;
   /** Replaces composition only between frames; false requires a new resource owner. */
   updateProject(project: VideoProject): boolean;
@@ -80,6 +85,7 @@ export interface VideoPreviewFrameMaterializer {
 
 interface VideoPreviewMaterializerState {
   disposed: boolean;
+  effectPreparation: PreviewSceneRenderInput['effectPreparation'];
   playbackSampler: ReturnType<typeof createCompositionCutSampleSource> | null;
   playbackSamplerConversion: 'canvas' | 'native';
   gpuPreview: ReturnType<typeof createNativeGpuPreviewRenderer> | null;
@@ -283,9 +289,11 @@ export function createVideoPreviewFrameMaterializer(params: {
     time: number,
     signal: AbortSignal,
     cameraOverride?: VideoCompositionCameraState,
-    acquireGpuOutput?: NativePreviewGpuTargetFactory
+    acquireGpuOutput?: NativePreviewGpuTargetFactory,
+    effectPreparation?: PreviewSceneRenderInput['effectPreparation']
   ): Promise<MaterializedPreviewFrame> => {
     if (busy) throw new Error('Composition frame is already being materialized.');
+    state.effectPreparation = effectPreparation;
     busy = true;
     try {
       return await (presentation
@@ -606,9 +614,15 @@ function createMaterializerMediaState(
 ): VideoPreviewMaterializerState {
   const state: VideoPreviewMaterializerState = {
     disposed: false,
+    effectPreparation: undefined,
     playbackSampler: null,
     playbackSamplerConversion: 'canvas',
-    gpuPreview: params.previewRenderer === 'legacy' ? null : createNativeGpuPreviewRenderer(),
+    gpuPreview:
+      params.previewRenderer === 'legacy'
+        ? null
+        : createNativeGpuPreviewRenderer(undefined, {
+            createPreparationExecutor: createVideoEditorEffectPreparationExecutor,
+          }),
     spatialRenderer: null,
     stagingCanvas: null,
     captionRenderer: createVideoProjectCaptionRenderer(),
@@ -782,6 +796,7 @@ async function renderMaterializedFrame(
       prepareImages: (frames) => prepareMaterializedImages(state.imageBank, frames, signal),
       previewRasterSize: params.rasterSize,
       project: renderProject,
+      ...(state.effectPreparation ? { effectPreparation: state.effectPreparation } : {}),
       signal,
       stage,
       videoRefs: { current: state.videoRefs },

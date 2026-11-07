@@ -7,6 +7,7 @@ import {
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { usePreviewStageRuntime } from './controller';
+import * as recordingEvents from './recording-events';
 import { usePreviewStagePresentationTime } from './presentation';
 import { usePreviewStageCanvasRender } from '../scene/render';
 import type { PreviewSceneRenderJob } from '../scene/render-scheduler';
@@ -49,6 +50,7 @@ function Harness(props: PreviewStageProps & { direct?: boolean }) {
     previewMode: props.previewMode,
     previewRasterSize: runtime.previewRasterSize,
     project: runtime.render.project,
+    effectPreparationProject: runtime.render.effectPreparationProject,
     resizeVersion: 0,
     videoFrameState,
     videoRefs: runtime.media.videoRefs,
@@ -123,6 +125,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -494,4 +497,37 @@ it('compiles camera inputs before event-window adaptation and preserves the bund
     cursorSpy.mockRestore();
     eventsSpy.mockRestore();
   }
+});
+
+it('forwards stable authored provenance with the latest hydrated project and effective preview cadence', async () => {
+  const base = props();
+  const input = { ...base, project: { ...base.project, fps: 60 }, previewFrameRate: '30' as const };
+  let revision = 0;
+  let source: VideoProject | undefined;
+  let hydrated: VideoProject;
+  let capturedRevision = -1;
+  vi.spyOn(recordingEvents, 'useRecordingEventsProject').mockImplementation((project) => {
+    if (source !== project || capturedRevision !== revision) {
+      source = project;
+      capturedRevision = revision;
+      hydrated = { ...project };
+    }
+    return hydrated;
+  });
+  await render(input);
+  const authored = latest.render.effectPreparationProject;
+  const first = latest.render.project;
+  expect(authored).toBe(input.project);
+  expect(scheduler.enqueue.mock.lastCall![0].effectPreparationProject).toBe(authored);
+  expect(first.fps).toBe(30);
+  revision++;
+  await render({ ...input });
+  expect(latest.render.project).not.toBe(first);
+  expect(latest.render.project.fps).toBe(30);
+  expect(latest.render.effectPreparationProject).toBe(authored);
+  expect(scheduler.enqueue.mock.lastCall![0].project).toBe(latest.render.project);
+  expect(scheduler.enqueue.mock.lastCall![0].effectPreparationProject).toBe(authored);
+  const edited = { ...input, project: { ...input.project, backgroundColor: '#123456' } };
+  await render(edited);
+  expect(latest.render.effectPreparationProject).toBe(edited.project);
 });

@@ -10,6 +10,7 @@ import {
   type GpuPreviewRenderer,
 } from '../../../../features/video/composition/canvas/gpu-preview';
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
+import * as effectPreparation from './effect-preparation';
 import { projectQuickEditPoint } from '../../../../features/video/composition/motion/spatial-geometry';
 import type { renderPreviewScene } from './render-preview';
 import { createSceneGradientBackground } from '../../../../features/video/project/scene/background-gradient';
@@ -1146,4 +1147,36 @@ it('refuses another CPU encoding before the pending frame actually submits', asy
   f.pending[0]!.done.resolve();
   const output = await first;
   if (output && typeof output === 'object') output.release();
+});
+
+it('updates advisory preparation only after successful rendering on its actual provider', async () => {
+  const update = vi.fn(),
+    dispose = vi.fn();
+  const createPreparation = vi
+    .spyOn(effectPreparation, 'createNativeEffectPreparation')
+    .mockReturnValue({ update, dispose });
+  const f = fixture();
+  const context = { project: f.input.project, signal: new AbortController().signal };
+  const input = {
+    ...f.input,
+    effectPreparation: { context, project: f.input.project, time: f.input.currentTime },
+  };
+  const fence = Promise.withResolvers<typeof f.bitmap>();
+  f.render.mockReturnValueOnce(fence.promise);
+  const pending = f.owner.render(input, f.passes, f.finish, () => false);
+  await vi.waitFor(() => expect(f.render).toHaveBeenCalledOnce());
+  expect(update).not.toHaveBeenCalled();
+  fence.resolve(f.bitmap);
+  await expect(pending).resolves.toBe(true);
+  expect(update).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      project: input.project,
+      canvas: input.canvas,
+      effectPreparation: input.effectPreparation,
+    }),
+    await f.create.mock.results[0]!.value
+  );
+  f.owner.dispose();
+  expect(dispose).toHaveBeenCalledOnce();
+  createPreparation.mockRestore();
 });

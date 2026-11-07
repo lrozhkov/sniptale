@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createVideoEditorEffectPreparationExecutor } from '../../../runtime/effect-runtime';
 import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
 import { useCursorTrajectoryProject } from '../runtime/cursor-trajectory';
 import { prepareCursorTrajectoryProject } from '../../../../features/video/project/cursor-trajectory/project-window';
@@ -667,7 +668,10 @@ it('connects reserved preparation only after the live GPU backend is available',
     };
     expect(options.prepare?.(input)).toBeUndefined();
     await options.render(input);
-    expect(createGpu).toHaveBeenCalledExactlyOnceWith(undefined, { maximumInFlight: 2 });
+    expect(createGpu).toHaveBeenCalledExactlyOnceWith(undefined, {
+      maximumInFlight: 2,
+      createPreparationExecutor: createVideoEditorEffectPreparationExecutor,
+    });
     expect(options.maximumInFlight).toBe(2);
     const prepared = await options.prepare?.(input);
     expect(prepared?.input.preparedFrame?.compositionTime).toBe(0);

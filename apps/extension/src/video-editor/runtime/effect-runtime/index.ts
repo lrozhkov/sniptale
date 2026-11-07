@@ -24,3 +24,13 @@ export function createVideoEditorEffectRuntime(args: {
     ownerDocument: args.ownerDocument,
   };
 }
+
+/** Create an isolated advisory session that cannot materialize a bitmap fallback. */
+export function createVideoEditorEffectPreparationExecutor(
+  ownerDocument: Document
+): EffectRuntimeSandboxExecutor {
+  return createEffectRuntimeSandboxExecutor({
+    ownerDocument,
+    compositionBackend: 'gpu-scene-plan',
+  });
+}

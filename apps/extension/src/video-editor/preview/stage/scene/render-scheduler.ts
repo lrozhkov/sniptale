@@ -3,11 +3,13 @@ import type {
   PreviewScenePresentation,
   PreviewScenePreparedFrame,
 } from './types';
+import { resolvePreviewCompositionFrameSize } from './canvas';
 import type { renderPreviewScene } from './render-preview';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 
 export type PreviewSceneRenderJob = Parameters<typeof renderPreviewScene>[0] & {
   controller: AbortController;
+  effectPreparationProject?: Parameters<typeof renderPreviewScene>[0]['project'] | undefined;
   /** The mounted frontend receives the completed output; the producer receives only acquisition. */
   framePresenter?: NativePreviewFramePresenter;
   onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
@@ -44,6 +46,12 @@ interface PreviewSceneRenderSchedulerState {
   active: ActiveRender[];
   latestJob: PreviewSceneRenderJob | null;
   failure: { error: unknown; retry: boolean } | null;
+  effectPreparation: {
+    context: NonNullable<PreviewSceneRenderJob['effectPreparation']>['context'];
+    controller: AbortController;
+    dimensions: string;
+    ownerDocument: Document;
+  } | null;
   lastPlaybackRenderStartedAt: number | null;
   pendingJob: PreviewSceneRenderJob | null;
   scheduledStartTimeout: ReturnType<typeof setTimeout> | null;
@@ -76,6 +84,7 @@ export function createPreviewSceneRenderScheduler(
     active: [],
     latestJob: null,
     failure: null,
+    effectPreparation: null,
     lastPlaybackRenderStartedAt: null,
     pendingJob: null,
     scheduledStartTimeout: null,
@@ -85,6 +94,8 @@ export function createPreviewSceneRenderScheduler(
   return {
     dispose() {
       state.disposed = true;
+      state.effectPreparation?.controller.abort();
+      state.effectPreparation = null;
       clearScheduledStart(state);
       for (const active of state.active) active.job.controller.abort();
       state.preparingJob?.controller.abort();
@@ -96,6 +107,54 @@ export function createPreviewSceneRenderScheduler(
         job.controller.abort();
         return () => undefined;
       }
+      const eligible =
+        !!job.effectPreparationProject &&
+        job.isPlaybackFrame &&
+        job.previewRenderer === 'gpu' &&
+        job.previewMode !== 'cache';
+      const output = eligible
+        ? (job.previewRasterSize ?? resolvePreviewCompositionFrameSize(job))
+        : null;
+      const dimensions = JSON.stringify([
+        job.project.fps,
+        job.project.width,
+        job.project.height,
+        output?.width,
+        output?.height,
+        job.renderGeneration,
+        job.runtimeVersion,
+        job.previewRenderer,
+        job.previewMode,
+        job.previewCacheBypass,
+      ]);
+      const preparation = state.effectPreparation;
+      if (
+        !eligible ||
+        !output ||
+        !preparation ||
+        preparation.context.project !== job.effectPreparationProject ||
+        preparation.dimensions !== dimensions ||
+        preparation.ownerDocument !== job.canvas.ownerDocument
+      ) {
+        state.effectPreparation?.controller.abort();
+        state.effectPreparation = null;
+      }
+      if (eligible && output) {
+        if (!state.effectPreparation) {
+          const controller = new AbortController();
+          state.effectPreparation = {
+            controller,
+            context: { project: job.effectPreparationProject!, signal: controller.signal },
+            dimensions,
+            ownerDocument: job.canvas.ownerDocument,
+          };
+        }
+        job.effectPreparation = {
+          context: state.effectPreparation.context,
+          project: job.project,
+          time: job.currentTime,
+        };
+      } else delete job.effectPreparation;
       state.latestJob = job;
       const reserved = state.prepared?.job ?? state.preparingJob;
       if (reserved && state.pendingJob === reserved && canRetainPreparation(reserved, job)) {
@@ -131,6 +190,7 @@ function renderInput(job: PreviewSceneRenderJob): Parameters<typeof renderPrevie
     framePresenter: _presenter,
     runtimeVersion: _runtime,
     layoutVersion: _layout,
+    effectPreparationProject: _provenance,
     ...input
   } = job;
   return { ...input, signal: job.controller.signal };
@@ -255,6 +315,8 @@ function failRender(
 ) {
   if (state.failure || state.disposed) return;
   state.failure = { error, retry: args.retrySerial?.(error) === true };
+  state.effectPreparation?.controller.abort();
+  state.effectPreparation = null;
   clearScheduledStart(state);
   for (const active of state.active) active.job.controller.abort();
   if (state.preparingJob) {

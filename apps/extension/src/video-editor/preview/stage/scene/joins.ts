@@ -111,7 +111,9 @@ export function createVideoPreviewCompositionJoinRenderer(
         const frame = await current.materializer.renderFrameWithPresentation(
           input.currentTime,
           signal,
-          input.cameraOverride
+          input.cameraOverride,
+          undefined,
+          input.effectPreparation
         );
         signal.throwIfAborted();
         const published = publishPreviewCompositionFrame({ ...input, signal }, frame.canvas);

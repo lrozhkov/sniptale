@@ -133,6 +133,7 @@ export interface PreviewStageCanvasProps {
   previewExactFrameCache: VideoPreviewExactFrameCache;
   renderGenerationRef?: React.MutableRefObject<number>;
   project: VideoProject;
+  effectPreparationProject?: VideoProject | undefined;
   selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedClip: VideoProjectClip | null;
   selectedClipId: string | null;

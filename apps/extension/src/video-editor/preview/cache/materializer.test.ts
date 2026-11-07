@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import * as nativeGpu from '../stage/scene/gpu-preview';
+import { createVideoEditorEffectPreparationExecutor } from '../../runtime/effect-runtime';
 import type { NativePreviewGpuTargetFactory, PreviewScenePresentation } from '../stage/scene/types';
 import type { GpuPreviewRenderer } from '../../../features/video/composition/canvas/gpu-preview';
 import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
@@ -1308,4 +1310,42 @@ it('does not wait for irrelevant camera preparation on an ordinary materialized 
   expect(camera).not.toHaveBeenCalled();
   expect(renderPreviewScene).toHaveBeenCalledOnce();
   materializer.dispose();
+});
+
+it('forwards the admitted original project to its own GPU provider across derived render projects', async () => {
+  const gpu = { acceptsNativeFrames: true, render: vi.fn(async () => false), dispose: vi.fn() };
+  const createGpu = vi.spyOn(nativeGpu, 'createNativeGpuPreviewRenderer').mockReturnValue(gpu);
+  const project = createEmptyVideoProject('Advisory materializer', 320, 180);
+  project.duration = 3;
+  const context = { project, signal: new AbortController().signal };
+  const latestProject = { ...project, fps: 24 };
+  const preparation = { context, project: latestProject, time: 1 };
+  const owner = createVideoPreviewFrameMaterializer({
+    project,
+    ownerDocument: document,
+    assetUrls: {},
+    rasterSize: { width: 320, height: 180 },
+  });
+  try {
+    await owner.renderFrameWithPresentation(
+      1,
+      new AbortController().signal,
+      undefined,
+      undefined,
+      preparation
+    );
+    expect(createGpu).toHaveBeenCalledWith(undefined, {
+      createPreparationExecutor: createVideoEditorEffectPreparationExecutor,
+    });
+    expect(renderPreviewScene).toHaveBeenLastCalledWith(
+      expect.objectContaining({ gpuPreview: gpu, effectPreparation: preparation })
+    );
+    expect(renderPreviewScene.mock.lastCall![0].effectPreparation!.project).toBe(latestProject);
+    expect(renderPreviewScene.mock.lastCall![0].effectPreparation!.context.project).toBe(project);
+    await owner.renderFrameWithPresentation(1.1, new AbortController().signal);
+    expect(renderPreviewScene.mock.lastCall![0]).not.toHaveProperty('effectPreparation');
+  } finally {
+    owner.dispose();
+    createGpu.mockRestore();
+  }
 });

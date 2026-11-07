@@ -58,6 +58,8 @@ export interface PreviewStageCanvasSceneParams {
   previewMode?: VideoEditorPreviewMode;
   previewRenderer?: VideoPreviewRenderer;
   project: VideoProject;
+  /** Stable authored snapshot, before runtime hydration. */
+  effectPreparationProject?: VideoProject | undefined;
   renderGeneration?: number;
   renderGenerationRef?: React.MutableRefObject<number> | undefined;
   stageRef: React.RefObject<HTMLDivElement | null>;
@@ -97,7 +99,20 @@ interface PreviewSceneFramePlan {
   >;
 }
 
+/** Admitted immutable source context; its lifetime spans ordinary playback frames. */
+interface NativeEffectPreparationContext {
+  /** Authored identity; runtime hydration does not replace this snapshot. */
+  readonly project: VideoProject;
+  readonly signal: AbortSignal;
+}
+
 export type PreviewSceneRenderInput = {
+  /** Future plan data retains current hydration and cadence, independently of authored identity. */
+  effectPreparation?: {
+    context: NativeEffectPreparationContext;
+    project: VideoProject;
+    time: number;
+  };
   /** Borrowed preparation; its caller releases it after render completion. */
   preparedFrame?: PreviewSceneFramePlan;
   /** Final GPU work was submitted; publication and source release still await completion. */

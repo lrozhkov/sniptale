@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } fr
 
 import {
   createVideoEditorEffectRuntime,
+  createVideoEditorEffectPreparationExecutor,
   type VideoEditorEffectRuntime,
 } from '../../../runtime/effect-runtime';
 import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
@@ -102,6 +103,7 @@ function usePreviewStageRenderEffect(
         previewMode: current.previewMode,
         previewRenderer: current.previewRenderer ?? 'gpu',
         project: current.project,
+        effectPreparationProject: current.effectPreparationProject,
         renderGeneration: current.renderGenerationRef?.current ?? current.renderGeneration ?? 0,
         runtimeVersion: current.effectRuntimeFeedback.retryVersion,
         layoutVersion: current.resizeVersion,
@@ -160,6 +162,7 @@ function usePreviewStageRenderEffect(
     params.imageBank,
     params.isPlaying,
     params.project,
+    params.effectPreparationProject,
     activeClipKey,
     params.previewMode,
     params.previewRenderer,
@@ -203,6 +206,7 @@ function createPreviewStageCanvasRenderJob(args: {
   previewMode: PreviewStageCanvasSceneParams['previewMode'];
   previewRenderer: PreviewStageCanvasSceneParams['previewRenderer'];
   project: PreviewStageCanvasSceneParams['project'];
+  effectPreparationProject?: PreviewStageCanvasSceneParams['effectPreparationProject'];
   renderGeneration: number;
   runtimeVersion: number;
   layoutVersion: number;
@@ -243,6 +247,7 @@ function createPreviewStageCanvasRenderJob(args: {
       : { previewCacheBypass: args.previewCacheBypass }),
     ...(args.previewMode ? { previewMode: args.previewMode } : {}),
     project: args.project,
+    effectPreparationProject: args.effectPreparationProject,
     renderGeneration: args.renderGeneration,
     runtimeVersion: args.runtimeVersion,
     layoutVersion: args.layoutVersion,
@@ -358,7 +363,10 @@ function usePreviewRenderSchedulerRef(
             prepareNativePreviewSceneFrame
           );
           if (input.previewRenderer !== 'legacy')
-            gpuRef.current ??= createNativeGpuPreviewRenderer(undefined, { maximumInFlight: 2 });
+            gpuRef.current ??= createNativeGpuPreviewRenderer(undefined, {
+              maximumInFlight: 2,
+              createPreparationExecutor: createVideoEditorEffectPreparationExecutor,
+            });
           return joinsRef.current.render({
             ...input,
             ...(gpuRef.current ? { gpuPreview: gpuRef.current } : {}),

@@ -840,7 +840,9 @@ it.each(['project', 'layout', 'runtime', 'seek'] as const)(
       currentTime: 4,
       controller: new AbortController(),
       ...(kind === 'project' ? { project: { ...f.first.project } } : {}),
-      ...(kind === 'layout' ? { layoutVersion: 1 } : {}),
+      ...(kind === 'layout'
+        ? { layoutVersion: 1, previewRasterSize: { width: 1280, height: 720 } }
+        : {}),
       ...(kind === 'runtime' ? { runtimeVersion: 1 } : {}),
       ...(kind === 'seek' ? { renderGeneration: 1 } : {}),
     };
@@ -902,4 +904,157 @@ it('waits for cancelled CPU preparation before shared error cleanup', async () =
   expect(prepared.release).toHaveBeenCalledOnce();
   expect(f.error).toHaveBeenCalledExactlyOnceWith(failure);
   f.scheduler.dispose();
+});
+
+it('keeps one advisory context across admitted playback frames and retires it on seek', async () => {
+  const render = vi.fn<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>(
+    async () => {}
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, onError: vi.fn() });
+  const source = { ...createProject([]), fps: 60 };
+  const first = {
+    ...createJob(1, true),
+    project: source,
+    effectPreparationProject: source,
+    previewRasterSize: { width: 1904, height: 1072 },
+    previewRenderer: 'gpu' as const,
+  };
+  scheduler.enqueue(first);
+  await admit();
+  const a = render.mock.calls[0]![0].effectPreparation;
+  expect(a).toBeDefined();
+  expect(a!.context.project).toBe(first.project);
+  expect(a!.context.signal.aborted).toBe(false);
+  const second = { ...first, currentTime: 1.1, controller: new AbortController() };
+  scheduler.enqueue(second);
+  await admit();
+  const b = render.mock.calls[1]![0].effectPreparation;
+  expect(b!.context).toBe(a!.context);
+  expect(b!.time).toBe(1.1);
+  second.controller.abort();
+  expect(a!.context.signal.aborted).toBe(false);
+  const seek = {
+    ...first,
+    currentTime: 0.5,
+    renderGeneration: 1,
+    controller: new AbortController(),
+  };
+  scheduler.enqueue(seek);
+  expect(a!.context.signal.aborted).toBe(true);
+  await admit();
+  const c = render.mock.calls[2]![0].effectPreparation;
+  expect(c!.context).not.toBe(a!.context);
+  scheduler.dispose();
+  expect(c!.context.signal.aborted).toBe(true);
+});
+
+it.each([
+  'project',
+  'layout',
+  'logical',
+  'fps',
+  'document',
+  'provenance',
+  'runtime',
+  'renderer',
+  'cache',
+  'paused',
+] as const)('retires advisory context immediately for %s invalidation', async (kind) => {
+  const render = vi.fn<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>(
+    async () => {}
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, onError: vi.fn() });
+  const source = { ...createProject([]), fps: 60 };
+  const first = {
+    ...createJob(1, true),
+    project: source,
+    effectPreparationProject: source,
+    previewRasterSize: { width: 1904, height: 1072 },
+    previewRenderer: 'gpu' as const,
+  };
+  scheduler.enqueue(first);
+  await admit();
+  const context = render.mock.calls[0]![0].effectPreparation!.context;
+  const next: PreviewSceneRenderJob = {
+    ...first,
+    currentTime: 1.1,
+    controller: new AbortController(),
+    ...(kind === 'project'
+      ? { project: { ...first.project }, effectPreparationProject: { ...source } }
+      : {}),
+    ...(kind === 'logical'
+      ? { project: { ...first.project, width: first.project.width + 1 } }
+      : {}),
+    ...(kind === 'fps' ? { project: { ...first.project, fps: first.project.fps + 1 } } : {}),
+    ...(kind === 'document'
+      ? { canvas: document.implementation.createHTMLDocument().createElement('canvas') }
+      : {}),
+    ...(kind === 'provenance' ? { effectPreparationProject: undefined } : {}),
+    ...(kind === 'layout'
+      ? { layoutVersion: 1, previewRasterSize: { width: 1280, height: 720 } }
+      : {}),
+    ...(kind === 'runtime' ? { runtimeVersion: 1 } : {}),
+    ...(kind === 'renderer' ? { previewRenderer: 'legacy' } : {}),
+    ...(kind === 'cache' ? { previewMode: 'cache' } : {}),
+    ...(kind === 'paused' ? { isPlaybackFrame: false } : {}),
+  };
+  scheduler.enqueue(next);
+  expect(context.signal.aborted).toBe(true);
+  await admit();
+  if (kind === 'renderer' || kind === 'cache' || kind === 'paused')
+    expect(render.mock.lastCall![0]).not.toHaveProperty('effectPreparation');
+  scheduler.dispose();
+});
+
+it('keeps advisory provenance while a hydrated view invalidates foreground rendering', async () => {
+  const completion = Promise.withResolvers<void>();
+  const render = vi
+    .fn<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>()
+    .mockReturnValueOnce(completion.promise)
+    .mockResolvedValue(undefined);
+  const scheduler = createPreviewSceneRenderScheduler({ render, onError: vi.fn() });
+  const source = { ...createProject([]), fps: 60 };
+  const first = {
+    ...createJob(12, true),
+    project: { ...source },
+    effectPreparationProject: source,
+    previewRenderer: 'gpu' as const,
+    previewRasterSize: { width: 1904, height: 1072 },
+  };
+  scheduler.enqueue(first);
+  const context = render.mock.calls[0]![0].effectPreparation!.context;
+  const hydrated = {
+    ...first,
+    project: { ...first.project },
+    previewRasterSize: { ...first.previewRasterSize },
+    renderRevision: Promise.resolve('unchanged-content'),
+    onCameraPresented: vi.fn(),
+    currentTime: 12.15,
+    controller: new AbortController(),
+  };
+  try {
+    scheduler.enqueue(hydrated);
+    expect(first.controller.signal.aborted).toBe(true);
+    expect(context.signal.aborted).toBe(false);
+    completion.resolve();
+    await admit();
+    const next = render.mock.lastCall![0].effectPreparation!;
+    expect(next.context).toBe(context);
+    expect(next.context.project).toBe(source);
+    expect(next.project).toBe(hydrated.project);
+  } finally {
+    completion.resolve();
+    scheduler.dispose();
+  }
+});
+
+it('does not infer advisory provenance from an arbitrary render project', async () => {
+  const render = vi.fn<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>(
+    async () => {}
+  );
+  const scheduler = createPreviewSceneRenderScheduler({ render, onError: vi.fn() });
+  scheduler.enqueue({ ...createJob(1, true), previewRenderer: 'gpu' });
+  await admit();
+  expect(render.mock.calls[0]![0]).not.toHaveProperty('effectPreparation');
+  scheduler.dispose();
 });

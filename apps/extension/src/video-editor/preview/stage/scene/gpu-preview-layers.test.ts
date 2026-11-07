@@ -10,7 +10,7 @@ import { createQuickEditSpotlight } from '../../../../features/video/project/sce
 import type { GpuPreviewLayer } from '../../../../features/video/composition/canvas/gpu-preview';
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import type { renderPreviewScene } from './render-preview';
-import { buildNativeGpuPreviewLayers } from './gpu-preview-layers';
+import { buildNativeGpuPreviewLayers, buildNativeGpuEffectLayer } from './gpu-preview-layers';
 import { createNativeGpuPreviewMaterials } from './gpu-preview-materials';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
@@ -1268,4 +1268,39 @@ it('keeps ordinary source feedback artwork and its GPU group local to the painte
   expect(plan.layers.at(-1)!.rect.height).toBeLessThan(32);
   plan.release();
   expect((feedback.source as HTMLCanvasElement).width).toBe(0);
+});
+
+it('shares the exact attached SDK wrapper between foreground and descriptor-only preparation', async () => {
+  const { f, effect, bitmap, frames } = await attachedFixture();
+  const plan = await buildNativeGpuPreviewLayers({
+    ...f,
+    effects: { overlayFrames: frames, framesByTime: new Map([[1, frames]]) },
+  });
+  plans.push(plan);
+  const nodes = flatten(plan.layers);
+  const original = nodes.find((layer) => layer.cssFilter?.blur === effect.renderState.blurAmount);
+  if (!original || !('kind' in original.source) || original.source.kind !== 'group')
+    throw new Error('Expected attached group');
+  const mask = flatten([original]).find((layer) => layer.blend === 'mask')!;
+  const source = mask.source;
+  const paint = vi.fn();
+  const wrapped = buildNativeGpuEffectLayer({
+    layer: effect,
+    frame: frames.get('attached')!,
+    fullFrame: false,
+    plane: original.rect,
+    mask: (key, draw) => {
+      expect(key).toBeTypeOf('string');
+      paint(draw);
+      return { source, rect: original.rect, inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1] };
+    },
+  });
+  expect(original).toEqual(wrapped);
+  expect(wrapped.cssFilter).toEqual({
+    blur: effect.renderState.blurAmount,
+    brightness: 1,
+    saturate: 1,
+  });
+  expect(paint).toHaveBeenCalledOnce();
+  expect(bitmap.close).not.toHaveBeenCalled();
 });

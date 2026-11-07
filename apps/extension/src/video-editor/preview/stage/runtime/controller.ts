@@ -244,6 +244,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
       currentTime: transient.currentTime,
       effectRuntimeFeedback,
       project: previewProject,
+      effectPreparationProject: transient.previewProject,
       renderGenerationRef,
     },
     surface,

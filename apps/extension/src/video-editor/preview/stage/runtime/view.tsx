@@ -57,6 +57,7 @@ function buildPreviewStageSurfaceProps(
     previewZoom: props.previewZoom,
     previewStatus: runtime.media.previewStatus,
     project: runtime.render.project,
+    effectPreparationProject: runtime.render.effectPreparationProject,
     renderGenerationRef: runtime.render.renderGenerationRef,
     selectedActionOccurrence: props.selectedActionOccurrence,
     selectedClip: runtime.surface.selectedClip,

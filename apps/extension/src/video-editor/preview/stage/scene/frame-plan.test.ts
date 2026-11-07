@@ -1,11 +1,20 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { parseEffectRuntimeSnapshotDocument } from '../../../../features/video/composition/effect-runtime/runtime/snapshot-document';
+import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
+import { scaleEffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/render/wave';
 import {
   createProject,
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-import { captureNativePreviewSources, prepareNativePreviewSceneFrame } from './frame-plan';
+import {
+  captureNativePreviewSources,
+  prepareNativePreviewSceneFrame,
+  resolveUpcomingNativeEffect,
+  resolveUpcomingNativeEffectOnset,
+} from './frame-plan';
 import type { PreviewSceneRenderInput } from './types';
 
 afterEach(() => {
@@ -137,4 +146,106 @@ it('rolls back partial captures when a later source is unavailable', () => {
   expect(result).toBeNull();
   expect(f.frames).toHaveLength(1);
   expect(f.frames[0]!.close).toHaveBeenCalledOnce();
+});
+
+function futureFixture() {
+  const f = fixture();
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'utf8'
+  );
+  const document = parseEffectRuntimeSnapshotDocument({ source });
+  const id = 'a'.repeat(64);
+  f.input.project.effectSnapshots = [
+    {
+      id: `effect:${id}`,
+      source,
+      sha256: id,
+      documentId: document.id,
+      assets: [],
+      kind: 'standalone',
+      schemaVersion: 'sniptale.effect.v1',
+      retainedByteLength: new TextEncoder().encode(source).byteLength,
+    },
+  ];
+  f.input.project.effectInstances = [
+    {
+      id: 'future',
+      snapshotId: `effect:${id}`,
+      controls: {},
+      duration: document.duration,
+      enabled: true,
+      kind: 'standalone',
+      playbackRate: 1,
+      startTime: 2,
+      target: { kind: 'scene' },
+    },
+  ];
+  const host = createEffectHostClip({
+    effectInstanceId: 'future',
+    name: 'Future',
+    startTime: 2,
+    duration: document.duration,
+    trackId: f.input.project.tracks[0]!.id,
+    projectWidth: f.input.project.width,
+    projectHeight: f.input.project.height,
+  });
+  f.input.project.clips.push(host);
+  f.input.currentTime = 1.1;
+  f.input.previewRasterSize = { width: 640, height: 360 };
+  Object.defineProperties(f.input.canvas, {
+    clientWidth: { value: 640 },
+    clientHeight: { value: 360 },
+  });
+  return { ...f, host };
+}
+
+it('selects the actual scaled future standalone plan without capturing or seeking media', () => {
+  const f = futureFixture(),
+    before = f.video.currentTime;
+  const candidate = resolveUpcomingNativeEffect(f.input);
+  expect(candidate).not.toBeNull();
+  if (!candidate) throw new Error('Expected future effect');
+  expect(candidate.onset).toBe(2);
+  expect(candidate.time).toBeGreaterThan(2);
+  expect(candidate.time).toBeLessThanOrEqual(2 + 2 / f.input.project.fps);
+  const expected = resolveVideoCompositionRenderPasses(
+    f.input.project,
+    candidate.time
+  ).overlayFrame.effectRuntimePlans!.find((plan) => plan.effectInstanceId === 'future')!;
+  const scale = Math.min(640 / f.input.project.width, 360 / f.input.project.height);
+  expect(candidate.plan).toEqual(scaleEffectRuntimeFramePlan(expected, scale));
+  expect(candidate.layer.clipId).toBe(f.host.id);
+  expect(candidate.plan.target).toMatchObject({ kind: 'scene', clipId: f.host.id });
+  expect(candidate.fullFrame).toBe(false);
+  expect(candidate.logical).toEqual({
+    width: f.input.project.width,
+    height: f.input.project.height,
+  });
+  expect(candidate.output).toEqual({ width: 640, height: 360 });
+  expect(f.frames).toEqual([]);
+  expect(f.video.currentTime).toBe(before);
+});
+
+it.each(['hidden', 'disabled', 'unreferenced', 'outside'] as const)(
+  'does not select an ineligible future standalone effect (%s)',
+  (reason) => {
+    const f = futureFixture();
+    if (reason === 'hidden') f.input.project.tracks[0]!.visible = false;
+    if (reason === 'disabled') f.input.project.effectInstances![0]!.enabled = false;
+    if (reason === 'unreferenced')
+      f.input.project.clips = f.input.project.clips.filter((clip) => clip.id !== f.host.id);
+    if (reason === 'outside') f.input.currentTime = 0.5;
+    expect(resolveUpcomingNativeEffect(f.input)).toBeNull();
+    expect(f.frames).toEqual([]);
+  }
+);
+
+it('selects a cheap onset without resolving future composition or touching media', () => {
+  const f = futureFixture();
+  const spy = vi.spyOn(f.input.canvas, 'getContext');
+  const next = resolveUpcomingNativeEffectOnset(f.input.project, f.input.currentTime);
+  expect(next).toMatchObject({ clipId: f.host.id, effectInstanceId: 'future', onset: 2 });
+  expect(spy).not.toHaveBeenCalled();
+  expect(f.frames).toEqual([]);
 });

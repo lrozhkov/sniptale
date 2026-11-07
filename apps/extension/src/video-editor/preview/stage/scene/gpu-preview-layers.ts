@@ -100,6 +100,30 @@ function integerArtworkBounds(bounds: GpuPreviewLayer['rect'] | null) {
   return { x, y, width: right - x, height: bottom - y };
 }
 
+function layerProjection(layer: Layer): QuickEditHomography {
+  const state = layer.renderState;
+  const angle = (layer.rotation * Math.PI) / 180,
+    c = Math.cos(angle),
+    s = Math.sin(angle);
+  const x = layer.x + layer.width / 2,
+    y = layer.y + layer.height / 2;
+  const a = state.scaleX * c,
+    b = -state.scaleX * s,
+    d = state.scaleY * s,
+    e = state.scaleY * c;
+  return [
+    a,
+    b,
+    x + state.translateX - a * x - b * y,
+    d,
+    e,
+    y + state.translateY - d * x - e * y,
+    0,
+    0,
+    1,
+  ];
+}
+
 /** Describes ordered GPU work; vector artwork and alpha masks never read back video pixels. */
 export async function buildNativeGpuPreviewLayers(args: {
   sourceMask?: NativeGpuSourceMaterial;
@@ -404,29 +428,7 @@ export async function buildNativeGpuPreviewLayers(args: {
     result.push({ source: masks.dim, rect: { x: 0, y: 0, ...logical }, inverse: IDENTITY });
     return result;
   };
-  const layerProjection = (layer: Layer): QuickEditHomography => {
-    const state = layer.renderState;
-    const angle = (layer.rotation * Math.PI) / 180,
-      c = Math.cos(angle),
-      s = Math.sin(angle);
-    const x = layer.x + layer.width / 2,
-      y = layer.y + layer.height / 2;
-    const a = state.scaleX * c,
-      b = -state.scaleX * s,
-      d = state.scaleY * s,
-      e = state.scaleY * c;
-    return [
-      a,
-      b,
-      x + state.translateX - a * x - b * y,
-      d,
-      e,
-      y + state.translateY - d * x - e * y,
-      0,
-      0,
-      1,
-    ];
-  };
+
   const sourceBodies = new Map<VideoLayer, NativeGpuVideoSourceBody>();
   const video = (layer: VideoLayer, sourceOwner = layer): GpuPreviewLayer[] => {
     const source = args.sources.get(layer.clipId);
@@ -490,98 +492,25 @@ export async function buildNativeGpuPreviewLayers(args: {
         const frame = selected.frame;
         if ('retain' in frame && !repeated) retained.push(frame.retain());
         if (repeated) body = [];
-        else if (selected.fullFrame)
+        else
           body = [
-            {
-              source: 'source' in frame ? frame.source : frame.bitmap,
-              rect: { x: 0, y: 0, width: frame.logicalWidth, height: frame.logicalHeight },
-              inverse: IDENTITY,
-            },
-          ];
-        else {
-          const bounds = frame.bitmapBounds ?? { x: 0, y: 0, width: 1, height: 1 };
-          const local: GpuPreviewLayer = {
-            source: 'source' in frame ? frame.source : frame.bitmap,
-            rect: {
-              x: layer.x + bounds.x * layer.width,
-              y: layer.y + bounds.y * layer.height,
-              width: bounds.width * layer.width,
-              height: bounds.height * layer.height,
-            },
-            inverse: invertQuickEditProjection(layerProjection(layer))!,
-            opacity: layer.opacity,
-          };
-          if (!local.inverse) throw new Error('Effect bitmap projection is unavailable.');
-          if (layer.kind === 'effect' && layer.sourceAttachment) {
-            const { owner, mapping, innerTransform } = layer.sourceAttachment;
-            const window = getFittedMediaWindowFrame(mapping),
-              content = getFittedMediaContentFrame(mapping);
-            const placement: QuickEditHomography = [
-              content.width / mapping.sourceWidth,
-              0,
-              content.x,
-              0,
-              content.height / mapping.sourceHeight,
-              content.y,
-              0,
-              0,
-              1,
-            ];
-            const transform = multiplyQuickEditProjections(innerTransform ?? IDENTITY, placement);
-            const inverse = invertQuickEditProjection(transform);
-            const ownerInverse = invertQuickEditProjection(layerProjection(owner));
-            if (!inverse || !ownerInverse)
-              throw new Error('Attached effect projection is unavailable.');
-            const paintCoverage = (context: CanvasRenderingContext2D) => {
-              context.fillStyle = '#fff';
-              context.beginPath();
-              context.roundRect(
-                window.x,
-                window.y,
-                window.width,
-                window.height,
-                roundedWindowRadius(window.width, window.height, mapping.windowCornerRadius ?? 0)
-              );
-              context.fill();
-              if (mapping.sourceCrop) {
-                const crop = mapping.sourceCrop;
-                context.globalCompositeOperation = 'destination-in';
-                context.fillRect(
-                  content.x + crop.x * content.width,
-                  content.y + crop.y * content.height,
-                  crop.width * content.width,
-                  crop.height * content.height
-                );
-              }
-            };
-            const coverageKey = JSON.stringify([
-              window,
-              mapping.windowCornerRadius ?? 0,
-              mapping.sourceCrop ? [mapping.sourceCrop, content] : null,
-            ]);
-            const coverage = args.annotationMask?.(
-              input.canvas.ownerDocument,
+            buildNativeGpuEffectLayer({
+              layer,
+              frame,
+              fullFrame: selected.fullFrame,
               plane,
-              coverageKey,
-              paintCoverage
-            );
-            if (coverage) retained.push(coverage);
-            const mask = coverage?.layer ?? raster(paintCoverage, true);
-            body = [
-              {
-                ...groupLayer(
-                  [
-                    { ...local, inverse: multiplyQuickEditProjections(local.inverse, inverse) },
-                    { ...mask, blend: 'mask' },
-                  ],
-                  true
-                ),
-                inverse: ownerInverse,
-                opacity: owner.opacity,
+              mask(key, paint) {
+                const coverage = args.annotationMask?.(
+                  input.canvas.ownerDocument,
+                  plane,
+                  key,
+                  paint
+                );
+                if (coverage) retained.push(coverage);
+                return coverage?.layer ?? raster(paint, true);
               },
-            ];
-          } else body = [local];
-        }
+            }),
+          ];
       } else
         body =
           layer.kind === 'video'
@@ -593,13 +522,6 @@ export async function buildNativeGpuPreviewLayers(args: {
                   true
                 ),
               ];
-      if (selected && !selected.fullFrame && layer.renderState.blurAmount > 0)
-        body = [
-          {
-            ...groupLayer(body, true),
-            cssFilter: { blur: layer.renderState.blurAmount, brightness: 1, saturate: 1 },
-          },
-        ];
       if (!layer.effectActionsOnly) {
         content.push(...body);
         if (sharp.length) sharp.push({ ...groupLayer(body, true), blend: 'erase' });
@@ -894,4 +816,134 @@ export async function buildNativeGpuPreviewLayers(args: {
     release();
     throw error;
   }
+}
+
+type EffectAttachment = NonNullable<Extract<Layer, { kind: 'effect' }>['sourceAttachment']>;
+
+function nativeEffectCoverage(attachment: EffectAttachment) {
+  const { owner, mapping, innerTransform } = attachment;
+  const window = getFittedMediaWindowFrame(mapping),
+    content = getFittedMediaContentFrame(mapping);
+  const placement: QuickEditHomography = [
+    content.width / mapping.sourceWidth,
+    0,
+    content.x,
+    0,
+    content.height / mapping.sourceHeight,
+    content.y,
+    0,
+    0,
+    1,
+  ];
+  const inverse = invertQuickEditProjection(
+    multiplyQuickEditProjections(innerTransform ?? IDENTITY, placement)
+  );
+  const ownerInverse = invertQuickEditProjection(layerProjection(owner));
+  if (!inverse || !ownerInverse) throw new Error('Attached effect projection is unavailable.');
+  return {
+    inverse,
+    ownerInverse,
+    opacity: owner.opacity,
+    key: JSON.stringify([
+      window,
+      mapping.windowCornerRadius ?? 0,
+      mapping.sourceCrop ? [mapping.sourceCrop, content] : null,
+    ]),
+    paint(context: CanvasRenderingContext2D) {
+      context.fillStyle = '#fff';
+      context.beginPath();
+      context.roundRect(
+        window.x,
+        window.y,
+        window.width,
+        window.height,
+        roundedWindowRadius(window.width, window.height, mapping.windowCornerRadius ?? 0)
+      );
+      context.fill();
+      if (mapping.sourceCrop) {
+        const crop = mapping.sourceCrop;
+        context.globalCompositeOperation = 'destination-in';
+        context.fillRect(
+          content.x + crop.x * content.width,
+          content.y + crop.y * content.height,
+          crop.width * content.width,
+          crop.height * content.height
+        );
+      }
+    },
+  };
+}
+
+/** Shared SDK placement and attachment graph. The caller owns every source and mask lease. */
+export function buildNativeGpuEffectLayer(args: {
+  layer: Layer;
+  frame: EffectRuntimeRenderedFrame | EffectRuntimeGpuPreparedFrame;
+  fullFrame: boolean;
+  plane: GpuPreviewLayer['rect'];
+  mask(key: string, paint: (context: CanvasRenderingContext2D) => void): GpuPreviewLayer;
+}): GpuPreviewLayer {
+  const { layer, frame, plane } = args;
+  const source = 'source' in frame ? frame.source : frame.bitmap;
+  if (args.fullFrame)
+    return {
+      source,
+      rect: { x: 0, y: 0, width: frame.logicalWidth, height: frame.logicalHeight },
+      inverse: IDENTITY,
+    };
+  const bounds = frame.bitmapBounds ?? { x: 0, y: 0, width: 1, height: 1 };
+  const inverse = invertQuickEditProjection(layerProjection(layer));
+  if (!inverse) throw new Error('Effect bitmap projection is unavailable.');
+  const local: GpuPreviewLayer = {
+    source,
+    rect: {
+      x: layer.x + bounds.x * layer.width,
+      y: layer.y + bounds.y * layer.height,
+      width: bounds.width * layer.width,
+      height: bounds.height * layer.height,
+    },
+    inverse,
+    opacity: layer.opacity,
+  };
+  let body = local;
+  if (layer.kind === 'effect' && layer.sourceAttachment) {
+    const coverage = nativeEffectCoverage(layer.sourceAttachment);
+    const mask = args.mask(coverage.key, coverage.paint);
+    body = {
+      ...nativeEffectPaddedLayer(
+        [
+          { ...local, inverse: multiplyQuickEditProjections(local.inverse, coverage.inverse) },
+          { ...mask, blend: 'mask' },
+        ],
+        plane
+      ),
+      inverse: coverage.ownerInverse,
+      opacity: coverage.opacity,
+    };
+  }
+  return layer.renderState.blurAmount > 0
+    ? {
+        ...nativeEffectPaddedLayer([body], plane),
+        cssFilter: { blur: layer.renderState.blurAmount, brightness: 1, saturate: 1 },
+      }
+    : body;
+}
+
+function nativeEffectPaddedLayer(
+  layers: readonly GpuPreviewLayer[],
+  plane: GpuPreviewLayer['rect']
+): GpuPreviewLayer {
+  const translate: QuickEditHomography = [1, 0, plane.x, 0, 1, plane.y, 0, 0, 1];
+  return {
+    source: {
+      kind: 'group',
+      output: { width: Math.ceil(plane.width), height: Math.ceil(plane.height) },
+      logical: { width: plane.width, height: plane.height },
+      layers: layers.map((item) => ({
+        ...item,
+        inverse: multiplyQuickEditProjections(item.inverse, translate),
+      })),
+    },
+    rect: plane,
+    inverse: IDENTITY,
+  };
 }

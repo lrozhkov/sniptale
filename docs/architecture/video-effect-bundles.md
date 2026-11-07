@@ -30,7 +30,9 @@ Gallery and Native live preview can select `gpu-scene` through the sandbox conne
 
 The default `renderFrame` request remains bitmap-only. Export retains this default. During the first migration stage, a valid plan above the parent transport limits uses the existing sandbox GPU bitmap result. Dependent effects also retain their existing path. These routes are intermediate migration work, not a completed GPU-scene transition.
 
-Gallery can select `gpu-scene-plan` for advisory preparation. This mode accepts only `prepareGpuFrame` requests and returns checked plans within the parent transport limits. It rejects bitmap results and oversized plans instead of using the bitmap fallback. This mode does not create a sandbox GPU renderer. Advisory sessions have separate queues and failure budgets. Their failures do not change the foreground session.
+Gallery and Native can select `gpu-scene-plan` for advisory preparation. This mode accepts only `prepareGpuFrame` requests and returns checked plans within the parent transport limits. It rejects bitmap results and oversized plans instead of using the bitmap fallback. This mode does not create a sandbox GPU renderer. Advisory sessions have separate queues and failure budgets. Their failures do not change the foreground session.
+
+Authored scene data and transient edits define the advisory context. Cursor and recording event hydration can replace render data without retiring this context. Foreground jobs retain their existing invalidation rules.
 
 The shared composition owner schedules overlay and sampled poses. Each prepared GPU frame owns its transferred resources. A retired pose closes those resources only after all GPU borrows end. The final graph includes the editor wrappers when it checks layer and depth limits. If generated effect groups exceed those limits, use the same parent GPU provider to prepare bounded chunks. Do not mutate a submitted graph or acquire a second device for this operation.
 

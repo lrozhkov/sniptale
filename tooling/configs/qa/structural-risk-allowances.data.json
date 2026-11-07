@@ -976,9 +976,9 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One materializer fixture controls source preparation, cancellation and frame ownership. Camera cases use the same renderer ports and controlled completions. Each case checks this materializer lifecycle. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or authoring owners. Remove when the analyzer models this cohesive lifecycle.",
-      "reviewDate": "2026-11-06",
-      "astHash": "c88259cc0b2392a910a121495739b439923a981d48edccb75faaf2c7c594663c",
-      "signatureHash": "bd836b6657e9f2def7a3f67395bfdcab6ca5aff539399f60a319d31eb2e0bff2"
+      "reviewDate": "2026-11-07",
+      "astHash": "b0e8424407cb69d0671dbcc560db964e58366f70d488e4396ff259c550f558be",
+      "signatureHash": "5c9f5a6cb63559fe16f67f34406f26698c7dedac38fed91135512dc0ee0629e7"
     },
     {
       "rule": "structural-file-risk",
@@ -5113,8 +5113,8 @@
       "reason": "tool-noise: One editor graph adapter owns construction and material leases. GPU annotations join its existing borrow ledger. Source capture, submission and publication stay outside this owner.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-07",
-      "astHash": "bfa82b2d2d5bbace0be0e346c91ca42a2df962a99ce7c21307ffbe29c39095c0",
-      "signatureHash": "a6e6c165841fa14bef1f7df2c0ac0a9b318bf6c460c8d0b61e32b6d0bc18060e"
+      "astHash": "16b1b64d2fdfb0bb8029607b3d875af348bf928a80b3ec26a3de3dbc33d1abc0",
+      "signatureHash": "1fbb96a034b6ce4202ea5dd02f6c54859813073168f1ef49b83511406c66b6ff"
     },
     {
       "rule": "structural-function-risk",
@@ -5146,8 +5146,8 @@
       "reason": "tool-noise: One Native GPU session owns backend admission, private material slots and retirement. Each slot has one render borrower. Splitting the factory would distribute the same session lifetime.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "78190a93e375d6aae237e08c74db0501a43c08001fe24c85b0a8c94ebddbc7bf",
-      "signatureHash": "d74fcfb33f34396a23620d0868a469af7acb306c6013b430959d949221caad9d"
+      "astHash": "ca3d70cd95ef78ab08f786e16a8fbd1c72fe2eff07df805ea92d5e0e0021a65f",
+      "signatureHash": "b7500273a72f0e5dedc2d23eea3949dd057c725515bcc237bce7ea734b0d36a3"
     },
     {
       "rule": "structural-function-risk",
@@ -5157,7 +5157,7 @@
       "reason": "tool-noise: One admitted frame owns its source captures, private materials, effects and exclusive output through GPU and validation completion. The local provider remains stable across another job failure. Final submission marks the CPU encoding boundary.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "cae7366451769f163b5b19dd9115e39945be08b3ba8f6a743266626da17962ad",
+      "astHash": "8a54ac9b4e31bc846927a2dfdff3e3b2ac2e26a73535d8c6561163e0c791c25d",
       "signatureHash": "7fbf6998a3988df89e02a05370e5486d9adf627b6e933b9dcfaf360518055ae2"
     },
     {
@@ -5849,8 +5849,8 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One materializer owns source acquisition, preparation and final frame resources. The camera demand check selects preparation through the existing reader port. Numerical camera compilation and UI state remain with their existing owners. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or authoring owners. Remove when the analyzer models this cohesive lifecycle.",
-      "reviewDate": "2026-11-06",
-      "astHash": "ea1a7d443709e04213728e71e41f1f25d7d8856ba28ead655436f7ee73366f5a",
+      "reviewDate": "2026-11-07",
+      "astHash": "781812bc669cbfa1ef9e15c213c624c6252393ba078defd7f759c5c4aea60657",
       "signatureHash": "e42062e33b27a7bc0b0a9d06f83fb09dc24d6f19aee17b6f6dbc80a14151d485"
     },
     {
@@ -5872,7 +5872,7 @@
       "reason": "tool-noise: The existing Native graph fixture now verifies local ordinary-feedback raster and group extents, plus release. It adds no fixture, lifetime or authority. File score stays three and cohesion1.00. The same source-layer builder and canvas fixture own these assertions. Fresh independent architecture review must validate this exact binding.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent coordinate contract, state, effect, resource lifetime or owner. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-07",
-      "astHash": "980a59642b2b7abb2ca8598445928af096a81851c030b178c9f5801e2d47e966",
+      "astHash": "d95581f1d5b1f0009e90649e120853f83ab269a86b54e1a1bae716b2e4a3ca51",
       "signatureHash": "fdb1659b4354a8924d5e92981c334e5c5f2845d70c0235d182a5d42568a27b50"
     },
     {
@@ -6045,8 +6045,8 @@
       "rule": "structural-file-risk",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "astHash": "b8c84819c7b15592cafa385e97d1215c714555a537c4e78913bd46bb898f2aae",
-      "signatureHash": "30d5084ef313ccb797d2fb3c9e7d189fb621390c86693d75c005881b30605240",
+      "astHash": "8eeb849e9e383badf376221f9abb8f26fe0f743775d28b766c1cfedd73f5f4df",
+      "signatureHash": "d5b77e096b7ce9574b55a4972a68ab5f5d3c568c9ad792e6c06bb67b8c5eaa1b",
       "reviewDate": "2026-11-07",
       "reason": "tool-noise: One Native GPU producer contract has deterministic tests for serial rendering, independent material slots, submission gating and retirement. These tests share the same producer fixture. No production authority is added by the test file.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction."
@@ -6180,7 +6180,7 @@
       "reason": "tool-noise: One mounted preview session owns its scheduler, renderer and helper retirement. The scheduler owns bounded admission and drains GPU work before fallback or error cleanup. The hook supplies dependencies and publishes image with geometry.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-07",
-      "astHash": "41aeb4a06c347aff4a30de604d562305658abe3bafb27d09c43826393cb399ef",
+      "astHash": "d9a3934b012e71c8a41e795dcfcc3f69a17326a74055bb24c42a6a81a2ba3935",
       "signatureHash": "2c629f4f939552b210db20350dffa3a44a616b1c0626c2fd6c9dd93d60a95705"
     },
     {
@@ -6199,7 +6199,7 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/render-scheduler.test.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "astHash": "37227f84a25fbf9f265d1d640e3f1368d33bce2252e14a79bcdec96d0d76e075",
+      "astHash": "7ac15fd27d29493971773f4ca9f00dc2e30f3837a6a11462196eaeb4681bda25",
       "signatureHash": "38d918b762e4d1ea8e1c0cd49d984d586285b4343057bda0c8dcee1b3f5858f6",
       "reviewDate": "2026-11-07",
       "reason": "tool-noise: One scheduler contract has deterministic tests for preparation, bounded admission, FIFO publication, invalidation and drained retry. The overlap fixture controls promise completion directly. Splitting by line count would separate cases of the same state machine.",
@@ -6246,8 +6246,8 @@
       "reason": "tool-noise: One scheduler fixture checks admitted rendering and resource cleanup. New preload tests use the same controlled renderer and pending jobs. The candidate adds no separate fixture or state owner. A fresh architecture review must check this exact binding.",
       "removalCondition": "Remove this allowance when the AST or signature changes. Reassess any separate queue, runtime, resource or fixture owner. Remove it when the analyzer models this proof owner.",
       "reviewDate": "2026-11-07",
-      "astHash": "bf2c80d0171e7a59eb095612a80115404ce0e7161ab0c65fd6864fe9978037ac",
-      "signatureHash": "108daa70125bb05f947861151ae858108345e0610cc580e5853bcfab39660765"
+      "astHash": "1515472cabc5dfb275e787b93236ff13406b60cf1a02eee894e3137d75b1b736",
+      "signatureHash": "d92be55f94dcd9a52c8301399a1673cf839abb5f6fc0e6bd9277a5d6474d6742"
     },
     {
       "rule": "structural-file-risk",

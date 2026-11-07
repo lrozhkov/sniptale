@@ -224,6 +224,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
     previewMode: params.previewMode,
     previewRenderer: params.previewRenderer ?? 'gpu',
     project: params.project,
+    effectPreparationProject: params.effectPreparationProject,
     renderGeneration: params.renderGenerationRef?.current ?? 0,
     stageRef: params.stageRef,
     videoRefs: params.videoRefs,

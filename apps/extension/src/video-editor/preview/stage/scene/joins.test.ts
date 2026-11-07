@@ -55,14 +55,19 @@ function fixture() {
     renderFrame,
     dispose,
     updateProject,
-    renderFrameWithPresentation: async (
-      time: number,
-      signal: AbortSignal,
-      camera?: import('../../../../features/video/composition/types').VideoCompositionCameraState
-    ) => ({
-      canvas: await renderFrame(time, signal, camera),
-      presentation: { camera: camera ?? resolveVideoCompositionFrame(project, time).camera, time },
-    }),
+    renderFrameWithPresentation: vi.fn(
+      async (
+        time: number,
+        signal: AbortSignal,
+        camera?: import('../../../../features/video/composition/types').VideoCompositionCameraState
+      ) => ({
+        canvas: await renderFrame(time, signal, camera),
+        presentation: {
+          camera: camera ?? resolveVideoCompositionFrame(project, time).camera,
+          time,
+        },
+      })
+    ),
   });
   const live = document.createElement('video');
   live.src = 'blob:source-one';
@@ -281,4 +286,20 @@ it('prepares the ordinary scene while joins and held windows retain serial admis
   prepared?.release();
   owner.dispose();
   expect(() => owner.prepare(body)).toThrow('disposed');
+});
+
+it('passes the original admitted preparation context through the materializer route', async () => {
+  const f = fixture();
+  const context = { project: f.input.project, signal: new AbortController().signal };
+  const preparation = { context, project: f.input.project, time: f.input.currentTime };
+  await f.owner.render({ ...f.input, effectPreparation: preparation });
+  const materializer = media.create.mock.results[0]!.value;
+  expect(materializer.renderFrameWithPresentation).toHaveBeenCalledWith(
+    f.input.currentTime,
+    expect.any(AbortSignal),
+    undefined,
+    undefined,
+    preparation
+  );
+  expect(f.raw).not.toHaveBeenCalled();
 });

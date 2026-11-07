@@ -1,3 +1,6 @@
+import type { EffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/runtime/types';
+import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
+import { scaleEffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/render/wave';
 import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
 import {
   canPrepareEffectRuntimeGpuComposition,
@@ -9,7 +12,10 @@ import {
   type VideoCompositionMediaSource,
 } from '../../../../features/video/composition/draw/media-source';
 import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-import { resolvePreviewEffectRuntimeRasterScale } from './canvas';
+import {
+  resolvePreviewEffectRuntimeRasterScale,
+  resolvePreviewCompositionFrameSize,
+} from './canvas';
 import type { PreviewSceneRenderInput, PreviewScenePreparedFrame } from './types';
 
 type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;
@@ -156,4 +162,86 @@ export function prepareNativePreviewSceneFrame(
       throw error;
     }
   })();
+}
+
+interface UpcomingNativeEffectOnset {
+  clipId: string;
+  effectInstanceId: string;
+  onset: number;
+  time: number;
+}
+
+/** Select eligibility and one positive tick before resolving future composition geometry. */
+export function resolveUpcomingNativeEffectOnset(
+  project: PreviewSceneRenderInput['project'],
+  currentTime: number
+): UpcomingNativeEffectOnset | null {
+  if (!Number.isFinite(currentTime) || !Number.isFinite(project.fps) || project.fps <= 0)
+    return null;
+  const hosts = project.clips
+    .filter(
+      (clip) =>
+        clip.type === 'EFFECT' &&
+        clip.startTime > currentTime &&
+        clip.startTime <= currentTime + 1 &&
+        clip.duration > 0 &&
+        project.tracks.some((track) => track.id === clip.trackId && track.visible) &&
+        project.effectInstances?.some(
+          (instance) =>
+            instance.id === clip.effectInstanceId &&
+            instance.kind === 'standalone' &&
+            instance.enabled
+        )
+    )
+    .sort((a, b) => a.startTime - b.startTime);
+  const host = hosts[0];
+  if (!host || host.type !== 'EFFECT') return null;
+  const first = Math.ceil(host.startTime * project.fps) / project.fps;
+  const end = host.startTime + host.duration;
+  const time = first + 1 / project.fps < end ? first + 1 / project.fps : first;
+  return time < end
+    ? { clipId: host.id, effectInstanceId: host.effectInstanceId, onset: host.startTime, time }
+    : null;
+}
+
+/** Resolve one future standalone request from project data without capturing or seeking media. */
+export function resolveUpcomingNativeEffect(
+  input: Pick<
+    PreviewSceneRenderInput,
+    'project' | 'currentTime' | 'canvas' | 'stage' | 'previewRasterSize'
+  >
+): {
+  onset: number;
+  time: number;
+  plan: EffectRuntimeFramePlan;
+  layer: VideoCompositionVisualLayer;
+  fullFrame: false;
+  logical: { width: number; height: number };
+  output: { width: number; height: number };
+} | null {
+  const { project, currentTime } = input;
+  const next = resolveUpcomingNativeEffectOnset(project, currentTime);
+  if (!next) return null;
+  const passes = resolveVideoCompositionRenderPasses(project, next.time);
+  const plan = passes.overlayFrame.effectRuntimePlans?.find(
+    (plan) =>
+      plan.effectInstanceId === next.effectInstanceId &&
+      plan.kind === 'standalone' &&
+      plan.target.kind === 'scene' &&
+      plan.target.clipId === next.clipId
+  );
+  const layer = passes.overlayFrame.visualLayers.find(
+    (layer) => layer.clipId === next.clipId && layer.kind === 'effect'
+  );
+  if (!plan || !layer) return null;
+  const logical = { width: project.width, height: project.height };
+  return {
+    onset: next.onset,
+    time: next.time,
+    fullFrame: false,
+    layer,
+    logical,
+    output: resolvePreviewCompositionFrameSize(input) ?? logical,
+    plan: scaleEffectRuntimeFramePlan(plan, resolvePreviewEffectRuntimeRasterScale(input)),
+  };
 }

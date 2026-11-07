@@ -1,3 +1,5 @@
+import { createNativeEffectPreparation } from './effect-preparation';
+import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
 import { prepareEffectRuntimeGpuScene } from '../../../../features/video/composition/effect-runtime/render/gpu-plan';
 import { createNativeGpuPreviewMaterials } from './gpu-preview-materials';
 import type { PreviewRendererStatus } from '../../../../features/video/preview/preferences';
@@ -128,7 +130,10 @@ function layerInverse(layer: VideoLayer, passes: Passes): QuickEditHomography | 
 /** A preview session owns the backend, its immutable raster revisions and captured raw frames. */
 export function createNativeGpuPreviewRenderer(
   createBackend: typeof createGpuPreviewRenderer = createGpuPreviewRenderer,
-  options: { maximumInFlight?: 1 | 2 } = {}
+  options: {
+    maximumInFlight?: 1 | 2;
+    createPreparationExecutor?: (ownerDocument: Document) => EffectRuntimeSandboxExecutor;
+  } = {}
 ): NativeGpuPreviewRenderer {
   let backend: GpuPreviewRenderer | null = null;
   let preparation: Promise<GpuPreviewRenderer | null> | null = null;
@@ -139,6 +144,7 @@ export function createNativeGpuPreviewRenderer(
   let publicationHolds = 0;
   let materialsReleased = false;
   const lifetime = new AbortController();
+  const effectPreparation = createNativeEffectPreparation(options.createPreparationExecutor);
   const maximumInFlight = options.maximumInFlight ?? 1;
   const slots = Array.from({ length: maximumInFlight }, () => ({
     materials: createNativeGpuPreviewMaterials(),
@@ -167,6 +173,7 @@ export function createNativeGpuPreviewRenderer(
     },
     dispose() {
       disposed = true;
+      effectPreparation.dispose();
       lifetime.abort();
       settleRetirement();
     },
@@ -484,6 +491,7 @@ export function createNativeGpuPreviewRenderer(
           if (input.signal?.aborted || disposed || isInvalidated()) return false;
           publicationHolds++;
           acquiredOutput = undefined;
+          effectPreparation.update(input, provider);
           let released = false;
           return {
             canvas: target.canvas,
@@ -516,6 +524,7 @@ export function createNativeGpuPreviewRenderer(
           prepared.context.drawImage(bitmap, 0, 0, staging.width, staging.height);
           if (input.signal?.aborted || disposed || isInvalidated()) return false;
           publishCompletedPreviewFrame(input.canvas, staging, !input.deferFrameEvent);
+          effectPreparation.update(input, provider);
           return true;
         } finally {
           prepared.context.restore();
@@ -524,6 +533,7 @@ export function createNativeGpuPreviewRenderer(
         if (input.signal?.aborted || disposed || isInvalidated()) return false;
         if (error instanceof GpuPreviewDeviceError || inputDeviceFailure) {
           unavailable = true;
+          effectPreparation.dispose();
           fallbackReason = 'device-failed';
           const failed = backend;
           backend = null;
