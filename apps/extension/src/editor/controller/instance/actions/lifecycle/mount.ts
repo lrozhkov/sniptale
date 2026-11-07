@@ -26,6 +26,7 @@ export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
     fireMiddleClick: false,
     preserveObjectStacking: true,
     selection: true,
+    selectionFullyContained: true,
     selectionKey: 'ctrlKey',
     targetFindTolerance: 5,
     uniformScaling: false,

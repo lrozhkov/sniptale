@@ -244,45 +244,48 @@ async function drag(page: Page, start: { x: number; y: number }, end: { x: numbe
   await page.mouse.move(end.x, end.y, { steps: 5 });
   await page.mouse.up();
 }
-async function expectHandle(page: Page, x: number, y: number) {
+async function expectHandle(page: Page, x: number, y: number, scope?: Locator) {
   await expect
     .poll(async () => {
-      const center = await page.locator('[data-ui="content.drawing.selection-chrome"]').evaluate(
-        (node, point) => {
-          if (!(node instanceof HTMLCanvasElement)) throw new Error('Selection canvas unavailable');
-          const ratio = node.width / innerWidth,
-            radius = 11;
-          const left = Math.round((point.x - radius) * ratio),
-            top = Math.round((point.y - radius) * ratio);
-          const data = node
-            .getContext('2d')!
-            .getImageData(
-              left,
-              top,
-              Math.round(radius * 2 * ratio),
-              Math.round(radius * 2 * ratio)
-            );
-          let minX = data.width,
-            minY = data.height,
-            maxX = -1,
-            maxY = -1;
-          for (let yy = 0; yy < data.height; yy++)
-            for (let xx = 0; xx < data.width; xx++)
-              if (data.data[(yy * data.width + xx) * 4 + 3]! > 0) {
-                minX = Math.min(minX, xx);
-                maxX = Math.max(maxX, xx);
-                minY = Math.min(minY, yy);
-                maxY = Math.max(maxY, yy);
-              }
-          return maxX < 0
-            ? null
-            : {
-                x: (left + (minX + maxX + 1) / 2) / ratio,
-                y: (top + (minY + maxY + 1) / 2) / ratio,
-              };
-        },
-        { x, y }
-      );
+      const center = await (scope ?? page)
+        .locator('[data-ui="content.drawing.selection-chrome"]')
+        .evaluate(
+          (node, point) => {
+            if (!(node instanceof HTMLCanvasElement))
+              throw new Error('Selection canvas unavailable');
+            const ratio = node.width / innerWidth,
+              radius = 11;
+            const left = Math.round((point.x - radius) * ratio),
+              top = Math.round((point.y - radius) * ratio);
+            const data = node
+              .getContext('2d')!
+              .getImageData(
+                left,
+                top,
+                Math.round(radius * 2 * ratio),
+                Math.round(radius * 2 * ratio)
+              );
+            let minX = data.width,
+              minY = data.height,
+              maxX = -1,
+              maxY = -1;
+            for (let yy = 0; yy < data.height; yy++)
+              for (let xx = 0; xx < data.width; xx++)
+                if (data.data[(yy * data.width + xx) * 4 + 3]! > 0) {
+                  minX = Math.min(minX, xx);
+                  maxX = Math.max(maxX, xx);
+                  minY = Math.min(minY, yy);
+                  maxY = Math.max(maxY, yy);
+                }
+            return maxX < 0
+              ? null
+              : {
+                  x: (left + (minX + maxX + 1) / 2) / ratio,
+                  y: (top + (minY + maxY + 1) / 2) / ratio,
+                };
+          },
+          { x, y }
+        );
       return center ? Math.max(Math.abs(center.x - x), Math.abs(center.y - y)) : Infinity;
     })
     .toBeLessThanOrEqual(1);
@@ -420,4 +423,132 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       await page.close();
     }
   });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const mode of ['page', 'crop'] as const) {
+    test(`selected outline moves from its center and resizes to a lower peer ${mode} ${name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      try {
+        if (mode === 'page') await enterDrawing(page);
+        if (mode === 'crop') {
+          if (!(await page.locator('[data-ui="content.toolbar.timer-button"]').count())) {
+            await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+            await page.locator('[data-ui="content.toolbar.settings.show-hidden-buttons"]').click();
+            const compact = page.getByRole('button', { name: /^Compact menu view/u });
+            if ((await compact.getAttribute('aria-pressed')) !== 'true') await compact.click();
+            await page.keyboard.press('Escape');
+          }
+          await page.locator('[data-ui="content.toolbar.timer-button"]').click();
+          await page
+            .locator('[data-ui="content.toolbar.timer-menu"]')
+            .getByText('No delay', { exact: true })
+            .click();
+          await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
+          await drag(page, { x: 250, y: 120 }, { x: 1050, y: 500 });
+          const drawingMode = page.locator('[data-ui="content.crop.mode.drawing"]');
+          if ((await drawingMode.getAttribute('data-active')) !== 'true') await drawingMode.click();
+        }
+        const surface = page.locator(
+          mode === 'crop'
+            ? '[data-ui="content.crop.drawing-layer"]'
+            : '[data-ui="content.drawing.surface"]'
+        );
+        const toolbar =
+          mode === 'crop'
+            ? page.locator('[data-ui="content.crop.drawing-slot"]')
+            : page.locator('[data-ui="content.toolbar.root"]');
+        await toolbar.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+        const option = toolbar.locator(
+          '[data-ui="content.toolbar.drawing-options.shape.kind-rectangle"]'
+        );
+        if (!(await option.isVisible()))
+          await toolbar.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+        await option.click();
+        const fill = toolbar.locator(
+          '[data-ui="content.toolbar.drawing-options.shape.fill-toggle"]'
+        );
+        if ((await fill.getAttribute('aria-pressed')) === 'true') await fill.click();
+        await drag(page, { x: 400, y: 180 }, { x: 540, y: 240 });
+        await expectHandle(page, 400, 180, surface);
+        await expectHandle(page, 540, 240, surface);
+        await page.keyboard.down('Alt');
+        await drag(page, { x: 470, y: 210 }, { x: 490, y: 220 });
+        await page.keyboard.up('Alt');
+        await expectHandle(page, 420, 190, surface);
+        await expectHandle(page, 560, 250, surface);
+        await page.screenshot({
+          path: info.outputPath('selected-outline-center-move.png'),
+          fullPage: false,
+        });
+        await toolbar.locator('[data-ui="content.toolbar.drawing.select"]').click();
+        await page.mouse.click(300, 300);
+        await toolbar.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+        await drag(page, { x: 400, y: 380 }, { x: 700, y: 440 });
+        await toolbar.locator('[data-ui="content.toolbar.drawing.select"]').click();
+        await page.mouse.click(490, 220);
+        await page.mouse.move(560, 220);
+        await page.mouse.down();
+        await page.mouse.move(696, 220, { steps: 6 });
+        const guides = surface.locator('[data-ui="content.drawing.alignment-guides"]');
+        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '700');
+        await expect(guides.locator('[data-axis="y"]')).toHaveCount(0);
+        await page.screenshot({
+          path: info.outputPath('peer-width-alignment.png'),
+          fullPage: false,
+        });
+        await page.keyboard.down('Alt');
+        await expect(guides).toHaveCount(0);
+        await page.keyboard.up('Alt');
+        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '700');
+        await page.mouse.up();
+        await expectHandle(page, 700, 220, surface);
+        await page.mouse.click(300, 300);
+        await toolbar.locator('[data-ui="content.toolbar.drawing.shape"]').click();
+        await drag(page, { x: 480, y: 200 }, { x: 620, y: 280 });
+        await toolbar.locator('[data-ui="content.toolbar.drawing.select"]').click();
+        await page.mouse.click(450, 220);
+        await expectHandle(page, 420, 190, surface);
+        await page.keyboard.down('Alt');
+        await drag(page, { x: 550, y: 220 }, { x: 570, y: 230 });
+        await page.keyboard.up('Alt');
+        await expectHandle(page, 440, 200, surface);
+        await expectHandle(page, 720, 260, surface);
+        await page.screenshot({
+          path: info.outputPath('selected-layer-under-overlay.png'),
+          fullPage: false,
+        });
+        await page.mouse.click(550, 230);
+        await expectHandle(page, 480, 200, surface);
+        await expectHandle(page, 620, 280, surface);
+        await page.evaluate(() => {
+          const target = document.createElement('div');
+          target.style.cssText =
+            'position:fixed;left:650px;top:200px;width:50px;height:100px;background:#ddd';
+          document.body.append(target);
+        });
+        await page.mouse.move(620, 240);
+        await page.mouse.down();
+        await page.mouse.move(646, 240, { steps: 6 });
+        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '650');
+        await page.screenshot({
+          path: info.outputPath('crop-and-page-dom-target.png'),
+          fullPage: false,
+        });
+        await page.mouse.up();
+        await expectHandle(page, 650, 240, surface);
+        await expect(toolbar.locator('[data-ui="content.toolbar.drawing.select"]')).toHaveAttribute(
+          'title',
+          /Alt/
+        );
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
 }

@@ -671,3 +671,34 @@ it('ignores a page-generated Alt event during a drawing gesture', () => {
   scene.event('pointercancel', 296, 196);
   scene.dispose();
 });
+
+it.each([false, true])(
+  'moves the selected layer beneath an overlapping layer, release-only=%s, and preserves upper click',
+  (releaseOnly) => {
+    const scene = setupAlignmentSurface(false);
+    act(() => {
+      scene.session.commitObject({
+        id: 'upper',
+        kind: 'rectangle',
+        bounds: { x: 90, y: 90, width: 100, height: 100 },
+        color: '#000',
+        width: 2,
+      });
+      scene.session.select('moving');
+    });
+    scene.commit.mockClear();
+    scene.event('pointerdown', 120, 110);
+    scene.event('pointermove', 123, 110);
+    expect(scene.moving()).toMatchObject({ bounds: { x: 80, y: 80 } });
+    if (!releaseOnly) scene.event('pointermove', 140, 120);
+    scene.event('pointerup', 140, 120);
+    expect(scene.moving()).toMatchObject({ bounds: { x: 100, y: 90 } });
+    expect(scene.session.getSnapshot().selectedObjectIds).toEqual(['moving']);
+    expect(scene.commit).toHaveBeenCalledOnce();
+    scene.event('pointerdown', 140, 120);
+    scene.event('pointerup', 140, 120);
+    expect(scene.session.getSnapshot().selectedObjectIds).toEqual(['upper']);
+    expect(scene.commit).toHaveBeenCalledOnce();
+    scene.dispose();
+  }
+);

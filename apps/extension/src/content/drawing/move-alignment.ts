@@ -38,7 +38,8 @@ function getTargets(
   moving: readonly DrawingObject[],
   bounds: DrawingBounds,
   objects: readonly DrawingObject[],
-  domBounds: readonly DrawingBounds[]
+  domBounds: readonly DrawingBounds[],
+  includeDistantShapes = false
 ): Target[] {
   const ids = new Set(moving.map((object) => object.id));
   const shapes = objects
@@ -72,9 +73,16 @@ function getTargets(
       ];
   }
   return [
-    ...shapes.map(({ bounds: target }) => ({ bounds: target })),
-    ...domBounds.map((target) => ({ bounds: target })),
-  ].filter((target) => distance(bounds, target.bounds) <= NEIGHBOR_DISTANCE);
+    ...shapes
+      .filter(
+        ({ bounds: target }) =>
+          includeDistantShapes || distance(bounds, target) <= NEIGHBOR_DISTANCE
+      )
+      .map(({ bounds: target }) => ({ bounds: target })),
+    ...domBounds
+      .filter((target) => distance(bounds, target) <= NEIGHBOR_DISTANCE)
+      .map((target) => ({ bounds: target })),
+  ];
 }
 
 function matchAxis(
@@ -214,7 +222,7 @@ export function resolveDrawingResizeAlignment(args: {
     return unchanged;
   const geometry = getDrawingResizeHandleGeometry(draft, point, modifiers.ctrlKey);
   const bounds = getDrawingObjectSelectionBounds(draft.object);
-  const targets = getTargets([draft.object], bounds, args.objects, args.domBounds ?? []);
+  const targets = getTargets([draft.object], bounds, args.objects, args.domBounds ?? [], true);
   let x = matchAxis(bounds, targets, 'x', [geometry.current.x]);
   let y = matchAxis(bounds, targets, 'y', [geometry.current.y]);
   let delta: DrawingPoint;

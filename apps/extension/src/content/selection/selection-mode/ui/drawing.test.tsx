@@ -87,9 +87,18 @@ vi.mock('../../../platform/page-scroll', async (importOriginal) => ({
 vi.mock('../../../drawing/surface', async () => {
   const interaction = await import('../../../drawing/interaction');
   return {
-    DrawingSurface: (props: { active: boolean; onExit?: () => void }) => {
+    DrawingSurface: (props: {
+      active: boolean;
+      alignMovesToPage?: boolean;
+      onExit?: () => void;
+    }) => {
       state.onExitDrawing = props.onExit;
-      return <div data-surface-active={props.active} />;
+      return (
+        <div
+          data-surface-active={props.active}
+          data-surface-alignment={String(props.alignMovesToPage ?? false)}
+        />
+      );
     },
     getDrawingViewportProjection: interaction.getDrawingViewportProjection,
     toDrawingScenePoint: interaction.toDrawingScenePoint,
@@ -99,11 +108,13 @@ vi.mock('../../../overlay/toolbar/controls/drawing', () => ({
   ToolbarDrawingControls: (props: {
     owner: ToolbarDrawingControlsOwner;
     controller: ContentDrawingController;
+    pageAlignment?: boolean;
   }) => {
     state.resolveMenuLayout = props.owner.resolveMenuLayout;
     return (
       <div
         data-tools-placement={props.owner.preferredMenuPlacement}
+        data-toolbar-alignment={String(props.pageAlignment ?? false)}
         data-command-scope={String(useContext(CommandPressScope))}
       >
         {props.owner.renderActions?.(props.controller.session.getSnapshot())}
@@ -690,4 +701,10 @@ describe('crop drawing runtime disposal', () => {
     expect(container.querySelector('[data-ui="content.crop.drawing-layer"]')).toBeNull();
     expect(container.querySelector('[data-ui="content.crop.mode-toggle"]')).toBeNull();
   });
+});
+
+it('enables the page-alignment gestures and hints in crop drawing', () => {
+  const { container, tooltip } = setup(true);
+  expect(container.querySelector('[data-surface-alignment="true"]')).not.toBeNull();
+  expect(tooltip.root.querySelector('[data-toolbar-alignment="true"]')).not.toBeNull();
 });

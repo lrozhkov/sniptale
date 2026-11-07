@@ -158,3 +158,31 @@ it('does not advertise a stationary axis when a side handle coincides with anoth
   expect(getDrawingObjectBounds(result.object)).toEqual({ x: 100, y: 100, width: 200, height: 80 });
   expect(result.guides.map((guide) => guide.axis)).toEqual(['x']);
 });
+
+it.each([40, 140])('aligns the width to a drawn rectangle below with a %s pixel gap', (gap) => {
+  const original = shape();
+  const peer = { ...shape(), id: 'peer', bounds: { x: 100, y: 180 + gap, width: 200, height: 80 } };
+  const result = resolveDrawingResizeAlignment({
+    ...gesture(original, 'e', { x: 296, y: 140 }),
+    objects: [original, peer],
+  });
+  expect(getDrawingObjectBounds(result.object)).toEqual({ x: 100, y: 100, width: 200, height: 80 });
+  expect(result.guides.map((guide) => [guide.axis, guide.coordinate])).toEqual([['x', 300]]);
+  expect(peer.bounds).toEqual({ x: 100, y: 180 + gap, width: 200, height: 80 });
+});
+
+it('aligns the height to a drawn rectangle in a separate column', () => {
+  const original = shape();
+  const peer = { ...shape(), id: 'peer', bounds: { x: 400, y: 100, width: 100, height: 160 } };
+  const result = resolveDrawingResizeAlignment({
+    ...gesture(original, 's', { x: 150, y: 256 }),
+    objects: [original, peer],
+  });
+  expect(getDrawingObjectBounds(result.object)).toEqual({
+    x: 100,
+    y: 100,
+    width: 100,
+    height: 160,
+  });
+  expect(result.guides.map((guide) => [guide.axis, guide.coordinate])).toEqual([['y', 260]]);
+});

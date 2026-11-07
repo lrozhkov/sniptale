@@ -70,9 +70,31 @@ export function updateDrawingMarqueeDraft(
   draft: Extract<PointerDraft, { kind: 'marquee' }>,
   point: DrawingPoint,
   documentObjects: readonly DrawingObject[]
-): { draft: Extract<PointerDraft, { kind: 'marquee' }>; selection?: readonly string[] } {
+): { draft: PointerDraft; selection?: readonly string[] } {
   if (draft.clickObjectId && Math.hypot(point.x - draft.start.x, point.y - draft.start.y) < 4) {
     return { draft };
+  }
+  if (draft.moveObjects) {
+    const delta = { x: point.x - draft.start.x, y: point.y - draft.start.y };
+    const [original] = draft.moveObjects;
+    if (original) {
+      return {
+        draft:
+          draft.moveObjects.length > 1
+            ? {
+                kind: 'move-selection',
+                start: draft.start,
+                originals: draft.moveObjects,
+                objects: draft.moveObjects.map((object) => translateDrawingObject(object, delta)),
+              }
+            : {
+                kind: 'move',
+                start: draft.start,
+                original,
+                object: translateDrawingObject(original, delta),
+              },
+      };
+    }
   }
   const marquee = { ...draft, current: point };
   delete marquee.clickObjectId;

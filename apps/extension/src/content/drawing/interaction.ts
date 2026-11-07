@@ -68,6 +68,7 @@ export type PointerDraft =
       current: DrawingPoint;
       initialSelectionIds: readonly string[];
       clickObjectId?: string;
+      moveObjects?: readonly DrawingObject[];
       mode: DrawingSelectionMode;
       object?: never;
     }
@@ -497,6 +498,76 @@ type DrawingPointerStart = {
   text?: { id: string | null; point: DrawingPoint; value: string };
 };
 
+function beginSelectionPointer(
+  point: DrawingPoint,
+  snapshot: DrawingSessionSnapshot,
+  selectedObjects: readonly DrawingObject[],
+  hit: DrawingObject | null,
+  modifiers: DrawingPointerModifiers
+): DrawingPointerStart {
+  const mode: DrawingSelectionMode = modifiers.ctrlKey
+    ? 'toggle'
+    : modifiers.shiftKey
+      ? 'add'
+      : 'replace';
+  if (hit && !snapshot.selectedObjectIds.includes(hit.id)) {
+    return {
+      draft: {
+        kind: 'marquee',
+        start: point,
+        current: point,
+        initialSelectionIds: snapshot.selectedObjectIds,
+        clickObjectId: hit.id,
+        ...(!modifiers.ctrlKey &&
+        !modifiers.shiftKey &&
+        hitTestDrawingDocument(selectedObjects, point)
+          ? { moveObjects: selectedObjects }
+          : {}),
+        mode,
+      },
+    };
+  }
+  if (hit && modifiers.ctrlKey) {
+    return {
+      draft: null,
+      selection: snapshot.selectedObjectIds.includes(hit.id)
+        ? snapshot.selectedObjectIds.filter((id) => id !== hit.id)
+        : [...snapshot.selectedObjectIds, hit.id],
+    };
+  }
+  if (hit && modifiers.shiftKey) {
+    return {
+      draft: null,
+      selection: snapshot.selectedObjectIds.includes(hit.id)
+        ? snapshot.selectedObjectIds
+        : [...snapshot.selectedObjectIds, hit.id],
+    };
+  }
+  if (hit) {
+    const selection = snapshot.selectedObjectIds.includes(hit.id)
+      ? snapshot.selectedObjectIds
+      : [hit.id];
+    const moving = snapshot.document.objects.filter((object) => selection.includes(object.id));
+    return {
+      draft:
+        moving.length > 1
+          ? { kind: 'move-selection', start: point, originals: moving, objects: moving }
+          : { kind: 'move', start: point, original: hit, object: hit },
+      selection,
+    };
+  }
+  return {
+    draft: {
+      kind: 'marquee',
+      start: point,
+      current: point,
+      initialSelectionIds: snapshot.selectedObjectIds,
+      mode,
+    },
+    selection: mode === 'replace' ? [] : snapshot.selectedObjectIds,
+  };
+}
+
 export function beginDrawingPointer(args: {
   modifiers?: DrawingPointerModifiers;
   point: DrawingPoint;
@@ -561,62 +632,7 @@ export function beginDrawingPointer(args: {
     };
   }
   if (snapshot.activeTool === 'select') {
-    const mode: DrawingSelectionMode = modifiers.ctrlKey
-      ? 'toggle'
-      : modifiers.shiftKey
-        ? 'add'
-        : 'replace';
-    if (hit && !snapshot.selectedObjectIds.includes(hit.id)) {
-      return {
-        draft: {
-          kind: 'marquee',
-          start: point,
-          current: point,
-          initialSelectionIds: snapshot.selectedObjectIds,
-          clickObjectId: hit.id,
-          mode,
-        },
-      };
-    }
-    if (hit && modifiers.ctrlKey) {
-      return {
-        draft: null,
-        selection: snapshot.selectedObjectIds.includes(hit.id)
-          ? snapshot.selectedObjectIds.filter((id) => id !== hit.id)
-          : [...snapshot.selectedObjectIds, hit.id],
-      };
-    }
-    if (hit && modifiers.shiftKey) {
-      return {
-        draft: null,
-        selection: snapshot.selectedObjectIds.includes(hit.id)
-          ? snapshot.selectedObjectIds
-          : [...snapshot.selectedObjectIds, hit.id],
-      };
-    }
-    if (hit) {
-      const selection = snapshot.selectedObjectIds.includes(hit.id)
-        ? snapshot.selectedObjectIds
-        : [hit.id];
-      const moving = snapshot.document.objects.filter((object) => selection.includes(object.id));
-      return {
-        draft:
-          moving.length > 1
-            ? { kind: 'move-selection', start: point, originals: moving, objects: moving }
-            : { kind: 'move', start: point, original: hit, object: hit },
-        selection,
-      };
-    }
-    return {
-      draft: {
-        kind: 'marquee',
-        start: point,
-        current: point,
-        initialSelectionIds: snapshot.selectedObjectIds,
-        mode,
-      },
-      selection: mode === 'replace' ? [] : snapshot.selectedObjectIds,
-    };
+    return beginSelectionPointer(point, snapshot, selectedObjects, hit, modifiers);
   }
   if (snapshot.activeTool === 'text') {
     return { draft: null, selection: [], text: { id: null, point, value: '' } };

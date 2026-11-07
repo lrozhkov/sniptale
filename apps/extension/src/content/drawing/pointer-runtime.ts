@@ -54,7 +54,7 @@ function useDrawingDraftInterruption(
 
 type DrawingPointerRuntimeOptions = {
   active: boolean;
-  /** Enables disposable page alignment; crop and recording retain their current gestures. */
+  /** Enables disposable page alignment for page and crop drawing. */
   alignMoves?: boolean;
   controller: ContentDrawingController;
   root: PageScrollRoot;
