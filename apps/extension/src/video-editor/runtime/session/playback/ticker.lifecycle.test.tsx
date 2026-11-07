@@ -7,7 +7,7 @@ import { createPlaybackLatestState } from './state';
 import { usePlaybackTicker } from './ticker';
 import type { PlaybackRefState, PlaybackPreviewRuntime } from '../../../interaction/playback/types';
 
-it('keeps the transport anchor through inspector edits while reading current project limits', () => {
+it('holds its initial frame for stale RAF time and keeps the anchor through inspector edits', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   let callback: FrameRequestCallback = () => {};
   vi.stubGlobal(
@@ -18,10 +18,11 @@ it('keeps the transport anchor through inspector edits while reading current pro
     })
   );
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  const clock = vi.spyOn(performance, 'now').mockReturnValue(0);
+  const clock = vi.spyOn(performance, 'now').mockReturnValue(1000);
   const root = createRoot(document.createElement('div'));
   let project = createEmptyVideoProject('Playback');
   project.duration = 20;
+  project.fps = 60;
   let playing = true;
   const playbackRef = { current: null as PlaybackRefState | null };
   const latestStateRef = {
@@ -84,11 +85,14 @@ it('keeps the transport anchor through inspector edits while reading current pro
   try {
     act(() => root.render(<Harness />));
     const anchor = playbackRef.current;
+    act(() => callback(984));
+    expect(present).toHaveBeenLastCalledWith(4);
+    expect(handlersRef.current.setCurrentTime).toHaveBeenLastCalledWith(4);
     for (let i = 1; i <= 8; i++) {
-      clock.mockReturnValue(i * 100);
+      clock.mockReturnValue(1000 + i * 100);
       project = { ...project, name: `Edit ${i}` };
       act(() => root.render(<Harness />));
-      act(() => callback(i * 100));
+      act(() => callback(1000 + i * 100));
       expect(playbackRef.current).toBe(anchor);
     }
     const times = present.mock.calls.map(([time]) => time as number);
@@ -96,10 +100,10 @@ it('keeps the transport anchor through inspector edits while reading current pro
     expect(times.every((time, index) => index === 0 || time > times[index - 1]!)).toBe(true);
     project = { ...project, duration: 4.85 };
     act(() => root.render(<Harness />));
-    act(() => callback(900));
+    act(() => callback(1900));
     expect(handlersRef.current.setPlaying).toHaveBeenCalledWith(false);
     project = { ...project, id: 'another-project', duration: 20 };
-    clock.mockReturnValue(1000);
+    clock.mockReturnValue(2000);
     act(() => root.render(<Harness />));
     expect(playbackRef.current).not.toBe(anchor);
     playing = false;

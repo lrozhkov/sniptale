@@ -113,5 +113,6 @@ export function resolvePlaybackTickTime(
     return 0;
   }
 
-  return playback.initialTime + (now - playback.startedAt) / 1000;
+  // A frame timestamp can precede the performance.now() anchor created during that frame.
+  return playback.initialTime + Math.max(0, now - playback.startedAt) / 1000;
 }
