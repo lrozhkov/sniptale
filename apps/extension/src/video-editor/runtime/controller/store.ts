@@ -330,6 +330,13 @@ export function getCurrentVideoEditorCurrentTime(): number {
   return useVideoEditorStore.getState().currentTime;
 }
 
+/** Notify visible time consumers without subscribing their containing inspector. */
+export function subscribeVideoEditorPlaybackTime(listener: () => void): () => void {
+  return useVideoEditorStore.subscribe((next, previous) => {
+    if (next.currentTime !== previous.currentTime) listener();
+  });
+}
+
 export function getCurrentVideoEditorSelectedClipId(): string | null {
   return resolveSelectedClipId(useVideoEditorStore.getState().selection);
 }

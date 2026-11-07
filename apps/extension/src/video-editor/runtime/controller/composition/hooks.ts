@@ -1,3 +1,7 @@
+import {
+  VideoProjectClipType,
+  VideoProjectTrackRole,
+} from '../../../../features/video/project/types';
 import { getVideoProjectWatermarkAsset } from '../../../../features/video/project/scene/watermark';
 import { useContext, useMemo, type Context } from 'react';
 import {
@@ -338,10 +342,18 @@ export function useVideoEditorPreviewController() {
 export function useVideoEditorSidebarController() {
   const { assetUrls } = useRuntimePreviewContext();
   const project = usePresentedProject();
-  const playback = useVideoEditorPlaybackPort(({ currentTime, setCurrentTime, setPlaying }) => ({
-    currentTime,
-    setCurrentTime,
-    setPlaying,
+  const selections = useVideoEditorSelectionsContext();
+  const selectedClip = selections.selectedClip;
+  const followsTime =
+    !!selections.selectedActionOccurrence ||
+    (selectedClip?.type === VideoProjectClipType.VIDEO &&
+      project?.tracks.some(
+        (track) => track.id === selectedClip.trackId && track.role === VideoProjectTrackRole.CAMERA
+      ));
+  const playback = useVideoEditorPlaybackPort((port) => ({
+    ...(followsTime ? { currentTime: port.currentTime } : {}),
+    setCurrentTime: port.setCurrentTime,
+    setPlaying: port.setPlaying,
   }));
   const lifecycle = useVideoEditorProjectLifecyclePort(({ project, recordingId }) => ({
     project,
@@ -354,7 +366,6 @@ export function useVideoEditorSidebarController() {
   const session = useVideoEditorRuntimeSessionPort((port) => port);
   const timeline = useVideoEditorTimelineEditingPort((port) => port);
   const libraries = useVideoEditorLibrariesContext();
-  const selections = useVideoEditorSelectionsContext();
   const dialogs = useWorkspaceDialogsContext();
   const layout = useWorkspaceLayoutContext();
   const grid = useWorkspaceGridContext();
@@ -375,6 +386,9 @@ export function useVideoEditorSidebarController() {
     ...session,
     ...timeline,
     ...lifecycle,
+    get currentTime() {
+      return getCurrentVideoEditorCurrentTime();
+    },
   };
   const projectUpdaters = createWorkspaceProjectUpdaters({
     ...store,

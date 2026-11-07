@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export interface VideoEditorWorkspaceGridState {
   gridColor: string;
@@ -25,31 +25,58 @@ export function useWorkspaceGridState(): VideoEditorWorkspaceGridState {
   const [gridEnabled, setGridEnabled] = useState(false);
   const [gridSnapEnabled, setGridSnapEnabled] = useState(true);
   const [magnetEnabled, setMagnetEnabled] = useState(true);
-  const [gridSize, setGridSize] = useState(80);
+  const [gridSize, setGridSizeState] = useState(80);
   const [gridColor, setGridColor] = useState('#94a3b8');
 
-  return {
-    gridColor,
-    gridEnabled,
-    gridPopoverOpen,
-    gridSize,
-    gridSnapEnabled,
-    magnetEnabled,
-    workspacePopoverOpen,
-    closeGridPopover: () => setGridPopoverOpen(false),
-    closeWorkspacePopover: () => setWorkspacePopoverOpen(false),
-    setGridColor,
-    setGridEnabled,
-    setGridSize: (size) => setGridSize(Math.max(4, Math.min(240, Math.round(size)))),
-    setGridSnapEnabled,
-    toggleGridPopover: () => {
-      setGridPopoverOpen((value) => !value);
-      setWorkspacePopoverOpen(false);
-    },
-    toggleMagnet: () => setMagnetEnabled((value) => !value),
-    toggleWorkspacePopover: () => {
-      setWorkspacePopoverOpen((value) => !value);
-      setGridPopoverOpen(false);
-    },
-  };
+  const closeGridPopover = useCallback(() => setGridPopoverOpen(false), []);
+  const closeWorkspacePopover = useCallback(() => setWorkspacePopoverOpen(false), []);
+  const setGridSize = useCallback(
+    (size: number) => setGridSizeState(Math.max(4, Math.min(240, Math.round(size)))),
+    []
+  );
+  const toggleGridPopover = useCallback(() => {
+    setGridPopoverOpen((value) => !value);
+    setWorkspacePopoverOpen(false);
+  }, []);
+  const toggleMagnet = useCallback(() => setMagnetEnabled((value) => !value), []);
+  const toggleWorkspacePopover = useCallback(() => {
+    setWorkspacePopoverOpen((value) => !value);
+    setGridPopoverOpen(false);
+  }, []);
+
+  return useMemo(
+    () => ({
+      gridColor,
+      gridEnabled,
+      gridPopoverOpen,
+      gridSize,
+      gridSnapEnabled,
+      magnetEnabled,
+      workspacePopoverOpen,
+      closeGridPopover,
+      closeWorkspacePopover,
+      setGridColor,
+      setGridEnabled,
+      setGridSize,
+      setGridSnapEnabled,
+      toggleGridPopover,
+      toggleMagnet,
+      toggleWorkspacePopover,
+    }),
+    [
+      gridColor,
+      gridEnabled,
+      gridPopoverOpen,
+      gridSize,
+      gridSnapEnabled,
+      magnetEnabled,
+      workspacePopoverOpen,
+      closeGridPopover,
+      closeWorkspacePopover,
+      setGridSize,
+      toggleGridPopover,
+      toggleMagnet,
+      toggleWorkspacePopover,
+    ]
+  );
 }

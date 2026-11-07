@@ -10,6 +10,7 @@ import { useRecordingTelemetry } from '../recording-telemetry';
 import { useVideoEditorSelections } from '../selections';
 import {
   getCurrentVideoEditorCurrentTime,
+  subscribeVideoEditorPlaybackTime,
   getCurrentVideoEditorExportJobId,
   getCurrentVideoEditorExportStateSnapshot,
   getCurrentVideoEditorProjectId,
@@ -335,6 +336,10 @@ function useVideoEditorContextProjections(
   );
   const runtimePlayback = useMemo(
     () => ({
+      playbackTimeSource: {
+        getSnapshot: getCurrentVideoEditorCurrentTime,
+        subscribe: subscribeVideoEditorPlaybackTime,
+      },
       isPreparingPlayback: runtime.isPreparingPlayback,
       pausePlayback: runtime.pausePlayback,
       seekTo: runtime.seekTo,

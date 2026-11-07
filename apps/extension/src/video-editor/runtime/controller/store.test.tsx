@@ -8,6 +8,7 @@ import { useVideoEditorStore } from '../../state/store';
 import {
   getCurrentVideoEditorCurrentTime,
   subscribeVideoEditorProjectHistory,
+  subscribeVideoEditorPlaybackTime,
   getCurrentVideoEditorExportStateSnapshot,
   getCurrentVideoEditorSelectedClipId,
   useVideoEditorAnnotationEditingPort,
@@ -346,4 +347,19 @@ it('publishes a history lease synchronously before the authored project changes'
   useVideoEditorStore.getState().endProjectHistoryTransaction(lease!);
   expect(observed.at(-1)).toEqual({ lease: null, name: 'During gesture' });
   unsubscribe();
+});
+
+it('notifies live time consumers only for changed snapshots and stops after unsubscribe', () => {
+  const before = getCurrentVideoEditorCurrentTime();
+  const observed: number[] = [];
+  const unsubscribe = subscribeVideoEditorPlaybackTime(() => {
+    observed.push(getCurrentVideoEditorCurrentTime());
+  });
+  useVideoEditorStore.setState({ currentTime: before + 1 });
+  useVideoEditorStore.setState({ currentTime: before + 1, isPlaying: true });
+  useVideoEditorStore.setState({ currentTime: before + 2 });
+  expect(observed).toEqual([before + 1, before + 2]);
+  unsubscribe();
+  useVideoEditorStore.setState({ currentTime: before + 3 });
+  expect(observed).toHaveLength(2);
 });

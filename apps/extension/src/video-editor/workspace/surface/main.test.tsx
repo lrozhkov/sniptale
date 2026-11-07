@@ -50,6 +50,9 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
 
 vi.mock('../../runtime/controller/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/store')>()),
+  useVideoEditorProjectLifecyclePort: (
+    selector: (port: { project: ReturnType<typeof createSidebarState>['project'] }) => unknown
+  ) => selector({ project: createSidebarState().project }),
   useVideoEditorExportPort: (selector: (port: unknown) => unknown) =>
     selector({
       exportState: { dialogOpen: hookMocks.exportOpen },

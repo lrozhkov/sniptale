@@ -1,3 +1,4 @@
+import type { VideoEditorPlaybackTimeSource } from '../../../../contracts/controller-store';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -127,7 +128,7 @@ it('does not mount or seek crop media while the real disclosure is collapsed', (
   expect(container.querySelectorAll('input')).toHaveLength(4);
 });
 
-function cropFixture() {
+function cropFixture(playbackTimeSource?: VideoEditorPlaybackTimeSource) {
   const project = createVideoProjectFromRecording({
     recordingId: 'crop-lifecycle',
     filename: 'crop.mp4',
@@ -155,6 +156,7 @@ function cropFixture() {
             project={project}
             clip={clip}
             currentTime={currentTime}
+            playbackTimeSource={playbackTimeSource}
             disabled={false}
             onEdit={onEdit}
           />
@@ -226,4 +228,56 @@ it('replaces only crop media for a changed source URL and leaves the source URL 
   expect(container.querySelector('input')).toBe(input);
   expect(load).not.toHaveBeenCalled();
   expect(f.onEdit).not.toHaveBeenCalled();
+});
+
+it('subscribes only the expanded crop preview and reads fresh time without disturbing numeric edits', () => {
+  let time = 1.5;
+  const listeners = new Set<() => void>();
+  const playbackTimeSource: VideoEditorPlaybackTimeSource = {
+    getSnapshot: () => time,
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+  const f = cropFixture(playbackTimeSource);
+  f.clip.playbackRate = 2;
+  f.clip.duration = 5;
+  const seek = vi.spyOn(HTMLMediaElement.prototype, 'currentTime', 'set');
+  vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(2);
+  f.render(0);
+  const inputs = [...container.querySelectorAll('input')];
+  expect(listeners.size).toBe(0);
+  expandCrop(true);
+  expect(listeners.size).toBe(1);
+  expect(seek).toHaveBeenLastCalledWith(3);
+  const field = inputs[0]!;
+  act(() => {
+    field.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '12.3');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => {
+    time = 2;
+    for (const listener of listeners) listener();
+  });
+  expect(seek).toHaveBeenLastCalledWith(4);
+  expect([...container.querySelectorAll('input')]).toEqual(inputs);
+  expect(document.activeElement).toBe(field);
+  expect(field.value).toBe('12.3');
+  expect(f.onEdit).not.toHaveBeenCalled();
+  expandCrop(false);
+  expect(listeners.size).toBe(0);
+  const calls = seek.mock.calls.length;
+  act(() => {
+    time = 3;
+    for (const listener of listeners) listener();
+  });
+  expect(seek.mock.calls).toHaveLength(calls);
+  expandCrop(true);
+  expect(seek).toHaveBeenLastCalledWith(6);
+  act(() => root.render(null));
+  expect(listeners.size).toBe(0);
 });

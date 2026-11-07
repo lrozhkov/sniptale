@@ -1,4 +1,5 @@
-import { useContext } from 'react';
+import { useContext, useSyncExternalStore, type ComponentProps } from 'react';
+import type { VideoEditorPlaybackTimeSource } from '../../../../contracts/controller-store';
 import { RotateCcw } from 'lucide-react';
 import type { MediaSourceCrop } from '../../../../../features/video/project/media-crop';
 import { getMediaClipSourceTime } from '../../../../../features/video/project/timeline/rate';
@@ -17,13 +18,16 @@ import { MediaCropPreview } from './media-crop-preview';
 
 const WHOLE_SOURCE: MediaSourceCrop = { x: 0, y: 0, width: 1, height: 1 };
 
-export function MediaCropControls(props: {
+interface MediaCropControlsProps {
   project: VideoProject;
   clip: VideoProjectVideoClip | VideoProjectImageClip;
   currentTime: number;
+  playbackTimeSource?: VideoEditorPlaybackTimeSource | undefined;
   disabled: boolean;
   onEdit?: ((clipId: string, edit: VideoEditorMediaClipEdit) => void) | undefined;
-}) {
+}
+
+export function MediaCropControls(props: MediaCropControlsProps) {
   const runtime = useContext(RuntimePreviewContext);
   const crop = props.clip.sourceCrop ?? WHOLE_SOURCE;
   const asset = props.project.assets.find((asset) => asset.id === props.clip.assetId);
@@ -64,17 +68,15 @@ export function MediaCropControls(props: {
       {(open) => (
         <div className="sniptale-parameter-stack space-y-1" data-ui="video-editor.media-crop">
           {open && (
-            <MediaCropPreview
+            <MediaCropPlaybackPreview
               key={`${props.clip.id}:${runtime?.assetUrls[props.clip.assetId] ?? ''}`}
               url={runtime?.assetUrls[props.clip.assetId]}
               kind={props.clip.type}
               width={asset?.metadata.width ?? 1}
               height={asset?.metadata.height ?? 1}
-              sourceTime={
-                props.clip.type === 'VIDEO'
-                  ? getMediaClipSourceTime(props.clip, props.currentTime)
-                  : 0
-              }
+              clip={props.clip}
+              currentTime={props.currentTime}
+              playbackTimeSource={props.playbackTimeSource}
               crop={crop}
               disabled={disabled}
               onChange={change}
@@ -118,5 +120,24 @@ export function MediaCropControls(props: {
         </div>
       )}
     </InspectorDetails>
+  );
+}
+
+const subscribeStaticTime = () => () => undefined;
+
+function MediaCropPlaybackPreview(
+  props: Omit<ComponentProps<typeof MediaCropPreview>, 'sourceTime'> &
+    Pick<MediaCropControlsProps, 'clip' | 'currentTime' | 'playbackTimeSource'>
+) {
+  const { clip, currentTime, playbackTimeSource, ...preview } = props;
+  const time = useSyncExternalStore(
+    playbackTimeSource?.subscribe ?? subscribeStaticTime,
+    playbackTimeSource?.getSnapshot ?? (() => currentTime)
+  );
+  return (
+    <MediaCropPreview
+      {...preview}
+      sourceTime={clip.type === 'VIDEO' ? getMediaClipSourceTime(clip, time) : 0}
+    />
   );
 }

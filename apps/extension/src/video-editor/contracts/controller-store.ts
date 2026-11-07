@@ -196,3 +196,9 @@ export interface VideoEditorProjectStorageStatus {
   projectUpdatedAt: number | null;
   saveState: VideoEditorSaveState;
 }
+
+/** Read-only notifications from the authoritative playback time store. */
+export interface VideoEditorPlaybackTimeSource {
+  getSnapshot(): number;
+  subscribe(listener: () => void): () => void;
+}

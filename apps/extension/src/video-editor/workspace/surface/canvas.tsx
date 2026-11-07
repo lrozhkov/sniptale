@@ -48,13 +48,14 @@ import {
 } from '../../runtime/controller/composition/hooks';
 import {
   useVideoEditorEffectEditingPort,
+  useVideoEditorProjectLifecyclePort,
   useVideoEditorTimelineEditingPort,
 } from '../../runtime/controller/store';
 
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
   const [revealRequest, setRevealRequest] = useState<TimelineRevealRequest>();
   const layout = useVideoEditorLayoutController();
-  const preview = useVideoEditorPreviewController();
+  const projectId = useVideoEditorProjectLifecyclePort((port) => port.project?.id);
   const viewer = useWorkspacePreviewContext();
   const previewHeight = props.previewHeightStyle.height ?? '60%';
   return (
@@ -70,7 +71,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
       >
         <div data-ui="video-editor.workspace.upper" className="contents">
           <VideoEditorWorkspaceUpper
-            key={preview?.project.id ?? 'empty'}
+            key={projectId ?? 'empty'}
             {...props}
             onRevealTarget={(target) =>
               setRevealRequest((previous) => ({ ...target, serial: (previous?.serial ?? 0) + 1 }))
