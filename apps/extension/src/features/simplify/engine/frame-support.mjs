@@ -323,7 +323,7 @@ export function recoverFramedLabels(image, boxes, frames, measure) {
         .filter((p) => p.n >= 3)
         .sort((a, b) => a.x - b.x),
       suffix = parts.at(-1);
-    if (parts.length >= 3 && suffix && frame.w > frame.h * 1.8) {
+    if (parts.length >= 2 && suffix && frame.w > frame.h * 1.8) {
       const suffixClaim = framedLabelSuffix(image, inner, frame, parts, suffix, measure);
       if (suffixClaim) {
         const { tail, label, caret, m } = suffixClaim;
@@ -570,7 +570,7 @@ function framedLabelSuffix(image, inner, frame, parts, suffix, measure) {
       frame.x + frame.w - (suffix.x + suffix.w) <= Math.max(8, frame.h * 0.65) &&
       m &&
       m.glyphs >= 2 &&
-      m.foregroundCoverage >= 0.9 &&
+      m.foregroundCoverage >= 0.8 &&
       m.baselineAgreement >= 0.8 &&
       m.heightAgreement >= 0.8 &&
       m.stroke / m.xHeight <= 0.4 &&

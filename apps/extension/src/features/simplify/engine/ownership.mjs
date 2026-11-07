@@ -3,7 +3,7 @@ import {
   resolveConnectedCaptionClaims,
   resolveDecorativeLockups,
 } from './ownership-ink.mjs';
-import { inkRuns, matchingSourceGlyph } from './ownership-ink.mjs';
+import { inkRuns, matchingSourceGlyph, sameSourceInk } from './ownership-ink.mjs';
 import { recoverColumnGlyphs } from './ownership-columns.mjs';
 import {
   recoverRepeatedNumericText,
@@ -59,7 +59,7 @@ export function resolveSurfaceClaims(image, media, controls, measure) {
           const edge =
             (side === 'top' ? y : side === 'bottom' ? y + h - 1 : side === 'left' ? x : x + w - 1) +
             offset;
-          const step = box.kind === 'compound-island' ? 1 : 2;
+          const step = 1;
           const inward = side === 'top' || side === 'left' ? step : -step;
           const inside = horizontal ? color(x + n, edge + inward) : color(edge + inward, y + n);
           const outside = horizontal ? color(x + n, edge - inward) : color(edge - inward, y + n);
@@ -533,13 +533,96 @@ function inlineSingleGlyphPeers(image, box, m, input) {
   return [left, right];
 }
 
+function compactSourceMetrics(image, input, measure, parts) {
+  const metrics = new Map();
+  for (const q of input) {
+    if (!['unknown', 'icon'].includes(q.shape) || q.roleEvidence || q.kind === 'control-icon')
+      continue;
+    const bodies = parts(q).filter((p) => p.n >= 5),
+      t = measure(image, { ...(q.sourceBounds || q), bg: q.bg }, 1);
+    if (bodies.length !== 1 || !t || t.glyphs !== 1) continue;
+    const p = bodies[0];
+    if (p.h < 5 || p.w > p.h * 0.9) continue;
+    metrics.set(q, {
+      ...t,
+      xHeight: p.h,
+      upperHeight: p.h,
+      glyphBounds: { x: p.x, y: p.y, w: p.w, h: p.h },
+      inferredFromContext: true,
+    });
+  }
+  return metrics;
+}
+
+function spacedSingleGlyphPeers(image, box, input, measure) {
+  const cache = new Map();
+  const parts = (q) => {
+    if (!cache.has(q)) cache.set(q, inkParts(image, { ...q, atoms: null }));
+    return cache.get(q);
+  };
+  const metrics = compactSourceMetrics(image, input, measure, parts);
+  const m = metrics.get(box),
+    glyph = m?.glyphBounds;
+  if (!glyph) return null;
+  const sameInk = (q) =>
+    parts(q).some((p) => parts(box).some((r) => sameSourceInk(p.rgb, r.rgb, q.bg, box.bg)));
+  const family = [...metrics.keys()]
+    .filter((q) => {
+      const t = metrics.get(q),
+        g = t.glyphBounds;
+      return (
+        Math.abs(g.y + g.h - glyph.y - glyph.h) <= 1.5 &&
+        Math.min(g.h, glyph.h) >= Math.max(g.h, glyph.h) * 0.75 &&
+        Math.min(t.stroke, m.stroke) >= Math.max(t.stroke, m.stroke) * 0.65 &&
+        Math.max(...q.bg.map((v, c) => Math.abs(v - box.bg[c]))) <= 8 &&
+        sameInk(q)
+      );
+    })
+    .sort((a, b) => a.x - b.x);
+  const index = family.indexOf(box);
+  if (index < 0) return null;
+  let first = index,
+    last = index;
+  const close = (a, b) => b.x - a.x - a.w <= glyph.h * 4;
+  while (first > 0 && close(family[first - 1], family[first])) first--;
+  while (last + 1 < family.length && close(family[last], family[last + 1])) last++;
+  if (last - first + 1 < 4) return null;
+  const left = family[first],
+    right = family[last];
+  const peers = input.filter((q) => {
+    const t = q.typeMetrics,
+      g = t?.glyphBounds;
+    if (q.shape !== 'text' || !q.textConfidence || !g || t.glyphs < 3) return false;
+    const gap = Math.max(left.x - q.x - q.w, q.x - right.x - right.w);
+    if (
+      gap < 0 ||
+      gap > glyph.h * 6 ||
+      Math.min(t.upperHeight, glyph.h) < Math.max(t.upperHeight, glyph.h) * 0.75 ||
+      Math.max(...q.bg.map((v, c) => Math.abs(v - box.bg[c]))) > 8 ||
+      !sameInk(q)
+    )
+      return false;
+    // Descenders do not define the baseline of the neighboring compact values.
+    const bottoms = parts(q)
+      .filter((p) => p.h >= t.xHeight * 0.7 && p.h <= glyph.h && p.w <= p.h * 2)
+      .map((p) => p.y + p.h)
+      .sort((a, b) => a - b);
+    return (
+      bottoms.length > 0 &&
+      Math.abs(bottoms[Math.floor(bottoms.length / 2)] - glyph.y - glyph.h) <=
+        Math.max(1.5, glyph.h * 0.2)
+    );
+  });
+  return peers.length ? { peers, metric: m } : null;
+}
+
 function recoverSingleGlyphRows(image, input, measure) {
   const median = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
   return input.map((box) => {
     if (!['icon', 'unknown'].includes(box.shape) || box.roleEvidence || box.kind === 'control-icon')
       return box;
-    const original = box.sourceBounds || box,
-      m = measure(image, { ...original, bg: box.bg }, 1);
+    const original = box.sourceBounds || box;
+    let m = measure(image, { ...original, bg: box.bg }, 1);
     if (!m || m.glyphs !== 1 || m.xHeight < 5 || m.stroke / m.xHeight > 0.4) return box;
     const glyph = m.glyphBounds,
       bottom = glyph.y + glyph.h;
@@ -567,6 +650,13 @@ function recoverSingleGlyphRows(image, input, measure) {
           });
     if (peers.length < 4 || !peers.some((q) => q.x < box.x) || !peers.some((q) => q.x > box.x))
       peers = inlineSingleGlyphPeers(image, box, m, input);
+    if (!peers.length) {
+      const spaced = spacedSingleGlyphPeers(image, box, input, measure);
+      if (spaced) {
+        peers = spaced.peers;
+        m = spaced.metric;
+      }
+    }
     if (!peers.length) return box;
     const stroke = median(peers.map((q) => q.typeMetrics.stroke));
     if (m.stroke / stroke < 0.65 || m.stroke / stroke > 1.5) return box;

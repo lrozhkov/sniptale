@@ -78,9 +78,16 @@ it('clips a private tile to the supported element scroll root', () => {
     )
   );
   const layer = host.querySelector<HTMLElement>('[data-ui="content.drawing.visual-layer"]')!;
-  expect(layer.style.clipPath).toBe(
-    `inset(20px ${Math.max(0, window.innerWidth - 210)}px ${Math.max(0, window.innerHeight - 120)}px 10px)`
-  );
+  expect(layer.style.clipPath).toBe('');
+  expect(layer.style.overflow).toBe('hidden');
+  expect(layer.style.left).toBe('10px');
+  expect(layer.style.top).toBe('20px');
+  expect(layer.style.width).toBe('200px');
+  expect(layer.style.height).toBe('100px');
+  const tile = layer.querySelector<HTMLElement>('[data-ui="content.drawing.simplify-private"]')!;
+  expect(tile.style.position).toBe('absolute');
+  expect(tile.style.left).toBe('-10px');
+  expect(tile.style.top).toBe('-20px');
   expect(host.querySelector('img,canvas')).toBeNull();
   act(() => root.unmount());
   host.remove();

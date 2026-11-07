@@ -27,19 +27,15 @@ export function DrawingVisualLayers(props: {
   getObjectAnchor?: (object: DrawingObject) => Element | null;
 }) {
   const clip = props.root.kind === 'element' ? props.root.element.getBoundingClientRect() : null;
-  const clipPath = clip
-    ? `inset(${[
-        Math.max(0, clip.top),
-        Math.max(0, window.innerWidth - clip.right),
-        Math.max(0, window.innerHeight - clip.bottom),
-        Math.max(0, clip.left),
-      ]
-        .map((edge) => `${edge}px`)
-        .join(' ')})`
-    : undefined;
   const pixelBudget = 16_777_216 / props.layers.filter((layer) => layer.kind === 'ink').length;
   return props.layers.map((layer, index) => {
     if (layer.kind === 'ink' && index === 0) return null;
+    const objectClip =
+      layer.kind === 'simplify' &&
+      clip &&
+      clipDrawingObjectToRoot(layer.object, props.root, props.getObjectAnchor?.(layer.object))
+        ? clip
+        : null;
     return (
       <div
         key={layer.kind === 'ink' ? layer.objects[0]!.id : layer.object.id}
@@ -49,11 +45,15 @@ export function DrawingVisualLayers(props: {
           inset: 0,
           pointerEvents: 'none',
           zIndex: index,
-          ...(layer.kind === 'simplify' &&
-          clip &&
-          clipDrawingObjectToRoot(layer.object, props.root, props.getObjectAnchor?.(layer.object))
+          // Overflow preserves the page backdrop; a parent clip-path isolates it.
+          ...(objectClip
             ? {
-                clipPath,
+                inset: undefined,
+                left: objectClip.left,
+                top: objectClip.top,
+                width: objectClip.width,
+                height: objectClip.height,
+                overflow: 'hidden',
               }
             : {}),
         }}
@@ -71,6 +71,7 @@ export function DrawingVisualLayers(props: {
             object={layer.object}
             previewFill={layer.previewFill ?? false}
             projection={props.projection}
+            viewportOrigin={{ x: objectClip?.left ?? 0, y: objectClip?.top ?? 0 }}
             opacity={props.getObjectOpacity?.(layer.object.id) ?? 1}
           />
         ) : layer.kind === 'text' ? (

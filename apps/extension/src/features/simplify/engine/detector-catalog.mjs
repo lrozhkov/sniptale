@@ -306,7 +306,19 @@ function admitControlLabels(
             Math.max(0, Math.min(b.y + b.h, label.y + label.h) - Math.max(b.y, label.y));
           if (overlap < Math.min(b.w * b.h, label.w * label.h) * 0.6) return false;
           const m = glyphMetrics(image, b);
-          return m && m.glyphs >= 3 && m.baselineAgreement >= 0.7 && m.heightAgreement >= 0.7;
+          if (!m || m.glyphs < 3 || m.baselineAgreement < 0.7 || m.heightAgreement < 0.7)
+            return false;
+          if (overlap >= label.w * label.h * 0.9) return true;
+          // A complete, independently measured label can supersede a suffix.
+          // Weak surface groups must not absorb adjacent graphics.
+          const whole = glyphMetrics(image, label);
+          return (
+            !whole ||
+            whole.glyphs < 3 ||
+            whole.foregroundCoverage < 0.9 ||
+            whole.baselineAgreement < 0.8 ||
+            whole.heightAgreement < 0.8
+          );
         })
     );
   catalog = catalog.filter((b) => !labels.some((label) => intersects(b, label)));

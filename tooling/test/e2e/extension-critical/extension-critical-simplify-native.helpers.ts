@@ -538,15 +538,19 @@ async function sampleNativeSimplifyInk(
     context.drawImage(image, 0, 0);
     const pixels = context.getImageData(0, 0, image.width, image.height).data;
     let blue = 0,
-      gray = 0;
+      gray = 0,
+      variation = 0;
     for (let i = 0; i < pixels.length; i += 4) {
+      const pixel = i / 4;
+      if (pixel % image.width > 0) variation += Math.abs(pixels[i]! - pixels[i - 4]!);
+      if (pixel >= image.width) variation += Math.abs(pixels[i]! - pixels[i - image.width * 4]!);
       const r = pixels[i]!,
         g = pixels[i + 1]!,
         b = pixels[i + 2]!;
       if (r < 100 && b - r > 40 && g - r > 15) blue++;
       if (r >= 100 && r <= 220 && Math.max(r, g, b) - Math.min(r, g, b) <= 45) gray++;
     }
-    return { blue, gray };
+    return { blue, gray, variation: variation / (pixels.length / 4) };
   }, png.toString('base64'));
 }
 
@@ -596,7 +600,14 @@ export async function assertNativeNestedScrollSimplify(page: Page, info: TestInf
   const body = { x: 464, y: 280, width: 250, height: 30 };
   const originalBody = await sampleNativeSimplifyInk(page, body);
   expect(originalBody.blue).toBeGreaterThan(100);
-  await dragSimplify(page, { x: 450, y: 268 }, { x: 800, y: 330 });
+  await page.mouse.move(450, 268);
+  await page.mouse.down();
+  await page.mouse.move(800, 330, { steps: 8 });
+  await expect(page.locator('[data-ui="content.drawing.simplify-private"]').last()).toBeVisible();
+  const previewBody = await sampleNativeSimplifyInk(page, body);
+  expect(previewBody.variation).toBeLessThan(originalBody.variation * 0.8);
+  await page.screenshot({ path: info.outputPath('nested-new-area-blur.png'), fullPage: false });
+  await page.mouse.up();
   await waitForNativeSimplifyCount(page, 2);
   await expect
     .poll(async () => (await sampleNativeSimplifyInk(page, body)).blue)

@@ -27,6 +27,7 @@ function showPrimitiveFill(root: ShadowRoot, source: CanvasImageSource): void {
 export function DrawingSimplifyLayer(props: {
   object: DrawingSimplifyObject;
   projection: DrawingPoint;
+  viewportOrigin?: DrawingPoint;
   opacity?: number;
   previewFill?: boolean;
 }) {
@@ -92,13 +93,13 @@ export function DrawingSimplifyLayer(props: {
       data-simplify-pending={!props.object.result ? 'true' : undefined}
       aria-hidden="true"
       style={{
-        position: 'fixed',
+        position: props.viewportOrigin ? 'absolute' : 'fixed',
         pointerEvents: 'none',
         ...(!props.object.result
           ? { border: '1px dashed #2563eb', boxSizing: 'border-box' as const }
           : {}),
-        left: bounds.x - props.projection.x,
-        top: bounds.y - props.projection.y,
+        left: bounds.x - props.projection.x - (props.viewportOrigin?.x ?? 0),
+        top: bounds.y - props.projection.y - (props.viewportOrigin?.y ?? 0),
         width: bounds.width,
         height: bounds.height,
         transform: mask ? 'none' : `rotate(${props.object.rotation ?? 0}deg)`,

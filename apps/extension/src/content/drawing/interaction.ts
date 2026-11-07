@@ -610,6 +610,7 @@ export function beginDrawingPointer(args: {
   }
   const object = createDrawingObject(snapshot.activeTool, point, timestamp, snapshot.defaults);
   return {
+    ...(object ? { selection: [] } : {}),
     draft: object
       ? {
           kind: 'create',

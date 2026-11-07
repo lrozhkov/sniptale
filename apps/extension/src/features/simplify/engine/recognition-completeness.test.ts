@@ -471,3 +471,120 @@ it.each([1, 2])('simplifies isolated values in a supported text column at scale 
   for (let row = 0; row < 7; row++)
     expect(delta(24 * scale, (20 + row * 45 + 1) * scale, 21 * scale, 23 * scale)).toBe(0);
 });
+
+for (const scale of [1, 2])
+  it(`replaces spaced short text values beside a label at scale ${scale}`, () => {
+    const canvas = createCanvas(600 * scale, 100 * scale),
+      context = canvas.getContext('2d');
+    context.scale(scale, scale);
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 600, 100);
+    context.textBaseline = 'top';
+    context.font = '12px Arial';
+    context.fillStyle = '#0064bf';
+    const values = ['2', '3', '4', '5', '6', '7'];
+    values.forEach((text, i) => context.fillText(text, 20 + i * 24, 40));
+    context.fillText('Continue browsing', 190, 40);
+    const delta = execute(canvas);
+    for (let i = 0; i < values.length; i++)
+      expect(
+        delta((20 + i * 24) * scale, 40 * scale, 9 * scale, 15 * scale),
+        values[i]
+      ).toBeGreaterThan(8);
+  });
+
+it('replaces a two-glyph framed label independently of its connected foreground parts', () => {
+  const canvas = createCanvas(250, 90),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 250, 90);
+  context.strokeStyle = '#bbbbbb';
+  context.lineWidth = 1;
+  context.strokeRect(20.5, 30.5, 60, 24);
+  context.fillStyle = '#444444';
+  context.font = '12px Arial';
+  context.textBaseline = 'top';
+  context.fillText('20', 29, 36);
+  context.beginPath();
+  context.moveTo(65, 40);
+  context.lineTo(73, 40);
+  context.lineTo(69, 45);
+  context.closePath();
+  context.fill();
+  const delta = execute(canvas);
+  expect(delta(29, 36, 15, 14)).toBeGreaterThan(20);
+  expect(delta(65, 40, 8, 5)).toBe(0);
+  expect(delta(20, 30, 61, 1)).toBe(0);
+});
+
+it('replaces complete light control labels instead of retaining only their recognized suffix', () => {
+  const canvas = createCanvas(340, 100),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 340, 100);
+  context.fillStyle = '#0063b0';
+  context.fillRect(30, 35, 100, 24);
+  context.fillStyle = '#ffffff';
+  context.font = 'bold 13px Arial';
+  context.textBaseline = 'top';
+  context.fillText('Отменить', 41, 40);
+  const delta = execute(canvas);
+  expect(delta(41, 40, 38, 16)).toBeGreaterThan(30);
+  expect(delta(81, 40, 35, 16)).toBeGreaterThan(20);
+  expect(delta(31, 36, 8, 21)).toBe(0);
+});
+
+it.each(['missing', 'distant', 'different-ink'])(
+  'preserves compact glyph-like rows with %s text evidence',
+  (kind) => {
+    const canvas = createCanvas(650, 100),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 650, 100);
+    context.textBaseline = 'top';
+    context.font = '12px Arial';
+    context.fillStyle = '#0064bf';
+    ['2', '3', '4', '5', '6', '7'].forEach((text, i) => context.fillText(text, 20 + i * 24, 40));
+    if (kind !== 'missing') {
+      if (kind === 'different-ink') context.fillStyle = '#dc2626';
+      context.fillText('Continue browsing', kind === 'distant' ? 450 : 190, 40);
+    }
+    const delta = execute(canvas);
+    for (let i = 0; i < 6; i++) expect(delta(20 + i * 24, 40, 9, 15)).toBe(0);
+  }
+);
+
+it('retains control-label ownership across a one-pixel gutter between filled controls', async () => {
+  const { resolveSurfaceClaims } = await vi.importActual<{
+    resolveSurfaceClaims(
+      image: unknown,
+      media: object[],
+      controls: object,
+      measure: () => null
+    ): { controls: { labels: object[] } };
+  }>('./ownership.mjs');
+  const canvas = createCanvas(240, 80),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 240, 80);
+  context.fillStyle = '#0063b0';
+  context.fillRect(20, 25, 90, 24);
+  context.fillRect(111, 25, 110, 24);
+  context.fillStyle = '#ffffff';
+  context.font = 'bold 13px Arial';
+  context.textBaseline = 'top';
+  context.fillText('Rollback', 30, 30);
+  const label = { x: 29, y: 29, w: 65, h: 17, bg: [0, 99, 176], shape: 'text' };
+  const claims = resolveSurfaceClaims(
+    context.getImageData(0, 0, 240, 80),
+    [],
+    {
+      boundaries: [{ x: 20, y: 25, w: 90, h: 24, kind: 'control' }],
+      protected: [],
+      labels: [label],
+    },
+    () => null
+  );
+  expect(claims.controls.labels).toEqual([label]);
+  expect(execute(canvas)(30, 30, 60, 16)).toBeGreaterThan(100);
+});

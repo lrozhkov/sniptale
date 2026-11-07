@@ -369,7 +369,15 @@ it('submits a Simplify pointer release to its async owner without committing a d
   });
   const commit = vi.fn(() => true);
   const session = createDrawingSession({ onDocumentCommit: commit });
+  session.commitObject({
+    id: 'previous',
+    kind: 'blur',
+    bounds: { x: 300, y: 200, width: 100, height: 80 },
+  });
   session.setActiveTool('simplify');
+  session.select('previous');
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['previous']);
+  commit.mockClear();
   const submit = vi.fn<NonNullable<ContentDrawingController['simplify']>['submit']>(
     async () => undefined
   );
@@ -413,6 +421,7 @@ it('submits a Simplify pointer release to its async owner without committing a d
     act(() => {
       canvas.dispatchEvent(mousePointerEvent(type, x, y));
     });
+    if (type === 'pointerdown') expect(session.getSnapshot().selectedObjectIds).toEqual([]);
     if (type === 'pointermove') {
       const preview = host.querySelector<HTMLElement>(
         '[data-ui="content.drawing.simplify-private"]'
@@ -430,7 +439,7 @@ it('submits a Simplify pointer release to its async owner without committing a d
   });
   expect(submit.mock.calls[0]?.[1]).toBeInstanceOf(Event);
   expect(commit).not.toHaveBeenCalled();
-  expect(session.getSnapshot().document.objects).toHaveLength(0);
+  expect(session.getSnapshot().document.objects).toHaveLength(1);
   act(() => root.unmount());
   session.dispose();
 });
