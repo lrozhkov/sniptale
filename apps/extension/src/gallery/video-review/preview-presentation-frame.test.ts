@@ -331,3 +331,117 @@ it('aggregates camera ownership without placing a resource lease in the render p
   expect(f.raw.close).toHaveBeenCalledOnce();
   expect(f.reservation.release).toHaveBeenCalledOnce();
 });
+
+it('captures owned RGB without claiming source PTS when VideoFrame is absent', () => {
+  const f = setup();
+  f.captured.release();
+  f.reserveSource.mockClear();
+  f.reservation.release.mockClear();
+  vi.stubGlobal('VideoFrame', undefined);
+  const canvas = { width: 0, height: 0, getContext: () => ({ drawImage: vi.fn() }) };
+  vi.stubGlobal('document', { createElement: () => canvas });
+  const video = {
+    ...f.video,
+    videoWidth: 80,
+    videoHeight: 40,
+    readyState: 2,
+    seeking: false,
+  } as HTMLVideoElement;
+  const captured = captureReviewPreviewFrame({
+    video,
+    description: f.description,
+    sequence: 1,
+    time: 12,
+    transition: null,
+    sourceTime: () => 15,
+    reserveSource: f.reserveSource,
+    captureCamera: () => undefined,
+  });
+  expect(captured).not.toBeNull();
+  expect(f.reserveSource).toHaveBeenCalledWith(80 * 40 * 4);
+  expect(captured!.value.source.videoFrame).toBeUndefined();
+  expect(captured!.value.source.timestamp).toBeUndefined();
+  expect(captured!.value.sourceTime).toBe(15);
+  expect(captured!.value.resultTime).toBe(12);
+  const drawImage = vi.fn();
+  captured!.value.source.draw({ drawImage } as unknown as CanvasRenderingContext2D, 0, 0, 80, 40);
+  const image = drawImage.mock.calls[0]![0] as HTMLCanvasElement;
+  expect(image.width).toBe(80);
+  captured!.release();
+  captured!.release();
+  expect(image.width).toBe(0);
+  expect(f.reservation.release).toHaveBeenCalledOnce();
+});
+
+it.each(['budget', 'context', 'camera'] as const)(
+  'rolls back absent-API RGB primary %s failure',
+  (failure) => {
+    const f = setup();
+    f.captured.release();
+    f.reservation.release.mockClear();
+    vi.stubGlobal('VideoFrame', undefined);
+    const rgb = {
+      width: 0,
+      height: 0,
+      getContext: () => (failure === 'context' ? null : { drawImage: vi.fn() }),
+    };
+    vi.stubGlobal('document', { createElement: () => rgb });
+    if (failure === 'budget')
+      f.reserveSource.mockImplementationOnce(() => {
+        throw new Error('budget refused');
+      });
+    expect(() =>
+      captureReviewPreviewFrame({
+        video: {
+          ...f.video,
+          videoWidth: 80,
+          videoHeight: 40,
+          readyState: 2,
+          seeking: false,
+        } as HTMLVideoElement,
+        description: f.description,
+        sequence: 1,
+        time: 12,
+        transition: null,
+        sourceTime: () => 15,
+        reserveSource: f.reserveSource,
+        captureCamera: () => {
+          throw new Error('camera unavailable');
+        },
+      })
+    ).toThrow();
+    expect(rgb.width).toBe(0);
+    expect(f.reservation.release).toHaveBeenCalledTimes(failure === 'budget' ? 0 : 1);
+  }
+);
+
+it.each(['metadata', 'seeking'] as const)('keeps absent-API RGB pending during %s', (state) => {
+  const f = setup();
+  f.captured.release();
+  f.reserveSource.mockClear();
+  vi.stubGlobal('VideoFrame', undefined);
+  const rgb = { width: 0, height: 0, getContext: () => ({ drawImage: vi.fn() }) };
+  vi.stubGlobal('document', { createElement: () => rgb });
+  const video = {
+    ...f.video,
+    videoWidth: 80,
+    videoHeight: 40,
+    readyState: state === 'metadata' ? 1 : 2,
+    seeking: state === 'seeking',
+  } as HTMLVideoElement;
+  const captureCamera = vi.fn();
+  expect(
+    captureReviewPreviewFrame({
+      video,
+      description: f.description,
+      sequence: 1,
+      time: 12,
+      transition: null,
+      sourceTime: () => 15,
+      reserveSource: f.reserveSource,
+      captureCamera,
+    })
+  ).toBeNull();
+  expect(f.reserveSource).not.toHaveBeenCalled();
+  expect(captureCamera).not.toHaveBeenCalled();
+});

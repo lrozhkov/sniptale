@@ -122,7 +122,8 @@ type Frame = {
   sourceTime: number;
   resultTime: number;
   source: Drawable & {
-    timestamp: number;
+    /** Actual source PTS, absent only for a draw-only RGB compatibility snapshot. */
+    timestamp?: number;
     backing: Size;
     prepare?(signal: AbortSignal): Promise<void>;
   };
@@ -427,6 +428,14 @@ function prepareRetainedSceneCaptions(
   return enabled ? prepareSceneCaptions(prepared, assets, resources, signal) : null;
 }
 
+/** Transition membership requires actual sample PTS, independently of the authored clock. */
+function knownTransitionSource(source: Frame['source']) {
+  const timestamp = source.timestamp;
+  if (timestamp === undefined || !Number.isFinite(timestamp))
+    throw new Error('Transition source timestamp is unavailable.');
+  return { ...source, timestamp };
+}
+
 /** Keep the admitted static window plane; camera and overlays do not change its pixels. */
 function retainedWindowRaster(
   scene: Scene,
@@ -437,6 +446,7 @@ function retainedWindowRaster(
 ): ReviewWindowRaster | undefined {
   // Click magnification changes raster density over time; its original lease path stays dynamic.
   if (
+    frame.source.timestamp === undefined ||
     (!assets.header && !layout.sourceCrop) ||
     frame.transition ||
     scene.clicks.some((cue) => cue.settings.effect === 'magnify')
@@ -600,7 +610,7 @@ async function drawPreparedCanvasFrame(
       sample = selectReviewCutTransitionSource(
         frame.transition.blend,
         frame.transition.frames,
-        frame.source
+        knownTransitionSource(frame.source)
       );
     } else if (frame.transition && frame.transition.blend.plan.type !== 'dissolve') {
       validSize(frame.source.backing);
@@ -610,7 +620,7 @@ async function drawPreparedCanvasFrame(
         transition.canvas,
         frame.transition.blend,
         frame.transition.frames,
-        frame.source
+        knownTransitionSource(frame.source)
       );
       const raster = transition.canvas;
       sample = {
@@ -758,7 +768,7 @@ async function drawPreparedCanvasFrame(
       const sides = reviewCutTransitionSides(
         blend,
         frames,
-        frame.source,
+        knownTransitionSource(frame.source),
         frame.resultTime,
         resultOffset
       );
@@ -854,6 +864,8 @@ function admitRender(
   const retainedSpatial = assets.spatial?.allocations ?? [];
   const enhancement = frame?.exportEnhancer ?? exportEnhancer;
   if (enhancement) {
+    if (frame && frame.source.timestamp === undefined)
+      throw new Error('Export enhancement source timestamp is unavailable.');
     const request = sceneRequest(prepared, frame ?? { resultTime: 0 });
     const plan = planReviewExportSource({
       scene: {
@@ -906,7 +918,7 @@ function admitRender(
     const sides = reviewCutTransitionSides(
       frame.transition.blend,
       frame.transition.frames,
-      frame.source,
+      knownTransitionSource(frame.source),
       frame.resultTime,
       frame.transition.resultOffset
     );
@@ -1035,8 +1047,14 @@ export function createReviewPreviewRenderer(args: {
     if (rendering >= capacity) throw new Error('Preview frame is already admitted.');
     if (disposed || !leases.has(prepared) || current?.prepared.generation !== prepared.generation)
       throw new Error('Preview scene is stale.');
-    if (![frame.source.timestamp, frame.sourceTime, frame.resultTime].every(Number.isFinite))
+    if (
+      ![frame.sourceTime, frame.resultTime].every(Number.isFinite) ||
+      (frame.source.timestamp !== undefined && !Number.isFinite(frame.source.timestamp)) ||
+      (frame.source.videoFrame !== undefined && frame.source.timestamp === undefined)
+    )
       throw new Error('Invalid preview frame time.');
+    if ((frame.exportEnhancer || args.exportEnhancer) && frame.source.timestamp === undefined)
+      throw new Error('Export enhancement source timestamp is unavailable.');
     const captured = current;
     const callerSignal = signal ?? preparation?.signal;
     if (!callerSignal) throw new Error('Preview scene is stale.');
@@ -1127,7 +1145,7 @@ export function createReviewPreviewRenderer(args: {
         sceneGeneration: prepared.generation,
         sourceTime: frame.sourceTime,
         resultTime: frame.resultTime,
-        representedMediaTime: frame.source.timestamp,
+        representedMediaTime: frame.source.timestamp ?? null,
         cameraMediaTime: frame.camera?.representedMediaTime ?? null,
         cameraGeneration: frame.camera?.generation ?? null,
         captionConflicts: prepared.captionConflicts,

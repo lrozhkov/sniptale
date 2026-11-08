@@ -491,6 +491,22 @@ export function useZoomPreviewCanvasPaint(
               };
           };
           if (input.frame?.image instanceof HTMLVideoElement) {
+            if (typeof VideoFrame === 'undefined') {
+              signal.throwIfAborted();
+              const rgb = canvas.ownerDocument.createElement('canvas');
+              rgb.width = input.frame.width;
+              rgb.height = input.frame.height;
+              try {
+                const sourceContext = rgb.getContext('2d');
+                if (!sourceContext) throw new Error('Inspector source canvas is unavailable.');
+                sourceContext.drawImage(input.frame.image, 0, 0, rgb.width, rgb.height);
+                signal.throwIfAborted();
+                paint({ ...input.frame, image: rgb });
+              } finally {
+                rgb.width = rgb.height = 0;
+              }
+              return;
+            }
             const captured = await prepareDecodedVideoFrame(
               new VideoFrame(input.frame.image),
               signal

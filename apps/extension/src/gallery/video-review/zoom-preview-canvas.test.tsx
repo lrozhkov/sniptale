@@ -1,3 +1,4 @@
+import { ReviewPreviewRendererContext } from './use-preview-preferences';
 // @vitest-environment jsdom
 import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -234,6 +235,53 @@ it('restores paused Result pixels after overlays and live playback without retai
   } finally {
     await act(async () => root.unmount());
     getContext.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('paints live HTML through owned RGB when VideoFrame is absent', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('VideoFrame', undefined);
+  const rgbContext = document.createElement('canvas').getContext('2d')!;
+  vi.spyOn(rgbContext, 'drawImage').mockImplementation(() => {});
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(rgbContext);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const output = { width: 80, height: 40 };
+  const video = document.createElement('video');
+  Object.defineProperty(video, 'readyState', { value: 2 });
+  const camera = { scale: 1, centerX: 0.5, centerY: 0.5 };
+  const ready = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <ReviewPreviewRendererContext.Provider value="legacy">
+          <ZoomPreviewCanvas
+            background={{ enabled: false }}
+            imageUrl={null}
+            camera={camera}
+            frame={{ image: video, ...output }}
+            output={output}
+            view="result"
+            cornerRadius={0}
+            layout={computeQuickEditSceneLayout({
+              output,
+              source: output,
+              background: { enabled: false },
+              camera,
+            })}
+            live
+            onCenter={vi.fn()}
+            onPaintReady={ready}
+          />
+        </ReviewPreviewRendererContext.Provider>
+      )
+    );
+    expect(ready).toHaveBeenLastCalledWith(true);
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   }
 });

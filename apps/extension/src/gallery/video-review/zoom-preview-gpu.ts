@@ -189,6 +189,7 @@ export function createZoomPreviewGpuRenderer(): MiniRenderer {
           (live.readyState < 2 || live.seeking)
         )
           throw new PendingZoomPreviewFrame();
+        if (typeof VideoFrame === 'undefined') return null;
         initialization ??= createGpuPreviewRenderer({
           reserve: (bytes) => resources.bytes('inspector-gpu', bytes),
         });

@@ -50,6 +50,12 @@ vi.mock('../../platform/i18n', async (original) => ({
 const output = { width: 480, height: 270 };
 const owners: { dispose(): void }[] = [];
 beforeEach(() => {
+  vi.stubGlobal(
+    'VideoFrame',
+    class {
+      close() {}
+    }
+  );
   sources.acquire.mockReset().mockResolvedValue(null);
   sources.create.mockReturnValue({
     acquire: sources.acquire,
@@ -1204,4 +1210,33 @@ it('admits fallback readiness by source generation instead of the HTML image obj
   } finally {
     await act(async () => root.unmount());
   }
+});
+
+it('returns the existing Canvas fallback for live HTML when VideoFrame is absent', async () => {
+  vi.stubGlobal('VideoFrame', undefined);
+  const video = document.createElement('video');
+  Object.defineProperty(video, 'readyState', { value: 2 });
+  io.create.mockResolvedValue({ render: io.render, dispose: io.dispose, allocatedBytes: 0 });
+  const renderer = createZoomPreviewGpuRenderer();
+  owners.push(renderer);
+  await expect(
+    renderer.render(
+      input({ frame: { image: video, width: 1904, height: 984 }, live: true }),
+      new AbortController().signal
+    )
+  ).resolves.toBeNull();
+  expect(io.render).not.toHaveBeenCalled();
+});
+
+it('falls back for paused RGB when the native frame API is absent', async () => {
+  vi.stubGlobal('VideoFrame', undefined);
+  const completed = bitmap();
+  io.render.mockResolvedValue(completed);
+  io.create.mockResolvedValue({ render: io.render, dispose: io.dispose, allocatedBytes: 0 });
+  const renderer = createZoomPreviewGpuRenderer();
+  owners.push(renderer);
+  await expect(renderer.render(input(), new AbortController().signal)).resolves.toBeNull();
+  expect(io.create).not.toHaveBeenCalled();
+  expect(io.render).not.toHaveBeenCalled();
+  completed.close();
 });

@@ -589,3 +589,53 @@ it('starts HTML compatibility only after actual canonical unsupported', async ()
   expect(f.acquire).toHaveBeenCalledOnce();
   expect(f.events.failed).not.toHaveBeenCalled();
 });
+
+it('retains RGB camera borrowers after source disposal when VideoFrame is absent', async () => {
+  vi.stubGlobal('VideoFrame', undefined);
+  const rgbContext = document.createElement('canvas').getContext('2d')!;
+  vi.spyOn(rgbContext, 'drawImage').mockImplementation(() => {});
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(rgbContext);
+  const f = manualSetup();
+  await admitManual(f);
+  const result = f.source.captureAccepted({}, f.resources);
+  expect(result.status).toBe('ready');
+  if (result.status !== 'ready') throw new Error('Expected RGB camera');
+  expect(result.frame.drawable.videoFrame).toBeUndefined();
+  expect(result.frame.representedMediaTime).toBe(0);
+  const drawImage = vi.fn();
+  const context = { drawImage } as unknown as CanvasRenderingContext2D;
+  f.source.dispose();
+  result.frame.drawable.draw(context, 0, 0, 100, 100);
+  const image = drawImage.mock.calls[0]![0] as HTMLCanvasElement;
+  expect(image.width).toBe(100);
+  expect(f.reservations.some((lease) => lease.release.mock.calls.length === 0)).toBe(true);
+  result.frame.release();
+  result.frame.release();
+  expect(image.width).toBe(0);
+  for (const lease of f.reservations) expect(lease.release).toHaveBeenCalledOnce();
+});
+
+it.each(['retained', 'active', 'draw'] as const)(
+  'rolls back RGB camera %s failure',
+  async (failure) => {
+    vi.stubGlobal('VideoFrame', undefined);
+    const context = document.createElement('canvas').getContext('2d')!;
+    const copy = vi.spyOn(context, 'drawImage').mockImplementation(() => {});
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context);
+    const f = manualSetup();
+    await admitManual(f);
+    const bytes = f.resources.bytes.getMockImplementation()!;
+    if (failure === 'draw')
+      copy.mockImplementationOnce(() => {
+        throw new Error('copy failed');
+      });
+    else
+      f.resources.bytes.mockImplementation((role, count) => {
+        if (role === `webcam.${failure}`) throw new Error('reservation refused');
+        return bytes(role, count);
+      });
+    expect(f.source.captureAccepted({}, f.resources).status).toBe('failed');
+    f.source.dispose();
+    for (const lease of f.reservations) expect(lease.release).toHaveBeenCalledOnce();
+  }
+);

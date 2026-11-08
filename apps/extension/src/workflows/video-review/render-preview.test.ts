@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
@@ -109,6 +110,10 @@ function setup() {
       const context = {
         save: vi.fn(),
         restore: vi.fn(),
+        setTransform: vi.fn(),
+        clearRect: vi.fn(),
+        rect: vi.fn(),
+        clip: vi.fn(),
         scale: vi.fn(),
         drawImage: vi.fn(),
         fillRect: vi.fn(() => io.order.push('outer-fade')),
@@ -2557,3 +2562,123 @@ it.each(['legacy', 'gpu'] as const)(
     renderer.dispose();
   }
 );
+
+it('renders draw-only RGB with unknown PTS and reports an unknown represented time', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const input = frame();
+  const { timestamp: _timestamp, ...rgb } = input.source;
+  const output = await renderer.render(prepared, { ...input, source: rgb }, signal);
+  expect(output.representedMediaTime).toBeNull();
+  expect(output.sourceTime).toBe(1);
+  expect(output.resultTime).toBe(2);
+  output.release();
+  renderer.dispose();
+});
+
+it('does not reuse a PTS-keyed window raster for unknown RGB snapshots', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(
+    { ...scene(), windowHeader: { ...DEFAULT_WINDOW_HEADER } },
+    dimensions,
+    signal
+  );
+  io.frame.mockImplementation((context, request) => {
+    if (!request.windowRaster) request.sample.draw(context, 0, 0, 10, 10);
+  });
+  (await renderer.render(prepared, frame(), signal)).release();
+  expect(io.frame.mock.lastCall![1].windowRaster).toBeDefined();
+  const first = vi.fn(),
+    second = vi.fn();
+  for (const draw of [first, second]) {
+    const source = { backing: dimensions.backing, draw };
+    (await renderer.render(prepared, { ...frame(), source }, signal)).release();
+    expect(io.frame.mock.lastCall![1].windowRaster).toBeUndefined();
+  }
+  expect(first).toHaveBeenCalledOnce();
+  expect(second).toHaveBeenCalledOnce();
+  renderer.dispose();
+});
+
+it.each([NaN, Infinity])('rejects a supplied invalid source PTS %s', async (timestamp) => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  await expect(
+    renderer.render(prepared, { ...frame(), source: { ...frame().source, timestamp } }, signal)
+  ).rejects.toThrow('Invalid preview frame time');
+  expect(io.frame).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('requires actual PTS for a native source accessor', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const source = {
+    backing: dimensions.backing,
+    draw: vi.fn(),
+    videoFrame: () => ({}) as VideoFrame,
+  };
+  await expect(renderer.render(prepared, { ...frame(), source }, signal)).rejects.toThrow(
+    'Invalid preview frame time'
+  );
+  renderer.dispose();
+});
+
+it('requires actual PTS only when a transition needs retained membership', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const blend = reviewCutTransitionAt(2, [
+    {
+      id: 'cut',
+      type: 'fade-black',
+      seam: 2,
+      before: 0.5,
+      after: 0.5,
+      left: { start: 0, end: 1 },
+      right: { start: 3, end: 5 },
+    },
+  ])!;
+  const endpoint = { timestamp: 0.99, draw: vi.fn(), close: vi.fn() };
+  const source = { backing: dimensions.backing, draw: vi.fn() };
+  await expect(
+    renderer.render(
+      prepared,
+      {
+        ...frame(),
+        source,
+        transition: { blend, frames: { left: endpoint, right: { ...endpoint, timestamp: 3 } } },
+      },
+      signal
+    )
+  ).rejects.toThrow('Transition source timestamp is unavailable');
+  expect(endpoint.draw).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('preserves enhancement preparation estimates but refuses an unknown source PTS', async () => {
+  const { resources } = setup();
+  const enhancer = {
+    mode: 'bicubic-sharpen' as const,
+    withEnhancedRegion: vi.fn(),
+    dispose: vi.fn(),
+  };
+  const renderer = createReviewPreviewRenderer({ resources, exportEnhancer: enhancer });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const source = { backing: dimensions.backing, draw: vi.fn() };
+  await expect(renderer.render(prepared, { ...frame(), source }, signal)).rejects.toThrow(
+    'Export enhancement source timestamp is unavailable'
+  );
+  expect(enhancer.withEnhancedRegion).not.toHaveBeenCalled();
+  renderer.dispose();
+});

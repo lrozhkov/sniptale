@@ -155,6 +155,16 @@ export function useZoomPreviewSource(file: File | null): ZoomPreviewFrameLoader 
         canvas.height = Math.max(1, video.videoHeight);
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Preview canvas is unavailable.');
+        if (typeof VideoFrame === 'undefined') {
+          try {
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            signal.throwIfAborted();
+            return { image: canvas, width: canvas.width, height: canvas.height };
+          } catch (error) {
+            canvas.width = canvas.height = 0;
+            throw error;
+          }
+        }
         const frame = await prepareDecodedVideoFrame(new VideoFrame(video), signal);
         try {
           signal.throwIfAborted();

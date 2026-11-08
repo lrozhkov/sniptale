@@ -77,9 +77,24 @@ export function captureReviewPreviewFrame(args: {
   reserveSource(bytes: number): { release(): void };
   captureCamera(): ReviewWebcamFrameLease | undefined;
 }) {
-  let source: VideoFrame;
+  let source: VideoFrame | undefined;
+  let rgb: HTMLCanvasElement | undefined;
   try {
-    source = new VideoFrame(args.video);
+    if (typeof VideoFrame !== 'undefined') source = new VideoFrame(args.video);
+    else {
+      if (args.video.seeking || args.video.readyState < 2) return null;
+      const { videoWidth: width, videoHeight: height } = args.video;
+      if (
+        !Number.isSafeInteger(width) ||
+        width <= 0 ||
+        !Number.isSafeInteger(height) ||
+        height <= 0
+      )
+        return null;
+      rgb = document.createElement('canvas');
+      rgb.width = width;
+      rgb.height = height;
+    }
   } catch (error) {
     // Metadata readiness can precede the first capturable native frame in Chrome.
     // Only that constructor state is transient; decoding/admission errors remain failures.
@@ -89,16 +104,27 @@ export function captureReviewPreviewFrame(args: {
   let reservation: { release(): void } | undefined;
   let camera: ReviewWebcamFrameLease | undefined;
   let sourceClosed = false;
+  let released = false;
   const release = () => {
+    if (released) return;
+    released = true;
     camera?.release();
     if (!sourceClosed) {
-      source.close();
+      source?.close();
+      if (rgb) rgb.width = rgb.height = 0;
       sourceClosed = true;
     }
     reservation?.release();
   };
   try {
-    reservation = args.reserveSource(previewSourceFrameBytes(source));
+    reservation = args.reserveSource(
+      source ? previewSourceFrameBytes(source) : rgb!.width * rgb!.height * 4
+    );
+    if (rgb) {
+      const context = rgb.getContext('2d');
+      if (!context) throw new Error('Preview source canvas is unavailable.');
+      context.drawImage(args.video, 0, 0, rgb.width, rgb.height);
+    }
     camera = args.captureCamera();
     const frame: RenderFrame = {
       generation: args.sequence,
@@ -106,18 +132,23 @@ export function captureReviewPreviewFrame(args: {
       sourceTime: args.sourceTime(),
       resultTime: args.time,
       source: {
-        videoFrame: () => source,
-        prepare: async (signal) => {
-          try {
-            source = await prepareDecodedVideoFrame(source, signal);
-          } catch (error) {
-            sourceClosed = true;
-            throw error;
-          }
-        },
-        timestamp: source.timestamp / 1e6,
+        ...(source
+          ? {
+              videoFrame: () => source!,
+              prepare: async (signal: AbortSignal) => {
+                try {
+                  source = await prepareDecodedVideoFrame(source!, signal);
+                } catch (error) {
+                  sourceClosed = true;
+                  throw error;
+                }
+              },
+              timestamp: source.timestamp / 1e6,
+            }
+          : {}),
         backing: previewTransitionBacking(args.description, args.time),
-        draw: (context, x, y, width, height) => context.drawImage(source, x, y, width, height),
+        draw: (context, x, y, width, height) =>
+          context.drawImage(source ?? rgb!, x, y, width, height),
       },
       ...(camera
         ? {

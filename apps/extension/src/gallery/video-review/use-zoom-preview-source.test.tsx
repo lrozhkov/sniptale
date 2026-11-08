@@ -525,3 +525,16 @@ it('recovers on retry and ignores a pending completion after unmount', async () 
   expect(canvas.width).toBe(640);
   expect(canvas.height).toBe(360);
 });
+
+it('loads owned RGB when VideoFrame is absent and preserves the completed canvas', async () => {
+  const f = mountSource();
+  vi.stubGlobal('VideoFrame', undefined);
+  const result = await f.load(0, new AbortController().signal);
+  expect(result.image).toBeInstanceOf(HTMLCanvasElement);
+  expect(result.width).toBe(640);
+  expect(result.selection).toBeUndefined();
+  const canvas = result.image as HTMLCanvasElement;
+  dispose?.();
+  expect(canvas.width).toBe(640);
+  expect(canvas.height).toBe(360);
+});

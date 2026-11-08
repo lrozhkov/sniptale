@@ -391,3 +391,46 @@ it('retains normalized sources through asynchronous Canvas work and discards an 
   expect(f.owned.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
   expect(f.release).not.toHaveBeenCalled();
 });
+
+it('freezes an owned RGB Native source when VideoFrame is absent', async () => {
+  vi.stubGlobal('VideoFrame', undefined);
+  const rgbContext = document.createElement('canvas').getContext('2d')!;
+  vi.spyOn(rgbContext, 'drawImage').mockImplementation(() => {});
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(rgbContext);
+  const clip = createVideoClip({ id: 'source', duration: 5, sourceDuration: 5 });
+  const project = createProject([clip]);
+  project.width = 80;
+  project.height = 40;
+  const video = document.createElement('video');
+  Object.defineProperties(video, {
+    readyState: { value: 2 },
+    videoWidth: { value: 80 },
+    videoHeight: { value: 40 },
+  });
+  const canvas = document.createElement('canvas');
+  Object.defineProperties(canvas, { clientWidth: { value: 80 }, clientHeight: { value: 40 } });
+  const original = visual.drawPreviewVisualPasses;
+  let snapshot: HTMLCanvasElement | undefined;
+  vi.spyOn(visual, 'drawPreviewVisualPasses').mockImplementation(async (args) => {
+    const source = args.clipMediaElements.get(clip.id) as VideoCompositionFrameSource;
+    expect(source.toVideoFrame).toBeUndefined();
+    const drawImage = vi.fn();
+    source.draw({ drawImage } as unknown as CanvasRenderingContext2D, 0, 0, 80, 40);
+    snapshot = drawImage.mock.calls[0]![0] as HTMLCanvasElement;
+    expect(snapshot).not.toBe(video);
+    expect(snapshot.width).toBe(80);
+    return original(args);
+  });
+  await expect(
+    renderPreviewScene({
+      project,
+      currentTime: 1,
+      canvas,
+      stage: null,
+      imageBank: {},
+      videoRefs: { current: { source: video } },
+      previewRenderer: 'legacy',
+    })
+  ).resolves.toMatchObject({ renderer: { backend: 'legacy' } });
+  expect(snapshot?.width).toBe(0);
+});

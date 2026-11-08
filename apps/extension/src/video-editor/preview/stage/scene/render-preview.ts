@@ -209,6 +209,26 @@ function capturePreviewSceneVideos(
         continue;
       }
       if (!(source instanceof HTMLVideoElement)) continue;
+      if (typeof VideoFrame === 'undefined') {
+        captureSignal.throwIfAborted();
+        const rgb = source.ownerDocument.createElement('canvas');
+        rgb.width = source.videoWidth;
+        rgb.height = source.videoHeight;
+        frames.push({
+          close() {
+            rgb.width = rgb.height = 0;
+          },
+        });
+        const context = rgb.getContext('2d');
+        if (!context) throw new Error('Preview source canvas is unavailable.');
+        context.drawImage(source, 0, 0, rgb.width, rgb.height);
+        media.set(clipId, {
+          sourceWidth: rgb.width,
+          sourceHeight: rgb.height,
+          draw: (target, x, y, width, height) => target.drawImage(rgb, x, y, width, height),
+        });
+        continue;
+      }
       const captured = await prepareDecodedVideoFrame(new VideoFrame(source), captureSignal);
       frames.push(captured);
       captureSignal.throwIfAborted();

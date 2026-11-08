@@ -64,7 +64,14 @@ type CaptureRequest = {
 type CaptureResult =
   | { status: 'ready'; frame: ReviewWebcamFrameLease }
   | { status: 'unavailable' | 'failed' | 'hidden' };
-type RetainedFrame = { frame: VideoFrame; bytes: number; generation: number; release(): void };
+type RetainedFrame = {
+  frame: VideoFrame | HTMLCanvasElement;
+  representedMediaTime: number;
+  source: { width: number; height: number };
+  bytes: number;
+  generation: number;
+  release(): void;
+};
 
 /** Owns one decoder; manual admission never invokes the hybrid canvas painter. */
 export function createReviewWebcamPreviewSource(
@@ -369,7 +376,7 @@ function createWebcamCapture(
         ready &&
         (!retained ||
           retained.generation !== accepted.generation ||
-          Math.abs(retained.frame.timestamp / 1e6 - accepted.representedMediaTime) > 0.000001)
+          Math.abs(retained.representedMediaTime - accepted.representedMediaTime) > 0.000001)
       ) {
         clearRetained();
         retained = retainWebcamFrame(video, accepted, tolerance, resources);
@@ -427,6 +434,41 @@ function retainWebcamFrame(
   tolerance: number,
   resources: RenderResources
 ): RetainedFrame | null {
+  if (typeof VideoFrame === 'undefined') {
+    const width = video.videoWidth,
+      height = video.videoHeight;
+    if (!Number.isSafeInteger(width) || width <= 0 || !Number.isSafeInteger(height) || height <= 0)
+      throw new Error('Invalid webcam dimensions');
+    const bytes = width * height * 4;
+    const frame = video.ownerDocument.createElement('canvas');
+    frame.width = frame.height = 0;
+    const reservation = resources.bytes('webcam.retained', bytes);
+    try {
+      frame.width = width;
+      frame.height = height;
+      const context = frame.getContext('2d');
+      if (!context) throw new Error('Camera source canvas is unavailable.');
+      context.drawImage(video, 0, 0, width, height);
+    } catch (error) {
+      frame.width = frame.height = 0;
+      reservation.release();
+      throw error;
+    }
+    let released = false;
+    return {
+      frame,
+      bytes,
+      representedMediaTime: accepted.representedMediaTime,
+      source: { width, height },
+      generation: accepted.generation,
+      release() {
+        if (released) return;
+        released = true;
+        frame.width = frame.height = 0;
+        reservation.release();
+      },
+    };
+  }
   const frame = new VideoFrame(video);
   let bytes: number;
   let reservation: { release(): void };
@@ -450,6 +492,8 @@ function retainWebcamFrame(
   return {
     frame,
     bytes,
+    representedMediaTime: frame.timestamp / 1e6,
+    source: { width: frame.displayWidth, height: frame.displayHeight },
     generation: accepted.generation,
     release: () => {
       if (released) return;
@@ -469,31 +513,44 @@ function cloneWebcamFrame(
   resources: RenderResources
 ): CaptureResult {
   const reservation = resources.bytes('webcam.active', retained.bytes);
-  let frame: VideoFrame;
+  let frame: VideoFrame | HTMLCanvasElement | undefined;
+  let native: VideoFrame | undefined;
   try {
-    frame = retained.frame.clone();
+    if (retained.frame instanceof HTMLCanvasElement) {
+      const rgb = retained.frame.ownerDocument.createElement('canvas');
+      frame = rgb;
+      rgb.width = retained.source.width;
+      rgb.height = retained.source.height;
+      const context = rgb.getContext('2d');
+      if (!context) throw new Error('Camera source canvas is unavailable.');
+      context.drawImage(retained.frame, 0, 0, rgb.width, rgb.height);
+    } else frame = native = retained.frame.clone();
   } catch (error) {
+    if (frame instanceof HTMLCanvasElement) frame.width = frame.height = 0;
     reservation.release();
     throw error;
   }
+  const pixels = frame;
+  const nativePixels = native;
   let released = false;
   return {
     status: 'ready',
     frame: {
       allocationBytes: retained.bytes,
-      representedMediaTime: frame.timestamp / 1e6,
+      representedMediaTime: retained.representedMediaTime,
       generation: accepted.generation,
-      source: { width: frame.displayWidth, height: frame.displayHeight },
+      source: retained.source,
       placement: request.placement ?? mapped.placement,
       crop: request.crop ?? mapped.crop,
       drawable: {
-        videoFrame: () => frame,
-        draw: (context, x, y, width, height) => context.drawImage(frame, x, y, width, height),
+        ...(nativePixels ? { videoFrame: () => nativePixels } : {}),
+        draw: (context, x, y, width, height) => context.drawImage(pixels, x, y, width, height),
       },
       release: () => {
         if (released) return;
         released = true;
-        frame.close();
+        if (pixels instanceof HTMLCanvasElement) pixels.width = pixels.height = 0;
+        else pixels.close();
         reservation.release();
       },
     },

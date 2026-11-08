@@ -4241,10 +4241,10 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "createReviewPreviewRenderer",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One prepared scene owner controls cancellation, scene assets and frame admission. Its two output methods share one transaction and return distinct typed contracts. It does not choose the visible frontend frame. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-07",
-      "astHash": "25501999f86aab17cdcfeb7628a61cc8aee6c05392731437ce9b3477ca614715",
+      "reason": "tool-noise: One renderer generation owns admission, resources and completed output. Unknown PTS validation and receipt data stay in this transaction. Existing cancellation and output cleanup remain local. Independent diagnosis found no second clock or selection owner. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "a52e10a73adaf3ddcbf1454dc1d544f3d258052e5640cee1c28356fc07bf9fbf",
       "signatureHash": "1e14adff13052e9a8ffe49867ce685fa017cdb746ca17d96cd31972e5c1baf6b"
     },
     {
@@ -5066,10 +5066,10 @@
       "file": "apps/extension/src/gallery/video-review/zoom-preview-gpu.ts",
       "symbol": "createZoomPreviewGpuRenderer",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One inspector owns its GPU initialization, artwork and rendering resources. Active work delays disposal. Source selection and publication remain with separate owners. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent source, state, publication or resource owner. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: One inspector session owns backend, artwork, active borrowers and retirement. The API guard returns before backend creation. It adds no source or publication authority. Independent diagnosis found no separate lifetime. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "astHash": "853201dca055a7d215b0d6aea2165642ee6819cdfd969f514645100dc44bbc14",
+      "astHash": "3c045371c2a24e2393a0ac24d61a10618eb2319ee03e73a4f1edecb12b0349e1",
       "signatureHash": "53c2ad88b4c675b8662604b00290ea66d814c67ac60f266f0a8c45db91f270a9"
     },
     {
@@ -5077,10 +5077,10 @@
       "file": "apps/extension/src/gallery/video-review/zoom-preview-gpu.ts",
       "symbol": "createZoomPreviewGpuRenderer.render",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One frame borrows an admitted source and retains its clone through GPU completion. The finally block releases that clone and primitives. Local exposure layout changes do not mutate the input scene. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent source, state, publication or resource owner. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: One borrowed-frame transaction prepares and draws the inspector image. The API guard preserves existing final cleanup and retirement. Local projection data does not mutate editor state. Independent diagnosis found no separate operation. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "astHash": "1a5be783fcc36c4b3a16e1f6e4cb97a6841d02a9d1177a87927a8d054c8ed4fa",
+      "astHash": "e6d6ce17f24c9c472e9cd0f9f4b19e5326d2b3583533b0f53c05e2b722001fbc",
       "signatureHash": "43f7deafd7588c5265e10a4d45278aa16d1de2268c0816e3cdf147da1ea784bf"
     },
     {
@@ -5396,11 +5396,11 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One renderer fixture checks scene admission, frame generations and output cleanup. Separately named camera normalization cases use the same setup and deferred gate. They prove that painting waits for preparation and retains placement. No second fixture lifetime is present. Fresh architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent asset, fixture, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One renderer fixture checks admission, generations, time validation and cleanup. Separate cases cover unknown PTS, cache eligibility, transition refusal and enhancement boundaries. They use the existing scene and resource setup. Independent diagnosis found no separate fixture lifetime. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "astHash": "a7a293ec8974b08265ce66cb5208d0c7e6355a785d94708f415b12d5a82f1bac",
-      "signatureHash": "a2043057597679bfc0100ba49606decb9cf0c2abf4fb8f569029b0e27e5489eb"
+      "astHash": "371e48167a69b0c5e2178496cfd8636f3f6775525d545d5d7de96992a36321aa",
+      "signatureHash": "5928effb6b5453427010c7032f2a46a605803fddca94076660f1d3c35821f22e"
     },
     {
       "rule": "structural-file-risk",
@@ -5693,10 +5693,10 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One prepared scene owner admits frames and returns image and geometry under one output transaction. The optional camera preparation hook preserves existing capture and renderer ownership. Canvas fallback remains exclusive. Independent diagnosis found no separate authority. Fresh architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent asset, fixture, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One prepared scene transaction checks frames and returns image and geometry. Unknown PTS stays explicit. Native accessors and exact temporal operations still require finite PTS. Cache eligibility uses this same policy. Independent diagnosis found no separate authority. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "astHash": "0f7e17066f19432dc5d09c875b72d03e79855e82837859aaddff29137f7bd4c9",
+      "astHash": "3877980d8d599b5c5ce3243e146737ac3b46a54585aa0b29f2ca038396df5229",
       "signatureHash": "4a9e4901ac25e8106bd46c62349f1685ed10969427268f61e81f87081277e8e0"
     },
     {
@@ -6485,11 +6485,11 @@
       "file": "apps/extension/src/gallery/video-review/zoom-preview-gpu.test.ts",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "astHash": "064b2eb9fbc5bc160b45974a4cad08880f9f6fdc9ec68be94037f453eb596a79",
+      "astHash": "fa154ecee1e6b8793a98543f3e828f6d71bbd5b587ab0e4714ec9acb1d173569",
       "signatureHash": "e50ca9755787ba938261f30f60fb9a0bc0a19313ad07e13b677195b26f454785",
       "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One controlled fixture tests source acquisition, rendering, cancellation and accepted geometry. It disposes every registered owner. It adds no independent service or persisted state. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent source, state, publication or resource owner. Remove when the analyzer models this cohesive operation."
+      "reason": "tool-noise: One controlled fixture owns the inspector renderer, media objects and teardown. Separate cases test native capture and absent API recovery. API-present cases install the same explicit frame fixture. Independent diagnosis found no second fixture authority. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-file-risk",
@@ -6512,6 +6512,17 @@
       "reviewDate": "2026-11-09",
       "reason": "tool-noise: One camera asset owns its URL, metadata, provider and compatibility element. One disposal signal ends this lifetime. Canonical capture freezes source time and settings. Native and Canvas views retain their own lease. A second state owner would duplicate this asset lifetime. Independent diagnosis found no separate authority. Fresh architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess a new independent asset, fixture, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary."
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.ts",
+      "symbol": "<file>",
+      "owner": "extension:video-editor",
+      "astHash": "bdd8feb492f6337bd77cf1081346b5ab9693a9943019fe8004c9485e6c3bb9df",
+      "signatureHash": "a41aa4d2bea9c506c0776c4c02a32585423d44f4cbea05c54d66790d64925300",
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One existing source capture transaction owns normalized frames and RGB snapshots. The RGB branch copies ready HTML pixels into the same media map. Existing cleanup retains scratch through composition. Independent diagnosis found no second decoder, clock or publication owner. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary."
     }
   ]
 }
