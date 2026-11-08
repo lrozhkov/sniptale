@@ -10,6 +10,8 @@ it('defaults to automatic text-only and retains the inactive manual choice', () 
     sensitivity: 55,
     thickness: 0.5,
     lineSpacing: 1.5,
+    textPattern: 'typical',
+    textAlign: 'left',
     color: null,
   });
   const image = { ...initial, automatic: false, manualKind: 'image' as const };
@@ -49,4 +51,27 @@ it('defaults legacy settings to normal spacing and retains each explicit interva
   expect(parseSimplifySettings(legacy)?.lineSpacing).toBe(1.5);
   for (const lineSpacing of [1, 1.5, 2])
     expect(parseSimplifySettings({ ...legacy, lineSpacing })?.lineSpacing).toBe(lineSpacing);
+});
+
+it('defaults omitted paragraph settings and validates explicit pattern/alignment values', () => {
+  const {
+    textPattern: omittedPattern,
+    textAlign: omittedAlignment,
+    ...legacy
+  } = createDefaultSimplifySettings();
+  expect([omittedPattern, omittedAlignment]).toEqual(['typical', 'left']);
+  expect(parseSimplifySettings(legacy)).toMatchObject({
+    textPattern: 'typical',
+    textAlign: 'left',
+  });
+  for (const textPattern of ['typical', 'random'])
+    for (const textAlign of ['left', 'center', 'right'])
+      expect(parseSimplifySettings({ ...legacy, textPattern, textAlign })).toMatchObject({
+        textPattern,
+        textAlign,
+      });
+  for (const value of [null, false, 1, 'other', {}, []]) {
+    expect(parseSimplifySettings({ ...legacy, textPattern: value })).toBeNull();
+    expect(parseSimplifySettings({ ...legacy, textAlign: value })).toBeNull();
+  }
 });

@@ -223,6 +223,8 @@ it('flattens only accepted Simplify tiles at the existing capture boundary', asy
     sensitivity: 55,
     thickness: 0.5,
     lineSpacing: 1.5,
+    textPattern: 'typical',
+    textAlign: 'left',
     color: null,
   } as const;
   const original = source();
@@ -266,6 +268,8 @@ it('clips a rotated Auto mask without rotating its recognized source content', a
     sensitivity: 55,
     thickness: 0.5,
     lineSpacing: 1.5,
+    textPattern: 'typical',
+    textAlign: 'left',
     color: null,
   } as const;
   const result = await compositeContentDrawingCapture(source(), {

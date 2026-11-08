@@ -1,6 +1,6 @@
 import { prepare, render, paint, drawReplacement, ENGINE_VERSION } from './engine/render.mjs';
 import { sampleBackground } from './engine/detector.mjs';
-import { attachEraseSupport } from './engine/erasures.mjs';
+import { attachEraseSupport, eraseOwned } from './engine/erasures.mjs';
 import type { SimplifySettings } from './settings';
 
 export type SimplifyPaintContext = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -117,21 +117,41 @@ export function createSimplifyRaster(input: SimplifyPixelSource): SimplifyRaster
         const top = bounds.y + (bounds.h - lineHeight - (count - 1) * pitch) / 2;
         // Restore the complete source area once. Additional rows only paint replacements.
         const box = attachEraseSupport(image, proposal);
-        paint(
-          context,
-          {
-            ...box,
-            textSize: Math.max(2, lineHeight - 4),
-            textHeightLimit: lineHeight,
-            textCenterY: top + lineHeight / 2,
-          },
-          style
-        );
-        for (let row = 1; row < count; row++)
-          drawReplacement(context, { ...proposal, y: top + row * pitch, h: lineHeight }, style);
+        eraseOwned(context, box);
+        for (let row = 0; row < count; row++) {
+          const width = Math.max(
+            1,
+            Math.round(bounds.w * manualRowFraction(row, count, settings.textPattern))
+          );
+          const alignment =
+            settings.textAlign === 'right' ? 1 : settings.textAlign === 'center' ? 0.5 : 0;
+          drawReplacement(
+            context,
+            {
+              ...proposal,
+              x: bounds.x + Math.round((bounds.w - width) * alignment),
+              y: top + row * pitch,
+              w: width,
+              h: lineHeight,
+            },
+            style
+          );
+        }
       } finally {
         context.restore();
       }
     },
   };
+}
+
+function manualRowFraction(
+  row: number,
+  count: number,
+  pattern: SimplifySettings['textPattern']
+): number {
+  if (pattern === 'typical') return count > 1 && row === count - 1 ? 0.68 : 1;
+  // Index hashing preserves the sequence across moves, resize, color edits and rebuild.
+  let hash = Math.imul(row + 1, 0x45d9f3b);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
+  return 0.55 + 0.45 * (((hash ^ (hash >>> 16)) >>> 0) / 0xffffffff);
 }

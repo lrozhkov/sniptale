@@ -259,6 +259,8 @@ it('reads legacy preferences without simplify and preserves remembered inactive 
       sensitivity: 90 as const,
       thickness: 0.65 as const,
       lineSpacing: 2 as const,
+      textPattern: 'random' as const,
+      textAlign: 'right' as const,
       color: '#123456',
     },
   };

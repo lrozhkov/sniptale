@@ -244,3 +244,36 @@ it('offers three spacing icons only in manual Text and retains the choice across
   await click('automatic');
   expect(option('line-spacing-1.5')?.getAttribute('aria-pressed')).toBe('true');
 });
+
+it('keeps manual Text layout choices across modes and uses named Tabler icons', async () => {
+  render();
+  expect(option('random-widths')).toBeNull();
+  expect(option('align-left')).toBeNull();
+  await click('automatic');
+  expect(option('random-widths')?.getAttribute('aria-pressed')).toBe('false');
+  expect(option('align-left')?.getAttribute('aria-pressed')).toBe('true');
+  for (const alignment of ['center', 'right', 'left']) {
+    await click(`align-${alignment}`);
+    expect(change).toHaveBeenLastCalledWith({ textAlign: alignment });
+    expect(option(`align-${alignment}`)?.getAttribute('aria-pressed')).toBe('true');
+    expect(option(`align-${alignment}`)?.querySelector('svg')).not.toBeNull();
+    expect(option(`align-${alignment}`)?.getAttribute('aria-label')).toBeTruthy();
+  }
+  await click('random-widths');
+  expect(change).toHaveBeenLastCalledWith({ textPattern: 'random' });
+  expect(option('random-widths')?.getAttribute('aria-pressed')).toBe('true');
+  expect(option('random-widths')?.querySelector('svg')).not.toBeNull();
+  await click('align-right');
+  await click('manual-image');
+  expect(option('random-widths')).toBeNull();
+  expect(option('align-right')).toBeNull();
+  await click('manual-text');
+  expect(option('random-widths')?.getAttribute('aria-pressed')).toBe('true');
+  expect(option('align-right')?.getAttribute('aria-pressed')).toBe('true');
+  await click('automatic');
+  expect(option('random-widths')).toBeNull();
+  await click('automatic');
+  expect(option('align-right')?.getAttribute('aria-pressed')).toBe('true');
+  await click('random-widths');
+  expect(change).toHaveBeenLastCalledWith({ textPattern: 'typical' });
+});

@@ -1,3 +1,7 @@
+import alignLeftIcon from '@iconify-icons/tabler/align-left-2';
+import alignCenterIcon from '@iconify-icons/tabler/align-center';
+import alignRightIcon from '@iconify-icons/tabler/align-right-2';
+import diceIcon from '@iconify-icons/tabler/dice-5';
 import photoSearchIcon from '@iconify-icons/tabler/photo-search';
 import scanLetterAIcon from '@iconify-icons/tabler/scan-letter-a';
 import { Icon as IconifyIcon } from '@iconify/react';
@@ -224,6 +228,47 @@ function ManualTextSpacingOptions(
           </QuickOptionButton>
         );
       })}
+      <ManualTextLayoutOptions {...props} />
+    </>
+  );
+}
+
+const ALIGNMENT_OPTIONS = [
+  { value: 'left', icon: alignLeftIcon, label: 'content.toolbar.drawingSimplifyAlignLeft' },
+  { value: 'center', icon: alignCenterIcon, label: 'content.toolbar.drawingSimplifyAlignCenter' },
+  { value: 'right', icon: alignRightIcon, label: 'content.toolbar.drawingSimplifyAlignRight' },
+] as const;
+
+function ManualTextLayoutOptions(
+  props: Pick<DrawingSimplifyOptionsProps, 'settings' | 'vertical' | 'onChange'>
+) {
+  return (
+    <>
+      <DrawingOptionsDivider vertical={props.vertical} />
+      <QuickOptionButton
+        active={props.settings.textPattern === 'random'}
+        label={translate('content.toolbar.drawingSimplifyRandomWidths')}
+        dataUi="content.toolbar.drawing-options.simplify.random-widths"
+        onClick={() =>
+          props.onChange({
+            textPattern: props.settings.textPattern === 'random' ? 'typical' : 'random',
+          })
+        }
+      >
+        <IconifyIcon aria-hidden="true" ssr icon={diceIcon} width={17} height={17} />
+      </QuickOptionButton>
+      <DrawingOptionsDivider vertical={props.vertical} />
+      {ALIGNMENT_OPTIONS.map((option) => (
+        <QuickOptionButton
+          key={option.value}
+          active={props.settings.textAlign === option.value}
+          label={translate(option.label)}
+          dataUi={`content.toolbar.drawing-options.simplify.align-${option.value}`}
+          onClick={() => props.onChange({ textAlign: option.value })}
+        >
+          <IconifyIcon aria-hidden="true" ssr icon={option.icon} width={17} height={17} />
+        </QuickOptionButton>
+      ))}
     </>
   );
 }

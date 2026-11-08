@@ -374,9 +374,117 @@ it.each([true, false])('spacing has no effect on automatic=%s image content', (a
         automatic,
         manualKind: 'image',
         lineSpacing,
+        textPattern: lineSpacing === 1 ? 'typical' : 'random',
+        textAlign: lineSpacing === 1 ? 'left' : 'right',
       }
     );
     return output.context.getImageData(0, 0, 80, 40).data;
   });
   expect(rendered[0]).toEqual(rendered[1]);
+});
+
+function paintedRows(output: ReturnType<typeof canvas>) {
+  const { width, height } = output.element;
+  const pixels = output.context.getImageData(0, 0, width, height).data;
+  const rows: { x: number; y: number; width: number; height: number }[] = [];
+  for (let y = 0; y < height; y++) {
+    let first = width,
+      last = -1;
+    for (let x = 0; x < width; x++) {
+      const at = (y * width + x) * 4;
+      if (pixels[at] === 64 && pixels[at + 1] === 80 && pixels[at + 2] === 101) {
+        first = Math.min(first, x);
+        last = x;
+      }
+    }
+    if (last < first) continue;
+    const previous = rows.at(-1);
+    if (previous && previous.y + previous.height === y) {
+      previous.height++;
+      const right = Math.max(previous.x + previous.width, last + 1);
+      previous.x = Math.min(previous.x, first);
+      previous.width = right - previous.x;
+    } else rows.push({ x: first, y, width: last - first + 1, height: 1 });
+  }
+  return rows;
+}
+function manualLayoutFixture() {
+  const source = canvas(280, 200),
+    output = canvas(280, 200);
+  source.context.fillStyle = '#ffffff';
+  source.context.fillRect(0, 0, 280, 200);
+  const raster = createSimplifyRaster(source.context.getImageData(0, 0, 280, 200));
+  const settings = { ...createDefaultSimplifySettings(), automatic: false, color: '#405065' };
+  const region = { x: 12, y: 8, width: 100, height: 112 };
+  return { source, output, raster, settings, region };
+}
+it.each(['left', 'center', 'right'] as const)(
+  'typical paragraph shortens only the final row with %s alignment',
+  (textAlign) => {
+    const { source, output, raster, settings, region } = manualLayoutFixture();
+    raster.render(output.context, source.element, region, { ...settings, textAlign });
+    const rows = paintedRows(output);
+    expect(rows).toHaveLength(5);
+    expect(rows.slice(0, -1).map((row) => [row.x, row.width])).toEqual(
+      Array.from({ length: 4 }, () => [14, 96])
+    );
+    expect(rows.at(-1)).toMatchObject({
+      x: textAlign === 'left' ? 14 : textAlign === 'center' ? 30 : 46,
+      width: 64,
+    });
+    expect(rows.every((row) => row.height === 6)).toBe(true);
+    raster.render(
+      output.context,
+      source.element,
+      { ...region, height: 16 },
+      { ...settings, textAlign }
+    );
+    expect(paintedRows(output)).toMatchObject([{ x: 14, width: 96, height: 6 }]);
+  }
+);
+it.each(['left', 'center', 'right'] as const)(
+  'varied paragraph lengths are stable and correctly aligned: %s',
+  (textAlign) => {
+    const { source, output, raster, settings, region } = manualLayoutFixture();
+    const style = { ...settings, textAlign, textPattern: 'random' as const };
+    raster.render(output.context, source.element, region, style);
+    const rows = paintedRows(output),
+      firstPixels = output.context.getImageData(0, 0, 280, 200).data;
+    expect(rows).toHaveLength(5);
+    expect(new Set(rows.map((row) => row.width)).size).toBeGreaterThan(2);
+    for (const row of rows) {
+      expect(row.width).toBeGreaterThanOrEqual(51);
+      expect(row.width).toBeLessThanOrEqual(96);
+      if (textAlign === 'left') expect(row.x).toBe(14);
+      else if (textAlign === 'right') expect(row.x + row.width).toBe(110);
+      else expect(Math.abs(row.x + row.width / 2 - 62)).toBeLessThanOrEqual(0.5);
+    }
+    raster.render(output.context, source.element, region, style);
+    expect(output.context.getImageData(0, 0, 280, 200).data).toEqual(firstPixels);
+    raster.render(output.context, source.element, { ...region, x: 19, y: 14 }, style);
+    expect(paintedRows(output).map((row) => row.width)).toEqual(rows.map((row) => row.width));
+    raster.render(output.context, source.element, { ...region, width: 200, height: 160 }, style);
+    const resized = paintedRows(output);
+    expect(resized).toHaveLength(7);
+    for (let i = 0; i < rows.length; i++)
+      expect(Math.abs(resized[i]!.width + 4 - 2 * (rows[i]!.width + 4))).toBeLessThanOrEqual(1);
+  }
+);
+it('restores source ink outside narrowed right-aligned rows and keeps all paint inside the selection', () => {
+  const { source, output, settings, region } = manualLayoutFixture();
+  source.context.fillStyle = '#202020';
+  for (let y = 10; y < 120; y += 7) source.context.fillRect(16, y, 92, 2);
+  const original = source.context.getImageData(0, 0, 280, 200);
+  createSimplifyRaster(original).render(output.context, source.element, region, {
+    ...settings,
+    textPattern: 'random',
+    textAlign: 'right',
+  });
+  const result = output.context.getImageData(0, 0, 280, 200);
+  expectNoRetainedInk(original.data, result.data, [255, 255, 255]);
+  for (const row of paintedRows(output))
+    expect(row.x >= region.x && row.x + row.width <= region.x + region.width).toBe(true);
+  expect(output.context.getImageData(0, 0, 280, 8).data).toEqual(
+    source.context.getImageData(0, 0, 280, 8).data
+  );
 });
