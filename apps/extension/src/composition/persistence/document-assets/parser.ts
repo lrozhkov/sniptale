@@ -1,3 +1,4 @@
+import { isEditorCompositionBase } from '../../../features/editor/document/guards';
 import { parseEditorFrameGradient } from '../../../features/editor/document/frame-gradient';
 // policyStateIds: [] - canvas binary field names are an immutable persisted-data validation
 // allowlist; per-document sets are operation-local indexes and grant no authority.
@@ -283,6 +284,8 @@ export function parsePersistedEditorDocument(value: unknown): PersistedEditorDoc
   const frame = parseFrame(value['frame']);
   const browserFrame = parseBrowserFrame(value['browserFrame']);
   const assets = parseAssets(value['assets']);
+  const base = value['compositionBase'];
+  if (base !== undefined && !isEditorCompositionBase(base)) return null;
   if (!sourceImage || !frame || browserFrame === null || !assets) return null;
   const declaredIds = new Set(assets.map((asset) => asset.assetId));
   if (!declaredIds.has(sourceImage.assetId)) return null;
@@ -323,6 +326,16 @@ export function parsePersistedEditorDocument(value: unknown): PersistedEditorDoc
   return {
     version: 3,
     sourceImage: { assetId: sourceImage.assetId },
+    ...(base === undefined
+      ? {}
+      : {
+          compositionBase: {
+            sourceWidth: base.sourceWidth,
+            sourceHeight: base.sourceHeight,
+            canvasWidth: base.canvasWidth,
+            canvasHeight: base.canvasHeight,
+          },
+        }),
     sourceName: value['sourceName'],
     ...(value['displayName'] === undefined ? {} : { displayName: value['displayName'] }),
     sourceWidth: value['sourceWidth'],

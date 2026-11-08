@@ -1,5 +1,6 @@
-import type { Canvas, FabricObject } from 'fabric';
+import { Point, Textbox, type Canvas, type FabricObject } from 'fabric';
 import { synchronizeEditorDrawingObjectFromFabric } from '../../drawing/object/metadata';
+import { applyEditorDrawingTextVisuals } from '../../drawing/object/vector';
 import { normalizeFrameAnnotationProxyGeometry } from '../../frame-annotation/proxy';
 
 import type { SourceState } from '../../document/model/source-state';
@@ -44,10 +45,44 @@ function resolveBrowserFrameObjectScale(args: {
   };
 }
 
+function isSceneTextBox(object: FabricObject): object is Textbox {
+  return object instanceof Textbox;
+}
+
+function synchronizeSceneDrawing(
+  object: FabricObject,
+  transform: { x: number; y: number; scaleX: number; scaleY: number }
+): void {
+  const drawing = synchronizeEditorDrawingObjectFromFabric(object, transform);
+  if (drawing?.kind !== 'text' || !isSceneTextBox(object)) return;
+  const center = object.getCenterPoint();
+  const automaticWidth = object.sniptaleDrawingTextAutoWidth;
+  object.set({
+    fontSize: drawing.fontSize,
+    width: Math.max(1, drawing.bounds.width),
+    scaleX: 1,
+    scaleY: 1,
+  });
+  // Text padding has a fixed scene size, including after a history restore.
+  object.sniptaleDrawingTextAutoWidth = false;
+  try {
+    applyEditorDrawingTextVisuals(object);
+  } finally {
+    if (automaticWidth === undefined) delete object.sniptaleDrawingTextAutoWidth;
+    else object.sniptaleDrawingTextAutoWidth = automaticWidth;
+  }
+  if (drawing.rotation)
+    object.setPositionByOrigin(new Point(center.x, center.y), 'center', 'center');
+  else object.set({ left: drawing.bounds.x, top: drawing.bounds.y });
+  object.setCoords();
+  synchronizeEditorDrawingObjectFromFabric(object);
+}
+
 export function updateUserObjectLayout(options: {
   canvas: Canvas;
   currentSource: SourceState;
   sourceSizeChanged: boolean;
+  header?: { left: number; top: number; width: number; height: number } | null;
   layoutSource: {
     left: number;
     top: number;
@@ -76,9 +111,15 @@ export function updateUserObjectLayout(options: {
       });
 
       object.set({
-        left: (object.left ?? 0) + deltaX,
-        top: (object.top ?? 0) + deltaY,
+        left: options.header?.left ?? (object.left ?? 0) + deltaX,
+        top: options.header?.top ?? (object.top ?? 0) + deltaY,
         ...browserFrameScale,
+        ...(options.header
+          ? {
+              scaleX: options.header.width / object.width,
+              scaleY: options.header.height / object.height,
+            }
+          : {}),
       });
       object.setCoords();
       return;
@@ -92,7 +133,7 @@ export function updateUserObjectLayout(options: {
     });
     object.setCoords();
     normalizeFrameAnnotationProxyGeometry(object);
-    synchronizeEditorDrawingObjectFromFabric(object, {
+    synchronizeSceneDrawing(object, {
       x: layoutSource.left - currentSource.left * ratioX,
       y: layoutSource.top - currentSource.top * ratioY,
       scaleX: ratioX,

@@ -47,6 +47,7 @@ export function prepareAppliedDocument(document: EditorDocument): PreparedApplie
       top: normalizedDocument.sourceTop,
       displayWidth: normalizedDocument.sourceDisplayWidth,
       displayHeight: normalizedDocument.sourceDisplayHeight,
+      ...(document.compositionBase ? { compositionBase: { ...document.compositionBase } } : {}),
       visible: true,
       locked: true,
     },

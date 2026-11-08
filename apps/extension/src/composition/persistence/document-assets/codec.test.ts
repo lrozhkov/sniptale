@@ -547,3 +547,30 @@ it('externalizes Simplify source and result and restores both for document trans
     sniptaleSimplifySourceData: 'data:image/png;base64,c291cmNl',
   });
 });
+
+it.each([800, 0, -20])(
+  'preserves composition extents %s through asset persistence, hydration and portable transfer',
+  async (extent) => {
+    const base = { sourceWidth: 800, sourceHeight: 600, canvasWidth: extent, canvasHeight: extent };
+    const document = { ...createEditorDocumentFixture(), compositionBase: base };
+    const prepared = await preparePersistedEditorDocument(document);
+    expect(prepared.document.compositionBase).toEqual(base);
+    const parsed = parsePersistedEditorDocument(prepared.document)!;
+    expect(parsed.compositionBase).toEqual(base);
+    mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+    const hydrated = await hydratePersistedEditorDocument({
+      document: parsed,
+      refs: prepared.refs,
+    });
+    try {
+      expect(hydrated.document.compositionBase).toEqual(base);
+    } finally {
+      hydrated.release();
+    }
+    const transferred = await materializePersistedEditorDocumentForLegacyTransfer({
+      document: parsed,
+      refs: prepared.refs,
+    });
+    expect(transferred.compositionBase).toEqual(base);
+  }
+);

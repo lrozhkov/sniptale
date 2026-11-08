@@ -314,6 +314,7 @@ export async function hydratePersistedEditorDocument(args: {
 function projectEditorImageMetadata(
   document: Pick<
     EditorDocument,
+    | 'compositionBase'
     | 'sourceName'
     | 'displayName'
     | 'sourceWidth'
@@ -327,6 +328,7 @@ function projectEditorImageMetadata(
   >
 ) {
   return {
+    ...(document.compositionBase ? { compositionBase: { ...document.compositionBase } } : {}),
     sourceName: document.sourceName,
     ...(document.displayName === undefined ? {} : { displayName: document.displayName }),
     sourceWidth: document.sourceWidth,

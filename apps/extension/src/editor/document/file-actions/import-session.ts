@@ -79,11 +79,14 @@ function assertDocumentGeometry(document: EditorDocument): void {
     [document.sourceWidth, document.sourceHeight],
     [document.sourceDisplayWidth, document.sourceDisplayHeight],
   ];
-  const base = document.browserFrame?.compositionBase;
-  if (base)
+  const commonBase = document.compositionBase;
+  // Shared canvas extents can be negative after a crop; the domain guard bounds them.
+  if (commonBase) dimensionPairs.push([commonBase.sourceWidth, commonBase.sourceHeight]);
+  const legacyBase = document.browserFrame?.compositionBase;
+  if (legacyBase)
     dimensionPairs.push(
-      [base.sourceWidth, base.sourceHeight],
-      [base.canvasWidth, base.canvasHeight]
+      [legacyBase.sourceWidth, legacyBase.sourceHeight],
+      [legacyBase.canvasWidth, legacyBase.canvasHeight]
     );
   if (
     !dimensionPairs.every(

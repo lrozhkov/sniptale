@@ -13,6 +13,7 @@ export function readCurrentBrowserFrameSourceState(
   }
 
   return {
+    ...(fallback?.compositionBase ? { compositionBase: fallback.compositionBase } : {}),
     id: sourceObject.sniptaleId ?? fallback?.id ?? 'source-image-layer',
     dataUrl: fallback?.dataUrl ?? '',
     name: fallback?.name ?? null,

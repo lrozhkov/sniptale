@@ -1,3 +1,4 @@
+import { parseImportedEditorDocument } from './import-session';
 // @vitest-environment jsdom
 
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
@@ -208,4 +209,10 @@ it('rejects invalid editor session payloads with a normalized validation error',
     editorFileActions.importEditorSessionFromFile(controller, file, setImageData)
   ).rejects.toThrow(translate('editor.runtime.sessionImportInvalid'));
   expect(controller.loadDocument).not.toHaveBeenCalled();
+});
+
+it('admits the unchanged fixture before testing invalid session content', () => {
+  expect(parseImportedEditorDocument(JSON.stringify(createEditorDocument()))).toMatchObject({
+    version: 2,
+  });
 });

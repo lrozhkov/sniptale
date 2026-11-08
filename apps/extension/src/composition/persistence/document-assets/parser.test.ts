@@ -196,3 +196,43 @@ it('retains complete linear gradients through persisted document parsing and JSO
     })
   ).toBeNull();
 });
+
+it('admits bounded shared composition geometry and rejects malformed or oversized baselines', () => {
+  const base = { sourceWidth: 800, sourceHeight: 600, canvasWidth: 800, canvasHeight: 600 };
+  const document = createPersistedDocument();
+  expect(
+    parsePersistedEditorDocument({ ...document, compositionBase: { ...base, ignored: true } })
+      ?.compositionBase
+  ).toEqual(base);
+  for (const compositionBase of [
+    null,
+    {},
+    { ...base, sourceWidth: NaN },
+    { ...base, sourceHeight: Infinity },
+    { ...base, sourceWidth: 32769 },
+    { ...base, sourceWidth: 10001, sourceHeight: 10000 },
+    { ...base, canvasWidth: 10001, canvasHeight: 10000 },
+  ]) {
+    expect(parsePersistedEditorDocument({ ...document, compositionBase })).toBeNull();
+  }
+});
+
+it('retains finite signed reference extents and rejects unbounded signed extents', () => {
+  const document = createPersistedDocument();
+  for (const extent of [-20, 0, 100]) {
+    const compositionBase = {
+      sourceWidth: 800,
+      sourceHeight: 600,
+      canvasWidth: extent,
+      canvasHeight: extent,
+    };
+    expect(parsePersistedEditorDocument({ ...document, compositionBase })?.compositionBase).toEqual(
+      compositionBase
+    );
+  }
+  for (const compositionBase of [
+    { sourceWidth: 800, sourceHeight: 600, canvasWidth: -32769, canvasHeight: 1 },
+    { sourceWidth: 800, sourceHeight: 600, canvasWidth: -10001, canvasHeight: 10000 },
+  ])
+    expect(parsePersistedEditorDocument({ ...document, compositionBase })).toBeNull();
+});

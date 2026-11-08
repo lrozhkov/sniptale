@@ -1,4 +1,7 @@
+import type { EditorCompositionBase } from '../../../features/editor/document/types';
+
 export interface SourceState {
+  compositionBase?: EditorCompositionBase;
   id: string;
   dataUrl: string;
   name: string | null;

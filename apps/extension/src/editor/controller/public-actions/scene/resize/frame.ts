@@ -7,6 +7,7 @@ import type {
 import type { SourceState } from '../../../../document/model/source-state';
 import { applyImageSettings } from '../../../../objects/image-style';
 import { getSourceObject } from '../../../document/layers';
+import { resolveSceneCompositionBase } from '../../../document/scene/composition';
 import { resolveRelayoutSceneGeometry } from '../../../document/scene/layout';
 import { hasSameBackgroundPaint } from '../../../background/sync';
 import {
@@ -15,10 +16,6 @@ import {
 } from '../../../browser-frame/document-layer';
 import { findBrowserFrameHeader } from '../../../tools/frame-header';
 import { applyEditorViewportZoom } from '../../../viewport';
-import {
-  shouldFitSourceToContent,
-  shouldPreserveCanvasForBrowserFrame,
-} from '../../../../browser-frame/layout';
 
 import { doesFrameGeometryChange, hasBrowserFrameLayer } from './geometry';
 import type { FrameSceneSettingsOptions } from './types';
@@ -90,8 +87,13 @@ export async function applyEditorFrameSceneSettings(
   const geometryChanged = doesFrameGeometryChange(current, frame);
   const hasBrowserFrame = hasBrowserFrameLayer(canvas);
   const relayoutOptions = {
-    preserveCanvasSize: shouldPreserveCanvasForBrowserFrame(frame, browserFrame, hasBrowserFrame),
-    fitSourceToContent: shouldFitSourceToContent(frame, browserFrame, hasBrowserFrame),
+    compositionBase: resolveSceneCompositionBase({
+      source,
+      canvasSize: options.getCanvasDocumentSize(),
+      frame: accepted,
+      browserFrame,
+      hasBrowserFrame,
+    }),
   };
   const currentSize = options.getCanvasDocumentSize();
   const layout = geometryChanged

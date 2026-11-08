@@ -27,7 +27,7 @@ function createCanonicalObject(
     if (!source) return null;
     return createEditorDrawingBlurObject({ drawing, labelIndex: 1, source });
   }
-  return createEditorDrawingFabricObject(drawing, 1);
+  return createEditorDrawingFabricObject(drawing, 1, { preserveTextWidth: true });
 }
 
 export function replaceEditorDrawingObjectWithCanonicalGeometry(args: {

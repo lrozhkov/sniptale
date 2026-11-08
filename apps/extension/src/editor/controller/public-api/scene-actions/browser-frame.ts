@@ -1,3 +1,4 @@
+import { prepareEditorBackgroundLayer } from '../../background/sync';
 import type { FabricObject } from 'fabric';
 import { useEditorStore } from '../../../state/useEditorStore';
 import type { BrowserFrameState } from '../../../../features/editor/document/types';
@@ -25,9 +26,20 @@ function createBrowserFrameRelayout(controller: Pick<EditorBrowserFrameApi, 'rel
   };
 }
 
-function createEditorBrowserFrameArgs(controller: EditorBrowserFrameApi, token: number) {
+function createEditorBrowserFrameArgs(
+  controller: EditorBrowserFrameApi,
+  isMutationCurrent: () => boolean
+) {
   return {
-    isMutationCurrent: () => controller.isLayerMutationTokenCurrent(token),
+    isMutationCurrent,
+    prepareBackground: (canvasSize: { width: number; height: number }) =>
+      prepareEditorBackgroundLayer({
+        canvas: controller.canvas,
+        canvasSize,
+        frame: useEditorStore.getState().frame,
+        prepareObject: (object: FabricObject) => controller.prepareObject(object),
+        isCurrent: isMutationCurrent,
+      }),
     canvas: controller.canvas,
     source: controller.source,
     store: createEditorSceneStoreBridge(),
@@ -59,14 +71,13 @@ function enqueueBrowserFrameIntent(
       !controller.isLayerMutationTokenCurrent(token)
     )
       return;
-    const args = createEditorBrowserFrameArgs(controller, token);
-    const tokenIsCurrent = args.isMutationCurrent;
-    args.isMutationCurrent = () =>
+    const isCurrent = () =>
       controller.canvas === canvas &&
       !canvas?.disposed &&
       !canvas?.destroyed &&
       getSourceObject(canvas) === sourceObject &&
-      tokenIsCurrent();
+      controller.isLayerMutationTokenCurrent(token);
+    const args = createEditorBrowserFrameArgs(controller, isCurrent);
     await operation(args);
   });
 }
