@@ -35,6 +35,7 @@ export function createEffectRuntimeSandboxExecutor(
     ...(scene
       ? {
           maximumGpuFramesInFlight: 2 as const,
+          preload: () => manager.preload(),
           prepareGpuFrame: (request: Parameters<EffectRuntimeSandboxExecutor['renderFrame']>[0]) =>
             manager.prepareGpuFrame(request),
         }

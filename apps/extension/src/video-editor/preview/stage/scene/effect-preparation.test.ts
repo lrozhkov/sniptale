@@ -49,6 +49,7 @@ function fixture() {
   const contextController = new AbortController();
   const frameController = new AbortController();
   const context = { project, signal: contextController.signal };
+  const primary = { preload: vi.fn(), dispose: vi.fn(), renderFrame: vi.fn() };
   const input: PreviewSceneRenderInput = {
     project: { ...project },
     currentTime: 1,
@@ -60,7 +61,7 @@ function fixture() {
     previewRenderer: 'gpu',
     signal: frameController.signal,
     effectPreparation: { context, project, time: 1 },
-    effectRuntimeExecutor: vi.fn<() => EffectRuntimeSandboxExecutor>(),
+    effectRuntimeExecutor: vi.fn(() => primary),
   };
   input.effectPreparation!.project = input.project;
   const plan = {
@@ -148,6 +149,7 @@ function fixture() {
   const owner = createNativeEffectPreparation(create);
   return {
     owner,
+    primary,
     input,
     context,
     contextController,
@@ -175,7 +177,8 @@ it('prepares on the actual provider once and releases packet pixels before compi
   expect(io.resolve).toHaveBeenCalledOnce();
   expect(io.resolve.mock.calls[0]![0].project).toBe(f.input.effectPreparation!.project);
   expect(f.create).toHaveBeenCalledExactlyOnceWith(document);
-  expect(f.input.effectRuntimeExecutor).not.toHaveBeenCalled();
+  expect(f.input.effectRuntimeExecutor).toHaveBeenCalledOnce();
+  expect(f.primary.preload).toHaveBeenCalledOnce();
   f.frameController.abort();
   expect(f.executor.dispose).not.toHaveBeenCalled();
   compile.resolve();
@@ -254,7 +257,8 @@ it('retires an outstanding compilation without retaining pixels or awaiting its 
   compile.reject(new Error('retired compilation'));
   await Promise.resolve();
   await Promise.resolve();
-  expect(f.input.effectRuntimeExecutor).not.toHaveBeenCalled();
+  expect(f.input.effectRuntimeExecutor).toHaveBeenCalledOnce();
+  expect(f.primary.dispose).not.toHaveBeenCalled();
   f.owner.dispose();
 });
 
@@ -302,4 +306,71 @@ it('uses hydrated data with stable authored identity and one attempt per event',
   expect(io.resolve).toHaveBeenCalledOnce();
   expect(f.create).toHaveBeenCalledOnce();
   f.owner.dispose();
+});
+
+it.each(['getter', 'object'] as const)(
+  'preloads the %s primary once before isolated preparation without owning its cleanup',
+  async (kind) => {
+    const f = fixture();
+    if (kind === 'object') f.input.effectRuntimeExecutor = f.primary;
+    f.create.mockImplementation(() => {
+      expect(f.primary.preload).toHaveBeenCalledOnce();
+      return f.executor;
+    });
+    f.owner.update(f.input, f.provider);
+    await vi.waitFor(() => expect(f.preparePipelines).toHaveBeenCalledOnce());
+    f.owner.update(f.input, f.provider);
+    expect(f.primary.preload).toHaveBeenCalledOnce();
+    expect(f.primary.renderFrame).not.toHaveBeenCalled();
+    f.contextController.abort();
+    f.owner.dispose();
+    expect(f.primary.dispose).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['getter', 'preload', 'missing'] as const)(
+  'keeps isolated preparation after optional primary %s failure or absence',
+  async (kind) => {
+    const f = fixture();
+    if (kind === 'getter')
+      f.input.effectRuntimeExecutor = () => {
+        throw new Error('getter failed');
+      };
+    if (kind === 'preload')
+      f.primary.preload.mockImplementation(() => {
+        throw new Error('preload failed');
+      });
+    if (kind === 'missing')
+      f.input.effectRuntimeExecutor = { dispose: vi.fn(), renderFrame: vi.fn() };
+    expect(() => f.owner.update(f.input, f.provider)).not.toThrow();
+    await vi.waitFor(() => expect(f.preparePipelines).toHaveBeenCalledOnce());
+    expect(f.primary.dispose).not.toHaveBeenCalled();
+    f.owner.dispose();
+  }
+);
+
+it('preloads only accepted candidates and permits a new context to retry readiness', async () => {
+  const f = fixture();
+  io.resolve.mockReturnValueOnce(null);
+  f.owner.update(f.input, f.provider);
+  expect(f.primary.preload).not.toHaveBeenCalled();
+  f.owner.update(f.input, f.provider);
+  expect(f.primary.preload).not.toHaveBeenCalled();
+  const controller = new AbortController();
+  const input = {
+    ...f.input,
+    effectPreparation: {
+      context: { project: f.input.project, signal: controller.signal },
+      project: f.input.project,
+      time: 1.1,
+    },
+  };
+  f.owner.update(input, f.provider);
+  await vi.waitFor(() => expect(f.primary.preload).toHaveBeenCalledOnce());
+  controller.abort();
+  f.owner.update(input, f.provider);
+  expect(f.primary.preload).toHaveBeenCalledOnce();
+  f.owner.dispose();
+  f.owner.update(f.input, f.provider);
+  expect(f.primary.preload).toHaveBeenCalledOnce();
 });

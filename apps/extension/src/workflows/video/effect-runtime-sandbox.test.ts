@@ -313,6 +313,11 @@ it.each([undefined, 'gpu-preview', 'gpu-scene', 'gpu-scene-plan'] as const)(
     expect(document.querySelectorAll('iframe')).toHaveLength(
       compositionBackend === 'gpu-scene' || compositionBackend === 'gpu-scene-plan' ? 1 : 0
     );
+    expect(typeof executor.preload).toBe(
+      compositionBackend === 'gpu-scene' || compositionBackend === 'gpu-scene-plan'
+        ? 'function'
+        : 'undefined'
+    );
     executor.dispose();
     await Promise.resolve();
     expect(document.querySelector('iframe')).toBeNull();
@@ -412,5 +417,35 @@ it('rejects a checked bitmap fallback returned to the plan-only parent', async (
   } finally {
     manager.dispose();
     rendered.mockRestore();
+  }
+});
+
+it('retries explicit transport preload without posting frames and retains readiness until disposal', async () => {
+  installSynchronousMessageChannel();
+  const executor = createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene' });
+  const first = document.querySelector('iframe')!;
+  const ports: MessagePort[] = [];
+  try {
+    executor.preload!();
+    expect(document.querySelector('iframe')).toBe(first);
+    first.dispatchEvent(new Event('error'));
+    await Promise.resolve();
+    expect(document.querySelector('iframe')).toBeNull();
+    executor.preload!();
+    const replacement = document.querySelector('iframe')!;
+    expect(replacement).not.toBe(first);
+    const requests: EffectRuntimeRenderMessage[] = [];
+    installCacheRetryResponder(replacement, requests, ports);
+    replacement.dispatchEvent(new Event('load'));
+    await Promise.resolve();
+    executor.preload!();
+    expect(document.querySelector('iframe')).toBe(replacement);
+    expect(requests).toEqual([]);
+    executor.dispose();
+    executor.preload!();
+    expect(document.querySelector('iframe')).toBeNull();
+  } finally {
+    executor.dispose();
+    for (const port of ports) port.close();
   }
 });

@@ -195,6 +195,8 @@ export interface EffectRuntimeSandboxExecutor {
   /** Concurrent GPU preparations return independently owned resources, including bitmap fallback. */
   readonly maximumGpuFramesInFlight?: 2;
   dispose(): void;
+  /** Prepare transport readiness without a frame request; an unavailable session can retry. */
+  preload?(): void;
   prepareGpuFrame?(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult>;
   renderFrame(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeFrameResult>;
 }

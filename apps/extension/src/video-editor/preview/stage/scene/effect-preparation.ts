@@ -61,6 +61,20 @@ function prepareNativeEffectPipelines(
   }
 }
 
+function preloadNativeEffectTransport(
+  input: Pick<PreviewSceneRenderInput, 'effectRuntimeExecutor'>
+): void {
+  try {
+    const primary =
+      typeof input.effectRuntimeExecutor === 'function'
+        ? input.effectRuntimeExecutor()
+        : input.effectRuntimeExecutor;
+    primary?.preload?.();
+  } catch {
+    // Primary readiness failure must not prevent the isolated pipeline preparation.
+  }
+}
+
 /** One actual Native provider owns one isolated advisory transaction, independently of frame leases. */
 export function createNativeEffectPreparation(
   createExecutor?: (ownerDocument: Document) => EffectRuntimeSandboxExecutor
@@ -178,6 +192,7 @@ export function createNativeEffectPreparation(
           currentTime: preparation.time,
         });
         if (!candidate) return;
+        preloadNativeEffectTransport(input);
         cancel();
         const executor = createExecutor(input.canvas.ownerDocument);
         const current: Flight = {
