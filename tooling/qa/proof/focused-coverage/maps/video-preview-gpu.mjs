@@ -1,5 +1,31 @@
 export const VIDEO_PREVIEW_GPU_OWNER_MAPPINGS = [
   {
+    owner: 'native-persistent-gpu-frames',
+    productionFile: 'apps/extension/src/video-editor/preview/cache/build-persistent.ts',
+    reason:
+      'Completed preview images remain owned through capture, encoding and persistent cache recovery.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/cache/build-persistent.test.ts',
+      'apps/extension/src/video-editor/preview/cache/encode.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-resume.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-lifecycle.test.ts',
+    ],
+  },
+  {
+    owner: 'native-preview-frame-encoder',
+    productionFile: 'apps/extension/src/video-editor/preview/cache/encode.ts',
+    reason:
+      'Completed preview images remain owned through capture, encoding and persistent cache recovery.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/cache/build-persistent.test.ts',
+      'apps/extension/src/video-editor/preview/cache/encode.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-resume.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-lifecycle.test.ts',
+    ],
+  },
+  {
     owner: 'native-exact-frame-bitmap-leases',
     productionFile: 'apps/extension/src/video-editor/preview/cache/exact-frame-cache.ts',
     reason:

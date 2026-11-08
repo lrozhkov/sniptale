@@ -10,6 +10,7 @@ import {
   type VideoPreviewCacheSegment,
 } from '../../../composition/persistence/video-preview-cache';
 import { encodePersistentVideoPreview } from './encode';
+import { createMaterializerGpuOutputs } from './materializer-gpu-outputs';
 import type { VideoPreviewCacheSegmentPlanEntry } from './segments';
 import {
   cacheExactVideoPreviewFrame,
@@ -42,28 +43,48 @@ async function renderPersistentSegment(params: {
   state: PersistentBuildState;
 }): Promise<VideoPreviewCacheSegment> {
   const { context, segment, state } = params;
-  const encoded = await encodePersistentVideoPreview({
-    canvas: context.materializer.canvas,
-    endFrame: segment.endFrame,
-    fps: context.params.project.fps,
-    onFrame: async (frameIndex) => {
-      const frame = await context.materializer.renderFrameWithPresentation(
-        frameIndex / context.params.project.fps,
-        context.params.signal
-      );
-      if (
-        state.exactFramesCached < context.exactFrameCapacity &&
-        (hasExactVideoPreviewFrame(context, frameIndex) ||
-          (await cacheExactVideoPreviewFrame(context, frameIndex, frame)))
-      ) {
-        state.exactFramesCached += 1;
-      }
-      state.completedFrames += 1;
-      reportVideoPreviewBuildProgress(context, 'preparing-video-cache', state.completedFrames);
-    },
-    signal: context.params.signal,
-    startFrame: segment.startFrame,
-  });
+  const gpuOutputs =
+    context.params.previewRenderer === 'legacy'
+      ? undefined
+      : createMaterializerGpuOutputs(context.params.ownerDocument);
+  let encoded: Awaited<ReturnType<typeof encodePersistentVideoPreview>>;
+  try {
+    encoded = await encodePersistentVideoPreview({
+      canvas: context.materializer.canvas,
+      endFrame: segment.endFrame,
+      fps: context.params.project.fps,
+      onFrame: async (frameIndex) => {
+        const frame = await context.materializer.renderFrameWithPresentation(
+          frameIndex / context.params.project.fps,
+          context.params.signal,
+          undefined,
+          gpuOutputs?.acquire
+        );
+        const { output, ...presentation } = frame.presentation;
+        const canvas = output?.canvas ?? frame.canvas;
+        try {
+          if (
+            state.exactFramesCached < context.exactFrameCapacity &&
+            (hasExactVideoPreviewFrame(context, frameIndex) ||
+              (await cacheExactVideoPreviewFrame(context, frameIndex, { canvas, presentation })))
+          ) {
+            state.exactFramesCached += 1;
+          }
+          state.completedFrames += 1;
+          reportVideoPreviewBuildProgress(context, 'preparing-video-cache', state.completedFrames);
+          // The encoder owns the completed image until its sample is accepted.
+          return { canvas, release: () => output?.release() };
+        } catch (error) {
+          output?.release();
+          throw error;
+        }
+      },
+      signal: context.params.signal,
+      startFrame: segment.startFrame,
+    });
+  } finally {
+    gpuOutputs?.dispose();
+  }
   if (state.codec && state.codec !== encoded.codec) {
     throw new PersistentPreviewCodecMismatchError();
   }
