@@ -79,6 +79,12 @@ function assertDocumentGeometry(document: EditorDocument): void {
     [document.sourceWidth, document.sourceHeight],
     [document.sourceDisplayWidth, document.sourceDisplayHeight],
   ];
+  const base = document.browserFrame?.compositionBase;
+  if (base)
+    dimensionPairs.push(
+      [base.sourceWidth, base.sourceHeight],
+      [base.canvasWidth, base.canvasHeight]
+    );
   if (
     !dimensionPairs.every(
       ([width, height]) =>

@@ -361,3 +361,30 @@ it('accepts additive complete linear frame gradients and rejects invalid importe
     ).toBe(false);
   }
 });
+
+it('validates optional header composition dimensions and retains legacy documents', () => {
+  const document = createEditorDocumentFixture();
+  expect(isEditorDocument(document)).toBe(true);
+  const base = { sourceWidth: 801, sourceHeight: 601, canvasWidth: 801, canvasHeight: 601 };
+  expect(
+    isEditorDocument({
+      ...document,
+      browserFrame: { ...document.browserFrame, compositionBase: base },
+    })
+  ).toBe(true);
+  for (const invalid of [
+    null,
+    {},
+    { ...base, sourceWidth: 0 },
+    { ...base, sourceHeight: Infinity },
+    { ...base, canvasWidth: '801' },
+    { ...base, canvasHeight: NaN },
+  ]) {
+    expect(
+      isEditorDocument({
+        ...document,
+        browserFrame: { ...document.browserFrame, compositionBase: invalid },
+      })
+    ).toBe(false);
+  }
+});

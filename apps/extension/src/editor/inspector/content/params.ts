@@ -5,7 +5,6 @@ import {
   WORKSPACE_BACKGROUND_PALETTE,
   clampGridSize,
   getBrowserCanvasModeOptions,
-  getBrowserContentModeOptions,
   getFrameBackgroundImageFitOptions,
   getFrameBackgroundModeOptions,
   getFrameGradientPresets,
@@ -23,7 +22,6 @@ function getEditorInspectorContentOptions() {
   return {
     lineStyleOptions: getLineStyleOptions(),
     browserCanvasModeOptions: getBrowserCanvasModeOptions(),
-    browserContentModeOptions: getBrowserContentModeOptions(),
     frameBackgroundImageFitOptions: getFrameBackgroundImageFitOptions(),
     frameBackgroundModeOptions: getFrameBackgroundModeOptions(),
     frameGradientPresets: getFrameGradientPresets(),

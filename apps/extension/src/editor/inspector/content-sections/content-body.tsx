@@ -97,7 +97,6 @@ function renderEditorInspectorDocumentPanel(
   return (
     <EditorInspectorDocumentPanel
       browserCanvasModeOptions={props.browserCanvasModeOptions}
-      browserContentModeOptions={props.browserContentModeOptions}
       browserFrame={props.browserFrame}
       canvasAspectRatio={props.canvasAspectRatio}
       canvasSize={props.canvasSize}

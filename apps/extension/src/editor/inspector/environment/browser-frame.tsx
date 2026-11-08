@@ -51,11 +51,10 @@ export function EditorWindowHeaderSettings(props: {
 
 export const EditorInspectorBrowserFramePanelContent: React.FC<{
   browserCanvasModeOptions: { label: string; value: 'resize' | 'keep-size' }[];
-  browserContentModeOptions: { label: string; value: 'push-down' | 'fit-content' }[];
   browserFrame: BrowserFrameState;
   insertOrUpdateBrowserFrame?: () => Promise<void> | void;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
-}> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => {
+}> = ({ browserCanvasModeOptions, browserFrame, syncBrowserFrame }) => {
   useAppLocale();
 
   return (
@@ -68,7 +67,6 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
         >
           <BrowserFrameBehaviorSections
             browserCanvasModeOptions={browserCanvasModeOptions}
-            browserContentModeOptions={browserContentModeOptions}
             browserFrame={browserFrame}
             syncBrowserFrame={syncBrowserFrame}
           />

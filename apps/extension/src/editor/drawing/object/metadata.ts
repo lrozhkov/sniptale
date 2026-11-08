@@ -8,7 +8,7 @@ import {
   type ObjectEvents,
   type PathProps,
   type SerializedPathProps,
-  type Textbox,
+  Textbox,
 } from 'fabric';
 import {
   getDrawingObjectBounds,
@@ -196,8 +196,10 @@ function normalizeSynchronizedArrowGeometry<
   util.applyTransformToObject(target, placement);
 }
 
+/** Synchronizes object geometry. A scene transform also scales text and maps retained source bounds. */
 export function synchronizeEditorDrawingObjectFromFabric(
-  target: FabricObject
+  target: FabricObject,
+  sceneTransform?: { x: number; y: number; scaleX: number; scaleY: number }
 ): DrawingObject | null {
   const drawing = readEditorDrawingObject(target);
   if (!drawing) return null;
@@ -245,16 +247,39 @@ export function synchronizeEditorDrawingObjectFromFabric(
       ...rotation,
       ...(skewX ? { skewX } : {}),
     };
+  } else if (drawing.kind === 'text' && target instanceof Textbox && sceneTransform) {
+    next = {
+      ...drawing,
+      bounds,
+      ...rotation,
+      fontSize: target.fontSize * target.getObjectScaling().y,
+    };
   } else {
     next = { ...drawing, bounds, ...rotation };
   }
   if (
+    !sceneTransform &&
     next.kind === 'simplify' &&
     drawing.kind === 'simplify' &&
     (next.settings.automatic || next.settings.manualKind === 'text') &&
     (JSON.stringify(next.bounds) !== JSON.stringify(previous) || next.rotation !== drawing.rotation)
   )
     next = { ...next, sourceDirty: true };
+  if (next.kind === 'simplify' && next.source && sceneTransform) {
+    const bounds = next.source.bounds;
+    next = {
+      ...next,
+      source: {
+        ...next.source,
+        bounds: {
+          x: bounds.x * sceneTransform.scaleX + sceneTransform.x,
+          y: bounds.y * sceneTransform.scaleY + sceneTransform.y,
+          width: bounds.width * sceneTransform.scaleX,
+          height: bounds.height * sceneTransform.scaleY,
+        },
+      },
+    };
+  }
   if (next.kind === 'arrow' && target instanceof Path) normalizeSynchronizedArrowGeometry(target);
   writeEditorDrawingObject(target, next);
   return next;

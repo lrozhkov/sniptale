@@ -62,6 +62,12 @@ export interface BrowserFrameState extends Partial<
   faviconSource?: WindowHeader['faviconSource'] | null;
   canvasMode: BrowserFrameCanvasMode;
   contentMode: BrowserFrameContentMode;
+  compositionBase?: {
+    sourceWidth: number;
+    sourceHeight: number;
+    canvasWidth: number;
+    canvasHeight: number;
+  };
 }
 
 export interface EditorFrameSettings {

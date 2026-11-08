@@ -1,4 +1,6 @@
 import type { Canvas, FabricObject } from 'fabric';
+import { synchronizeEditorDrawingObjectFromFabric } from '../../drawing/object/metadata';
+import { normalizeFrameAnnotationProxyGeometry } from '../../frame-annotation/proxy';
 
 import type { SourceState } from '../../document/model/source-state';
 import {
@@ -89,5 +91,12 @@ export function updateUserObjectLayout(options: {
       scaleY: (object.scaleY ?? 1) * ratioY,
     });
     object.setCoords();
+    normalizeFrameAnnotationProxyGeometry(object);
+    synchronizeEditorDrawingObjectFromFabric(object, {
+      x: layoutSource.left - currentSource.left * ratioX,
+      y: layoutSource.top - currentSource.top * ratioY,
+      scaleX: ratioX,
+      scaleY: ratioY,
+    });
   });
 }

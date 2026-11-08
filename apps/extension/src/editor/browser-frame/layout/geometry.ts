@@ -62,8 +62,8 @@ function createSceneContentRect(
 
 function normalizeSceneSource(input: ResolveEditorSceneLayoutInput) {
   return {
-    width: roundSize(input.source.width),
-    height: roundSize(input.source.height),
+    width: Math.max(MIN_CANVAS_SIZE, input.source.width),
+    height: Math.max(MIN_CANVAS_SIZE, input.source.height),
   };
 }
 

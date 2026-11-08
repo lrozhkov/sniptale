@@ -217,3 +217,13 @@ it('keeps custom icon provenance across image normalization and clears it for we
     normalizeBrowserFrameState({ ...local, faviconEnabled: false }).faviconSource
   ).toBeUndefined();
 });
+
+it('retains header composition baseline during document normalization', () => {
+  const compositionBase = {
+    sourceWidth: 801,
+    sourceHeight: 601,
+    canvasWidth: 801,
+    canvasHeight: 601,
+  };
+  expect(normalizeBrowserFrameState({ compositionBase }).compositionBase).toEqual(compositionBase);
+});

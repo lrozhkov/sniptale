@@ -31,7 +31,6 @@ it('offers shared browser and application settings with explicit image insertion
       root.render(
         <EditorInspectorBrowserFramePanelContent
           browserCanvasModeOptions={[{ label: 'Resize', value: 'resize' }]}
-          browserContentModeOptions={[{ label: 'Push down', value: 'push-down' }]}
           browserFrame={{
             ...DEFAULT_BROWSER_FRAME_STATE,
             title: 'Saved title',

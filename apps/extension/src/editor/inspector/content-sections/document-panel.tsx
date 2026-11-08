@@ -18,7 +18,6 @@ interface EditorInspectorDocumentPanelProps {
   inspector: DocumentInspectorMode;
   browserFrame: BrowserFrameState;
   browserCanvasModeOptions: CompactSelectOption<BrowserFrameState['canvasMode']>[];
-  browserContentModeOptions: CompactSelectOption<BrowserFrameState['contentMode']>[];
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
   insertOrUpdateBrowserFrame?: (() => Promise<void> | void) | undefined;
   imageSizeText: string;
@@ -87,7 +86,6 @@ function describeDocumentSection(
           <EditorInspectorBrowserFramePanel
             browserFrame={props.browserFrame}
             browserCanvasModeOptions={props.browserCanvasModeOptions}
-            browserContentModeOptions={props.browserContentModeOptions}
             syncBrowserFrame={props.syncBrowserFrame}
             {...(props.insertOrUpdateBrowserFrame === undefined
               ? {}

@@ -6,7 +6,7 @@ import { isBrowserFrameObject } from '../../../../document/model';
 import { readCurrentBrowserFrameSourceState } from '../../../browser-frame/source-state';
 
 import {
-  resolveBrowserFrameRelayoutOptions,
+  resolveBrowserFrameComposition,
   resolveBrowserFrameScene,
   resolveNextBrowserFramePosition,
   resolveNextBrowserFrameWidth,
@@ -17,7 +17,6 @@ export async function applyEditorBrowserFrameSettings(
   options: BrowserFrameActionOptions & { browserFrame: BrowserFrameState }
 ): Promise<void> {
   const nextBrowserFrame = { ...options.store.getBrowserFrame(), ...options.browserFrame };
-  options.store.setBrowserFrame(nextBrowserFrame);
 
   const applied = await upsertBrowserFrameLayer(options, nextBrowserFrame);
   if (!applied) {
@@ -39,11 +38,37 @@ export async function removeEditorBrowserFrameSettings(
   const header = findBrowserFrameLayer(canvas);
   if (!header) return;
   const browserFrame = options.store.getBrowserFrame();
+  const currentSource = browserFrame.compositionBase
+    ? readCurrentBrowserFrameSourceState(canvas, options.source)
+    : null;
+  const composition = currentSource
+    ? resolveBrowserFrameComposition({
+        currentSource,
+        currentBrowserFrame: browserFrame,
+        nextBrowserFrame: browserFrame,
+        options,
+        hasHeader: true,
+      })
+    : null;
+  const restoreBase = composition?.baseIsCurrent ? browserFrame.compositionBase : undefined;
   canvas.remove(header);
   options.relayoutScene(browserFrame, {
     hasBrowserFrame: false,
     preserveCanvasSize: browserFrame.canvasMode === 'keep-size',
     fitSourceToContent: false,
+    ...(restoreBase
+      ? {
+          preserveCanvasSize: true,
+          sourceSize: {
+            width: restoreBase.sourceWidth,
+            height: restoreBase.sourceHeight,
+          },
+          canvasSize: {
+            width: restoreBase.canvasWidth,
+            height: restoreBase.canvasHeight,
+          },
+        }
+      : {}),
   });
   options.ensureBrowserFrameOnTop();
   canvas.requestRenderAll();
@@ -67,7 +92,15 @@ async function upsertBrowserFrameLayer(
   if (!currentSource) {
     return false;
   }
-  const relayoutOptions = resolveBrowserFrameRelayoutOptions(browserFrame);
+  const composition = resolveBrowserFrameComposition({
+    currentSource,
+    currentBrowserFrame: options.store.getBrowserFrame(),
+    nextBrowserFrame: browserFrame,
+    options,
+    hasHeader: existingLayer !== null,
+  });
+  browserFrame = composition.browserFrame;
+  const { relayoutOptions } = composition;
   const nextScene = resolveBrowserFrameScene({
     browserFrame,
     currentSource,
@@ -98,6 +131,7 @@ async function upsertBrowserFrameLayer(
 
   if (options.isMutationCurrent && !options.isMutationCurrent()) return false;
   options.relayoutScene(browserFrame, relayoutOptions);
+  options.store.setBrowserFrame(browserFrame);
   replaceBrowserFrameLayer(canvas, existingLayer, nextLayer);
   options.ensureBrowserFrameOnTop();
   canvas.requestRenderAll();

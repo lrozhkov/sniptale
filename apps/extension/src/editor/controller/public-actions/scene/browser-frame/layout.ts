@@ -63,14 +63,65 @@ export function resolveBrowserFrameScene(args: {
 }) {
   return resolveEditorSceneLayout({
     browserFrame: args.browserFrame,
-    canvas: args.options.canvasDocumentSize,
+    canvas: args.relayoutOptions.canvasSize ?? args.options.canvasDocumentSize,
     fitSourceToContent: args.relayoutOptions.fitSourceToContent ?? false,
     frame: args.options.store.getFrame(),
     hasBrowserFrame: true,
     preserveCanvasSize: args.relayoutOptions.preserveCanvasSize ?? false,
     source: {
-      width: args.currentSource.displayWidth,
-      height: args.currentSource.displayHeight,
+      width: args.relayoutOptions.sourceSize?.width ?? args.currentSource.displayWidth,
+      height: args.relayoutOptions.sourceSize?.height ?? args.currentSource.displayHeight,
     },
   });
+}
+
+/** Keep header layout independent from previously fitted source dimensions. */
+export function resolveBrowserFrameComposition(args: {
+  currentSource: SourceState;
+  currentBrowserFrame: BrowserFrameState;
+  nextBrowserFrame: BrowserFrameState;
+  options: BrowserFrameActionOptions;
+  hasHeader: boolean;
+}) {
+  const previousBase = args.hasHeader ? args.currentBrowserFrame.compositionBase : undefined;
+  let base = previousBase;
+  if (base) {
+    const previous = resolveBrowserFrameScene({
+      currentSource: args.currentSource,
+      browserFrame: args.currentBrowserFrame,
+      options: args.options,
+      relayoutOptions: compositionRelayoutOptions(args.currentBrowserFrame, base),
+    });
+    // An explicit source or canvas edit establishes a new composition baseline.
+    if (
+      Math.abs(previous.source.width - args.currentSource.displayWidth) > 0.001 ||
+      Math.abs(previous.source.height - args.currentSource.displayHeight) > 0.001 ||
+      previous.canvas.width !== args.options.canvasDocumentSize.width ||
+      previous.canvas.height !== args.options.canvasDocumentSize.height
+    )
+      base = undefined;
+  }
+  base ??= {
+    sourceWidth: args.currentSource.displayWidth,
+    sourceHeight: args.currentSource.displayHeight,
+    canvasWidth: args.options.canvasDocumentSize.width,
+    canvasHeight: args.options.canvasDocumentSize.height,
+  };
+  const browserFrame = { ...args.nextBrowserFrame, compositionBase: base };
+  return {
+    browserFrame,
+    relayoutOptions: compositionRelayoutOptions(browserFrame, base),
+    baseIsCurrent: previousBase !== undefined && base === previousBase,
+  };
+}
+
+function compositionRelayoutOptions(
+  browserFrame: BrowserFrameState,
+  base: NonNullable<BrowserFrameState['compositionBase']>
+): RelayoutOptions {
+  return {
+    ...resolveBrowserFrameRelayoutOptions(browserFrame),
+    sourceSize: { width: base.sourceWidth, height: base.sourceHeight },
+    canvasSize: { width: base.canvasWidth, height: base.canvasHeight },
+  };
 }

@@ -135,9 +135,10 @@ function expectInsertedBrowserHeaderMutation(args: {
     contentMode: 'fit-content',
     title: 'Next title',
     url: 'https://next.example',
+    compositionBase: { sourceWidth: 320, sourceHeight: 180, canvasWidth: 1200, canvasHeight: 900 },
   });
   expect(args.options.relayoutScene).toHaveBeenCalledWith(
-    args.options.browserFrame,
+    expect.objectContaining(args.options.browserFrame),
     expect.objectContaining({
       hasBrowserFrame: true,
       fitSourceToContent: true,
@@ -159,7 +160,7 @@ function runInsertBrowserHeaderLayerSuite() {
 
     expect(mocks.createBrowserFrameLayerObjectMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        browserFrame: mutation.options.browserFrame,
+        browserFrame: expect.objectContaining(mutation.options.browserFrame),
         left: 48,
         nextLabelIndex: 3,
         top: expect.closeTo(48, 8),

@@ -102,6 +102,17 @@ function isEditorFrameSettings(value: unknown): boolean {
   );
 }
 
+function isOptionalHeaderCompositionBase(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      ['sourceWidth', 'sourceHeight', 'canvasWidth', 'canvasHeight'].every((key) => {
+        const size = value[key];
+        return typeof size === 'number' && Number.isFinite(size) && size >= 1;
+      }))
+  );
+}
+
 function isBrowserFrameState(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -120,6 +131,7 @@ function isBrowserFrameState(value: unknown): boolean {
       faviconDataUrl: value['faviconDataUrl'] ?? undefined,
       faviconSource: value['faviconSource'] ?? undefined,
     }) !== null &&
+    isOptionalHeaderCompositionBase(value['compositionBase']) &&
     (value['canvasMode'] === 'resize' || value['canvasMode'] === 'keep-size') &&
     (value['contentMode'] === 'push-down' || value['contentMode'] === 'fit-content')
   );

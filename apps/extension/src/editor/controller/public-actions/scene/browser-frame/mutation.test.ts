@@ -100,13 +100,13 @@ it('creates and installs a browser-frame layer before committing the mutation', 
 
   expect(mocks.createBrowserFrameLayerObject).toHaveBeenCalledWith(
     expect.objectContaining({
-      browserFrame: options.browserFrame,
+      browserFrame: expect.objectContaining(options.browserFrame),
       nextLabelIndex: 9,
       prepareObject: options.prepareObject,
     })
   );
   expect(options.relayoutScene).toHaveBeenCalledWith(
-    options.browserFrame,
+    expect.objectContaining(options.browserFrame),
     expect.objectContaining({ hasBrowserFrame: true })
   );
   expect(canvas.add).toHaveBeenCalledWith(nextLayer);
@@ -232,3 +232,20 @@ it.each([false, true])(
     expect(effects.commitHistory).toHaveBeenCalledOnce();
   }
 );
+
+it('preserves completed settings and geometry when header rendering fails', async () => {
+  const canvas = createCanvas([]);
+  const { options, effects } = createOptions(canvas);
+  mocks.readCurrentBrowserFrameSourceState.mockReturnValueOnce({
+    displayHeight: 300,
+    displayWidth: 400,
+    left: 10,
+    top: 40,
+  });
+  mocks.createBrowserFrameLayerObject.mockRejectedValueOnce(new Error('render failed'));
+  await expect(applyEditorBrowserFrameSettings(options)).rejects.toThrow('render failed');
+  expect(options.store.setBrowserFrame).not.toHaveBeenCalled();
+  expect(options.relayoutScene).not.toHaveBeenCalled();
+  expect(effects.commitHistory).not.toHaveBeenCalled();
+  expect(canvas.getObjects()).toEqual([]);
+});

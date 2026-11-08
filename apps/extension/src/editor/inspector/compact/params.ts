@@ -95,7 +95,6 @@ function buildCompactFrameOptions(
 ): BuildEditorInspectorCompactCommandGroupsParams['frameOptions'] {
   return {
     browserCanvasModeOptions: params.browserCanvasModeOptions,
-    browserContentModeOptions: params.browserContentModeOptions,
     frameLayoutModeOptions: params.frameLayoutModeOptions,
     frameBackgroundModeOptions: params.frameBackgroundModeOptions,
     frameBackgroundImageFitOptions: params.frameBackgroundImageFitOptions,

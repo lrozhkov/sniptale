@@ -58,7 +58,6 @@ it('forwards browser-frame props into the panel content owner', () => {
     root?.render(
       <EditorInspectorBrowserFramePanel
         browserCanvasModeOptions={[]}
-        browserContentModeOptions={[]}
         browserFrame={{
           canvasMode: 'resize',
           contentMode: 'push-down',

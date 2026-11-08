@@ -90,7 +90,6 @@ interface EditorInspectorCompactStyleOptionParams
 
 interface EditorInspectorCompactFrameOptionParams {
   browserCanvasModeOptions: CompactSelectOption<'resize' | 'keep-size'>[];
-  browserContentModeOptions: CompactSelectOption<'push-down' | 'fit-content'>[];
   frameLayoutModeOptions: CompactSelectOption<EditorFrameSettings['layoutMode']>[];
   frameBackgroundModeOptions: CompactSelectOption<EditorFrameSettings['backgroundMode']>[];
   frameBackgroundImageFitOptions: CompactSelectOption<EditorFrameSettings['backgroundImageFit']>[];

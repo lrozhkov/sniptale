@@ -53,6 +53,17 @@ export async function loadPreparedDocumentOnCanvas(
     objectCount: options.canvas.getObjects().length,
   });
 
+  const loadedSource = getSourceObject(options.canvas);
+  if (loadedSource) {
+    const savedSource = options.prepared.source;
+    loadedSource.set({
+      left: savedSource.left,
+      top: savedSource.top,
+      scaleX: (loadedSource.scaleX * savedSource.displayWidth) / loadedSource.getScaledWidth(),
+      scaleY: (loadedSource.scaleY * savedSource.displayHeight) / loadedSource.getScaledHeight(),
+    });
+    loadedSource.setCoords();
+  }
   const source = await ensureEditorSourceLayer({
     canvas: options.canvas,
     source: options.prepared.source,

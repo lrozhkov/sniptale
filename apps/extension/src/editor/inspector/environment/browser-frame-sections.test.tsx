@@ -71,43 +71,46 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('routes canvas and scene behavior changes through the async action boundary', async () => {
-  const syncBrowserFrame = vi.fn();
+it.each([false, true])(
+  'routes both composition directions through the async action boundary (fit: %s)',
+  async (fit) => {
+    const syncBrowserFrame = vi.fn();
 
-  act(() => {
-    root?.render(
-      <BrowserFrameBehaviorSections
-        browserCanvasModeOptions={[
-          { label: 'Resize', value: 'resize' },
-          { label: 'Keep', value: 'keep-size' },
-        ]}
-        browserContentModeOptions={[
-          { label: 'Push', value: 'push-down' },
-          { label: 'Fit', value: 'fit-content' },
-        ]}
-        browserFrame={{ canvasMode: 'resize', contentMode: 'push-down' }}
-        syncBrowserFrame={syncBrowserFrame}
-      />
-    );
-  });
+    act(() => {
+      root?.render(
+        <BrowserFrameBehaviorSections
+          browserCanvasModeOptions={[
+            { label: 'Resize', value: 'resize' },
+            { label: 'Keep', value: 'keep-size' },
+          ]}
+          browserFrame={{
+            canvasMode: fit ? 'keep-size' : 'resize',
+            contentMode: fit ? 'fit-content' : 'push-down',
+          }}
+          syncBrowserFrame={syncBrowserFrame}
+        />
+      );
+    });
 
-  await act(async () => {
-    container?.querySelectorAll('button').forEach((button) => button.click());
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+    await act(async () => {
+      container?.querySelectorAll('button').forEach((button) => button.click());
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-  expect(syncBrowserFrame).toHaveBeenCalledWith({ canvasMode: 'keep-size' });
-  expect(syncBrowserFrame).toHaveBeenCalledWith({ contentMode: 'fit-content' });
-  expect(container?.querySelectorAll('[data-testid^="select-field-"]')).toHaveLength(2);
-});
+    expect(syncBrowserFrame).toHaveBeenCalledWith({
+      canvasMode: fit ? 'resize' : 'keep-size',
+      contentMode: fit ? 'push-down' : 'fit-content',
+    });
+    expect(container?.querySelectorAll('[data-testid^="select-field-"]')).toHaveLength(1);
+  }
+);
 
 it('renders alternate labels for keep-size and fit-content browser behavior', () => {
   act(() => {
     root?.render(
       <BrowserFrameBehaviorSections
         browserCanvasModeOptions={[{ label: 'Keep', value: 'keep-size' }]}
-        browserContentModeOptions={[{ label: 'Fit', value: 'fit-content' }]}
         browserFrame={{ canvasMode: 'keep-size', contentMode: 'fit-content' }}
         syncBrowserFrame={vi.fn()}
       />
@@ -115,5 +118,4 @@ it('renders alternate labels for keep-size and fit-content browser behavior', ()
   });
 
   expect(container?.textContent).toContain('Keep');
-  expect(container?.textContent).toContain('Fit');
 });
