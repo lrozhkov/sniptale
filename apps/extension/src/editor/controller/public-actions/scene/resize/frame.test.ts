@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { FabricImage, Rect } from 'fabric';
-import { expect, it, vi } from 'vitest';
+import { FabricImage, Rect, type FabricObject } from 'fabric';
+import { afterEach, expect, it, vi } from 'vitest';
 import * as browserFrameLayers from '../../../browser-frame/document-layer';
+import { ensureEditorBrowserFrameOnTop } from '../../../browser-frame/document-stacking';
 import { relayoutEditorScene } from '../../../document/scene/relayout';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -12,6 +13,8 @@ import { createFabricCanvasFixture } from '../../../../testing/fabric-canvas.tes
 import { applyEditorFrameSceneSettings } from './frame';
 
 vi.mock('../../../viewport', () => ({ applyEditorViewportZoom: vi.fn() }));
+
+afterEach(() => vi.restoreAllMocks());
 
 it.each([false, true])(
   'applies source decoration without geometry changes (browser header: %s)',
@@ -297,27 +300,34 @@ it.each([false, true])(
   async (cancel) => {
     const { image, options } = createPreviewFixture();
     image.set({ left: 32, top: 64 });
-    const header = new Rect({ left: 32, top: 32, width: 200, height: 32 });
+    const header = new FabricImage(document.createElement('img'), {
+      left: 32,
+      top: 32,
+      width: 200,
+      height: 32,
+    });
     header.sniptaleType = 'browser-frame';
     header.sniptaleRole = 'annotation';
-    const nextHeader = new Rect({ width: 136, height: 32 });
+    const nextHeader = new FabricImage(document.createElement('img'), { width: 136, height: 6.5 });
+    nextHeader.sniptaleType = 'browser-frame';
+    nextHeader.sniptaleRole = 'annotation';
     const dispose = vi.spyOn(nextHeader, 'dispose');
-    let complete!: (value: Rect) => void;
+    let complete!: (value: FabricImage) => void;
     const preparation = vi
       .spyOn(browserFrameLayers, 'prepareBrowserFrameLayerReplacement')
       .mockImplementation(
         () =>
-          new Promise<Rect>((resolve) => {
+          new Promise<FabricImage>((resolve) => {
             complete = resolve;
           })
       );
-    const objects = [image, header];
+    const objects: FabricObject[] = [image, header];
     const canvas = createFabricCanvasFixture({
       getObjects: () => objects,
       getActiveObject: () => undefined,
       getActiveObjects: () => [],
-      add: (object: Rect) => objects.push(object),
-      remove: (object: Rect) => objects.splice(objects.indexOf(object), 1),
+      add: (object: FabricObject) => objects.push(object),
+      remove: (object: FabricObject) => objects.splice(objects.indexOf(object), 1),
       moveObjectTo: vi.fn(),
       requestRenderAll: vi.fn(),
     });
@@ -331,6 +341,9 @@ it.each([false, true])(
         relayoutOptions
       );
     });
+    ensureEditorBrowserFrameOnTop(canvas);
+    const previousAttachment = Reflect.get(image, 'sniptaleBrowserHeader');
+    expect(previousAttachment).toMatchObject({ image: header.getElement(), displayHeight: 32 });
     const abort = new AbortController();
     const pending = applyEditorFrameSceneSettings({
       ...options,
@@ -350,12 +363,18 @@ it.each([false, true])(
       expect(objects).not.toContain(nextHeader);
       expect(relayoutScene).not.toHaveBeenCalled();
       expect(dispose).toHaveBeenCalledOnce();
+      expect(Reflect.get(image, 'sniptaleBrowserHeader')).toBe(previousAttachment);
     } else {
       expect(objects).toContain(nextHeader);
       expect(objects).not.toContain(header);
       expect(image.getScaledWidth()).toBeLessThan(200);
       expect(nextHeader.left).toBe(header.left);
       expect(nextHeader.top).toBe(header.top);
+      expect(Reflect.get(image, 'sniptaleBrowserHeader')).toMatchObject({
+        image: nextHeader.getElement(),
+        displayHeight: nextHeader.getScaledHeight(),
+      });
+      expect(nextHeader.visible).toBe(false);
     }
     expect(options.store.updateFrame).not.toHaveBeenCalled();
     expect(options.commitHistory).not.toHaveBeenCalled();

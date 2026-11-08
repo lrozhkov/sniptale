@@ -14,6 +14,7 @@ import {
   prepareBrowserFrameLayerReplacement,
   replaceBrowserFrameLayer,
 } from '../../../browser-frame/document-layer';
+import { ensureEditorBrowserFrameOnTop } from '../../../browser-frame/document-stacking';
 import { findBrowserFrameHeader } from '../../../tools/frame-header';
 import { applyEditorViewportZoom } from '../../../viewport';
 
@@ -148,6 +149,7 @@ export async function applyEditorFrameSceneSettings(
   if (header && nextHeader) {
     nextHeader.set({ left: header.left, top: header.top });
     replaceBrowserFrameLayer(canvas, header, nextHeader);
+    ensureEditorBrowserFrameOnTop(canvas);
   }
 
   applyChangedSourceImageStyle(canvas, current, frame);

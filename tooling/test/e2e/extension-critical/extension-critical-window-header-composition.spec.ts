@@ -631,3 +631,139 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     });
   }
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`padding refreshes the visible joined browser header ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    const dimensions = { width: 2560, height: 1440 };
+    const dataUrl = await page.evaluate(({ width, height }) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#446688';
+      context.fillRect(0, 0, width, height);
+      return canvas.toDataURL();
+    }, dimensions);
+    await applyHarnessBootstrap(page, {
+      editorBootstrapPayload: { dataUrl, title: 'Padding proof' },
+      storage: { 'sniptale-locale-preference': 'en' },
+    });
+    await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+    await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0)
+      )
+      .toBeGreaterThan(0);
+    const history = () =>
+      page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex);
+    const perform = async (action: () => Promise<unknown>) => {
+      const index = await history();
+      await action();
+      await expect.poll(history).toBe(index + 1);
+    };
+    await page.locator('[data-ui="editor.floating.layers.mode.browser-frame"]').click();
+    await perform(() =>
+      page
+        .locator('[data-ui="window-header-settings"]')
+        .getByRole('button', { name: 'Browser', exact: true })
+        .click()
+    );
+    await page.locator('summary').filter({ hasText: 'Composition' }).click();
+    await page.getByRole('button', { name: 'Placement', exact: true }).click();
+    await perform(() => page.getByRole('option', { name: 'Fit in canvas', exact: true }).click());
+    await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
+    await perform(() => page.getByRole('button', { name: 'Image', exact: true }).click());
+    await page.getByRole('button', { name: 'Canvas size', exact: true }).click();
+    await perform(() => page.getByRole('option', { name: 'Fit image', exact: true }).click());
+    const pixels = () =>
+      page.evaluate(({ width, height }) => {
+        const header = window
+          .__sniptaleEditorHarness!.getCanvasObjects()
+          .find((o) => o['sniptaleType'] === 'browser-frame')!;
+        const source = window
+          .__sniptaleEditorHarness!.getCanvasObjects()
+          .find((o) => o['sniptaleType'] === 'source-image')!;
+        const doc = document
+          .querySelector('[data-ui="editor.canvas.document-checkerboard"]')!
+          .getBoundingClientRect();
+        const canvas = document.querySelector<HTMLCanvasElement>('canvas.lower-canvas')!;
+        const box = canvas.getBoundingClientRect();
+        const context = canvas.getContext('2d')!;
+        const pixel = (y: number) =>
+          Array.from(
+            context.getImageData(
+              Math.round(
+                ((doc.left +
+                  ((Number(header['left']) + Number(header['scaledWidth']) * 0.65) * doc.width) /
+                    width -
+                  box.left) *
+                  canvas.width) /
+                  box.width
+              ),
+              Math.round(
+                ((doc.top + (y * doc.height) / height - box.top) * canvas.height) / box.height
+              ),
+              1,
+              1
+            ).data
+          );
+        return {
+          top: Number(header['top']),
+          inside: pixel(Number(header['top']) + 4),
+          above: pixel(Number(header['top']) - 4),
+          sourceTop: pixel(Number(source['top']) + 4),
+          sourceBottom: pixel(Number(source['top']) + Number(source['scaledHeight']) - 4),
+        };
+      }, dimensions);
+    const checkPixels = async (padding: number) => {
+      // The light header fill must start at its model edge, never above it.
+      await expect.poll(async () => (await pixels()).inside).toEqual([223, 225, 230, 255]);
+      await expect.poll(async () => (await pixels()).top).toBeCloseTo(padding, 3);
+      await expect.poll(async () => (await pixels()).sourceTop).toEqual([68, 102, 136, 255]);
+      await expect.poll(async () => (await pixels()).sourceBottom).toEqual([68, 102, 136, 255]);
+      if (padding > 0)
+        await expect
+          .poll(async () => (await pixels()).above.slice(0, 3))
+          .not.toEqual([223, 225, 230]);
+    };
+    for (const padding of [0, 115, 0, 115, 0]) {
+      await perform(async () => {
+        await page.getByRole('textbox', { name: 'Top', exact: true }).hover();
+        const slider = page.locator('[data-ui="editor.frame.padding-fields"] input[type="range"]');
+        await expect(slider).toBeVisible();
+        const box = (await slider.boundingBox())!;
+        const current = Number(await slider.inputValue());
+        const maximum = Number(await slider.getAttribute('max'));
+        await page.mouse.move(
+          box.x + 7 + ((box.width - 14) * current) / maximum,
+          box.y + box.height / 2
+        );
+        await page.mouse.down();
+        await page.mouse.move(
+          box.x + 7 + ((box.width - 14) * padding) / maximum,
+          box.y + box.height / 2,
+          { steps: 8 }
+        );
+        await checkPixels(padding);
+        await page.mouse.up();
+      });
+      await checkPixels(padding);
+      await page.screenshot({
+        path: info.outputPath(`joined-header-padding-${padding}.png`),
+        fullPage: false,
+      });
+    }
+    const finalIndex = await history();
+    await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+    await expect.poll(history).toBe(finalIndex - 1);
+    await checkPixels(115);
+    await page.locator('[data-ui="editor.floating.tool-rail.history.redo"]').click();
+    await expect.poll(history).toBe(finalIndex);
+    await checkPixels(0);
+  });
+}
