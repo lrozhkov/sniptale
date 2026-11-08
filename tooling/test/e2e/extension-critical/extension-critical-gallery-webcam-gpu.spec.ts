@@ -1,7 +1,10 @@
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
@@ -378,3 +381,266 @@ test.describe('Gallery webcam GPU crop publication', () => {
     });
   }
 });
+
+/** Read the current authored camera rather than its pre-history baseline. */
+async function currentCameraSettings(page: Page) {
+  const stored = await readWebcamWorkspace(page);
+  if (!stored) throw new Error('Camera workspace is unavailable.');
+  const edit = stored.history
+    .slice(0, stored.cursor)
+    .findLast((entry) => entry.target === 'advancedContent');
+  const camera = edit?.target === 'advancedContent' ? edit.after.webcam : stored.advanced.webcam;
+  if (!camera) throw new Error('Camera settings are unavailable.');
+  return camera;
+}
+
+/** These points lie inside the authored camera rectangle, independently of the primary source. */
+async function cameraRectangleColors(
+  canvas: Locator,
+  rect: { x: number; y: number; width: number; height: number }
+) {
+  return canvas.evaluate((node: HTMLCanvasElement, rect) => {
+    const copy = document.createElement('canvas');
+    copy.width = node.width;
+    copy.height = node.height;
+    const context = copy.getContext('2d');
+    if (!context) throw new Error('Camera rectangle readback is unavailable.');
+    context.drawImage(node, 0, 0);
+    return {
+      raster: { width: node.width, height: node.height },
+      colors: [
+        [20 / 160, 70 / 90],
+        [70 / 160, 80 / 90],
+        [40 / 160, 82 / 90],
+      ].map(([x, y]) =>
+        [
+          ...context.getImageData(
+            Math.floor((rect.x + x! * rect.width) * node.width),
+            Math.floor((rect.y + y! * rect.height) * node.height),
+            1,
+            1
+          ).data,
+        ].slice(0, 3)
+      ),
+    };
+  }, rect);
+}
+
+/** The camera fixture has a uniform colour field whose red channel advances with source PTS. */
+function cameraReferenceColors(time: number) {
+  const source = new URL('../fixtures/review-webcam-clock.webm', import.meta.url);
+  const bytes = execFileSync(
+    '/usr/bin/ffmpeg',
+    [
+      '-v',
+      'error',
+      '-ss',
+      String(time),
+      '-i',
+      fileURLToPath(source),
+      '-frames:v',
+      '1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgba',
+      'pipe:1',
+    ],
+    { timeout: 10_000, maxBuffer: 160 * 90 * 4 + 1024 }
+  );
+  expect(bytes.length).toBe(160 * 90 * 4);
+  return [
+    [20, 70],
+    [70, 80],
+    [40, 82],
+  ].map(([x, y]) => [...bytes.subarray((y! * 160 + x!) * 4, (y! * 160 + x!) * 4 + 3)]);
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`Gallery main webcam ${viewport.size.width === 1920 ? 'canonical source and Standard' : 'gesture geometry'} at ${viewport.name}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ ...viewport.size });
+    const host = await startHostServer();
+    const dialog = page.locator('dialog');
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: label(key), exact: true });
+    const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewWebcamBundle(page);
+      await page.reload();
+      await page.getByRole('button', { name: /: Screen$/ }).click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.advancedEditing').click();
+      await dialog
+        .locator('[data-review-header-track="webcam"] [data-review-track-select]')
+        .click();
+      await dialog
+        .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
+        .click();
+      await expect(inspector).toBeVisible();
+      const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+      const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+      const box = await ruler.boundingBox();
+      if (!box) throw new Error('Camera source ruler is unavailable.');
+      const duration = Number(await plane.getAttribute('aria-valuemax'));
+      if (!Number.isFinite(duration) || duration <= 0)
+        throw new Error('Source duration is invalid.');
+      await ruler.click({ position: { x: (box.width * 1.02) / duration, y: 8 } });
+      const clock = async () => Number(await plane.getAttribute('aria-valuenow'));
+      await expect.poll(clock).toBeGreaterThan(1);
+      await expect.poll(clock).toBeLessThan(1 + 1 / 30);
+      // Ruler seeking clears selection. Restore the camera settings without changing the clock.
+      await dialog
+        .locator('[data-review-header-track="webcam"] [data-review-track-select]')
+        .click();
+      await dialog
+        .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
+        .click();
+      await expect(inspector).toBeVisible();
+      const main = dialog.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      );
+      const camera = await currentCameraSettings(page);
+      const initialClock = await clock();
+      if (viewport.size.width === 1920) {
+        const error = (expected: number[][], actual: number[][]) =>
+          Math.max(
+            ...expected.flatMap((color, index) =>
+              color.map((value, channel) => Math.abs(value - actual[index]![channel]!))
+            )
+          );
+        const reference1 = cameraReferenceColors(1);
+        const reference2 = cameraReferenceColors(2);
+        expect(error(reference1, reference2)).toBeGreaterThan(4);
+        const changeOffset = async (value: string) => {
+          const offset = inspector.getByRole('textbox', {
+            name: label('gallery.videoReview.webcamOffset'),
+            exact: true,
+          });
+          if (!(await offset.isVisible()))
+            await inspector
+              .getByRole('heading', {
+                name: label('gallery.videoReview.webcamTiming'),
+                exact: true,
+              })
+              .click();
+          await offset.fill(value);
+          await offset.press('Enter');
+          await expect
+            .poll(async () => (await currentCameraSettings(page)).offsetSeconds)
+            .toBe(Number(value));
+        };
+        await expect
+          .poll(
+            async () =>
+              error(reference1, (await cameraRectangleColors(main, camera.placement)).colors),
+            {
+              message:
+                'GPU camera pixels must match its own clock source, not the underlying screen video',
+            }
+          )
+          .toBeLessThan(4);
+        await changeOffset('-1');
+        await expect
+          .poll(
+            async () =>
+              error(reference2, (await cameraRectangleColors(main, camera.placement)).colors),
+            {
+              message:
+                'GPU camera must sample the mapped camera time while primary time stays fixed',
+            }
+          )
+          .toBeLessThan(4);
+        const gpu = await cameraRectangleColors(main, camera.placement);
+        await dialog.locator('[data-ui="gallery.videoReview.previewSettings"]').click();
+        const panel = dialog.locator('[data-ui="gallery.videoReview.previewInspector"]');
+        await panel
+          .getByRole('button', { name: label('editor.scene.previewRenderer'), exact: true })
+          .click();
+        await page
+          .getByRole('option', { name: label('editor.scene.previewRendererLegacy'), exact: true })
+          .click();
+        await panel.press('Escape');
+        await expect(inspector).toBeVisible();
+        await changeOffset('0');
+        await expect
+          .poll(
+            async () =>
+              error(reference1, (await cameraRectangleColors(main, camera.placement)).colors),
+            {
+              message:
+                'Standard camera must replace the different GPU frame with the mapped camera source',
+            }
+          )
+          .toBeLessThan(4);
+        const standard = await cameraRectangleColors(main, camera.placement);
+        await expect.poll(clock).toBe(initialClock);
+        await writeFile(
+          info.outputPath('main-camera-source-reference.json'),
+          JSON.stringify(
+            {
+              viewport: viewport.size,
+              mainSourceTime: initialClock,
+              cameraPlacement: camera.placement,
+              cameraAssetId: camera.assetId,
+              cameraSHA256: createHash('sha256')
+                .update(
+                  await readFile(new URL('../fixtures/review-webcam-clock.webm', import.meta.url))
+                )
+                .digest('hex'),
+              source: { width: 160, height: 90, fps: 30 },
+              gpuOffsetSeconds: -1,
+              gpuReferenceSeekTime: 2,
+
+              standardOffsetSeconds: 0,
+              standardReferenceSeekTime: 1,
+
+              reference1,
+              reference2,
+              gpu,
+              standard,
+              maximumRGBDifference: Math.max(
+                error(reference2, gpu.colors),
+                error(reference1, standard.colors)
+              ),
+              limits:
+                'Raw camera-rectangle pixels against independent FFmpeg seek references. Controlled source-owner tests prove provider intervals and delayed source/pose ownership. No independent browser PTS or cadence claim.',
+            },
+            null,
+            2
+          )
+        );
+      } else {
+        const area = dialog
+          .locator('[data-ui="gallery.videoReview.webcamOverlay"]')
+          .getByRole('group', { name: label('gallery.videoReview.webcamSettings'), exact: true });
+        await expect(area).toBeVisible();
+        const before = await area.boundingBox();
+        if (!before) throw new Error('Presented camera handles are unavailable.');
+        await area.focus();
+        await area.press('ArrowRight');
+        await expect.poll(async () => (await area.boundingBox())?.x).toBeGreaterThan(before.x);
+        await button('gallery.videoReview.undo').click();
+        await expect.poll(async () => await currentCameraSettings(page)).toEqual(camera);
+        await expect.poll(async () => (await area.boundingBox())?.x).toBeCloseTo(before.x, 1);
+        await expect.poll(clock).toBe(initialClock);
+      }
+      await page.screenshot({
+        path: info.outputPath(`main-camera-${viewport.name}.png`),
+        fullPage: false,
+      });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

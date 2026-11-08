@@ -15,6 +15,7 @@ import {
 import type { useReviewCutTransitionProvider } from './cut-transition-preview';
 import { createReviewWebcamPreviewSource } from './webcam-preview';
 import {
+  attachReviewPreviewCamera,
   captureReviewPreviewFrame,
   captureDecodedReviewPreviewFrame,
 } from './preview-presentation-frame';
@@ -268,6 +269,9 @@ class ManualPresentationSession {
         ? this.clockSample.sourceTime
         : video.currentTime
       : this.current.sourceTime;
+    const snapshot = this.latest();
+    const cameraSource = this.cameraSource;
+    const cameraState = this.cameraState;
     const args = {
       video,
       description: this.current,
@@ -277,19 +281,12 @@ class ManualPresentationSession {
       sourceTime: () => sourceTime,
       reserveSource: (bytes: number) =>
         this.admission.reserveSource(bytes, prepared.allocationAssets),
-      captureCamera: () =>
-        capturePresentationCamera(
-          this.latest(),
-          video,
-          this.cameraState,
-          this.cameraSource,
-          this.admission.cameraResources
-        ),
+      captureCamera: () => undefined,
     };
-    if (this.sourceReady && this.canDecodeSource())
-      return this.captureDecoded(args, sourceTime, signal);
-    const captured = captureReviewPreviewFrame(args);
-    if (!captured) {
+    // Compatibility pixels freeze before camera acquisition can yield to another HTML tick.
+    const primary =
+      this.sourceReady && this.canDecodeSource() ? undefined : captureReviewPreviewFrame(args);
+    if (primary === null) {
       if (
         this.sourceFrameCallback === null &&
         typeof video.requestVideoFrameCallback === 'function'
@@ -300,8 +297,38 @@ class ManualPresentationSession {
         });
       throw new PendingPresentation();
     }
-    this.cancelSourceFrameCallback();
-    return captured;
+    if (!snapshot.input.webcam) {
+      this.cancelSourceFrameCallback();
+      return primary ?? this.captureDecoded(args, sourceTime, signal);
+    }
+    return (async () => {
+      let captured = primary;
+      let camera: Awaited<ReturnType<typeof capturePresentationCamera>>;
+      try {
+        camera = await capturePresentationCamera(
+          snapshot,
+          sourceTime,
+          cameraState,
+          cameraSource,
+          this.admission.cameraResources,
+          signal
+        );
+        signal.throwIfAborted();
+        if (this.disposed || this.cameraSource !== cameraSource) throw new PendingPresentation();
+        captured ??= await this.captureDecoded(args, sourceTime, signal);
+        signal.throwIfAborted();
+        const primaryFrame = captured;
+        const cameraFrame = camera;
+        captured = undefined;
+        camera = undefined;
+        const result = attachReviewPreviewCamera(primaryFrame, cameraFrame);
+        this.cancelSourceFrameCallback();
+        return result;
+      } finally {
+        camera?.release();
+        captured?.release();
+      }
+    })();
   };
 
   private canDecodeSource() {
@@ -352,8 +379,6 @@ class ManualPresentationSession {
     const provider = this.sourceProvider;
     if (!provider) throw new PendingPresentation();
     signal.throwIfAborted();
-    // Camera and source targets are frozen before the decoder can yield to another media tick.
-    let camera = args.captureCamera();
     let lease: PreviewSourceLease | null = null;
     const discontinuity = this.sourceDiscontinuity || !this.latest().input.playing;
     this.sourceDiscontinuity = false;
@@ -369,16 +394,11 @@ class ManualPresentationSession {
         ...args,
         binding,
         releaseSource: () => ownedSource.release(),
-        captureCamera: () => {
-          const accepted = camera;
-          camera = undefined;
-          return accepted;
-        },
+        captureCamera: () => undefined,
       });
       this.cancelSourceFrameCallback();
       return captured;
     } finally {
-      camera?.release();
       lease?.release();
     }
   }
@@ -629,32 +649,37 @@ class ManualPresentationSession {
 }
 
 /** Camera readiness is independent of the atomic source-frame lease and native transport. */
-function capturePresentationCamera(
+async function capturePresentationCamera(
   snapshot: PresentationSnapshot,
-  video: HTMLVideoElement,
+  sourceTime: number,
   state: PresentationCameraState,
   source: CameraSource | null,
-  resources: RenderResources
+  resources: RenderResources,
+  signal: AbortSignal
 ) {
   const binding = snapshot.input.webcam;
   if (!binding) return undefined;
   if (state.phase === 'failed') throw new Error('Camera preview unavailable');
   if (state.phase !== 'ready' || !source) throw new PendingPresentation();
-  const mapped = quickEditWebcamFrameAt(binding.settings, video.currentTime, state.duration);
+  const mapped = quickEditWebcamFrameAt(binding.settings, sourceTime, state.duration);
   if (!mapped) return undefined;
-  const screen = quickEditWebcamScreenPlacementAt(binding.settings, video.currentTime);
+  const screen = quickEditWebcamScreenPlacementAt(binding.settings, sourceTime);
   const split = screen.width < 1 || screen.height < 1 || !!screen.clip || !!screen.cameraOverlay;
   const selected =
     !binding.disabled && ['webcam', 'webcam-position'].includes(binding.editor.selection.kind);
-  const result = source.captureAccepted(
+  const result = await source.captureFrame(
     {
+      sourceTime,
+      settings: binding.settings,
       placement: split
         ? undefined
         : (snapshot.placement ?? (selected ? binding.editor.placement : undefined)),
       crop: selected ? binding.editor.crop : undefined,
     },
-    resources
+    resources,
+    signal
   );
+  if (result.status === 'hidden') return undefined;
   if (result.status === 'failed') throw new Error('Camera preview unavailable');
   if (result.status !== 'ready') throw new PendingPresentation();
   return result.frame;

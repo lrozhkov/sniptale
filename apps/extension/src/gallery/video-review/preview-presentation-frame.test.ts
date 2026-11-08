@@ -302,3 +302,32 @@ it('preserves camera ownership through cancelled decoded normalization', async (
   expect(f.releaseSource).toHaveBeenCalledOnce();
   expect(f.reservation.release).toHaveBeenCalledOnce();
 });
+
+it('aggregates camera ownership without placing a resource lease in the render payload', () => {
+  const f = setup();
+  const release = vi.fn();
+  const camera = {
+    allocationBytes: 12,
+    representedMediaTime: 0.4,
+    generation: 3,
+    source: { width: 2, height: 4 },
+    placement: { x: 0, y: 0, width: 0.2, height: 0.4 },
+    drawable: {
+      orientation: { rotation: 90 as const, flip: true },
+      draw: vi.fn(),
+      prepare: vi.fn(async () => {}),
+    },
+    release,
+  };
+  const aggregate = captures.attachReviewPreviewCamera(f.captured, camera);
+  expect(aggregate.value.source).toBe(f.captured.value.source);
+  expect(aggregate.value.camera?.drawable).toBe(camera.drawable);
+  expect(aggregate.value.camera).not.toHaveProperty('release');
+  expect(aggregate.value.camera).not.toHaveProperty('allocationBytes');
+  expect(f.raw.close).not.toHaveBeenCalled();
+  aggregate.release();
+  aggregate.release();
+  expect(release).toHaveBeenCalledOnce();
+  expect(f.raw.close).toHaveBeenCalledOnce();
+  expect(f.reservation.release).toHaveBeenCalledOnce();
+});

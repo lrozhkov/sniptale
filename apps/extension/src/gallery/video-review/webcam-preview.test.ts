@@ -1,3 +1,4 @@
+import * as canonicalProvider from '../../workflows/video/preview-source';
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
@@ -375,4 +376,216 @@ it('loads a recorded WebM whose native duration is Infinity from inspected track
   expect(events.failed).not.toHaveBeenCalled();
   expect(events.loaded).toHaveBeenCalledWith(10);
   expect(mocks.playback.mock.lastCall?.[0]).toMatchObject({ duration: 10 });
+});
+
+function canonicalCamera() {
+  vi.stubGlobal('VideoDecoder', class {});
+  class Frame {
+    format = 'RGBA';
+    colorSpace = { matrix: 'bt709', primaries: 'bt709', transfer: 'bt709', fullRange: false };
+    codedWidth = 100;
+    codedHeight = 100;
+    displayWidth = 100;
+    displayHeight = 100;
+    timestamp = 400000;
+    duration = 200000;
+    allocationSize() {
+      return 40000;
+    }
+    close = vi.fn();
+    clone() {
+      return new Frame();
+    }
+  }
+  vi.stubGlobal('VideoFrame', Frame);
+  const frame = new Frame();
+  const release = vi.fn();
+  const acquire = vi.fn().mockResolvedValue({
+    bindings: new Map([
+      [
+        'camera',
+        {
+          source: {
+            sourceWidth: 100,
+            sourceHeight: 100,
+            orientation: { rotation: 90, flip: true },
+            toVideoFrame: () => frame,
+            draw: vi.fn(),
+          },
+          timestamp: 0.4,
+          nextTimestamp: 0.6,
+          target: 0.5,
+          url: 'blob:camera',
+        },
+      ],
+    ]),
+    release,
+  });
+  const dispose = vi.fn();
+  vi.spyOn(canonicalProvider, 'createPreviewSourceProvider').mockReturnValue({
+    acquire,
+    retainSources: vi.fn(),
+    dispose,
+  });
+  const f = manualSetup();
+  f.main.currentTime = 99;
+  return { ...f, frame, release, acquire, dispose };
+}
+
+it('selects a canonical camera interval without waiting for HTML metadata or clock', async () => {
+  const f = canonicalCamera();
+  const { acquire, release, frame } = f;
+  const captured = await f.source.captureFrame(
+    { sourceTime: 0.5, settings: f.settings },
+    f.resources,
+    new AbortController().signal
+  );
+  expect(mocks.playback).not.toHaveBeenCalled();
+  expect(f.events.loaded).toHaveBeenCalledWith(10);
+  expect(acquire.mock.calls[0]![0]).toEqual([
+    { id: 'camera', url: 'blob:camera', time: 0.5, rangeStart: 0, rangeEnd: 10 },
+  ]);
+  expect(captured.status).toBe('ready');
+  if (captured.status !== 'ready') throw new Error('Expected camera frame');
+  expect(captured.frame.representedMediaTime).toBe(0.4);
+  expect(captured.frame.drawable.orientation).toEqual({ rotation: 90, flip: true });
+  expect(release).not.toHaveBeenCalled();
+  loaded[0]!.dispatchEvent(new Event('loadedmetadata'));
+  loaded[0]!.dispatchEvent(new Event('error'));
+  expect(f.events.ready).toHaveBeenLastCalledWith(true);
+  expect(f.events.failed).not.toHaveBeenCalled();
+  const gpu = captured.frame.drawable.videoFrame!();
+  f.source.dispose();
+  expect(frame.close).not.toHaveBeenCalled();
+  expect(vi.mocked(gpu.close)).not.toHaveBeenCalled();
+  captured.frame.release();
+  captured.frame.release();
+  expect(frame.close).toHaveBeenCalledOnce();
+  expect(vi.mocked(gpu.close)).toHaveBeenCalledOnce();
+  expect(release).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'releases late canonical camera after %s',
+  async (operation) => {
+    const f = canonicalCamera();
+    const gate = Promise.withResolvers<Awaited<ReturnType<typeof f.acquire>>>();
+    const late = { bindings: new Map(), release: vi.fn() };
+    f.acquire.mockReturnValueOnce(gate.promise);
+    const controller = new AbortController();
+    const pending = f.source.captureFrame(
+      { sourceTime: 0.5, settings: f.settings },
+      f.resources,
+      controller.signal
+    );
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    await vi.waitFor(() => expect(f.acquire).toHaveBeenCalledOnce());
+    if (operation === 'abort') controller.abort();
+    else f.source.dispose();
+    gate.resolve(late);
+    await rejected;
+    expect(late.release).toHaveBeenCalledOnce();
+    expect(f.reservations).toHaveLength(0);
+    expect(f.events.failed).not.toHaveBeenCalled();
+  }
+);
+
+it('freezes camera settings and crop while metadata is pending', async () => {
+  const read = Promise.withResolvers<Blob | null>();
+  mocks.read.mockReturnValueOnce(read.promise);
+  const f = canonicalCamera();
+  f.settings.offsetSeconds = 0.25;
+  const placement = { ...f.settings.placement, x: 0.2 };
+  const crop = { zoom: 2, panX: 0.1, panY: 0.2 };
+  const pending = f.source.captureFrame(
+    { sourceTime: 0.75, settings: f.settings, placement, crop },
+    f.resources,
+    new AbortController().signal
+  );
+  f.main.currentTime = 99;
+  f.settings.offsetSeconds = 9;
+  placement.x = 0.8;
+  crop.zoom = 3;
+  read.resolve(new Blob(['camera']));
+  const result = await pending;
+  expect(f.acquire.mock.calls[0]![0][0].time).toBe(0.5);
+  if (result.status !== 'ready') throw new Error('Expected camera');
+  expect(result.frame.placement.x).toBe(0.2);
+  expect(result.frame.crop?.zoom).toBe(2);
+  result.frame.release();
+});
+
+it.each(['EOF', 'negative', 'hidden', 'disabled'] as const)(
+  'hides canonical camera at %s',
+  async (kind) => {
+    const f = canonicalCamera();
+    if (kind === 'hidden') f.settings.hiddenRanges = [{ id: 'hidden', start: 0, end: 1 }];
+    if (kind === 'disabled') f.settings.enabled = false;
+    const result = await f.source.captureFrame(
+      {
+        sourceTime: kind === 'EOF' ? 10 : 0.5,
+        settings: { ...f.settings, offsetSeconds: kind === 'negative' ? 1 : 0 },
+      },
+      f.resources,
+      new AbortController().signal
+    );
+    expect(result.status).toBe('hidden');
+    expect(f.acquire).not.toHaveBeenCalled();
+    expect(f.events.ready).toHaveBeenLastCalledWith(false);
+  }
+);
+
+it.each(['decode', 'missing-binding', 'invalid-frame'] as const)(
+  'rejects canonical camera %s without HTML fallback',
+  async (kind) => {
+    const f = canonicalCamera();
+    if (kind === 'decode') f.acquire.mockRejectedValueOnce(new Error('decode failed'));
+    if (kind === 'missing-binding')
+      f.acquire.mockResolvedValueOnce({ bindings: new Map(), release: f.release });
+    if (kind === 'invalid-frame') vi.spyOn(f.frame, 'allocationSize').mockReturnValue(0);
+    await expect(
+      f.source.captureFrame(
+        { sourceTime: 0.5, settings: f.settings },
+        f.resources,
+        new AbortController().signal
+      )
+    ).rejects.toThrow();
+    expect(mocks.playback).not.toHaveBeenCalled();
+    expect(f.events.failed).toHaveBeenCalledOnce();
+    if (kind !== 'decode') expect(f.release).toHaveBeenCalledOnce();
+    if (kind === 'invalid-frame') expect(f.frame.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('starts HTML compatibility only after actual canonical unsupported', async () => {
+  const f = canonicalCamera();
+  f.acquire.mockResolvedValueOnce(null);
+  const result = await f.source.captureFrame(
+    { sourceTime: 0.5, settings: f.settings },
+    f.resources,
+    new AbortController().signal
+  );
+  expect(result.status).toBe('unavailable');
+  const node = await camera();
+  node.dispatchEvent(new Event('loadedmetadata'));
+  expect(mocks.playback).toHaveBeenCalledOnce();
+  Object.defineProperty(node, 'readyState', { configurable: true, value: 2 });
+  mocks.playback.mock.lastCall![0].paint({
+    time: 0.5,
+    placement: f.settings.placement,
+    representedMediaTime: 0.4,
+    generation: 2,
+    tolerance: 0.2,
+    acceptedAt: performance.now(),
+  });
+  const compatible = await f.source.captureFrame(
+    { sourceTime: 0.5, settings: f.settings },
+    f.resources,
+    new AbortController().signal
+  );
+  expect(compatible.status).toBe('ready');
+  if (compatible.status !== 'ready') throw new Error('Expected compatibility camera');
+  compatible.frame.release();
+  expect(f.acquire).toHaveBeenCalledOnce();
+  expect(f.events.failed).not.toHaveBeenCalled();
 });

@@ -85,7 +85,14 @@ it('composes split screen and borrowed camera pixels with a silhouette mask on t
     scene: { ...scene, webcam },
     dimensions,
     main: f.main,
-    camera: { source: size, placement: webcam.placement, drawable: { videoFrame: () => frame } },
+    camera: {
+      source: size,
+      placement: webcam.placement,
+      drawable: {
+        videoFrame: () => frame,
+        orientation: { rotation: 90, flip: true },
+      },
+    },
     sourceTime: 2,
     resultTime: 2,
     primitives: f.primitives,
@@ -96,6 +103,7 @@ it('composes split screen and borrowed camera pixels with a silhouette mask on t
   const video = flattened.find((layer) => layer.source === frame)!;
   expect(video).toBeDefined();
   expect(video.inverse[0]).toBe(-1);
+  expect(video.orientation).toEqual({ rotation: 90, flip: true });
   expect(flattened.some((layer) => layer.blend === 'mask')).toBe(true);
   expect(f.drawImage).not.toHaveBeenCalled();
   expect(frame.close).not.toHaveBeenCalled();

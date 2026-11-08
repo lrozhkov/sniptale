@@ -1,3 +1,4 @@
+import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import type { RetainedRasterMaterialLease } from '../../features/video/composition/canvas/retained-raster-material';
 import type {
   GpuPreviewGroup,
@@ -64,7 +65,7 @@ export interface ReviewGpuCamera {
   source: Size;
   placement: QuickEditWebcamPlacement;
   crop?: Pick<QuickEditWebcam['appearance'], 'zoom' | 'panX' | 'panY'>;
-  drawable: { videoFrame?(): VideoFrame };
+  drawable: Pick<VideoCompositionFrameSource, 'orientation'> & { videoFrame?(): VideoFrame };
 }
 
 /** Raster primitives are tracked by the existing ledger and never read source video pixels. */
@@ -485,6 +486,7 @@ function webcamLayers(
     : identity;
   const video: GpuPreviewLayer = {
     source: frame,
+    ...(camera.drawable.orientation ? { orientation: camera.drawable.orientation } : {}),
     rect: { x: rect.x + crop.x, y: rect.y + crop.y, width: crop.width, height: crop.height },
     inverse,
   };

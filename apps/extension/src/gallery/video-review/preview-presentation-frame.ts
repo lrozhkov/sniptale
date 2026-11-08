@@ -9,6 +9,47 @@ import type { ReviewWebcamFrameLease } from './webcam-preview';
 import type { useReviewCutTransitionProvider } from './cut-transition-preview';
 import type { Description, RenderFrame } from './preview-presentation-state';
 
+function cameraDescription(camera: ReviewWebcamFrameLease): NonNullable<RenderFrame['camera']> {
+  return {
+    representedMediaTime: camera.representedMediaTime,
+    generation: camera.generation,
+    source: camera.source,
+    placement: camera.placement,
+    drawable: camera.drawable,
+    ...(camera.crop ? { crop: camera.crop } : {}),
+  };
+}
+
+/** Joins an already frozen primary image and camera lease without transferring native ownership to UI. */
+export function attachReviewPreviewCamera(
+  captured: { value: RenderFrame; release(): void },
+  camera: ReviewWebcamFrameLease | undefined
+) {
+  if (!camera) return captured;
+  let released = false;
+  try {
+    return {
+      value: { ...captured.value, camera: cameraDescription(camera) },
+      release() {
+        if (released) return;
+        released = true;
+        try {
+          camera.release();
+        } finally {
+          captured.release();
+        }
+      },
+    };
+  } catch (error) {
+    try {
+      camera.release();
+    } finally {
+      captured.release();
+    }
+    throw error;
+  }
+}
+
 /** Admission includes the overlapping raw frame, native plane copy and packed frame. */
 function previewSourceFrameBytes(source: VideoFrame) {
   const bytes = source.allocationSize();
@@ -80,14 +121,7 @@ export function captureReviewPreviewFrame(args: {
       },
       ...(camera
         ? {
-            camera: {
-              representedMediaTime: camera.representedMediaTime,
-              generation: camera.generation,
-              source: camera.source,
-              placement: camera.placement,
-              drawable: camera.drawable,
-              ...(camera.crop ? { crop: camera.crop } : {}),
-            },
+            camera: cameraDescription(camera),
           }
         : {}),
       ...(args.description.cameraTransform
@@ -175,14 +209,7 @@ export function captureDecodedReviewPreviewFrame(args: {
       },
       ...(camera
         ? {
-            camera: {
-              representedMediaTime: camera.representedMediaTime,
-              generation: camera.generation,
-              source: camera.source,
-              placement: camera.placement,
-              drawable: camera.drawable,
-              ...(camera.crop ? { crop: camera.crop } : {}),
-            },
+            camera: cameraDescription(camera),
           }
         : {}),
       ...(args.description.cameraTransform

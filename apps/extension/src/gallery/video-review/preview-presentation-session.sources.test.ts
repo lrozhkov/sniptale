@@ -1,3 +1,5 @@
+import * as cameraSources from './webcam-preview';
+import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
@@ -56,7 +58,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function sourceSession(createProvider?: () => PreviewSourceProvider) {
+function sourceSession(
+  createProvider?: () => PreviewSourceProvider,
+  webcam?: PresentationInput['webcam']
+) {
   vi.stubGlobal('VideoDecoder', class {});
   vi.stubGlobal('VideoFrame', class {});
   vi.stubGlobal('navigator', { gpu: {}, userAgent: 'test' });
@@ -88,6 +93,7 @@ function sourceSession(createProvider?: () => PreviewSourceProvider) {
   Object.defineProperty(video, 'readyState', { configurable: true, value: 2 });
   video.currentTime = 1.25;
   const input: PresentationInput = {
+    ...(webcam ? { webcam } : {}),
     video: { current: video },
     host: { current: document.createElement('div') },
     sourceIdentity: 'blob:fixed-source',
@@ -364,3 +370,57 @@ it.each(['gpu', 'legacy'] as const)(
     expect(io.legacy).not.toHaveBeenCalled();
   }
 );
+
+it('keeps primary decoding strict and independent of pending camera acquisition', async () => {
+  const settings = createQuickEditWebcam(
+    'camera',
+    { width: 2, height: 2 },
+    { width: 200, height: 100 }
+  );
+  const camera = {
+    allocationBytes: 16,
+    representedMediaTime: 0.4,
+    generation: 1,
+    source: { width: 2, height: 2 },
+    placement: settings.placement,
+    drawable: { draw: vi.fn() },
+    release: vi.fn(),
+  };
+  const captureFrame = vi
+    .fn<ReturnType<typeof cameraSources.createReviewWebcamPreviewSource>['captureFrame']>()
+    .mockResolvedValue({ status: 'unavailable' });
+  const cameraFactory = vi.spyOn(cameraSources, 'createReviewWebcamPreviewSource').mockReturnValue({
+    captureFrame,
+    captureAccepted: vi.fn(),
+    subscribeAdmission: () => () => {},
+    dispose: vi.fn(),
+  });
+  const f = sourceSession(undefined, {
+    settings,
+    disabled: false,
+    editor: {
+      selection: { kind: 'webcam' },
+      placement: settings.placement,
+      crop: { zoom: 1, panX: 0, panY: 0 },
+      resourceAttempt: 0,
+      place: vi.fn(),
+      retry: vi.fn(),
+      selectVisible: vi.fn(),
+      time: 1.25,
+    },
+  });
+  cameraFactory.mock.lastCall![3].loaded(10);
+  const prepared = await f.prepare();
+  await expect(f.hooks.capture(prepared.value, 1, f.signal)).rejects.toThrow();
+  expect(io.provider).toHaveBeenCalledOnce();
+  expect(io.legacy).not.toHaveBeenCalled();
+  expect(io.decoded).not.toHaveBeenCalled();
+  captureFrame.mockResolvedValue({ status: 'ready', frame: camera });
+  f.acquire.mockRejectedValueOnce(new Error('primary decode failed'));
+  await expect(f.hooks.capture(prepared.value, 1, f.signal)).rejects.toThrow(
+    'primary decode failed'
+  );
+  expect(camera.release).toHaveBeenCalledOnce();
+  expect(io.legacy).not.toHaveBeenCalled();
+  expect(io.provider).toHaveBeenCalledOnce();
+});

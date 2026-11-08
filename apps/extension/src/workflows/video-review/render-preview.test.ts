@@ -2498,3 +2498,62 @@ it.each(['abort', 'dispose'] as const)(
     }
   }
 );
+
+it.each(['legacy', 'gpu'] as const)(
+  'awaits camera normalization before %s Canvas fallback',
+  async (backend) => {
+    const { resources } = setup();
+    const gpu = {
+      allocatedBytes: 0,
+      render: vi.fn(async () => false),
+      renderPresentation: vi.fn(),
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+    };
+    io.gpu.mockReturnValue(gpu);
+    vi.stubGlobal('navigator', { gpu: {} });
+    const renderer = createReviewPreviewRenderer({ resources, renderer: backend });
+    const webcam = createQuickEditWebcam('camera', size, dimensions.canonical);
+    const signal = new AbortController().signal;
+    const prepared = await renderer.prepare({ ...scene(), webcam }, dimensions, signal);
+    const gate = Promise.withResolvers<void>();
+    const started = Promise.withResolvers<void>();
+    const drawable = {
+      prepare: vi.fn((_signal: AbortSignal) => {
+        started.resolve();
+        return gate.promise;
+      }),
+      draw: vi.fn(),
+    };
+    const input = {
+      ...frame(),
+      source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+      camera: {
+        representedMediaTime: 0.4,
+        generation: 1,
+        source: size,
+        placement: webcam.placement,
+        drawable,
+      },
+    };
+    const pending = renderer.render(prepared, input, signal);
+    await started.promise;
+    expect(io.webcam).not.toHaveBeenCalled();
+    gate.resolve();
+    const output = await pending;
+    expect(drawable.prepare).toHaveBeenCalledOnce();
+    expect(drawable.prepare.mock.calls[0]![0].aborted).toBe(false);
+    expect(io.webcam).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      webcam.placement,
+      size,
+      drawable,
+      undefined
+    );
+    expect(gpu.render).toHaveBeenCalledTimes(backend === 'gpu' ? 1 : 0);
+    output.release();
+    renderer.dispose();
+  }
+);

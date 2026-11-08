@@ -1,3 +1,10 @@
+import { VideoSample } from 'mediabunny';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+} from '../../workflows/video/preview-source';
+import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
+import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { quickEditWebcamFrameAt } from '../../features/video/review/advanced/webcam';
 import type {
@@ -32,7 +39,8 @@ export interface ReviewWebcamFrameLease {
   source: { width: number; height: number };
   placement: QuickEditWebcamPlacement;
   crop?: Pick<QuickEditWebcam['appearance'], 'zoom' | 'panX' | 'panY'> | undefined;
-  drawable: {
+  drawable: Pick<VideoCompositionFrameSource, 'orientation'> & {
+    prepare?(signal: AbortSignal): Promise<void>;
     /** Borrowed until this camera lease is released, including asynchronous GPU completion. */
     videoFrame?(): VideoFrame;
     draw(
@@ -47,13 +55,15 @@ export interface ReviewWebcamFrameLease {
 }
 
 type CaptureRequest = {
+  sourceTime?: number;
+  settings?: QuickEditWebcam;
   generation?: number;
   placement?: QuickEditWebcamPlacement | undefined;
   crop?: Pick<QuickEditWebcam['appearance'], 'zoom' | 'panX' | 'panY'> | undefined;
 };
 type CaptureResult =
   | { status: 'ready'; frame: ReviewWebcamFrameLease }
-  | { status: 'unavailable' | 'failed' };
+  | { status: 'unavailable' | 'failed' | 'hidden' };
 type RetainedFrame = { frame: VideoFrame; bytes: number; generation: number; release(): void };
 
 /** Owns one decoder; manual admission never invokes the hybrid canvas painter. */
@@ -85,6 +95,10 @@ function createWebcamSource(
   hybridView?: () => PreviewView
 ) {
   let disposed = false;
+  const canonical =
+    !hybridView && typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
+  let unsupported = false;
+  let provider: PreviewSourceProvider | undefined;
   const abort = new AbortController();
   let metadata = { duration: 0, frameDuration: 1 / 30 };
   let url: string | null = null;
@@ -99,7 +113,7 @@ function createWebcamSource(
     if (disposed) return;
     capture.accept(frame);
     if (paint) paint(frame);
-    else events.ready(!!frame);
+    else if (!canonical || unsupported) events.ready(!!frame);
     for (const listener of listeners) listener(frame);
   };
   const fail = () => {
@@ -110,7 +124,7 @@ function createWebcamSource(
   };
   const capture = createWebcamCapture(main, video, settings, () => metadata.duration, fail);
   const loaded = () => {
-    if (disposed) return;
+    if (disposed || (canonical && !unsupported)) return;
     if (
       ![metadata.duration, video.videoWidth, video.videoHeight].every(
         (value) => Number.isFinite(value) && value > 0
@@ -119,7 +133,7 @@ function createWebcamSource(
       fail();
       return;
     }
-    events.loaded(metadata.duration);
+    if (!canonical) events.loaded(metadata.duration);
     stop?.();
     if (capture.current()) publish(null);
     stop = createReviewWebcamPlayback({
@@ -132,24 +146,83 @@ function createWebcamSource(
     });
   };
   video.addEventListener('loadedmetadata', loaded);
-  video.addEventListener('error', fail);
-  void resolveReviewAssetBytes(assetId)
-    .then(async (blob) => {
-      if (disposed) return;
-      if (!blob) {
-        fail();
-        return;
-      }
-      metadata = await inspectReviewWebcamMetadata(blob, abort.signal);
-      if (disposed) return;
-      url = URL.createObjectURL(blob);
-      video.src = url;
-      video.load();
-    })
-    .catch(fail);
+  const htmlFailed = () => {
+    if (!canonical || unsupported) fail();
+  };
+  video.addEventListener('error', htmlFailed);
+  const acquired = resolveReviewAssetBytes(assetId).then(async (blob) => {
+    if (disposed) return;
+    if (!blob) {
+      throw new Error('Camera source is unavailable.');
+    }
+    metadata = await inspectReviewWebcamMetadata(blob, abort.signal);
+    if (disposed) return;
+    url = URL.createObjectURL(blob);
+    video.src = url;
+    video.load();
+    if (canonical) events.loaded(metadata.duration);
+  });
+  void acquired.catch(fail);
 
   return {
     captureAccepted: capture.captureAccepted,
+    async captureFrame(
+      request: CaptureRequest & { sourceTime: number; settings: QuickEditWebcam },
+      resources: RenderResources,
+      signal: AbortSignal
+    ): Promise<CaptureResult> {
+      const frozen = {
+        ...request,
+        settings: structuredClone(request.settings),
+        placement: request.placement && { ...request.placement },
+        crop: request.crop && { ...request.crop },
+      };
+      if (frozen.settings.assetId !== assetId)
+        throw new Error('Camera source binding was replaced.');
+      const discontinuity = main.paused;
+      const interest = AbortSignal.any([signal, abort.signal]);
+      interest.throwIfAborted();
+      if (!canonical || unsupported) return capture.captureAccepted(frozen, resources);
+      await acquired;
+      interest.throwIfAborted();
+      const mapped = quickEditWebcamFrameAt(frozen.settings, frozen.sourceTime, metadata.duration);
+      if (!mapped) {
+        events.ready(false);
+        return { status: 'hidden' };
+      }
+      if (!url) throw new Error('Camera source is unavailable.');
+      provider ??= createPreviewSourceProvider();
+      let lease: import('../../workflows/video/preview-source').PreviewSourceLease | null;
+      try {
+        lease = await provider.acquire(
+          [{ id: 'camera', url, time: mapped.time, rangeStart: 0, rangeEnd: metadata.duration }],
+          interest,
+          { discontinuity }
+        );
+      } catch (error) {
+        if (!interest.aborted) fail();
+        throw error;
+      }
+      let admitted: ReviewWebcamFrameLease | undefined;
+      try {
+        interest.throwIfAborted();
+        if (lease === null) {
+          unsupported = true;
+          if (video.readyState >= 1) loaded();
+          return capture.captureAccepted(frozen, resources);
+        }
+        const binding = lease.bindings.get('camera');
+        if (!binding) throw new Error('Camera source frame is unavailable.');
+        admitted = retainCanonicalCamera(binding, lease.release, frozen, mapped, resources);
+        events.ready(true);
+        return { status: 'ready', frame: admitted };
+      } catch (error) {
+        if (admitted) admitted.release();
+        else lease?.release();
+        if (!interest.aborted) fail();
+        throw error;
+      }
+    },
     subscribeAdmission(listener: (frame: ReviewWebcamAdmission | null) => void) {
       if (disposed) return () => {};
       listeners.add(listener);
@@ -164,15 +237,91 @@ function createWebcamSource(
       abort.abort();
       stop?.();
       capture.dispose();
+      provider?.dispose();
       listeners.clear();
       video.removeEventListener('loadedmetadata', loaded);
-      video.removeEventListener('error', fail);
+      video.removeEventListener('error', htmlFailed);
       video.pause();
       video.removeAttribute('src');
       video.load();
       if (url) URL.revokeObjectURL(url);
     },
   };
+}
+
+/** One canonical camera lease owns its native and Canvas views through the render completion. */
+function retainCanonicalCamera(
+  binding: import('../../workflows/video/preview-source').PreviewSourceBinding,
+  releaseSource: () => void,
+  request: CaptureRequest,
+  mapped: NonNullable<ReturnType<typeof quickEditWebcamFrameAt>>,
+  resources: RenderResources
+): ReviewWebcamFrameLease {
+  let raw: VideoFrame | undefined;
+  let sample: VideoSample | undefined;
+  let gpu: VideoFrame | undefined;
+  let reservation: { release(): void } | undefined;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    gpu?.close();
+    sample?.close();
+    raw?.close();
+    reservation?.release();
+    releaseSource();
+  };
+  try {
+    raw = binding.source.toVideoFrame?.();
+    if (!raw) throw new Error('Camera source frame is unavailable.');
+    const bytes = raw.allocationSize();
+    if (!Number.isSafeInteger(bytes) || bytes <= 0 || !Number.isFinite(binding.timestamp))
+      throw new Error('Invalid camera source frame.');
+    reservation = resources.bytes('webcam.active', bytes * 3);
+    sample = new VideoSample(raw, {
+      timestamp: binding.timestamp,
+      rotation: binding.source.orientation?.rotation ?? 0,
+      flip: binding.source.orientation?.flip ?? false,
+    });
+    raw = undefined;
+    const current = () => {
+      if (released || !sample) throw new Error('Camera source frame is unavailable.');
+      return sample;
+    };
+    return {
+      allocationBytes: bytes * 3,
+      representedMediaTime: binding.timestamp,
+      generation: request.generation ?? 0,
+      source: { width: sample.displayWidth, height: sample.displayHeight },
+      placement: request.placement ?? mapped.placement,
+      crop: request.crop ?? mapped.crop,
+      drawable: {
+        ...(binding.source.orientation ? { orientation: binding.source.orientation } : {}),
+        videoFrame: () => (gpu ??= current().toVideoFrame()),
+        prepare: async (signal) => {
+          const previous = current();
+          gpu?.close();
+          gpu = undefined;
+          sample = undefined;
+          const normalized = await prepareDecodedVideoSample(previous, signal);
+          if (released) {
+            normalized.close();
+            throw new Error('Camera source frame is unavailable.');
+          }
+          sample = normalized;
+        },
+        draw: (context, x, y, width, height) => current().draw(context, x, y, width, height),
+      },
+      release,
+    };
+  } catch (error) {
+    // The caller releases the source lease if construction fails.
+    gpu?.close();
+    sample?.close();
+    raw?.close();
+    reservation?.release();
+    throw error;
+  }
 }
 
 /** Owns immutable admission retention independently of URL and decoder acquisition. */
@@ -193,14 +342,18 @@ function createWebcamCapture(
   };
   const captureAccepted = (request: CaptureRequest, resources: RenderResources): CaptureResult => {
     const accepted = admission;
-    const currentSettings = settings();
-    const mapped = quickEditWebcamFrameAt(currentSettings, main.currentTime, duration());
+    const currentSettings = request.settings ?? settings();
+    const mapped = quickEditWebcamFrameAt(
+      currentSettings,
+      request.sourceTime ?? main.currentTime,
+      duration()
+    );
     if (
       disposed ||
       !accepted ||
       !mapped ||
-      main.seeking ||
-      acceptedSettings !== currentSettings ||
+      (request.sourceTime === undefined && main.seeking) ||
+      acceptedSettings !== settings() ||
       (request.generation !== undefined && request.generation !== accepted.generation)
     ) {
       clearRetained();

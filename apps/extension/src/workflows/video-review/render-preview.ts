@@ -104,6 +104,7 @@ type CanvasPublicationOutput = RenderCanvasLease & {
 };
 type PublicationOutput = CanvasPublicationOutput | ReviewGpuPresentedFrame;
 type Drawable = Pick<VideoCompositionFrameSource, 'orientation'> & {
+  prepare?(signal: AbortSignal): Promise<void>;
   videoFrame?(): VideoFrame; // Borrowed until the captured frame lease is released.
   draw(
     context: CanvasRenderingContext2D,
@@ -583,6 +584,7 @@ async function drawPreparedCanvasFrame(
   const { context, canvas } = output;
   let geometry: ReviewPresentedGeometry;
   await frame.source.prepare?.(signal);
+  await frame.camera?.drawable.prepare?.(signal);
   signal.throwIfAborted();
   if (assets.retired) throw new Error('Preview scene is stale.');
   if (request.layout.spatial && !assets.spatial)
