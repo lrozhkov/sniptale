@@ -1,3 +1,4 @@
+import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import { createZoomPreviewGpuArtwork } from './zoom-preview-gpu-artwork';
 import {
   createGpuPreviewRenderer,
@@ -40,6 +41,22 @@ const identity: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 /** Inspector scene inputs retain the existing authored gesture and history authorities. */
 export interface ZoomPreviewGpuInput {
   currentTime?: number | undefined;
+  /** Physical source clock and navigation intent frozen with this scene. */
+  liveSource?:
+    | {
+        readonly url: string;
+        readonly time: number;
+        readonly seekRevision: number;
+        readonly segmentStart?: number | null;
+      }
+    | undefined;
+  sourceSelection?: ZoomPreviewFrame['selection'];
+  auxiliary?:
+    | {
+        scene: import('../../features/video/review/advanced/types').QuickEditCameraSceneInput;
+        focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
+      }
+    | undefined;
   background: QuickEditBackgroundSettings;
   imageUrl: string | null | undefined;
   headerImage?: CanvasImageSource | null | undefined;
@@ -126,7 +143,11 @@ export class PendingZoomPreviewFrame extends Error {
 
 /** Render borrowed inputs; the caller closes the completed bitmap after publication. */
 export type MiniRenderer = {
-  render(input: ZoomPreviewGpuInput, signal: AbortSignal): Promise<ImageBitmap | null>;
+  render(
+    input: ZoomPreviewGpuInput,
+    signal: AbortSignal,
+    source?: VideoCompositionFrameSource
+  ): Promise<ImageBitmap | null>;
   dispose(): void;
 };
 
@@ -143,14 +164,26 @@ export function createZoomPreviewGpuRenderer(): MiniRenderer {
   let unavailable = false;
   let disposed = false;
   const artwork = createZoomPreviewGpuArtwork(resources, painter);
+  let active = 0;
+  let retired = false;
+  const retire = () => {
+    if (!disposed || active || retired) return;
+    retired = true;
+    renderer?.dispose();
+    painter.dispose();
+    artwork.dispose();
+    resources.dispose();
+  };
   return {
-    async render(input, signal) {
+    async render(input, signal, borrowed) {
       if (unavailable || disposed) return null;
+      active++;
       let owned: VideoFrame | null = null;
       const primitives = createReviewGpuPrimitives(resources);
       try {
         const live = input.frame?.image;
         if (
+          !borrowed &&
           typeof HTMLVideoElement !== 'undefined' &&
           live instanceof HTMLVideoElement &&
           (live.readyState < 2 || live.seeking)
@@ -163,13 +196,19 @@ export function createZoomPreviewGpuRenderer(): MiniRenderer {
         signal.throwIfAborted();
         if (!renderer || disposed) {
           unavailable = true;
-          renderer?.dispose();
           return null;
         }
         const art = await artwork.prepare(input, signal);
         let source: GpuPreviewLayer['source'];
         const imageSource = input.frame?.image;
-        if (typeof HTMLVideoElement !== 'undefined' && imageSource instanceof HTMLVideoElement) {
+        if (borrowed) {
+          if (!borrowed.toVideoFrame) throw new Error('Inspector source frame is unavailable.');
+          owned = borrowed.toVideoFrame();
+          source = owned;
+        } else if (
+          typeof HTMLVideoElement !== 'undefined' &&
+          imageSource instanceof HTMLVideoElement
+        ) {
           try {
             owned = new VideoFrame(imageSource);
           } catch (error) {
@@ -207,6 +246,7 @@ export function createZoomPreviewGpuRenderer(): MiniRenderer {
             : []),
           {
             source,
+            ...(borrowed?.orientation ? { orientation: borrowed.orientation } : {}),
             rect: input.layout.videoRect,
             inverse: identity,
             clip: { rect: input.layout.windowRect, radius: input.cornerRadius },
@@ -365,18 +405,13 @@ export function createZoomPreviewGpuRenderer(): MiniRenderer {
       } finally {
         primitives.dispose();
         owned?.close();
+        active--;
+        retire();
       }
     },
     dispose() {
       disposed = true;
-      renderer?.dispose();
-      void initialization?.then(
-        (value) => value?.dispose(),
-        () => {}
-      );
-      painter.dispose();
-      artwork.dispose();
-      resources.dispose();
+      retire();
     },
   };
 }

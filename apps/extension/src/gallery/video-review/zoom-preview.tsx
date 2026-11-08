@@ -149,7 +149,13 @@ function PreparedZoomPreview(
   const playback = props.playback;
   const camera = props.prepared.camera;
   const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(props, camera);
-  const paintSource = playback?.video ?? frame?.image ?? null;
+  const paintSource = playback?.source
+    ? JSON.stringify([
+        playback.source.url,
+        playback.source.seekRevision,
+        playback.source.segmentStart,
+      ])
+    : (playback?.video ?? frame?.image ?? null);
   const paintIdentity = useMemo(
     () => ({ source: paintSource, view, width: output.width, height: output.height }),
     [paintSource, view, output.width, output.height]
@@ -223,6 +229,16 @@ function PreparedZoomPreview(
     camera,
     disabled: !positionInteractive || tool !== 'position',
     live: !!playback,
+    liveSource: playback?.source,
+    auxiliary: {
+      scene: {
+        source: props.source,
+        canvas: props.canvas,
+        background,
+        windowHeader: props.windowHeader,
+      },
+      focus: props.focus,
+    },
     frame: playback ? { image: playback.video, ...props.source } : frame,
     layout,
     output,
@@ -267,6 +283,7 @@ function PreparedZoomPreview(
         {overlay ? (
           <ReviewSpotlightPreview
             {...surface}
+            presented={presented}
             key={region.id}
             region={region}
             focus={props.focus}
@@ -293,6 +310,7 @@ function PreparedZoomPreview(
           imageUrl={image.url}
           headerImage={header.image}
           frame={frame}
+          presented={presented}
           result={resultOverlays}
           gpuActive={gpuActive}
         />
@@ -337,30 +355,50 @@ function ZoomPreviewResultLayers(props: {
   imageUrl: ReturnType<typeof useReviewBackgroundImage>['url'];
   headerImage: ReturnType<typeof useReviewWindowHeader>['image'];
   frame: ReturnType<typeof useZoomPreviewFrame>['frame'];
+  presented: ZoomPreviewGpuInput | null;
   result: ReturnType<typeof resolveZoomResultOverlays> | null;
   gpuActive: boolean;
 }) {
   const { scene, view, overlay, camera, geometry, imageUrl, headerImage, frame, result } = props;
   const playback = scene.playback;
   if (props.gpuActive) return null;
+  const accepted = playback ? props.presented : null;
+  const sourceFrame = playback ? accepted?.frame : frame;
+  const auxiliary = accepted?.auxiliary;
+  const shownResult = playback
+    ? accepted
+      ? resolveZoomResultOverlays({
+          view: accepted.view,
+          overlay,
+          playing: true,
+          region: accepted.region ?? scene.region,
+          focus: auxiliary?.focus,
+          background: accepted.background,
+          output: accepted.output,
+          layout: accepted.layout,
+          scale: (accepted.previewScale ?? 1) * accepted.camera.scale,
+          cornerRadius: accepted.cornerRadius,
+        })
+      : null
+    : result;
   return (
     <>
       {!overlay && (view === 'result' || playback) ? (
         <ReviewMotionBlurPreview
-          scene={scene}
+          scene={auxiliary?.scene ?? scene}
           hasSpatialBase={view === 'result'}
-          focus={scene.focus}
-          camera={camera}
-          layout={geometry.layout}
-          output={geometry.output}
-          background={scene.background}
-          imageUrl={imageUrl}
-          headerImage={headerImage}
-          sceneScale={geometry.previewScale}
-          getFrame={() => playback?.video ?? frame?.image ?? null}
+          focus={playback ? auxiliary?.focus : scene.focus}
+          camera={accepted?.camera ?? camera}
+          layout={accepted?.layout ?? geometry.layout}
+          output={accepted?.output ?? geometry.output}
+          background={accepted?.background ?? scene.background}
+          imageUrl={accepted ? accepted.imageUrl : imageUrl}
+          headerImage={accepted ? accepted.headerImage : headerImage}
+          sceneScale={accepted?.previewScale ?? geometry.previewScale}
+          getFrame={() => sourceFrame?.image ?? null}
         />
       ) : null}
-      {result ? <ZoomResultOverlays value={result} /> : null}
+      {shownResult ? <ZoomResultOverlays value={shownResult} /> : null}
     </>
   );
 }

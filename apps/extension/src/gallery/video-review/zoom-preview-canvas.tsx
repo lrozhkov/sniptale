@@ -190,6 +190,19 @@ function ZoomPreviewBackground({
   );
 }
 
+function sameZoomFrameSource(accepted: ZoomPreviewGpuInput, current: ZoomPreviewGpuInput) {
+  if (accepted.liveSource || current.liveSource)
+    return (
+      !!accepted.live &&
+      !!current.live &&
+      accepted.liveSource?.url === current.liveSource?.url &&
+      accepted.liveSource?.seekRevision === current.liveSource?.seekRevision &&
+      accepted.liveSource?.segmentStart === current.liveSource?.segmentStart &&
+      accepted.authoringRevision === current.authoringRevision
+    );
+  return accepted.frame?.image === current.frame?.image;
+}
+
 /** Camera projection and hover belong to this local model; source loading stays in the parent. */
 function useZoomCanvasModel(props: ZoomCanvasProps) {
   const [accepted, setAccepted] = useState<ZoomPreviewGpuInput | null>(null);
@@ -204,7 +217,7 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
   const basis =
     props.view === 'result' &&
     accepted?.view === props.view &&
-    accepted.frame?.image === props.frame?.image &&
+    sameZoomFrameSource(accepted, props) &&
     accepted.output.width === props.output.width &&
     accepted.output.height === props.output.height
       ? accepted
@@ -263,14 +276,16 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
     onPresented,
   });
 
-  const visible = computeZoomPreviewArea(layout, props.background, props.output);
+  const displayedLayout = props.live ? basis.layout : layout;
+  const displayedBackground = props.live ? basis.background : props.background;
+  const visible = computeZoomPreviewArea(displayedLayout, displayedBackground, props.output);
   const opening = {
     x: windowRect.x + visible.x * windowRect.width,
     y: windowRect.y + visible.y * windowRect.height,
     width: visible.width * windowRect.width,
     height: visible.height * windowRect.height,
   };
-  const motion = computeQuickEditSceneCamera(layout, props.background);
+  const motion = computeQuickEditSceneCamera(displayedLayout, displayedBackground);
   const offsetX = (motion.x / props.output.width) * 100;
   const offsetY = (motion.y / props.output.height) * 100;
   return {
@@ -414,7 +429,8 @@ export function useZoomPreviewCanvasPaint(
   const [painted, setPainted] = useState<ZoomPreviewGpuInput | null>(null);
   const paintReady =
     !spatialFailure &&
-    painted?.frame?.image === props.frame?.image &&
+    !!painted &&
+    sameZoomFrameSource(painted, props) &&
     painted?.view === props.view &&
     painted.output.width === props.output.width &&
     painted.output.height === props.output.height;

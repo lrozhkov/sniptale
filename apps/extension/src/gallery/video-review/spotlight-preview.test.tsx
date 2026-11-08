@@ -1,3 +1,6 @@
+import * as canvasModule from './zoom-preview-canvas';
+import * as blurModule from './motion-blur-preview';
+import type { ZoomPreviewGpuInput } from './zoom-preview-gpu';
 // @vitest-environment jsdom
 import {
   createQuickEditBorder,
@@ -794,3 +797,70 @@ it.each(['border', 'spotlight'] as const)(
     expect(paint).toHaveBeenCalledTimes(3);
   }
 );
+
+it('forwards live intent without retaining presented snapshots in the next paint job', async () => {
+  const queue = vi
+    .spyOn(canvasModule, 'useZoomPreviewCanvasPaint')
+    .mockReturnValue({ spatialFailure: false, gpuActive: false, retrySpatial: vi.fn() });
+  const blur = vi.spyOn(blurModule, 'ReviewMotionBlurPreview').mockImplementation(() => null);
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'live-mask', at: 0 }),
+    spotlight: createQuickEditSpotlight(),
+  };
+  const camera = { scale: 1, centerX: 0.5, centerY: 0.5 };
+  const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
+  const liveSource = { url: 'blob:frozen', time: 0.5, seekRevision: 2, segmentStart: 0 };
+  const auxiliary = {
+    scene: { source: output, background: { enabled: false as const } },
+    focus: { regions: [region], time: 1 },
+  };
+  const image = document.createElement('canvas');
+  image.width = 200;
+  image.height = 100;
+  const accepted: ZoomPreviewGpuInput = {
+    background: { enabled: false },
+    camera,
+    layout,
+    output,
+    frame: { image, ...output },
+    imageUrl: null,
+    currentTime: 1,
+    view: 'result',
+    cornerRadius: 4,
+    live: true,
+    liveSource,
+    auxiliary,
+  };
+  const video = document.createElement('video');
+  video.currentTime = 99;
+  await act(async () =>
+    root.render(
+      <ReviewSpotlightPreview
+        region={region}
+        frame={{ image: video, ...output }}
+        camera={{ ...camera, scale: 2 }}
+        layout={layout}
+        output={output}
+        view="result"
+        cornerRadius={4}
+        scale={1}
+        disabled
+        live
+        liveSource={liveSource}
+        auxiliary={auxiliary}
+        focus={{ regions: [region], time: 2 }}
+        presented={accepted}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  const input = queue.mock.lastCall![1];
+  expect(input.liveSource).toBe(liveSource);
+  expect(input.auxiliary).toBe(auxiliary);
+  expect(input).not.toHaveProperty('presented');
+  expect(blur.mock.lastCall![0].getFrame()).toBe(image);
+  expect(blur.mock.lastCall![0].camera).toBe(camera);
+  expect(blur.mock.lastCall![0].layout).toBe(layout);
+  expect(blur.mock.lastCall![0].focus?.time).toBe(1);
+  expect(video.currentTime).toBe(99);
+});

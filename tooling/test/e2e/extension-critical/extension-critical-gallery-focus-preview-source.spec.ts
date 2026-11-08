@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
+import { enableGpuPreviewProof, installCameraFrameObserver } from '../support/gpu-preview-proof';
 import { expect, test, type Locator } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import {
@@ -66,6 +66,18 @@ async function expectVisibleSource(preview: Locator) {
     .toEqual({ paintedSource: true, visibleSource: true });
 }
 
+/** Read only native timestamps attached to the currently published single-job inspector bitmap. */
+async function currentInspectorFrame(canvas: Locator) {
+  return canvas.evaluate((node: HTMLCanvasElement) => {
+    const read: unknown = Reflect.get(window, 'sniptaleCurrentInspectorFrame');
+    if (typeof read !== 'function') throw new Error('Inspector source observer is unavailable.');
+    const value: unknown = Reflect.apply(read, undefined, [node]);
+    if (value !== null && (typeof value !== 'number' || !Number.isSafeInteger(value)))
+      throw new Error('Inspector source timestamp is invalid.');
+    return value;
+  });
+}
+
 /** Independent packet timestamps choose the reference for the saved source interval. */
 function sourceReferenceInterval(fixture: URL, target: number) {
   const value: unknown = JSON.parse(
@@ -112,6 +124,7 @@ function sourceReferenceInterval(fixture: URL, target: number) {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`Focus inspector source stays visible (${theme})`, async ({ page }, info) => {
+    await page.addInitScript(installCameraFrameObserver);
     const host = await startHostServer();
     const dialog = page.locator('dialog');
     const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
@@ -159,6 +172,7 @@ for (const theme of ['light', 'dark'] as const) {
             .getByRole('button', { name: label(`gallery.videoReview.${kind}`), exact: true })
             .click();
           await expectVisibleSource(preview);
+          let pausedReference: number[][] | null = null;
           if (theme === 'light' && background === 'none' && kind === 'zoomRegionLabel') {
             const selected = await persistedFocus(page);
             if (!selected) throw new Error('Paused focus source selection was not saved.');
@@ -211,6 +225,7 @@ for (const theme of ['light', 'dark'] as const) {
                 ),
               };
             }, points);
+            pausedReference = expected;
             expect(
               Math.max(
                 ...expected.flatMap((color, index) =>
@@ -241,6 +256,88 @@ for (const theme of ['light', 'dark'] as const) {
               )
             );
           }
+          if (theme === 'light' && background === 'none' && kind === 'zoomRegionLabel') {
+            const sourceCanvas = preview.locator('canvas').first();
+            await button('gallery.videoReview.play').click();
+            await button('gallery.videoReview.pause').waitFor();
+            await dialog
+              .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+              .first()
+              .click();
+            await expect(preview).toHaveAttribute('data-playing', 'true');
+            const published = new Set<number>();
+            await expect
+              .poll(
+                async () => {
+                  const timestamp = await currentInspectorFrame(sourceCanvas);
+                  if (typeof timestamp === 'number') published.add(timestamp);
+                  return published.size;
+                },
+                {
+                  message:
+                    'Live focus inspector must publish distinct admitted native source frames',
+                }
+              )
+              .toBeGreaterThan(1);
+            await button('gallery.videoReview.pause').click();
+            await dialog
+              .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+              .first()
+              .click();
+            await expectVisibleSource(preview);
+            await expect.poll(() => currentInspectorFrame(sourceCanvas)).toBe(null);
+            if (!pausedReference) throw new Error('Paused reference colors are unavailable.');
+            const reference = pausedReference;
+            await expect
+              .poll(
+                async () => {
+                  const colors = await sourceCanvas.evaluate((node: HTMLCanvasElement) => {
+                    const context = node.getContext('2d');
+                    if (!context) throw new Error('Restored source readback is unavailable.');
+                    return [
+                      [20, 70],
+                      [70, 80],
+                      [40, 82],
+                    ].map(([x, y]) =>
+                      [
+                        ...context.getImageData(
+                          Math.floor((x! / 160) * node.width),
+                          Math.floor((y! / 90) * node.height),
+                          1,
+                          1
+                        ).data,
+                      ].slice(0, 3)
+                    );
+                  });
+                  return Math.max(
+                    ...reference.flatMap((color, index) =>
+                      color.map((value, channel) => Math.abs(value - colors[index]![channel]!))
+                    )
+                  );
+                },
+                { message: 'Pause must restore the independently decoded selected source image' }
+              )
+              .toBeLessThan(4);
+
+            await writeFile(
+              info.outputPath('live-focus-native-source.json'),
+              JSON.stringify(
+                {
+                  viewport: page.viewportSize(),
+                  raster: await sourceCanvas.evaluate((node: HTMLCanvasElement) => ({
+                    width: node.width,
+                    height: node.height,
+                  })),
+                  publishedNativePTS: [...published],
+                  pausedNativePTS: await currentInspectorFrame(sourceCanvas),
+                  limitation:
+                    'Single active inspector device. Native PTS prove content publication. Controlled consumer tests prove provider selection and source/result mapping. Canvas-only fallback is outside this observer.',
+                },
+                null,
+                2
+              )
+            );
+          }
           if (kind !== 'zoomRegionLabel') {
             await button('gallery.videoReview.play').click();
             await button('gallery.videoReview.pause').click();
@@ -261,3 +358,70 @@ for (const theme of ['light', 'dark'] as const) {
     }
   });
 }
+
+// The short viewport checks interaction only; source/color coverage stays in the primary case.
+test('Focus source restoration keeps gestures and Undo at 1280x560', async ({ page }, info) => {
+  await page.setViewportSize({ width: 1280, height: 560 });
+  const host = await startHostServer();
+  const dialog = page.locator('dialog');
+  const button = (key: Parameters<typeof translate>[0]) =>
+    dialog.getByRole('button', { name: translate(key, 'en'), exact: true });
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    await button('gallery.videoReview.advancedEditing').click();
+    await addReviewFocus(page);
+    const preview = dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');
+    await expectVisibleSource(preview);
+    await button('gallery.videoReview.play').click();
+    await button('gallery.videoReview.pause').click();
+    await dialog
+      .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+      .first()
+      .click();
+    await expectVisibleSource(preview);
+    const before = (await persistedFocus(page))!.transform;
+    const frame = preview.locator('[data-focus-frame]');
+    await frame.hover();
+    const grip = frame.locator('[data-resize="se"]');
+    const box = (await grip.boundingBox())!;
+    const x = box.x + box.width / 2,
+      y = box.y + box.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - 8, y - 5, { steps: 3 });
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await expect.poll(async () => (await persistedFocus(page))?.transform).toEqual(before);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - 8, y - 5, { steps: 3 });
+    await page.mouse.up();
+    await expect
+      .poll(async () => (await persistedFocus(page))?.transform.scale)
+      .toBeGreaterThan(before.scale);
+    await button('gallery.videoReview.undo').click();
+    await expect.poll(async () => (await persistedFocus(page))?.transform).toEqual(before);
+    await preview.locator('canvas').first().focus();
+    await page.keyboard.press('ArrowRight');
+    await expect
+      .poll(async () => (await persistedFocus(page))?.transform.centerX)
+      .toBeGreaterThan(before.centerX);
+    await button('gallery.videoReview.undo').click();
+    await expect.poll(async () => (await persistedFocus(page))?.transform).toEqual(before);
+    await page.screenshot({
+      path: info.outputPath('focus-restored-gestures-1280x560.png'),
+      fullPage: false,
+    });
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

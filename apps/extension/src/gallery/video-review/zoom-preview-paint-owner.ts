@@ -1,3 +1,10 @@
+import { VideoSample } from 'mediabunny';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+  type PreviewSourceLease,
+} from '../../workflows/video/preview-source';
+import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import {
   createZoomPreviewGpuRenderer,
@@ -25,6 +32,15 @@ export function createZoomPreviewPaintOwner(args: {
   let active: AbortController | null = null;
   let revision = 0;
   let disposed = false;
+  let retired = false;
+  let provider: PreviewSourceProvider | null = null;
+  let acquired: ZoomPreviewGpuInput['liveSource'];
+  const retire = () => {
+    if (disposed && !active && !retired) {
+      retired = true;
+      renderer?.dispose();
+    }
+  };
   let scheduled: number | null = null;
   let failed = false;
   let presented: {
@@ -70,28 +86,106 @@ export function createZoomPreviewPaintOwner(args: {
     const generation = revision;
     const controller = new AbortController();
     active = controller;
+    let lease: PreviewSourceLease | null = null;
+    let sample: VideoSample | undefined;
+    let receipt = input;
     try {
+      if (
+        input.liveSource &&
+        typeof VideoDecoder !== 'undefined' &&
+        typeof VideoFrame !== 'undefined'
+      ) {
+        provider ??= createPreviewSourceProvider();
+        provider.retainSources(new Set([input.liveSource.url]));
+        const discontinuity =
+          !acquired ||
+          acquired.url !== input.liveSource.url ||
+          acquired.seekRevision !== input.liveSource.seekRevision ||
+          acquired.segmentStart !== input.liveSource.segmentStart;
+        lease = await provider.acquire(
+          [
+            {
+              id: 'zoom-preview',
+              url: input.liveSource.url,
+              time: input.liveSource.time,
+              holdSourceEnd: true,
+            },
+          ],
+          controller.signal,
+          { discontinuity }
+        );
+        if (disposed || generation !== revision || controller.signal.aborted) return;
+        acquired = input.liveSource;
+      }
+      const binding = lease?.bindings.get('zoom-preview');
+      if (lease && (!binding || !binding.source.toVideoFrame))
+        throw new Error('Inspector source binding is unavailable.');
+      if (
+        binding &&
+        (!input.frame ||
+          binding.source.sourceWidth !== input.frame.width ||
+          binding.source.sourceHeight !== input.frame.height)
+      )
+        throw new Error('Inspector source dimensions do not match the prepared scene.');
+      if (binding)
+        receipt = {
+          ...input,
+          sourceSelection: Object.freeze({
+            url: binding.url,
+            target: binding.target,
+            timestamp: binding.timestamp,
+            nextTimestamp: binding.nextTimestamp,
+            ...(binding.sampleTime === undefined ? {} : { sampleTime: binding.sampleTime }),
+            ...(binding.heldAtEnd === undefined ? {} : { heldAtEnd: binding.heldAtEnd }),
+          }),
+        };
       const bitmap =
         !args.renderer && (typeof navigator === 'undefined' || !navigator.gpu)
           ? null
-          : await renderer?.render(input, controller.signal);
+          : binding
+            ? await renderer?.render(input, controller.signal, binding.source)
+            : await renderer?.render(input, controller.signal);
       try {
         if (disposed || generation !== revision || controller.signal.aborted) return;
         if (bitmap) {
-          args.publish(bitmap, input);
+          args.publish(bitmap, receipt);
           args.onBackend(true);
         } else {
-          await args.fallback(input, controller.signal);
+          if (binding) {
+            if (!binding.source.toVideoFrame)
+              throw new Error('Inspector source frame is unavailable.');
+            sample = await prepareDecodedVideoSample(
+              new VideoSample(binding.source.toVideoFrame(), binding.source.orientation),
+              controller.signal
+            );
+            if (disposed || generation !== revision || controller.signal.aborted) return;
+            const canvas = document.createElement('canvas');
+            canvas.width = binding.source.sourceWidth;
+            canvas.height = binding.source.sourceHeight;
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Inspector source canvas is unavailable.');
+            sample.draw(context, 0, 0, canvas.width, canvas.height);
+            receipt = {
+              ...receipt,
+              frame: {
+                image: canvas,
+                width: canvas.width,
+                height: canvas.height,
+                ...(receipt.sourceSelection ? { selection: receipt.sourceSelection } : {}),
+              },
+            };
+          }
+          await args.fallback(receipt, controller.signal);
           if (!disposed && generation === revision && !controller.signal.aborted)
             args.onBackend(false);
         }
         if (!disposed && generation === revision && !controller.signal.aborted) {
           presented = {
             key: authoringKey(input),
-            frame: input.frame?.image ?? null,
+            frame: receipt.frame?.image ?? null,
             header: input.headerImage,
           };
-          args.onPresented?.(input);
+          args.onPresented?.(receipt);
         }
       } finally {
         bitmap?.close();
@@ -103,7 +197,10 @@ export function createZoomPreviewPaintOwner(args: {
         args.onError(error);
       }
     } finally {
+      sample?.close();
+      lease?.release();
       active = null;
+      retire();
       if (pending && !disposed) void drain();
       else schedule();
     }
@@ -114,12 +211,18 @@ export function createZoomPreviewPaintOwner(args: {
     const identity = JSON.stringify([
       input.output,
       input.view,
+      !!input.live,
+      input.liveSource?.url,
+      input.liveSource?.seekRevision,
+      input.liveSource?.segmentStart,
+      input.live && input.liveSource && input.authoringRevision,
       input.frame?.width,
       input.frame?.height,
     ]);
     const temporalKey = JSON.stringify([
       next,
       input.live,
+      input.liveSource,
       input.currentTime,
       input.view === 'result' && input.camera,
       input.view === 'result' && input.exposures,
@@ -183,11 +286,13 @@ export function createZoomPreviewPaintOwner(args: {
   return {
     update,
     dispose() {
+      if (disposed) return;
       disposed = true;
       pending = null;
       active?.abort();
       if (scheduled !== null) cancelTick(scheduled);
-      renderer?.dispose();
+      provider?.dispose();
+      retire();
     },
   };
 }

@@ -1,3 +1,7 @@
+import { ReviewPreviewRendererContext } from './use-preview-preferences';
+import { VideoSample } from 'mediabunny';
+import type { PreviewSourceLease } from '../../workflows/video/preview-source';
+import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 // @vitest-environment jsdom
 import { createZoomPreviewPaintOwner } from './zoom-preview-paint-owner';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -25,6 +29,15 @@ import {
   GpuPreviewDeviceError,
   type GpuPreviewLayer,
 } from '../../features/video/composition/canvas/gpu-preview';
+const sources = vi.hoisted(() => ({
+  create: vi.fn(),
+  acquire: vi.fn(),
+  retain: vi.fn(),
+  dispose: vi.fn(),
+}));
+vi.mock('../../workflows/video/preview-source', () => ({
+  createPreviewSourceProvider: sources.create,
+}));
 const io = vi.hoisted(() => ({ create: vi.fn(), render: vi.fn(), dispose: vi.fn() }));
 vi.mock('../../features/video/composition/canvas/gpu-preview', async (original) => ({
   ...(await original<typeof import('../../features/video/composition/canvas/gpu-preview')>()),
@@ -37,6 +50,12 @@ vi.mock('../../platform/i18n', async (original) => ({
 const output = { width: 480, height: 270 };
 const owners: { dispose(): void }[] = [];
 beforeEach(() => {
+  sources.acquire.mockReset().mockResolvedValue(null);
+  sources.create.mockReturnValue({
+    acquire: sources.acquire,
+    retainSources: sources.retain,
+    dispose: sources.dispose,
+  });
   vi.stubGlobal('navigator', { gpu: {}, userAgent: 'jsdom', language: 'en-US' });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (
     this: HTMLCanvasElement
@@ -593,4 +612,596 @@ it('uses Standard painting without acquiring a GPU inspector renderer', async ()
   expect(fallback).toHaveBeenCalledOnce();
   expect(publish).not.toHaveBeenCalled();
   expect(io.create).not.toHaveBeenCalled();
+});
+
+it('holds a canonical live lease with the frozen source and pose through GPU completion', async () => {
+  vi.stubGlobal('VideoDecoder', class {});
+  vi.stubGlobal('VideoFrame', class {});
+  const acquire = Promise.withResolvers<{
+    bindings: Map<
+      string,
+      {
+        source: {
+          sourceWidth: number;
+          sourceHeight: number;
+          toVideoFrame: ReturnType<typeof vi.fn>;
+          draw: ReturnType<typeof vi.fn>;
+        };
+        target: number;
+        timestamp: number;
+        nextTimestamp: number;
+        url: string;
+      }
+    >;
+    release: ReturnType<typeof vi.fn>;
+  }>();
+  const source = { sourceWidth: 1904, sourceHeight: 984, toVideoFrame: vi.fn(), draw: vi.fn() };
+  const release = vi.fn();
+  const lease = {
+    bindings: new Map([
+      [
+        'zoom-preview',
+        { source, target: 0.5, timestamp: 0.3, nextTimestamp: 0.7, url: 'blob:source' },
+      ],
+    ]),
+    release,
+  };
+  sources.acquire.mockReturnValueOnce(acquire.promise);
+  const fence = Promise.withResolvers<ImageBitmap>();
+  const render = vi.fn(() => fence.promise);
+  const publish = vi.fn(),
+    receipt = vi.fn();
+  const owner = createZoomPreviewPaintOwner({
+    renderer: { render, dispose: vi.fn() },
+    publish,
+    fallback: vi.fn(),
+    onBackend: vi.fn(),
+    onPresented: receipt,
+    onError: vi.fn(),
+    requestTick: () => 1,
+    cancelTick: vi.fn(),
+  });
+  owners.push(owner);
+  const video = document.createElement('video');
+  video.currentTime = 99;
+  const initial = {
+    ...input({ live: true, currentTime: 2, frame: { image: video, width: 1904, height: 984 } }),
+    liveSource: { url: 'blob:source', time: 0.5, seekRevision: 0 },
+  };
+  try {
+    owner.update(initial);
+    await Promise.resolve();
+    expect(sources.acquire).toHaveBeenCalledOnce();
+    expect(render).not.toHaveBeenCalled();
+    acquire.resolve(lease);
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce());
+    expect(render.mock.calls[0]).toEqual([initial, expect.any(AbortSignal), source]);
+    expect(release).not.toHaveBeenCalled();
+    const completed = bitmap();
+    fence.resolve(completed);
+    await vi.waitFor(() => expect(receipt).toHaveBeenCalledOnce());
+    expect(receipt.mock.lastCall![0]).toMatchObject({
+      currentTime: 2,
+      camera: initial.camera,
+      sourceSelection: { target: 0.5, timestamp: 0.3, nextTimestamp: 0.7 },
+    });
+    expect(receipt.mock.lastCall![0]).not.toHaveProperty('source');
+    expect(release).toHaveBeenCalledOnce();
+  } finally {
+    acquire.resolve(lease);
+    fence.resolve(bitmap());
+    owner.dispose();
+  }
+});
+
+function canonicalLive() {
+  vi.stubGlobal('VideoDecoder', class {});
+  const frames: {
+    close: ReturnType<typeof vi.fn>;
+    copyTo: ReturnType<typeof vi.fn>;
+    timestamp: number;
+  }[] = [];
+  class Frame {
+    format = 'RGBA';
+    codedWidth = 984;
+    codedHeight = 1904;
+    displayWidth = 984;
+    displayHeight = 1904;
+    duration = 400000;
+    visibleRect = { x: 0, y: 0, width: 984, height: 1904 };
+    colorSpace = { matrix: 'bt709', primaries: 'bt709', transfer: 'bt709', fullRange: false };
+    close = vi.fn();
+    copyTo = vi.fn();
+    constructor(readonly timestamp = 300000) {
+      frames.push(this);
+    }
+  }
+  vi.stubGlobal('VideoFrame', Frame);
+  const video = document.createElement('video');
+  video.currentTime = 99;
+  const request = input({
+    live: true,
+    currentTime: 2,
+    frame: { image: video, width: 1904, height: 984 },
+    liveSource: { url: 'blob:source', time: 0.5, seekRevision: 0, segmentStart: 0 },
+    authoringRevision: 'same-model',
+  });
+  const release = vi.fn();
+  const source: VideoCompositionFrameSource = {
+    sourceWidth: 1904,
+    sourceHeight: 984,
+    orientation: { rotation: 90, flip: true },
+    toVideoFrame: vi.fn(() => new Frame() as unknown as VideoFrame),
+    draw: vi.fn(),
+  };
+  const lease: PreviewSourceLease = {
+    bindings: new Map([
+      [
+        'zoom-preview',
+        { source, target: 0.5, timestamp: 0.3, nextTimestamp: 0.7, url: 'blob:source' },
+      ],
+    ]),
+    release,
+  };
+  sources.acquire.mockResolvedValue(lease);
+  return { source, lease, release, frames, video, request };
+}
+
+it('keeps the native GPU clone and artwork alive until a disposed render settles', async () => {
+  const c = canonicalLive();
+  const fence = Promise.withResolvers<ImageBitmap>();
+  io.render.mockReturnValueOnce(fence.promise);
+  io.create.mockResolvedValue({ render: io.render, dispose: io.dispose, allocatedBytes: 0 });
+  const renderer = createZoomPreviewGpuRenderer();
+  owners.push(renderer);
+  const rendering = renderer.render(c.request, new AbortController().signal, c.source);
+  await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
+  const native: GpuPreviewLayer[] = [];
+  const visit = (layers: readonly GpuPreviewLayer[]) => {
+    for (const layer of layers) {
+      if (layer.source === c.frames[0]) native.push(layer);
+      if ('kind' in layer.source && layer.source.kind === 'group') visit(layer.source.layers);
+    }
+  };
+  visit(io.render.mock.calls[0]![0].layers);
+  expect(native).toHaveLength(1);
+  expect(native[0]).toMatchObject({ orientation: { rotation: 90, flip: true } });
+  expect(c.frames[0]!.timestamp).toBe(300000);
+  expect(c.frames[0]!.copyTo).not.toHaveBeenCalled();
+  renderer.dispose();
+  expect(io.dispose).not.toHaveBeenCalled();
+  expect(c.frames[0]!.close).not.toHaveBeenCalled();
+  const completed = bitmap();
+  fence.resolve(completed);
+  expect(await rendering).toBe(completed);
+  expect(c.frames[0]!.close).toHaveBeenCalledOnce();
+  expect(io.dispose).toHaveBeenCalledOnce();
+  completed.close();
+});
+
+it.each(['dispose', 'source', 'seek', 'cut', 'paused'] as const)(
+  'retires a canonical lease after an obsolete %s GPU job settles',
+  async (mode) => {
+    const c = canonicalLive();
+    const fence = Promise.withResolvers<ImageBitmap>();
+    const render = vi.fn().mockReturnValueOnce(fence.promise).mockResolvedValue(bitmap());
+    const rendererDispose = vi.fn(),
+      publish = vi.fn(),
+      receipt = vi.fn();
+    const owner = createZoomPreviewPaintOwner({
+      renderer: { render, dispose: rendererDispose },
+      publish,
+      fallback: vi.fn(),
+      onBackend: vi.fn(),
+      onPresented: receipt,
+      onError: vi.fn(),
+      requestTick: () => 1,
+      cancelTick: vi.fn(),
+    });
+    owners.push(owner);
+    owner.update(c.request);
+    await vi.waitFor(() => expect(render).toHaveBeenCalledOnce());
+    if (mode === 'dispose') owner.dispose();
+    else {
+      sources.acquire.mockReturnValue(new Promise(() => {}));
+      owner.update(
+        mode === 'paused'
+          ? input()
+          : {
+              ...c.request,
+              liveSource: {
+                ...c.request.liveSource!,
+                ...(mode === 'source'
+                  ? { url: 'blob:new' }
+                  : mode === 'seek'
+                    ? { seekRevision: 1 }
+                    : { segmentStart: 5, time: 5.1 }),
+              },
+            }
+      );
+    }
+    expect(render.mock.calls[0]![1].aborted).toBe(true);
+    expect(c.release).not.toHaveBeenCalled();
+    expect(rendererDispose).not.toHaveBeenCalled();
+    const old = bitmap();
+    fence.resolve(old);
+    await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
+    expect(old.close).toHaveBeenCalledOnce();
+    if (mode !== 'paused') expect(publish).not.toHaveBeenCalled();
+    if (mode === 'dispose') expect(rendererDispose).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps ordinary advances sequential and restarts on explicit seeks or cut segments', async () => {
+  const c = canonicalLive();
+  const receipt = vi.fn();
+  const owner = createZoomPreviewPaintOwner({
+    renderer: { render: vi.fn(async () => bitmap()), dispose: vi.fn() },
+    publish: vi.fn(),
+    fallback: vi.fn(),
+    onBackend: vi.fn(),
+    onPresented: receipt,
+    onError: vi.fn(),
+    requestTick: () => 1,
+    cancelTick: vi.fn(),
+  });
+  owners.push(owner);
+  for (const [index, source] of [
+    c.request.liveSource!,
+    { ...c.request.liveSource!, time: 0.6 },
+    { ...c.request.liveSource!, time: 5.1, segmentStart: 5 },
+    { ...c.request.liveSource!, time: 0.5, seekRevision: 1 },
+  ].entries()) {
+    sources.acquire.mockResolvedValueOnce({
+      ...c.lease,
+      bindings: new Map([
+        [
+          'zoom-preview',
+          {
+            source: c.source,
+            target: source.time,
+            timestamp: source.time - 0.1,
+            nextTimestamp: source.time + 0.1,
+            url: source.url,
+          },
+        ],
+      ]),
+    });
+    owner.update({ ...c.request, currentTime: index + 2, liveSource: source });
+    await vi.waitFor(() => expect(receipt).toHaveBeenCalledTimes(index + 1));
+    expect(sources.acquire.mock.calls[index]![2]).toEqual({ discontinuity: index !== 1 });
+    expect(receipt.mock.lastCall![0].liveSource.time).toBe(source.time);
+    expect(receipt.mock.lastCall![0].currentTime).toBe(index + 2);
+  }
+});
+
+it('keeps a valid temporal pose while acquiring only the latest pending source request', async () => {
+  const c = canonicalLive();
+  const fence = Promise.withResolvers<ImageBitmap>();
+  const render = vi.fn().mockReturnValueOnce(fence.promise).mockResolvedValue(bitmap());
+  const receipt = vi.fn();
+  const owner = createZoomPreviewPaintOwner({
+    renderer: { render, dispose: vi.fn() },
+    publish: vi.fn(),
+    fallback: vi.fn(),
+    onBackend: vi.fn(),
+    onPresented: receipt,
+    onError: vi.fn(),
+    requestTick: () => 1,
+    cancelTick: vi.fn(),
+  });
+  owners.push(owner);
+  owner.update(c.request);
+  await vi.waitFor(() => expect(render).toHaveBeenCalledOnce());
+  owner.update({
+    ...c.request,
+    currentTime: 2.1,
+    liveSource: { ...c.request.liveSource!, time: 0.6 },
+    camera: { ...c.request.camera, centerX: 0.6 },
+  });
+  owner.update({
+    ...c.request,
+    currentTime: 2.2,
+    liveSource: { ...c.request.liveSource!, time: 0.65 },
+    camera: { ...c.request.camera, centerX: 0.7 },
+  });
+  expect(render.mock.calls[0]![1].aborted).toBe(false);
+  expect(sources.acquire).toHaveBeenCalledOnce();
+  sources.acquire.mockResolvedValueOnce({
+    ...c.lease,
+    bindings: new Map([
+      [
+        'zoom-preview',
+        { source: c.source, target: 0.65, timestamp: 0.3, nextTimestamp: 0.7, url: 'blob:source' },
+      ],
+    ]),
+  });
+  fence.resolve(bitmap());
+  await vi.waitFor(() => expect(receipt).toHaveBeenCalledTimes(2));
+  expect(receipt.mock.calls[0]![0]).toMatchObject({
+    currentTime: 2,
+    camera: c.request.camera,
+    sourceSelection: { target: 0.5 },
+  });
+  expect(receipt.mock.calls[1]![0]).toMatchObject({
+    currentTime: 2.2,
+    camera: { centerX: 0.7 },
+    sourceSelection: { target: 0.65 },
+  });
+  expect(sources.acquire).toHaveBeenCalledTimes(2);
+});
+
+it.each(['fallback', 'legacy', 'draw-failure'] as const)(
+  'publishes independent RGB and frozen pose after canonical %s',
+  async (mode) => {
+    const c = canonicalLive();
+    const draw = vi.spyOn(VideoSample.prototype, 'draw').mockImplementation(function (
+      this: VideoSample,
+      context,
+      x,
+      y,
+      width,
+      height
+    ) {
+      expect(this.timestamp).toBe(0.3);
+      expect(this.rotation).toBe(90);
+      expect(this.flip).toBe(true);
+      context.fillRect(x, y, width, height);
+    });
+    const fence = Promise.withResolvers<void>();
+    const fallback = vi.fn(async (accepted: ZoomPreviewGpuInput) => {
+      expect(accepted.frame?.image).toBeInstanceOf(HTMLCanvasElement);
+      expect(accepted.camera).toBe(c.request.camera);
+      expect(accepted.liveSource).toBe(c.request.liveSource);
+      await fence.promise;
+      if (mode === 'draw-failure') throw new Error('draw failed');
+    });
+    const receipt = vi.fn(),
+      onError = vi.fn();
+    const owner = createZoomPreviewPaintOwner({
+      ...(mode === 'legacy'
+        ? { backend: 'legacy' as const }
+        : { renderer: { render: vi.fn(async () => null), dispose: vi.fn() } }),
+      publish: vi.fn(),
+      fallback,
+      onBackend: vi.fn(),
+      onPresented: receipt,
+      onError,
+      requestTick: () => 1,
+      cancelTick: vi.fn(),
+    });
+    owners.push(owner);
+    owner.update(c.request);
+    await vi.waitFor(() => expect(fallback).toHaveBeenCalledOnce());
+    expect(c.release).not.toHaveBeenCalled();
+    expect(c.frames[0]!.close).not.toHaveBeenCalled();
+    fence.resolve();
+    await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
+    expect(c.frames[0]!.close).toHaveBeenCalledOnce();
+    expect(draw).toHaveBeenCalledOnce();
+    if (mode === 'draw-failure') {
+      expect(receipt).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledOnce();
+    } else {
+      const accepted = receipt.mock.lastCall![0];
+      expect(accepted.frame).toMatchObject({
+        width: 1904,
+        height: 984,
+        selection: { target: 0.5, timestamp: 0.3, nextTimestamp: 0.7 },
+      });
+      expect(accepted).not.toHaveProperty('source');
+      owner.dispose();
+      expect(accepted.frame.image.width).toBe(1904);
+      expect(accepted.frame.image.height).toBe(984);
+    }
+  }
+);
+
+it.each(['unsupported', 'decode-error', 'missing-binding', 'missing-accessor'] as const)(
+  'admits HTML compatibility only for actual unsupported selection: %s',
+  async (mode) => {
+    const c = canonicalLive();
+    if (mode === 'unsupported') {
+      Object.defineProperty(c.video, 'readyState', { value: 2 });
+      c.video.currentTime = 0.5;
+      sources.acquire.mockResolvedValueOnce(null);
+    } else if (mode === 'decode-error')
+      sources.acquire.mockRejectedValueOnce(new Error('decode failed'));
+    else
+      sources.acquire.mockResolvedValueOnce({
+        bindings:
+          mode === 'missing-binding'
+            ? new Map()
+            : new Map([
+                [
+                  'zoom-preview',
+                  {
+                    source: { sourceWidth: 1904, sourceHeight: 984, draw: vi.fn() },
+                    target: 0.5,
+                    timestamp: 0.3,
+                    nextTimestamp: 0.7,
+                    url: 'blob:source',
+                  },
+                ],
+              ]),
+        release: c.release,
+      });
+    const render = vi.fn(async () => bitmap()),
+      onError = vi.fn(),
+      receipt = vi.fn();
+    const owner = createZoomPreviewPaintOwner({
+      renderer: { render, dispose: vi.fn() },
+      publish: vi.fn(),
+      fallback: vi.fn(),
+      onBackend: vi.fn(),
+      onPresented: receipt,
+      onError,
+      requestTick: () => 1,
+      cancelTick: vi.fn(),
+    });
+    owners.push(owner);
+    owner.update(c.request);
+    await vi.waitFor(() =>
+      expect(mode === 'unsupported' ? receipt : onError).toHaveBeenCalledOnce()
+    );
+    if (mode === 'unsupported') {
+      expect(render.mock.calls[0]).toHaveLength(2);
+      expect(receipt.mock.lastCall![0]).toBe(c.request);
+    } else {
+      expect(render).not.toHaveBeenCalled();
+      expect(receipt).not.toHaveBeenCalled();
+    }
+  }
+);
+
+it('rejects admitted dimensions that disagree with the frozen source geometry', async () => {
+  const c = canonicalLive();
+  sources.acquire.mockResolvedValueOnce({
+    bindings: new Map([
+      [
+        'zoom-preview',
+        {
+          source: { ...c.source, sourceWidth: 984, sourceHeight: 1904 },
+          target: 0.5,
+          timestamp: 0.3,
+          nextTimestamp: 0.7,
+          url: 'blob:source',
+        },
+      ],
+    ]),
+    release: c.release,
+  });
+  const render = vi.fn(async () => bitmap()),
+    fallback = vi.fn(),
+    onError = vi.fn(),
+    publish = vi.fn();
+  const owner = createZoomPreviewPaintOwner({
+    renderer: { render, dispose: vi.fn() },
+    fallback,
+    onError,
+    publish,
+    onBackend: vi.fn(),
+    requestTick: () => 1,
+    cancelTick: vi.fn(),
+  });
+  owners.push(owner);
+  owner.update(c.request);
+  await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
+  expect(render).not.toHaveBeenCalled();
+  expect(fallback).not.toHaveBeenCalled();
+  expect(publish).not.toHaveBeenCalled();
+  expect(onError).toHaveBeenCalledWith(
+    expect.objectContaining({
+      message: 'Inspector source dimensions do not match the prepared scene.',
+    })
+  );
+});
+
+it('releases a canonical acquisition arriving after job disposal without starting GPU work', async () => {
+  const c = canonicalLive();
+  const gate = Promise.withResolvers<PreviewSourceLease>();
+  sources.acquire.mockReturnValueOnce(gate.promise);
+  const render = vi.fn(),
+    onError = vi.fn(),
+    publish = vi.fn();
+  const owner = createZoomPreviewPaintOwner({
+    renderer: { render, dispose: vi.fn() },
+    publish,
+    fallback: vi.fn(),
+    onBackend: vi.fn(),
+    onError,
+    requestTick: () => 1,
+    cancelTick: vi.fn(),
+  });
+  owners.push(owner);
+  owner.update(c.request);
+  expect(sources.acquire).toHaveBeenCalledOnce();
+  owner.dispose();
+  expect(c.release).not.toHaveBeenCalled();
+  gate.resolve(c.lease);
+  await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
+  expect(render).not.toHaveBeenCalled();
+  expect(publish).not.toHaveBeenCalled();
+  expect(onError).not.toHaveBeenCalled();
+});
+
+it('normalizes the admitted image after a typed GPU device failure', async () => {
+  const c = canonicalLive();
+  io.create.mockResolvedValue({ render: io.render, dispose: io.dispose, allocatedBytes: 0 });
+  io.render.mockRejectedValueOnce(new GpuPreviewDeviceError('lost'));
+  vi.spyOn(VideoSample.prototype, 'draw').mockImplementation((context, x, y, width, height) =>
+    context.fillRect(x, y, width, height)
+  );
+  const receipt = vi.fn(),
+    fallback = vi.fn(),
+    onError = vi.fn();
+  const owner = createZoomPreviewPaintOwner({
+    publish: vi.fn(),
+    fallback,
+    onPresented: receipt,
+    onBackend: vi.fn(),
+    onError,
+    requestTick: () => 1,
+    cancelTick: vi.fn(),
+  });
+  owners.push(owner);
+  owner.update(c.request);
+  await vi.waitFor(() => expect(receipt).toHaveBeenCalledOnce());
+  expect(fallback.mock.lastCall![0].frame.image).toBeInstanceOf(HTMLCanvasElement);
+  expect(receipt.mock.lastCall![0]).toMatchObject({
+    currentTime: 2,
+    sourceSelection: { target: 0.5, timestamp: 0.3, nextTimestamp: 0.7 },
+  });
+  expect(c.frames).toHaveLength(2);
+  expect(c.frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
+  expect(c.release).toHaveBeenCalledOnce();
+  expect(onError).not.toHaveBeenCalled();
+});
+
+it('admits fallback readiness by source generation instead of the HTML image object', async () => {
+  const c = canonicalLive();
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn(() => 1)
+  );
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.spyOn(VideoSample.prototype, 'draw').mockImplementation((context, x, y, width, height) =>
+    context.fillRect(x, y, width, height)
+  );
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const ready = vi.fn(),
+    receipt = vi.fn();
+  const show = (request: ZoomPreviewGpuInput) =>
+    act(async () =>
+      root.render(
+        React.createElement(
+          ReviewPreviewRendererContext.Provider,
+          { value: 'legacy' },
+          React.createElement(ZoomPreviewCanvas, {
+            ...request,
+            disabled: true,
+            onCenter: vi.fn(),
+            onPaintReady: ready,
+            onPresented: receipt,
+          })
+        )
+      )
+    );
+  try {
+    await show(c.request);
+    expect(ready).toHaveBeenLastCalledWith(true);
+    expect(receipt.mock.lastCall![0].frame.image).not.toBe(c.video);
+    const held = Promise.withResolvers<PreviewSourceLease>();
+    sources.acquire.mockReturnValueOnce(held.promise);
+    const next = { ...c.request, liveSource: { ...c.request.liveSource!, seekRevision: 1 } };
+    await show(next);
+    expect(ready).toHaveBeenLastCalledWith(false);
+    await act(async () => held.resolve(c.lease));
+    expect(ready).toHaveBeenLastCalledWith(true);
+    expect(receipt.mock.lastCall![0].liveSource.seekRevision).toBe(1);
+  } finally {
+    await act(async () => root.unmount());
+  }
 });

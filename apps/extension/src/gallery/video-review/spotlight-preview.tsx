@@ -1,3 +1,4 @@
+import type { ZoomPreviewGpuInput } from './zoom-preview-gpu';
 import { useZoomPreviewCanvasPaint } from './zoom-preview-canvas';
 import {
   quickEditMotionBlurCameras,
@@ -30,6 +31,10 @@ export function ReviewSpotlightPreview(props: {
   focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
   frame: ZoomPreviewFrame | null;
   live?: boolean;
+  liveSource?: ZoomPreviewGpuInput['liveSource'];
+  auxiliary?: ZoomPreviewGpuInput['auxiliary'];
+  presented?: ZoomPreviewGpuInput | null;
+  onPresented?: ((input: ZoomPreviewGpuInput) => void) | undefined;
   imageUrl?: string | null | undefined;
   headerImage?: CanvasImageSource | null | undefined;
   output: { width: number; height: number };
@@ -73,6 +78,15 @@ export function ReviewSpotlightPreview(props: {
   const motion = computeQuickEditSceneCamera(props.layout, props.background ?? { enabled: false });
   const spotlights = evaluateQuickEditSpotlightsAtTime(args);
   const clip = { rect: motion.windowClip, radius: props.cornerRadius * motion.scale };
+  const { presented: acceptedSnapshot, ...paintProps } = props;
+  const accepted = props.live ? acceptedSnapshot : null;
+  const shownMotion = accepted
+    ? computeQuickEditSceneCamera(accepted.layout, accepted.background)
+    : motion;
+  const shownClip = accepted
+    ? { rect: shownMotion.windowClip, radius: accepted.cornerRadius * shownMotion.scale }
+    : clip;
+  const shownSpotlights = accepted?.spotlightFrames ?? spotlights;
   return (
     <div className="relative">
       {!gpuActive ? (
@@ -95,7 +109,7 @@ export function ReviewSpotlightPreview(props: {
         </div>
       ) : null}
       <SpotlightSourceFrame
-        {...props}
+        {...paintProps}
         lensFrames={spotlights.filter((frame) => frame.lens).map((frame) => ({ ...frame, clip }))}
         spotlightFrames={spotlights.map((frame) => ({ ...frame, clip }))}
         borderFrames={evaluateQuickEditBordersAtTime(args)}
@@ -104,29 +118,30 @@ export function ReviewSpotlightPreview(props: {
       />
       {!gpuActive && !framing ? (
         <ReviewMotionBlurPreview
-          focus={props.focus}
-          camera={props.camera}
-          layout={props.layout}
-          output={props.output}
-          background={props.background ?? { enabled: false }}
-          imageUrl={props.imageUrl}
-          headerImage={props.headerImage}
-          sceneScale={props.scale}
-          getFrame={() => props.frame?.image ?? null}
+          scene={accepted?.auxiliary?.scene}
+          focus={accepted ? accepted.auxiliary?.focus : props.focus}
+          camera={accepted?.camera ?? props.camera}
+          layout={accepted?.layout ?? props.layout}
+          output={accepted?.output ?? props.output}
+          background={accepted?.background ?? props.background ?? { enabled: false }}
+          imageUrl={accepted ? accepted.imageUrl : props.imageUrl}
+          headerImage={accepted ? accepted.headerImage : props.headerImage}
+          sceneScale={accepted?.previewScale ?? props.scale}
+          getFrame={() => (props.live ? accepted?.frame?.image : props.frame?.image) ?? null}
         />
       ) : null}
       {!gpuActive ? (
         <ReviewSpotlightOverlay
-          output={props.output}
-          frames={spotlights.filter((frame) => frame.dim > 0 || frame.blur > 0)}
-          clip={clip}
+          output={accepted?.output ?? props.output}
+          frames={shownSpotlights.filter((frame) => frame.dim > 0 || frame.blur > 0)}
+          clip={shownClip}
         />
       ) : null}
       {!gpuActive ? (
         <ReviewBorderOverlay
-          output={props.output}
-          frames={evaluateQuickEditBordersAtTime(args)}
-          clip={{ rect: motion.windowClip, radius: props.cornerRadius * motion.scale }}
+          output={accepted?.output ?? props.output}
+          frames={accepted?.borderFrames ?? evaluateQuickEditBordersAtTime(args)}
+          clip={shownClip}
         />
       ) : null}
       {overlay && framing ? (

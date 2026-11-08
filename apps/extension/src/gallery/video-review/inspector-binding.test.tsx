@@ -90,23 +90,27 @@ vi.mock('./speech-panel', () => ({
     </>
   ),
 }));
+const selectedProbe = vi.hoisted(() => vi.fn());
 vi.mock('./selected-properties', () => ({
   reviewSelectionLabel: () => 'Voiceover',
-  ReviewSelectedProperties: (props: ComponentProps<typeof ReviewSelectedProperties>) => (
-    <>
-      <button onClick={() => void props.flushAdvanced?.()}>Flush clip buffers</button>
-      <button onClick={() => props.onSelectText?.('related')}>Open related text</button>
-      <button onClick={() => props.onSelectText?.('missing')}>Open missing text</button>
-      <button onClick={() => props.onPreviewFrame?.(2)}>Preview source frame</button>
-      <button
-        onClick={() =>
-          props.onFocus(createQuickEditZoomRegion({ id: 'history-focus', at: 1, duration: 2 }))
-        }
-      >
-        Focus recorded interval
-      </button>
-    </>
-  ),
+  ReviewSelectedProperties: (props: ComponentProps<typeof ReviewSelectedProperties>) => {
+    selectedProbe(props);
+    return (
+      <>
+        <button onClick={() => void props.flushAdvanced?.()}>Flush clip buffers</button>
+        <button onClick={() => props.onSelectText?.('related')}>Open related text</button>
+        <button onClick={() => props.onSelectText?.('missing')}>Open missing text</button>
+        <button onClick={() => props.onPreviewFrame?.(2)}>Preview source frame</button>
+        <button
+          onClick={() =>
+            props.onFocus(createQuickEditZoomRegion({ id: 'history-focus', at: 1, duration: 2 }))
+          }
+        >
+          Focus recorded interval
+        </button>
+      </>
+    );
+  },
   ReviewSelectedTextProperties: () => null,
 }));
 
@@ -134,18 +138,15 @@ async function checkCaptionLockAdmission(
   expect(sceneProbe.captionsLocked).toBe(false);
 }
 
-it('joins every editor buffer for either recognition source and guards related-text navigation', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  const order: string[] = [];
-  const pause = vi.fn();
-  const seek = vi.fn();
-  const select = vi.fn();
-  let allowed = false;
-  const advanced = createQuickEditAdvancedState();
-  const props = {
+function inspectorFixture(
+  advanced: ReturnType<typeof createQuickEditAdvancedState>,
+  order: string[],
+  pause: () => void,
+  seek: (time: number, playing: boolean) => void,
+  select: ComponentProps<typeof ReviewInspectorBinding>['state']['setActiveSelection'],
+  beforeAction: (action: () => void) => void
+): ComponentProps<typeof ReviewInspectorBinding> {
+  return {
     resource: { filename: 'video', file: new Blob(), source: {}, session: {} },
     state: {
       message: 'Backup refused',
@@ -179,9 +180,7 @@ it('joins every editor buffer for either recognition source and guards related-t
       video: { current: { pause } },
       seek,
       setActiveSelection: select,
-      beforeAction: (action: () => void) => {
-        if (allowed) action();
-      },
+      beforeAction,
       editing: { exporter: { phase: 'idle', index: null } },
       zoom: { addRegion: vi.fn(() => 'focus'), setSelection: vi.fn() },
       canStart: () => true,
@@ -197,6 +196,22 @@ it('joins every editor buffer for either recognition source and guards related-t
     audio: { assets: new Map() },
     navigation: { setSection: vi.fn() },
   } as unknown as ComponentProps<typeof ReviewInspectorBinding>;
+}
+
+it('joins every editor buffer for either recognition source and guards related-text navigation', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const order: string[] = [];
+  const pause = vi.fn();
+  const seek = vi.fn();
+  const select = vi.fn();
+  let allowed = false;
+  const advanced = createQuickEditAdvancedState();
+  const props = inspectorFixture(advanced, order, pause, seek, select, (action) => {
+    if (allowed) action();
+  });
   const click = (label: string) =>
     act(async () => {
       const button = Array.from(host.querySelectorAll('button')).find(
@@ -435,6 +450,142 @@ it('joins every editor buffer for either recognition source and guards related-t
   }
 });
 
+it('freezes live source identity and preserves range during physical preview seeks', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const advanced = createQuickEditAdvancedState();
+  const seek = vi.fn();
+  const props = inspectorFixture(advanced, [], vi.fn(), seek, vi.fn(), (action) => action());
+  try {
+    const mainVideo = document.createElement('video');
+    mainVideo.currentTime = 99;
+    const liveProps: ComponentProps<typeof ReviewInspectorBinding> = {
+      ...props,
+      resource: {
+        ...props.resource,
+        url: 'blob:frozen',
+        source: { ...props.resource.source, width: 320, height: 180, duration: 12 },
+      },
+      state: {
+        ...props.state,
+        playing: true,
+        time: 0.5,
+        seekRevision: 7,
+        video: { current: mainVideo },
+        features: { ...props.state.features, zoomRegions: [], background: advanced.background },
+        timeline: {
+          ...props.state.timeline,
+          sceneOutputTime: 2,
+          timeMap: {
+            ...props.state.timeline.timeMap,
+            getSegments: () => [
+              {
+                kind: 'cut',
+                sourceStart: 0,
+                sourceEnd: 0.25,
+                resultStart: 2,
+                resultEnd: 2,
+                rate: 1,
+              },
+              {
+                kind: 'keep',
+                sourceStart: 0.25,
+                sourceEnd: 1,
+                resultStart: 2,
+                resultEnd: 2.75,
+                rate: 1,
+              },
+            ],
+          },
+        },
+      },
+    };
+    await act(async () => root.render(<ReviewInspectorBinding {...liveProps} />));
+    expect(selectedProbe.mock.lastCall![0].playback.source).toEqual({
+      url: 'blob:frozen',
+      time: 0.5,
+      seekRevision: 7,
+      segmentStart: 0.25,
+    });
+    expect(selectedProbe.mock.lastCall![0].focusTime).toBe(2);
+    expect(mainVideo.currentTime).toBe(99);
+
+    const selectedRange = { kind: 'range' as const, start: 0.25, end: 1 };
+    await act(async () =>
+      root.render(
+        <ReviewInspectorBinding
+          {...liveProps}
+          state={{ ...liveProps.state, selection: selectedRange }}
+        />
+      )
+    );
+    expect(selectedProbe.mock.lastCall![0].webcamRange).toBe(selectedRange);
+    const pauseMain = vi.spyOn(mainVideo, 'pause').mockImplementation(() => {});
+    await act(async () => selectedProbe.mock.lastCall![0].onPreviewFrame(0.75));
+    expect(pauseMain).toHaveBeenCalledOnce();
+    expect(seek).toHaveBeenLastCalledWith(0.75, false);
+    expect(selectedProbe.mock.lastCall![0].webcamRange).toBe(selectedRange);
+    expect(selectedRange).toEqual({ kind: 'range', start: 0.25, end: 1 });
+    await act(async () =>
+      root.render(
+        <ReviewInspectorBinding {...liveProps} state={{ ...liveProps.state, time: 12 }} />
+      )
+    );
+    expect(selectedProbe.mock.lastCall![0].playback.source).toEqual({
+      url: 'blob:frozen',
+      time: 12,
+      seekRevision: 7,
+      segmentStart: null,
+    });
+    await act(async () =>
+      root.render(
+        <ReviewInspectorBinding
+          {...liveProps}
+          state={{ ...liveProps.state, video: { current: null } }}
+        />
+      )
+    );
+    expect(selectedProbe.mock.lastCall![0].playback).toBeUndefined();
+    expect(selectedProbe.mock.lastCall![0].mainVideo).toBeUndefined();
+    await act(async () => selectedProbe.mock.lastCall![0].onPreviewFrame(0.8));
+    expect(pauseMain).toHaveBeenCalledOnce();
+    expect(seek).toHaveBeenLastCalledWith(0.8, false);
+    const replacementVideo = document.createElement('video');
+    const pauseReplacement = vi.spyOn(replacementVideo, 'pause').mockImplementation(() => {});
+    const replacementSeek = vi.fn();
+    await act(async () =>
+      root.render(
+        <ReviewInspectorBinding
+          {...liveProps}
+          resource={{ ...liveProps.resource, url: 'blob:replacement' }}
+          state={{
+            ...liveProps.state,
+            seekRevision: 8,
+            seek: replacementSeek,
+            video: { current: replacementVideo },
+          }}
+        />
+      )
+    );
+    expect(selectedProbe.mock.lastCall![0].playback.source).toEqual({
+      url: 'blob:replacement',
+      time: 0.5,
+      seekRevision: 8,
+      segmentStart: 0.25,
+    });
+    await act(async () => selectedProbe.mock.lastCall![0].onPreviewFrame(0.9));
+    expect(pauseReplacement).toHaveBeenCalledOnce();
+    expect(pauseMain).toHaveBeenCalledOnce();
+    expect(replacementSeek).toHaveBeenCalledWith(0.9, false);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
 /** The binding delegates only a canonical contiguous compatible-clock selection to Cut. */
 async function checkTextTemporalActions(
   root: ReturnType<typeof createRoot>,
@@ -572,6 +723,18 @@ async function checkHistoryPlaybackIsolation(
     ref: { kind: 'action', id: 'recorded' },
   });
   expect(section).toHaveBeenCalledWith('selected');
+  await act(async () =>
+    root.render(
+      <ReviewInspectorBinding
+        {...current}
+        state={{ ...current.state, activeSelection: select.mock.lastCall![0] }}
+      />
+    )
+  );
+  await act(async () => selectedProbe.mock.lastCall![0].onOpenHistory());
+  expect(section).toHaveBeenLastCalledWith('history');
+  expect(pause).toHaveBeenCalledOnce();
+  expect(seek).toHaveBeenCalledOnce();
   const blocked = { ...current, state: { ...current.state, beforeAction: vi.fn() } };
   await act(async () => root.render(<ReviewInspectorBinding {...blocked} />));
   await act(async () => button.click());

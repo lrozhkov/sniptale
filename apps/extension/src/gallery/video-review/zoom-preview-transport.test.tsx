@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import * as canvasModule from './zoom-preview-canvas';
+import * as blurModule from './motion-blur-preview';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -115,4 +117,49 @@ it('paints live transport, then restores the target and cancels animation on sto
   await render(1);
   await act(async () => root.render(null));
   expect(requests.size).toBe(0);
+});
+
+it('keeps auxiliary fallback pixels paired with the accepted live camera snapshot', async () => {
+  const image = document.createElement('canvas');
+  image.width = 640;
+  image.height = 360;
+  const paint = vi.spyOn(canvasModule, 'ZoomPreviewCanvas').mockImplementation(() => <canvas />);
+  const blur = vi.spyOn(blurModule, 'ReviewMotionBlurPreview').mockImplementation(() => null);
+  const video = document.createElement('video');
+  video.currentTime = 99;
+  const selected = region();
+  const loadFrame = vi.fn(async () => frame);
+  const show = (time: number, sceneTime: number, scale: number) =>
+    act(async () =>
+      root.render(
+        <ReviewZoomPreview
+          region={selected}
+          background={{ ...background, enabled: false }}
+          source={{ width: 640, height: 360 }}
+          sourceTime={3}
+          loadFrame={loadFrame}
+          onChange={vi.fn()}
+          focus={{ regions: [selected], time: sceneTime }}
+          playback={{
+            video,
+            camera: { scale, centerX: 0.5, centerY: 0.5 },
+            source: { url: 'blob:frozen', time, seekRevision: 0, segmentStart: 0 },
+          }}
+        />
+      )
+    );
+  await show(0.5, 2, 2);
+  const queued = paint.mock.lastCall![0];
+  await act(async () => {
+    queued.onPresented?.({ ...queued, frame: { image, width: 640, height: 360 } });
+    queued.onPaintReady?.(true);
+  });
+  expect(blur.mock.lastCall![0].getFrame()).toBe(image);
+  expect(blur.mock.lastCall![0].camera.scale).toBe(2);
+  expect(blur.mock.lastCall![0].focus?.time).toBe(2);
+  await show(0.6, 2.1, 3);
+  expect(blur.mock.lastCall![0].getFrame()).toBe(image);
+  expect(blur.mock.lastCall![0].camera.scale).toBe(2);
+  expect(blur.mock.lastCall![0].focus?.time).toBe(2);
+  expect(video.currentTime).toBe(99);
 });

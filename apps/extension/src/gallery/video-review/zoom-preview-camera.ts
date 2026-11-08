@@ -43,7 +43,18 @@ export type ZoomPreviewProps = {
   sourceTime: number | null;
   loadFrame: ZoomPreviewFrameLoader | null;
   /** Read-only transport sample while playing; paused editing retains the selected target. */
-  playback?: { video: HTMLVideoElement; camera: QuickEditZoomRegion['transform'] } | undefined;
+  playback?:
+    | {
+        video: HTMLVideoElement;
+        camera: QuickEditZoomRegion['transform'];
+        source?: {
+          readonly url: string;
+          readonly time: number;
+          readonly seekRevision: number;
+          readonly segmentStart?: number | null;
+        };
+      }
+    | undefined;
   onInteract?: ((sourceTime: number) => void) | undefined;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;

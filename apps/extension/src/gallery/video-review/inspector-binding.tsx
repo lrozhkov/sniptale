@@ -66,6 +66,7 @@ type InspectorState = Pick<
   | 'video'
   | 'time'
   | 'playing'
+  | 'seekRevision'
   | 'play'
   | 'features'
   | 'selected'
@@ -754,6 +755,20 @@ function ReviewSelectionBinding({
         state.playing && video.current
           ? {
               video: video.current,
+              source: {
+                url: resource.url,
+                time: state.time,
+                seekRevision: state.seekRevision,
+                segmentStart:
+                  state.timeline.timeMap
+                    .getSegments()
+                    .find(
+                      (part) =>
+                        part.kind !== 'cut' &&
+                        state.time >= part.sourceStart &&
+                        state.time < part.sourceEnd
+                    )?.sourceStart ?? null,
+              },
               camera: evaluateQuickEditCameraAtTime(
                 state.features.zoomRegions,
                 state.timeline.sceneOutputTime,

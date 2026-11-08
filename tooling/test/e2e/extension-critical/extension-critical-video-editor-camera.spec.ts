@@ -1,4 +1,4 @@
-import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
+import { enableGpuPreviewProof, installCameraFrameObserver } from '../support/gpu-preview-proof';
 import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -201,63 +201,6 @@ async function cameraGeometry(
     expect(after?.y).toBe(before?.y);
     await page.screenshot({ path: capture(`camera-mirror-${width}.png`), fullPage: false });
   }
-}
-
-function installCameraFrameObserver() {
-  if (typeof GPUDevice === 'undefined' || typeof GPUCanvasContext === 'undefined') return;
-  const surfaces = new WeakMap<HTMLCanvasElement | OffscreenCanvas, GPUDevice>();
-  const bitmaps = new WeakMap<ImageBitmap, { device: GPUDevice; timestamps: number[] }>();
-  const publications = new WeakMap<HTMLCanvasElement | OffscreenCanvas, number[]>();
-  const frames = new WeakMap<GPUDevice, number[]>();
-  const configure = GPUCanvasContext.prototype.configure;
-  const importTexture = GPUDevice.prototype.importExternalTexture;
-  GPUCanvasContext.prototype.configure = function (
-    this: GPUCanvasContext,
-    configuration: GPUCanvasConfiguration
-  ) {
-    Reflect.apply(configure, this, [configuration]);
-    surfaces.set(this.canvas, configuration.device);
-  };
-  GPUDevice.prototype.importExternalTexture = function (
-    this: GPUDevice,
-    descriptor: GPUExternalTextureDescriptor
-  ) {
-    const result = Reflect.apply(importTexture, this, [descriptor]);
-    if (descriptor.source instanceof VideoFrame) {
-      const values = frames.get(this) ?? [];
-      values.push(descriptor.source.timestamp);
-      if (values.length > 128) values.shift();
-      frames.set(this, values);
-    }
-    return result;
-  };
-  const transferToBitmap = OffscreenCanvas.prototype.transferToImageBitmap;
-  const transferFromBitmap = ImageBitmapRenderingContext.prototype.transferFromImageBitmap;
-  OffscreenCanvas.prototype.transferToImageBitmap = function (this: OffscreenCanvas) {
-    const bitmap = Reflect.apply(transferToBitmap, this, []);
-    const device = surfaces.get(this);
-    if (device) bitmaps.set(bitmap, { device, timestamps: [...(frames.get(device) ?? [])] });
-    return bitmap;
-  };
-  ImageBitmapRenderingContext.prototype.transferFromImageBitmap = function (
-    this: ImageBitmapRenderingContext,
-    bitmap: ImageBitmap | null
-  ) {
-    const snapshot = bitmap && bitmaps.get(bitmap);
-    Reflect.apply(transferFromBitmap, this, [bitmap]);
-    if (snapshot) {
-      surfaces.set(this.canvas, snapshot.device);
-      publications.set(this.canvas, snapshot.timestamps);
-    } else {
-      surfaces.delete(this.canvas);
-      publications.delete(this.canvas);
-    }
-  };
-  Object.defineProperty(window, 'sniptaleCameraFrameImports', {
-    value: (canvas: HTMLCanvasElement) => {
-      return [...(publications.get(canvas) ?? [])];
-    },
-  });
 }
 
 async function cameraFrameImports(canvas: Locator) {
