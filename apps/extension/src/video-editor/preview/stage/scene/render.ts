@@ -18,7 +18,7 @@ import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import type { PreviewSceneRenderJob } from './render-scheduler';
 import type { PreviewStageCanvasSceneParams } from './types';
 import { createVideoPreviewRenderRevision } from '../../cache/revision';
-import { renderPreviewSceneWithExactCache } from '../../cache/render';
+import { createVideoPreviewExactFrameRenderer } from '../../cache/render';
 import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
 import { resolveActivePreviewClips } from '../runtime/index';
@@ -223,10 +223,7 @@ function createPreviewStageCanvasRenderJob(args: {
       ? {
           framePresenter: args.framePresenter,
           deferFrameEvent: true,
-          // Exact-cache fills sample the fallback canvas and retain their Canvas2D contract.
-          ...(args.previewMode !== 'cache'
-            ? { acquireGpuOutput: args.framePresenter.acquire }
-            : {}),
+          acquireGpuOutput: args.framePresenter.acquire,
         }
       : {}),
     controller,
@@ -280,6 +277,9 @@ function usePreviewRenderSchedulerRef(
   const stagingRef = useRef<HTMLCanvasElement | null>(null);
   const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
   const gpuRef = useRef<ReturnType<typeof createNativeGpuPreviewRenderer> | null>(null);
+  const cacheRendererRef = useRef<ReturnType<typeof createVideoPreviewExactFrameRenderer> | null>(
+    null
+  );
   const retryRef = useRef({ version: retryVersion, renderer });
   const serialFallbackRef = useRef(false);
   if (!schedulerRef.current) {
@@ -310,6 +310,7 @@ function usePreviewRenderSchedulerRef(
       },
       onError: (error) => {
         joinsRef.current?.clear();
+        cacheRendererRef.current?.clear();
         watermarkRenderer.clear();
         const spatial = spatialRef.current;
         spatialRef.current = null;
@@ -405,7 +406,8 @@ function usePreviewRenderSchedulerRef(
           });
         };
         if (!exactFrameCache) return render(job);
-        return renderPreviewSceneWithExactCache({
+        cacheRendererRef.current ??= createVideoPreviewExactFrameRenderer();
+        return cacheRendererRef.current.render({
           cache: exactFrameCache,
           job,
           render,
@@ -419,6 +421,7 @@ function usePreviewRenderSchedulerRef(
     serialFallbackRef.current = false;
     watermarkRef.current?.clear();
     joinsRef.current?.clear();
+    cacheRendererRef.current?.clear();
     const spatial = spatialRef.current;
     spatialRef.current = null;
     spatial?.dispose();
@@ -429,6 +432,8 @@ function usePreviewRenderSchedulerRef(
     const scheduler = schedulerRef.current;
     return () => {
       scheduler?.dispose();
+      cacheRendererRef.current?.dispose();
+      cacheRendererRef.current = null;
       joinsRef.current?.dispose();
       joinsRef.current = null;
       captionsRef.current?.clear();

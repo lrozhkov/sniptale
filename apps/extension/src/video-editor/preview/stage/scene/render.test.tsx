@@ -42,6 +42,8 @@ vi.mock('./render-preview', async (original) => ({
 }));
 import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
 import * as nativeGpu from './gpu-preview';
+import * as cachedGpu from '../../cache/render';
+import { createVideoPreviewExactFrameCache } from '../../cache/exact-frame-cache';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import { createReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 vi.mock('../../../../features/video/composition/canvas/spatial-renderer', () => ({
@@ -61,8 +63,10 @@ let root: Root | null = null;
 function RenderHarness({
   retryVersion = 0,
   framePresenterRef,
+  cache,
 }: {
   retryVersion?: number;
+  cache?: PreviewStageCanvasSceneParams['previewExactFrameCache'];
   framePresenterRef?: React.RefObject<GpuPreviewFramePresenter | null>;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
@@ -70,6 +74,7 @@ function RenderHarness({
 
   usePreviewStageCanvasRender({
     activeClips: [],
+    ...(cache ? { previewExactFrameCache: cache, previewMode: 'cache' as const } : {}),
     canvasRef,
     ...(framePresenterRef ? { framePresenterRef } : {}),
     currentTime: 0,
@@ -513,11 +518,18 @@ it('holds a dependency transition until the committed media is ready, then refre
 });
 it('retains the React time path for cache playback', async () => {
   let request: PlaybackRequest | undefined;
+  const presenter: GpuPreviewFramePresenter = {
+    acquire: vi.fn<GpuPreviewFramePresenter['acquire']>(),
+    publish: vi.fn(),
+  };
+  const framePresenterRef = React.createRef<GpuPreviewFramePresenter>();
+  framePresenterRef.current = presenter;
   function CacheHarness({ time }: { time: number }) {
     const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
     const stageRef = React.useRef<HTMLDivElement | null>(null);
     usePreviewStageCanvasRender({
       activeClips: [],
+      framePresenterRef,
       canvasRef,
       stageRef,
       currentTime: time,
@@ -549,6 +561,8 @@ it('retains the React time path for cache playback', async () => {
   expect(schedulerMocks.enqueueMock.mock.calls.at(-1)?.[0]).toMatchObject({
     currentTime: 1,
     previewMode: 'cache',
+    framePresenter: presenter,
+    acquireGpuOutput: presenter.acquire,
   });
 });
 
@@ -815,4 +829,42 @@ it('starts future effect readiness only after the previous renderer context drai
   finish();
   await vi.waitFor(() => expect(callback).toHaveBeenCalledOnce());
   scheduler.dispose();
+});
+
+it('keeps one cache renderer across retry and retires it without clearing caller cache data', async () => {
+  const cache = createVideoPreviewExactFrameCache(64);
+  const clearData = vi.spyOn(cache, 'clear');
+  const cached = {
+    clear: vi.fn(),
+    dispose: vi.fn(),
+    render: vi.fn<ReturnType<typeof cachedGpu.createVideoPreviewExactFrameRenderer>['render']>(
+      async () => undefined
+    ),
+  };
+  const createCached = vi
+    .spyOn(cachedGpu, 'createVideoPreviewExactFrameRenderer')
+    .mockReturnValue(cached);
+  await act(async () => root?.render(<RenderHarness cache={cache} />));
+  const options = vi.mocked(createPreviewSceneRenderScheduler).mock.calls.at(-1)![0];
+  const input = {
+    canvas: document.createElement('canvas'),
+    currentTime: 0,
+    imageBank: {},
+    project: createEmptyVideoProject('Cached frame'),
+    stage: null,
+    videoRefs: { current: {} },
+  };
+  await options.render(input);
+  expect(createCached).toHaveBeenCalledOnce();
+  expect(cached.render.mock.calls[0]?.[0]).toMatchObject({ cache, job: input });
+  options.onError?.(new Error('Frame failed'));
+  expect(cached.clear).toHaveBeenCalledOnce();
+  await act(async () => root?.render(<RenderHarness cache={cache} retryVersion={1} />));
+  expect(cached.clear).toHaveBeenCalledTimes(2);
+  await options.render(input);
+  expect(createCached).toHaveBeenCalledOnce();
+  act(() => root?.unmount());
+  root = null;
+  expect(cached.dispose).toHaveBeenCalledOnce();
+  expect(clearData).not.toHaveBeenCalled();
 });

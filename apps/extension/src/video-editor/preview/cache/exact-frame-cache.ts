@@ -6,9 +6,20 @@ interface ExactFrameEntry {
   bitmap: ImageBitmap;
   presentation: PreviewScenePresentation | undefined;
   byteLength: number;
+  readers: number;
+  retired: boolean;
+}
+
+/** A reader pins one cached bitmap and its matching geometry until completion. */
+interface VideoPreviewExactFrameLease {
+  readonly bitmap: ImageBitmap;
+  readonly presentation: PreviewScenePresentation | undefined;
+  release(): void;
 }
 
 export interface VideoPreviewExactFrameCache {
+  /** Release the acquired reader after all asynchronous pixel use completes. */
+  acquire(key: string): VideoPreviewExactFrameLease | null;
   clear(): void;
   get(key: string): ImageBitmap | null;
   getPresentation(key: string): PreviewScenePresentation | null;
@@ -26,15 +37,45 @@ export function createVideoPreviewExactFrameCache(
   const entries = new Map<string, ExactFrameEntry>();
   let retainedBytes = 0;
 
-  function deleteEntry(key: string): void {
-    const entry = entries.get(key);
-    if (!entry) return;
-    entries.delete(key);
+  function closeEntry(entry: ExactFrameEntry): void {
     retainedBytes -= entry.byteLength;
     entry.bitmap.close();
   }
 
+  function touchEntry(key: string): ExactFrameEntry | undefined {
+    const entry = entries.get(key);
+    if (entry) {
+      entries.delete(key);
+      entries.set(key, entry);
+    }
+    return entry;
+  }
+
+  function deleteEntry(key: string): void {
+    const entry = entries.get(key);
+    if (!entry) return;
+    entries.delete(key);
+    entry.retired = true;
+    if (entry.readers === 0) closeEntry(entry);
+  }
+
   return {
+    acquire(key) {
+      const entry = touchEntry(key);
+      if (!entry) return null;
+      entry.readers += 1;
+      let released = false;
+      return {
+        bitmap: entry.bitmap,
+        presentation: entry.presentation,
+        release() {
+          if (released) return;
+          released = true;
+          entry.readers -= 1;
+          if (entry.retired && entry.readers === 0) closeEntry(entry);
+        },
+      };
+    },
     get byteLength() {
       return retainedBytes;
     },
@@ -42,11 +83,7 @@ export function createVideoPreviewExactFrameCache(
       for (const key of entries.keys()) deleteEntry(key);
     },
     get(key) {
-      const entry = entries.get(key);
-      if (!entry) return null;
-      entries.delete(key);
-      entries.set(key, entry);
-      return entry.bitmap;
+      return touchEntry(key)?.bitmap ?? null;
     },
     getPresentation(key) {
       return entries.get(key)?.presentation ?? null;
@@ -60,10 +97,19 @@ export function createVideoPreviewExactFrameCache(
       deleteEntry(key);
       while (retainedBytes + byteLength > maxBytes) {
         const oldestKey = entries.keys().next().value as string | undefined;
-        if (!oldestKey) break;
+        if (oldestKey === undefined) break;
         deleteEntry(oldestKey);
       }
-      entries.set(key, { bitmap, byteLength, presentation });
+      if (retainedBytes + byteLength > maxBytes) {
+        bitmap.close();
+        return 'capacity-limited';
+      }
+      let metadata = presentation;
+      if (presentation && 'output' in presentation) {
+        metadata = { ...presentation };
+        delete metadata.output;
+      }
+      entries.set(key, { bitmap, byteLength, presentation: metadata, readers: 0, retired: false });
       retainedBytes += byteLength;
       return 'stored';
     },

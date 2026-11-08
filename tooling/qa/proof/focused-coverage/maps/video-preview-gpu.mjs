@@ -1,5 +1,31 @@
 export const VIDEO_PREVIEW_GPU_OWNER_MAPPINGS = [
   {
+    owner: 'native-exact-frame-bitmap-leases',
+    productionFile: 'apps/extension/src/video-editor/preview/cache/exact-frame-cache.ts',
+    reason:
+      'Cached pixels and metadata remain borrowed through GPU completion and existing cache writers.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/cache/exact-frame-cache.test.ts',
+      'apps/extension/src/video-editor/preview/cache/render.test.ts',
+      'apps/extension/src/video-editor/preview/cache/build-exact.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-resume.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-lifecycle.test.ts',
+    ],
+  },
+  {
+    owner: 'native-stage-cache-publication',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/scene/render.ts',
+    reason:
+      'The scheduler owns a cache renderer lifetime and transfers completed output with its camera.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/render-scheduler.test.ts',
+      'apps/extension/src/video-editor/preview/cache/render.test.ts',
+      'apps/extension/src/video-editor/preview/cache/exact-frame-cache.test.ts',
+    ],
+  },
+  {
     owner: 'shared-gpu-destination-admission',
     productionFile: 'apps/extension/src/features/video/composition/canvas/gpu-preview.ts',
     allowCrossOwner: true,

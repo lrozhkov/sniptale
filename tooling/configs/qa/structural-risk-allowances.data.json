@@ -6177,10 +6177,10 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/render.ts",
       "symbol": "usePreviewRenderSchedulerRef",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One mounted preview session owns its scheduler, renderer and helper retirement. The scheduler owns bounded admission and drains GPU work before fallback or error cleanup. The hook supplies dependencies and publishes image with geometry.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-07",
-      "astHash": "d9a3934b012e71c8a41e795dcfcc3f69a17326a74055bb24c42a6a81a2ba3935",
+      "reason": "tool-noise: One mounted preview session coordinates scheduler dependencies, publication and renderer retirement. Its exact-cache renderer follows the existing error, retry, renderer-change and unmount lifecycle. The injected factory owns GPU composition; the caller retains cache-data ownership. Extracting its reference would distribute this coordinated lifecycle. Independent read-only structural diagnosis confirmed Keep. Fresh candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent queue, resource, publication, state, cache-data or fixture ownership. Remove when the analyzer models this cohesive lifecycle.",
+      "reviewDate": "2026-11-08",
+      "astHash": "146244ecceff7b9d86f4b845d13778089574f54a20671851750bbb7bd3bd45a7",
       "signatureHash": "2c629f4f939552b210db20350dffa3a44a616b1c0626c2fd6c9dd93d60a95705"
     },
     {
@@ -6243,11 +6243,11 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/render.test.tsx",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One scheduler fixture checks admitted rendering and resource cleanup. New preload tests use the same controlled renderer and pending jobs. The candidate adds no separate fixture or state owner. A fresh architecture review must check this exact binding.",
-      "removalCondition": "Remove this allowance when the AST or signature changes. Reassess any separate queue, runtime, resource or fixture owner. Remove it when the analyzer models this proof owner.",
-      "reviewDate": "2026-11-07",
-      "astHash": "1515472cabc5dfb275e787b93236ff13406b60cf1a02eee894e3137d75b1b736",
-      "signatureHash": "d92be55f94dcd9a52c8301399a1673cf839abb5f6fc0e6bd9277a5d6474d6742"
+      "reason": "tool-noise: One mounted preview hook fixture checks scheduler wiring, publication and cleanup. The exact-cache case reuses its React root, scheduler mock and RenderHarness. It proves dependency reuse and retirement without clearing caller cache data. GPU and bitmap lifetime proof stays beside the cache renderer. Independent read-only structural diagnosis confirmed Keep. Fresh candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent queue, resource, publication, state, cache-data or fixture ownership. Remove when the analyzer models this cohesive lifecycle.",
+      "reviewDate": "2026-11-08",
+      "astHash": "f48ecb285402763234ccd0ef405be0c438e23e292cf2426afe2e689a676adbf1",
+      "signatureHash": "25bb7b651e32706be425139ee904c2c8dfc5c7cd4c5e44d0e80d6ac4c5d9e334"
     },
     {
       "rule": "structural-file-risk",

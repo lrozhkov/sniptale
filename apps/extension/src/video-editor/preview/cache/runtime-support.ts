@@ -179,18 +179,28 @@ export function isStoredVideoPreviewCompatible(
   );
 }
 
+/** Consumes the completed frame output after snapshot capture settles, including failure. */
 export async function cacheExactVideoPreviewFrame(
   context: FreshVideoPreviewBuildContext,
   frameIndex: number,
   frame: MaterializedPreviewFrame
 ): Promise<boolean> {
-  if (typeof createImageBitmap !== 'function') return false;
-  const bitmap = await createImageBitmap(frame.canvas);
-  const { params } = context;
-  return (
-    params.cache.set(createExactFrameKey(context, frameIndex), bitmap, frame.presentation) ===
-    'stored'
-  );
+  const output = frame.presentation.output;
+  try {
+    if (typeof createImageBitmap !== 'function') return false;
+    const bitmap = await createImageBitmap(output?.canvas ?? frame.canvas);
+    const { params } = context;
+    if (params.signal.aborted) {
+      bitmap.close();
+      throw new DOMException('Preview preparation was cancelled', 'AbortError');
+    }
+    return (
+      params.cache.set(createExactFrameKey(context, frameIndex), bitmap, frame.presentation) ===
+      'stored'
+    );
+  } finally {
+    output?.release();
+  }
 }
 
 export function reportVideoPreviewBuildProgress(
