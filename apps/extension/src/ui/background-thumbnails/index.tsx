@@ -55,7 +55,7 @@ export function BackgroundThumbnails(props: BackgroundThumbnailsProps) {
             aria-disabled={props.pending || props.disabled || item.disabled || false}
             onDragStart={(event) => event.preventDefault()}
             className={[
-              'relative h-8 min-w-0 cursor-pointer overflow-hidden rounded border',
+              'relative h-8 min-w-0 cursor-pointer overflow-hidden rounded border bg-clip-padding',
               'border-[var(--sniptale-color-border-subtle)]',
               'transition-opacity hover:opacity-80 aria-pressed:outline',
               item.loading ? 'disabled:opacity-100' : 'disabled:opacity-40',

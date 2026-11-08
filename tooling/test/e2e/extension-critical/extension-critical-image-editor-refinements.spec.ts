@@ -6,11 +6,16 @@ import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critica
 
 test.use({ actionTimeout: 10000 });
 
-async function openEditor(page: Page, hostOrigin: string, locale: 'en' | 'ru') {
+async function openEditor(
+  page: Page,
+  hostOrigin: string,
+  locale: 'en' | 'ru',
+  theme = page.viewportSize()?.width === 1920 ? 'dark' : 'light'
+) {
   await applyHarnessBootstrap(page, {
     storage: {
       'sniptale-locale-preference': locale,
-      'sniptale-theme-preference': page.viewportSize()?.width === 1920 ? 'dark' : 'light',
+      'sniptale-theme-preference': theme,
     },
   });
   await page.addInitScript(
@@ -564,6 +569,7 @@ for (const locale of ['en', 'ru'] as const) {
       expect(await presets.locator('button[style*="background-color"]').count()).toBeGreaterThan(0);
       expect(await presets.locator('button[style*="background-image"]').count()).toBeGreaterThan(0);
       const tile = (await presets.locator('button').first().boundingBox())!;
+      await expect(presets.locator('button').first()).toHaveCSS('background-clip', 'padding-box');
       const checkPicker = async (picker: ReturnType<Page['locator']>) => {
         await expect(picker).toBeVisible();
         const box = (await picker.boundingBox())!;
@@ -612,6 +618,154 @@ for (const locale of ['en', 'ru'] as const) {
       const picker = page.locator('[data-ui="shared.ui.color-selector.picker"]');
       await page.screenshot({ path: info.outputPath('nearby-color-picker.png'), fullPage: false });
       await checkPicker(picker);
+    });
+  }
+}
+
+for (const locale of ['en', 'ru'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`short editor panel consistency ${locale} ${theme}`, async ({
+      page,
+      hostOrigin,
+    }, info) => {
+      await page.setViewportSize({ width: 1280, height: 560 });
+      await openEditor(page, hostOrigin, locale, theme);
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+      const owner = page.locator('[data-ui="editor.floating.layers-panel"]');
+      const scroller = page.locator('[data-ui="editor.floating.inspector-scroll"]');
+      const checkBounds = async () => {
+        const bounds = (await owner.boundingBox())!;
+        expect(bounds.y).toBeGreaterThanOrEqual(0);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(560);
+        expect(await scroller.evaluate((n) => n.scrollWidth - n.clientWidth)).toBeLessThanOrEqual(
+          1
+        );
+      };
+      const capture = async (name: string) => {
+        await page.mouse.move(400, 200);
+        await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: false });
+      };
+      for (const mode of [
+        'frame',
+        'browser-frame',
+        'meta',
+        'image-size',
+        'canvas-size',
+        'layers',
+      ]) {
+        await page.locator(`[data-ui="editor.floating.layers.mode.${mode}"]`).click();
+        await expect(owner).toBeVisible();
+        if (mode === 'layers') {
+          await capture('layers');
+          continue;
+        }
+        if (mode === 'frame') {
+          await page.locator('[data-ui="editor.frame.background-mode"] button').nth(1).click();
+          await expect(page.locator('[data-ui="editor.frame.paint-presets"]')).toBeVisible();
+          const tile = page.locator('[data-ui="editor.frame.paint-presets"] button').first();
+          await expect(tile).toHaveCSS('background-clip', 'padding-box');
+          const paintBounds = (await tile.boundingBox())!;
+          await capture('background-paint');
+          await page.locator('[data-ui="editor.frame.background-mode"] button').nth(2).click();
+          const image = page.locator('[data-ui="background.image.picker"] img').first();
+          await expect(image).toBeVisible();
+          const imageBounds = (await image.boundingBox())!;
+          expect(Math.abs(paintBounds.height - 2 - imageBounds.height)).toBeLessThanOrEqual(1);
+          expect(Math.abs(paintBounds.width - 2 - imageBounds.width)).toBeLessThanOrEqual(1);
+          await capture('background-image');
+        }
+        if (mode === 'browser-frame') {
+          for (const kind of ['windowHeader.browser', 'windowHeader.application'] as const) {
+            const button = page.getByRole('button', { name: label(kind), exact: true });
+            await button.click();
+            await expect(button).toHaveAttribute('aria-pressed', 'true');
+            await capture(kind);
+          }
+        }
+        if (mode === 'meta') {
+          await page.locator('[data-ui="editor.technical-data.field-date"]').check();
+          await page.locator('[data-ui="editor.technical-data.field-url"]').check();
+        }
+        const summaries = page.locator('[data-ui="editor.inspector.disclosure"] > summary');
+        for (let i = 0; i < (await summaries.count()); i++) {
+          const summary = summaries.nth(i);
+          if ((await summary.locator('..').getAttribute('open')) === null) await summary.click();
+        }
+        await checkBounds();
+        await scroller.evaluate((n) => {
+          n.scrollTop = 0;
+        });
+        await capture(`${mode}-top`);
+        const pickerTrigger = owner
+          .locator(
+            '[data-ui="shared.ui.color-selector.picker-trigger"], [data-ui="shared.ui.paint-selector.trigger"]'
+          )
+          .first();
+        if (await pickerTrigger.count()) {
+          await pickerTrigger.click();
+          const picker = page
+            .locator(
+              '[data-ui="shared.ui.color-selector.picker"], [data-ui="shared.ui.paint-selector.popup"]'
+            )
+            .first();
+          await expect(picker).toBeVisible();
+          const box = (await picker.boundingBox())!;
+          expect(box.y).toBeGreaterThanOrEqual(0);
+          expect(box.y + box.height).toBeLessThanOrEqual(560);
+          await capture(`${mode}-picker`);
+          await picker
+            .getByRole('button', { name: label('common.actions.cancel'), exact: true })
+            .click();
+          await expect(picker).toHaveCount(0);
+        }
+        await scroller.evaluate((n) => {
+          n.scrollTop = n.scrollHeight;
+        });
+        await capture(`${mode}-bottom`);
+      }
+      for (const tool of ['pencil', 'marker', 'text', 'shape', 'arrow', 'blur', 'simplify']) {
+        await page.locator(`[data-ui="editor.floating.tool-rail.${tool}"]`).click();
+        const options = page.locator('[data-ui="editor.floating.tool-properties"]');
+        await expect(options).toBeVisible();
+        const box = (await options.boundingBox())!;
+        expect(box.y).toBeGreaterThanOrEqual(0);
+        expect(box.y + box.height).toBeLessThanOrEqual(560);
+        await capture(`tool-${tool}`);
+        const swatch = options
+          .locator('[data-ui="shared.ui.color-selector.picker-trigger"]')
+          .first();
+        if (await swatch.count()) {
+          await swatch.click();
+          const picker = page.locator('[data-ui="shared.ui.color-selector.picker"]');
+          await expect(picker).toBeVisible();
+          const pickerBox = (await picker.boundingBox())!;
+          expect(pickerBox.y).toBeGreaterThanOrEqual(0);
+          expect(pickerBox.y + pickerBox.height).toBeLessThanOrEqual(560);
+          await capture(`tool-${tool}-picker`);
+          await picker
+            .getByRole('button', { name: label('common.actions.cancel'), exact: true })
+            .click();
+        }
+      }
+      await page.locator('[data-ui="editor.floating.view-controls.workspace"]').click();
+      const workspace = page.locator('[data-ui="editor.floating.view-controls.popover.workspace"]');
+      await expect(workspace).toBeVisible();
+      await capture('workspace');
+      const value = workspace.locator('[data-ui="shared.ui.color-selector.value-trigger"]');
+      const accepted = await value.textContent();
+      await workspace
+        .locator('[data-ui="shared.ui.color-selector.picker-trigger"]')
+        .first()
+        .click();
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker"]');
+      await expect(picker).toBeVisible();
+      await picker.locator('.sniptale-color-plane').click({ position: { x: 80, y: 50 } });
+      await expect(workspace).toBeVisible();
+      await capture('workspace-picker');
+      await picker
+        .getByRole('button', { name: label('common.actions.cancel'), exact: true })
+        .click();
+      await expect(value).toHaveText(accepted ?? '');
     });
   }
 }
