@@ -1,4 +1,4 @@
-import { prepare, render, paint, ENGINE_VERSION } from './engine/render.mjs';
+import { prepare, render, paint, drawReplacement, ENGINE_VERSION } from './engine/render.mjs';
 import { sampleBackground } from './engine/detector.mjs';
 import { attachEraseSupport } from './engine/erasures.mjs';
 import type { SimplifySettings } from './settings';
@@ -107,8 +107,28 @@ export function createSimplifyRaster(input: SimplifyPixelSource): SimplifyRaster
         context.clip();
         const bg = sampleBackground(image, bounds);
         const proposal = { ...bounds, bg, shape: settings.manualKind };
-        const box = settings.manualKind === 'text' ? attachEraseSupport(image, proposal) : proposal;
-        paint(context, box, style);
+        if (settings.manualKind === 'image') {
+          paint(context, proposal, style);
+          return;
+        }
+        const lineHeight = Math.min(16, bounds.h);
+        const pitch = lineHeight * settings.lineSpacing;
+        const count = 1 + Math.floor((bounds.h - lineHeight) / pitch);
+        const top = bounds.y + (bounds.h - lineHeight - (count - 1) * pitch) / 2;
+        // Restore the complete source area once. Additional rows only paint replacements.
+        const box = attachEraseSupport(image, proposal);
+        paint(
+          context,
+          {
+            ...box,
+            textSize: Math.max(2, lineHeight - 4),
+            textHeightLimit: lineHeight,
+            textCenterY: top + lineHeight / 2,
+          },
+          style
+        );
+        for (let row = 1; row < count; row++)
+          drawReplacement(context, { ...proposal, y: top + row * pitch, h: lineHeight }, style);
       } finally {
         context.restore();
       }

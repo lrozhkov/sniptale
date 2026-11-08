@@ -273,3 +273,110 @@ it.each([36, 40])(
     expect(replacement).toBeGreaterThan(500);
   }
 );
+
+function replacementBands(output: ReturnType<typeof canvas>, x: number, y: number, height: number) {
+  const pixels = output.context.getImageData(x, y, 1, height).data;
+  const bands: { y: number; height: number }[] = [];
+  for (let row = 0; row < height; row++) {
+    const at = row * 4;
+    if (pixels[at] !== 64 || pixels[at + 1] !== 80 || pixels[at + 2] !== 101) continue;
+    const previous = bands.at(-1);
+    if (previous && previous.y + previous.height === row) previous.height++;
+    else bands.push({ y: row, height: 1 });
+  }
+  return bands;
+}
+
+it.each([
+  [1, 7],
+  [1.5, 5],
+  [2, 4],
+] as const)(
+  'manual text spacing %s paints %s equal rows and removes source ink between them',
+  (lineSpacing, count) => {
+    const source = canvas(120, 144);
+    source.context.fillStyle = '#f5f5f5';
+    source.context.fillRect(0, 0, 120, 144);
+    source.context.fillStyle = '#202020';
+    for (let y = 12; y < 116; y += 9) source.context.fillRect(20, y, 50, 2);
+    const image = source.context.getImageData(0, 0, 120, 144);
+    const original = image.data.slice();
+    const output = canvas(120, 144);
+    createSimplifyRaster(image).render(
+      output.context,
+      source.element,
+      { x: 12, y: 8, width: 80, height: 112 },
+      {
+        ...createDefaultSimplifySettings(),
+        automatic: false,
+        manualKind: 'text',
+        lineSpacing,
+        color: '#405065',
+      }
+    );
+    const bands = replacementBands(output, 30, 8, 112);
+    expect(bands).toHaveLength(count);
+    expect(new Set(bands.map((b) => b.height))).toEqual(new Set([6]));
+    expect(new Set(bands.slice(1).map((b, i) => b.y - bands[i]!.y))).toEqual(
+      new Set([16 * lineSpacing])
+    );
+    const pixels = output.context.getImageData(30, 8, 1, 112).data;
+    for (let y = 0; y < 112; y++) {
+      if (bands.some((b) => y >= b.y && y < b.y + b.height)) continue;
+      expect([...pixels.slice(y * 4, y * 4 + 4)]).toEqual([245, 245, 245, 255]);
+    }
+    expect(output.context.getImageData(0, 0, 120, 8).data).toEqual(
+      source.context.getImageData(0, 0, 120, 8).data
+    );
+    expect(image.data).toEqual(original);
+  }
+);
+it('manual height adds rows while width changes and repeated resize preserve row thickness', () => {
+  const source = canvas(120, 160);
+  source.context.fillStyle = '#ffffff';
+  source.context.fillRect(0, 0, 120, 160);
+  const raster = createSimplifyRaster(source.context.getImageData(0, 0, 120, 160));
+  const output = canvas(120, 160);
+  const settings = { ...createDefaultSimplifySettings(), automatic: false, color: '#405065' };
+  for (const [height, width, count] of [
+    [16, 60, 1],
+    [64, 80, 3],
+    [112, 60, 5],
+    [16, 80, 1],
+  ]) {
+    raster.render(
+      output.context,
+      source.element,
+      { x: 8, y: 8, width: width!, height: height! },
+      settings
+    );
+    const bands = replacementBands(output, 30, 8, height!);
+    expect(bands).toHaveLength(count!);
+    expect(bands.every((b) => b.height === 6)).toBe(true);
+  }
+  raster.render(output.context, source.element, { x: 8, y: 8, width: 60, height: 3 }, settings);
+  expect(replacementBands(output, 30, 0, 160)).toHaveLength(1);
+});
+it.each([true, false])('spacing has no effect on automatic=%s image content', (automatic) => {
+  const source = canvas(80, 40);
+  source.context.fillStyle = '#eeeeee';
+  source.context.fillRect(0, 0, 80, 40);
+  const raster = createSimplifyRaster(source.context.getImageData(0, 0, 80, 40));
+  const outputs = [1, 2] as const;
+  const rendered = outputs.map((lineSpacing) => {
+    const output = canvas(80, 40);
+    raster.render(
+      output.context,
+      source.element,
+      { x: 0, y: 0, width: 80, height: 40 },
+      {
+        ...createDefaultSimplifySettings(),
+        automatic,
+        manualKind: 'image',
+        lineSpacing,
+      }
+    );
+    return output.context.getImageData(0, 0, 80, 40).data;
+  });
+  expect(rendered[0]).toEqual(rendered[1]);
+});

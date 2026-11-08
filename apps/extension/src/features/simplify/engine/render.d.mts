@@ -18,3 +18,5 @@ export function render(
   region: { x: number; y: number; w: number; h: number }
 ): void;
 export function paint(context: SimplifyPaintContext, box: object, settings: PaintSettings): void;
+
+export function drawReplacement(context: SimplifyPaintContext, box: object, settings: PaintSettings): void;

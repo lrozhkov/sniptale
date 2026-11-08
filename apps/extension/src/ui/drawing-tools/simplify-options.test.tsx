@@ -218,3 +218,29 @@ it('keeps shared translucent palette colors opaque for Simplify', async () => {
   await act(async () => swatch.click());
   expect(change).toHaveBeenCalledExactlyOnceWith({ color: '#abcdef' });
 });
+
+it('offers three spacing icons only in manual Text and retains the choice across modes', async () => {
+  render();
+  const choices = () => host.querySelectorAll('[data-ui*="simplify.line-spacing-"]');
+  expect(choices()).toHaveLength(0);
+  await click('automatic');
+  expect(choices()).toHaveLength(3);
+  expect(option('line-spacing-1.5')?.getAttribute('aria-pressed')).toBe('true');
+  expect(
+    new Set([...choices()].map((button) => button.querySelector('path')?.getAttribute('d'))).size
+  ).toBe(3);
+  for (const value of [1, 2, 1.5]) {
+    await click(`line-spacing-${value}`);
+    expect(change).toHaveBeenLastCalledWith({ lineSpacing: value });
+    expect(option(`line-spacing-${value}`)?.getAttribute('aria-pressed')).toBe('true');
+    expect(option(`line-spacing-${value}`)?.getAttribute('aria-label')).toBeTruthy();
+  }
+  await click('manual-image');
+  expect(choices()).toHaveLength(0);
+  await click('manual-text');
+  expect(option('line-spacing-1.5')?.getAttribute('aria-pressed')).toBe('true');
+  await click('automatic');
+  expect(choices()).toHaveLength(0);
+  await click('automatic');
+  expect(option('line-spacing-1.5')?.getAttribute('aria-pressed')).toBe('true');
+});

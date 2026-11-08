@@ -6,7 +6,11 @@ import { Image, Type, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, type RefObject } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import { SIMPLIFY_THICKNESSES, type SimplifySettings } from '../../features/simplify/settings';
+import {
+  SIMPLIFY_THICKNESSES,
+  SIMPLIFY_LINE_SPACINGS,
+  type SimplifySettings,
+} from '../../features/simplify/settings';
 import { translate } from '../../platform/i18n';
 import {
   DrawingColorOptions,
@@ -33,6 +37,12 @@ const THICKNESS_LABELS = [
   'content.toolbar.drawingSimplifyThicknessThin',
   'content.toolbar.drawingSimplifyThicknessMedium',
   'content.toolbar.drawingSimplifyThicknessThick',
+] as const;
+
+const SPACING_LABELS = [
+  'content.toolbar.drawingSimplifyLineSpacingCompact',
+  'content.toolbar.drawingSimplifyLineSpacingNormal',
+  'content.toolbar.drawingSimplifyLineSpacingWide',
 ] as const;
 
 /** Renders pure Simplify controls; the consumer owns application and preview recovery. */
@@ -125,6 +135,13 @@ export function DrawingSimplifyOptions(props: DrawingSimplifyOptionsProps) {
             ))}
           </>
         ) : null}
+        {!settings.automatic && !image ? (
+          <ManualTextSpacingOptions
+            settings={settings}
+            vertical={props.vertical}
+            onChange={props.onChange}
+          />
+        ) : null}
         <DrawingOptionsDivider vertical={props.vertical} />
         <DrawingFillToggle
           filled={settings.color !== null}
@@ -172,5 +189,41 @@ export function DrawingSimplifyOptions(props: DrawingSimplifyOptionsProps) {
         ) : null}
       </div>
     </CommandPressScope>
+  );
+}
+
+function ManualTextSpacingOptions(
+  props: Pick<DrawingSimplifyOptionsProps, 'settings' | 'vertical' | 'onChange'>
+) {
+  const { settings } = props;
+  return (
+    <>
+      <DrawingOptionsDivider vertical={props.vertical} />
+      {SIMPLIFY_LINE_SPACINGS.map((value, index) => {
+        const gap = 3 + index * 3;
+        return (
+          <QuickOptionButton
+            key={value}
+            active={settings.lineSpacing === value}
+            label={translate(SPACING_LABELS[index]!)}
+            dataUi={`content.toolbar.drawing-options.simplify.line-spacing-${value}`}
+            onClick={() => props.onChange({ lineSpacing: value })}
+          >
+            <svg
+              aria-hidden="true"
+              width={17}
+              height={17}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+            >
+              <path d={`M4 ${12 - gap}h16M4 12h16M4 ${12 + gap}h16`} />
+            </svg>
+          </QuickOptionButton>
+        );
+      })}
+    </>
   );
 }

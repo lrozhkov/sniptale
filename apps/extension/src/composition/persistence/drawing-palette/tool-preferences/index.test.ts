@@ -258,6 +258,7 @@ it('reads legacy preferences without simplify and preserves remembered inactive 
       manualKind: 'image' as const,
       sensitivity: 90 as const,
       thickness: 0.65 as const,
+      lineSpacing: 2 as const,
       color: '#123456',
     },
   };
