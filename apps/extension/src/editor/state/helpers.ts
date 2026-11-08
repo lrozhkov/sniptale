@@ -51,6 +51,7 @@ type ResetDocumentState = Pick<
   | 'cropSelection'
   | 'richShapeToolSelection'
   | 'canvasCropMode'
+  | 'canvasCropAspectRatio'
   | 'layers'
   | 'selection'
   | 'history'
@@ -204,6 +205,7 @@ function createResetDocumentUiState(
   | 'cropSelection'
   | 'richShapeToolSelection'
   | 'canvasCropMode'
+  | 'canvasCropAspectRatio'
 > {
   return {
     activeTool: 'select',
@@ -226,6 +228,7 @@ function createResetDocumentUiState(
     cropSelection: null,
     richShapeToolSelection: null,
     canvasCropMode: 'crop',
+    canvasCropAspectRatio: null,
   };
 }
 

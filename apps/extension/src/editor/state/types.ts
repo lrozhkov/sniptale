@@ -64,6 +64,7 @@ interface EditorUiState {
   viewportPreviewAutomationBlockedInSession: boolean;
   showOutsideCanvas: boolean;
   canvasCropMode: 'crop' | 'expand';
+  canvasCropAspectRatio: number | null;
   saveErrorMessage: string | null;
   saveState: 'idle' | 'saving' | 'saved' | 'error';
   sessionId: string | null;
@@ -103,6 +104,7 @@ interface EditorUiActions {
   setViewportPreviewOpenFromSync: (open: boolean) => void;
   setShowOutsideCanvas: (show: boolean) => void;
   setCanvasCropMode: (mode: 'crop' | 'expand') => void;
+  setCanvasCropAspectRatio: (ratio: number | null) => void;
   setSaveErrorMessage: (message: string | null) => void;
   setSaveState: (saveState: EditorState['saveState']) => void;
   setSessionId: (sessionId: string | null) => void;

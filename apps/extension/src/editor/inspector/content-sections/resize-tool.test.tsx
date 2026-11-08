@@ -131,6 +131,7 @@ function renderResizeTool(
 
 afterEach(() => {
   useEditorStore.getState().setCanvasCropMode('crop');
+  useEditorStore.getState().setCanvasCropAspectRatio(null);
   act(() => root?.unmount());
   root = null;
   container?.remove();
@@ -469,3 +470,25 @@ function getActionButton(label: string): HTMLButtonElement {
   if (!button) throw new Error(`Missing action: ${label}`);
   return button;
 }
+
+it('updates a locked ratio when crop mode explicitly resets the size to document dimensions', () => {
+  renderResizeTool(createController(), {
+    canvasSize: { width: 1600, height: 900 },
+    canvasSizeDraft: { width: 300, height: 225 },
+  });
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.size-controls.aspect-toggle"]')
+      ?.click()
+  );
+  useEditorStore.getState().setCanvasCropAspectRatio(4 / 3);
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.segmented-row"] button:nth-child(2)'
+      )
+      ?.click()
+  );
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBe(16 / 9);
+  useEditorStore.getState().setCanvasCropAspectRatio(null);
+});

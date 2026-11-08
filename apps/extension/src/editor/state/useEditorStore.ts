@@ -64,6 +64,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   viewportPreviewAutomationBlockedInSession: false,
   showOutsideCanvas: false,
   canvasCropMode: 'crop',
+  canvasCropAspectRatio: null,
   saveErrorMessage: null,
   saveState: 'idle',
   sessionId: null,

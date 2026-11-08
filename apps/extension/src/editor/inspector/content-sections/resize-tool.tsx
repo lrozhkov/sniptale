@@ -13,6 +13,7 @@ import {
 import { AspectToggle } from '../sidebar-shared';
 import {
   applySelectedAspectRatio,
+  resolveSizeDraftAspectRatio,
   applySizePreset,
   buildAspectRatioOptions,
   buildSizePresetOptions,
@@ -164,6 +165,10 @@ export function EditorInspectorResizeToolSection(props: ResizeToolSectionProps) 
               setCanvasCropMode(cropMode);
               props.controller.clearCropSelection();
               props.setCanvasSizeDraft(props.canvasSize);
+              if (props.canvasSizeLocked)
+                useEditorStore
+                  .getState()
+                  .setCanvasCropAspectRatio(resolveSizeDraftAspectRatio(props.canvasSize));
               if (cropMode === 'expand') {
                 props.controller.previewCanvasSize(props.canvasSize.width, props.canvasSize.height);
               }
@@ -270,7 +275,11 @@ function ResizeToolSizePanel(props: {
           bounds={props.bounds}
           updateLockedDraft={props.updateLockedDraft}
         />
-        <ResizeToolAspectRatioField active={props.active} bounds={props.bounds} />
+        <ResizeToolAspectRatioField
+          active={props.active}
+          bounds={props.bounds}
+          isCanvasMode={props.isCanvasMode}
+        />
       </div>
     </section>
   );
@@ -364,6 +373,7 @@ function ResizeToolSizePresetField(props: { active: ActiveResizeState }) {
 }
 
 function ResizeToolAspectRatioField(props: {
+  isCanvasMode: boolean;
   active: ActiveResizeState;
   bounds: SizeDraft | undefined;
 }) {
@@ -373,7 +383,11 @@ function ResizeToolAspectRatioField(props: {
     <SelectField
       label={translate('editor.compact.aspectRatioPreset')}
       value={currentValue}
-      onChange={(value) => applySelectedAspectRatio(props.active.setDraft, value, props.bounds)}
+      onChange={(value) => {
+        const ratio = applySelectedAspectRatio(props.active.setDraft, value, props.bounds);
+        if (props.isCanvasMode && props.active.locked && ratio !== null)
+          useEditorStore.getState().setCanvasCropAspectRatio(ratio);
+      }}
       options={buildAspectRatioOptions()}
       placeholder={translate('editor.compact.customSizePreset')}
     />

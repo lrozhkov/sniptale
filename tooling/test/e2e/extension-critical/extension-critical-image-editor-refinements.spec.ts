@@ -769,3 +769,116 @@ for (const locale of ['en', 'ru'] as const) {
     });
   }
 }
+
+for (const { size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`canvas crop keeps locked ratio through resize handles ${size.width}x${size.height}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    await page.locator('[data-ui="editor.floating.layers.mode.canvas-size"]').click();
+    const dimensions = page.locator('[data-size-panel-dimensions]');
+    const inputs = dimensions.locator('input');
+    const documentWidth = Number(await inputs.nth(0).inputValue());
+    const documentHeight = Number(await inputs.nth(1).inputValue());
+    await inputs.nth(0).fill('305');
+    await inputs.nth(0).press('Enter');
+    await inputs.nth(1).fill('229');
+    await inputs.nth(1).press('Enter');
+    const lock = dimensions.locator('[data-ui="editor.size-controls.aspect-toggle"]');
+    await lock.click();
+    await expect(lock).toHaveAttribute('aria-pressed', 'true');
+    const controls = page.locator('[data-ui="editor.canvas.selection-controls"] circle');
+    await expect(controls).toHaveCount(4);
+    const drag = async (edge: boolean, dx: number, dy: number) => {
+      const points = await controls.evaluateAll((elements) =>
+        elements.map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+        })
+      );
+      const x = Math.max(...points.map((point) => point.x));
+      const bottom = Math.max(...points.map((point) => point.y));
+      const top = Math.min(...points.map((point) => point.y));
+      const y = edge ? (bottom + top) / 2 : bottom;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x + dx, y + dy, { steps: 8 });
+      await page.mouse.up();
+    };
+    const checkRatio = async (ratio: number) => {
+      await expect
+        .poll(async () =>
+          Math.abs(
+            Number(await inputs.nth(0).inputValue()) -
+              Number(await inputs.nth(1).inputValue()) * ratio
+          )
+        )
+        .toBeLessThanOrEqual((1 + ratio) / 2 + 0.01);
+    };
+    await drag(true, 55, 0);
+    await checkRatio(4 / 3);
+    const beforeCenteredWidth = Number(await inputs.nth(0).inputValue());
+    await page.keyboard.down('Control');
+    await drag(false, -30, 0);
+    await page.keyboard.up('Control');
+    await expect
+      .poll(async () => Number(await inputs.nth(0).inputValue()))
+      .toBeLessThan(beforeCenteredWidth);
+    await checkRatio(4 / 3);
+    await page.keyboard.down('Shift');
+    await drag(false, -40, -8);
+    await page.keyboard.up('Shift');
+    await checkRatio(4 / 3);
+    const modes = page.locator('[data-ui="shared.ui.compact-inspector.segmented-row"] button');
+    await modes.nth(1).click();
+    await expect(inputs.nth(0)).toHaveValue(String(documentWidth));
+    await expect(inputs.nth(1)).toHaveValue(String(documentHeight));
+    await expect(controls).toHaveCount(4);
+    await drag(false, -25, -5);
+    await checkRatio(documentWidth / documentHeight);
+    await modes.nth(0).click();
+    await page.locator('[data-ui="editor.floating.layers.collapse-button"]').click();
+    await page
+      .locator(
+        '[data-ui="editor.floating.layers-collapsed-toolbar"] [data-ui="editor.floating.layers.mode.canvas-size"]'
+      )
+      .click();
+    await expect(lock).toHaveAttribute('aria-pressed', 'true');
+    await page
+      .getByRole('button', {
+        name: translate('editor.compact.aspectRatioPreset', 'en'),
+        exact: true,
+      })
+      .click();
+    await page.getByRole('option', { name: '16:9', exact: true }).click();
+    await checkRatio(16 / 9);
+    await expect
+      .poll(async () => {
+        const points = await controls.evaluateAll((elements) =>
+          elements.map((element) => {
+            const rect = element.getBoundingClientRect();
+            return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+          })
+        );
+        const width =
+          Math.max(...points.map((point) => point.x)) - Math.min(...points.map((point) => point.x));
+        const height =
+          Math.max(...points.map((point) => point.y)) - Math.min(...points.map((point) => point.y));
+        return Math.abs(width / height - 16 / 9);
+      })
+      .toBeLessThan(0.02);
+    await drag(false, 20, 12);
+    await checkRatio(16 / 9);
+    await page.screenshot({ path: info.outputPath('crop-ratio-locked.png'), fullPage: false });
+    await lock.click();
+    const beforeWidth = Number(await inputs.nth(0).inputValue());
+    const beforeHeight = Number(await inputs.nth(1).inputValue());
+    await drag(true, -30, 0);
+    await expect
+      .poll(async () => Number(await inputs.nth(0).inputValue()))
+      .toBeLessThan(beforeWidth);
+    expect(Number(await inputs.nth(1).inputValue())).toBe(beforeHeight);
+  });
+}
