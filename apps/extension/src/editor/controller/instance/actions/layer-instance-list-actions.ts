@@ -20,7 +20,7 @@ export function reorderLayerForController(
 export function selectLayerForController(
   controller: EditorControllerInstance,
   id: string,
-  options: { additive?: boolean; range?: boolean; toggle?: boolean } = {}
+  options: Parameters<typeof selectEditorControllerLayer>[2] = {}
 ): void {
   selectEditorControllerLayer(controller.getPublicApiAdapter(), id, options);
 }

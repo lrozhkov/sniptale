@@ -444,7 +444,10 @@ function useFinishDrag(input: {
       controller.canvas?.requestRenderAll();
       controller.commitHistory();
       controller.syncRuntimeState();
-      controller.selectLayer?.(draft.id, { focusViewport: false });
+      controller.selectLayer?.(draft.id, {
+        focusViewport: false,
+        preserveActiveTool: drag.mode === 'create' && draft.annotationKind !== undefined,
+      });
       setSelectedId(draft.id);
       updateDraft(null);
       forceRender();

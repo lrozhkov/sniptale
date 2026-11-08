@@ -596,3 +596,64 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
     await capture(page, info, 'editor-element-1100');
   });
 }
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const kind of ['step-badge', 'callout'] as const) {
+    test(`editor keeps standalone tool ${kind} ${viewport.name}`, async ({
+      page,
+      hostOrigin,
+    }, info) => {
+      await page.setViewportSize(viewport.size);
+      await applyHarnessBootstrap(page, {});
+      await page.addInitScript(() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 320;
+        window.__sniptaleHarnessBootstrap = {
+          ...window.__sniptaleHarnessBootstrap,
+          editorBootstrapPayload: { dataUrl: canvas.toDataURL(), title: 'Test' },
+        };
+      });
+      await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+      await expect(ui(page, 'editor.page.root')).toBeVisible();
+      const boundsOwner = ui(page, 'editor.canvas.document-boundary');
+      const count = () =>
+        page.evaluate(() => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0);
+      await expect.poll(count).toBeGreaterThan(0);
+      const before = await count();
+      const tool = ui(page, `content.toolbar.future-frame-${kind}`);
+      await tool.click();
+      const bounds = (await boundsOwner.boundingBox())!;
+      for (const [index, fraction] of [0.15, 0.75].entries()) {
+        await page.mouse.click(
+          bounds.x + bounds.width * fraction,
+          bounds.y + bounds.height * fraction
+        );
+        await expect.poll(count).toBe(before + index + 1);
+        await expect(tool).toHaveAttribute('aria-pressed', 'true');
+        if (kind === 'callout') {
+          await page
+            .locator('.sniptale-callout [contenteditable="true"]')
+            .last()
+            .fill(`Comment ${index + 1}`);
+        }
+      }
+      if (kind === 'step-badge')
+        await expect(page.locator('.sniptale-step-badge')).toHaveText(['1', '2']);
+      await page.screenshot({
+        path: info.outputPath('two-standalone-elements.png'),
+        fullPage: false,
+      });
+      const cursor = ui(page, 'editor.floating.tool-rail.select');
+      await cursor.click();
+      await expect(tool).toHaveAttribute('aria-pressed', 'false');
+      await expect.poll(count).toBe(before + 2);
+      if (kind === 'step-badge') {
+        await ui(page, 'editor.floating.tool-rail.history.undo').click();
+        await expect.poll(count).toBe(before + 1);
+        await ui(page, 'editor.floating.tool-rail.history.redo').click();
+        await expect.poll(count).toBe(before + 2);
+      }
+    });
+  }
+}

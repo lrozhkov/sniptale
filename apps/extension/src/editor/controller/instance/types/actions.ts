@@ -80,7 +80,13 @@ export interface EditorControllerInstanceSelectionActions {
   sendSelectionToBack(): void;
   selectLayer(
     id: string,
-    options?: { additive?: boolean; focusViewport?: boolean; range?: boolean; toggle?: boolean }
+    options?: {
+      additive?: boolean;
+      focusViewport?: boolean;
+      preserveActiveTool?: boolean;
+      range?: boolean;
+      toggle?: boolean;
+    }
   ): void;
 }
 
