@@ -64,6 +64,7 @@ it('groups page fields as checkboxes and text styling in compact disclosures', a
   expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
   for (const checkbox of container.querySelectorAll('input[type="checkbox"]')) {
     expect(checkbox.classList.contains('sniptale-parameter-check')).toBe(true);
+    expect(checkbox.classList.contains('sniptale-parameter-check--round')).toBe(true);
     expect(checkbox.closest('.sniptale-boolean-parameter')).not.toBeNull();
   }
   const disclosures = Array.from(

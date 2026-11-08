@@ -85,19 +85,37 @@
   justify-content: space-between;
 }
 
+.editor-inspector-surface .editor-size-dimensions::before,
 .editor-inspector-surface .editor-size-dimensions::after {
   content: '';
   position: absolute;
   pointer-events: none;
-  inset-inline-end: 12px;
-  top: 16px;
-  bottom: 24px;
+  inset-inline-end: 16px;
   width: 12px;
-  border: 1px solid var(--sniptale-color-border-strong);
-  border-inline-start: 0;
-  border-radius: 0 4px 4px 0;
+  height: calc(
+    (
+        100% - var(--sniptale-parameter-context-space) - 2 *
+          var(--sniptale-parameter-control-height)
+      ) /
+      2
+  );
+  border-inline-end: 1px solid var(--sniptale-color-border-strong);
 }
-.editor-inspector-surface .editor-size-dimensions > div:last-child {
-  z-index: 1;
-  background: var(--sniptale-color-surface-panel);
+.editor-inspector-surface .editor-size-dimensions::before {
+  top: calc(var(--sniptale-parameter-control-height) / 2);
+  border-top: 1px solid var(--sniptale-color-border-strong);
+  border-start-end-radius: 4px;
+}
+.editor-inspector-surface .editor-size-dimensions::after {
+  bottom: calc(
+    var(--sniptale-parameter-control-height) / 2 + var(--sniptale-parameter-context-space)
+  );
+  border-bottom: 1px solid var(--sniptale-color-border-strong);
+  border-end-end-radius: 4px;
+}
+.editor-inspector-surface .editor-aspect-control {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(50% - var(--sniptale-parameter-context-space) / 2);
+  transform: translateY(-50%);
 }

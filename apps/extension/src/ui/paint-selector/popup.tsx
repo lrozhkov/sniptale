@@ -92,19 +92,20 @@ function PaintSelectorLayer(props: LayerProps) {
   const [section, setSection] = useState<PaintSelectorSection>('paint');
   const theme = useResolvedPortalTheme(props.rootRef.current);
   const width = props.draft.kind === 'gradient' ? 620 : 300;
-  const layerStyle = resolvePaintSelectorLayerStyle(
-    useColorSelectorLayerStyle(
-      props.rootRef.current,
-      props.open,
-      'auto',
-      null,
-      props.layerRef,
-      'palette',
-      560
-    ),
+  const inspectorBoundary = props.rootRef.current?.closest('[data-picker-boundary]');
+  const baseStyle = useColorSelectorLayerStyle(
     props.rootRef.current,
-    width
+    props.open,
+    'auto',
+    null,
+    props.layerRef,
+    'palette',
+    560,
+    inspectorBoundary ? width : undefined
   );
+  const layerStyle = inspectorBoundary
+    ? baseStyle
+    : resolvePaintSelectorLayerStyle(baseStyle, props.rootRef.current, width);
   return (
     <ColorSelectorFloatingLayer
       layerRef={props.layerRef}

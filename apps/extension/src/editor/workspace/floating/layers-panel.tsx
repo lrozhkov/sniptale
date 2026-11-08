@@ -177,6 +177,7 @@ function EditorFloatingExpandedLayersPanel(props: {
     <FloatingChromePanel
       ref={panelRef}
       dataUi="editor.floating.layers-panel"
+      data-picker-boundary
       className={LAYERS_PANEL_CLASS_NAME}
       style={{ height: props.height }}
     >

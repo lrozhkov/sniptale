@@ -493,3 +493,125 @@ test('inspector keeps settings and layer-list scroll through tabs and collapse',
   await mode('frame').click();
   await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBe(settingsPosition);
 });
+
+for (const locale of ['en', 'ru'] as const) {
+  for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`inspector detail fixes ${locale} ${name}`, async ({ page, hostOrigin }, info) => {
+      await page.setViewportSize(size);
+      await openEditor(page, hostOrigin, locale);
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+      const mode = (value: string) =>
+        page.locator(`[data-ui="editor.floating.layers.mode.${value}"]`);
+      await mode('image-size').click();
+      const dimensions = page.locator('[data-size-panel-dimensions]');
+      const lock = dimensions.locator('[data-ui="editor.size-controls.aspect-toggle"]');
+      const fields = dimensions.locator(
+        '[data-ui="shared.ui.compact-inspector.numeric-value-field"]'
+      );
+      const centers = await fields.evaluateAll((nodes) =>
+        nodes.map((n) => {
+          const b = n.getBoundingClientRect();
+          return b.y + b.height / 2;
+        })
+      );
+      const lockedBox = (await lock.boundingBox())!;
+      expect(
+        Math.abs(lockedBox.y + lockedBox.height / 2 - (centers[0]! + centers[1]!) / 2)
+      ).toBeLessThanOrEqual(0.5);
+      expect((await lock.locator('svg').boundingBox())!.width).toBeGreaterThanOrEqual(14);
+      if ((await lock.getAttribute('aria-pressed')) === 'true') await lock.click();
+      await page.mouse.move(500, 100);
+      await expect(lock).toHaveAttribute('aria-pressed', 'false');
+      expect(await lock.locator('..').evaluate((n) => getComputedStyle(n).backgroundColor)).toBe(
+        'rgba(0, 0, 0, 0)'
+      );
+      const width = dimensions.getByRole('textbox', {
+        name: label('editor.compact.widthDimension'),
+        exact: true,
+      });
+      const height = dimensions.getByRole('textbox', {
+        name: label('editor.compact.heightDimension'),
+        exact: true,
+      });
+      await width.fill('1237');
+      await width.press('Enter');
+      await height.fill('731');
+      await height.press('Enter');
+      for (const key of [
+        'editor.compact.sizePreset',
+        'editor.compact.aspectRatioPreset',
+      ] as const) {
+        const trigger = page.getByRole('button', { name: label(key), exact: true });
+        await expect(trigger).toContainText(label('editor.compact.customSizePreset'));
+        await trigger.click();
+        await expect(
+          page.getByRole('option', { name: label('editor.compact.customSizePreset'), exact: true })
+        ).toHaveCount(0);
+        await page.keyboard.press('Escape');
+      }
+      await page.screenshot({
+        path: info.outputPath('dimensions-unlinked-custom.png'),
+        fullPage: false,
+      });
+      await mode('frame').click();
+      const panel = page.locator('[data-ui="editor.frame-panel"]');
+      const kinds = panel.locator('[data-ui="editor.frame.background-mode"] button');
+      await kinds.nth(1).click();
+      const presets = panel.locator('[data-ui="editor.frame.paint-presets"]');
+      await expect(presets.locator('[data-ui="shared.ui.backgroundThumbnails.group"]')).toHaveCount(
+        0
+      );
+      expect(await presets.locator('button[style*="background-color"]').count()).toBeGreaterThan(0);
+      expect(await presets.locator('button[style*="background-image"]').count()).toBeGreaterThan(0);
+      const tile = (await presets.locator('button').first().boundingBox())!;
+      const checkPicker = async (picker: ReturnType<Page['locator']>) => {
+        await expect(picker).toBeVisible();
+        const box = (await picker.boundingBox())!;
+        const owner = (await page
+          .locator('[data-ui="editor.floating.layers-panel"]')
+          .boundingBox())!;
+        expect(owner.x - box.x - box.width).toBeGreaterThanOrEqual(7);
+        expect(owner.x - box.x - box.width).toBeLessThanOrEqual(9);
+        await expect(picker).toHaveCSS('outline-style', 'solid');
+        expect(await picker.evaluate((n) => getComputedStyle(n).boxShadow)).not.toBe('none');
+        await picker
+          .getByRole('button', { name: label('common.actions.cancel'), exact: true })
+          .click();
+      };
+      for (const style of ['background-color', 'background-image']) {
+        await presets.locator(`button[style*="${style}"]`).first().click();
+        await panel.locator('[data-ui="shared.ui.paint-selector.trigger"]').click();
+        await checkPicker(page.locator('[data-ui="shared.ui.paint-selector.popup"]'));
+      }
+      await kinds.nth(2).click();
+      const image = panel
+        .locator('[data-ui="background.image.picker"] [role="group"] button')
+        .first();
+      await expect(image).toBeVisible();
+      const imageTile = (await image.boundingBox())!;
+      expect(Math.abs(tile.width - imageTile.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(tile.height - imageTile.height)).toBeLessThanOrEqual(1);
+      await mode('meta').click();
+      const check = page.locator('[data-ui="editor.technical-data.field-date"]');
+      expect(
+        await check.evaluate((n) => ({
+          width: getComputedStyle(n).width,
+          round: getComputedStyle(n, '::before').borderRadius,
+        }))
+      ).toEqual({ width: '28px', round: '50%' });
+      await page
+        .locator('summary')
+        .filter({ hasText: label('editor.compact.technicalDataTextSettings') })
+        .click();
+      await page
+        .locator(
+          '[data-ui="editor.technical-data.text-settings"] [data-ui="shared.ui.color-selector.picker-trigger"]'
+        )
+        .first()
+        .click();
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker"]');
+      await page.screenshot({ path: info.outputPath('nearby-color-picker.png'), fullPage: false });
+      await checkPicker(picker);
+    });
+  }
+}

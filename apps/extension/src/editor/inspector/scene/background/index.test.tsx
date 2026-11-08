@@ -170,8 +170,14 @@ it('renders the solid color branch and forwards color updates', async () => {
   ).toHaveLength(1);
 
   const colors = container!.querySelector('[data-ui="editor.frame.paint-presets"]')!;
+  expect(colors.querySelectorAll('[data-ui="shared.ui.backgroundThumbnails.group"]')).toHaveLength(
+    0
+  );
   expect(
-    Array.from(colors.querySelectorAll('button'), (button) => button.title).slice(0, 2)
+    Array.from(colors.querySelectorAll('button'))
+      .filter((button) => button.style.backgroundColor)
+      .map((button) => button.title)
+      .slice(0, 2)
   ).toEqual(['#111111', '#eeeeee']);
   await act(async () => colors.querySelector('button')!.click());
   expect(applyFramePatch).toHaveBeenCalledWith({

@@ -35,6 +35,7 @@ export function CompactWorkspacePopoverContent({
 
   return (
     <div
+      data-picker-boundary
       className={[
         'sniptale-inspector-surface editor-inspector-surface',
         'max-h-[calc(100dvh-6.5rem)] max-[720px]:max-h-[calc(100dvh-10.5rem)]',

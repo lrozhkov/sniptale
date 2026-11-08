@@ -129,17 +129,22 @@ function resolveColorSelectorLayerStyle(
   boundary: HTMLElement | null,
   layer: HTMLElement | null = null,
   layerKind: 'palette' | 'picker' = 'palette',
-  preferredHeight = 260
+  preferredHeight = 260,
+  preferredLayerWidth?: number
 ): CSSProperties {
   const preferredWidth =
-    layerKind === 'picker' ? COLOR_SELECTOR_PICKER_LAYER_WIDTH : COLOR_SELECTOR_LAYER_WIDTH;
+    preferredLayerWidth ??
+    (layerKind === 'picker' ? COLOR_SELECTOR_PICKER_LAYER_WIDTH : COLOR_SELECTOR_LAYER_WIDTH);
   if (!anchor || typeof window === 'undefined') {
     return { width: preferredWidth };
   }
 
   const uiScale = readContentUiScaleCompensation(anchor);
   const { clientRect, rect } = projectElementRect(anchor, uiScale);
-  const boundaryRect = boundary ? projectElementRect(boundary, uiScale).rect : rect;
+  const ownerBoundary = anchor.closest<HTMLElement>('[data-picker-boundary]');
+  const resolvedBoundary =
+    placement === 'side' ? (boundary ?? ownerBoundary) : (ownerBoundary ?? boundary);
+  const boundaryRect = resolvedBoundary ? projectElementRect(resolvedBoundary, uiScale).rect : rect;
   const right = rect.x + rect.width;
   const viewport = resolveContentUiViewport({
     clientHeight: window.innerHeight || clientRect.bottom + COLOR_SELECTOR_VIEWPORT_PADDING,
@@ -149,7 +154,7 @@ function resolveColorSelectorLayerStyle(
   const viewportWidth = viewport.width;
   const viewportHeight = viewport.height;
   const layerWidth = Math.min(preferredWidth, Math.max(0, viewportWidth - 16));
-  if (placement === 'side') {
+  if (placement === 'side' || ownerBoundary) {
     const sideStyle = resolveSideLayerStyle({
       anchorRect: rect,
       boundaryRect,
@@ -194,6 +199,7 @@ function resolveColorSelectorLayerStyle(
   };
 }
 
+/** Panel owners opt in to adjacent placement with data-picker-boundary; wide editors supply their actual width. */
 export function useColorSelectorLayerStyle(
   anchor: HTMLElement | null,
   open: boolean,
@@ -201,7 +207,8 @@ export function useColorSelectorLayerStyle(
   boundary: HTMLElement | null = null,
   layerRef?: RefObject<HTMLElement | null>,
   layerKind: 'palette' | 'picker' = 'palette',
-  preferredHeight = 260
+  preferredHeight = 260,
+  preferredLayerWidth?: number
 ) {
   const [style, setStyle] = useState<CSSProperties>(() =>
     resolveColorSelectorLayerStyle(
@@ -210,7 +217,8 @@ export function useColorSelectorLayerStyle(
       boundary,
       layerRef?.current,
       layerKind,
-      preferredHeight
+      preferredHeight,
+      preferredLayerWidth
     )
   );
   const updateStyle = useCallback(() => {
@@ -221,10 +229,11 @@ export function useColorSelectorLayerStyle(
         boundary,
         layerRef?.current,
         layerKind,
-        preferredHeight
+        preferredHeight,
+        preferredLayerWidth
       )
     );
-  }, [anchor, boundary, layerKind, layerRef, placement, preferredHeight]);
+  }, [anchor, boundary, layerKind, layerRef, placement, preferredHeight, preferredLayerWidth]);
 
   useEffect(() => {
     if (!open) {

@@ -173,7 +173,7 @@ it.each(['image', 'canvas'] as const)('uses distinct dimension parameters in %s 
   const aspect = dimensions.querySelector('[data-ui="editor.size-controls.aspect-toggle"]');
   expect(aspect).not.toBeNull();
   expect(aspect?.closest('.sniptale-parameter-row')).toBeNull();
-  expect(aspect?.parentElement?.className).toContain('top-1/2');
+  expect(aspect?.parentElement?.className).toContain('editor-aspect-control');
 });
 
 it('keeps image resize free of mouse selection preview and applies a flattened image resize action', () => {
@@ -389,15 +389,15 @@ it('resolves size and aspect-ratio presets including custom branches', () => {
 
   expect(findPresetValue({ height: 1080, width: 1920 })).toBe('1920x1080');
   expect(findPresetValue({ height: 111, width: 222 })).toBeNull();
-  expect(buildSizePresetOptions('custom')[0]?.value).toBe('custom');
-  expect(buildSizePresetOptions('1920x1080')[0]?.value).toBe('3840x2160');
+  expect(buildSizePresetOptions().some((option) => option.value === 'custom')).toBe(false);
+  expect(buildSizePresetOptions()[0]?.value).toBe('3840x2160');
   applySizePreset(setDraft, '1280x720');
   applySizePreset(setDraft, 'missing');
   expect(setDraft).toHaveBeenCalledWith({ height: 720, width: 1280 });
 
   expect(findAspectRatioValue({ height: 900, width: 1600 })).toBe('16:9');
   expect(findAspectRatioValue({ height: 777, width: 1000 })).toBeNull();
-  expect(buildAspectRatioOptions('custom')[0]?.value).toBe('custom');
+  expect(buildAspectRatioOptions().some((option) => option.value === 'custom')).toBe(false);
   applySelectedAspectRatio(setDraft, '1:1');
   applyCurrentAspectRatio(setDraft, '9:16', 'short');
   applyCurrentAspectRatio(setDraft, 'missing', 'long');

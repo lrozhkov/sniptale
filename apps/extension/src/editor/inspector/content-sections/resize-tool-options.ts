@@ -1,5 +1,4 @@
 import type React from 'react';
-import { translate } from '../../../platform/i18n';
 import type { CompactSelectOption } from '../../chrome/ui';
 
 type AspectFitSide = 'long' | 'short';
@@ -45,15 +44,8 @@ export function findPresetValue(draft: SizeDraft): string | null {
   );
 }
 
-export function buildSizePresetOptions(currentValue: string): CompactSelectOption<string>[] {
-  if (currentValue !== 'custom') {
-    return SIZE_PRESETS;
-  }
-
-  return [
-    { value: 'custom', label: translate('editor.compact.customSizePreset') },
-    ...SIZE_PRESETS,
-  ];
+export function buildSizePresetOptions(): CompactSelectOption<string>[] {
+  return SIZE_PRESETS;
 }
 
 export function applySizePreset(
@@ -74,15 +66,8 @@ export function findAspectRatioValue(draft: SizeDraft): string | null {
   );
 }
 
-export function buildAspectRatioOptions(currentValue: string): CompactSelectOption<string>[] {
-  if (currentValue !== 'custom') {
-    return ASPECT_RATIO_PRESETS;
-  }
-
-  return [
-    { value: 'custom', label: translate('editor.compact.customSizePreset') },
-    ...ASPECT_RATIO_PRESETS,
-  ];
+export function buildAspectRatioOptions(): CompactSelectOption<string>[] {
+  return ASPECT_RATIO_PRESETS;
 }
 
 export function applySelectedAspectRatio(

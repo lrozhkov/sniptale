@@ -94,6 +94,7 @@ function TechnicalDataOptionRow({ checked, onToggle, option }: TechnicalDataOpti
   return (
     <div className={cx('min-w-0', 'text-[color:var(--sniptale-color-text-secondary)]', 'w-full')}>
       <CheckboxField
+        shape="round"
         dataUi={`editor.technical-data.field-${option.kind}`}
         label={translate(option.labelKey)}
         value={checked}

@@ -308,7 +308,7 @@ function ResizeToolDimensionRow(props: {
           </InspectorParameterRow>
         );
       })}
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 [&>button]:h-6 [&>button]:w-6 [&_svg]:size-3">
+      <div className="editor-aspect-control">
         <AspectToggle
           compact
           checked={props.active.locked}
@@ -348,7 +348,7 @@ function updateSizeDraft(
 }
 
 function ResizeToolSizePresetField(props: { active: ActiveResizeState }) {
-  const currentPresetValue = findPresetValue(props.active.draft) ?? 'custom';
+  const currentPresetValue = findPresetValue(props.active.draft) ?? '';
 
   return (
     <div className="space-y-2">
@@ -356,7 +356,8 @@ function ResizeToolSizePresetField(props: { active: ActiveResizeState }) {
         label={translate('editor.compact.sizePreset')}
         value={currentPresetValue}
         onChange={(value) => applySizePreset(props.active.setDraft, value)}
-        options={buildSizePresetOptions(currentPresetValue)}
+        options={buildSizePresetOptions()}
+        placeholder={translate('editor.compact.customSizePreset')}
       />
     </div>
   );
@@ -366,14 +367,15 @@ function ResizeToolAspectRatioField(props: {
   active: ActiveResizeState;
   bounds: SizeDraft | undefined;
 }) {
-  const currentValue = findAspectRatioValue(props.active.draft) ?? 'custom';
+  const currentValue = findAspectRatioValue(props.active.draft) ?? '';
 
   return (
     <SelectField
       label={translate('editor.compact.aspectRatioPreset')}
       value={currentValue}
       onChange={(value) => applySelectedAspectRatio(props.active.setDraft, value, props.bounds)}
-      options={buildAspectRatioOptions(currentValue)}
+      options={buildAspectRatioOptions()}
+      placeholder={translate('editor.compact.customSizePreset')}
     />
   );
 }
