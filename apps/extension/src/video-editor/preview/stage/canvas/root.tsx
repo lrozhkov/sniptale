@@ -203,7 +203,11 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
       presenter.dispose();
     };
   }, []);
-  const imageBank = usePreviewStageImageBank(params.project, params.activeClips, params.assetUrls);
+  const { images: imageBank, prepareImages } = usePreviewStageImageBank(
+    params.project,
+    params.activeClips,
+    params.assetUrls
+  );
 
   usePreviewStageCanvasScene({
     activeClips: params.activeClips,
@@ -217,6 +221,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
     currentTime: params.currentTime,
     effectRuntimeFeedback: params.effectRuntimeFeedback,
     imageBank,
+    prepareImages,
     isPlaying: params.isPlaying,
     previewCacheBypass: params.previewCacheBypass,
     previewExactFrameCache: params.previewExactFrameCache,

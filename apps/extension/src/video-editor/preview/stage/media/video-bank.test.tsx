@@ -1,9 +1,23 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import {
+  createImageClip,
+  createProject,
+} from '../../../../features/video/project/timeline/project-meta.test.helpers';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+import {
+  capturePreviewImageResources,
+  arePreviewImageResourcesReady,
+} from '../scene/image-resources';
+import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 // @vitest-environment jsdom
 
 import { act } from 'react';
 import { projectWindowHeaderImages } from '../../../../features/video/composition/draw/window-header';
 
-vi.mock('../../../../features/video/composition/draw/window-header', () => ({
+vi.mock('../../../../features/video/composition/draw/window-header', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../../features/video/composition/draw/window-header')
+  >()),
   projectWindowHeaderImages: vi.fn(() => []),
 }));
 import { createRoot, type Root } from 'react-dom/client';
@@ -141,7 +155,7 @@ it('keeps pending image requests across equivalent frame plans and ignores stale
   const clip = { ...createVideoClip(), type: VideoProjectClipType.IMAGE };
   let images: Record<string, HTMLImageElement> = {};
   function Probe({ source }: { source: string }) {
-    images = usePreviewStageImageBank(project, [clip], { [clip.assetId]: source });
+    images = usePreviewStageImageBank(project, [clip], { [clip.assetId]: source }).images;
     return null;
   }
   const render = (source: string) => act(() => root!.render(<Probe source={source} />));
@@ -172,7 +186,7 @@ it('retains a failed header image across equivalent frame renders', () => {
   let renders = 0;
   function Probe() {
     if (++renders > 20) throw new Error('Repeated image bank render');
-    images = usePreviewStageImageBank(project, [], {});
+    images = usePreviewStageImageBank(project, [], {}).images;
     return null;
   }
   act(() => root!.render(<Probe />));
@@ -213,7 +227,7 @@ it('reuses header preparation on ordinary frames and admits the pending image', 
   });
   let images: Record<string, HTMLImageElement> = {};
   function Probe({ snapshot = project }: { snapshot?: typeof project }) {
-    images = usePreviewStageImageBank(snapshot, [clip], assetUrls);
+    images = usePreviewStageImageBank(snapshot, [clip], assetUrls).images;
     return null;
   }
   for (let frame = 0; frame < 30; frame++) act(() => root!.render(<Probe />));
@@ -250,7 +264,7 @@ it('replaces the image plan when seeking to another clip and prunes the previous
   });
   let images: Record<string, HTMLImageElement> = {};
   function Probe({ clips }: { clips: VideoProjectVideoClip[] }) {
-    images = usePreviewStageImageBank(project, clips, assetUrls);
+    images = usePreviewStageImageBank(project, clips, assetUrls).images;
     return null;
   }
   act(() => root!.render(<Probe clips={[first]} />));
@@ -262,4 +276,219 @@ it('replaces the image plan when seeking to another clip and prunes the previous
   expect(images[second.id]).toBe(requested[1]);
   act(() => root!.render(<Probe clips={[]} />));
   expect(images).toEqual({});
+});
+
+it('rebinds equal loaded header content synchronously before effects without another decode or identity flip', () => {
+  const project = createEmptyVideoProject();
+  const first = createVideoClip({ id: 'first' }),
+    second = createVideoClip({ id: 'second' });
+  const urls = {};
+  const requested: HTMLImageElement[] = [];
+  vi.mocked(projectWindowHeaderImages).mockImplementation((_project, clips = []) =>
+    clips.map((clip) => ({ key: clip.id, src: 'blob:same-header' }))
+  );
+  vi.stubGlobal('Image', function () {
+    const image = document.createElement('img');
+    requested.push(image);
+    return image;
+  });
+  const observations: { id: string; bank: Record<string, HTMLImageElement> }[] = [];
+  function Probe({ clip }: { clip: VideoProjectVideoClip }) {
+    const bank = usePreviewStageImageBank(project, [clip], urls).images;
+    observations.push({ id: clip.id, bank });
+    return null;
+  }
+  act(() => root!.render(<Probe clip={first} />));
+  Object.defineProperties(requested[0]!, {
+    complete: { value: true },
+    naturalWidth: { value: 100 },
+  });
+  act(() => requested[0]!.dispatchEvent(new Event('load')));
+  const oldBank = observations.at(-1)!.bank;
+  const before = observations.length;
+  act(() => root!.render(<Probe clip={second} />));
+  expect(requested).toHaveLength(1);
+  const next = observations.slice(before);
+  expect(next[0]!.bank['second']).toBe(requested[0]);
+  expect(next.every((row) => row.bank === next[0]!.bank)).toBe(true);
+  expect(next[0]!.bank['first']).toBeUndefined();
+  expect(oldBank['first']).toBe(requested[0]);
+  const descriptorCalls = vi.mocked(projectWindowHeaderImages).mock.calls.length;
+  const sourceReads = vi.spyOn(requested[0]!, 'src', 'get');
+  for (let frame = 0; frame < 30; frame++) act(() => root!.render(<Probe clip={second} />));
+  expect(projectWindowHeaderImages).toHaveBeenCalledTimes(descriptorCalls);
+  expect(sourceReads).not.toHaveBeenCalled();
+  sourceReads.mockRestore();
+});
+
+it('excludes stale same-key header content on the first changed-source render and admits Undo content freshly', () => {
+  const project = createEmptyVideoProject();
+  const requested: HTMLImageElement[] = [];
+  vi.stubGlobal('Image', function () {
+    const image = document.createElement('img');
+    requested.push(image);
+    return image;
+  });
+  const observations: Record<string, HTMLImageElement>[] = [];
+  function Probe({ source }: { source: string }) {
+    vi.mocked(projectWindowHeaderImages).mockReturnValue([{ key: 'header', src: source }]);
+    observations.push(usePreviewStageImageBank({ ...project, name: source }, [], {}).images);
+    return null;
+  }
+  act(() => root!.render(<Probe source="blob:old" />));
+  Object.defineProperties(requested[0]!, {
+    complete: { value: true },
+    naturalWidth: { value: 100 },
+  });
+  act(() => requested[0]!.dispatchEvent(new Event('load')));
+  let before = observations.length;
+  act(() => root!.render(<Probe source="blob:new" />));
+  expect(observations[before]!['header']).toBeUndefined();
+  Object.defineProperties(requested[1]!, {
+    complete: { value: true },
+    naturalWidth: { value: 100 },
+  });
+  act(() => requested[1]!.dispatchEvent(new Event('load')));
+  expect(observations.at(-1)!['header']).toBe(requested[1]);
+  before = observations.length;
+  act(() => root!.render(<Probe source="blob:old" />));
+  expect(observations[before]!['header']).toBeUndefined();
+  expect(requested).toHaveLength(3);
+});
+
+it('loads neighboring IMAGE body and header while paused on the first clip', async () => {
+  const realHeaders = await vi.importActual<
+    typeof import('../../../../features/video/composition/draw/window-header')
+  >('../../../../features/video/composition/draw/window-header');
+  vi.mocked(projectWindowHeaderImages).mockImplementation(realHeaders.projectWindowHeaderImages);
+  const first = createImageClip({
+    id: 'A',
+    assetId: 'asset-A',
+    startTime: 0,
+    duration: 2,
+    windowHeader: DEFAULT_WINDOW_HEADER,
+  });
+  const second = createImageClip({
+    id: 'B',
+    assetId: 'asset-B',
+    startTime: 2,
+    duration: 2,
+    windowHeader: DEFAULT_WINDOW_HEADER,
+  });
+  const project = createProject([first, second]);
+  project.duration = 4;
+  const template = project.assets[0]!;
+  project.assets = [
+    { ...template, id: 'asset-A', type: 'IMAGE' },
+    { ...template, id: 'asset-B', type: 'IMAGE' },
+  ];
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 4,
+      scale: 2,
+      zoomInDuration: 3,
+      zoomOutDuration: 0,
+      motionBlurAmount: 1,
+    },
+  ];
+  const passes = resolveVideoCompositionRenderPasses(project, 1.99);
+  expect(passes.overlayFrame.visualLayers.map((layer) => layer.clipId)).toEqual(['A']);
+  expect(
+    passes.visualPasses.some((pass) =>
+      pass.frame.visualLayers.some((layer) => layer.clipId === 'B')
+    )
+  ).toBe(true);
+  const urls = { 'asset-A': 'blob:A', 'asset-B': 'blob:B' };
+  const requested: HTMLImageElement[] = [];
+  vi.stubGlobal('Image', function () {
+    const image = document.createElement('img');
+    requested.push(image);
+    return image;
+  });
+  let owner: ReturnType<typeof usePreviewStageImageBank> | undefined;
+  let renders = 0;
+  function Probe() {
+    renders++;
+    owner = usePreviewStageImageBank(project, [first], urls);
+    return null;
+  }
+  act(() => root!.render(<Probe />));
+  for (const image of [...requested]) {
+    Object.defineProperties(image, {
+      complete: { configurable: true, value: true },
+      naturalWidth: { configurable: true, value: 1280 },
+    });
+    act(() => image.dispatchEvent(new Event('load')));
+  }
+  if (!owner) throw new Error('Expected image owner');
+  const request: unknown = Reflect.get(owner, 'prepareImages');
+  await act(async () => {
+    if (typeof request === 'function')
+      await request([passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)]);
+  });
+  expect(requested.some((image) => image.src === 'blob:B')).toBe(true);
+  const resources = () =>
+    capturePreviewImageResources({ project, assetUrls: urls, imageBank: owner!.images }, passes);
+  expect(arePreviewImageResourcesReady(resources())).toBe(false);
+  const headerA = realHeaders.windowHeaderImageKey(first.id, DEFAULT_WINDOW_HEADER);
+  const headerB = realHeaders.windowHeaderImageKey(second.id, DEFAULT_WINDOW_HEADER);
+  expect(owner!.images[headerB]).toBe(owner!.images[headerA]);
+  const body = requested.find((image) => image.src === 'blob:B')!;
+  Object.defineProperties(body, { complete: { value: true }, naturalWidth: { value: 1280 } });
+  act(() => body.dispatchEvent(new Event('load')));
+  expect(arePreviewImageResourcesReady(resources())).toBe(true);
+  const calls = vi.mocked(projectWindowHeaderImages).mock.calls.length;
+  const renderCount = renders;
+  const callback = owner!.prepareImages;
+  const sourceReads = requested.map((image) => vi.spyOn(image, 'src', 'get'));
+  for (let i = 0; i < 30; i++)
+    await act(async () =>
+      callback([passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)])
+    );
+  expect(owner!.prepareImages).toBe(callback);
+  expect(renders).toBe(renderCount);
+  expect(projectWindowHeaderImages).toHaveBeenCalledTimes(calls);
+  expect(requested).toHaveLength(3);
+  for (const read of sourceReads) {
+    expect(read).not.toHaveBeenCalled();
+    read.mockRestore();
+  }
+});
+
+it('keeps canceled demand private and rejects retained prior-project callbacks', async () => {
+  const first = createImageClip({ id: 'A', assetId: 'A' });
+  const next = createImageClip({ id: 'B', assetId: 'B' });
+  const project = createProject([first, next]);
+  const urls = { A: 'blob:A', B: 'blob:B' };
+  const frames = [resolveVideoCompositionRenderPasses(createProject([next]), 1).overlayFrame];
+  const requested: HTMLImageElement[] = [];
+  vi.stubGlobal('Image', function () {
+    const image = document.createElement('img');
+    requested.push(image);
+    return image;
+  });
+  let owner: ReturnType<typeof usePreviewStageImageBank> | undefined;
+  function Probe({ revision = project }: { revision?: typeof project }) {
+    owner = usePreviewStageImageBank(revision, [first], urls);
+    return null;
+  }
+  act(() => root!.render(<Probe />));
+  const old = owner!.prepareImages;
+  const canceled = new AbortController();
+  await act(async () => owner!.prepareImages(frames, canceled.signal));
+  canceled.abort();
+  const body = requested.find((image) => image.src === 'blob:B')!;
+  Object.defineProperties(body, { complete: { value: true }, naturalWidth: { value: 100 } });
+  act(() => body.dispatchEvent(new Event('load')));
+  expect(owner!.images['B']).toBeUndefined();
+  await act(async () => owner!.prepareImages(frames, new AbortController().signal));
+  expect(owner!.images['B']).toBe(body);
+  const revision = { ...project, name: 'Edited' };
+  act(() => root!.render(<Probe revision={revision} />));
+  expect(owner!.images['B']).toBeUndefined();
+  const count = requested.length;
+  await act(async () => old(frames, new AbortController().signal));
+  expect(owner!.images['B']).toBeUndefined();
+  expect(requested).toHaveLength(count);
 });

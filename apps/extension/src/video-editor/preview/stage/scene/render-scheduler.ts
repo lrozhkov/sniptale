@@ -1,5 +1,10 @@
+import { arePreviewImageResourcesCurrent } from './image-resources';
 import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
-import type { PreviewScenePresentation, PreviewScenePreparedFrame } from './types';
+import type {
+  PreviewScenePresentation,
+  PreviewScenePreparedFrame,
+  PreviewSceneImageResources,
+} from './types';
 import { resolvePreviewCompositionFrameSize } from './canvas';
 import type { renderPreviewScene } from './render-preview';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
@@ -25,7 +30,12 @@ interface PreviewSceneRenderScheduler {
 }
 
 type Preparation =
-  | { job: PreviewSceneRenderJob; kind: 'ready'; frame: PreviewScenePreparedFrame | undefined }
+  | {
+      job: PreviewSceneRenderJob;
+      kind: 'ready';
+      frame: PreviewScenePreparedFrame | undefined;
+      imageResources?: PreviewSceneImageResources | undefined;
+    }
   | { job: PreviewSceneRenderJob; kind: 'failed'; error: unknown };
 
 type ActiveRender = {
@@ -34,11 +44,13 @@ type ActiveRender = {
   submitted: boolean;
   finished: boolean;
   presentation?: Awaited<ReturnType<typeof renderPreviewScene>>;
+  imageResources?: PreviewSceneImageResources | undefined;
 };
 
 interface PreviewSceneRenderSchedulerState {
   disposed: boolean;
   preparingJob: PreviewSceneRenderJob | null;
+  preparingImages: { job: PreviewSceneRenderJob; resources: PreviewSceneImageResources } | null;
   prepared: Preparation | null;
   active: ActiveRender[];
   latestJob: PreviewSceneRenderJob | null;
@@ -77,6 +89,7 @@ export function createPreviewSceneRenderScheduler(
   const state: PreviewSceneRenderSchedulerState = {
     disposed: false,
     preparingJob: null,
+    preparingImages: null,
     prepared: null,
     active: [],
     latestJob: null,
@@ -154,12 +167,27 @@ export function createPreviewSceneRenderScheduler(
       } else delete job.effectPreparation;
       state.latestJob = job;
       const reserved = state.prepared?.job ?? state.preparingJob;
-      if (reserved && state.pendingJob === reserved && canRetainPreparation(reserved, job)) {
+      if (
+        reserved &&
+        state.pendingJob === reserved &&
+        canRetainPreparation(
+          reserved,
+          job,
+          state.prepared?.kind === 'ready'
+            ? state.prepared.imageResources
+            : state.preparingImages?.job === reserved
+              ? state.preparingImages.resources
+              : undefined
+        )
+      ) {
         if (reserved !== job) job.controller.abort();
         return () => undefined;
       }
       for (const active of state.active) {
-        if (active.job !== job && shouldAbortActivePreviewJob(active.job, job))
+        if (
+          active.job !== job &&
+          shouldAbortActivePreviewJob(active.job, job, active.imageResources)
+        )
           active.job.controller.abort();
       }
       if (state.pendingJob && state.pendingJob !== job) discardPendingFrame(state);
@@ -181,7 +209,10 @@ export function createPreviewSceneRenderScheduler(
   };
 }
 
-function renderInput(job: PreviewSceneRenderJob): Parameters<typeof renderPreviewScene>[0] {
+function renderInput(
+  job: PreviewSceneRenderJob,
+  onImages?: (resources: PreviewSceneImageResources) => void
+): Parameters<typeof renderPreviewScene>[0] {
   const {
     controller: _controller,
     framePresenter: _presenter,
@@ -190,10 +221,20 @@ function renderInput(job: PreviewSceneRenderJob): Parameters<typeof renderPrevie
     effectPreparationProject: _provenance,
     ...input
   } = job;
-  return { ...input, signal: job.controller.signal };
+  return {
+    ...input,
+    signal: job.controller.signal,
+    ...(job.previewRenderer === 'gpu' && job.previewMode !== 'cache' && onImages
+      ? { onImageResourcesPrepared: onImages }
+      : {}),
+  };
 }
 
-function sameRenderingContext(previous: PreviewSceneRenderJob, next: PreviewSceneRenderJob) {
+function sameRenderingContext(
+  previous: PreviewSceneRenderJob,
+  next: PreviewSceneRenderJob,
+  images?: PreviewSceneImageResources
+) {
   return (
     previous.renderGeneration === next.renderGeneration &&
     previous.runtimeVersion === next.runtimeVersion &&
@@ -210,18 +251,24 @@ function sameRenderingContext(previous: PreviewSceneRenderJob, next: PreviewScen
     previous.acquireGpuOutput === next.acquireGpuOutput &&
     previous.onCameraPresented === next.onCameraPresented &&
     previous.videoRefs === next.videoRefs &&
-    previous.imageBank === next.imageBank &&
+    (images
+      ? arePreviewImageResourcesCurrent(images, next.imageBank)
+      : previous.imageBank === next.imageBank) &&
     previous.assetUrls === next.assetUrls
   );
 }
 
-function canRetainPreparation(previous: PreviewSceneRenderJob, next: PreviewSceneRenderJob) {
+function canRetainPreparation(
+  previous: PreviewSceneRenderJob,
+  next: PreviewSceneRenderJob,
+  images?: PreviewSceneImageResources
+) {
   return (
     previous.isPlaybackFrame &&
     next.isPlaybackFrame &&
     next.currentTime >= previous.currentTime &&
     next.currentTime - previous.currentTime <= 2 / previous.project.fps &&
-    sameRenderingContext(previous, next)
+    sameRenderingContext(previous, next, images)
   );
 }
 
@@ -250,7 +297,15 @@ function preparePendingFrame(
     return;
   let preparation: ReturnType<NonNullable<typeof args.prepare>>;
   try {
-    preparation = args.prepare(renderInput(job));
+    preparation = args.prepare(
+      renderInput(job, (resources) => {
+        if (!state.disposed && state.pendingJob === job) {
+          state.preparingImages = { job, resources };
+          if (state.latestJob && !sameRenderingContext(job, state.latestJob, resources))
+            job.controller.abort();
+        }
+      })
+    );
   } catch (error) {
     state.prepared = { job, kind: 'failed', error };
     return;
@@ -262,7 +317,15 @@ function preparePendingFrame(
       (frame) => {
         if (state.disposed || state.pendingJob !== job || job.controller.signal.aborted)
           frame?.release();
-        else state.prepared = { job, kind: 'ready', frame };
+        else
+          state.prepared = {
+            job,
+            kind: 'ready',
+            frame,
+            imageResources:
+              frame?.input.preparedFrame?.imageResources ??
+              (state.preparingImages?.job === job ? state.preparingImages.resources : undefined),
+          };
       },
       (error: unknown) => {
         if (!state.disposed && state.pendingJob === job && !job.controller.signal.aborted)
@@ -271,14 +334,21 @@ function preparePendingFrame(
     )
     .finally(() => {
       if (state.preparingJob === job) state.preparingJob = null;
+      if (state.preparingImages?.job === job) state.preparingImages = null;
       flushCompleted(state, args);
       preparePendingFrame(state, args);
       scheduleNextPreviewSceneRender(state, args);
     });
 }
 
-function shouldAbortActivePreviewJob(active: PreviewSceneRenderJob, next: PreviewSceneRenderJob) {
-  return !sameRenderingContext(active, next) || !active.isPlaybackFrame || !next.isPlaybackFrame;
+function shouldAbortActivePreviewJob(
+  active: PreviewSceneRenderJob,
+  next: PreviewSceneRenderJob,
+  images?: PreviewSceneImageResources
+) {
+  return (
+    !sameRenderingContext(active, next, images) || !active.isPlaybackFrame || !next.isPlaybackFrame
+  );
 }
 
 function canStart(
@@ -300,7 +370,7 @@ function canStart(
         active.independent &&
         active.submitted &&
         !active.job.controller.signal.aborted &&
-        sameRenderingContext(active.job, job)
+        sameRenderingContext(active.job, job, active.imageResources)
     )
   );
 }
@@ -335,6 +405,8 @@ function flushCompleted(
         !state.disposed &&
         !state.failure &&
         !active.job.controller.signal.aborted &&
+        (!state.latestJob ||
+          sameRenderingContext(active.job, state.latestJob, active.imageResources)) &&
         presented !== false
       )
         transferred = args.onSuccess?.(active.job, presented || undefined) === true;
@@ -375,6 +447,7 @@ function startNextPreviewSceneRender(
   }
   const active: ActiveRender = {
     job,
+    imageResources: prepared?.kind === 'ready' ? prepared.imageResources : undefined,
     submitted: false,
     finished: false,
     independent: Boolean(
@@ -398,6 +471,16 @@ function startNextPreviewSceneRender(
   try {
     render = args.render({
       ...renderJob,
+      ...(job.previewRenderer === 'gpu' && job.previewMode !== 'cache'
+        ? {
+            onImageResourcesPrepared(resources: PreviewSceneImageResources) {
+              if (state.disposed || job.controller.signal.aborted) return;
+              active.imageResources = resources;
+              if (state.latestJob && !sameRenderingContext(job, state.latestJob, resources))
+                job.controller.abort();
+            },
+          }
+        : {}),
       onGpuSubmitted() {
         if (job.controller.signal.aborted || state.disposed) return;
         renderJob.onGpuSubmitted?.();

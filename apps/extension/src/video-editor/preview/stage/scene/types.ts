@@ -20,6 +20,8 @@ import type { VideoCompositionCameraState } from '../../../../features/video/com
 import type {
   VideoProject,
   VideoProjectClip,
+  VideoProjectVideoClip,
+  VideoProjectImageClip,
 } from '../../../../features/video/project/types/index';
 import type { PreviewStageVideoRefs } from '../types';
 import type { PreviewEffectRuntimeFeedback } from '../types';
@@ -46,6 +48,7 @@ export interface PreviewStageCanvasSceneParams {
   onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   effectRuntimeFeedback: PreviewEffectRuntimeFeedback;
   imageBank: Record<string, HTMLImageElement>;
+  prepareImages?: PreviewSceneRenderInput['prepareImages'];
   isPlaying?: boolean;
   previewCacheBypass?: boolean;
   previewExactFrameCache?: VideoPreviewExactFrameCache;
@@ -65,9 +68,24 @@ type PreviewEffectRuntimeExecutorInput =
   | EffectRuntimeSandboxExecutor
   | (() => EffectRuntimeSandboxExecutor);
 
+/** Resource metadata from one actual frame; no geometry is resampled. */
+export interface PreviewImageResourceDemand {
+  readonly assets: ReadonlySet<string>;
+  readonly headers: ReadonlyMap<string, VideoProjectVideoClip | VideoProjectImageClip>;
+}
+
+/** Borrowed immutable image bindings live only for their original render/preparation job. */
+export interface PreviewSceneImageResources {
+  readonly images: Record<string, HTMLImageElement>;
+  readonly bindings: ReadonlyMap<string, HTMLImageElement | undefined>;
+  readonly headers: ReadonlySet<string>;
+  readonly requiredAssets?: ReadonlySet<string>;
+}
+
 /** Geometry and effect plans use one composition time; source timestamps retain their own authority. */
 interface PreviewSceneFramePlan {
   readonly passes: ReturnType<typeof resolveVideoCompositionRenderPasses>;
+  readonly imageResources?: PreviewSceneImageResources;
   readonly effects?: EffectRuntimeGpuPreparedComposition;
   readonly rasterScale: number;
   readonly compositionTime: number;
@@ -95,6 +113,8 @@ export type PreviewSceneRenderInput = {
   preparedFrame?: PreviewSceneFramePlan;
   /** Final GPU work was submitted; publication and source release still await completion. */
   onGpuSubmitted?: () => void;
+  /** Transient scheduler notification; never retained in presentation/cache metadata. */
+  onImageResourcesPrepared?: (resources: PreviewSceneImageResources) => void;
   previewRenderer?: VideoPreviewRenderer;
   gpuPreview?: NativeGpuPreviewRenderer;
   /** An admitted GPU job must drain before the scheduler can retry Canvas fallback. */
@@ -118,7 +138,7 @@ export type PreviewSceneRenderInput = {
   assetUrls?: Record<string, string>;
   imageBank: Record<string, HTMLImageElement>;
   /** The media owner prepares dependencies from this same plan before any raster work. */
-  prepareImages?: (frames: readonly VideoCompositionFrame[]) => Promise<void>;
+  prepareImages?: (frames: readonly VideoCompositionFrame[], signal?: AbortSignal) => Promise<void>;
   effectRuntimeExecutor?: PreviewEffectRuntimeExecutorInput;
   isPlaybackFrame?: boolean;
   previewRasterSize?: VideoEditorPreviewRasterSize;

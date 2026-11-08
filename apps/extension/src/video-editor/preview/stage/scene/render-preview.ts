@@ -1,3 +1,4 @@
+import { preparePreviewImageResources } from './image-resources';
 import { canPrepareEffectRuntimeGpuComposition } from '../../../../features/video/composition/effect-runtime/render/gpu-wave';
 import type { EffectRuntimeGpuPreparedComposition } from '../../../../features/video/composition/effect-runtime/runtime/types';
 import type { PreviewScenePresentation } from './types';
@@ -250,15 +251,16 @@ async function renderPreparedPreviewScene(
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   let gpuEffectFrames: EffectRuntimeGpuPreparedComposition | undefined;
   let capture: ReturnType<typeof capturePreviewSceneVideos> | undefined;
+
   try {
+    if (params.previewRenderer === 'legacy' || !params.gpuPreview) {
+      capture = capturePreviewSceneVideos(clipMediaElements, videos, params.signal);
+      if (capture.ready) await capture.ready;
+    }
+    const imageInput = await preparePreviewImageResources(params, renderPasses);
+    if (!imageInput) return false;
+    params = imageInput;
     if (params.previewRenderer !== 'legacy' && params.gpuPreview) {
-      if (params.prepareImages && !params.preparedFrame) {
-        await params.prepareImages([
-          renderPasses.overlayFrame,
-          ...renderPasses.visualPasses.map((pass) => pass.frame),
-        ]);
-        params.signal?.throwIfAborted();
-      }
       const captions = await (
         params.captionRenderer ?? createVideoProjectCaptionRenderer()
       ).prepare(params.project, params.project, params.signal);
@@ -346,13 +348,6 @@ async function renderPreparedPreviewScene(
     if (params.gpuOnly) throw new PreviewGpuSerialFallback();
     capture ??= capturePreviewSceneVideos(clipMediaElements, videos, params.signal);
     if (capture.ready) await capture.ready;
-    if (params.prepareImages) {
-      await params.prepareImages([
-        renderPasses.overlayFrame,
-        ...renderPasses.visualPasses.map((pass) => pass.frame),
-      ]);
-      params.signal?.throwIfAborted();
-    }
     const captions = await (params.captionRenderer ?? createVideoProjectCaptionRenderer()).prepare(
       params.project,
       params.project,

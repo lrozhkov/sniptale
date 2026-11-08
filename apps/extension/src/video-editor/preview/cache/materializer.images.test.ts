@@ -387,3 +387,53 @@ it('prepares transparent image inputs even when an effect replaces their visible
   expect(paintScene).toHaveBeenCalledOnce();
   owner.dispose();
 });
+
+it('waits for the scene background even when it is absent from frame visual layers', async () => {
+  vi.useFakeTimers();
+  const { image, readiness, owner } = imageReadinessFixture(false, 0, {
+    configure(project) {
+      project.clips = [];
+      project.sceneBackground = { kind: 'image', assetId: 'image' };
+    },
+  });
+  const pending = owner.renderFrame(0, new AbortController().signal);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(paintScene).not.toHaveBeenCalled();
+  readiness.complete = true;
+  readiness.naturalWidth = 320;
+  image.dispatchEvent(new Event('load'));
+  await expect(pending).resolves.toBe(owner.canvas);
+  expect(paintScene).toHaveBeenCalledOnce();
+  owner.dispose();
+});
+
+it.each(['error', 'abort'] as const)(
+  'settles pending scene background on %s without painting',
+  async (event) => {
+    vi.useFakeTimers();
+    const { image, readiness, owner } = imageReadinessFixture(false, 0, {
+      configure(project) {
+        project.clips = [];
+        project.sceneBackground = { kind: 'image', assetId: 'image' };
+      },
+    });
+    const controller = new AbortController();
+    const outcome = owner.renderFrame(0, controller.signal).then(
+      () => 'painted',
+      (error) => error
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    if (event === 'abort') controller.abort();
+    else {
+      readiness.complete = true;
+      image.dispatchEvent(new Event('error'));
+    }
+    expect(await outcome).toEqual(
+      event === 'error'
+        ? new Error('Preview media could not be decoded')
+        : expect.objectContaining({ name: 'AbortError' })
+    );
+    expect(paintScene).not.toHaveBeenCalled();
+    owner.dispose();
+  }
+);

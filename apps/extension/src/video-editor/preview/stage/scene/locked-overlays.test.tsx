@@ -4,6 +4,7 @@ import { act } from 'react';
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createVideoClip } from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { VideoMotionOverlayZoomMode } from '../../../../features/video/project/types';
 
 const { drawCompositionVisualLayerMock, resolveVideoCompositionRenderPassesMock } = vi.hoisted(
@@ -247,7 +248,12 @@ afterEach(() => {
 
 function createLockedVisualLayers() {
   return [
-    { clipId: 'video-1', kind: 'video' },
+    {
+      clipId: 'video-1',
+      kind: 'video',
+      clip: createVideoClip({ id: 'video-1' }),
+      trackRole: 'MAIN',
+    },
     {
       clipId: 'annotation-1',
       kind: 'annotation',

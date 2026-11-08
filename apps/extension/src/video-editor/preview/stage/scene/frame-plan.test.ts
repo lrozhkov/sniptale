@@ -1,3 +1,11 @@
+import { createEffectRuntimeFailure } from '../../../../contracts/effect-runtime/identity';
+import type {
+  EffectRuntimeSceneResult,
+  EffectRuntimeRenderCommand,
+} from '../../../../contracts/effect-runtime/types';
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
+import * as timeline from '../../../../features/video/composition/timeline/render';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -65,8 +73,14 @@ function fixture() {
 it('holds the captured source PTS while asynchronous dependencies and the media clock advance', async () => {
   const f = fixture();
   const images = Promise.withResolvers<void>();
-  const prepareImages = vi.fn(() => images.promise);
-  const pending = prepareNativePreviewSceneFrame({ ...f.input, prepareImages });
+  const prepareImages = vi.fn((_frames: unknown, _signal?: AbortSignal) => images.promise);
+  const controller = new AbortController();
+  const pending = prepareNativePreviewSceneFrame({
+    ...f.input,
+    prepareImages,
+    signal: controller.signal,
+  });
+  expect(prepareImages.mock.calls[0]?.[1]).toBe(controller.signal);
   expect(f.frames).toHaveLength(1);
   f.video.currentTime = 2;
   images.resolve();
@@ -248,4 +262,74 @@ it('selects a cheap onset without resolving future composition or touching media
   expect(next).toMatchObject({ clipId: f.host.id, effectInstanceId: 'future', onset: 2 });
   expect(spy).not.toHaveBeenCalled();
   expect(f.frames).toEqual([]);
+});
+
+it('releases captured sources without reserving a frame while its header is pending', async () => {
+  const f = fixture();
+  const clip = f.input.project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.windowHeader = DEFAULT_WINDOW_HEADER;
+  const notify = vi.fn();
+  await expect(
+    prepareNativePreviewSceneFrame({ ...f.input, onImageResourcesPrepared: notify })
+  ).resolves.toBeUndefined();
+  expect(notify).toHaveBeenCalledOnce();
+  expect(f.frames[0]!.close).toHaveBeenCalledOnce();
+});
+
+it('captures the prepared image snapshot from its one resolved pass set after image readiness', async () => {
+  const f = fixture();
+  const clip = f.input.project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.windowHeader = DEFAULT_WINDOW_HEADER;
+  const key = windowHeaderImageKey(clip.id, DEFAULT_WINDOW_HEADER);
+  const image = document.createElement('img');
+  Object.defineProperties(image, { complete: { value: true }, naturalWidth: { value: 100 } });
+  const bank = { [key]: image, unused: image };
+  const gate = Promise.withResolvers<void>();
+  const notify = vi.fn();
+  const resolve = vi.spyOn(timeline, 'resolveVideoCompositionRenderPasses');
+  const pending = prepareNativePreviewSceneFrame({
+    ...f.input,
+    imageBank: bank,
+    prepareImages: () => gate.promise,
+    onImageResourcesPrepared: notify,
+  });
+  expect(notify).not.toHaveBeenCalled();
+  gate.resolve();
+  const prepared = await pending;
+  if (!prepared) throw new Error('Expected prepared frame');
+  expect(resolve).toHaveBeenCalledOnce();
+  expect(notify).toHaveBeenCalledOnce();
+  expect(prepared.input.preparedFrame?.imageResources).toBe(notify.mock.calls[0]![0]);
+  expect(prepared.input.imageBank[key]).toBe(image);
+  expect(prepared.input.imageBank['unused']).toBeUndefined();
+  expect(bank.unused).toBe(image);
+  prepared.release();
+  resolve.mockRestore();
+});
+
+it('reports the prepared resource snapshot before its SDK request completes and releases failure inputs', async () => {
+  const f = futureFixture();
+  f.input.currentTime = 2.1;
+  const response = Promise.withResolvers<EffectRuntimeSceneResult>();
+  const executor = {
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn((_request: EffectRuntimeRenderCommand) => response.promise),
+  };
+  const notify = vi.fn();
+  const pending = prepareNativePreviewSceneFrame({
+    ...f.input,
+    effectRuntimeExecutor: executor,
+    onImageResourcesPrepared: notify,
+  });
+  const rejected = expect(pending).rejects.toThrow();
+  await vi.waitFor(() => expect(executor.prepareGpuFrame).toHaveBeenCalledOnce());
+  expect(notify).toHaveBeenCalledOnce();
+  const command = executor.prepareGpuFrame.mock.calls[0]?.[0];
+  if (!command) throw new Error('Expected SDK request');
+  response.resolve(createEffectRuntimeFailure(command, 'inputRejected'));
+  await rejected;
+  expect(f.frames[0]!.close).toHaveBeenCalledOnce();
 });

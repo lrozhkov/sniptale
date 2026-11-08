@@ -1,3 +1,4 @@
+import { capturePreviewImageResources, arePreviewImageResourcesReady } from './image-resources';
 import type { EffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/runtime/types';
 import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
 import { scaleEffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/render/wave';
@@ -138,17 +139,25 @@ export function prepareNativePreviewSceneFrame(
           draw: (context, x, y, width, height) => context.drawImage(frame, x, y, width, height),
         });
       }
-      await input.prepareImages?.(frames);
+      await input.prepareImages?.(frames, input.signal);
       input.signal?.throwIfAborted();
+      const imageResources = capturePreviewImageResources(input, passes);
+      input.onImageResourcesPrepared?.(imageResources);
+      if (!arePreviewImageResourcesReady(imageResources)) {
+        release();
+        return undefined;
+      }
       if (executor)
         effects = await prepareNativePreviewGpuComposition(input, passes, executor, rasterScale);
       input.signal?.throwIfAborted();
       return {
         input: {
           ...input,
+          imageBank: imageResources.images,
           decodedVideoFrames: media,
           preparedFrame: {
             passes,
+            imageResources,
             ...(effects ? { effects } : {}),
             rasterScale,
             compositionTime: input.currentTime,

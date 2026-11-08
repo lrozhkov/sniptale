@@ -98,6 +98,7 @@ function usePreviewStageRenderEffect(
         ...(current.assetUrls ? { assetUrls: current.assetUrls } : {}),
         effectRuntimeRef,
         imageBank: current.imageBank,
+        prepareImages: current.prepareImages,
         isPlaying: current.isPlaying === true,
         previewRasterSize: current.previewRasterSize,
         previewCacheBypass: current.previewCacheBypass,
@@ -161,6 +162,7 @@ function usePreviewStageRenderEffect(
     params.assetUrls,
     effectRuntimeRef,
     params.imageBank,
+    params.prepareImages,
     params.isPlaying,
     params.project,
     params.effectPreparationProject,
@@ -201,6 +203,7 @@ function createPreviewStageCanvasRenderJob(args: {
   assetUrls?: Record<string, string>;
   effectRuntimeRef: MutableRefObject<VideoEditorEffectRuntime | null>;
   imageBank: PreviewStageCanvasSceneParams['imageBank'];
+  prepareImages: PreviewStageCanvasSceneParams['prepareImages'];
   isPlaying: boolean;
   previewRasterSize: PreviewStageCanvasSceneParams['previewRasterSize'];
   previewCacheBypass: PreviewStageCanvasSceneParams['previewCacheBypass'];
@@ -237,6 +240,7 @@ function createPreviewStageCanvasRenderJob(args: {
         args.previewRenderer ?? 'gpu'
       ).executor,
     imageBank: args.imageBank,
+    ...(args.prepareImages ? { prepareImages: args.prepareImages } : {}),
     isEffectRuntimeFrame: args.project.effectInstances?.some(({ enabled }) => enabled) === true,
     isPlaybackFrame: args.isPlaying === true,
     ...(args.previewRasterSize ? { previewRasterSize: args.previewRasterSize } : {}),

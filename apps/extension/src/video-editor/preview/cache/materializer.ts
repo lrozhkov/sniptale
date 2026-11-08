@@ -1,3 +1,5 @@
+import { collectPreviewImageResourceDemand } from '../stage/scene/image-resources';
+import { getProjectSceneBackgroundImageAssetId } from '../../../features/video/project/scene/background';
 import type {
   GpuPreviewOutput,
   GpuPreviewTargetFactory,
@@ -37,10 +39,7 @@ import { createVideoProjectWatermarkRenderer } from '../../../features/video/com
 import { loadVideoEditorAssetBlob } from '../../runtime/session/asset-urls';
 import { createReviewSpatialSession } from '../../../workflows/video-review/spatial-render-session';
 import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
-import {
-  projectWindowHeaderImages,
-  windowHeaderImageKey,
-} from '../../../features/video/composition/draw/window-header';
+import { projectWindowHeaderImages } from '../../../features/video/composition/draw/window-header';
 import type {
   VideoCompositionCameraState,
   VideoCompositionFrame,
@@ -997,7 +996,8 @@ async function renderMaterializedFrame(
         return state.effectRuntime.executor;
       },
       imageBank: state.imageBank,
-      prepareImages: (frames) => prepareMaterializedImages(state.imageBank, frames, signal),
+      prepareImages: (frames) =>
+        prepareMaterializedImages(state.imageBank, frames, signal, renderProject),
       previewRasterSize: params.rasterSize,
       project: renderProject,
       ...(state.effectPreparation ? { effectPreparation: state.effectPreparation } : {}),
@@ -1091,21 +1091,13 @@ async function prepareMaterializedVideos(
 async function prepareMaterializedImages(
   imageBank: Record<string, HTMLImageElement>,
   frames: readonly VideoCompositionFrame[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  project: VideoProject
 ): Promise<void> {
-  const keys = new Set<string>();
-  for (const frame of frames) {
-    for (const layer of [...frame.visualLayers, ...frame.effectInputLayers]) {
-      if (layer.kind === 'image') keys.add(layer.clip.assetId);
-      if (layer.kind === 'shape' && layer.clip.embeddedAsset)
-        keys.add(layer.clip.embeddedAsset.assetId);
-      if (
-        (layer.kind === 'image' || (layer.kind === 'video' && layer.trackRole !== 'CAMERA')) &&
-        layer.clip.windowHeader
-      )
-        keys.add(windowHeaderImageKey(layer.clipId, layer.clip.windowHeader));
-    }
-  }
+  const demand = collectPreviewImageResourceDemand(frames);
+  const keys = new Set([...demand.assets, ...demand.headers.keys()]);
+  const background = getProjectSceneBackgroundImageAssetId(project);
+  if (background) keys.add(background);
   await Promise.all(
     [...keys].map((key) => {
       const image = imageBank[key];
