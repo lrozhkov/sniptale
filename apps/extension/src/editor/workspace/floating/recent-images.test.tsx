@@ -26,7 +26,7 @@ beforeEach(() => {
     Array.from({ length: 15 }, (_, i) => ({
       id: `image-${i}`,
       title: `Image ${i}`,
-      detail: '640 × 360',
+      detail: 'example.org\n11/8/26, 10:00 AM',
       updatedAt: 100 - i,
     }))
   );
@@ -49,6 +49,11 @@ it('opens a transient bounded list, marks current, and closes with Escape restor
   await open();
   expect(host.querySelectorAll('[data-ui="editor.recent-images.item"]')).toHaveLength(12);
   expect(host.querySelector('[data-recent-close]')).toBeNull();
+  expect(query('editor.recent-images.panel').textContent).not.toContain('Image 0');
+  expect(query('editor.recent-images.panel').querySelector('[title="Image 0"]')).toBeNull();
+  expect(host.querySelector('[aria-current="true"]')?.getAttribute('aria-label')).toContain(
+    'example.org'
+  );
   expect(query('editor.recent-images.panel').textContent).not.toContain('Recent images');
   expect(document.activeElement).toBe(host.querySelector('[aria-current="true"]'));
   expect(host.querySelector('[aria-current="true"]')?.getAttribute('data-asset-id')).toBe(

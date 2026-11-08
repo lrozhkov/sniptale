@@ -1,6 +1,7 @@
 import {
   getMediaAssetBlob,
   getMediaLibraryEntry,
+  getMediaThumbnail,
   listMediaLibrary,
 } from '../../composition/persistence/media-library';
 import { getAggregatePresentation } from '../../composition/persistence/aggregate-presentations';
@@ -24,7 +25,7 @@ export async function listRecentEditorImages(
       title: item.filename,
       detail:
         detail === 'source'
-          ? `${recentImageSource(item.sourceUrl, item.kind, locale)} · ${formatDateTime(
+          ? `${recentImageSource(item.sourceUrl, item.kind, locale)}\n${formatDateTime(
               item.updatedAt,
               { dateStyle: 'short', timeStyle: 'short' },
               locale
@@ -52,18 +53,18 @@ function recentImageSource(url: string | null | undefined, kind: string, locale:
   );
 }
 
-/** Reads only a presentation that matches the current accepted workspace revision. */
+/** Prefers a current edited presentation and uses the original image while it is unavailable. */
 export async function readRecentEditorThumbnail(id: string): Promise<Blob | undefined> {
   const entry = await getMediaLibraryEntry(id);
   if (!entry || entry.lifecycle?.trashedAt !== undefined) return undefined;
   const revision = entry.workspaceRevision ?? 0;
   const presentation = await getAggregatePresentation({ kind: 'image', id });
   const blob =
-    presentation?.presentationRevision === revision
+    (presentation?.presentationRevision === revision
       ? (presentation.previewBlob ?? presentation.thumbnailBlob)
-      : revision === 0
-        ? await getMediaAssetBlob(id)
-        : undefined;
+      : undefined) ??
+    (await getMediaThumbnail(id))?.blob ??
+    (await getMediaAssetBlob(id));
   const latest = await getMediaLibraryEntry(id);
   return latest &&
     latest.lifecycle?.trashedAt === undefined &&

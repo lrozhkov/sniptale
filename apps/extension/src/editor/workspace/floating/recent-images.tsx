@@ -26,31 +26,29 @@ function RecentImageRow(props: {
       data-asset-id={item.id}
       aria-current={item.id === props.currentId ? 'true' : undefined}
       aria-disabled={props.pendingId !== null || item.id === props.currentId || item.unavailable}
-      title={item.title}
+      aria-label={item.detail}
       onClick={() => {
         if (!item.unavailable) void props.onSelect(item.id);
       }}
       className={[
-        'flex min-h-14 w-full shrink-0 items-center gap-3 rounded px-2 py-2 text-left',
+        'flex min-h-20 w-full shrink-0 items-center gap-3 rounded px-2 py-2 text-left',
         'hover:bg-[var(--sniptale-color-surface-hover)]',
         'aria-current:bg-[var(--sniptale-color-surface-hover)]',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
         'focus-visible:outline-[var(--sniptale-color-accent)]',
       ].join(' ')}
     >
-      <span className="w-14 shrink-0 overflow-hidden rounded">
+      <span className="w-28 shrink-0 overflow-hidden rounded">
         <EditorStartThumbnail item={item} fallback={<ImageIcon size={20} />} />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] text-[var(--sniptale-color-text-primary)]">
-          {item.title}
-        </span>
-        <span
-          className="block truncate text-xs text-[var(--sniptale-color-text-secondary)]"
-          title={item.detail}
-        >
-          {item.detail}
-        </span>
+      <span
+        className={[
+          'min-w-0 flex-1 whitespace-pre-line break-words text-xs leading-5',
+          'text-[var(--sniptale-color-text-secondary)]',
+        ].join(' ')}
+        title={item.detail}
+      >
+        {item.detail}
       </span>
       {props.pendingId === item.id ? (
         <LoaderCircle

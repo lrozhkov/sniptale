@@ -106,8 +106,16 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(popup).not.toContainText(
         locale === 'ru' ? 'Недавние изображения' : 'Recent images'
       );
-      await expect(popup.locator('[data-asset-id]').first()).toContainText('example.org ·');
+      await expect(popup.locator('[data-asset-id]').first()).toContainText('example.org');
       await expect(popup).not.toContainText('640 × 360');
+      await expect(popup).not.toContainText('Recent image');
+      await expect(popup.locator('[title^="Recent image"]')).toHaveCount(0);
+      const preview = (await popup.locator('img').first().boundingBox())!;
+      expect(preview.width).toBeGreaterThanOrEqual(111);
+      expect(preview.height).toBeGreaterThanOrEqual(62);
+      // These rows have no editor workspace: they are fresh library captures.
+      await expect(popup.locator(`[data-asset-id="${prefix}-1"]`)).toBeVisible();
+
       const scroll = popup.locator('[data-ui="editor.recent-images.scroll"]');
       expect(await scroll.evaluate((n) => n.scrollWidth - n.clientWidth)).toBe(0);
       expect(await scroll.evaluate((n) => n.scrollHeight > n.clientHeight)).toBe(true);
@@ -189,6 +197,8 @@ for (const locale of ['en', 'ru'] as const) {
       await page.setViewportSize({ width: 1920, height: 900 });
       await trigger.click();
       await expect(popup.locator('[data-ui="editor.recent-images.item"]')).toHaveCount(12);
+      // An edited image with no regenerated presentation must still show its base thumbnail.
+      await expect(popup.locator(`[data-asset-id="${prefix}-0"] img`)).toBeVisible();
       await page.screenshot({ path: info.outputPath('recent-images-wide.png'), fullPage: false });
       await page.keyboard.press('Escape');
       await page.setViewportSize({ width: 1100, height: 560 });
