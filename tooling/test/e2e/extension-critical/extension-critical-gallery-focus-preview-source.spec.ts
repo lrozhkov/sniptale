@@ -1,8 +1,19 @@
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { expect, test, type Locator } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
-import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
+
+enableGpuPreviewProof();
 
 /** Compare the visible interior against the painted source, where focus controls and masks do not cover it. */
 async function expectVisibleSource(preview: Locator) {
@@ -55,6 +66,50 @@ async function expectVisibleSource(preview: Locator) {
     .toEqual({ paintedSource: true, visibleSource: true });
 }
 
+/** Independent packet timestamps choose the reference for the saved source interval. */
+function sourceReferenceInterval(fixture: URL, target: number) {
+  const value: unknown = JSON.parse(
+    execFileSync(
+      '/usr/bin/ffprobe',
+      [
+        '-v',
+        'error',
+        '-select_streams',
+        'v:0',
+        '-show_packets',
+        '-show_entries',
+        'packet=pts_time',
+        '-of',
+        'json',
+        fileURLToPath(fixture),
+      ],
+      { encoding: 'utf8', timeout: 10_000, maxBuffer: 128 * 1024 }
+    )
+  );
+  if (!value || typeof value !== 'object') throw new Error('Reference timestamps are unavailable.');
+  const packets: unknown = Reflect.get(value, 'packets');
+  if (!Array.isArray(packets)) throw new Error('Reference packets are unavailable.');
+  const times = packets
+    .map((packet: unknown) => {
+      if (!packet || typeof packet !== 'object') throw new Error('Reference packet is invalid.');
+      const text: unknown = Reflect.get(packet, 'pts_time');
+      if (typeof text !== 'string' || !/^[-+.0-9eE]+$/.test(text))
+        throw new Error('Reference timestamp is invalid.');
+      const time = Number(text);
+      if (!Number.isFinite(time)) throw new Error('Reference timestamp is not finite.');
+      return time;
+    })
+    .sort((a, b) => a - b);
+  const index = times.findLastIndex((time) => time <= target);
+  const timestamp = times[index],
+    nextTimestamp = times[index + 1];
+  if (timestamp === undefined || nextTimestamp === undefined)
+    throw new Error('Reference interval is unavailable.');
+  expect(target).toBeGreaterThanOrEqual(timestamp);
+  expect(target).toBeLessThan(nextTimestamp);
+  return { timestamp, nextTimestamp };
+}
+
 for (const theme of ['light', 'dark'] as const) {
   test(`Focus inspector source stays visible (${theme})`, async ({ page }, info) => {
     const host = await startHostServer();
@@ -80,7 +135,14 @@ for (const theme of ['light', 'dark'] as const) {
       for (const background of ['none', 'gradient'] as const) {
         if (background === 'gradient') {
           await button('gallery.videoReview.scene').click();
-          await button('gallery.videoReview.backgroundGradient').click();
+          await button('gallery.videoReview.backgroundSolid').click();
+          const gradient = dialog
+            .locator('[data-ui="gallery.videoReview.gradientPresets"] button[style*="gradient"]')
+            .first();
+          if (!(await gradient.isVisible()))
+            await button('settings.editor.backgrounds.showMore').click();
+          await gradient.click();
+          await expect(gradient).toHaveAttribute('aria-pressed', 'true');
           const padding = dialog.getByRole('textbox', {
             name: label('gallery.videoReview.backgroundPadding'),
             exact: true,
@@ -97,6 +159,88 @@ for (const theme of ['light', 'dark'] as const) {
             .getByRole('button', { name: label(`gallery.videoReview.${kind}`), exact: true })
             .click();
           await expectVisibleSource(preview);
+          if (theme === 'light' && background === 'none' && kind === 'zoomRegionLabel') {
+            const selected = await persistedFocus(page);
+            if (!selected) throw new Error('Paused focus source selection was not saved.');
+            const requestedSourceTime = (selected.start + selected.end) / 2;
+            const fixture = new URL('../fixtures/review-vp8-opus.webm', import.meta.url);
+            const interval = sourceReferenceInterval(fixture, requestedSourceTime);
+            const decoded = execFileSync(
+              '/usr/bin/ffmpeg',
+              [
+                '-v',
+                'error',
+                '-ss',
+                String(interval.timestamp),
+                '-i',
+                fileURLToPath(fixture),
+                '-frames:v',
+                '1',
+                '-f',
+                'rawvideo',
+                '-pix_fmt',
+                'rgb24',
+                'pipe:1',
+              ],
+              { timeout: 10_000, maxBuffer: 128 * 1024 }
+            );
+            expect(decoded.byteLength).toBe(160 * 90 * 3);
+            const points = [
+              [20, 70],
+              [70, 80],
+              [40, 82],
+            ] as const;
+            const expected = points.map(([x, y]) => [
+              ...decoded.subarray((y * 160 + x) * 3, (y * 160 + x) * 3 + 3),
+            ]);
+            const canvas = preview.locator('canvas[data-review-camera-area]');
+            const actual = await canvas.evaluate((node: HTMLCanvasElement, points) => {
+              const context = node.getContext('2d');
+              if (!context) throw new Error('Paused source readback is unavailable.');
+              return {
+                raster: { width: node.width, height: node.height },
+                colors: points.map(([x, y]) =>
+                  [
+                    ...context.getImageData(
+                      Math.floor((x / 160) * node.width),
+                      Math.floor((y / 90) * node.height),
+                      1,
+                      1
+                    ).data,
+                  ].slice(0, 3)
+                ),
+              };
+            }, points);
+            expect(
+              Math.max(
+                ...expected.flatMap((color, index) =>
+                  color.map((value, channel) => Math.abs(value - actual.colors[index]![channel]!))
+                )
+              )
+            ).toBeLessThan(4);
+            await writeFile(
+              info.outputPath('paused-focus-source-reference.json'),
+              JSON.stringify(
+                {
+                  viewport: page.viewportSize(),
+                  sourceSHA256: createHash('sha256')
+                    .update(await readFile(fixture))
+                    .digest('hex'),
+                  requestedSourceTime,
+                  sourceDimensions: { width: 160, height: 90 },
+                  reference:
+                    'Independent FFmpeg RGB decode at the packet PTS covering saved source time.',
+                  referenceInterval: interval,
+                  expected,
+                  actual,
+                  ptsEvidence:
+                    'Controlled canonical provider/loader tests; browser checks corresponding source pixels.',
+                },
+                null,
+                2
+              )
+            );
+          }
           if (kind !== 'zoomRegionLabel') {
             await button('gallery.videoReview.play').click();
             await button('gallery.videoReview.pause').click();

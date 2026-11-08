@@ -1,4 +1,13 @@
-import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
+import { VideoSample } from 'mediabunny';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+  type PreviewSourceBinding,
+} from '../../workflows/video/preview-source';
+import {
+  prepareDecodedVideoFrame,
+  prepareDecodedVideoSample,
+} from '../../features/video/composition/draw/decoded-sample';
 import { useEffect, useState } from 'react';
 
 /** One materialized source frame, independent of the main playback element. */
@@ -6,6 +15,11 @@ export interface ZoomPreviewFrame {
   image: CanvasImageSource;
   width: number;
   height: number;
+  /** Scalar provenance survives the owned RGB copy; the decoded source lease does not escape. */
+  readonly selection?: Pick<
+    PreviewSourceBinding,
+    'url' | 'target' | 'timestamp' | 'nextTimestamp' | 'sampleTime' | 'heldAtEnd'
+  >;
 }
 
 export type ZoomPreviewFrameLoader = (
@@ -72,9 +86,57 @@ export function useZoomPreviewSource(file: File | null): ZoomPreviewFrameLoader 
     video.preload = 'auto';
     video.src = url;
     let queue: Promise<unknown> = Promise.resolve();
+    let provider: PreviewSourceProvider | null = null;
     const load: ZoomPreviewFrameLoader = (sourceTime, requestedSignal) => {
       const signal = AbortSignal.any([owner.signal, requestedSignal]);
       const task = queue.then(async () => {
+        signal.throwIfAborted();
+        if (typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined') {
+          provider ??= createPreviewSourceProvider();
+          provider.retainSources(new Set([url]));
+          const lease = await provider.acquire(
+            [{ id: 'zoom-preview', url, time: sourceTime, holdSourceEnd: true }],
+            signal,
+            { discontinuity: true }
+          );
+          if (lease) {
+            let sample: VideoSample | undefined;
+            try {
+              signal.throwIfAborted();
+              const binding = lease.bindings.get('zoom-preview');
+              if (!binding?.source.toVideoFrame)
+                throw new Error('Preview source binding is unavailable.');
+              sample = await prepareDecodedVideoSample(
+                new VideoSample(binding.source.toVideoFrame(), binding.source.orientation),
+                signal
+              );
+              signal.throwIfAborted();
+              const canvas = document.createElement('canvas');
+              canvas.width = binding.source.sourceWidth;
+              canvas.height = binding.source.sourceHeight;
+              const context = canvas.getContext('2d');
+              if (!context) throw new Error('Preview canvas is unavailable.');
+              sample.draw(context, 0, 0, canvas.width, canvas.height);
+              signal.throwIfAborted();
+              return {
+                image: canvas,
+                width: canvas.width,
+                height: canvas.height,
+                selection: Object.freeze({
+                  url: binding.url,
+                  target: binding.target,
+                  timestamp: binding.timestamp,
+                  nextTimestamp: binding.nextTimestamp,
+                  ...(binding.sampleTime === undefined ? {} : { sampleTime: binding.sampleTime }),
+                  ...(binding.heldAtEnd === undefined ? {} : { heldAtEnd: binding.heldAtEnd }),
+                }),
+              };
+            } finally {
+              sample?.close();
+              lease.release();
+            }
+          }
+        }
         await waitForVideo(video, 'loadeddata', () => video.readyState >= 2, signal);
         const time = Math.max(0, Math.min(sourceTime, Math.max(0, video.duration - 0.001)));
         if (video.seeking || Math.abs(video.currentTime - time) > 0.0001)
@@ -108,6 +170,7 @@ export function useZoomPreviewSource(file: File | null): ZoomPreviewFrameLoader 
     setSource({ file, load });
     return () => {
       owner.abort();
+      provider?.dispose();
       video.removeAttribute('src');
       video.load();
       URL.revokeObjectURL(url);

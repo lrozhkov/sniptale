@@ -6457,6 +6457,28 @@
       "reviewDate": "2026-11-08",
       "reason": "tool-noise: One camera case keeps source pixels, crop changes, history and main transport observations with its fixture cleanup. The primary viewport adds matching source colors and a terminal camera offset. The short viewport retains interaction checks. Existing tolerances and authored history assertions remain unchanged. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, asset, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/use-zoom-preview-source.ts",
+      "symbol": "useZoomPreviewSource.useEffect callback.load.queue.then callback",
+      "owner": "extension:gallery",
+      "astHash": "bfcc9625493d69bf892c9acfdda263f1a6986d396ba0e89d909ff66b3cc725ec",
+      "signatureHash": "7588c9e9464f94ecbbc3671d9ff30308d26cbf91beafa1555a4f30de8cd72c91",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One serialized frame operation acquires a canonical lease, normalizes its clone and copies pixels into a new canvas. The provider owns physical selection and budgets. The operation closes native resources after copying. Returned canvases retain independent lifetimes. Existing HTML compatibility remains within that source loader. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independently changing selection, queue, native clone, RGB lifetime, fallback, reference decoder or fixture cleanup owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-focus-preview-source.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "astHash": "6477eea85697ece81a1383d7c44c857f4900b212a3090c9f9b5978fbbbcea005",
+      "signatureHash": "8ce7fbe82a9ac3169f4e857873f03fe064522448e787f418923e9ccafaf643b1",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One fixture connects saved source time, independent packet intervals, decoded reference pixels and visible inspector checks. The finite CLI reference creates no production source owner. The selected gradient uses the current palette controls. Existing background, type and transport assertions retain their cleanup. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independently changing selection, queue, native clone, RGB lifetime, fallback, reference decoder or fixture cleanup owners. Remove when the analyzer models this cohesive operation."
     }
   ]
 }
