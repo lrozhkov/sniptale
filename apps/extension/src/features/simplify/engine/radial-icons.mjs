@@ -65,57 +65,89 @@ function sun(image, parts, bg) {
   return null;
 }
 
-// Two disconnected arcs that jointly cover an empty ellipse provide graphic
-// evidence that neither an open letter nor a closed single-component ring has.
-export function segmentedAnnulus(image, parts, bg) {
-  if (parts.length !== 2) return null;
-  const [major, minor] = [...parts].sort((a, b) => b.n - a.n),
-    box = bounds(parts);
-  if (
-    box.w < 12 ||
-    box.h < 12 ||
-    box.w > 40 ||
-    box.h > 40 ||
-    box.w / box.h < 0.75 ||
-    box.w / box.h > 1.33 ||
-    minor.n < 8 ||
-    minor.n > major.n * 0.55
-  )
-    return null;
-  const cx = box.x + (box.w - 1) / 2,
-    cy = box.y + (box.h - 1) / 2,
-    rx = box.w / 2,
-    ry = box.h / 2;
-  const angles = [new Set(), new Set()];
-  let ink = 0,
-    inner = 0,
-    outer = 0;
-  for (let y = box.y; y < box.y + box.h; y++)
-    for (let x = box.x; x < box.x + box.w; x++) {
+// Recover connected pixel membership: arc bounds can also contain an unrelated
+// central glyph, so bounding-box membership cannot prove an empty ring band.
+function connectedPixels(image, part, bg) {
+  const mask = new Set();
+  for (let y = part.y; y < part.y + part.h; y++)
+    for (let x = part.x; x < part.x + part.w; x++) {
       const i = (y * image.width + x) * 4;
-      if (Math.max(...bg.map((v, c) => Math.abs(v - image.data[i + c]))) <= 40) continue;
-      const dx = (x - cx) / rx,
-        dy = (y - cy) / ry,
-        r = Math.hypot(dx, dy),
-        bin = Math.floor(((Math.atan2(dy, dx) + Math.PI) * 8) / Math.PI) % 16;
-      ink++;
-      if (r < 0.35) inner++;
-      if (r > 1.25) outer++;
-      for (const [j, p] of [major, minor].entries())
-        if (x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h) angles[j].add(bin);
+      if (Math.max(...bg.map((v, c) => Math.abs(v - image.data[i + c]))) > 40)
+        mask.add(y * image.width + x);
     }
-  const total = new Set([...angles[0], ...angles[1]]);
-  if (
-    !ink ||
-    inner > ink * 0.025 ||
-    outer > ink * 0.05 ||
-    total.size < 15 ||
-    angles[0].size < 9 ||
-    angles[1].size < 2 ||
-    angles[1].size > 6
-  )
-    return null;
-  return [major, minor];
+  const pixels = [mask.values().next().value];
+  mask.delete(pixels[0]);
+  for (let i = 0; i < pixels.length; i++) {
+    const x = pixels[i] % image.width,
+      y = Math.floor(pixels[i] / image.width);
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const at = (y + dy) * image.width + x + dx;
+        if (x + dx >= part.x && x + dx < part.x + part.w && mask.delete(at)) pixels.push(at);
+      }
+  }
+  return pixels.length === part.n
+    ? pixels.map((at) => [at % image.width, Math.floor(at / image.width)])
+    : [];
+}
+
+// Two disconnected outer arcs must prove a complete ring independently of any
+// enclosed glyph. Nearby marks outside the ring retain independent ownership.
+export function segmentedAnnulus(image, parts, bg) {
+  const pixels = new Map(parts.map((p) => [p, connectedPixels(image, p, bg)]));
+  if ([...pixels.values()].some((p) => !p.length)) return null;
+  for (let i = 0; i < parts.length; i++)
+    for (let j = i + 1; j < parts.length; j++) {
+      const [major, minor] = [parts[i], parts[j]].sort((a, b) => b.n - a.n),
+        box = bounds([major, minor]);
+      if (
+        box.w < 12 ||
+        box.h < 12 ||
+        box.w > 40 ||
+        box.h > 40 ||
+        box.w / box.h < 0.75 ||
+        box.w / box.h > 1.33 ||
+        minor.n < 8 ||
+        minor.n > major.n * 0.55
+      )
+        continue;
+      const cx = box.x + (box.w - 1) / 2,
+        cy = box.y + (box.h - 1) / 2,
+        rx = box.w / 2,
+        ry = box.h / 2,
+        radius = ([x, y]) => Math.hypot((x - cx) / rx, (y - cy) / ry),
+        angles = [new Set(), new Set()];
+      const innerRadius = parts.length === 2 ? 0.35 : 0.7;
+      let ink = 0,
+        inner = 0,
+        outer = 0;
+      for (const [k, part] of [major, minor].entries())
+        for (const [x, y] of pixels.get(part)) {
+          const r = radius([x, y]);
+          ink++;
+          if (r < innerRadius) inner++;
+          if (r > 1.25) outer++;
+          angles[k].add(
+            Math.floor(((Math.atan2((y - cy) / ry, (x - cx) / rx) + Math.PI) * 8) / Math.PI) % 16
+          );
+        }
+      const total = new Set([...angles[0], ...angles[1]]);
+      if (
+        !ink ||
+        inner > ink * 0.025 ||
+        outer > ink * 0.05 ||
+        total.size < 15 ||
+        angles[0].size < 9 ||
+        angles[1].size < 2 ||
+        angles[1].size > 6
+      )
+        continue;
+      const enclosed = parts.filter(
+        (p) => p !== major && p !== minor && pixels.get(p).every((point) => radius(point) <= 0.7)
+      );
+      return [major, minor, ...enclosed];
+    }
+  return null;
 }
 
 // A closed counter and a tail in the lower-right quadrant are necessary but
@@ -297,22 +329,18 @@ export function claimRadialIcons(image, input, measure, options = {}) {
     out = [];
   for (let i = 0; i < input.length; i++) {
     const first = input[i];
-    if (
-      used.has(i) ||
-      !['unknown', 'text'].includes(first.shape) ||
-      first.roleEvidence ||
-      !first.bg
-    )
-      continue;
+    if (used.has(i) || !radialProposal(first) || !first.bg) continue;
     const candidates = radialProposalGroups(input, i, first, used);
     for (const ids of candidates) {
       const proposals = ids.map((k) => input[k]),
         area = bounds(proposals);
-      if (area.w < 8 || area.h < 8 || area.w > 42 || area.h > 42) continue;
+      const replacesSymbol = proposals.some((p) => p.shape === 'icon'),
+        limit = replacesSymbol ? 48 : 42;
+      if (area.w < 8 || area.h < 8 || area.w > limit || area.h > limit) continue;
       if (protectedRects.some((p) => overlap(area, p))) continue;
       const parts = inkParts(image, { ...area, bg: first.bg, atoms: null });
       const { found, reason } = recognizeRadialParts(image, parts, first.bg, input, area, ids);
-      if (!found) continue;
+      if (!found || (replacesSymbol && reason !== 'segmented-annulus')) continue;
       const tight = bounds(found);
       // A proposal can include a nearby dropdown caret; retain its full source.
       // Reject a proposal that also has typography or a different nearby owner.
@@ -434,14 +462,21 @@ function radialProposalGroups(input, i, first, used) {
     const q = input[j];
     if (
       used.has(j) ||
-      !['unknown', 'text'].includes(q.shape) ||
-      q.roleEvidence ||
+      !radialProposal(q) ||
       !q.bg ||
       Math.max(...q.bg.map((v, k) => Math.abs(v - first.bg[k]))) > 8
     )
       continue;
     const b = bounds([first, q]);
-    if (b.w <= 42 && b.h <= 42) candidates.push([i, j]);
+    const limit = first.shape === 'icon' || q.shape === 'icon' ? 48 : 42;
+    if (b.w <= limit && b.h <= limit) candidates.push([i, j]);
   }
   return candidates;
+}
+
+function radialProposal(p) {
+  return (
+    (['unknown', 'text'].includes(p.shape) && !p.roleEvidence) ||
+    (p.shape === 'icon' && p.roleEvidence === 'structured-symbol')
+  );
 }

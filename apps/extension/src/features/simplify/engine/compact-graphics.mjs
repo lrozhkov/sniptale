@@ -12,6 +12,7 @@ import {
 } from './compact-contours.mjs';
 import {
   uncertainColorTexture,
+  createTextPixelEvidence,
   iconRowDots,
   staggeredColor,
   joinedStaggeredPrefix,
@@ -270,6 +271,7 @@ export function claimCompactGraphics(image, input, measure, options = {}) {
   const protectedRects = (options.protected || input.protected || []).filter(
     (b) => b.kind !== 'outline'
   );
+  const peerEvidence = createTextPixelEvidence(image, input);
   const used = new Set(),
     output = [];
   for (let i = 0; i < input.length; i++) {
@@ -281,7 +283,7 @@ export function claimCompactGraphics(image, input, measure, options = {}) {
       !first.bg
     )
       continue;
-    if (uncertainColorTexture(image, first)) {
+    if (uncertainColorTexture(image, first, peerEvidence)) {
       output.push({ ...first, shape: 'unknown', roleEvidence: 'uncertain-color-texture' });
       used.add(i);
       continue;

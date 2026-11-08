@@ -51,7 +51,7 @@ function variedColorRows(image, box, points, width, top, bottom) {
   return variedRows;
 }
 
-export function uncertainColorTexture(image, box) {
+export function uncertainColorTexture(image, box, peerEvidence = () => false) {
   const unit = box.typeMetrics?.xHeight;
   if (box.shape !== 'text' || !unit || box.w < unit * 8 || box.h > unit * 4) return false;
   const w = box.w,
@@ -97,6 +97,7 @@ export function uncertainColorTexture(image, box) {
       if (sharedInks.get(key)) continue;
     }
     if (subpixelTextEvidence(image, box, { left, right, top, bottom })) continue;
+    if (peerEvidence(box, { left, right, top, bottom })) continue;
     return true;
   }
   return false;
@@ -155,14 +156,15 @@ function subpixelChannelPeaks(image, box, part) {
   return peaks;
 }
 
-function subpixelPhase(image, box, part, strong = true) {
+function subpixelProfile(image, box, part) {
   const peaks = subpixelChannelPeaks(image, box, part);
-  if (Math.min(...peaks) < 12) return 0;
+  if (Math.min(...peaks) < 12) return null;
   let error = 0,
     energy = 0;
   const dots = [0, 0, 0],
     redEnergy = [0, 0, 0],
-    blueEnergy = [0, 0, 0];
+    blueEnergy = [0, 0, 0],
+    cross = [0, 0, 0];
   const at = (x, y, c) => {
     if (x < 0 || x >= box.w) return 0;
     const i = ((box.y + y) * image.width + box.x + x) * 4;
@@ -181,17 +183,131 @@ function subpixelPhase(image, box, part, strong = true) {
         dots[j] += r * v;
         redEnergy[j] += r * r;
         blueEnergy[j] += v * v;
+        cross[j] += b * v;
       }
     }
-  if (!energy || error > energy * 0.2) return 0;
+  if (!energy || error > energy * 0.2) return null;
+  return { dots, redEnergy, blueEnergy, cross, ink: peaks.map((v) => v / Math.hypot(...peaks)) };
+}
+
+function profilePhase(profile, strong = true) {
+  if (!profile) return 0;
+  const { dots, redEnergy, blueEnergy } = profile;
   const scores = dots.map((v, j) => v / Math.sqrt(redEnergy[j] * blueEnergy[j] || 1));
-  // A target may borrow a consistent phase only from two independent strong witnesses.
   const margin = strong ? 0.08 : Number.EPSILON;
   if (scores[0] >= 0.85 && scores[0] >= scores[1] + margin && scores[0] >= scores[2] + margin)
     return -1;
   if (scores[2] >= 0.85 && scores[2] >= scores[1] + margin && scores[2] >= scores[0] + margin)
     return 1;
   return 0;
+}
+
+function subpixelPhase(image, box, part, strong = true) {
+  return profilePhase(subpixelProfile(image, box, part), strong);
+}
+
+function matchesResampledPhase(profile, phase) {
+  const { dots, redEnergy, blueEnergy, cross } = profile,
+    j = phase + 1;
+  // A resampled channel is a linear blend of adjacent samples. Solve its best
+  // correlation analytically; retain the existing 0.85 correlation requirement.
+  const a = dots[1],
+    b = dots[j] - a,
+    c = blueEnergy[1],
+    d = cross[j] - c,
+    e = blueEnergy[j] + c - 2 * cross[j];
+  const denominator = b * d - a * e;
+  if (!denominator) return false;
+  const t = Math.max(0, Math.min(1, (a * d - b * c) / denominator));
+  const correlation = (a + b * t) / Math.sqrt(redEnergy[1] * (c + 2 * d * t + e * t * t) || 1);
+  return t > 0 && correlation >= 0.85;
+}
+
+function coherentText(box) {
+  const m = box.typeMetrics;
+  return (
+    box.shape === 'text' &&
+    box.textConfidence &&
+    m?.glyphs >= 3 &&
+    m.baselineAgreement >= 0.9 &&
+    m.heightAgreement >= 0.9 &&
+    m.stroke / m.xHeight <= 0.4
+  );
+}
+
+function pixelWitnesses(image, box) {
+  let peak = 0;
+  for (let y = 0; y < box.h; y++)
+    for (let x = 0; x < box.w; x++) {
+      const i = ((box.y + y) * image.width + box.x + x) * 4;
+      for (let c = 0; c < 3; c++) peak = Math.max(peak, Math.abs(image.data[i + c] - box.bg[c]));
+    }
+  const mask = new Uint8Array(box.w * box.h),
+    threshold = Math.max(40, peak * 0.55);
+  for (let y = 0; y < box.h; y++)
+    for (let x = 0; x < box.w; x++) {
+      const i = ((box.y + y) * image.width + box.x + x) * 4;
+      if (
+        image.data[i + 3] >= 128 &&
+        box.bg.some((v, c) => Math.abs(image.data[i + c] - v) > threshold)
+      )
+        mask[y * box.w + x] = 1;
+    }
+  const result = [],
+    unit = box.typeMetrics.xHeight;
+  for (let k = 0; k < mask.length; k++) {
+    if (!mask[k]) continue;
+    const p = textureComponent(mask, box.w, box.h, k),
+      w = p.right - p.left + 1,
+      h = p.bottom - p.top + 1;
+    if (w < unit * 0.8 || w > unit * 2.5 || h < unit * 0.7 || h > unit * 2.5) continue;
+    const profile = subpixelProfile(image, box, p),
+      phase = profilePhase(profile);
+    if (phase)
+      result.push({ box, profile, phase, rect: { x: box.x + p.left, y: box.y + p.top, w, h } });
+  }
+  return result;
+}
+
+/** Build lazy original-pixel evidence from immutable pre-pass typography proposals. */
+export function createTextPixelEvidence(image, input) {
+  const rows = input
+    .filter(coherentText)
+    .map((b) => ({ ...b, bg: [...b.bg], typeMetrics: { ...b.typeMetrics } }));
+  let witnesses;
+  return (box, part) => {
+    if (!coherentText(box)) return false;
+    const profile = subpixelProfile(image, box, part);
+    if (!profile) return false;
+    witnesses ??= rows.flatMap((b) => pixelWitnesses(image, b));
+    const target = {
+      x: box.x + part.left,
+      y: box.y + part.top,
+      w: part.right - part.left + 1,
+      h: part.bottom - part.top + 1,
+    };
+    const compatible = witnesses.filter((w) => {
+      const m = w.box.typeMetrics,
+        n = box.typeMetrics;
+      const stroke = m.typeStroke || m.stroke,
+        targetStroke = n.typeStroke || n.stroke;
+      return (
+        Math.abs(m.xHeight - n.xHeight) <= Math.max(m.xHeight, n.xHeight) * 0.2 &&
+        Math.min(stroke, targetStroke) >= Math.max(stroke, targetStroke) * 0.8 &&
+        box.bg.every((v, c) => Math.abs(v - w.box.bg[c]) <= 20) &&
+        Math.hypot(...profile.ink.map((v, c) => v - w.profile.ink[c])) <= 0.08 &&
+        !intersect(target, w.rect)
+      );
+    });
+    for (const phase of [-1, 1]) {
+      if (!matchesResampledPhase(profile, phase)) continue;
+      const peers = compatible.filter((w) => w.phase === phase);
+      for (let i = 0; i < peers.length; i++)
+        for (let j = i + 1; j < peers.length; j++)
+          if (!intersect(peers[i].rect, peers[j].rect)) return true;
+    }
+    return false;
+  };
 }
 
 export function iconRowDots(image, box, input, protectedRects) {

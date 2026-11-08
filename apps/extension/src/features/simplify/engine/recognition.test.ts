@@ -29,8 +29,13 @@ vi.mock('./media-frames.mjs', async (original) => ({
   ...(await original<object>()),
   detectClippedFramedImages: () => media.frames,
 }));
-const { uncertainColorTexture } = await vi.importActual<{
-  uncertainColorTexture(image: SimplifyPixelSource, box: Box): boolean;
+type PixelEvidence = (
+  box: Box,
+  part: { left: number; right: number; top: number; bottom: number }
+) => boolean;
+const { uncertainColorTexture, createTextPixelEvidence } = await vi.importActual<{
+  uncertainColorTexture(image: SimplifyPixelSource, box: Box, evidence?: PixelEvidence): boolean;
+  createTextPixelEvidence(image: SimplifyPixelSource, input: Box[]): PixelEvidence;
 }>('./compact-textures.mjs');
 const { detectMedia } = await vi.importActual<{
   detectMedia(image: SimplifyPixelSource, measure: null): Box[];
@@ -192,3 +197,87 @@ it.each(['original', 'reversed-fringe', 'recolored'] as const)(
     expect(uncertainColorTexture(image, box)).toBe(false);
   }
 );
+
+const captionRows = [
+  [58, 17, 7, 2.1667, 5],
+  [231, 16, 6, 2.3462, 9],
+  [95, 13, 6, 1.4583, 4],
+  [76, 16, 6, 1.6923, 6],
+  [63, 13, 6, 1.5238, 7],
+  [902, 16, 6, 1.4938, 63],
+];
+async function captionFixture(reverse = false) {
+  const raster = await loadImage(
+    await readFile(new URL('../fixtures/subpixel-colored-captions.png', import.meta.url))
+  );
+  const canvas = createCanvas(raster.width, raster.height);
+  canvas.getContext('2d').drawImage(raster, 0, 0);
+  const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+  const rows = captionRows.map(([w, h, xHeight, stroke, glyphs], i) => ({
+    x: 0,
+    y: i * 24,
+    w: w!,
+    h: h!,
+    bg: i === 1 ? [32, 33, 34] : [...background],
+    shape: 'text',
+    textConfidence: true,
+    typeMetrics: {
+      xHeight: xHeight!,
+      stroke: stroke!,
+      typeStroke: 2,
+      glyphs: glyphs!,
+      baselineAgreement: 1,
+      heightAgreement: 1,
+    },
+  }));
+  if (reverse) {
+    for (let i = 0; i < pixels.data.length; i += 4)
+      [pixels.data[i], pixels.data[i + 2]] = [pixels.data[i + 2]!, pixels.data[i]!];
+    for (const row of rows) row.bg.reverse();
+  }
+  return { pixels, rows };
+}
+it.each([false, true])(
+  'uses compatible pixel peers for short colored captions independent of input order (reverse: %s)',
+  async (reverse) => {
+    const { pixels, rows } = await captionFixture(reverse);
+    const guard = uncertainColorTexture;
+    for (const input of [rows, [...rows].reverse()]) {
+      const evidence = createTextPixelEvidence(pixels, input);
+      for (const box of rows.slice(0, 5)) expect(guard(pixels, box, evidence)).toBe(false);
+    }
+  }
+);
+it('does not lend compatible text evidence to a bichromatic texture', async () => {
+  const { pixels, rows } = await captionFixture();
+  // Real peer typography is retained below the independent synthetic texture.
+  for (let y = 0; y < 24; y++)
+    for (let x = 0; x < pixels.width; x++) mark(pixels, x, y, background);
+  thinColoredComponent(pixels);
+  const box = { ...rows[0]!, w: 100, h: 20, typeMetrics: { ...rows[0]!.typeMetrics, xHeight: 6 } };
+  const guard = uncertainColorTexture;
+  expect(guard(pixels, box, createTextPixelEvidence(pixels, [box, ...rows.slice(1)]))).toBe(true);
+});
+it('does not borrow from an incompatible color or typography scale', async () => {
+  const { pixels, rows } = await captionFixture();
+  const guard = uncertainColorTexture;
+  const target = rows[2]!;
+  for (const peers of [
+    rows.map((b) => ({ ...b, bg: [90, 90, 90] })),
+    rows.map((b) => ({ ...b, typeMetrics: { ...b.typeMetrics, xHeight: 15 } })),
+  ]) {
+    expect(guard(pixels, target, createTextPixelEvidence(pixels, peers))).toBe(true);
+  }
+});
+it('snapshots peer proposals before ownership changes', async () => {
+  const { pixels, rows } = await captionFixture();
+  const guard = uncertainColorTexture;
+  const target = { ...rows[2]!, bg: [...rows[2]!.bg], typeMetrics: { ...rows[2]!.typeMetrics } };
+  const evidence = createTextPixelEvidence(pixels, rows);
+  for (const row of rows) {
+    row.shape = 'unknown';
+    row.typeMetrics.xHeight = 30;
+    row.bg.fill(255);
+  }
+  expect(guard(pixels, target, evidence)).toBe(false);
+});
