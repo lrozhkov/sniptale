@@ -37,7 +37,7 @@ async function seedImages(page: Page, prefix: string) {
         width: 640,
         height: 360,
         duration: null,
-        sourceUrl: null,
+        sourceUrl: 'https://example.org/capture',
         sourceTitle: null,
         sourceFavicon: null,
         tags: [],
@@ -102,6 +102,23 @@ for (const locale of ['en', 'ru'] as const) {
         .evaluateAll((ns) => ns.map((n) => n.getAttribute('data-asset-id')));
       expect(ids).toEqual(Array.from({ length: 12 }, (_, i) => `${prefix}-${i}`));
       await expect(popup.locator('img').first()).toBeVisible();
+      await expect(popup.locator('[data-recent-close]')).toHaveCount(0);
+      await expect(popup).not.toContainText(
+        locale === 'ru' ? 'Недавние изображения' : 'Recent images'
+      );
+      await expect(popup.locator('[data-asset-id]').first()).toContainText('example.org ·');
+      await expect(popup).not.toContainText('640 × 360');
+      const scroll = popup.locator('[data-ui="editor.recent-images.scroll"]');
+      expect(await scroll.evaluate((n) => n.scrollWidth - n.clientWidth)).toBe(0);
+      expect(await scroll.evaluate((n) => n.scrollHeight > n.clientHeight)).toBe(true);
+      await scroll.evaluate((n) => {
+        n.scrollTop = n.scrollHeight;
+      });
+      await expect(popup.locator('[data-asset-id]').last()).toBeInViewport();
+      await scroll.evaluate((n) => {
+        n.scrollTop = 0;
+      });
+
       const bounds = (await popup.boundingBox())!;
       expect(bounds.x).toBeGreaterThanOrEqual(0);
       expect(bounds.y + bounds.height).toBeLessThanOrEqual(560);
@@ -254,6 +271,27 @@ for (const locale of ['en', 'ru'] as const) {
         await popup.locator(`[data-asset-id="${prefix}-0"]`).click();
         await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(4);
       }
+      await page.evaluate(async (prefix) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('sniptale-db');
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        const tx = db.transaction('media_library', 'readwrite');
+        for (let i = 1; i < 16; i++) tx.objectStore('media_library').delete(`${prefix}-${i}`);
+        tx.objectStore('media_library').delete(`${prefix}-broken`);
+        await new Promise<void>((resolve, reject) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+        db.close();
+      }, prefix);
+      await trigger.click();
+      await expect(popup.locator('[data-asset-id]')).toHaveCount(1);
+      const shortScroll = popup.locator('[data-ui="editor.recent-images.scroll"]');
+      expect(await shortScroll.evaluate((n) => n.scrollHeight - n.clientHeight)).toBe(0);
+      expect(await shortScroll.evaluate((n) => n.scrollWidth - n.clientWidth)).toBe(0);
+      await page.screenshot({ path: info.outputPath('recent-images-one.png'), fullPage: false });
       await page.close();
     });
   }

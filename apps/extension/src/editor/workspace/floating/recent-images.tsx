@@ -1,8 +1,8 @@
-import { Check, Images, Image as ImageIcon, LoaderCircle, X } from 'lucide-react';
+import { Check, Images, Image as ImageIcon, LoaderCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
-import { translate } from '../../../platform/i18n';
+import { translate, useAppLocale } from '../../../platform/i18n';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 import { useEditorStartItems, type EditorStartItem } from '../../../ui/editor-start';
 import { EditorStartThumbnail } from '../../../ui/editor-start/thumbnail';
@@ -31,10 +31,10 @@ function RecentImageRow(props: {
         if (!item.unavailable) void props.onSelect(item.id);
       }}
       className={[
-        'my-px flex min-h-14 w-full items-center gap-3 rounded px-2 py-2 text-left',
+        'flex min-h-14 w-full shrink-0 items-center gap-3 rounded px-2 py-2 text-left',
         'hover:bg-[var(--sniptale-color-surface-hover)]',
         'aria-current:bg-[var(--sniptale-color-surface-hover)]',
-        'focus-visible:outline focus-visible:outline-2',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px]',
         'focus-visible:outline-[var(--sniptale-color-accent)]',
       ].join(' ')}
     >
@@ -45,7 +45,10 @@ function RecentImageRow(props: {
         <span className="block truncate text-[13px] text-[var(--sniptale-color-text-primary)]">
           {item.title}
         </span>
-        <span className="block text-xs text-[var(--sniptale-color-text-secondary)]">
+        <span
+          className="block truncate text-xs text-[var(--sniptale-color-text-secondary)]"
+          title={item.detail}
+        >
           {item.detail}
         </span>
       </span>
@@ -72,7 +75,6 @@ function useRecentImagesDismissal(
   onClose: (restoreFocus: boolean) => void
 ) {
   useEffect(() => {
-    root.current?.querySelector<HTMLButtonElement>('[data-recent-close]')?.focus();
     const outside = (event: PointerEvent) => {
       if (
         event.target instanceof Node &&
@@ -100,10 +102,9 @@ function useRecentImagePicker(
   root: RefObject<HTMLDivElement | null>,
   onClose: (restoreFocus: boolean) => void
 ) {
-  const { items, status, refresh } = useEditorStartItems(
-    listRecentEditorImages,
-    readRecentEditorThumbnail
-  );
+  const locale = useAppLocale();
+  const list = useCallback(() => listRecentEditorImages('source', locale), [locale]);
+  const { items, status, refresh } = useEditorStartItems(list, readRecentEditorThumbnail);
   const controller = useEditorController();
   const openStatus = useEditorOpenStatus();
   const currentId = useEditorStore((state) => state.sessionId);
@@ -154,6 +155,15 @@ function RecentImagesPanel(props: {
     root,
     props.onClose
   );
+  const didFocus = useRef(false);
+  useEffect(() => {
+    if (didFocus.current || status === 'loading') return;
+    const target = root.current?.querySelector<HTMLButtonElement>('[aria-current="true"], button');
+    if (target) {
+      target.focus({ preventScroll: true });
+      didFocus.current = true;
+    }
+  }, [status]);
   useRecentImagesDismissal(root, props.anchor, props.onClose);
   return (
     <FloatingChromePanel
@@ -169,22 +179,11 @@ function RecentImagesPanel(props: {
         aria-label={translate('editor.recentImages.title')}
         className="flex min-h-0 flex-col"
       >
-        <div className="flex shrink-0 items-center justify-between gap-2 px-2 py-1">
-          <span
-            className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]"
-            title={translate('editor.recentImages.order')}
-          >
-            {translate('editor.recentImages.title')}
-          </span>
-          <ContentToolbarButton
-            data-recent-close
-            title={translate('common.actions.close')}
-            onClick={() => props.onClose(true)}
-          >
-            <X size={16} aria-hidden="true" />
-          </ContentToolbarButton>
-        </div>
-        <div className="min-h-0 overflow-y-auto" aria-busy={pendingId !== null}>
+        <div
+          data-ui="editor.recent-images.scroll"
+          className="flex min-h-0 flex-col gap-0.5 overflow-x-hidden overflow-y-auto"
+          aria-busy={pendingId !== null}
+        >
           {status === 'loading' && items.length === 0 ? (
             <p role="status" className="p-3 text-xs">
               {translate('shared.editorStart.loading')}

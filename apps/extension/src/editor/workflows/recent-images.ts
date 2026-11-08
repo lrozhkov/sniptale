@@ -4,8 +4,13 @@ import {
   listMediaLibrary,
 } from '../../composition/persistence/media-library';
 import { getAggregatePresentation } from '../../composition/persistence/aggregate-presentations';
+import { formatDateTime, getCurrentLocale, translate, type AppLocale } from '../../platform/i18n';
+
 /** Lists reusable image metadata for the start page and transient recent chooser. */
-export async function listRecentEditorImages() {
+export async function listRecentEditorImages(
+  detail: 'dimensions' | 'source' = 'dimensions',
+  locale: AppLocale = getCurrentLocale()
+) {
   const images = await listMediaLibrary();
   return images
     .filter(
@@ -17,12 +22,34 @@ export async function listRecentEditorImages() {
     .map((item) => ({
       id: item.id,
       title: item.filename,
-      detail: [item.width, item.height].every((value) => typeof value === 'number')
-        ? `${item.width} × ${item.height}`
-        : '',
+      detail:
+        detail === 'source'
+          ? `${recentImageSource(item.sourceUrl, item.kind, locale)} · ${formatDateTime(
+              item.updatedAt,
+              { dateStyle: 'short', timeStyle: 'short' },
+              locale
+            )}`
+          : [item.width, item.height].every((value) => typeof value === 'number')
+            ? `${item.width} × ${item.height}`
+            : '',
       updatedAt: item.updatedAt,
       thumbnailId: item.id,
     }));
+}
+
+function recentImageSource(url: string | null | undefined, kind: string, locale: AppLocale) {
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return parsed.hostname;
+    } catch {
+      // Missing or invalid provenance uses the local source label.
+    }
+  }
+  return translate(
+    kind === 'screenshot' ? 'editor.recentImages.screenCapture' : 'editor.recentImages.file',
+    locale
+  );
 }
 
 /** Reads only a presentation that matches the current accepted workspace revision. */

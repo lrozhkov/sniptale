@@ -2764,6 +2764,8 @@
       "noSavePresets": "No active presets. Add a path in settings to save quickly without the system dialog."
     },
     "recentImages": {
+      "screenCapture": "Screen capture",
+      "file": "File",
       "title": "Recent images",
       "order": "Most recently changed first",
       "current": "Current image",

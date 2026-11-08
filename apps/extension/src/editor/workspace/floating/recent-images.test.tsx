@@ -48,6 +48,9 @@ async function open() {
 it('opens a transient bounded list, marks current, and closes with Escape restoring focus', async () => {
   await open();
   expect(host.querySelectorAll('[data-ui="editor.recent-images.item"]')).toHaveLength(12);
+  expect(host.querySelector('[data-recent-close]')).toBeNull();
+  expect(query('editor.recent-images.panel').textContent).not.toContain('Recent images');
+  expect(document.activeElement).toBe(host.querySelector('[aria-current="true"]'));
   expect(host.querySelector('[aria-current="true"]')?.getAttribute('data-asset-id')).toBe(
     'image-0'
   );
