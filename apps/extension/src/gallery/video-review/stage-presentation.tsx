@@ -145,7 +145,6 @@ export function useStagePresentation(
     preferences: props.preview?.preferences ?? DEFAULT_QUICK_PREVIEW_PREFERENCES,
     playing: props.preview?.playing ?? false,
     interacting: interacting || !!props.preview?.interacting,
-    deferFrames: !(props.preview?.playing ?? false) && !!props.preview?.interacting && !interacting,
     visible: true,
     pausedSourceTime: props.comments?.time ?? props.video.current?.currentTime ?? 0,
     pausedResultTime: props.scene?.focus?.time ?? 0,

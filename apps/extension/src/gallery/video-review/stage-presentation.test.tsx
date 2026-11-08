@@ -15,7 +15,7 @@ const io = vi.hoisted(() => ({ present: vi.fn() }));
 vi.mock('./use-preview-presentation', () => ({ useReviewPreviewPresentation: io.present }));
 afterEach(() => vi.unstubAllGlobals());
 
-it('keeps inspector draft interaction active independently of local stage pointer capture', () => {
+it('keeps inspector draft interaction and rendering live independently of local stage pointer capture', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   io.present.mockReturnValue({ status: { actualRaster: null } });
   const host = document.createElement('div');
@@ -58,9 +58,9 @@ it('keeps inspector draft interaction active independently of local stage pointe
       props.preview!.onPresentationActive
     );
     expect(io.present.mock.lastCall![0].interacting).toBe(false);
-    expect(io.present.mock.lastCall![0].deferFrames).toBe(false);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
     render(true);
-    expect(io.present.mock.lastCall![0].deferFrames).toBe(true);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
     render(false);
     act(() =>
       host.firstElementChild!.dispatchEvent(
@@ -68,14 +68,14 @@ it('keeps inspector draft interaction active independently of local stage pointe
       )
     );
     expect(io.present.mock.lastCall![0].interacting).toBe(true);
-    expect(io.present.mock.lastCall![0].deferFrames).toBe(false);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
     render(true);
     act(() => window.dispatchEvent(new Event('pointerup')));
     expect(io.present.mock.lastCall![0].interacting).toBe(true);
-    expect(io.present.mock.lastCall![0].deferFrames).toBe(true);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
     props.preview = { ...props.preview!, playing: true };
     render(true);
-    expect(io.present.mock.lastCall![0].deferFrames).toBe(false);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
     props.preview = { ...props.preview!, playing: false };
     render(false);
     expect(io.present.mock.lastCall![0].interacting).toBe(false);
