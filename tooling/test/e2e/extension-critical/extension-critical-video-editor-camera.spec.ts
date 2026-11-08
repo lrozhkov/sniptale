@@ -1308,6 +1308,20 @@ for (const variant of [
         expect((await readCamera()).sourceDuration).toBe(1);
         const retainedError = pixelError(retained, await pixels(front), false);
         const gpuColors = await sourceColors(front);
+        await expect
+          .poll(
+            async () =>
+              sourceColorError(
+                matchedSourceColors.main.colors,
+                (await sourceColors(page.locator('[data-preview-stage-canvas]'), sourceFrame))
+                  .colors
+              ),
+            {
+              message:
+                'A different main frame must replace the GPU reference before Standard is selected',
+            }
+          )
+          .toBeGreaterThan(4);
         await page.locator('[data-ui="video.preview.display-settings"]').click();
         const display = page.locator('[data-ui="video.preview.display-settings.panel"]');
         await display
@@ -1331,6 +1345,27 @@ for (const variant of [
         await expect
           .poll(async () => sourceColorError(gpuColors.colors, (await sourceColors(front)).colors))
           .toBeLessThan(4);
+        await playhead.focus();
+        await playhead.press('Home');
+        for (let index = 0; index < 9; index++) await playhead.press('ArrowRight');
+        await expect
+          .poll(async () => Number(await playhead.getAttribute('aria-valuenow')))
+          .toBeCloseTo(0.9, 6);
+        await expect
+          .poll(
+            async () =>
+              sourceColorError(
+                matchedSourceColors.main.colors,
+                (await sourceColors(page.locator('[data-preview-stage-canvas]'), sourceFrame))
+                  .colors
+              ),
+            { message: 'Standard main source pixels must match the canonical GPU reference' }
+          )
+          .toBeLessThan(4);
+        const standardMain = await sourceColors(
+          page.locator('[data-preview-stage-canvas]'),
+          sourceFrame
+        );
         await writeFile(
           info.outputPath('camera-retained-source.json'),
           JSON.stringify(
@@ -1346,6 +1381,7 @@ for (const variant of [
               imports,
               pixelError: retainedError,
               matchedSourceColors,
+              standardMain,
               gpu: gpuColors,
               canvas: await sourceColors(front),
             },

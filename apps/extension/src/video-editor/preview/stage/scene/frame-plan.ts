@@ -131,7 +131,11 @@ export function prepareNativePreviewGpuComposition(
 export function prepareNativePreviewSceneFrame(
   input: PreviewSceneRenderInput
 ): Promise<PreviewScenePreparedFrame | undefined> | undefined {
-  if (input.previewRenderer === 'legacy' || typeof VideoFrame === 'undefined') return undefined;
+  if (
+    (input.previewRenderer === 'legacy' && !input.sourceRuntime?.selected) ||
+    typeof VideoFrame === 'undefined'
+  )
+    return undefined;
   input.signal?.throwIfAborted();
   const passes =
     input.preparedFrame?.passes ??
@@ -141,14 +145,16 @@ export function prepareNativePreviewSceneFrame(
     for (const pass of passes.visualPasses) pass.frame.camera = input.cameraOverride;
   }
   const frames = [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)];
-  const gpuIsolated = canPrepareEffectRuntimeGpuComposition(frames);
+  const gpuIsolated =
+    input.previewRenderer !== 'legacy' && canPrepareEffectRuntimeGpuComposition(frames);
   if (!gpuIsolated && !input.sourceRuntime?.selected) return undefined;
   const hasPlans = frames.some((frame) => (frame.effectRuntimePlans ?? []).length > 0);
-  const executor = hasPlans
-    ? typeof input.effectRuntimeExecutor === 'function'
-      ? input.effectRuntimeExecutor()
-      : input.effectRuntimeExecutor
-    : undefined;
+  const executor =
+    hasPlans && input.previewRenderer !== 'legacy'
+      ? typeof input.effectRuntimeExecutor === 'function'
+        ? input.effectRuntimeExecutor()
+        : input.effectRuntimeExecutor
+      : undefined;
   if (hasPlans && !executor?.prepareGpuFrame && !input.sourceRuntime?.selected) return undefined;
   const rasterScale = resolvePreviewEffectRuntimeRasterScale({
     canvas: input.canvas,

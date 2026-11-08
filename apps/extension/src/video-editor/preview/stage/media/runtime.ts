@@ -46,7 +46,7 @@ export function usePreviewStageMediaRuntime(params: PreviewStageMediaRuntimePara
   const sourceRuntime = useNativePreviewSourceRuntime({
     project: params.project,
     assetUrls: params.assetUrls,
-    enabled: params.previewMode !== 'cache' && params.previewRenderer !== 'legacy',
+    enabled: params.previewMode !== 'cache',
     retryVersion: params.effectRuntimeFeedback.retryVersion,
   });
   const bankedVideos = usePreviewStageVideoBankClips(

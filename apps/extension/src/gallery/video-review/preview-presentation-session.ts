@@ -305,13 +305,7 @@ class ManualPresentationSession {
   };
 
   private canDecodeSource() {
-    return (
-      this.rendererPreference === 'gpu' &&
-      typeof navigator !== 'undefined' &&
-      !!navigator.gpu &&
-      typeof VideoDecoder !== 'undefined' &&
-      typeof VideoFrame !== 'undefined'
-    );
+    return typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
   }
 
   private resetSource() {

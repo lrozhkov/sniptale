@@ -962,7 +962,6 @@ async function renderMaterializedFrame(
     assertActive();
     const preciseSource =
       !decodedVideoFrames &&
-      params.previewRenderer !== 'legacy' &&
       typeof VideoDecoder !== 'undefined' &&
       typeof VideoFrame !== 'undefined';
     if (!decodedVideoFrames && !preciseSource)

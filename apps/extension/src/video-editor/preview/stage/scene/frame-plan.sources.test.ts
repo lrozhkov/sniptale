@@ -129,3 +129,48 @@ it('releases its precise source lease while a healthy header is pending', async 
   expect(notified).toHaveBeenCalledOnce();
   expect(release).toHaveBeenCalledOnce();
 });
+
+it('keeps Standard canonical sources serial and skips GPU effect preparation', async () => {
+  const { input, release, sourceRuntime } = fixture();
+  const geometry = timeline.resolveVideoCompositionRenderPasses(input.project, input.currentTime);
+  geometry.overlayFrame.effectRuntimePlans = [
+    {
+      assets: [],
+      controls: {},
+      dimensions: { width: 1904, height: 1072 },
+      documentSha256: 'test-effect',
+      documentSource: 'test',
+      duration: 1,
+      effectInstanceId: 'effect',
+      fps: 30,
+      frameIndex: 0,
+      kind: 'standalone',
+      progress: 0,
+      renderDimensions: { width: 1904, height: 1072 },
+      snapshotId: 'snapshot',
+      target: { kind: 'scene', clipId: 'source' },
+      time: input.currentTime,
+    },
+  ];
+  vi.spyOn(timeline, 'resolveVideoCompositionRenderPasses').mockReturnValue(geometry);
+  vi.spyOn(gpuComposition, 'canPrepareEffectRuntimeGpuComposition').mockReturnValue(true);
+  const prepareGpuFrame = vi.fn();
+  const executor = vi.fn(() => ({ prepareGpuFrame, renderFrame: vi.fn(), dispose: vi.fn() }));
+  const prepared = await prepareNativePreviewSceneFrame({
+    ...input,
+    previewRenderer: 'legacy',
+    effectRuntimeExecutor: executor,
+  });
+  expect(prepared?.input.preparedFrame?.sourceFrames).toBeDefined();
+  expect(prepared?.input.preparedFrame?.gpuIsolated).toBe(false);
+  expect(prepared?.input.preparedFrame?.sourcePresentation.get('source')?.timestampUs).toBe(
+    39283333
+  );
+  expect(sourceRuntime.acquire).toHaveBeenCalledOnce();
+  expect(executor).not.toHaveBeenCalled();
+  expect(prepareGpuFrame).not.toHaveBeenCalled();
+  expect(release).not.toHaveBeenCalled();
+  prepared?.release();
+  prepared?.release();
+  expect(release).toHaveBeenCalledOnce();
+});

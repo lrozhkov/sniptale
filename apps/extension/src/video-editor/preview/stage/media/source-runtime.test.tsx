@@ -44,9 +44,16 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-it.each([true, false])(
-  'does not play or seek raw video in the precise route (playing=%s)',
-  async (playing) => {
+it.each([
+  ['gpu', true, 'live'],
+  ['gpu', false, 'live'],
+  ['legacy', true, 'live'],
+  ['legacy', false, 'live'],
+  ['gpu', false, 'cache'],
+  ['legacy', false, 'cache'],
+] as const)(
+  'preserves %s source routing with playing=%s and mode=%s',
+  async (renderer, playing, mode) => {
     const clip = createVideoClip();
     const project = createProject([clip]);
     project.assets[0]!.metadata.hasAudio = false;
@@ -73,8 +80,8 @@ it.each([true, false])(
         onPresentationTime: vi.fn(),
         playbackRange: null,
         previewExactFrameCache: cache,
-        previewMode: 'live',
-        previewRenderer: 'gpu',
+        previewMode: mode,
+        previewRenderer: renderer,
         previewRasterSize: { width: 1280, height: 720 },
         project,
         renderGenerationRef: { current: 0 },
@@ -84,9 +91,16 @@ it.each([true, false])(
       return null;
     }
     await act(async () => root.render(<Harness />));
-    expect(seek).not.toHaveBeenCalled();
     expect(play).not.toHaveBeenCalled();
-    expect(current?.videoBankClips).toEqual([]);
+    if (mode === 'cache') {
+      expect(current?.sourceRuntime.selected).toBe(false);
+      expect(current?.videoBankClips).toEqual([clip]);
+      expect(seek).toHaveBeenCalledWith(2);
+    } else {
+      expect(seek).not.toHaveBeenCalled();
+      expect(current?.sourceRuntime.selected).toBe(true);
+      expect(current?.videoBankClips).toEqual([]);
+    }
   }
 );
 
@@ -266,7 +280,7 @@ it('rejects retained runtime callbacks after unmount without closing a caller-ow
   lease.release();
 });
 
-it('suspends the precise provider when explicit legacy or cache mode is selected', async () => {
+it('suspends the precise provider when source acquisition is disabled', async () => {
   const { provider } = mockProvider();
   const params = sourceParams();
   let current: NativePreviewSourceRuntime | undefined;

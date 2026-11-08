@@ -153,10 +153,17 @@ it('renders canonical PTS and orientation with the requested camera instead of H
   expect(f.provider.dispose).toHaveBeenCalledOnce();
 });
 
-it.each(['complete', 'abort', 'dispose'] as const)(
-  'retains canonical source preparation through pending GPU completion on %s',
-  async (operation) => {
-    const f = fixture();
+it.each([
+  ['gpu', 'complete'],
+  ['gpu', 'abort'],
+  ['gpu', 'dispose'],
+  ['legacy', 'complete'],
+  ['legacy', 'abort'],
+  ['legacy', 'dispose'],
+] as const)(
+  'retains %s source preparation through pending completion on %s',
+  async (renderer, operation) => {
+    const f = fixture(renderer);
     const controller = new AbortController();
     const fence = Promise.withResolvers<void>();
     io.render.mockImplementationOnce(async (input: PreviewSceneRenderInput) => {
@@ -183,33 +190,39 @@ it.each(['complete', 'abort', 'dispose'] as const)(
   }
 );
 
-it('allows HTML compatibility only for the provider upfront unsupported result', async () => {
-  const f = fixture();
-  vi.mocked(f.provider.acquire).mockResolvedValueOnce(null);
-  try {
-    await f.owner.renderFrameWithPresentation(0, new AbortController().signal);
-    expect(f.provider.acquire).toHaveBeenCalledOnce();
-    expect(io.render.mock.calls[0]![0].preparedFrame).toBeUndefined();
-    expect(io.render.mock.calls[0]![0].videoRefs.current.source).toBeInstanceOf(HTMLVideoElement);
-    expect(f.release).not.toHaveBeenCalled();
-  } finally {
-    f.owner.dispose();
+it.each(['gpu', 'legacy'] as const)(
+  'allows %s HTML only after provider unsupported',
+  async (renderer) => {
+    const f = fixture(renderer);
+    vi.mocked(f.provider.acquire).mockResolvedValueOnce(null);
+    try {
+      await f.owner.renderFrameWithPresentation(0, new AbortController().signal);
+      expect(f.provider.acquire).toHaveBeenCalledOnce();
+      expect(io.render.mock.calls[0]![0].preparedFrame).toBeUndefined();
+      expect(io.render.mock.calls[0]![0].videoRefs.current.source).toBeInstanceOf(HTMLVideoElement);
+      expect(f.release).not.toHaveBeenCalled();
+    } finally {
+      f.owner.dispose();
+    }
   }
-});
+);
 
-it('propagates decode failure without silently capturing HTML video', async () => {
-  const f = fixture();
-  vi.mocked(f.provider.acquire).mockRejectedValueOnce(new Error('decoded source unavailable'));
-  try {
-    await expect(
-      f.owner.renderFrameWithPresentation(0, new AbortController().signal)
-    ).rejects.toThrow('decoded source unavailable');
-    expect(io.render).not.toHaveBeenCalled();
-    expect(document.querySelector('video')).toBeNull();
-  } finally {
-    f.owner.dispose();
+it.each(['gpu', 'legacy'] as const)(
+  'propagates %s decode failure without HTML capture',
+  async (renderer) => {
+    const f = fixture(renderer);
+    vi.mocked(f.provider.acquire).mockRejectedValueOnce(new Error('decoded source unavailable'));
+    try {
+      await expect(
+        f.owner.renderFrameWithPresentation(0, new AbortController().signal)
+      ).rejects.toThrow('decoded source unavailable');
+      expect(io.render).not.toHaveBeenCalled();
+      expect(document.querySelector('video')).toBeNull();
+    } finally {
+      f.owner.dispose();
+    }
   }
-});
+);
 
 it('rejects undefined preparation without an actual unsupported source result', async () => {
   const f = fixture();
@@ -225,12 +238,18 @@ it('rejects undefined preparation without an actual unsupported source result', 
   }
 });
 
-it('preserves explicit legacy video preparation without opening the decoded provider', async () => {
+it('prepares Standard canonical sources without HTML capture or GPU isolation', async () => {
   const f = fixture('legacy');
   try {
-    await f.owner.renderFrameWithPresentation(0, new AbortController().signal);
-    expect(io.create).not.toHaveBeenCalled();
-    expect(io.render.mock.calls[0]![0].videoRefs.current.source).toBeInstanceOf(HTMLVideoElement);
+    await f.owner.renderFrameWithPresentation(1.26, new AbortController().signal);
+    expect(io.create).toHaveBeenCalledOnce();
+    const input = io.render.mock.calls[0]![0];
+    expect(input.previewRenderer).toBe('legacy');
+    expect(input.gpuPreview).toBeUndefined();
+    expect(input.videoRefs.current).toEqual({});
+    expect(input.preparedFrame?.sourcePresentation.get('source')?.timestampUs).toBe(1_250_000);
+    expect(input.preparedFrame?.gpuIsolated).toBe(false);
+    expect(f.release).toHaveBeenCalledOnce();
   } finally {
     f.owner.dispose();
   }

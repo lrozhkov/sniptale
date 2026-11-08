@@ -425,3 +425,160 @@ test('Focus source restoration keeps gestures and Undo at 1280x560', async ({ pa
     await new Promise<void>((resolve) => host.server.close(() => resolve()));
   }
 });
+
+/** Read source interiors without requesting a context from the publication canvas. */
+async function mainSourceColors(canvas: Locator) {
+  return canvas.evaluate((node: HTMLCanvasElement) => {
+    const copy = document.createElement('canvas');
+    copy.width = node.width;
+    copy.height = node.height;
+    const context = copy.getContext('2d');
+    if (!context) throw new Error('Main source readback is unavailable.');
+    context.drawImage(node, 0, 0);
+    return {
+      raster: { width: node.width, height: node.height },
+      colors: [
+        [20, 70],
+        [70, 80],
+        [40, 82],
+      ].map(([x, y]) =>
+        [
+          ...context.getImageData(
+            Math.floor((x! / 160) * node.width),
+            Math.floor((y! / 90) * node.height),
+            1,
+            1
+          ).data,
+        ].slice(0, 3)
+      ),
+    };
+  });
+}
+
+test('Gallery Standard main keeps canonical source pixels across renderer and seek', async ({
+  page,
+}, info) => {
+  const host = await startHostServer();
+  const dialog = page.locator('dialog');
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    await dialog
+      .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+      .click();
+    const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+    const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+    const clock = async () => Number(await plane.getAttribute('aria-valuenow'));
+    const seek = async (time: number) => {
+      const box = await ruler.boundingBox();
+      if (!box) throw new Error('Source ruler is unavailable.');
+      const duration = Number(await plane.getAttribute('aria-valuemax'));
+      if (!Number.isFinite(duration) || duration <= 0)
+        throw new Error('Source duration is invalid.');
+      await ruler.click({ position: { x: (box.width * time) / duration, y: 8 } });
+    };
+    await seek(1.02);
+    await expect.poll(clock).toBeGreaterThan(1);
+    await expect.poll(clock).toBeLessThan(1.1);
+    const target = await clock();
+    const fixture = new URL('../fixtures/review-vp8-opus.webm', import.meta.url);
+    const interval = sourceReferenceInterval(fixture, target);
+    const reference = execFileSync(
+      '/usr/bin/ffmpeg',
+      [
+        '-v',
+        'error',
+        '-ss',
+        String(interval.timestamp),
+        '-i',
+        fileURLToPath(fixture),
+        '-frames:v',
+        '1',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgba',
+        'pipe:1',
+      ],
+      { timeout: 10_000, maxBuffer: 160 * 90 * 4 + 1024 }
+    );
+    expect(reference.length).toBe(160 * 90 * 4);
+    const expected = [
+      [20, 70],
+      [70, 80],
+      [40, 82],
+    ].map(([x, y]) => [...reference.subarray((y! * 160 + x!) * 4, (y! * 160 + x!) * 4 + 3)]);
+    const error = (colors: number[][]) =>
+      Math.max(
+        ...expected.flatMap((color, index) =>
+          color.map((value, channel) => Math.abs(value - colors[index]![channel]!))
+        )
+      );
+    const front = dialog.locator(
+      '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+    );
+    await expect.poll(async () => error((await mainSourceColors(front)).colors)).toBeLessThan(4);
+    const gpu = await mainSourceColors(front);
+    await seek(2.02);
+    await expect.poll(clock).toBeGreaterThan(2);
+    await expect
+      .poll(async () => error((await mainSourceColors(front)).colors), {
+        message:
+          'A different source frame must replace the GPU reference before Standard is selected',
+      })
+      .toBeGreaterThan(4);
+    await dialog.locator('[data-ui="gallery.videoReview.previewSettings"]').click();
+    const panel = dialog.locator('[data-ui="gallery.videoReview.previewInspector"]');
+    await panel
+      .getByRole('button', { name: label('editor.scene.previewRenderer'), exact: true })
+      .click();
+    await page
+      .getByRole('option', { name: label('editor.scene.previewRendererLegacy'), exact: true })
+      .click();
+    await seek(1.02);
+    await expect.poll(clock).toBeGreaterThan(1);
+    await expect.poll(clock).toBeLessThan(1.1);
+    await expect
+      .poll(async () => error((await mainSourceColors(front)).colors), {
+        message: 'Standard main must restore the independently decoded source image',
+      })
+      .toBeLessThan(4);
+    const standard = await mainSourceColors(front);
+    expect(standard.raster).toEqual(gpu.raster);
+    await writeFile(
+      info.outputPath('standard-main-source-reference.json'),
+      JSON.stringify(
+        {
+          viewport: page.viewportSize(),
+          source: { width: 160, height: 90 },
+          sourceSHA256: createHash('sha256')
+            .update(await readFile(fixture))
+            .digest('hex'),
+          requestedTime: target,
+          standardRequestedTime: await clock(),
+          referenceInterval: interval,
+          reference:
+            'Independent FFmpeg RGB at verified predecessor PTS, using established flat interior points.',
+          expected,
+          gpu,
+          standard,
+          maxRGBDifference: error(standard.colors),
+        },
+        null,
+        2
+      )
+    );
+    await page.screenshot({ path: info.outputPath('standard-main-source.png'), fullPage: false });
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});

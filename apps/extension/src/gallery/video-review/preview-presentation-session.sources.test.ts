@@ -178,18 +178,23 @@ it('releases an aborted acquisition before a decoded capture can borrow it', asy
   expect(io.decoded).not.toHaveBeenCalled();
 });
 
-it('keeps real decode failure on the precise route instead of recapturing HTML', async () => {
-  const f = sourceSession();
-  const prepared = await f.prepare();
-  const failure = new Error('Preview source frame is unavailable.');
-  f.acquire.mockRejectedValueOnce(failure);
-  await expect(f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).rejects.toBe(
-    failure
-  );
-  expect(io.legacy).not.toHaveBeenCalled();
-});
+it.each(['gpu', 'legacy'] as const)(
+  'keeps %s decode failure on the precise route instead of recapturing HTML',
+  async (renderer) => {
+    const f = sourceSession();
+    f.input.preferences = { ...f.input.preferences, renderer };
+    f.description.renderer = renderer;
+    const prepared = await f.prepare();
+    const failure = new Error('Preview source frame is unavailable.');
+    f.acquire.mockRejectedValueOnce(failure);
+    await expect(f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).rejects.toBe(
+      failure
+    );
+    expect(io.legacy).not.toHaveBeenCalled();
+  }
+);
 
-it('keeps explicit legacy capture synchronous and retires the selected source on retry', async () => {
+it('retires the precise owner on retry and reacquires across a Standard renderer change', async () => {
   const f = sourceSession();
   const prepared = await f.prepare();
   await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
@@ -199,8 +204,11 @@ it('keeps explicit legacy capture synchronous and retires the selected source on
   f.description.renderer = 'legacy';
   const legacy = await f.prepare();
   const result = f.hooks.capture(legacy.value, f.hooks.sampleTime(), f.signal);
-  expect(result).not.toBeInstanceOf(Promise);
-  expect(io.legacy).toHaveBeenCalledOnce();
+  expect(result).toBeInstanceOf(Promise);
+  await result;
+  expect(io.decoded).toHaveBeenCalledTimes(2);
+  expect(io.legacy).not.toHaveBeenCalled();
+  expect(io.provider).toHaveBeenCalledTimes(2);
 });
 
 it.each(['unsupported', 'unavailable'] as const)(
@@ -333,6 +341,26 @@ it.each(['cold', 'warm', 'retry'] as const)(
     expect(io.decoded.mock.lastCall?.[0].binding.heldAtEnd).toBeUndefined();
     replay.release();
     expect(opened).toHaveBeenCalledTimes(mode === 'retry' ? 2 : 1);
+    expect(io.legacy).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['gpu', 'legacy'] as const)(
+  'keeps canonical %s source selection without WebGPU and freezes both clocks',
+  async (renderer) => {
+    const f = sourceSession();
+    f.input.preferences = { ...f.input.preferences, renderer };
+    f.description.renderer = renderer;
+    vi.stubGlobal('navigator', { userAgent: 'test' });
+    const prepared = await f.prepare();
+    expect(f.acquire).toHaveBeenCalledOnce();
+    const sampledResultTime = f.hooks.sampleTime();
+    f.video.currentTime = 99;
+    await f.hooks.capture(prepared.value, sampledResultTime, f.signal);
+    expect(f.acquire.mock.lastCall?.[0]).toEqual([
+      expect.objectContaining({ url: f.input.sourceIdentity, time: 1.25 }),
+    ]);
+    expect(io.decoded.mock.lastCall?.[0]).toMatchObject({ binding: f.binding, time: 1 });
     expect(io.legacy).not.toHaveBeenCalled();
   }
 );
