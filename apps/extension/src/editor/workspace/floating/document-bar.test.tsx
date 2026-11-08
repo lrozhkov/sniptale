@@ -105,6 +105,7 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
     container?.querySelectorAll('[data-ui="editor.floating.document-bar"] button') ?? []
   ).map((button) => button.getAttribute('data-ui'));
   expect(actionIds).toEqual([
+    'editor.recent-images.trigger',
     'editor.floating.document-bar.title',
     'editor.floating.document-bar.promote-button',
     'editor.floating.document-bar.save-button',

@@ -2763,6 +2763,13 @@
       "rasterGradientTo": "Gradient to",
       "noSavePresets": "No active presets. Add a path in settings to save quickly without the system dialog."
     },
+    "recentImages": {
+      "title": "Recent images",
+      "order": "Most recently changed first",
+      "current": "Current image",
+      "switching": "Opening image…",
+      "switchFailed": "Could not open the image. The current project is still open."
+    },
     "documentActions": {
       "draft": "Draft",
       "inLibrary": "In library",

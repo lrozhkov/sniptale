@@ -24,6 +24,7 @@ import { useEditorController } from '../../application/controller-context';
 import { useEditorEmbedContext } from '../../application/embed-context/context';
 import { connectAggregateEditorPresence } from '../../../workflows/aggregate-editor-presence/client';
 import { promoteEditorImageToLibrary } from '../../workflows/promote-image-to-library';
+import { EditorRecentImagesButton } from './recent-images';
 import { EditorDocumentTitleEditor } from './document-title';
 import { EditorAnchoredAlert } from './anchored-feedback';
 export type { EditorFloatingDocumentController } from './document-bar-types';
@@ -467,6 +468,7 @@ export function EditorFloatingDocumentBar(props: EditorFloatingDocumentBarProps)
   return (
     <div data-ui="editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar dataUi="editor.floating.document-bar.surface">
+        {standalone && props.hasImage ? <EditorRecentImagesButton /> : null}
         <EditorDocumentTitleEditor
           hasImage={props.hasImage}
           title={documentState.pageTitle}
