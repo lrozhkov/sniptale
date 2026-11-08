@@ -1,3 +1,4 @@
+import { hasCursorFollowingCameraAt } from '../../features/video/composition/motion/camera-interval';
 import { disposeEffectRuntimeComposition } from '../../features/video/composition/effect-runtime';
 import type { VideoCompositionTimelineIndex } from '../../features/video/composition/timeline/frame/index';
 import { resolveProjectExportRange } from '../../features/video/project/export/range';
@@ -52,10 +53,15 @@ export async function renderProjectCompositionScene(
   };
   assertLive();
   let renderProject = project;
+  if (hasCursorFollowingCameraAt(project, currentTime)) {
+    job.cursorTrajectoryRenderer ??= createRecordingCursorTrajectoryRenderer();
+    renderProject = await job.cursorTrajectoryRenderer.prepareCamera(project, settings, signal);
+    assertLive();
+  }
   if (project.actionFeedback?.some((group) => group.events)) {
     job.recordingEventsRenderer ??= createRecordingEventsRenderer();
     renderProject = await job.recordingEventsRenderer.prepare(
-      project,
+      renderProject,
       { start: currentTime, end: currentTime },
       signal
     );

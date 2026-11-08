@@ -251,12 +251,13 @@ async function renderPreparedPreviewScene(
   for (const video of videos) video.addEventListener('seeking', invalidate);
   let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   let gpuEffectFrames: EffectRuntimeGpuPreparedComposition | undefined;
-  let capture: ReturnType<typeof capturePreviewSceneVideos> | undefined;
+  let capture: ReturnType<typeof capturePreviewSourcesIfNeeded>;
 
   try {
     if (params.previewRenderer === 'legacy' || !params.gpuPreview) {
       capture = capturePreviewSourcesIfNeeded(params, clipMediaElements, videos);
       if (capture?.ready) await capture.ready;
+      params = capture?.input ?? params;
     }
     const imageInput = await preparePreviewImageResources(params, renderPasses);
     if (!imageInput) return false;
@@ -349,6 +350,7 @@ async function renderPreparedPreviewScene(
     if (params.gpuOnly) throw new PreviewGpuSerialFallback();
     capture ??= capturePreviewSourcesIfNeeded(params, clipMediaElements, videos);
     if (capture?.ready) await capture.ready;
+    params = capture?.input ?? params;
     const captions = await (params.captionRenderer ?? createVideoProjectCaptionRenderer()).prepare(
       params.project,
       params.project,
@@ -716,12 +718,70 @@ function arePreviewSourcesReady(
 ) {
   return Boolean(input.preparedFrame?.sourceFrames) || arePreviewSceneVideosReady(passes, media);
 }
+/** Canvas copies keep exact clocks and source maps while the caller retains its original lease. */
 function capturePreviewSourcesIfNeeded(
   input: PreviewSceneRenderInput,
   media: Map<string, VideoCompositionMediaSource>,
   videos: readonly HTMLMediaElement[]
-) {
-  return input.preparedFrame?.sourceFrames
-    ? undefined
-    : capturePreviewSceneVideos(media, videos, input.signal);
+):
+  | (ReturnType<typeof capturePreviewSceneVideos> & {
+      readonly input?: PreviewSceneRenderInput | undefined;
+    })
+  | undefined {
+  const prepared = input.preparedFrame;
+  if (!prepared?.sourceFrames) return capturePreviewSceneVideos(media, videos, input.signal);
+  const exact = prepared.sourceFrames;
+  if (!exact.intervals.size) return undefined;
+  const signal = input.signal ?? new AbortController().signal;
+  const owned: VideoSample[] = [];
+  const converted = new Map<VideoCompositionFrameSource, VideoCompositionFrameSource>();
+  let canvasInput: PreviewSceneRenderInput | undefined;
+  const view = (sources: ReadonlyMap<string, VideoCompositionFrameSource>) => {
+    const result = new Map<string, VideoCompositionFrameSource>();
+    for (const [id, source] of sources) {
+      const normalized = converted.get(source);
+      if (!normalized) throw new Error('Exact Canvas source binding is unavailable.');
+      result.set(id, normalized);
+    }
+    return result;
+  };
+  const ready = (async () => {
+    for (const { source } of exact.intervals.values()) {
+      if (converted.has(source)) continue;
+      if (!source.toVideoFrame) throw new Error('Exact Canvas source frame is unavailable.');
+      const sample = await prepareDecodedVideoSample(
+        new VideoSample(source.toVideoFrame(), source.orientation),
+        signal
+      );
+      owned.push(sample);
+      signal.throwIfAborted();
+      converted.set(source, {
+        sourceWidth: source.sourceWidth ?? sample.displayWidth,
+        sourceHeight: source.sourceHeight ?? sample.displayHeight,
+        ...(source.orientation ? { orientation: source.orientation } : {}),
+        toVideoFrame: () => sample.toVideoFrame(),
+        draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
+      });
+    }
+    const sourceFrames = {
+      ...exact,
+      nominal: view(exact.nominal),
+      media: (...args: Parameters<typeof exact.media>) => view(exact.media(...args)),
+    };
+    for (const [id, source] of sourceFrames.nominal) media.set(id, source);
+    canvasInput = {
+      ...input,
+      decodedVideoFrames: sourceFrames.nominal,
+      preparedFrame: { ...prepared, sourceFrames },
+    };
+  })();
+  return {
+    ready,
+    get input() {
+      return canvasInput;
+    },
+    release() {
+      for (const sample of owned.splice(0)) sample.close();
+    },
+  };
 }

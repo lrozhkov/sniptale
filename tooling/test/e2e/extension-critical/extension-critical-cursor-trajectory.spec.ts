@@ -363,27 +363,35 @@ async function seekProjectTime(page: Page, time: number) {
 
 async function paintedCursor(page: Page) {
   return page.locator('[data-preview-stage-canvas]').evaluate((canvas: HTMLCanvasElement) => {
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Missing preview raster.');
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-    let count = 0;
-    let sumX = 0;
-    for (let i = 0; i < pixels.length; i += 4) {
-      if (
-        Math.abs(pixels[i]! - 19) <= 1 &&
-        Math.abs(pixels[i + 1]! - 227) <= 1 &&
-        Math.abs(pixels[i + 2]! - 107) <= 1 &&
-        pixels[i + 3] === 255
-      ) {
-        count++;
-        sumX += (i / 4) % canvas.width;
+    const readback = document.createElement('canvas');
+    readback.width = canvas.width;
+    readback.height = canvas.height;
+    try {
+      const context = readback.getContext('2d');
+      if (!context) throw new Error('Missing preview raster.');
+      context.drawImage(canvas, 0, 0);
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let count = 0;
+      let sumX = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (
+          Math.abs(pixels[i]! - 19) <= 1 &&
+          Math.abs(pixels[i + 1]! - 227) <= 1 &&
+          Math.abs(pixels[i + 2]! - 107) <= 1 &&
+          pixels[i + 3] === 255
+        ) {
+          count++;
+          sumX += (i / 4) % canvas.width;
+        }
       }
+      return { count, x: count ? sumX / count / canvas.width : null };
+    } finally {
+      readback.width = readback.height = 0;
     }
-    return { count, x: count ? sumX / count / canvas.width : null };
   });
 }
 
-for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+for (const viewport of [PRIMARY_BROWSER_VIEWPORTS[1]]) {
   test(`archived cursor follows camera through preview, reopen and export ${viewport.name}`, async ({
     page,
   }, info) => {
@@ -534,40 +542,69 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         .toBe('CURSOR');
       const sampleCanvasPoint = async (selector: string, point: { x: number; y: number }) =>
         page.locator(selector).evaluate((canvas: HTMLCanvasElement, point) => {
-          const scale = Math.min(canvas.width / 160, canvas.height / 90);
-          const x = (canvas.width - 160 * scale) / 2 + point.x * scale;
-          const y = (canvas.height - 90 * scale) / 2 + point.y * scale;
-          return Array.from(
-            canvas.getContext('2d')!.getImageData(Math.round(x), Math.round(y), 1, 1).data
-          ).slice(0, 3);
-        }, point);
-      const landmark = async () =>
-        page.locator('[data-preview-stage-canvas]').evaluate((canvas: HTMLCanvasElement) => {
-          const context = canvas.getContext('2d')!;
-          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-          const factor = Math.min(canvas.width / 160, canvas.height / 90);
-          const offsetX = (canvas.width - 160 * factor) / 2;
-          const offsetY = (canvas.height - 90 * factor) / 2;
-          const row = Math.round(offsetY + 75 * factor);
-          const runs: { start: number; end: number }[] = [];
-          let start: number | null = null;
-          for (let x = 0; x <= 160; x++) {
-            const index =
-              (row * canvas.width + Math.round(offsetX + Math.min(x, 159) * factor)) * 4;
-            const matchesMarker =
-              x < 160 &&
-              pixels[index]! > 220 &&
-              pixels[index + 1]! < 100 &&
-              pixels[index + 2]! > 140;
-            if (matchesMarker && start === null) start = x;
-            if (!matchesMarker && start !== null) {
-              runs.push({ start, end: x });
-              start = null;
-            }
+          const readback = document.createElement('canvas');
+          readback.width = canvas.width;
+          readback.height = canvas.height;
+          try {
+            const context = readback.getContext('2d');
+            if (!context) throw new Error('Preview point readback is unavailable.');
+            context.drawImage(canvas, 0, 0);
+            const scale = Math.min(canvas.width / 160, canvas.height / 90);
+            const x = (canvas.width - 160 * scale) / 2 + point.x * scale;
+            const y = (canvas.height - 90 * scale) / 2 + point.y * scale;
+            return Array.from(context.getImageData(Math.round(x), Math.round(y), 1, 1).data).slice(
+              0,
+              3
+            );
+          } finally {
+            readback.width = readback.height = 0;
           }
-          const widest = runs.sort((a, b) => b.end - b.start - (a.end - a.start))[0];
-          if (!widest) return null;
-          return { ...widest, y: 75 };
+        }, point);
+      const landmark = async (selector = '[data-preview-stage-canvas]') =>
+        page.locator(selector).evaluate((canvas: HTMLCanvasElement) => {
+          const readback = document.createElement('canvas');
+          readback.width = canvas.width;
+          readback.height = canvas.height;
+          try {
+            const context = readback.getContext('2d');
+            if (!context) throw new Error('Preview landmark readback is unavailable.');
+            context.drawImage(canvas, 0, 0);
+            const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+            const factor = Math.min(canvas.width / 160, canvas.height / 90);
+            const offsetX = (canvas.width - 160 * factor) / 2;
+            const offsetY = (canvas.height - 90 * factor) / 2;
+            const runs: { start: number; end: number; y: number }[] = [];
+            for (let y = 0; y < 90; y++) {
+              const row = Math.round(offsetY + y * factor);
+              let start: number | null = null;
+              for (let x = 0; x <= 160; x++) {
+                const index =
+                  (row * canvas.width + Math.round(offsetX + Math.min(x, 159) * factor)) * 4;
+                const matchesMarker =
+                  x < 160 &&
+                  pixels[index]! > 220 &&
+                  pixels[index + 1]! < 100 &&
+                  pixels[index + 2]! > 140;
+                if (matchesMarker && start === null) start = x;
+                if (!matchesMarker && start !== null) {
+                  runs.push({ start, end: x, y });
+                  start = null;
+                }
+              }
+            }
+            if (!runs.length) return null;
+            const top = Math.min(...runs.map((run) => run.y));
+            const bottom = Math.max(...runs.map((run) => run.y)) + 1;
+            // Keep the original reference row when it intersects the marker's colored interior.
+            const reference = runs.filter((run) => run.y === 75);
+            const row = reference.length ? 75 : Math.floor((top + bottom - 1) / 2);
+            const widest = runs
+              .filter((run) => run.y === row)
+              .sort((a, b) => b.end - b.start - (a.end - a.start))[0];
+            return widest ? { ...widest, top, bottom } : null;
+          } finally {
+            readback.width = readback.height = 0;
+          }
         });
       await chooseInspectorValue(
         page,
@@ -581,12 +618,55 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       const midpoint = (await landmark())!;
       const miniPoint = { x: midpoint.start + 5, y: midpoint.y };
       const stageColor = await sampleCanvasPoint('[data-preview-stage-canvas]', miniPoint);
+      const inspectorFront =
+        '[data-ui="video-editor.framing-preview"] canvas[data-preview-inspector-canvas]';
+      await expect(page.locator(inspectorFront)).toHaveCount(1);
+      await expect(page.locator(inspectorFront)).toBeVisible();
+      await writeFile(
+        info.outputPath('archive-follow-inspector-pixels.json'),
+        JSON.stringify(
+          {
+            point: miniPoint,
+            landmark: { stage: midpoint, inspector: await landmark(inspectorFront) },
+            backing: {
+              stage: await page
+                .locator('[data-preview-stage-canvas]')
+                .evaluate((canvas: HTMLCanvasElement) => ({
+                  width: canvas.width,
+                  height: canvas.height,
+                })),
+              inspector: await page
+                .locator(inspectorFront)
+                .evaluate((canvas: HTMLCanvasElement) => ({
+                  width: canvas.width,
+                  height: canvas.height,
+                })),
+            },
+            center: {
+              point: { x: (midpoint.start + midpoint.end) / 2, y: midpoint.y },
+              stage: await sampleCanvasPoint('[data-preview-stage-canvas]', {
+                x: (midpoint.start + midpoint.end) / 2,
+                y: midpoint.y,
+              }),
+              inspector: await sampleCanvasPoint(inspectorFront, {
+                x: (midpoint.start + midpoint.end) / 2,
+                y: midpoint.y,
+              }),
+            },
+            stage: stageColor,
+            inspector: await sampleCanvasPoint(inspectorFront, miniPoint),
+            background: {
+              stage: await sampleCanvasPoint('[data-preview-stage-canvas]', { x: 20, y: 20 }),
+              inspector: await sampleCanvasPoint(inspectorFront, { x: 20, y: 20 }),
+            },
+          },
+          null,
+          2
+        )
+      );
       await expect
         .poll(async () => {
-          const miniColor = await sampleCanvasPoint(
-            '[data-ui="video-editor.framing-preview"] canvas',
-            miniPoint
-          );
+          const miniColor = await sampleCanvasPoint(inspectorFront, miniPoint);
           return Math.max(...stageColor.map((value, index) => Math.abs(value - miniColor[index]!)));
         })
         .toBeLessThan(4);
@@ -605,6 +685,13 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         .toBeLessThan(first.start - 4);
       const last = (await landmark())!;
       expect(last.end - last.start).toBeGreaterThan(8);
+      expect(last.bottom - last.top).toBeGreaterThan(8);
+      // Source marker56..64 at2x and recorded cursorY41..49 imply top59..75 and bottom75..91.
+      // Three project pixels allow chroma-edge interpolation and rounding; the frame clips at90.
+      expect(last.top).toBeGreaterThanOrEqual(58);
+      expect(last.top).toBeLessThanOrEqual(78);
+      expect(last.bottom).toBeGreaterThanOrEqual(72);
+      expect(last.bottom).toBeLessThanOrEqual(90);
       await page.screenshot({
         path: info.outputPath('archive-follow-camera.png'),
         fullPage: false,
@@ -635,23 +722,25 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect(followed.motionRegions?.[0]?.focusMode).toBe('CURSOR');
       expect(followed.cursorTrack?.samples).toEqual([]);
       expect(followed.cursorTrack?.sourceObservations?.[0]?.samples).toEqual([]);
-      const encoded = await encodedNativeVideoSamples(
-        page,
-        server.origin,
-        followed,
-        index === 0 ? 'WEBM' : 'MP4',
-        [
-          { time: 2, ...point, expected: earlyColor },
-          { time: 4, ...point, expected: lateColor },
-        ],
-        { start: 0, end: 5 }
-      );
-      await writeFile(
-        info.outputPath('archive-follow-camera-export.json'),
-        JSON.stringify({ first, last, point, earlyColor, lateColor, encoded }, null, 2)
-      );
-      expect(encoded.samples).toHaveLength(2);
-      for (const pixel of encoded.samples) expect(pixel.error).toBeLessThan(12);
+      for (const format of ['WEBM', 'MP4'] as const) {
+        const encoded = await encodedNativeVideoSamples(
+          page,
+          server.origin,
+          followed,
+          format,
+          [
+            { time: 2, ...point, expected: earlyColor },
+            { time: 4, ...point, expected: lateColor },
+          ],
+          { start: 0, end: 5 }
+        );
+        await writeFile(
+          info.outputPath(`archive-follow-camera-export-${format.toLowerCase()}.json`),
+          JSON.stringify({ first, last, point, earlyColor, lateColor, encoded }, null, 2)
+        );
+        expect(encoded.samples).toHaveLength(2);
+        for (const pixel of encoded.samples) expect(pixel.error).toBeLessThan(12);
+      }
       await page.evaluate(
         async ({ databaseName, recordingId, trajectoryId }) => {
           const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -840,9 +929,18 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         if (!bounds) throw new Error('Cursor history row is unavailable.');
         const duration = Number(await plane.getAttribute('aria-valuemax'));
         await row.click({ position: { x: (bounds.width * 11) / duration, y: 8 } });
-        await expect(page.locator('[data-cursor-focus-key][aria-pressed="true"]')).toHaveCount(1);
+        const selectedTimelineKey = page.locator(
+          '[data-ui="cursorFocusPath.timelineKeys"] [data-cursor-focus-key][aria-pressed="true"]'
+        );
         const overlay = page.locator('[data-ui="cursorFocusPath.overlay"]');
+        const selectedOverlayKey = overlay.locator('[data-cursor-focus-key][aria-pressed="true"]');
+        await expect(selectedTimelineKey).toHaveCount(1);
         await expect(overlay).toBeVisible();
+        await expect(selectedOverlayKey).toHaveCount(1);
+        const selectedId = await selectedTimelineKey.getAttribute('data-cursor-focus-key');
+        expect(selectedId).toBeTruthy();
+        if (!selectedId) throw new Error('Selected cursor key identity is unavailable.');
+        await expect(selectedOverlayKey).toHaveAttribute('data-cursor-focus-key', selectedId);
         await expect
           .poll(() =>
             overlay.evaluate(

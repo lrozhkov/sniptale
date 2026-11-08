@@ -2,7 +2,17 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import fixture from '../../features/video/project/recording-events/fixtures.json';
 import { isRecordingEventsDescriptor } from '../../features/video/project/recording-events/records';
-import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
+import { createVideoProjectMotionRegion } from '../../features/video/project/motion';
+import { VideoMotionFocusMode } from '../../features/video/project/types';
+import { compileProjectCameraBundle } from '../../features/video/composition/motion/project-camera-preparation';
+import {
+  attachPreparedProjectCamera,
+  preparedProjectCamera,
+} from '../../features/video/composition/motion/prepared-project-camera';
+import {
+  createEmptyVideoProject,
+  createVideoProjectFromRecording,
+} from '../../features/video/project/factories/creation';
 import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 import { normalizeVideoProjectCursorSkin } from '../../features/video/project/cursor';
 import type { VideoProject } from '../../features/video/project/types';
@@ -20,6 +30,10 @@ const owners = vi.hoisted(() => ({
   effects: vi.fn(),
   draw: vi.fn(),
   dispose: vi.fn(),
+  cursorFactory: vi.fn(),
+}));
+vi.mock('../../workflows/video-review/cursor-trajectory', () => ({
+  createRecordingCursorTrajectoryRenderer: owners.cursorFactory,
 }));
 vi.mock('../../workflows/video-review/project-captions', () => ({
   createVideoProjectCaptionRenderer: () => ({ prepare: owners.captions }),
@@ -101,9 +115,14 @@ it('awaits the exact frame window before effects and drawing while captions reta
   const original = args.project;
   const prepared = { ...original, name: 'Prepared frame' };
   const prepare = vi.fn(async () => prepared);
-  args.job.cursorTrajectoryRenderer = { prepareCamera: vi.fn(), prepare, clear: vi.fn() };
+  args.job.cursorTrajectoryRenderer = {
+    prepareCamera: vi.fn(async (project: VideoProject) => project),
+    prepare,
+    clear: vi.fn(),
+  };
   await renderProjectCompositionScene(args);
   expect(prepare).toHaveBeenCalledExactlyOnceWith(original, 1);
+  expect(args.job.cursorTrajectoryRenderer.prepareCamera).not.toHaveBeenCalled();
   expect(owners.captions).toHaveBeenCalledWith(original, args.settings, undefined);
   expect(owners.effects).toHaveBeenCalledWith(expect.objectContaining({ project: prepared }));
   expect(owners.draw.mock.calls[0]?.[1]).toBe(prepared);
@@ -127,7 +146,11 @@ it('passes prepared event facts through cursor preparation before effects and dr
   const events = vi.fn(async () => eventsPrepared);
   const cursor = vi.fn(async () => cursorPrepared);
   args.job.recordingEventsRenderer = { prepare: events, clear: vi.fn() };
-  args.job.cursorTrajectoryRenderer = { prepareCamera: vi.fn(), prepare: cursor, clear: vi.fn() };
+  args.job.cursorTrajectoryRenderer = {
+    prepareCamera: vi.fn(async (project: VideoProject) => project),
+    prepare: cursor,
+    clear: vi.fn(),
+  };
   await renderProjectCompositionScene(args);
   expect(cursor).toHaveBeenCalledExactlyOnceWith(eventsPrepared, 1);
   expect(owners.effects).toHaveBeenCalledWith(expect.objectContaining({ project: cursorPrepared }));
@@ -139,7 +162,7 @@ it('refuses cancellation after a delayed cursor window without drawing a stale f
   const args = withTrajectory(input());
   const gate = Promise.withResolvers<VideoProject>();
   args.job.cursorTrajectoryRenderer = {
-    prepareCamera: vi.fn(),
+    prepareCamera: vi.fn(async (project: VideoProject) => project),
     prepare: vi.fn(() => gate.promise),
     clear: vi.fn(),
   };
@@ -254,7 +277,11 @@ it.each(['job', 'signal'] as const)(
     const prepare = vi.fn(() => gate.promise);
     const cursor = vi.fn(async () => args.project);
     args.job.recordingEventsRenderer = { prepare, clear: vi.fn() };
-    args.job.cursorTrajectoryRenderer = { prepareCamera: vi.fn(), prepare: cursor, clear: vi.fn() };
+    args.job.cursorTrajectoryRenderer = {
+      prepareCamera: vi.fn(async (project: VideoProject) => project),
+      prepare: cursor,
+      clear: vi.fn(),
+    };
     const controller = new AbortController();
     args.signal = controller.signal;
     const result = renderProjectCompositionScene(args);
@@ -324,3 +351,106 @@ it('releases a prepared source pass when the FX wave fails before drawing starts
   expect(releasePass).toHaveBeenCalledOnce();
   expect(owners.draw).not.toHaveBeenCalled();
 });
+
+function withFollowingCamera() {
+  const args = input();
+  args.project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 8,
+    height: 4,
+    duration: 2,
+    mimeType: 'video/webm',
+    size: 10,
+  });
+  withTrajectory(args);
+  const clip = args.project.clips.find((item) => item.type === 'VIDEO');
+  const group = args.project.cursorTrack?.sourceObservations?.[0];
+  if (!clip || !group?.trajectory) throw new Error('Missing camera source.');
+  group.sourceInstanceId = clip.sourceInstanceId!;
+  group.trajectory = { ...group.trajectory, state: 'complete', totalBlocks: 1 };
+  args.project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(args.project, 0),
+      duration: 2,
+      focusMode: VideoMotionFocusMode.CURSOR,
+    },
+  ];
+  if (!isRecordingEventsDescriptor(fixture.descriptor)) throw new Error('Invalid fixture.');
+  args.project.actionFeedback = [
+    {
+      recordingId: 'recording',
+      sourceInstanceId: clip.sourceInstanceId!,
+      signals: [],
+      settings: [],
+      events: fixture.descriptor,
+    },
+  ];
+  return args;
+}
+
+it('prepares full archived camera support before events and frame hydration at the export viewport', async () => {
+  const args = withFollowingCamera();
+  const original = args.project;
+  const bundle = compileProjectCameraBundle(original, args.settings);
+  const cameraProject = attachPreparedProjectCamera(original, bundle);
+  const events = vi.fn(async (project: VideoProject) => ({ ...project, name: 'Events' }));
+  const window = vi.fn(async (project: VideoProject) => ({ ...project, name: 'Frame window' }));
+  const camera = vi.fn(async () => cameraProject);
+  const renderer = { prepareCamera: camera, prepare: window, clear: vi.fn() };
+  owners.cursorFactory.mockReturnValueOnce(renderer);
+  args.job.recordingEventsRenderer = { prepare: events, clear: vi.fn() };
+  const controller = new AbortController();
+  args.signal = controller.signal;
+  await renderProjectCompositionScene(args);
+  expect(owners.cursorFactory).toHaveBeenCalledOnce();
+  expect(args.job.cursorTrajectoryRenderer).toBe(renderer);
+  expect(camera).toHaveBeenCalledExactlyOnceWith(original, args.settings, controller.signal);
+  expect(events).toHaveBeenCalledExactlyOnceWith(
+    cameraProject,
+    { start: 1, end: 1 },
+    controller.signal
+  );
+  expect(preparedProjectCamera(window.mock.calls[0]![0])).toBe(bundle);
+  const rendered = owners.draw.mock.calls[0]![1];
+  expect(preparedProjectCamera(rendered)).toBe(bundle);
+  expect(owners.effects).toHaveBeenCalledWith(expect.objectContaining({ project: rendered }));
+  expect(owners.captions).toHaveBeenCalledWith(original, args.settings, controller.signal);
+  expect(args.project).toBe(original);
+  expect(preparedProjectCamera(original)).toBeUndefined();
+  const order = [camera, events, window, owners.effects, owners.draw].map(
+    (mock) => mock.mock.invocationCallOrder[0]!
+  );
+  expect(order).toEqual([...order].sort((a, b) => a - b));
+});
+
+it.each(['job', 'signal', 'failure'] as const)(
+  'does not hydrate or draw after %s interrupts delayed camera preparation',
+  async (mode) => {
+    const args = withFollowingCamera();
+    const gate = Promise.withResolvers<VideoProject>();
+    const camera = vi.fn(() => gate.promise);
+    const window = vi.fn(async (project: VideoProject) => project);
+    const events = vi.fn(async (project: VideoProject) => project);
+    args.job.cursorTrajectoryRenderer = { prepareCamera: camera, prepare: window, clear: vi.fn() };
+    args.job.recordingEventsRenderer = { prepare: events, clear: vi.fn() };
+    const controller = new AbortController();
+    args.signal = controller.signal;
+    const rendering = renderProjectCompositionScene(args);
+    expect(camera).toHaveBeenCalledExactlyOnceWith(args.project, args.settings, controller.signal);
+    expect(events).not.toHaveBeenCalled();
+    expect(window).not.toHaveBeenCalled();
+    if (mode === 'job') args.job.cancelled = true;
+    if (mode === 'signal') controller.abort();
+    if (mode === 'failure') gate.reject(new Error('camera archive failed'));
+    else gate.resolve(args.project);
+    await expect(rendering).rejects.toThrow(
+      mode === 'failure' ? 'camera archive failed' : 'PROJECT_EXPORT_CANCELLED'
+    );
+    expect(events).not.toHaveBeenCalled();
+    expect(window).not.toHaveBeenCalled();
+    expect(owners.captions).not.toHaveBeenCalled();
+    expect(owners.effects).not.toHaveBeenCalled();
+    expect(owners.draw).not.toHaveBeenCalled();
+  }
+);

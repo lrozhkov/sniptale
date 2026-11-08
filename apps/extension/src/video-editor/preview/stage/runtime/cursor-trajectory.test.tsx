@@ -10,6 +10,7 @@ import {
   projectCameraOutputKey,
   preparedProjectCamera,
 } from '../../../../features/video/composition/motion/prepared-project-camera';
+import { createQuickEditSpotlight } from '../../../../features/video/project/scene/focus-appearance';
 import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
 import { prepareCursorTrajectoryProject } from '../../../../features/video/project/cursor-trajectory/project-window';
@@ -396,7 +397,9 @@ it('reports a retained camera failure only while the current time requires that 
   expect(canRender(1)).toBe(true);
   expect(feedback.onFailure).not.toHaveBeenCalled();
   await render(project, 2.5);
-  expect(canRender(2.5)).toBe(false);
+  expect(canRender(2.5)).toBe(true);
+  expect(latest.motionRegions![0]!.focusMode).toBe('MANUAL');
+  expect(project.motionRegions![0]!.focusMode).toBe('CURSOR');
   expect(feedback.onFailure).toHaveBeenCalledWith('camera-history', failure);
   feedback.onRecovery.mockClear();
   await render(project, 1);
@@ -407,4 +410,82 @@ it('reports a retained camera failure only while the current time requires that 
   expect(latestResult.cameraFailed).toBe(true);
   expect(feedback.onFailure).toHaveBeenCalledWith('camera-history', failure);
   expect(prepareCamera).toHaveBeenCalledOnce();
+});
+
+it('projects only cursor cameras to authored manual focus after resolved missing history and recovers', async () => {
+  const project = cameraFixture();
+  const cursor = project.motionRegions![0]!;
+  const manual = {
+    ...cursor,
+    id: 'manual',
+    startTime: 3,
+    duration: 1,
+    focusMode: 'MANUAL' as const,
+  };
+  const spotlight = { ...cursor, id: 'spotlight', spotlight: createQuickEditSpotlight() };
+  project.motionRegions = [manual, spotlight, cursor];
+  const before = structuredClone(project);
+  const staleWindow = cameraPrepared(project);
+  prepare.mockResolvedValue(staleWindow);
+  const failure = new Error('Missing camera archive');
+  prepareCamera.mockRejectedValueOnce(failure);
+  await render(project, 1);
+  expect(canRender(1.5)).toBe(true);
+  expect(latestResult.cameraFailed).toBe(true);
+  expect(feedback.onFailure).toHaveBeenCalledWith('camera-history', failure);
+  expect(preparedProjectCamera(latest)).toBeUndefined();
+  expect(latest.motionRegions).toEqual([manual, spotlight, { ...cursor, focusMode: 'MANUAL' }]);
+  expect(latest.motionRegions![0]).toBe(manual);
+  expect(latest.motionRegions![1]).toBe(spotlight);
+  expect(latest.clips).toBe(project.clips);
+  expect(latest.assets).toBe(project.assets);
+  expect(project).toEqual(before);
+  expect(project.motionRegions![2]!.focusMode).toBe('CURSOR');
+  const recovered = cameraPrepared(project);
+  prepareCamera.mockResolvedValueOnce(recovered);
+  await act(async () => latestResult.retryCamera());
+  expect(latestResult.cameraFailed).toBe(false);
+  expect(latest.motionRegions![2]!.focusMode).toBe('CURSOR');
+  expect(preparedProjectCamera(latest)).toBe(preparedProjectCamera(recovered));
+  expect(canRender(1.5)).toBe(true);
+  expect(feedback.onRecovery).toHaveBeenCalledWith('camera-history');
+});
+
+it('holds pending frame and camera retry requests instead of reusing a stale manual projection', async () => {
+  const project = cameraFixture();
+  const frame = Promise.withResolvers<VideoProject>();
+  prepare.mockReturnValueOnce(frame.promise);
+  prepareCamera.mockRejectedValueOnce(new Error('Missing archive'));
+  await render(project, 1);
+  expect(canRender(1)).toBe(false);
+  expect(latest.motionRegions![0]!.focusMode).toBe('CURSOR');
+  await act(async () => frame.resolve(project));
+  expect(canRender(1)).toBe(true);
+  const camera = Promise.withResolvers<VideoProject>();
+  prepareCamera.mockReturnValueOnce(camera.promise);
+  await render(project, 1, 1);
+  expect(canRender(1)).toBe(false);
+  expect(latest.motionRegions![0]!.focusMode).toBe('CURSOR');
+  expect(latestResult.cameraFailed).toBe(false);
+  await act(async () => camera.resolve(cameraPrepared(project)));
+  expect(canRender(1)).toBe(true);
+  expect(latest.motionRegions![0]!.focusMode).toBe('CURSOR');
+});
+
+it('does not reuse missing-history manual projection for a replaced project awaiting its frame', async () => {
+  const old = cameraFixture();
+  prepare.mockResolvedValueOnce(old);
+  prepareCamera.mockRejectedValueOnce(new Error('Missing old archive'));
+  await render(old, 1);
+  expect(canRender(1)).toBe(true);
+  const current = { ...cameraFixture(), name: 'Replacement' };
+  const gate = Promise.withResolvers<VideoProject>();
+  prepare.mockReturnValueOnce(gate.promise);
+  prepareCamera.mockRejectedValueOnce(new Error('Missing current archive'));
+  await render(current, 1);
+  expect(latest).toBe(current);
+  expect(canRender(1)).toBe(false);
+  await act(async () => gate.resolve(current));
+  expect(canRender(1)).toBe(true);
+  expect(current.motionRegions![0]!.focusMode).toBe('CURSOR');
 });

@@ -1,3 +1,4 @@
+import type { NativePreviewSourceRuntime } from '../media/source-runtime';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import * as schedulerOwner from './render-scheduler';
@@ -16,7 +17,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
-function job(): PreviewSceneRenderJob {
+function job(): PreviewSceneRenderJob & { sourceRuntime: NativePreviewSourceRuntime } {
   return {
     project: createProject([]),
     canvas: document.createElement('canvas'),

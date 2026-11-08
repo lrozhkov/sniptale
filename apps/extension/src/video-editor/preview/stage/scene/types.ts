@@ -156,7 +156,7 @@ export type PreviewSceneRenderInput = {
   videoRefs: PreviewStageVideoRefs;
   /** Borrowed immutable decoded frames for bounded cut sampling. */
   decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>;
-  sourceRuntime?: NativePreviewSourceRuntime;
+  sourceRuntime?: Pick<NativePreviewSourceRuntime, 'selected' | 'acquire'>;
 };
 
 /** A preparation owns its captured inputs until the sole render consumer completes. */

@@ -47,7 +47,7 @@ it('keeps retained windows on their existing materialized endpoint owner during 
     imageBank: {},
     videoRefs: { current: {} },
     assetUrls: { [clip.assetId]: 'blob:source' },
-    sourceRuntime: { selected: true, acquire, prepare: vi.fn(async () => 'ready' as const) },
+    sourceRuntime: { selected: true, acquire },
   };
   const admission = await owner.prepare(input);
   expect(admission?.input).toBe(input);

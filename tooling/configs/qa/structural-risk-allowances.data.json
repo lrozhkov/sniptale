@@ -5418,10 +5418,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-cursor-trajectory.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: One cursor archive suite seeds canonical history and exercises its existing editor consumers. Static source pixels separate camera movement from painted cursor movement. Export uses the existing encoded-video helper. Native and Quick Edit cases retain their own page and server cleanup.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes the archive fixture, export helper or editor lifecycle. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "e67a184ac77c6f54f37dae50689e1abe4d0da6f93eb1d207377e1487705c9ce7",
+      "reason": "tool-noise: One archive suite exercises its existing editor consumers. The canonical fixture retains source and history identity. Native and Quick Edit cases retain separate page and server cleanup. Temporary Canvas readbacks add no fixture or decoder authority. Independent diagnosis supports this Keep classification. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new source, archive or project identity, page or server lifetime, export implementation, fixture writer or unrelated consumer. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-08",
+      "astHash": "0c839ade182d7035574ea7761c1be27764bb7de00e6b27fddf8585febe8fd6e2",
       "signatureHash": "95e223c62d3d7883aa2453ce48d7e2eb22946cc8234e193e621a7077cc236a15"
     },
     {
@@ -5429,10 +5429,10 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-cursor-trajectory.spec.ts",
       "symbol": "test callback",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: One Native archive scenario follows the same recording and saved project through selection, preview, inspector, reopen and encoded export. It then removes that archive to check refusal without authoring changes. Server and page cleanup enclose the full scenario. Separate export machinery remains in its existing helper.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes the saved-project identity, archive teardown or scenario cleanup. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "56d166d90699b1c7e648f5df48804f19d5498a250cc41818d783c5e2a0914a04",
+      "reason": "tool-noise: One Native scenario follows one saved project through selection, preview, inspector, reopen and both exports. It removes the same archive to test refusal. Temporary readbacks retain pixel and geometry assertions. The existing helper owns encoded export. Page and server cleanup enclose this operation. Independent diagnosis supports this Keep classification. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any new source, archive or project identity, page or server lifetime, export implementation, fixture writer or unrelated consumer. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-08",
+      "astHash": "df56841334cf93a3dfbd4083d6c9167bc6bcdc062711dc357f82230d0b4454a6",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {
@@ -5847,11 +5847,11 @@
       "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
       "symbol": "<file>",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One materializer owns source preparation, bounded composition clocks and completed-frame handoff. Private destination allocation and GPU provider retirement remain in explicit pool and composer owners. Retained endpoint leases connect these owners without adding UI, persistence or another scheduler. Independent read-only structural diagnosis confirmed Keep. The stable Native leaf uses the materializer pool. Each nested child and its pool retire together; outstanding leases defer destruction. Follow-up independent diagnosis confirmed this ordering. Fresh candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: One materializer owns source preparation and handoff of a completed frame. The canonical provider retains source selection. The composer and pool retain GPU allocation. The frame transaction releases precise leases after render completion. No UI, persistence or second scheduler authority enters this file. Independent diagnosis supports this Keep classification. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source selection, scheduler, retry, publication, resource lifetime, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-08",
-      "astHash": "46e34b8f7e90c9becd7465965a4fb0cc0c0e2068c1df29f6d7f285de24831632",
-      "signatureHash": "64a7e2a1dd2de91a231f6d40161ab087838408a0df1f68bcb7a2f5d8d14bd4c2"
+      "astHash": "91dc28572aa51d8557be4d2dbffe967fa1c5d2d621af98f51a2e49f9c05e87d8",
+      "signatureHash": "dc560514b64ea66f570d578f00421ebdf6f50d8a792fd8710cc49d1d2f409926"
     },
     {
       "rule": "structural-function-risk",
@@ -5946,11 +5946,11 @@
       "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.ts",
       "symbol": "renderPreparedPreviewScene",
       "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One prepared frame transaction selects GPU or Canvas rendering and releases its effects. A typed failure before the Canvas branch transfers drained-retry policy to the scheduler. This function adds no queue or retry authority.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction.",
-      "astHash": "e5d4a9775874b0a932ade1ed1324a4a10634a6a57ac5c9b8aed2df5f4ba04c3c",
+      "reason": "tool-noise: One prepared frame transaction selects GPU or Canvas and releases temporary effects and samples. The caller retains the original source lease. Canvas conversion follows the existing capture await. The scheduler retains retry policy. This function adds no source selection, queue or publication authority. Independent diagnosis supports this Keep classification. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source selection, scheduler, retry, publication, resource lifetime, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
+      "astHash": "0ad70221be11c7978abcb21683ec42fec4766225135a864ff90b4137ef910e05",
       "signatureHash": "084a1b2312c4568a47f85b4608e3ec489241a489cc4774c140accadc29612e03",
-      "reviewDate": "2026-11-07"
+      "reviewDate": "2026-11-08"
     },
     {
       "rule": "structural-function-risk",
@@ -6347,6 +6347,28 @@
       "reviewDate": "2026-11-08",
       "reason": "tool-noise: One endpoint transaction samples immutable pairs, reuses matching times, borrows them through asynchronous completion and retires invalidated pairs. Optional retained samples and existing Canvas copies share this authority. Splitting would distribute pair acquisition and release. Independent read-only structural diagnosis confirmed Keep. Fresh candidate architecture review must validate this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
+      "symbol": "renderMaterializedFrame",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: One frame transaction prepares source bindings, renders the scene and transfers completed output. The existing finally releases precise and endpoint leases after completion. The provider retains source selection. The caller retains visible publication. Splitting this operation would distribute its cancellation and handoff authority. Independent diagnosis supports this Keep classification. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source selection, scheduler, retry, publication, resource lifetime, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-08",
+      "astHash": "dd5adce9feabbc87332f1939a68762da25a6edbf21dc5fd9fd5f84176ed1a378",
+      "signatureHash": "13024fe958d15e2253d98de7c8e0e18b278557f4be2a3989ac7f54f36bafda5f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/runtime/cursor-trajectory.ts",
+      "symbol": "useCursorTrajectoryProject",
+      "owner": "extension:video-editor:preview",
+      "reason": "tool-noise: One mounted preview combines stable camera preparation and bounded frame reads at its admission boundary. Retry keys reject stale preparation. The disposable manual view preserves authored data. Reader, export and persistence authority remain unchanged. Separate hooks would distribute the same decision for the current source and retry. Independent diagnosis supports this Keep classification. Fresh architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source selection, scheduler, retry, publication, resource lifetime, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-08",
+      "astHash": "024810ce8146d3683b55e6b5a06b1ca8b1fbd036620f16843bbaaf1a0742c3ea",
+      "signatureHash": "0e798642fe67e11922b8c7a18c66ad4f06efe9e441acfac0bcdbcdc25d2ff5f2"
     }
   ]
 }

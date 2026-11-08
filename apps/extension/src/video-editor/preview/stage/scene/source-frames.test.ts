@@ -41,7 +41,6 @@ it.each([false, true])(
     const release = vi.fn();
     const runtime = {
       selected: true,
-      prepare: vi.fn(async () => 'ready' as const),
       acquire: vi.fn(async (demands: readonly PreviewSourceDemand[]) => {
         acquired.push(...demands);
         return {
@@ -120,7 +119,6 @@ it('releases a decoded lease when its job is aborted before the acquisition sett
     signal: controller.signal,
     sourceRuntime: {
       selected: true,
-      prepare: vi.fn(async () => 'ready' as const),
       acquire: vi.fn(() => gate.promise),
     },
   };

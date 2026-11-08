@@ -1,3 +1,8 @@
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+} from '../../../workflows/video/preview-source';
+import { prepareNativePreviewSceneFrame } from '../stage/scene/frame-plan';
 import { collectPreviewImageResourceDemand } from '../stage/scene/image-resources';
 import { getProjectSceneBackgroundImageAssetId } from '../../../features/video/project/scene/background';
 import type {
@@ -95,6 +100,7 @@ interface VideoPreviewMaterializerState {
   gpuOutputs: ReturnType<typeof createMaterializerGpuOutputs>;
   effectPreparation: PreviewSceneRenderInput['effectPreparation'];
   playbackSampler: ReturnType<typeof createCompositionCutSampleSource> | null;
+  sourceProvider: PreviewSourceProvider | null;
   playbackSamplerConversion: 'canvas' | 'native';
   gpuPreview: ReturnType<typeof createNativeGpuPreviewRenderer> | null;
   spatialRenderer: ReviewSpatialRenderer | null;
@@ -814,6 +820,7 @@ function createMaterializerMediaState(
     effectPreparation: undefined,
     playbackSampler: null,
     playbackSamplerConversion: 'canvas',
+    sourceProvider: null,
     gpuPreview:
       params.previewRenderer === 'legacy'
         ? null
@@ -873,6 +880,8 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
   state.effectRuntime?.dispose();
   state.playbackSampler?.dispose();
   state.playbackSampler = null;
+  state.sourceProvider?.dispose();
+  state.sourceProvider = null;
   state.gpuOutputs.dispose();
   state.gpuPreview?.dispose();
   state.captionRenderer.clear();
@@ -926,6 +935,7 @@ async function renderMaterializedFrame(
     | Awaited<ReturnType<ReturnType<typeof createCompositionCutSampleSource>['sample']>>
     | undefined;
   let completedOutput: GpuPreviewOutput | undefined;
+  let prepared: Awaited<ReturnType<typeof prepareNativePreviewSceneFrame>>;
   let handedOff = false;
   try {
     assertActive();
@@ -950,7 +960,13 @@ async function renderMaterializedFrame(
       decodedVideoFrames = sampled.media;
     }
     assertActive();
-    if (!decodedVideoFrames) await prepareMaterializedVideos(params, state, stage, time, signal);
+    const preciseSource =
+      !decodedVideoFrames &&
+      params.previewRenderer !== 'legacy' &&
+      typeof VideoDecoder !== 'undefined' &&
+      typeof VideoFrame !== 'undefined';
+    if (!decodedVideoFrames && !preciseSource)
+      await prepareMaterializedVideos(params, state, stage, time, signal);
     else state.videoRefs = {};
     assertActive();
     const renderProject = await prepareMaterializerRenderProject(
@@ -960,7 +976,8 @@ async function renderMaterializedFrame(
       signal
     );
     assertActive();
-    const drawn = await renderPreviewScene({
+    let input: PreviewSceneRenderInput = {
+      assetUrls: params.assetUrls,
       ...(acquireGpuOutput ? { acquireGpuOutput, deferFrameEvent: true } : {}),
       previewRenderer: params.previewRenderer ?? 'gpu',
       ...(state.gpuPreview ? { gpuPreview: state.gpuPreview } : {}),
@@ -1005,7 +1022,39 @@ async function renderMaterializedFrame(
       stage,
       videoRefs: { current: state.videoRefs },
       ...(decodedVideoFrames ? { decodedVideoFrames } : {}),
-    });
+    };
+    if (preciseSource) {
+      state.sourceProvider ??= createPreviewSourceProvider();
+      const provider = state.sourceProvider;
+      provider.retainSources(new Set(Object.values(params.assetUrls)));
+      let unsupported = false;
+      prepared = await prepareNativePreviewSceneFrame({
+        ...input,
+        sourceRuntime: {
+          selected: true,
+          async acquire(demands, requestSignal, options) {
+            const lease = await provider.acquire(demands, requestSignal, options);
+            try {
+              assertActive();
+              if (lease === null) unsupported = true;
+              return lease;
+            } catch (error) {
+              lease?.release();
+              throw error;
+            }
+          },
+        },
+      });
+      assertActive();
+      if (prepared) input = prepared.input;
+      else {
+        if (!unsupported) throw new Error('Preview source preparation is unavailable');
+        await prepareMaterializedVideos(params, state, stage, time, signal);
+        assertActive();
+        input = { ...input, videoRefs: { current: state.videoRefs } };
+      }
+    }
+    const drawn = await renderPreviewScene(input);
     if (drawn) completedOutput = drawn.output;
     assertActive();
     if (!drawn) throw new Error('Preview frame is unavailable.');
@@ -1018,7 +1067,11 @@ async function renderMaterializedFrame(
   } finally {
     let samplesReleased = false;
     try {
-      sampled?.release();
+      try {
+        prepared?.release();
+      } finally {
+        sampled?.release();
+      }
       samplesReleased = true;
     } finally {
       if (!handedOff || !samplesReleased) completedOutput?.release();
