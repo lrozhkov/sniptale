@@ -5,6 +5,7 @@
 
 [data-ui='editor.frame.padding-fields'] [data-padding-link] {
   border: 0;
+  background: transparent;
 }
 
 [data-ui='editor.frame.padding-fields']
