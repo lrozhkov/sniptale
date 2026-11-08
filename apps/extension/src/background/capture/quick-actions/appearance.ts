@@ -1,3 +1,4 @@
+import { ensurePublicHttpsHeadGuard } from '../../../platform/network/https-redirect-guard';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { DEFAULT_FULL_PAGE_QUALITY_POLICY } from '../../../contracts/full-page-capture';
 import type { CaptureImagePreparation } from '../application/ports';
@@ -34,10 +35,18 @@ async function renderHeader(input: QuickActionHeaderRasterInput): Promise<string
       (async () => {
         await ensureOffscreenDocument('Render a quick-action window header');
         await waitForOffscreenReady();
+        const faviconRedirectGuardReady =
+          input.faviconWebsite && input.header.faviconEnabled && !input.header.faviconDataUrl
+            ? await ensurePublicHttpsHeadGuard().then(
+                () => true,
+                () => false
+              )
+            : false;
         const response = await createRuntimeMessagingTransport().sendRuntimeMessage(
           attachOffscreenCommandCapability({
             type: MessageType.OFFSCREEN_QUICK_ACTION_HEADER,
             ...input,
+            faviconRedirectGuardReady,
           })
         );
         if (!response?.success)

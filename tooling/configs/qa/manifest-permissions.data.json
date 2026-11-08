@@ -69,13 +69,13 @@
     },
     {
       "name": "declarativeNetRequest",
-      "owner": "apps/extension/src/background/capture/routing/web-snapshot/redirect-network-guard.ts",
-      "feature": "Pre-network redirect destination blocking for anonymous Web Snapshot assets",
-      "runtimeRoute": "background Web Snapshot asset fetch owner",
-      "capabilityPolicy": "Session rules apply only to extension-initiated, tabless GET fetches and block HTTP or syntactically private/local destinations before network dispatch.",
-      "failureBehavior": "A redirect-enabled asset fetch fails before fetch when the blocking rules cannot be installed.",
-      "justification": "Preserves public HTTPS asset redirects while preventing an allowed public URL from redirecting an anonymous extension GET to an insecure or private/local literal destination.",
-      "reviewNote": "Keep rules extension-initiated, GET-only, fail-closed before fetch, and aligned with the canonical private-network URL validator.",
+      "owner": "apps/extension/src/platform/network/https-redirect-guard.ts",
+      "feature": "Pre-network redirect blocking for anonymous Web Snapshot GET and public HTTPS HEAD requests",
+      "runtimeRoute": "Shared platform guard factory; background Web Snapshot GET adapter and extension UI or background-installed offscreen HEAD resolver",
+      "capabilityPolicy": "Keep separate extension-initiated xmlhttprequest profiles: GET rules 640001..640018 require tabIds [-1]; HEAD rules 650001..650019 omit tabIds for extension UI and offscreen contexts. Both block HTTP and syntactically private/local destinations; HEAD also blocks URL userinfo.",
+      "failureBehavior": "Redirect following fails before fetch if its exact guard profile cannot be installed.",
+      "justification": "Preserves anonymous public HTTPS redirects without dispatching insecure or syntactically private/local hops. The HEAD profile resolves canonical URLs without downloading bodies.",
+      "reviewNote": "Retain the existing GET verb, tab scope and rule IDs. Keep HEAD anonymous, fail closed before fetch, and align both profiles with the canonical private-network URL validator. Do not add manifest grants.",
       "userFacingDisclosure": "settings.permissions.requiredDeclarativeNetRequestDescription"
     },
     {

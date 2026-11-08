@@ -1,3 +1,4 @@
+import { resolvePublicHttpsRedirect } from '../../platform/network/https-redirects';
 import { isPrivateNetworkHost } from '@sniptale/platform/security/private-network-host';
 import { rasterizeWindowHeaderIcon } from './icon-raster';
 
@@ -49,20 +50,34 @@ async function readBounded(response: Response, limit: number): Promise<Uint8Arra
   return result;
 }
 
-async function fetchPublic(url: URL, signal: AbortSignal): Promise<Response> {
-  const response = await fetch(url.href, {
+async function fetchPublic(
+  url: URL,
+  signal: AbortSignal,
+  ensureGuardInstalled?: () => Promise<void>
+): Promise<{ response: Response; url: URL }> {
+  const options = {
     signal,
-    credentials: 'omit',
-    redirect: 'error',
-    referrerPolicy: 'no-referrer',
-    cache: 'no-store',
-  });
+    credentials: 'omit' as const,
+    referrerPolicy: 'no-referrer' as const,
+    cache: 'no-store' as const,
+  };
+  let canonical = url;
+  let response = await fetch(url.href, { ...options, redirect: 'manual' });
+  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+    await response.body?.cancel();
+    canonical = await resolvePublicHttpsRedirect(url, signal, ensureGuardInstalled);
+    response = await fetch(canonical.href, { ...options, redirect: 'error' });
+  }
   if (!response.ok) throw new Error('Favicon request failed');
-  return response;
+  return { response, url: canonical };
 }
 
-async function rasterIcon(url: URL, signal: AbortSignal): Promise<string | null> {
-  const response = await fetchPublic(url, signal);
+async function rasterIcon(
+  url: URL,
+  signal: AbortSignal,
+  ensureGuardInstalled?: () => Promise<void>
+): Promise<string | null> {
+  const { response } = await fetchPublic(url, signal, ensureGuardInstalled);
   const mime = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
   if (
     !mime ||
@@ -79,22 +94,26 @@ async function rasterIcon(url: URL, signal: AbortSignal): Promise<string | null>
 /** Explicit opt-in acquisition only. The caller stores the returned raster in its project. */
 export async function acquireWindowHeaderFavicon(
   address: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  ensureGuardInstalled?: () => Promise<void>
 ): Promise<string | null> {
   const url = publicUrl(address.includes('://') ? address.trim() : `https://${address.trim()}`);
   if (!url) return null;
   const timeout = AbortSignal.timeout(10_000);
   const combined = AbortSignal.any([signal, timeout]);
   const candidates: URL[] = [];
+  let pageUrl = url;
   try {
-    const response = await fetchPublic(url, combined);
+    const resource = await fetchPublic(url, combined, ensureGuardInstalled);
+    const response = resource.response;
+    pageUrl = resource.url;
     if (response.headers.get('content-type')?.toLowerCase().startsWith('text/html')) {
       const html = new TextDecoder().decode(await readBounded(response, MAX_PAGE_BYTES));
       const document = new DOMParser().parseFromString(html, 'text/html');
       for (const link of document.querySelectorAll('link[href]')) {
         const rel = link.getAttribute('rel')?.toLowerCase().split(/\s+/) ?? [];
         if (!rel.includes('icon') && !rel.includes('apple-touch-icon')) continue;
-        const candidate = publicUrl(link.getAttribute('href') ?? '', url.href);
+        const candidate = publicUrl(link.getAttribute('href') ?? '', pageUrl.href);
         if (candidate && !candidates.some((item) => item.href === candidate.href))
           candidates.push(candidate);
         if (candidates.length === 4) break;
@@ -105,11 +124,11 @@ export async function acquireWindowHeaderFavicon(
   } catch {
     combined.throwIfAborted();
   }
-  const fallback = publicUrl('/favicon.ico', url.href);
+  const fallback = publicUrl('/favicon.ico', pageUrl.href);
   if (fallback) candidates.push(fallback);
   for (const candidate of candidates) {
     try {
-      const result = await rasterIcon(candidate, combined);
+      const result = await rasterIcon(candidate, combined, ensureGuardInstalled);
       if (result) return result;
     } catch {
       combined.throwIfAborted();

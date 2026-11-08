@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   ensure: vi.fn(),
   ready: vi.fn(),
+  guard: vi.fn(),
+}));
+vi.mock('../../../platform/network/https-redirect-guard', () => ({
+  ensurePublicHttpsHeadGuard: mocks.guard,
 }));
 vi.mock('./flow/surface', () => ({
   getQuickActionAppearanceSnapshot: mocks.snapshot,
@@ -344,3 +348,35 @@ it('retains the lossless full-page source when the final appearance exceeds its 
     admission.release();
   }
 });
+
+it.each([true, false])(
+  'dispatches header artwork after guard installation, including refusal: %s',
+  async (ready) => {
+    mocks.ensure.mockResolvedValue(undefined);
+    mocks.ready.mockResolvedValue(undefined);
+    if (ready) mocks.guard.mockResolvedValue(undefined);
+    else mocks.guard.mockRejectedValue(new Error('guard unavailable'));
+    mocks.send.mockResolvedValue({ success: true, dataUrl: 'header-raster' });
+    mocks.render.mockImplementation(async (options: QuickActionRasterOptions) =>
+      options.renderHeader({
+        header: { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true },
+        source: { width: 640, height: 480 },
+        faviconWebsite: 'https://example.test',
+      })
+    );
+    const admission = beginPageAppearance(1, 'tx');
+    try {
+      await expect(admission.prepare!('raw', 'capture.png')).resolves.toMatchObject({
+        dataUrl: 'header-raster',
+      });
+      expect(mocks.send).toHaveBeenCalledWith(
+        expect.objectContaining({ faviconRedirectGuardReady: ready })
+      );
+      expect(mocks.guard.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.send.mock.invocationCallOrder[0]!
+      );
+    } finally {
+      admission.release();
+    }
+  }
+);

@@ -148,6 +148,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/platform/i18n`
 - `apps/extension/src/platform/media-utils`
 - `apps/extension/src/platform/navigation`
+- `apps/extension/src/platform/network`
 - `apps/extension/src/platform/runtime-messaging`
 - `apps/extension/src/platform/security-e2e-control`
 - `apps/extension/src/ui/action-audio`

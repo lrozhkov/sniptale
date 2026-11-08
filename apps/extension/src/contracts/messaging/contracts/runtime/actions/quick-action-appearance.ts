@@ -32,7 +32,10 @@ export const runtimeQuickActionAppearanceContracts = {
             header: (header) => parseWindowHeader(header) !== null,
             source: isSource,
           },
-          optional: { faviconWebsite: (address) => isString(address) && address.length <= 2048 },
+          optional: {
+            faviconWebsite: (address) => isString(address) && address.length <= 2048,
+            faviconRedirectGuardReady: (ready) => typeof ready === 'boolean',
+          },
         });
         if (!guard(value)) return false;
         const header = parseWindowHeader(value.header)!;

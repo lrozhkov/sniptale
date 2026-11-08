@@ -200,3 +200,53 @@ it('clears a file source explicitly through the image partial-patch adapter', as
     act(() => root.unmount());
   }
 });
+
+it('uses metadata-seeded header values on first enable and retains them through Off/on', async () => {
+  const initial = {
+    ...DEFAULT_BROWSER_FRAME_STATE,
+    enabled: false,
+    title: 'Captured page title',
+    url: 'https://capture.example.test/page',
+  };
+  useEditorStore.setState({ browserFrame: initial, sessionId: 'metadata-page' });
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const writes = vi.fn();
+  function Harness() {
+    const [frame, setFrame] = useState<BrowserFrameState>(initial);
+    return (
+      <EditorWindowHeaderSettings
+        browserFrame={frame}
+        syncBrowserFrame={(patch) => {
+          const next = { ...frame, ...patch };
+          writes(patch);
+          setFrame(next);
+          useEditorStore.setState({ browserFrame: next });
+        }}
+      />
+    );
+  }
+  const kind = (key: 'windowHeader.browser' | 'windowHeader.none') =>
+    [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === translate(key)
+    );
+  try {
+    await act(async () => root.render(<Harness />));
+    await act(async () => kind('windowHeader.browser')!.click());
+    expect(writes).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true, title: initial.title, url: initial.url })
+    );
+    expect(
+      [...container.querySelectorAll<HTMLInputElement>('input:not([type="file"])')].map(
+        (input) => input.value
+      )
+    ).toEqual([initial.title, initial.url]);
+    await act(async () => kind('windowHeader.none')!.click());
+    await act(async () => kind('windowHeader.browser')!.click());
+    expect(writes).toHaveBeenLastCalledWith(
+      expect.objectContaining({ title: initial.title, url: initial.url })
+    );
+  } finally {
+    act(() => root.unmount());
+  }
+});

@@ -33,6 +33,7 @@ export function EditorWindowHeaderSettings(props: {
         </EditorInspectorDetails>
       )}
       header={hasHeader ? resolveEditorWindowHeader(props.browserFrame) : undefined}
+      rememberedHeader={resolveEditorWindowHeader(props.browserFrame)}
       onChange={(header) =>
         props.syncBrowserFrame(
           header

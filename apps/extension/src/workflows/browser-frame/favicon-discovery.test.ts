@@ -29,3 +29,35 @@ it('discovers public icon links relative to the site and rejects private or acti
     'https://example.test/favicon.ico',
   ]);
 });
+
+it('resolves a redirected page and discovers relative icons from its final URL', async () => {
+  vi.stubGlobal('chrome', {
+    runtime: { id: 'favicon-proof' },
+    declarativeNetRequest: { updateSessionRules: vi.fn(async () => undefined) },
+  });
+  const canonical = 'https://canonical.example.test/portal/';
+  const page = new Response('<link rel="icon" href="brand.png">', {
+    headers: { 'content-type': 'text/html' },
+  });
+  Object.defineProperty(page, 'url', { value: canonical });
+  const fetch = vi.fn(async (address: string, options?: RequestInit) => {
+    if (address === 'https://example.test/' && options?.method === 'HEAD') {
+      const head = new Response(null);
+      Object.defineProperty(head, 'url', { value: canonical });
+      return head;
+    }
+    if (address === 'https://example.test/') return new Response(null, { status: 302 });
+    if (address === canonical) return page;
+    return new Response(null, { status: 404 });
+  });
+  vi.stubGlobal('fetch', fetch);
+  await acquireWindowHeaderFavicon('example.test', new AbortController().signal);
+  expect(fetch).toHaveBeenCalledWith(
+    'https://canonical.example.test/portal/brand.png',
+    expect.anything()
+  );
+  expect(fetch).toHaveBeenCalledWith(
+    'https://canonical.example.test/favicon.ico',
+    expect.anything()
+  );
+});

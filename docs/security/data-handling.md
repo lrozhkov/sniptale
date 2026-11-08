@@ -266,7 +266,9 @@ Quick-action presets can retain explicitly configured static text, website addre
 
 Settings transfer removes embedded background and icon bytes. The projected preset disables the removed image or icon and retains its other controls. Import refuses embedded artwork before storage admission. Preset artwork and text do not enter sync, diagnostics, or automatic exports.
 
-Favicon acquisition requires the configured option and an invoked capture. It uses the existing bounded anonymous public HTTPS policy with no redirects. Opening the Settings form does not fetch a favicon. Missing page data is omitted. Desktop decoration does not read a web page. Rendering checks encoded input, dimensions, and the combined raster budget before bitmap or canvas allocation.
+Favicon acquisition requires an explicit editor request or the configured option during capture. Requests omit credentials and use bounded public HTTPS resources. GET requests do not follow redirects. A guarded HEAD request can resolve a canonical public HTTPS address before the final GET request. The background installs the network guard before it dispatches favicon work to offscreen.
+
+Opening the Settings form does not fetch a favicon. Missing page data is omitted. Desktop decoration does not read a web page. Rendering checks encoded input, dimensions, and the combined raster budget before bitmap or canvas allocation.
 
 ## Experimental sync capture retention
 
