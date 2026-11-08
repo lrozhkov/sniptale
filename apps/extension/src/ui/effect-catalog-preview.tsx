@@ -31,7 +31,12 @@ export function EffectCatalogPreviewProvider({ children }: { children: ReactNode
             );
             if (!active) return;
             lastFrameAt = performance.now();
-            await task(() => (executor ??= createEffectRuntimeSandboxExecutor()));
+            await task(
+              () =>
+                (executor ??= createEffectRuntimeSandboxExecutor({
+                  compositionBackend: 'gpu-preview',
+                }))
+            );
           })
           .catch(() => undefined);
       },

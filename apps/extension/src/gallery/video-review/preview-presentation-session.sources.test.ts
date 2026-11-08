@@ -114,7 +114,11 @@ function sourceSession(createProvider?: () => PreviewSourceProvider) {
     sourceTime: 1.25,
   };
   const session = createManualPresentationOwner(
-    () => ({ input, cut: { read: () => null, retry: vi.fn(), current: null }, placement: null }),
+    () => ({
+      input,
+      cut: { plans: [], blend: null, read: () => null, retry: vi.fn(), current: null },
+      placement: null,
+    }),
     vi.fn(),
     vi.fn(),
     vi.fn()

@@ -11,6 +11,7 @@ import type {
   EffectRuntimeRenderCommand,
 } from '../contracts/effect-runtime/types';
 const mocks = vi.hoisted(() => ({
+  create: vi.fn(),
   render: vi.fn(),
   dispose: vi.fn(),
   load: vi.fn().mockResolvedValue(null),
@@ -20,13 +21,17 @@ vi.mock('../composition/persistence/video-preview-cache/effect-posters', () => (
 }));
 vi.mock('../workflows/video/effect-runtime-sandbox', async (original) => ({
   ...(await original<typeof import('../workflows/video/effect-runtime-sandbox')>()),
-  createEffectRuntimeSandboxExecutor: () => ({ renderFrame: mocks.render, dispose: mocks.dispose }),
+  createEffectRuntimeSandboxExecutor: (options: unknown) => {
+    mocks.create(options);
+    return { renderFrame: mocks.render, dispose: mocks.dispose };
+  },
 }));
 import { EffectCatalogPreview, EffectCatalogPreviewProvider } from './effect-catalog-preview';
 
 it.each([false, true])(
   'uses canonical sandbox identity and closes late frames (controlled=%s)',
   async (controlled) => {
+    mocks.create.mockClear();
     mocks.render.mockClear();
     mocks.dispose.mockClear();
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -68,6 +73,7 @@ it.each([false, true])(
       );
       await act(async () => observers.forEach((invoke) => invoke()));
       await vi.waitFor(() => expect(mocks.render).toHaveBeenCalledOnce());
+      expect(mocks.create).toHaveBeenCalledExactlyOnceWith({ compositionBackend: 'gpu-preview' });
       const command: EffectRuntimeRenderCommand = mocks.render.mock.calls[0]![0];
       expect(command.snapshotId).toBe(`effect:${entry.sha256}`);
       expect(command.documentRef.id).toBe(entry.sha256);
