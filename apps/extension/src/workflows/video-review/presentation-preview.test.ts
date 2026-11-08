@@ -80,6 +80,7 @@ it('uses the original late sequence lattice and a bounded unpublished writer', a
     write: async (args, preview) => {
       expect(args.file).toBe(input.file);
       expect(args.provenance).toBeUndefined();
+      expect(preview!.renderer).toBe('gpu');
       expect(preview!.window.startUs).toBeGreaterThan(3590_000_000);
       expect(preview!.window.endUs - preview!.window.startUs).toBeLessThanOrEqual(4_000_000);
       await args.writer.writeAt(0, new Blob(['clip']));

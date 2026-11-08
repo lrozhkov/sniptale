@@ -48,6 +48,7 @@ import { QuickEditExportUnavailable } from './export-unavailable';
 import { reviewExportPhase, cleanupReviewExportFailure } from './export-diagnostics';
 
 interface PresentationExportPreview {
+  renderer?: import('../../features/video/preview/preferences').VideoPreviewRenderer;
   window: import('../../features/video/review/presentation-preview').PresentationPreviewWindow;
   backing: { width: number; height: number };
 }
@@ -262,6 +263,7 @@ function createRenderer(
   return createReviewPresentationRenderer({
     plan: prepared.plan,
     settings: prepared.settings,
+    renderer: preview?.renderer ?? 'legacy',
     main: {
       ...(exportEnhancer ? { exportEnhancer } : {}),
       *plannedCandidates() {

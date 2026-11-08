@@ -1,3 +1,6 @@
+import { createPresentationGpu } from './presentation-gpu';
+import { resolveMediaFitFrame } from '../../features/video/project/window-geometry';
+import type { GpuPreviewLayer } from '../../features/video/composition/canvas/gpu-preview';
 import { drawCompositionColorOverlay } from '../../features/video/composition/canvas/scene-edges';
 import { createCompositionJoinEndpoints } from '../../features/video/composition/canvas/join-endpoints';
 import { evaluateCompositionJoin } from '../../features/video/project/scene/composition-join';
@@ -31,6 +34,7 @@ type Watermark = Awaited<ReturnType<typeof createWatermarkRenderer>>;
 /** Frozen planner output and the matching main composition snapshot. */
 export interface ReviewPresentationRendererInput {
   plan: PresentationSequencePlan;
+  renderer?: import('../../features/video/preview/preferences').VideoPreviewRenderer;
   settings: QuickEditPresentationSettings;
   main: ReviewPresentationMainInput;
 }
@@ -107,6 +111,8 @@ class PresentationRenderer {
     outro: null,
   };
   private readonly controller = new AbortController();
+  // Child canvases can remain borrowed after their render completes, until the outer GPU fence.
+  private readonly children = new AbortController();
   private readonly owned: { dispose(): void }[] = [];
   private readonly resources;
   private readonly holdTime: number;
@@ -117,11 +123,13 @@ class PresentationRenderer {
   private readonly joinEndpoints;
   private disposed = false;
   private busy = false;
+  private readonly gpu;
 
   constructor(
     private readonly args: ReviewPresentationRendererInput,
     private readonly plan: PresentationSequencePlan
   ) {
+    this.gpu = args.renderer === 'gpu' ? createPresentationGpu() : null;
     const { backing } = args.main.dimensions;
     this.resources = createPreviewRenderResources({
       maximumCanvases: plan.joins?.length ? 4 : 1,
@@ -131,6 +139,19 @@ class PresentationRenderer {
       resources: this.resources,
       size: backing,
       renderSample: (tick) => this.sampleEndpoint(tick),
+      compose: async ({ context, outgoing, incoming, incomingWeight, signal }) =>
+        (await this.gpu?.render({
+          output: backing,
+          context,
+          signal,
+          prepare: () => ({
+            layers: [
+              { ...this.layer(outgoing), opacity: 1 - incomingWeight },
+              { ...this.layer(incoming), opacity: incomingWeight, blend: 'add' },
+            ],
+            release() {},
+          }),
+        })) ?? false,
     });
     this.holdTime = presentationMainHoldTime(plan);
     args.main.signal.addEventListener('abort', this.dispose, { once: true });
@@ -153,8 +174,14 @@ class PresentationRenderer {
 
   async open() {
     this.assertLive();
-    const signal = this.controller.signal;
-    this.main = this.adopt(await createReviewPresentationMain({ ...this.args.main, signal }));
+    const signal = this.children.signal;
+    this.main = this.adopt(
+      await createReviewPresentationMain({
+        ...this.args.main,
+        renderer: this.args.renderer ?? 'legacy',
+        signal,
+      })
+    );
     this.audioTracks.main = this.main.audioTrack;
     for (const name of ['intro', 'outro'] as const) {
       if (!this.plan.segments.some((segment) => segment.name === name)) continue;
@@ -197,10 +224,35 @@ class PresentationRenderer {
         output = await this.dissolve(selected.join, selected.blend.incoming);
       else {
         output = await this.renderContent(candidate);
-        if (selected) this.drawColor(output.context, selected.blend.black, selected.join.color);
       }
       this.assertLive();
-      this.drawFade(output.context, candidate.timestampUs);
+      const colors = [
+        ...(selected && selected.join.type !== 'dissolve'
+          ? [{ opacity: selected.blend.black, color: selected.join.color ?? '#000000' }]
+          : []),
+        {
+          opacity: presentationColorOpacity(this.plan, candidate.timestampUs),
+          color: presentationColor(this.plan, candidate.timestampUs),
+        },
+      ].filter((color) => color.opacity > 0);
+      if (colors.length) {
+        const content = output;
+        const rendered = await this.gpu?.render({
+          output: this.args.main.dimensions.backing,
+          context: content.context,
+          signal: this.controller.signal,
+          prepare: (primitives) => ({
+            layers: [
+              this.layer(content.canvas),
+              ...colors.map((color) => primitives.color(color.color, color.opacity)),
+            ],
+            release() {},
+          }),
+        });
+        this.assertLive();
+        if (!rendered)
+          for (const color of colors) this.drawColor(content.context, color.opacity, color.color);
+      }
       const held = output;
       let released = false;
       const lease: RenderCanvasLease = {
@@ -221,6 +273,7 @@ class PresentationRenderer {
       throw error;
     } finally {
       this.busy = false;
+      if (this.disposed) this.retire();
     }
   }
 
@@ -241,8 +294,48 @@ class PresentationRenderer {
     try {
       this.assertLive();
       output = this.resources.canvas('presentation-bookend', this.args.main.dimensions.backing);
-      frame.draw(output.context);
-      this.drawWatermark(output.context);
+      const target = output;
+      const slot = this.args.settings[candidate.segment];
+      if (slot.mode === 'none') throw new Error('Missing bookend placement');
+      const framing = slot.mode === 'image' ? slot.image : slot.video;
+      const source = slot.mode === 'image' ? slot.image : slot.video.source;
+      const fit = resolveMediaFitFrame({
+        source,
+        output: this.args.main.dimensions.backing,
+        fit: framing.fit,
+        crop: framing.crop,
+      });
+      const rendered = await this.gpu?.render({
+        output: this.args.main.dimensions.backing,
+        context: target.context,
+        signal: this.controller.signal,
+        prepare: (primitives) => {
+          const bitmap = frame.snapshot();
+          try {
+            return {
+              layers: [
+                primitives.color(framing.fillColor, 1),
+                {
+                  ...this.layer(bitmap),
+                  rect: { x: fit.x, y: fit.y, width: fit.width, height: fit.height },
+                },
+                ...(this.watermark
+                  ? [primitives.raster((context) => this.drawWatermark(context))]
+                  : []),
+              ],
+              release: () => bitmap.close(),
+            };
+          } catch (error) {
+            bitmap.close();
+            throw error;
+          }
+        },
+      });
+      this.assertLive();
+      if (!rendered) {
+        frame.draw(target.context);
+        this.drawWatermark(target.context);
+      }
       return output;
     } catch (error) {
       output?.release();
@@ -303,12 +396,12 @@ class PresentationRenderer {
     }
   }
 
-  private drawFade(context: CanvasRenderingContext2D, timestampUs: number) {
-    this.drawColor(
-      context,
-      presentationColorOpacity(this.plan, timestampUs),
-      presentationColor(this.plan, timestampUs)
-    );
+  private layer(source: GpuPreviewLayer['source']): GpuPreviewLayer {
+    return {
+      source,
+      rect: { x: 0, y: 0, ...this.args.main.dimensions.backing },
+      inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    };
   }
 
   private drawColor(context: CanvasRenderingContext2D, alpha: number, color: string) {
@@ -326,10 +419,16 @@ class PresentationRenderer {
     this.disposed = true;
     this.args.main.signal.removeEventListener('abort', this.dispose);
     this.controller.abort();
+    if (!this.busy) this.retire();
+  };
+
+  private retire() {
+    this.children.abort();
+    this.gpu?.dispose();
     this.front?.release();
     this.front = null;
     this.joinEndpoints.dispose();
     for (const owner of this.owned.splice(0).reverse()) owner.dispose();
     this.resources.dispose();
-  };
+  }
 }

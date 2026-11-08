@@ -25,6 +25,16 @@ const io = vi.hoisted(() => ({
   watermarkDispose: vi.fn(),
   frameRelease: vi.fn(),
   outputRelease: vi.fn(),
+  gpuRender: vi.fn(),
+  gpuDispose: vi.fn(),
+  gpuCreate: vi.fn(),
+}));
+
+vi.mock('./presentation-gpu', () => ({
+  createPresentationGpu: () => {
+    io.gpuCreate();
+    return { render: io.gpuRender, dispose: io.gpuDispose };
+  },
 }));
 vi.mock('./presentation-main', () => ({ createReviewPresentationMain: io.main }));
 vi.mock('./presentation-media', () => ({ createReviewPresentationMedia: io.media }));
@@ -201,6 +211,7 @@ async function open(args = fixture()) {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  io.gpuRender.mockResolvedValue(false);
   io.render.mockImplementation(async () => canvasLease());
   io.main.mockImplementation(async () => ({
     render: io.render,
@@ -587,3 +598,118 @@ it.each([
     }
   }
 );
+
+it('keeps legacy free of GPU initialization and forwards GPU only to the selected main renderer', async () => {
+  const legacy = await open(fixture(false));
+  expect(io.gpuCreate).not.toHaveBeenCalled();
+  expect(io.main.mock.calls[0]![0].renderer).toBe('legacy');
+  legacy.dispose();
+  await open({ ...fixture(false), renderer: 'gpu' });
+  expect(io.gpuCreate).toHaveBeenCalledOnce();
+  expect(io.main.mock.calls[1]![0].renderer).toBe('gpu');
+});
+
+it.each(['dissolve', 'fade-black'] as const)(
+  'routes GPU bookends, watermark, %s and final fades through complete layer plans',
+  async (type) => {
+    const args = fixture();
+    args.renderer = 'gpu';
+    args.settings.introTransition = { type, before: 0.25, after: 0.25, color: '#ffffff' };
+    const planned = planReviewPresentationSequence({
+      settings: args.settings,
+      mainDuration: 1,
+      fragmentOffset: 7,
+      includeBookends: true,
+      rate: args.plan.rate,
+    });
+    if (!planned.ok) throw new Error('Invalid fixture');
+    args.plan = planned.plan;
+    const snapshot = { close: vi.fn() };
+    const draw = vi.fn();
+    io.frame.mockImplementation(async () => ({
+      draw,
+      snapshot: () => snapshot,
+      release: io.frameRelease,
+    }));
+    const layers: unknown[][] = [];
+    io.gpuRender.mockImplementation(async (request) => {
+      const prepared = request.prepare({
+        color: (color: string, opacity: number) => ({ color, opacity }),
+        raster: () => ({ watermark: true }),
+      });
+      layers.push(prepared.layers);
+      prepared.release();
+      return true;
+    });
+    const owner = await open(args);
+    for (const candidate of iteratePresentationCandidates(args.plan)) {
+      const frame = await owner.render(candidate);
+      frame.release();
+    }
+    expect(draw).not.toHaveBeenCalled();
+    expect(snapshot.close).toHaveBeenCalled();
+    expect(layers.some((plan) => plan.some((layer) => 'watermark' in Object(layer)))).toBe(true);
+    expect(
+      layers.some((plan) =>
+        plan.some(
+          (layer) => String(Object(layer).color).startsWith('#000000') && Object(layer).opacity > 0
+        )
+      )
+    ).toBe(true);
+    if (type === 'dissolve') {
+      const join = layers.find((plan) => Object(plan[1]).blend === 'add')!;
+      expect(join).toHaveLength(2);
+      expect(Object(join[0]).opacity + Object(join[1]).opacity).toBe(1);
+    } else
+      expect(layers.some((plan) => plan.some((layer) => Object(layer).color === '#ffffff'))).toBe(
+        true
+      );
+  }
+);
+
+it('retains completed content and all owners until a canceled GPU overlay settles', async () => {
+  const args = { ...fixture(false), renderer: 'gpu' as const };
+  io.main.mockImplementationOnce(async ({ signal }) => {
+    let disposed = false;
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      io.mainDispose();
+    };
+    signal.addEventListener('abort', dispose, { once: true });
+    return { render: io.render, audioTrack: null, dispose };
+  });
+  let complete!: (value: boolean) => void;
+  io.gpuRender.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      })
+  );
+  const owner = await open(args);
+  const pending = owner.render([...iteratePresentationCandidates(args.plan)][0]!);
+  await vi.waitFor(() => expect(io.gpuRender).toHaveBeenCalledOnce());
+  owner.dispose();
+  expect(io.outputRelease).not.toHaveBeenCalled();
+  expect(io.mainDispose).not.toHaveBeenCalled();
+  expect(io.gpuDispose).not.toHaveBeenCalled();
+  complete(true);
+  await expect(pending).rejects.toThrow();
+  expect(io.outputRelease).toHaveBeenCalledOnce();
+  expect(io.mainDispose).toHaveBeenCalledOnce();
+  expect(io.gpuDispose).toHaveBeenCalledOnce();
+});
+
+it('retries a GPU-selected bookend through legacy without snapshotting when hardware is unavailable', async () => {
+  const args = { ...fixture(), renderer: 'gpu' as const };
+  const draw = vi.fn();
+  const snapshot = vi.fn();
+  io.frame.mockResolvedValueOnce({ draw, snapshot, release: io.frameRelease });
+  const owner = await open(args);
+  const output = await owner.render([...iteratePresentationCandidates(args.plan)][0]!);
+  expect(io.gpuRender).toHaveBeenCalled();
+  expect(snapshot).not.toHaveBeenCalled();
+  expect(draw).toHaveBeenCalledOnce();
+  expect(io.frameRelease).toHaveBeenCalledOnce();
+  output.release();
+});

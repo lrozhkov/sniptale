@@ -134,8 +134,8 @@ vi.mock('./render-preview', async (importOriginal) => {
                 maximumManagedBytes: graph.maximumManagedBytes + io.retainedSpatialBytes,
               });
             },
-            render: (_prepared: unknown, frame: unknown) => {
-              io.render(frame);
+            render: async (_prepared: unknown, frame: unknown) => {
+              await io.render(frame);
               return args.resources.canvas('publication', { width: 64, height: 36 });
             },
             dispose: vi.fn(),
@@ -733,3 +733,40 @@ it.each(['long-leading-gap', 'outside-retained-interval'] as const)(
     expect(io.samples).toEqual([]);
   }
 );
+
+it('borrows an owned GPU source clone with SDK orientation until render settlement', async () => {
+  const raw = { close: vi.fn() };
+  const source = {
+    timestamp: 0,
+    draw: vi.fn(),
+    close: vi.fn(),
+    allocationSize: () => 4096,
+    toVideoFrame: vi.fn(() => raw),
+    rotation: 90,
+    flip: true,
+  };
+  io.sample.mockResolvedValueOnce(source);
+  let complete!: () => void;
+  io.render.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        complete = resolve;
+      })
+  );
+  const args = { ...fixture(), renderer: 'gpu' as const };
+  const owner = await open(args);
+  const pending = owner.renderAtTime(0);
+  await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
+  const frame = io.render.mock.calls[0]![0];
+  expect(frame.source.videoFrame()).toBe(raw);
+  expect(frame.source.orientation).toEqual({ rotation: 90, flip: true });
+  owner.dispose();
+  expect(raw.close).not.toHaveBeenCalled();
+  expect(source.close).not.toHaveBeenCalled();
+  expect(io.inputs[0]!.dispose).not.toHaveBeenCalled();
+  complete();
+  await expect(pending).rejects.toThrow();
+  expect(raw.close).toHaveBeenCalledOnce();
+  expect(source.close).toHaveBeenCalledOnce();
+  expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+});

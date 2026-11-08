@@ -29,6 +29,7 @@ type Camera = Awaited<ReturnType<typeof createReviewWebcamRenderer>>;
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 
 export interface ReviewPresentationMainInput {
+  renderer?: import('../../features/video/preview/preferences').VideoPreviewRenderer;
   exportEnhancer?: ExportEnhancer;
   recordingHistory?: ReviewRecordingRenderSource;
   file: Blob;
@@ -112,6 +113,7 @@ class PresentationMain {
     this.input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
     this.renderer = createReviewPreviewRenderer({
       resources: this.resources,
+      renderer: args.renderer ?? 'legacy',
       ...(args.exportEnhancer ? { exportEnhancer: args.exportEnhancer } : {}),
       readAsset: args.readAsset,
       allocation: {
@@ -345,6 +347,7 @@ class PresentationMain {
     const transition = createReviewTransitionFrames(this.transitionSink!, signal);
     const cameraFrames = this.camera?.sourceFrames([this.sourceTime]);
     let source: Awaited<ReturnType<SampleSink['getSample']>> = null;
+    let raw: VideoFrame | undefined;
     let prepared: Awaited<ReturnType<Renderer['prepare']>> | undefined;
     try {
       signal.throwIfAborted();
@@ -382,6 +385,7 @@ class PresentationMain {
       this.transitionBytes = endpoints
         ? [endpoints.left.allocationSize!(), endpoints.right.allocationSize!()]
         : null;
+      if (this.args.renderer === 'gpu' && !this.args.exportEnhancer) raw = source.toVideoFrame();
       const frame: Frame = {
         ...(this.args.exportEnhancer ? { exportEnhancer: this.args.exportEnhancer } : {}),
         ...(this.args.recordingHistory ? { recordingHistory: this.args.recordingHistory } : {}),
@@ -393,6 +397,12 @@ class PresentationMain {
           timestamp: source.timestamp,
           backing: this.scene!.source,
           draw: source.draw.bind(source),
+          ...(raw
+            ? {
+                videoFrame: () => raw!,
+                orientation: { rotation: source.rotation, flip: source.flip },
+              }
+            : {}),
         },
         ...(camera
           ? {
@@ -432,6 +442,7 @@ class PresentationMain {
         },
       };
     } finally {
+      raw?.close();
       source?.close();
       transition.dispose();
       try {
@@ -441,6 +452,7 @@ class PresentationMain {
         prepared?.release();
         this.sourceBytes = this.cameraBytes = this.transitionBytes = null;
         this.busy = false;
+        if (this.disposed) this.retire();
         signal.throwIfAborted();
       }
     }
@@ -451,6 +463,10 @@ class PresentationMain {
     this.disposed = true;
     this.args.signal.removeEventListener('abort', this.dispose);
     this.controller.abort();
+    if (!this.busy) this.retire();
+  };
+
+  private retire() {
     this.camera?.dispose();
     this.front?.release();
     this.front = null;
@@ -460,5 +476,5 @@ class PresentationMain {
     // Input disposal above terminates native decoding; pending iterator cleanup can reject on abort.
     void this.decoder?.dispose().catch(() => undefined);
     this.decoder = null;
-  };
+  }
 }
