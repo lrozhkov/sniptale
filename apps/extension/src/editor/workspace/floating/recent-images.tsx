@@ -6,13 +6,11 @@ import { translate } from '../../../platform/i18n';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 import { useEditorStartItems, type EditorStartItem } from '../../../ui/editor-start';
 import { EditorStartThumbnail } from '../../../ui/editor-start/thumbnail';
+import { openRecentEditorImage } from '../../workflows/switch-image';
+import { useEditorOpenStatus } from '../../runtime/open-status';
 import { useEditorController } from '../../application/controller-context';
 import { useEditorStore } from '../../state/useEditorStore';
-import {
-  listRecentEditorImages,
-  readRecentEditorThumbnail,
-  openRecentEditorImage,
-} from '../../workflows/recent-images';
+import { listRecentEditorImages, readRecentEditorThumbnail } from '../../workflows/recent-images';
 
 function RecentImageRow(props: {
   item: EditorStartItem;
@@ -107,6 +105,7 @@ function useRecentImagePicker(
     readRecentEditorThumbnail
   );
   const controller = useEditorController();
+  const openStatus = useEditorOpenStatus();
   const currentId = useEditorStore((state) => state.sessionId);
   const pendingRef = useRef(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -124,11 +123,14 @@ function useRecentImagePicker(
     setPendingId(id);
     setFailed(false);
     try {
-      await openRecentEditorImage({
-        id,
-        controller,
-        isActive: () => root.current?.isConnected === true,
-      });
+      const action = () =>
+        openRecentEditorImage({
+          id,
+          controller,
+          isActive: () => root.current?.isConnected === true,
+        });
+      if (openStatus) await openStatus.runSwitch(action);
+      else await action();
       if (!root.current) return;
       onClose(false);
     } catch {

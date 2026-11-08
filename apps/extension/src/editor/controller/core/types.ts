@@ -32,7 +32,12 @@ export interface ApplyDocumentOptions {
   preserveViewport?: boolean;
 }
 
-export interface OpenImageOptions {
+export interface EditorDocumentOpenOptions {
+  /** Keep the selected inspector during an in-place project switch. */
+  preserveInspector?: boolean;
+}
+
+export interface OpenImageOptions extends EditorDocumentOpenOptions {
   browserFrameUrl?: string;
   pageTitle?: string;
   sourceFaviconUrl?: string | null;

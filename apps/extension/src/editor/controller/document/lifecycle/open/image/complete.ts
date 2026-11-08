@@ -8,6 +8,7 @@ export function completeOpenedEditorDocument(options: {
   document: EditorDocument;
   faviconDataUrl?: string | null;
   pageTitle: string;
+  preserveInspector?: boolean;
   scheduleZoomToFit: () => void;
 }): void {
   traceEditorImageDocumentApplied(options.document);
@@ -17,5 +18,6 @@ export function completeOpenedEditorDocument(options: {
     dataUrl: options.dataUrl,
     faviconDataUrl: options.faviconDataUrl ?? null,
     pageTitle: options.pageTitle,
+    ...(options.preserveInspector ? { preserveInspector: true } : {}),
   });
 }

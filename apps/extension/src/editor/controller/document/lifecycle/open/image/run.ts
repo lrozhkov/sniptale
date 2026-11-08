@@ -36,6 +36,7 @@ export async function openEditorControllerImage(
     document,
     faviconDataUrl,
     pageTitle: context.pageTitle,
+    ...(options.openOptions.preserveInspector ? { preserveInspector: true } : {}),
     scheduleZoomToFit: options.scheduleZoomToFit,
   });
 }

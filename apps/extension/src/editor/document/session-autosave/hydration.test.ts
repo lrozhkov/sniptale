@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 import { describe, expect, it, vi } from 'vitest';
-import { activate, createDocument, commitWorkspaceMock } from './autosave.test-support';
+import {
+  activate,
+  createDocument,
+  commitWorkspaceMock,
+  getWorkspaceMock,
+} from './autosave.test-support';
 
 describe('image document hydration ownership', () => {
   it('rejects a queued explicit capture across same-root hydration even after it finishes', async () => {
@@ -116,4 +121,50 @@ describe('image document hydration ownership', () => {
     expect(commitWorkspaceMock).toHaveBeenCalledOnce();
     autosave.dispose();
   });
+});
+
+it('adopts prepared resource ownership only on commit and preserves disabled autosave mode', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  const releaseSource = vi.fn();
+  const releaseTarget = vi.fn();
+  getWorkspaceMock.mockResolvedValueOnce({
+    aggregateId: 'source',
+    revision: 2,
+    document: createDocument('source'),
+    createdAt: 1,
+    updatedAt: 2,
+    sourceUrl: '',
+    sourceTitle: 'Source',
+    releaseDocumentAssets: releaseSource,
+  });
+  await autosave.restoreDraft('source');
+  autosave.setEnabled(false);
+  const hydration = autosave.beginHydration(() => true);
+  expect(releaseSource).not.toHaveBeenCalled();
+  const map = new Map();
+  autosave.adoptPreparedDocument({
+    aggregateId: 'target',
+    revision: 7,
+    sourceUrl: '',
+    sourceTitle: 'Target',
+    documentAssetsByRuntimeUrl: map,
+    releaseDocumentAssets: releaseTarget,
+  });
+  expect(releaseSource).toHaveBeenCalledOnce();
+  expect(releaseTarget).not.toHaveBeenCalled();
+  expect(autosave.isEnabled()).toBe(false);
+  expect(autosave.getDurableRevision()).toBe(7);
+  hydration.finish(true);
+  await autosave.saveNow(() => createDocument('target edit'));
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      aggregateId: 'target',
+      expectedRevision: 7,
+      reusableAssetsByRuntimeUrl: map,
+    })
+  );
+  autosave.dispose();
+  expect(releaseTarget).toHaveBeenCalledOnce();
 });

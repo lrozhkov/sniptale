@@ -76,6 +76,7 @@ export function EditorPageLayout(props: {
   return (
     <div
       data-ui="editor.page.root"
+      aria-busy={props.openStatus === 'switching'}
       className={EDITOR_PAGE_ROOT_CLASS_NAME}
       onContextMenuCapture={handleEditorPageContextMenuCapture}
     >
@@ -85,6 +86,7 @@ export function EditorPageLayout(props: {
         }`}
         aria-hidden={!props.hasImage && Boolean(props.startPage)}
         data-ui="editor.canvas.layer"
+        inert={props.openStatus === 'switching'}
       >
         <CanvasWrapper hasImage={props.hasImage} />
       </div>
@@ -93,6 +95,7 @@ export function EditorPageLayout(props: {
           props.hasImage || !props.startPage ? 'contents' : 'invisible pointer-events-none'
         }
         aria-hidden={!props.hasImage && Boolean(props.startPage)}
+        inert={props.openStatus === 'switching'}
       >
         <EditorFloatingWorkspace hasImage={props.hasImage} />
       </div>
@@ -104,6 +107,22 @@ export function EditorPageLayout(props: {
       {!props.hasImage && props.startPage && props.openStatus !== 'loading' ? (
         <div className="absolute inset-0 z-40" data-ui="editor.page.start">
           {props.startPage}
+        </div>
+      ) : null}
+      {props.openStatus === 'switching' ? (
+        <div
+          className="absolute inset-0 z-[60] grid cursor-progress place-items-center"
+          data-ui="editor.page.switch-loading"
+          role="status"
+          aria-live="polite"
+        >
+          <div className={editorOpenLoadingCardClassName}>
+            <LoaderCircle
+              aria-hidden="true"
+              className="size-5 animate-spin motion-reduce:animate-none"
+            />
+            <span>{translate('editor.page.loadingImage')}</span>
+          </div>
         </div>
       ) : null}
       {props.openStatus === 'loading' ? (

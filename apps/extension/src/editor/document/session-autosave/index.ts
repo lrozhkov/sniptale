@@ -2,6 +2,8 @@ import type { ImageWorkspaceEntry } from '../../../composition/persistence/image
 import type { EditorDocument } from '../../../features/editor/document/types';
 import {
   activateAutosaveContext,
+  adoptPreparedAutosaveDocument,
+  type PreparedEditorSessionDocument,
   discardAutosaveDraft,
   disposeAutosaveState,
   rebindAutosaveAggregate,
@@ -40,6 +42,8 @@ export interface EditorSessionAutosaveService {
   };
   rebindAggregate: (context: ActiveEditorSessionContext) => void;
   updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>) => void;
+  /** Adopt prepared resources only after a successful load under the hydration gate. */
+  adoptPreparedDocument: (entry: PreparedEditorSessionDocument) => void;
   restoreDraft: (
     aggregateId: string,
     isCurrent?: () => boolean
@@ -99,6 +103,7 @@ function createEditorSessionAutosaveActions(
     },
     rebindAggregate: (context) => rebindAutosaveAggregate(state, context),
     updateContext: (patch) => updateAutosaveContext(state, patch),
+    adoptPreparedDocument: (entry) => adoptPreparedAutosaveDocument(state, entry),
     restoreDraft: (aggregateId, isCurrent) => restoreAutosaveDraft(state, aggregateId, isCurrent),
     scheduleAutosave: (document) => queuePendingAutosave(state, document),
     setInteractionActive: (active) => {

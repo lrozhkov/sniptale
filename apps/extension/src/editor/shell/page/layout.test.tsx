@@ -67,7 +67,7 @@ afterEach(() => {
 
 async function renderLayout(
   hasImage = true,
-  openStatus: 'idle' | 'loading' | 'error' | 'missing' = 'idle',
+  openStatus: 'idle' | 'loading' | 'switching' | 'error' | 'missing' = 'idle',
   onRecoverOriginal = vi.fn(async () => undefined)
 ) {
   await act(async () => {
@@ -240,3 +240,20 @@ for (const openStatus of ['idle', 'loading', 'error', 'missing'] as const) {
     ).toBe('false');
   });
 }
+
+it('keeps the same canvas and floating workspace during a transparent switch', async () => {
+  await renderLayout();
+  const workspace = container?.querySelector('[data-ui="editor.floating-workspace"]');
+  const canvas = container?.querySelector('[data-ui="editor.canvas-wrapper"]');
+  await renderLayout(true, 'switching');
+  expect(container?.querySelector('[data-ui="editor.floating-workspace"]')).toBe(workspace);
+  expect(container?.querySelector('[data-ui="editor.canvas-wrapper"]')).toBe(canvas);
+  expect(workspace?.parentElement?.hasAttribute('inert')).toBe(true);
+  expect(container?.querySelector('[data-ui="editor.page.open-loading"]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="editor.page.switch-loading"]')?.className
+  ).not.toContain('bg-');
+  await renderLayout();
+  expect(container?.querySelector('[data-ui="editor.floating-workspace"]')).toBe(workspace);
+  expect(workspace?.parentElement?.hasAttribute('inert')).toBe(false);
+});

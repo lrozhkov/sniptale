@@ -129,19 +129,45 @@ for (const locale of ['en', 'ru'] as const) {
       await page.mouse.down();
       await page.mouse.move(canvas.x + 160, canvas.y + 120, { steps: 5 });
       await page.mouse.up();
+      const backgroundTab = page.locator('[data-ui="editor.floating.layers.mode.frame"]');
+      await backgroundTab.click();
+      const inspectorScroll = page.locator('[data-ui="editor.floating.inspector-scroll"]');
+      await inspectorScroll.evaluate((node) => {
+        node.scrollTop = 100;
+      });
+      const previousScroll = await inspectorScroll.evaluate((node) => node.scrollTop);
+      const timeOrigin = await page.evaluate(() => performance.timeOrigin);
+      const toolbar = await page
+        .locator('[data-ui="editor.floating.document-bar.surface"]')
+        .elementHandle();
+      const inspector = await page
+        .locator('[data-ui="editor.floating.layers-panel"]')
+        .elementHandle();
       await trigger.click();
       await popup.locator(`[data-asset-id="${prefix}-1"]`).click();
       await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-1$`));
       await expect(page.locator('[data-ui="editor.floating.document-bar.title"]')).toContainText(
         'Recent image 1'
       );
+      expect(await page.evaluate(() => performance.timeOrigin)).toBe(timeOrigin);
+      expect(await toolbar!.evaluate((node) => node.isConnected)).toBe(true);
+      expect(await inspector!.evaluate((node) => node.isConnected)).toBe(true);
+      await expect(page.locator('[data-ui="editor.page.switch-loading"]')).toHaveCount(0);
+      await expect(backgroundTab).toHaveAttribute('aria-pressed', 'true');
+      expect(
+        Math.abs((await inspectorScroll.evaluate((node) => node.scrollTop)) - previousScroll)
+      ).toBeLessThanOrEqual(1);
+      await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
       await page.reload();
       await expect(page.locator('[data-ui="editor.floating.document-bar.title"]')).toContainText(
         'Recent image 1'
       );
+      await backgroundTab.click();
       await trigger.click();
       await popup.locator(`[data-asset-id="${prefix}-0"]`).click();
       await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-0$`));
+      await expect(backgroundTab).toHaveAttribute('aria-pressed', 'true');
+      await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
       await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(2);
       await page.setViewportSize({ width: 1920, height: 900 });
       await trigger.click();
@@ -167,17 +193,66 @@ for (const locale of ['en', 'ru'] as const) {
         await page.mouse.move(bounds.x + 200, bounds.y + 170, { steps: 5 });
         await page.mouse.up();
         await trigger.click();
-        const dialogPromise = page.waitForEvent('dialog');
-        const choosing = popup.locator(`[data-asset-id="${prefix}-1"]`).click();
-        const dialog = await dialogPromise;
-        expect(dialog.type()).toBe('beforeunload');
-        await dialog.dismiss();
-        await choosing;
+        await popup.locator(`[data-asset-id="${prefix}-1"]`).click();
+        await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-1$`));
+        await trigger.click();
+        await popup.locator(`[data-asset-id="${prefix}-0"]`).click();
         await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-0$`));
         await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(3);
         await page.locator('[data-ui="autosave-control"] > button').click();
         await page.getByRole('switch').locator('..').click();
         await page.keyboard.press('Escape');
+        await page.evaluate(async (prefix) => {
+          const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open('sniptale-db');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+          });
+          const original: unknown = await new Promise((resolve, reject) => {
+            const read = db
+              .transaction('media_library')
+              .objectStore('media_library')
+              .get(`${prefix}-1`);
+            read.onsuccess = () => resolve(read.result);
+            read.onerror = () => reject(read.error);
+          });
+          if (!original || typeof original !== 'object') throw new Error('Missing fixture');
+          const blob = new Blob(['invalid PNG'], { type: 'image/png' });
+          const tx = db.transaction('media_library', 'readwrite');
+          tx.objectStore('media_library').put({
+            ...original,
+            id: `${prefix}-broken`,
+            filename: 'Broken image.png',
+            updatedAt: Date.now() + 100000,
+            blob,
+            size: blob.size,
+          });
+          await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          });
+          db.close();
+        }, prefix);
+        await trigger.click();
+        await popup.locator(`[data-asset-id="${prefix}-broken"]`).click();
+        await expect(popup.getByRole('alert')).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-0$`));
+        await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(3);
+        await page.keyboard.press('Escape');
+        const restoredCanvas = (await page
+          .locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas')
+          .boundingBox())!;
+        await page.mouse.move(restoredCanvas.x + 100, restoredCanvas.y + 200);
+        await page.mouse.down();
+        await page.mouse.move(restoredCanvas.x + 200, restoredCanvas.y + 220, { steps: 4 });
+        await page.mouse.up();
+        await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(4);
+        await trigger.click();
+        await popup.locator(`[data-asset-id="${prefix}-1"]`).click();
+        await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-1$`));
+        await trigger.click();
+        await popup.locator(`[data-asset-id="${prefix}-0"]`).click();
+        await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(4);
       }
       await page.close();
     });

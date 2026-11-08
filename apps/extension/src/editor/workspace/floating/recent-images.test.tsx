@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({ list: vi.fn(), open: vi.fn(), subscribe: vi.fn
 vi.mock('../../workflows/recent-images', () => ({
   listRecentEditorImages: mocks.list,
   readRecentEditorThumbnail: vi.fn(),
-  openRecentEditorImage: mocks.open,
 }));
+vi.mock('../../workflows/switch-image', () => ({ openRecentEditorImage: mocks.open }));
 vi.mock('../../../features/media-hub/events', () => ({
   subscribeToMediaHubEvents: mocks.subscribe,
 }));

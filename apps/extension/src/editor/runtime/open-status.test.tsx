@@ -85,3 +85,38 @@ it('shows a distinct missing-original status while leaving the open action retry
   await act(async () => owner?.runOpen(async () => undefined));
   expect(consumer?.status).toBe('idle');
 });
+
+it('uses a non-destructive switch status and clears a recoverable switch failure', async () => {
+  let finish!: () => void;
+  let switching!: Promise<void>;
+  act(() => {
+    switching = owner!.runSwitch(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+  });
+  expect(consumer?.status).toBe('switching');
+  await act(async () => {
+    finish();
+    await switching;
+  });
+  expect(consumer?.status).toBe('idle');
+  await act(async () => {
+    await expect(
+      owner!.runSwitch(async () => {
+        throw new Error('save failed');
+      })
+    ).rejects.toThrow();
+  });
+  expect(consumer?.status).toBe('idle');
+  await act(async () => {
+    await expect(
+      owner!.runSwitch(async () => {
+        throw Object.assign(new Error('restore failed'), { name: 'EditorSwitchRecoveryError' });
+      })
+    ).rejects.toThrow();
+  });
+  expect(consumer?.status).toBe('error');
+});
