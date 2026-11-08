@@ -129,6 +129,10 @@ export function createNativeGpuPreviewRenderer(
   createBackend: typeof createGpuPreviewRenderer = createGpuPreviewRenderer,
   options: {
     maximumInFlight?: 1 | 2;
+    /** Optional retained destination limit; does not change frame concurrency. */
+    maximumPresentationSurfaces?: number;
+    /** Optional retained destination storage limit; does not change the texture budget. */
+    maximumPresentationBytes?: number;
     createPreparationExecutor?: (ownerDocument: Document) => EffectRuntimeSandboxExecutor;
   } = {}
 ): NativeGpuPreviewRenderer {
@@ -209,7 +213,20 @@ export function createNativeGpuPreviewRenderer(
       let preparedEffects: Awaited<ReturnType<typeof prepareEffectRuntimeGpuScene>> | undefined;
       try {
         preparation ??=
-          maximumInFlight === 1 ? createBackend() : createBackend({ maximumInFlight });
+          options.maximumPresentationSurfaces !== undefined ||
+          options.maximumPresentationBytes !== undefined
+            ? createBackend({
+                maximumInFlight,
+                ...(options.maximumPresentationSurfaces !== undefined
+                  ? { maximumPresentationSurfaces: options.maximumPresentationSurfaces }
+                  : {}),
+                ...(options.maximumPresentationBytes !== undefined
+                  ? { maximumPresentationBytes: options.maximumPresentationBytes }
+                  : {}),
+              })
+            : maximumInFlight === 1
+              ? createBackend()
+              : createBackend({ maximumInFlight });
         const resolved = await preparation;
         if (unavailable) return false;
         backend = resolved;

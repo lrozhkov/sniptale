@@ -1089,7 +1089,7 @@ it.each(['abort', 'dispose'] as const)(
 );
 
 it.each(['dissolve', 'fade-black'] as const)(
-  'keeps %s join sampling outside the UI output capability',
+  'keeps private %s samples separate from the frontend during GPU absence',
   async (kind) => {
     const f = compositionFixture(kind);
     const ui = uiOutputFixture();
@@ -1111,9 +1111,12 @@ it.each(['dissolve', 'fade-black'] as const)(
       expect(mixed.canvas).toBe(f.owner.canvas);
       expect(mixed.presentation.output).toBeUndefined();
       expect(renderPreviewScene.mock.calls.length).toBeGreaterThan(kind === 'dissolve' ? 1 : 0);
+      expect(renderPreviewScene.mock.calls.some(([input]) => !!input.acquireGpuOutput)).toBe(true);
       expect(
         renderPreviewScene.mock.calls.every(
-          ([input]) => input.acquireGpuOutput === undefined && input.deferFrameEvent === undefined
+          ([input]) =>
+            input.acquireGpuOutput !== ui.acquire &&
+            input.deferFrameEvent === (input.acquireGpuOutput ? true : undefined)
         )
       ).toBe(true);
       expect(ui.acquire).not.toHaveBeenCalled();
@@ -1336,6 +1339,8 @@ it('forwards the admitted original project to its own GPU provider across derive
       preparation
     );
     expect(createGpu).toHaveBeenCalledWith(undefined, {
+      maximumPresentationSurfaces: 5,
+      maximumPresentationBytes: 256 * 1024 * 1024,
       createPreparationExecutor: createVideoEditorEffectPreparationExecutor,
     });
     expect(renderPreviewScene).toHaveBeenLastCalledWith(

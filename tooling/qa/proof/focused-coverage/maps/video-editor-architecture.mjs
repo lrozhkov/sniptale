@@ -1,3 +1,5 @@
+import { VIDEO_PREVIEW_GPU_OWNER_MAPPINGS } from './video-preview-gpu.mjs';
+
 const CONTROLLER_CONTRACT_FILES = [
   'apps/extension/src/video-editor/runtime/controller/contracts/header.ts',
   'apps/extension/src/video-editor/runtime/controller/contracts/insertion.ts',
@@ -67,6 +69,7 @@ const spatialResourceMappings = [
 }));
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
+  ...VIDEO_PREVIEW_GPU_OWNER_MAPPINGS,
   {
     owner: 'native-materialized-frame-publication',
     productionFile: 'apps/extension/src/video-editor/preview/stage/scene/joins.ts',
@@ -709,6 +712,9 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
       'Preview media lifetime, frame readiness, cache generation, and framing consumers have focused proof.',
     testFiles: [
       'apps/extension/src/video-editor/preview/cache/build-exact.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-gpu.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-gpu-joins.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-gpu-outputs.test.ts',
       'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
       'apps/extension/src/video-editor/preview/cache/materializer.images.test.ts',
       'apps/extension/src/video-editor/preview/cache/materializer.videos.test.ts',

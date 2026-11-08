@@ -7,6 +7,15 @@ import type { VideoPreviewRenderer } from '../../../features/video/preview/prefe
 import type { PreviewSceneRenderInput, PreviewScenePresentation } from '../stage/scene/types';
 import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 import { createMaterializerGpuComposer } from './materializer-gpu';
+import { createMaterializerGpuOutputs } from './materializer-gpu-outputs';
+import type {
+  GpuPreviewGroup,
+  GpuPreviewLayer,
+} from '../../../features/video/composition/canvas/gpu-preview';
+import {
+  presentationEnvelopeOpacity,
+  resolveVideoProjectSceneEdgePlan,
+} from '../../../features/video/project/scene/edge-fades';
 import { createRecordingEventsRenderer } from '../../../workflows/video-review/recording-events';
 import { createCompositionCutSampleSource } from '../../../workflows/video-review/decoded-video-sample';
 import { createRecordingCursorTrajectoryRenderer } from '../../../workflows/video-review/cursor-trajectory';
@@ -84,6 +93,7 @@ export interface VideoPreviewFrameMaterializer {
 
 interface VideoPreviewMaterializerState {
   disposed: boolean;
+  gpuOutputs: ReturnType<typeof createMaterializerGpuOutputs>;
   effectPreparation: PreviewSceneRenderInput['effectPreparation'];
   playbackSampler: ReturnType<typeof createCompositionCutSampleSource> | null;
   playbackSamplerConversion: 'canvas' | 'native';
@@ -365,9 +375,23 @@ function createMaterializedJoinPresentation(
   let cutPlan: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>[number] | undefined;
   let cutPlans = plans.filter(({ boundary }) => boundary.sampling === 'cut');
   let nestedCuts: ReturnType<typeof createMaterializedJoinPresentation> | undefined;
+  let nestedOutputs: ReturnType<typeof createMaterializerGpuOutputs> | undefined;
+  const releaseNestedCuts = () => {
+    const previous = nestedCuts;
+    const outputs = nestedOutputs;
+    nestedCuts = undefined;
+    nestedOutputs = undefined;
+    try {
+      previous?.dispose();
+    } finally {
+      outputs?.dispose();
+    }
+  };
   let disposed = false;
   let cameraOverride: VideoCompositionCameraState | undefined;
   let busy = false;
+  let directSamples = false;
+  const colors = createMaterializedJoinColors(params.ownerDocument, params.rasterSize);
   const gpuComposer = createMaterializerGpuComposer(
     params.rasterSize,
     () => disposed || state.disposed,
@@ -384,7 +408,13 @@ function createMaterializedJoinPresentation(
           cutPlans,
           'omit'
         );
-        return nestedCuts.renderFrameWithPresentation(time, signal, cameraOverride);
+        if (directSamples) nestedOutputs ??= createMaterializerGpuOutputs(params.ownerDocument);
+        return nestedCuts.renderFrameWithPresentation(
+          time,
+          signal,
+          cameraOverride,
+          directSamples ? nestedOutputs?.acquire : undefined
+        );
       }
       return renderMaterializedFrame(
         params,
@@ -394,7 +424,9 @@ function createMaterializedJoinPresentation(
         time,
         signal,
         cameraOverride,
-        'omit'
+        'omit',
+        undefined,
+        directSamples ? state.gpuOutputs.acquire : undefined
       );
     }
     const conversion = state.gpuPreview?.acceptsNativeFrames ? 'native' : 'canvas';
@@ -426,7 +458,8 @@ function createMaterializedJoinPresentation(
           signal,
           cameraOverride,
           'omit',
-          frames.media
+          frames.media,
+          directSamples ? state.gpuOutputs.acquire : undefined
         );
       } finally {
         frames.release();
@@ -458,28 +491,139 @@ function createMaterializedJoinPresentation(
         signal
       );
     },
-    renderSample: async (time, signal) => ({
-      canvas: (await renderSample(time, signal)).canvas,
-      release() {},
-    }),
+    renderSample: async (time, signal) => {
+      const frame = await renderSample(time, signal);
+      const output = frame.presentation.output;
+      return output
+        ? { canvas: output.canvas, release: () => output.release(), retained: true }
+        : { canvas: frame.canvas, release() {} };
+    },
   });
+  const presentGpu = (
+    source: HTMLCanvasElement | GpuPreviewGroup,
+    time: number,
+    signal: AbortSignal,
+    acquire: GpuPreviewTargetFactory,
+    transition?: { color: string; opacity: number }
+  ) => {
+    const rect = { x: 0, y: 0, ...params.rasterSize };
+    const inverse = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
+    const layers: GpuPreviewLayer[] = [
+      {
+        source,
+        rect,
+        inverse,
+        clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+      },
+    ];
+    if (transition && transition.opacity > 0)
+      layers.push(colors.layer(transition.color, transition.opacity));
+    if (sceneEdges !== 'omit') {
+      const edgePlan = resolveVideoProjectSceneEdgePlan(
+        params.project,
+        params.sampleFps ?? params.project.fps
+      );
+      const opacity = presentationEnvelopeOpacity(edgePlan.visualEnvelope, time);
+      if (opacity > 0)
+        layers.push(
+          colors.layer(
+            time >= edgePlan.visualEnvelope.fadeIn ? edgePlan.endColor : edgePlan.color,
+            opacity
+          )
+        );
+    }
+    return gpuComposer.present(layers, signal, acquire);
+  };
+  const renderGpuJoinFrame = async (
+    plan: NonNullable<ReturnType<typeof resolveActiveVideoProjectCompositionJoinPlan>>,
+    time: number,
+    blend: NonNullable<ReturnType<typeof evaluateCompositionJoin>>,
+    signal: AbortSignal,
+    acquireGpuOutput: GpuPreviewTargetFactory
+  ): Promise<GpuPreviewOutput | undefined> => {
+    let output: GpuPreviewOutput | undefined;
+    let handedOff = false;
+    try {
+      if (plan.boundary.transition?.type === 'dissolve') {
+        const samples = resolveVideoProjectCompositionJoinEndpoints(
+          plan,
+          params.sampleFps ?? params.project.fps,
+          time
+        );
+        await endpoints.withEndpoints(
+          {
+            key: plan,
+            ...samples,
+            incomingWeight: blend.incoming,
+            ...(plan.boundary.sampling === 'cut' ? { sampling: 'cut' as const } : {}),
+          },
+          signal,
+          async ({ outgoing, incoming, incomingWeight, sampling }) => {
+            const rect = { x: 0, y: 0, ...params.rasterSize };
+            const inverse = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
+            const source: GpuPreviewGroup = {
+              kind: 'group',
+              output: params.rasterSize,
+              logical: params.rasterSize,
+              layers: [
+                {
+                  source: outgoing,
+                  rect,
+                  inverse,
+                  opacity: sampling === 'cut' ? 1 : 1 - incomingWeight,
+                  clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+                },
+                {
+                  source: incoming,
+                  rect,
+                  inverse,
+                  opacity: incomingWeight,
+                  blend: sampling === 'cut' ? 'over' : 'add',
+                  clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+                },
+              ],
+            };
+            output = await presentGpu(source, time, signal, acquireGpuOutput);
+          }
+        );
+      } else {
+        endpoints.clear();
+        const sample = await renderSample(time, signal);
+        try {
+          output = await presentGpu(sample.canvas, time, signal, acquireGpuOutput, {
+            color: plan.boundary.transition?.color ?? '#000000',
+            opacity: blend.black,
+          });
+        } finally {
+          sample.presentation.output?.release();
+        }
+      }
+      handedOff = true;
+      return output;
+    } finally {
+      if (!handedOff) output?.release();
+    }
+  };
   return {
     updateProject(project, nextPlans) {
       params = { ...params, project };
       plans = nextPlans;
       cutPlans = plans.filter(({ boundary }) => boundary.sampling === 'cut');
       endpoints.clear();
-      nestedCuts?.dispose();
-      nestedCuts = undefined;
+      releaseNestedCuts();
+      colors.dispose();
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       endpoints.dispose();
-      nestedCuts?.dispose();
+      releaseNestedCuts();
       cutSampler?.dispose();
-      resources.dispose();
       gpuComposer.dispose();
+      if (!busy) {
+        resources.dispose();
+        colors.dispose();
+      }
     },
     async renderFrameWithPresentation(
       time: number,
@@ -494,12 +638,13 @@ function createMaterializedJoinPresentation(
       if (cameraOverride !== nextCamera) endpoints.clear();
       cameraOverride = nextCamera;
       busy = true;
+      directSamples = !!acquireGpuOutput && params.previewRenderer !== 'legacy';
+      let completedOutput: GpuPreviewOutput | undefined;
       try {
         const plan = resolveActiveVideoProjectCompositionJoinPlan(plans, time);
         cutPlan = plan?.boundary.sampling === 'cut' ? plan : undefined;
         if (cutPlan || !plan) {
-          nestedCuts?.dispose();
-          nestedCuts = undefined;
+          releaseNestedCuts();
         }
         if (!cutPlan) {
           cutSampler?.dispose();
@@ -530,6 +675,22 @@ function createMaterializedJoinPresentation(
           time,
         };
         const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
+        if (directSamples && acquireGpuOutput) {
+          completedOutput = await renderGpuJoinFrame(plan, time, blend, signal, acquireGpuOutput);
+          throwIfAborted(signal);
+          if (disposed || state.disposed)
+            throw new DOMException('Preview preparation was cancelled', 'AbortError');
+          if (completedOutput) {
+            const output = completedOutput;
+            framePresentation.output = output;
+            framePresentation.renderer = { backend: 'gpu' };
+            completedOutput = undefined;
+            return { canvas: output.canvas, presentation: framePresentation };
+          }
+          // Only GPU absence/device failure reaches the established Canvas compatibility path.
+          directSamples = false;
+          endpoints.clear();
+        }
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Preview frame context is unavailable.');
         if (plan.boundary.transition?.type === 'dissolve') {
@@ -602,8 +763,45 @@ function createMaterializedJoinPresentation(
         endpoints.clear();
         throw error;
       } finally {
+        completedOutput?.release();
+        directSamples = false;
         busy = false;
+        if (disposed) {
+          resources.dispose();
+          colors.dispose();
+        }
       }
+    },
+  };
+}
+
+function createMaterializedJoinColors(ownerDocument: Document, size: VideoEditorPreviewRasterSize) {
+  const sources = new Map<string, HTMLCanvasElement>();
+  const key = crypto.randomUUID();
+  return {
+    layer(color: string, opacity: number): GpuPreviewLayer {
+      let source = sources.get(color);
+      if (!source) {
+        source = ownerDocument.createElement('canvas');
+        source.width = source.height = 1;
+        const context = source.getContext('2d');
+        if (!context) throw new Error('Composition color source is unavailable.');
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        sources.set(color, source);
+      }
+      return {
+        source,
+        opacity,
+        rect: { x: 0, y: 0, ...size },
+        inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+        clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+        cache: { key: `native-join-color:${key}:${color}`, revision: source },
+      };
+    },
+    dispose() {
+      for (const source of sources.values()) source.width = source.height = 0;
+      sources.clear();
     },
   };
 }
@@ -613,6 +811,7 @@ function createMaterializerMediaState(
 ): VideoPreviewMaterializerState {
   const state: VideoPreviewMaterializerState = {
     disposed: false,
+    gpuOutputs: createMaterializerGpuOutputs(params.ownerDocument),
     effectPreparation: undefined,
     playbackSampler: null,
     playbackSamplerConversion: 'canvas',
@@ -620,6 +819,11 @@ function createMaterializerMediaState(
       params.previewRenderer === 'legacy'
         ? null
         : createNativeGpuPreviewRenderer(undefined, {
+            maximumPresentationSurfaces: 5,
+            maximumPresentationBytes: Math.max(
+              256 * 1024 * 1024,
+              params.rasterSize.width * params.rasterSize.height * 8 * 5
+            ),
             createPreparationExecutor: createVideoEditorEffectPreparationExecutor,
           }),
     spatialRenderer: null,
@@ -670,6 +874,7 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
   state.effectRuntime?.dispose();
   state.playbackSampler?.dispose();
   state.playbackSampler = null;
+  state.gpuOutputs.dispose();
   state.gpuPreview?.dispose();
   state.captionRenderer.clear();
   state.cursorTrajectoryRenderer.clear();

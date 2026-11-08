@@ -28,7 +28,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function fixture(maximumInFlight: 1 | 2 = 1) {
+function fixture(
+  maximumInFlight: 1 | 2 = 1,
+  maximumPresentationSurfaces?: number,
+  maximumPresentationBytes?: number
+) {
   const clip = createVideoClip({
     transform: { x: 0, y: 0, width: 8, height: 4, rotation: 0, opacity: 1 },
   });
@@ -66,7 +70,11 @@ function fixture(maximumInFlight: 1 | 2 = 1) {
   const render = vi.fn<GpuPreviewRenderer['render']>(async () => bitmap);
   const dispose = vi.fn();
   const create = vi.fn(async () => ({ render, dispose, allocatedBytes: 0 }));
-  const owner = createNativeGpuPreviewRenderer(create, { maximumInFlight });
+  const owner = createNativeGpuPreviewRenderer(create, {
+    maximumInFlight,
+    ...(maximumPresentationSurfaces !== undefined ? { maximumPresentationSurfaces } : {}),
+    ...(maximumPresentationBytes !== undefined ? { maximumPresentationBytes } : {}),
+  });
   owners.push(owner);
   const input: Parameters<typeof renderPreviewScene>[0] = {
     project,
@@ -81,6 +89,38 @@ function fixture(maximumInFlight: 1 | 2 = 1) {
   const passes = resolveVideoCompositionRenderPasses(project, 1);
   return { owner, input, passes, finish, render, dispose, create, bitmap, captured };
 }
+
+it('preserves the default backend factory call without a surface allowance', async () => {
+  const f = fixture();
+  await f.owner.render(f.input, f.passes, f.finish, () => false);
+  expect(f.create).toHaveBeenCalledExactlyOnceWith();
+});
+
+it.each([1, 2] as const)(
+  'forwards an explicit surface allowance independently of %s Native GPU jobs',
+  async (maximumInFlight) => {
+    const f = fixture(maximumInFlight, 5);
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    expect(f.create).toHaveBeenCalledExactlyOnceWith({
+      maximumInFlight,
+      maximumPresentationSurfaces: 5,
+    });
+  }
+);
+
+it.each([undefined, 5])(
+  'forwards explicit presentation bytes with surface allowance %s',
+  async (maximumPresentationSurfaces) => {
+    const maximumPresentationBytes = 3840 * 2160 * 8 * 5;
+    const f = fixture(1, maximumPresentationSurfaces, maximumPresentationBytes);
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    expect(f.create).toHaveBeenCalledExactlyOnceWith({
+      maximumInFlight: 1,
+      maximumPresentationBytes,
+      ...(maximumPresentationSurfaces !== undefined ? { maximumPresentationSurfaces } : {}),
+    });
+  }
+);
 
 it('retains a source-density header at the exact direct-video boundary and releases its pixels', async () => {
   const f = fixture();

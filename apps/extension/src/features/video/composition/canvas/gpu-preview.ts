@@ -635,14 +635,39 @@ function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRequest {
   return layers === request.layers ? request : { ...request, layers };
 }
 
+function assertPresentationLimits(args: {
+  maximumPresentationSurfaces?: number;
+  maximumPresentationBytes?: number;
+}) {
+  if (
+    args.maximumPresentationSurfaces !== undefined &&
+    (!Number.isSafeInteger(args.maximumPresentationSurfaces) ||
+      args.maximumPresentationSurfaces < 1 ||
+      args.maximumPresentationSurfaces > 8)
+  )
+    throw new Error('GPU preview presentation surface limit is invalid.');
+  if (
+    args.maximumPresentationBytes !== undefined &&
+    (!Number.isSafeInteger(args.maximumPresentationBytes) ||
+      args.maximumPresentationBytes < 1 ||
+      args.maximumPresentationBytes > 512 * 1024 * 1024)
+  )
+    throw new Error('GPU preview presentation byte limit is invalid.');
+}
+
 /** Creates one isolated device; missing WebGPU returns null without changing the current preview. */
 export async function createGpuPreviewRenderer(
   args: {
     reserve?: (bytes: number) => Reservation;
     /** Complete requests retain private resources until both GPU barriers settle. Defaults to one. */
     maximumInFlight?: 1 | 2;
+    /** Retained destination limit, independent of GPU jobs. Integer 1–8; defaults to jobs plus one. */
+    maximumPresentationSurfaces?: number;
+    /** Retained destination bytes, independent of textures. Positive integer, at most 512 MiB; default 256 MiB. */
+    maximumPresentationBytes?: number;
   } = {}
 ): Promise<GpuPreviewRenderer | null> {
+  assertPresentationLimits(args);
   if (!navigator.gpu) return null;
   let device: GPUDevice;
   try {
@@ -1235,8 +1260,8 @@ export async function createGpuPreviewRenderer(
     presentation = createGpuPreviewPresentationOwner({
       device,
       format,
-      maximumSurfaces: (args.maximumInFlight ?? 1) + 1,
-      maximumBytes: MAX_TEXTURE_BYTES,
+      maximumSurfaces: args.maximumPresentationSurfaces ?? (args.maximumInFlight ?? 1) + 1,
+      maximumBytes: args.maximumPresentationBytes ?? MAX_TEXTURE_BYTES,
       ...(args.reserve ? { reserve: args.reserve } : {}),
       check,
       execute: async (request, outputTexture) => {

@@ -1796,6 +1796,129 @@ function presentationCanvas() {
   return { canvas, context, getContext, view };
 }
 
+it.each([0, -1, 1.5, 9, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER])(
+  'rejects invalid presentation surface limit %s before device allocation',
+  async (maximumPresentationSurfaces) => {
+    const g = graphics();
+    await expect(createGpuPreviewRenderer({ maximumPresentationSurfaces })).rejects.toThrow(
+      'presentation surface limit is invalid'
+    );
+    expect(navigator.gpu.requestAdapter).not.toHaveBeenCalled();
+    expect(g.adapter.requestDevice).not.toHaveBeenCalled();
+  }
+);
+
+it.each([1, 2, 3, 4, 5, 6, 7, 8])(
+  'admits exactly %s explicit presentation surfaces and recovers released capacity',
+  async (maximumPresentationSurfaces) => {
+    graphics();
+    const renderer = await owner({ maximumPresentationSurfaces });
+    const surfaces = Array.from({ length: maximumPresentationSurfaces }, () =>
+      renderer.createSurface!(presentationCanvas().canvas)
+    );
+    expect(() => renderer.createSurface!(presentationCanvas().canvas)).toThrow('surface capacity');
+    surfaces[0]!.dispose();
+    expect(() => renderer.createSurface!(presentationCanvas().canvas)).not.toThrow();
+  }
+);
+
+it.each([0, -1, 1.5, 512 * 1024 * 1024 + 1, Number.NaN, Number.POSITIVE_INFINITY])(
+  'rejects invalid presentation byte limit %s before device allocation',
+  async (maximumPresentationBytes) => {
+    const g = graphics();
+    await expect(createGpuPreviewRenderer({ maximumPresentationBytes })).rejects.toThrow(
+      'presentation byte limit is invalid'
+    );
+    expect(navigator.gpu.requestAdapter).not.toHaveBeenCalled();
+    expect(g.adapter.requestDevice).not.toHaveBeenCalled();
+  }
+);
+
+it.each([1, 512 * 1024 * 1024])(
+  'accepts the presentation byte limit boundary %s',
+  async (maximumPresentationBytes) => {
+    graphics();
+    await expect(owner({ maximumPresentationBytes })).resolves.toBeDefined();
+  }
+);
+
+it.each([1, 2] as const)(
+  'preserves the default presentation surface limit for %s GPU jobs',
+  async (maximumInFlight) => {
+    graphics();
+    const renderer = await owner({ maximumInFlight });
+    for (let index = 0; index < maximumInFlight + 1; index++)
+      renderer.createSurface!(presentationCanvas().canvas);
+    expect(() => renderer.createSurface!(presentationCanvas().canvas)).toThrow('surface capacity');
+  }
+);
+
+it('retains five presentation surfaces without admitting a second GPU job', async () => {
+  const g = graphics();
+  const renderer = await owner({ maximumInFlight: 1, maximumPresentationSurfaces: 5 });
+  const outputs = Array.from({ length: 5 }, () => presentationCanvas());
+  const surfaces = outputs.map((output) => renderer.createSurface!(output.canvas));
+  expect(() => renderer.createSurface!(presentationCanvas().canvas)).toThrow('surface capacity');
+  for (const surface of surfaces) await surface.present(request());
+  expect(outputs.every((output) => output.context.getCurrentTexture.mock.calls.length === 1)).toBe(
+    true
+  );
+  const fence = deferred<void>();
+  g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+  const pending = surfaces[0]!.present(request());
+  try {
+    await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledTimes(6));
+    await expect(surfaces[1]!.present(request())).rejects.toThrow('frame in flight');
+    await expect(renderer.render(request())).rejects.toThrow('frame in flight');
+    expect(g.queue.submit).toHaveBeenCalledTimes(6);
+  } finally {
+    fence.resolve();
+    await pending;
+  }
+  await surfaces[1]!.present(request());
+  expect(g.queue.submit).toHaveBeenCalledTimes(7);
+});
+
+it.each([
+  { allowance: undefined, admitted: 4 },
+  { allowance: 3840 * 2160 * 8 * 5, admitted: 5 },
+  { allowance: 3840 * 2160 * 8 * 5 - 1, admitted: 4 },
+])(
+  'bounds retained 4K presentation storage with allowance $allowance',
+  async ({ allowance, admitted }) => {
+    const g = graphics();
+    const renderer = await owner({
+      maximumPresentationSurfaces: 5,
+      reserve: g.reserve,
+      ...(allowance !== undefined ? { maximumPresentationBytes: allowance } : {}),
+    });
+    const baselineBytes = renderer.allocatedBytes;
+    const outputs = Array.from({ length: 5 }, () => {
+      const output = presentationCanvas();
+      output.canvas.width = 3840;
+      output.canvas.height = 2160;
+      return output;
+    });
+    const surfaces = outputs.map((output) => renderer.createSurface!(output.canvas));
+    const frame = {
+      ...request([]),
+      output: { width: 3840, height: 2160 },
+      logical: { width: 3840, height: 2160 },
+    };
+    for (const surface of surfaces.slice(0, admitted)) await surface.present(frame);
+    expect(renderer.allocatedBytes - baselineBytes).toBe(3840 * 2160 * 8 * admitted);
+    expect(g.queue.submit).toHaveBeenCalledTimes(admitted);
+    if (admitted < surfaces.length) {
+      const reservations = g.reserve.mock.calls.length;
+      await expect(surfaces[admitted]!.present(frame)).rejects.toThrow('storage budget');
+      expect(outputs[admitted]!.context.configure).not.toHaveBeenCalled();
+      expect(g.reserve).toHaveBeenCalledTimes(reservations);
+      expect(g.queue.submit).toHaveBeenCalledTimes(admitted);
+      expect(renderer.allocatedBytes - baselineBytes).toBe(3840 * 2160 * 8 * admitted);
+    }
+  }
+);
+
 it('presents directly to a leased GPU canvas without creating a bitmap and retains both barriers', async () => {
   const g = graphics();
   const destination = presentationCanvas();
