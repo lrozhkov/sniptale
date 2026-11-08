@@ -15,8 +15,7 @@ import {
 } from '../../../../features/video/composition/draw/fitted-media';
 import { roundedWindowRadius } from '../../../../features/video/project/window-geometry';
 import {
-  buildNativeGpuVideoLayers,
-  type NativeGpuVideoSourceBody,
+  createNativeGpuVideoLayerBuilder,
   type NativeGpuSourceMaterial,
 } from './gpu-preview-video';
 import type {
@@ -24,6 +23,7 @@ import type {
   GpuPreviewLayer,
 } from '../../../../features/video/composition/canvas/gpu-preview';
 import type {
+  VideoCompositionFrame,
   VideoCompositionCameraState,
   VideoCompositionVisualLayer,
 } from '../../../../features/video/composition/types';
@@ -80,7 +80,6 @@ import { resolvePreviewCompositionFrameSize } from './canvas';
 
 type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;
 type Layer = VideoCompositionVisualLayer;
-type VideoLayer = Extract<Layer, { kind: 'video' }>;
 const IDENTITY: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const PADDING = 128;
 
@@ -134,6 +133,14 @@ export async function buildNativeGpuPreviewLayers(args: {
   input: Input;
   passes: Passes;
   sources: ReadonlyMap<string, VideoFrame>;
+  sourceForFrame?: (
+    frame: Pick<VideoCompositionFrame, 'visualLayers'>,
+    time: number,
+    layers?: readonly Layer[]
+  ) => {
+    frames: ReadonlyMap<string, VideoFrame>;
+    media: ReadonlyMap<string, VideoCompositionMediaSource>;
+  };
   media: ReadonlyMap<string, VideoCompositionMediaSource>;
   effects?: EffectRuntimeRenderedComposition | EffectRuntimeGpuPreparedComposition;
   background: GpuPreviewLayer;
@@ -184,8 +191,14 @@ export async function buildNativeGpuPreviewLayers(args: {
     const sourceFeedbackBounds = new Map<Layer, GpuPreviewLayer['rect']>();
     for (const layer of layers) {
       if (layer.kind !== 'video') continue;
-      const borrowed = args.media.get(layer.clipId),
-        frame = args.sources.get(layer.clipId);
+      const owner = passes.visualPasses.find((pass) => pass.frame.visualLayers.includes(layer));
+      const selected = args.sourceForFrame?.(
+        owner?.frame ?? passes.overlayFrame,
+        owner?.time ?? input.currentTime,
+        [layer]
+      );
+      const borrowed = (selected?.media ?? args.media).get(layer.clipId),
+        frame = (selected?.frames ?? args.sources).get(layer.clipId);
       const source =
         borrowed instanceof HTMLVideoElement || isVideoCompositionFrameSource(borrowed)
           ? borrowed
@@ -429,50 +442,28 @@ export async function buildNativeGpuPreviewLayers(args: {
     return result;
   };
 
-  const sourceBodies = new Map<VideoLayer, NativeGpuVideoSourceBody>();
-  const video = (layer: VideoLayer, sourceOwner = layer): GpuPreviewLayer[] => {
-    const source = args.sources.get(layer.clipId);
-    if (!source) throw new Error('GPU video source is unavailable.');
-    const inverse = invertQuickEditProjection(layerProjection(layer));
-    if (!inverse) throw new Error('Visual layer projection is unavailable.');
-    return buildNativeGpuVideoLayers({
-      layer,
-      source,
-      borrowed: args.media.get(layer.clipId),
-      media: args.media,
-      imageBank: input.imageBank,
-      inverse,
-      sourceOwner,
-      sourceBodies,
-      ...(args.sourceMask
-        ? {
-            sourceMask: (key: string, paint: (context: CanvasRenderingContext2D) => void) => {
-              const lease = args.sourceMask!(input.canvas.ownerDocument, plane, key, paint);
-              retained.push(lease);
-              return lease.layer;
-            },
-          }
-        : {}),
-      ...(args.sourceDecoration
-        ? {
-            sourceDecoration: (key: string, paint: (context: CanvasRenderingContext2D) => void) => {
-              const lease = args.sourceDecoration!(input.canvas.ownerDocument, plane, key, paint);
-              retained.push(lease);
-              return lease.layer;
-            },
-          }
-        : {}),
-      raster,
-      groupLayer,
-      spotlight,
-    });
-  };
+  const video = createNativeGpuVideoLayerBuilder({
+    select: (layer, frame, time) =>
+      args.sourceForFrame?.(frame, time, [layer]) ?? { frames: args.sources, media: args.media },
+    imageBank: input.imageBank,
+    inverse: (layer) => invertQuickEditProjection(layerProjection(layer)),
+    raster,
+    groupLayer,
+    spotlight,
+    ownerDocument: input.canvas.ownerDocument,
+    plane,
+    retain: (lease) => retained.push(lease),
+    ...(args.sourceMask ? { sourceMask: args.sourceMask } : {}),
+    ...(args.sourceDecoration ? { sourceDecoration: args.sourceDecoration } : {}),
+  });
   const paintLayers = (
     layers: readonly Layer[],
     frames:
       | ReadonlyMap<string, EffectRuntimeRenderedFrame | EffectRuntimeGpuPreparedFrame>
       | undefined,
-    frameActionOwners?: ReadonlySet<string>
+    frameActionOwners?: ReadonlySet<string>,
+    sourceFrame = args.inputComposition?.scene?.frame ?? passes.overlayFrame,
+    sourceTime = args.inputComposition?.time ?? input.currentTime
   ) => {
     const drawn = new Set<string>();
     const content: GpuPreviewLayer[] = [];
@@ -514,7 +505,7 @@ export async function buildNativeGpuPreviewLayers(args: {
       } else
         body =
           layer.kind === 'video'
-            ? video({ ...layer, actions: [] }, layer)
+            ? video({ ...layer, actions: [] }, layer, sourceFrame, sourceTime)
             : [
                 raster(
                   (context) =>
@@ -531,7 +522,7 @@ export async function buildNativeGpuPreviewLayers(args: {
         (layer.actions?.length || (layer.deferSourceBorders && layer.borders?.length)) &&
         (layer.effectActionsOnly || !explicitActions.has(layer.clipId))
       ) {
-        sharp.push(...video({ ...layer, effectActionsOnly: true }, layer));
+        sharp.push(...video({ ...layer, effectActionsOnly: true }, layer, sourceFrame, sourceTime));
       }
     }
     return { content, sharp };
@@ -671,7 +662,9 @@ export async function buildNativeGpuPreviewLayers(args: {
             const frameLayers = paintLayers(
               resolveOrderedVisualPassLayers(part.layers, pass.frame.visualLayers),
               args.effects?.framesByTime.get(pass.time),
-              frameActionOwners
+              frameActionOwners,
+              pass.frame,
+              pass.time
             );
             const projected = cameraLayers(frameLayers.content, pass.frame.camera);
             if (frameLayers.sharp.length)

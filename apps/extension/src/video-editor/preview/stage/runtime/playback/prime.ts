@@ -1,3 +1,4 @@
+import type { NativePreviewSourceRuntime } from '../../media/source-runtime';
 import {
   getMediaClipSourceTime,
   getVideoClipSourceTime,
@@ -22,6 +23,7 @@ const MEDIA_READY_FOR_CURRENT_FRAME = 2;
 const PREVIEW_STAGE_PRIMING_TIMEOUT_MS = 180;
 
 export interface PreviewStagePlaybackPrepareState {
+  sourceRuntime?: NativePreviewSourceRuntime;
   project?: VideoProject;
   audioBankClips: PreviewStageAudioBankClip[];
   audioRefs: PreviewStageAudioRefs;
@@ -154,10 +156,20 @@ function resolveRequiredPreparedMedia(
 
 export async function preparePreviewStagePlayback(
   state: PreviewStagePlaybackPrepareState,
-  time: number
-): Promise<void> {
+  time: number,
+  signal?: AbortSignal
+): Promise<'ready' | 'retry'> {
   await waitForPreviewStageFrame();
+  signal?.throwIfAborted();
+  if (state.sourceRuntime?.selected) {
+    const result = await state.sourceRuntime.prepare(time, signal ?? new AbortController().signal);
+    signal?.throwIfAborted();
+    if (result === 'retry') return 'retry';
+  }
   prepareAudioDrivers(state.audioBankClips, state.audioRefs, time, state.project);
-  prepareVideoDrivers(state.videoBankClips, state.videoRefs, time, state.project);
+  if (!state.sourceRuntime?.selected)
+    prepareVideoDrivers(state.videoBankClips, state.videoRefs, time, state.project);
   await waitForPreparedMedia(resolveRequiredPreparedMedia(state, time));
+  signal?.throwIfAborted();
+  return 'ready';
 }

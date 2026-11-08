@@ -1,3 +1,4 @@
+import type { NativePreviewSourceRuntime } from './media/source-runtime';
 import type { VideoEditorMotionPreview } from '../../contracts/workspace';
 import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/patches';
 import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
@@ -76,6 +77,8 @@ export interface PreviewEffectRuntimeFeedback {
 }
 
 export interface PreviewStageCanvasProps {
+  /** Mounted source authority; exact samples do not depend on hidden video readiness. */
+  sourceRuntime?: NativePreviewSourceRuntime;
   /** Admission uses the requested clock time, including requests between React commits. */
   canRenderCursorFrame?: ((time: number) => boolean) | undefined;
   /** Borrows the mounted renderer's playback request until its cleanup runs. */

@@ -1,3 +1,4 @@
+import { scaleEffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/render/wave';
 import { preparePreviewImageResources } from './image-resources';
 import { canPrepareEffectRuntimeGpuComposition } from '../../../../features/video/composition/effect-runtime/render/gpu-wave';
 import type { EffectRuntimeGpuPreparedComposition } from '../../../../features/video/composition/effect-runtime/runtime/types';
@@ -234,7 +235,7 @@ async function renderPreparedPreviewScene(
   }
   const clipMediaElements = createPreviewSceneMediaMap(params.videoRefs, params.decodedVideoFrames);
   // Effects rasterize their inputs asynchronously; never start with an unavailable frame.
-  if (!arePreviewSceneVideosReady(renderPasses, clipMediaElements)) return false;
+  if (!arePreviewSourcesReady(params, renderPasses, clipMediaElements)) return false;
   const videos = [...clipMediaElements]
     .filter(([id]) =>
       [renderPasses.overlayFrame, ...renderPasses.visualPasses.map((pass) => pass.frame)].some(
@@ -254,8 +255,8 @@ async function renderPreparedPreviewScene(
 
   try {
     if (params.previewRenderer === 'legacy' || !params.gpuPreview) {
-      capture = capturePreviewSceneVideos(clipMediaElements, videos, params.signal);
-      if (capture.ready) await capture.ready;
+      capture = capturePreviewSourcesIfNeeded(params, clipMediaElements, videos);
+      if (capture?.ready) await capture.ready;
     }
     const imageInput = await preparePreviewImageResources(params, renderPasses);
     if (!imageInput) return false;
@@ -328,7 +329,7 @@ async function renderPreparedPreviewScene(
           videos.some(
             (video) => video.seeking || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
           ) ||
-          !arePreviewSceneVideosReady(renderPasses, clipMediaElements)
+          !arePreviewSourcesReady(params, renderPasses, clipMediaElements)
         ) {
           output?.release();
           return false;
@@ -346,8 +347,8 @@ async function renderPreparedPreviewScene(
       effectRuntimeFrames = undefined;
     }
     if (params.gpuOnly) throw new PreviewGpuSerialFallback();
-    capture ??= capturePreviewSceneVideos(clipMediaElements, videos, params.signal);
-    if (capture.ready) await capture.ready;
+    capture ??= capturePreviewSourcesIfNeeded(params, clipMediaElements, videos);
+    if (capture?.ready) await capture.ready;
     const captions = await (params.captionRenderer ?? createVideoProjectCaptionRenderer()).prepare(
       params.project,
       params.project,
@@ -363,7 +364,7 @@ async function renderPreparedPreviewScene(
       videos.some(
         (video) => video.seeking || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
       ) ||
-      !arePreviewSceneVideosReady(renderPasses, clipMediaElements)
+      !arePreviewSourcesReady(params, renderPasses, clipMediaElements)
     )
       return false;
     if (params.signal?.aborted) return;
@@ -493,6 +494,9 @@ async function drawResolvedPreviewSceneContent(
     ...(args.params.spatialRenderer ? { spatialRenderer: args.params.spatialRenderer } : {}),
     ...(viewportCanvas ? { viewportCanvas } : {}),
     clipMediaElements: args.clipMediaElements,
+    ...(args.params.preparedFrame?.sourceFrames
+      ? { sourceFrames: args.params.preparedFrame.sourceFrames }
+      : {}),
     currentTime: args.params.currentTime,
     ...(args.effectRuntimeFrames ? { effectRuntimeFrames: args.effectRuntimeFrames } : {}),
     imageBank: args.params.imageBank,
@@ -672,6 +676,21 @@ async function resolvePreviewEffectRuntimeFrames(
     streamVisualPasses: true,
     ...(composeInput ? { composeInput } : {}),
     clipMediaElements,
+    ...(params.preparedFrame?.sourceFrames
+      ? {
+          prepareSourcePass: async (frame, time) => ({
+            media: params.preparedFrame!.sourceFrames!.media(frame, time, [
+              ...frame.visualLayers,
+              ...frame.effectInputLayers,
+            ]),
+            renderDimensions: (plan) =>
+              scaleEffectRuntimeFramePlan(plan, resolvePreviewEffectRuntimeRasterScale(params))
+                .renderDimensions,
+            effectMedia: () =>
+              params.preparedFrame!.sourceFrames!.media(frame, time, frame.effectInputLayers),
+          }),
+        }
+      : {}),
     executor,
     imageBank: params.imageBank,
     overlayFrame: renderPasses.overlayFrame,
@@ -687,4 +706,22 @@ async function resolvePreviewEffectRuntimeFrames(
     visualPasses: renderPasses.visualPasses,
     ...(params.signal ? { signal: params.signal } : {}),
   });
+}
+
+/** Exact prepared sources are ready without a second moving-media admission or capture. */
+function arePreviewSourcesReady(
+  input: PreviewSceneRenderInput,
+  passes: ReturnType<typeof resolveVideoCompositionRenderPasses>,
+  media: Map<string, VideoCompositionMediaSource>
+) {
+  return Boolean(input.preparedFrame?.sourceFrames) || arePreviewSceneVideosReady(passes, media);
+}
+function capturePreviewSourcesIfNeeded(
+  input: PreviewSceneRenderInput,
+  media: Map<string, VideoCompositionMediaSource>,
+  videos: readonly HTMLMediaElement[]
+) {
+  return input.preparedFrame?.sourceFrames
+    ? undefined
+    : capturePreviewSceneVideos(media, videos, input.signal);
 }

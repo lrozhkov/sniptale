@@ -1,3 +1,5 @@
+import type { NativePreviewSourceRuntime } from '../media/source-runtime';
+import type { PreviewSceneSourceFrames } from './source-frames';
 import type {
   GpuPreviewOutput,
   GpuPreviewFramePresenter,
@@ -35,6 +37,7 @@ import type {
 } from '../../../../features/video/preview/preferences';
 
 export interface PreviewStageCanvasSceneParams {
+  sourceRuntime?: NativePreviewSourceRuntime;
   /** Admission uses the requested clock time, including requests between React commits. */
   canRenderCursorFrame?: ((time: number) => boolean) | undefined;
   activeClips: VideoProjectClip[];
@@ -84,6 +87,8 @@ export interface PreviewSceneImageResources {
 
 /** Geometry and effect plans use one composition time; source timestamps retain their own authority. */
 interface PreviewSceneFramePlan {
+  readonly sourceFrames?: PreviewSceneSourceFrames;
+  readonly gpuIsolated?: boolean;
   readonly passes: ReturnType<typeof resolveVideoCompositionRenderPasses>;
   readonly imageResources?: PreviewSceneImageResources;
   readonly effects?: EffectRuntimeGpuPreparedComposition;
@@ -151,6 +156,7 @@ export type PreviewSceneRenderInput = {
   videoRefs: PreviewStageVideoRefs;
   /** Borrowed immutable decoded frames for bounded cut sampling. */
   decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>;
+  sourceRuntime?: NativePreviewSourceRuntime;
 };
 
 /** A preparation owns its captured inputs until the sole render consumer completes. */

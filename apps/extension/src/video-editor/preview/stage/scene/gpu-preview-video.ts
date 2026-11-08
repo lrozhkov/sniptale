@@ -1,6 +1,9 @@
 import { resolveVideoMediaShadowParams } from '../../../../features/video/composition/canvas/media-shadow';
 import type { GpuPreviewLayer } from '../../../../features/video/composition/canvas/gpu-preview';
-import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
+import type {
+  VideoCompositionFrame,
+  VideoCompositionVisualLayer,
+} from '../../../../features/video/composition/types';
 import {
   isVideoCompositionFrameSource,
   type VideoCompositionMediaSource,
@@ -61,7 +64,7 @@ export type NativeGpuSourceMaterial = (
 ) => { layer: GpuPreviewLayer; release(): void };
 
 /** Immutable source artwork is shared only by derived draws of the same resolved layer. */
-export interface NativeGpuVideoSourceBody {
+interface NativeGpuVideoSourceBody {
   layers: readonly GpuPreviewLayer[];
   snapshot: GpuPreviewLayer;
 }
@@ -101,7 +104,7 @@ export function paintNativeGpuDecoration(context: CanvasRenderingContext2D, medi
 }
 
 /** Builds one video material; the caller owns raster allocation and ordered scene composition. */
-export function buildNativeGpuVideoLayers(args: {
+function buildNativeGpuVideoLayers(args: {
   layer: VideoLayer;
   source: VideoFrame;
   borrowed: VideoCompositionMediaSource | undefined;
@@ -482,4 +485,70 @@ export function buildNativeGpuVideoLayers(args: {
       blur: layer.renderState.blurAmount,
     },
   ];
+}
+
+/** One selected source pose owns body/sharp reuse and source decoration leases. */
+export function createNativeGpuVideoLayerBuilder(args: {
+  select(
+    layer: VideoLayer,
+    frame: Pick<VideoCompositionFrame, 'visualLayers'>,
+    time: number
+  ): {
+    frames: ReadonlyMap<string, VideoFrame>;
+    media: ReadonlyMap<string, VideoCompositionMediaSource>;
+  };
+  imageBank: Record<string, HTMLImageElement>;
+  inverse(layer: VideoLayer): QuickEditHomography | null;
+  raster: Raster;
+  groupLayer: Parameters<typeof buildNativeGpuVideoLayers>[0]['groupLayer'];
+  spotlight: Parameters<typeof buildNativeGpuVideoLayers>[0]['spotlight'];
+  ownerDocument: Document;
+  plane: GpuPreviewLayer['rect'];
+  retain(lease: { release(): void }): void;
+  sourceMask?: NativeGpuSourceMaterial;
+  sourceDecoration?: NativeGpuSourceMaterial;
+}) {
+  const bodies = new Map<
+    Pick<VideoCompositionFrame, 'visualLayers'>,
+    Map<VideoLayer, NativeGpuVideoSourceBody>
+  >();
+  const material =
+    (owner: NativeGpuSourceMaterial) =>
+    (key: string, paint: (context: CanvasRenderingContext2D) => void) => {
+      const lease = owner(args.ownerDocument, args.plane, key, paint);
+      args.retain(lease);
+      return lease.layer;
+    };
+  return (
+    layer: VideoLayer,
+    sourceOwner: VideoLayer,
+    frame: Pick<VideoCompositionFrame, 'visualLayers'>,
+    time: number
+  ) => {
+    const selected = args.select(sourceOwner, frame, time);
+    const source = selected.frames.get(layer.clipId);
+    if (!source) throw new Error('GPU video source is unavailable.');
+    const inverse = args.inverse(layer);
+    if (!inverse) throw new Error('Visual layer projection is unavailable.');
+    let sourceBodies = bodies.get(frame);
+    if (!sourceBodies) {
+      sourceBodies = new Map();
+      bodies.set(frame, sourceBodies);
+    }
+    return buildNativeGpuVideoLayers({
+      layer,
+      source,
+      borrowed: selected.media.get(layer.clipId),
+      media: selected.media,
+      imageBank: args.imageBank,
+      inverse,
+      sourceOwner,
+      sourceBodies,
+      raster: args.raster,
+      groupLayer: args.groupLayer,
+      spotlight: args.spotlight,
+      ...(args.sourceMask ? { sourceMask: material(args.sourceMask) } : {}),
+      ...(args.sourceDecoration ? { sourceDecoration: material(args.sourceDecoration) } : {}),
+    });
+  };
 }

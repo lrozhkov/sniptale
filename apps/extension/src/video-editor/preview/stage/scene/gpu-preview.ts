@@ -1,3 +1,5 @@
+import type { EffectRuntimeInputComposition } from '../../../../features/video/composition/effect-runtime/frame/inputs';
+import { isPreviewFrameGpuIsolated } from './source-frames';
 import type { GpuPreviewTarget } from '../../../../features/video/composition/canvas/preview-presentation';
 import { createNativeEffectPreparation } from './effect-preparation';
 import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
@@ -182,7 +184,7 @@ export function createNativeGpuPreviewRenderer(
       const layer = admittedLayer(input, passes);
       const depthLayer = admittedLayer(input, passes, true);
       if (disposed || unavailable || typeof VideoFrame === 'undefined') return undefined;
-      const exclusive = Boolean(input.preparedFrame && input.acquireGpuOutput);
+      const exclusive = Boolean(isPreviewFrameGpuIsolated(input) && input.acquireGpuOutput);
       if (
         active &&
         (!exclusive || slots.some((slot) => slot.busy && (!slot.exclusive || !slot.submitted)))
@@ -245,71 +247,24 @@ export function createNativeGpuPreviewRenderer(
         if (input.signal?.aborted || isInvalidated()) return false;
         capturedSources = captureNativePreviewSources(input, passes);
         if (!capturedSources) return false;
-        const { frames: captured, media } = capturedSources;
+        const { frames: captured, media, forFrame } = capturedSources;
         if (typeof effects === 'function') {
-          effects = await effects(async (request) => {
-            let graph: Awaited<ReturnType<typeof buildNativeGpuPreviewLayers>> | undefined;
-            let completed: ImageBitmap | undefined;
-            try {
-              const effectFrame = {
-                ...passes.overlayFrame,
-                visualLayers: [...request.layers],
-                effectInputLayers: [],
-                effectRuntimePlans: [],
-                actions: [],
-                cursor: null,
-                sceneSpotlights: request.scene?.frame.sceneSpotlights ?? [],
-              };
-              const backdrop = materials.background(
-                { ...input, currentTime: request.time ?? input.currentTime },
-                {
-                  ...passes,
-                  overlayFrame: {
-                    ...passes.overlayFrame,
-                    camera: request.camera ?? passes.overlayFrame.camera,
-                  },
-                }
-              );
-              graph = await buildNativeGpuPreviewLayers({
-                sourceMask: materials.sourceMask,
-                sourceDecoration: materials.sourceDecoration,
-                annotationMask: materials.annotationMask,
-                input: { ...input, currentTime: request.time ?? input.currentTime },
-                passes: {
-                  overlayFrame: effectFrame,
-                  visualPasses: [
-                    {
-                      alpha: 1,
-                      time: input.currentTime,
-                      frame: effectFrame,
-                      transitionOverlays: [],
-                    },
-                  ],
-                },
-                sources: captured,
-                media,
-                background: backdrop,
-                inputComposition: request,
-              });
-              completed = await provider.render({
-                output: request.renderDimensions,
-                logical: request.dimensions,
-                layers: graph.layers,
-                signal: input.signal ?? new AbortController().signal,
-              });
-              if (disposed || input.signal?.aborted || isInvalidated())
-                throw new DOMException('Effect input was cancelled', 'AbortError');
-              const result = completed;
-              completed = undefined;
-              return result;
-            } catch (error) {
-              if (error instanceof GpuPreviewDeviceError) inputDeviceFailure = error;
-              throw error;
-            } finally {
-              completed?.close();
-              graph?.release();
-            }
-          });
+          effects = await effects((request) =>
+            composeNativeGpuEffectInput({
+              input,
+              passes,
+              request,
+              materials,
+              provider,
+              captured,
+              media,
+              forFrame,
+              isInvalidated: () => disposed || isInvalidated(),
+              onDeviceFailure: (error) => {
+                inputDeviceFailure = error;
+              },
+            })
+          );
         }
         const backdrop = materials.background(input, passes);
         const createArtwork = (phase: 'borders' | 'final') => {
@@ -374,7 +329,14 @@ export function createNativeGpuPreviewRenderer(
           ];
         } else if (depthLayer && inverse && source && directDimensions) {
           const retained = await materials.depth(
-            { input, passes, sources: captured, media, background: backdrop },
+            {
+              input,
+              passes,
+              sources: captured,
+              media,
+              sourceForFrame: forFrame,
+              background: backdrop,
+            },
             depthLayer,
             source,
             inverse,
@@ -390,6 +352,7 @@ export function createNativeGpuPreviewRenderer(
             input,
             passes,
             sources: captured,
+            sourceForFrame: forFrame,
             media,
             snapshotGroup: async (group) => {
               const bitmap = await provider.render({
@@ -576,4 +539,94 @@ export function createNativeGpuPreviewRenderer(
       }
     },
   };
+}
+
+/** A dependent GPU input owns its temporary graph and readback independently of scene output. */
+async function composeNativeGpuEffectInput(args: {
+  input: Input;
+  passes: Passes;
+  request: EffectRuntimeInputComposition;
+  materials: ReturnType<typeof createNativeGpuPreviewMaterials>;
+  provider: GpuPreviewRenderer;
+  captured: ReadonlyMap<string, VideoFrame>;
+  media: NonNullable<ReturnType<typeof captureNativePreviewSources>>['media'];
+  forFrame: NonNullable<ReturnType<typeof captureNativePreviewSources>>['forFrame'];
+  isInvalidated(): boolean;
+  onDeviceFailure(error: GpuPreviewDeviceError): void;
+}) {
+  const {
+    input,
+    passes,
+    request,
+    materials,
+    provider,
+    captured,
+    media,
+    forFrame,
+    isInvalidated,
+    onDeviceFailure,
+  } = args;
+  let graph: Awaited<ReturnType<typeof buildNativeGpuPreviewLayers>> | undefined;
+  let completed: ImageBitmap | undefined;
+  try {
+    const effectFrame = {
+      ...passes.overlayFrame,
+      visualLayers: [...request.layers],
+      effectInputLayers: [],
+      effectRuntimePlans: [],
+      actions: [],
+      cursor: null,
+      sceneSpotlights: request.scene?.frame.sceneSpotlights ?? [],
+    };
+    const backdrop = materials.background(
+      { ...input, currentTime: request.time ?? input.currentTime },
+      {
+        ...passes,
+        overlayFrame: {
+          ...passes.overlayFrame,
+          camera: request.camera ?? passes.overlayFrame.camera,
+        },
+      }
+    );
+    graph = await buildNativeGpuPreviewLayers({
+      sourceMask: materials.sourceMask,
+      sourceDecoration: materials.sourceDecoration,
+      annotationMask: materials.annotationMask,
+      input: { ...input, currentTime: request.time ?? input.currentTime },
+      passes: {
+        overlayFrame: effectFrame,
+        visualPasses: [
+          {
+            alpha: 1,
+            time: input.currentTime,
+            frame: effectFrame,
+            transitionOverlays: [],
+          },
+        ],
+      },
+      sources: captured,
+      sourceForFrame: (_frame, time, layers) =>
+        forFrame(request.scene?.frame ?? passes.overlayFrame, request.time ?? time, layers),
+      media,
+      background: backdrop,
+      inputComposition: request,
+    });
+    completed = await provider.render({
+      output: request.renderDimensions,
+      logical: request.dimensions,
+      layers: graph.layers,
+      signal: input.signal ?? new AbortController().signal,
+    });
+    if (isInvalidated() || input.signal?.aborted)
+      throw new DOMException('Effect input was cancelled', 'AbortError');
+    const result = completed;
+    completed = undefined;
+    return result;
+  } catch (error) {
+    if (error instanceof GpuPreviewDeviceError) onDeviceFailure(error);
+    throw error;
+  } finally {
+    completed?.close();
+    graph?.release();
+  }
 }

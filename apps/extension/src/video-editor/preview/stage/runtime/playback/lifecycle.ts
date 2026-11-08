@@ -45,7 +45,29 @@ async function prepareRuntimeAttempt(
     if (latest.prepareSourceVoiceover !== authority.latestStateRef.current.prepareSourceVoiceover)
       return 'retry';
   }
-  await preparePreviewStagePlayback(latest, request.time);
+  const sourceController = new AbortController();
+  authority.activePreparationRef.current = sourceController;
+  let sourcePreparation: 'ready' | 'retry';
+  try {
+    sourcePreparation = await preparePreviewStagePlayback(
+      latest,
+      request.time,
+      AbortSignal.any([request.signal, sourceController.signal])
+    );
+  } catch (error) {
+    const stale = resolvePreviewAttemptFreshness(authority, request, revision);
+    if (stale) return stale;
+    if (latest.sourceRuntime !== authority.latestStateRef.current.sourceRuntime) return 'retry';
+    throw error;
+  } finally {
+    if (authority.activePreparationRef.current === sourceController)
+      authority.activePreparationRef.current = null;
+  }
+  if (
+    sourcePreparation === 'retry' ||
+    latest.sourceRuntime !== authority.latestStateRef.current.sourceRuntime
+  )
+    return 'retry';
   const stale = resolvePreviewAttemptFreshness(authority, request, revision);
   if (stale) return stale;
   if (latest.previewMode === VideoEditorPreviewMode.CACHE) {

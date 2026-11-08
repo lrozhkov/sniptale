@@ -69,6 +69,7 @@ function buildPreviewStageSurfaceProps(
     stageSizeStyle: runtime.surface.stageSizeStyle,
     videoBankClips: runtime.media.videoBankClips,
     videoRefs: runtime.media.videoRefs,
+    sourceRuntime: runtime.media.sourceRuntime,
     ...buildPreviewStageSurfaceActionProps(props, runtime),
   };
 }

@@ -1,3 +1,4 @@
+import { preparePreviewSourceFrames } from './source-frames';
 import { capturePreviewImageResources, arePreviewImageResourcesReady } from './image-resources';
 import type { EffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/runtime/types';
 import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
@@ -23,6 +24,42 @@ type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;
 
 /** Own captured sources independently of the moving media elements and their callers. */
 export function captureNativePreviewSources(input: PreviewSceneRenderInput, passes: Passes) {
+  const precise = input.preparedFrame?.sourceFrames;
+  const owned = new Map<VideoCompositionFrameSource, VideoFrame>();
+  const select = (media: ReadonlyMap<string, VideoCompositionMediaSource>) => {
+    const frames = new Map<string, VideoFrame>();
+    for (const [id, source] of media) {
+      if (!isVideoCompositionFrameSource(source) || !source.toVideoFrame)
+        throw new Error('GPU decoded source frame is unavailable.');
+      let frame = owned.get(source);
+      if (!frame) {
+        frame = source.toVideoFrame();
+        owned.set(source, frame);
+      }
+      frames.set(id, frame);
+    }
+    return { frames, media };
+  };
+  if (precise) {
+    try {
+      const nominal = select(precise.nominal);
+      return {
+        ...nominal,
+        forFrame: (
+          frame: Pick<Passes['overlayFrame'], 'visualLayers'>,
+          time: number,
+          layers?: readonly VideoCompositionVisualLayer[]
+        ) => select(precise.media(frame, time, layers)),
+        release() {
+          for (const frame of owned.values()) frame.close();
+          owned.clear();
+        },
+      };
+    } catch (error) {
+      for (const frame of owned.values()) frame.close();
+      throw error;
+    }
+  }
   const frames = new Map<string, VideoFrame>();
   const media = new Map<string, VideoCompositionMediaSource>();
   for (const [id, source] of Object.entries(input.videoRefs.current))
@@ -52,7 +89,16 @@ export function captureNativePreviewSources(input: PreviewSceneRenderInput, pass
         frames.set(id, source.toVideoFrame());
       else throw new Error('GPU decoded source frame is unavailable.');
     }
-    return { frames, media, release };
+    return {
+      frames,
+      media,
+      release,
+      forFrame: (
+        _frame: Pick<Passes['overlayFrame'], 'visualLayers'>,
+        _time: number,
+        _layers?: readonly VideoCompositionVisualLayer[]
+      ) => ({ frames, media }),
+    };
   } catch (error) {
     release();
     throw error;
@@ -87,29 +133,62 @@ export function prepareNativePreviewSceneFrame(
 ): Promise<PreviewScenePreparedFrame | undefined> | undefined {
   if (input.previewRenderer === 'legacy' || typeof VideoFrame === 'undefined') return undefined;
   input.signal?.throwIfAborted();
-  const passes = resolveVideoCompositionRenderPasses(input.project, input.currentTime);
+  const passes =
+    input.preparedFrame?.passes ??
+    resolveVideoCompositionRenderPasses(input.project, input.currentTime);
   if (input.cameraOverride) {
     passes.overlayFrame.camera = input.cameraOverride;
     for (const pass of passes.visualPasses) pass.frame.camera = input.cameraOverride;
   }
   const frames = [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)];
-  if (!canPrepareEffectRuntimeGpuComposition(frames)) return undefined;
+  const gpuIsolated = canPrepareEffectRuntimeGpuComposition(frames);
+  if (!gpuIsolated && !input.sourceRuntime?.selected) return undefined;
   const hasPlans = frames.some((frame) => (frame.effectRuntimePlans ?? []).length > 0);
   const executor = hasPlans
     ? typeof input.effectRuntimeExecutor === 'function'
       ? input.effectRuntimeExecutor()
       : input.effectRuntimeExecutor
     : undefined;
-  if (hasPlans && !executor?.prepareGpuFrame) return undefined;
+  if (hasPlans && !executor?.prepareGpuFrame && !input.sourceRuntime?.selected) return undefined;
   const rasterScale = resolvePreviewEffectRuntimeRasterScale({
     canvas: input.canvas,
     ...(input.previewRasterSize ? { previewRasterSize: input.previewRasterSize } : {}),
     project: input.project,
     stage: input.stage,
   });
-  const captured = captureNativePreviewSources(input, passes);
-  if (!captured) return undefined;
+  const immediate = input.sourceRuntime?.selected
+    ? undefined
+    : captureNativePreviewSources(input, passes);
+  if (!input.sourceRuntime?.selected && !immediate) return undefined;
   return (async () => {
+    const sourceFrames = input.sourceRuntime?.selected
+      ? await preparePreviewSourceFrames(input, passes)
+      : undefined;
+    if (input.sourceRuntime?.selected && !sourceFrames) return undefined;
+    if (sourceFrames)
+      input = {
+        ...input,
+        decodedVideoFrames: sourceFrames.nominal,
+        preparedFrame: {
+          passes,
+          sourceFrames,
+          gpuIsolated: gpuIsolated && (!hasPlans || Boolean(executor?.prepareGpuFrame)),
+          rasterScale,
+          compositionTime: input.currentTime,
+          sourcePresentation: new Map(),
+        },
+      };
+    let captured: ReturnType<typeof captureNativePreviewSources>;
+    try {
+      captured = immediate ?? captureNativePreviewSources(input, passes);
+    } catch (error) {
+      sourceFrames?.release();
+      throw error;
+    }
+    if (!captured) {
+      sourceFrames?.release();
+      return undefined;
+    }
     let effects: Awaited<ReturnType<typeof prepareNativePreviewGpuComposition>> | undefined;
     let released = false;
     const release = () => {
@@ -118,7 +197,11 @@ export function prepareNativePreviewSceneFrame(
       try {
         effects?.dispose();
       } finally {
-        captured.release();
+        try {
+          captured.release();
+        } finally {
+          sourceFrames?.release();
+        }
       }
     };
     try {
@@ -147,7 +230,7 @@ export function prepareNativePreviewSceneFrame(
         release();
         return undefined;
       }
-      if (executor)
+      if (executor?.prepareGpuFrame && gpuIsolated)
         effects = await prepareNativePreviewGpuComposition(input, passes, executor, rasterScale);
       input.signal?.throwIfAborted();
       return {
@@ -157,6 +240,12 @@ export function prepareNativePreviewSceneFrame(
           decodedVideoFrames: media,
           preparedFrame: {
             passes,
+            ...(sourceFrames
+              ? {
+                  sourceFrames,
+                  gpuIsolated: gpuIsolated && (!hasPlans || Boolean(executor?.prepareGpuFrame)),
+                }
+              : {}),
             imageResources,
             ...(effects ? { effects } : {}),
             rasterScale,

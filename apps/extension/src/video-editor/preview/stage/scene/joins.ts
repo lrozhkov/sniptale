@@ -62,7 +62,9 @@ export function createVideoPreviewCompositionJoinRenderer(
     prepare(input: Input) {
       input.signal?.throwIfAborted();
       if (disposed) throw new Error('Preview composition owner is disposed.');
-      return usesMaterializedScene(input) ? undefined : prepareCurrent?.(input);
+      if (usesMaterializedScene(input))
+        return input.sourceRuntime?.selected ? Promise.resolve({ input, release() {} }) : undefined;
+      return prepareCurrent?.(input);
     },
     dispose() {
       if (disposed) return;

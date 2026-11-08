@@ -60,13 +60,11 @@ export async function measureFullEditorPlayback(
     toolbar.getByRole('button', { name: translate(key, 'en'), exact: true });
   await expect
     .poll(() =>
-      page.evaluate(
-        ({ width, height }) =>
-          [...document.querySelectorAll('video')].some(
-            (video) => video.videoWidth === width && video.videoHeight === height
-          ),
-        options.sourceProfile
-      )
+      page
+        .locator('[data-preview-stage-canvas]')
+        .evaluate(
+          (canvas) => canvas instanceof HTMLCanvasElement && canvas.width > 0 && canvas.height > 0
+        )
     )
     .toBe(true);
   for (let repeat = 0; repeat < options.repetitions; repeat++) {

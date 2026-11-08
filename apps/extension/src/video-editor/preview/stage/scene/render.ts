@@ -85,7 +85,8 @@ function usePreviewStageRenderEffect(
       if (
         needed.length !== current.activeClips.length ||
         needed.some((clip, index) => clip.id !== current.activeClips[index]?.id) ||
-        !canRenderActivePreviewVideos(needed, current.videoRefs)
+        (!current.sourceRuntime?.selected &&
+          !canRenderActivePreviewVideos(needed, current.videoRefs))
       )
         return;
     }
@@ -99,6 +100,7 @@ function usePreviewStageRenderEffect(
         effectRuntimeRef,
         imageBank: current.imageBank,
         prepareImages: current.prepareImages,
+        sourceRuntime: current.sourceRuntime,
         isPlaying: current.isPlaying === true,
         previewRasterSize: current.previewRasterSize,
         previewCacheBypass: current.previewCacheBypass,
@@ -163,6 +165,7 @@ function usePreviewStageRenderEffect(
     effectRuntimeRef,
     params.imageBank,
     params.prepareImages,
+    params.sourceRuntime,
     params.isPlaying,
     params.project,
     params.effectPreparationProject,
@@ -205,6 +208,7 @@ function createPreviewStageCanvasRenderJob(args: {
   imageBank: PreviewStageCanvasSceneParams['imageBank'];
   prepareImages: PreviewStageCanvasSceneParams['prepareImages'];
   isPlaying: boolean;
+  sourceRuntime: PreviewStageCanvasSceneParams['sourceRuntime'];
   previewRasterSize: PreviewStageCanvasSceneParams['previewRasterSize'];
   previewCacheBypass: PreviewStageCanvasSceneParams['previewCacheBypass'];
   previewMode: PreviewStageCanvasSceneParams['previewMode'];
@@ -240,6 +244,7 @@ function createPreviewStageCanvasRenderJob(args: {
         args.previewRenderer ?? 'gpu'
       ).executor,
     imageBank: args.imageBank,
+    ...(args.sourceRuntime ? { sourceRuntime: args.sourceRuntime } : {}),
     ...(args.prepareImages ? { prepareImages: args.prepareImages } : {}),
     isEffectRuntimeFrame: args.project.effectInstances?.some(({ enabled }) => enabled) === true,
     isPlaybackFrame: args.isPlaying === true,
@@ -298,20 +303,13 @@ function usePreviewRenderSchedulerRef(
         serialFallbackRef.current = true;
         return true;
       },
-      prepare: (input) => {
-        if (
-          serialFallbackRef.current ||
-          input.previewRenderer === 'legacy' ||
-          input.previewMode === 'cache' ||
-          !gpuRef.current?.acceptsNativeFrames
-        )
-          return undefined;
-        joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(
-          renderPreviewScene,
-          prepareNativePreviewSceneFrame
-        );
-        return joinsRef.current.prepare(input);
-      },
+      prepare: (input) =>
+        prepareNativeSceneJob(
+          input,
+          serialFallbackRef.current,
+          gpuRef.current?.acceptsNativeFrames === true,
+          joinsRef
+        ),
       onError: (error) => {
         joinsRef.current?.clear();
         cacheRendererRef.current?.clear();
@@ -482,4 +480,26 @@ function resolvePreviewEffectRuntime(
   runtimeRef.current?.dispose();
   runtimeRef.current = createVideoEditorEffectRuntime({ ownerDocument, renderer });
   return runtimeRef.current;
+}
+
+/** Precise source readiness starts independently of backend startup or Canvas fallback. */
+function prepareNativeSceneJob(
+  input: Parameters<typeof renderPreviewScene>[0],
+  serialFallback: boolean,
+  nativeFrames: boolean,
+  joins: MutableRefObject<ReturnType<typeof createVideoPreviewCompositionJoinRenderer> | null>
+) {
+  if (
+    !input.sourceRuntime?.selected &&
+    (serialFallback ||
+      input.previewRenderer === 'legacy' ||
+      input.previewMode === 'cache' ||
+      !nativeFrames)
+  )
+    return undefined;
+  joins.current ??= createVideoPreviewCompositionJoinRenderer(
+    renderPreviewScene,
+    prepareNativePreviewSceneFrame
+  );
+  return joins.current.prepare(input);
 }

@@ -1,3 +1,4 @@
+import { isPreviewFrameGpuIsolated } from './source-frames';
 import { arePreviewImageResourcesCurrent } from './image-resources';
 import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 import type {
@@ -236,6 +237,7 @@ function sameRenderingContext(
   images?: PreviewSceneImageResources
 ) {
   return (
+    previous.sourceRuntime === next.sourceRuntime &&
     previous.renderGeneration === next.renderGeneration &&
     previous.runtimeVersion === next.runtimeVersion &&
     previous.layoutVersion === next.layoutVersion &&
@@ -288,8 +290,8 @@ function preparePendingFrame(
   if (
     state.disposed ||
     state.failure ||
-    !state.active.at(-1)?.submitted ||
-    !job?.isPlaybackFrame ||
+    (!job?.sourceRuntime?.selected && (!state.active.at(-1)?.submitted || !job?.isPlaybackFrame)) ||
+    !job ||
     state.preparingJob ||
     state.prepared ||
     !args.prepare
@@ -310,7 +312,10 @@ function preparePendingFrame(
     state.prepared = { job, kind: 'failed', error };
     return;
   }
-  if (!preparation) return;
+  if (!preparation) {
+    if (job.sourceRuntime?.selected) state.prepared = { job, kind: 'ready', frame: undefined };
+    return;
+  }
   state.preparingJob = job;
   void preparation
     .then(
@@ -362,7 +367,7 @@ function canStart(
   return (
     state.active.length < (args.maximumInFlight ?? 1) &&
     preparation?.kind === 'ready' &&
-    Boolean(preparation.frame?.input.preparedFrame) &&
+    Boolean(preparation.frame && isPreviewFrameGpuIsolated(preparation.frame.input)) &&
     Boolean(job.acquireGpuOutput) &&
     job.isPlaybackFrame &&
     state.active.every(
@@ -445,13 +450,21 @@ function startNextPreviewSceneRender(
     scheduleNextPreviewSceneRender(state, args);
     return;
   }
+  if (job.sourceRuntime?.selected && prepared?.kind === 'ready' && !prepared.frame) {
+    job.controller.abort();
+    scheduleNextPreviewSceneRender(state, args);
+    return;
+  }
   const active: ActiveRender = {
     job,
     imageResources: prepared?.kind === 'ready' ? prepared.imageResources : undefined,
     submitted: false,
     finished: false,
     independent: Boolean(
-      prepared?.frame?.input.preparedFrame && job.acquireGpuOutput && job.isPlaybackFrame
+      prepared?.frame &&
+      isPreviewFrameGpuIsolated(prepared.frame.input) &&
+      job.acquireGpuOutput &&
+      job.isPlaybackFrame
     ),
   };
   state.active.push(active);

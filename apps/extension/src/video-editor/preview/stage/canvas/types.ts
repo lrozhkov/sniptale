@@ -68,6 +68,7 @@ export type PreviewStageRootSurfaceProps = Pick<
   | 'stageSizeStyle'
   | 'videoBankClips'
   | 'videoRefs'
+  | 'sourceRuntime'
 > & {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   gpuHostRef?: React.RefObject<HTMLDivElement | null> | undefined;

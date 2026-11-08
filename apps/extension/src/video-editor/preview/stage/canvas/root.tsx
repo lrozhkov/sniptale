@@ -222,6 +222,7 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
     effectRuntimeFeedback: params.effectRuntimeFeedback,
     imageBank,
     prepareImages,
+    ...(params.sourceRuntime ? { sourceRuntime: params.sourceRuntime } : {}),
     isPlaying: params.isPlaying,
     previewCacheBypass: params.previewCacheBypass,
     previewExactFrameCache: params.previewExactFrameCache,
