@@ -155,13 +155,23 @@ export function createEditorSnapshotHistory(document: EditorDocument): SnapshotH
     maxBytes: EDITOR_HISTORY_LIMITS.maxBytes,
     measureBytes: (snapshots) => {
       let bytes = 0;
+      let smallestBaseline = Number.POSITIVE_INFINITY;
       const retained = new Set<string>();
       for (const value of snapshots) {
-        bytes += assets.bytesBySnapshot.get(value) ?? new TextEncoder().encode(value).byteLength;
-        for (const token of assets.tokensBySnapshot.get(value) ?? []) retained.add(token);
+        const metadata =
+          assets.bytesBySnapshot.get(value) ?? new TextEncoder().encode(value).byteLength;
+        bytes += metadata;
+        let baseline = metadata;
+        for (const token of assets.tokensBySnapshot.get(value) ?? []) {
+          retained.add(token);
+          baseline += assets.bytesByToken.get(token) ?? 0;
+        }
+        smallestBaseline = Math.min(smallestBaseline, baseline);
       }
       for (const token of retained) bytes += assets.bytesByToken.get(token) ?? 0;
-      return bytes;
+      // Bound additional history at every possible cursor. Current content is mandatory,
+      // and a retained window must stay affordable in both Undo and Redo directions.
+      return bytes - smallestBaseline;
     },
   });
   historyAssets.set(history, assets);

@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { crc32 } from 'node:zlib';
 
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
+import type { EditorDocument } from '../../../features/editor/document/types';
 import { createMockDocument } from '../instance/bindings/test-fixtures-document';
 import {
   createDefaultFrameCallout,
@@ -14,6 +15,10 @@ import {
 } from '../../frame-annotation/proxy';
 import { assertValidFrameAnnotationsInCanvasJson } from '../../frame-annotation/import-boundary';
 import { serializeCanvasObjects } from '../document/serialization';
+import {
+  undoEditorControllerSnapshot,
+  redoEditorControllerSnapshot,
+} from '../public-api/document/history';
 import {
   createEditorSnapshotHistory,
   pushEditorSnapshotHistory,
@@ -73,7 +78,7 @@ it('counts distinct pooled rasters once and releases history-only tokens under t
       }),
     });
   const retained = history.getSnapshots();
-  expect(retained.length).toBeLessThan(8);
+  expect(retained.length).toBe(8);
   expect(retained.length).toBeGreaterThan(1);
   expect(retained.every((snapshot) => snapshot.length < 1000)).toBe(true);
   const urls = new Set<string>([source(10)]);
@@ -82,9 +87,14 @@ it('counts distinct pooled rasters once and releases history-only tokens under t
     urls.add(value.sourceImageData);
     value = undoEditorSnapshot(history);
   }
-  expect(
-    [...urls].reduce((sum, url) => sum + new TextEncoder().encode(url).byteLength, 0)
-  ).toBeLessThan(8 * 1024 * 1024);
+  const imageBytes = [...urls].map((url) => new TextEncoder().encode(url).byteLength);
+  const metadataBytes = retained.map((snapshot) => new TextEncoder().encode(snapshot).byteLength);
+  const additionalBytes =
+    imageBytes.reduce((sum, bytes) => sum + bytes, 0) +
+    metadataBytes.reduce((sum, bytes) => sum + bytes, 0) -
+    Math.min(...imageBytes) -
+    Math.min(...metadataBytes);
+  expect(additionalBytes).toBeLessThanOrEqual(8 * 1024 * 1024);
   while (redoEditorSnapshot(history)) {
     /* Prove every retained transition remains decodable. */
   }
@@ -444,4 +454,107 @@ it('refuses stale pooled enrichment without exporting or changing the current he
   expect(exportDocument).not.toHaveBeenCalled();
   expect(readCurrentEditorSnapshot(history)).toEqual(second);
   expect(history.getState().size).toBe(2);
+});
+
+it('keeps vector undo and redo when the common raster exceeds the history byte budget', () => {
+  const source = `data:image/png;base64,${'A'.repeat(9 * 1024 * 1024)}`;
+  const first = {
+    ...createMockDocument(),
+    sourceImageData: source,
+    canvasJson: JSON.stringify({ objects: [{ type: 'image', src: source }] }),
+  };
+  const second = {
+    ...first,
+    canvasJson: JSON.stringify({
+      objects: [
+        { type: 'image', src: source },
+        {
+          type: 'path',
+          path: [
+            ['M', 0, 0],
+            ['L', 10, 10],
+          ],
+        },
+      ],
+    }),
+  };
+  const history = createEditorSnapshotHistory(first);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => second });
+  expect(history.getState().canUndo).toBe(true);
+  expect(undoEditorSnapshot(history)).toEqual(first);
+  expect(redoEditorSnapshot(history)).toEqual(second);
+});
+
+it('retains fifty small transitions over a mandatory oversized source', () => {
+  const source = `data:image/png;base64,${'A'.repeat(9 * 1024 * 1024)}`;
+  const first = { ...createMockDocument(), sourceImageData: source };
+  const history = createEditorSnapshotHistory(first);
+  for (let i = 1; i <= 55; i++)
+    pushEditorSnapshotHistory({
+      history,
+      muted: false,
+      exportDocument: () => ({ ...first, sourceName: `edit-${i}` }),
+    });
+  expect(history.getSnapshots()).toHaveLength(51);
+  expect(undoEditorSnapshot(history)?.sourceName).toBe('edit-54');
+  expect(redoEditorSnapshot(history)?.sourceName).toBe('edit-55');
+});
+
+it('keeps affordable distinct rasters reversible under every current snapshot', () => {
+  const source = (char: string) => `data:image/png;base64,${char.repeat(5 * 1024 * 1024)}`;
+  const first = { ...createMockDocument(), sourceImageData: source('A') };
+  const second = { ...first, sourceImageData: source('B') };
+  const history = createEditorSnapshotHistory(first);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => second });
+  for (let i = 0; i < 3; i++) {
+    expect(undoEditorSnapshot(history)).toEqual(first);
+    expect(redoEditorSnapshot(history)).toEqual(second);
+    expect(history.getSnapshots()).toHaveLength(2);
+  }
+});
+
+it('rejects an over-budget distinct raster pair and releases the discarded raster', () => {
+  const large = `data:image/png;base64,${'A'.repeat(9 * 1024 * 1024)}`;
+  const small = `data:image/png;base64,${'B'.repeat(1024 * 1024)}`;
+  const first = { ...createMockDocument(), sourceImageData: large };
+  const history = createEditorSnapshotHistory(first);
+  pushEditorSnapshotHistory({
+    history,
+    muted: false,
+    exportDocument: () => ({ ...first, sourceImageData: small }),
+  });
+  expect(history.getSnapshots()).toHaveLength(1);
+  expect(undoEditorSnapshot(history)).toBeNull();
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => first });
+  expect(history.getSnapshots()).toHaveLength(1);
+  expect(history.getCurrent()).toContain('sniptale-history-asset:2');
+  expect(readCurrentEditorSnapshot(history)?.sourceImageData).toBe(large);
+});
+
+it('restores the visible document and cursor after failed Undo with a large pooled raster', async () => {
+  const source = `data:image/png;base64,${'A'.repeat(9 * 1024 * 1024)}`;
+  const first = { ...createMockDocument(), sourceImageData: source };
+  const second = { ...first, sourceName: 'drawn layer' };
+  const history = createEditorSnapshotHistory(first);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => second });
+  let displayed: EditorDocument = second;
+  let fail = true;
+  const controller = {
+    history,
+    publishHistoryDocument: vi.fn(),
+    applyDocument: vi.fn(async (document: EditorDocument) => {
+      displayed = document;
+      if (fail) {
+        fail = false;
+        throw new Error('apply failed');
+      }
+    }),
+  };
+  await expect(undoEditorControllerSnapshot(controller)).rejects.toThrow('apply failed');
+  expect(displayed).toEqual(second);
+  expect(history.getState()).toMatchObject({ index: 1, canUndo: true, canRedo: false, size: 2 });
+  await undoEditorControllerSnapshot(controller);
+  expect(displayed).toEqual(first);
+  await redoEditorControllerSnapshot(controller);
+  expect(displayed).toEqual(second);
 });
