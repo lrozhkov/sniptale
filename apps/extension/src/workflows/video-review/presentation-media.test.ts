@@ -130,6 +130,11 @@ it('draws an admitted image and releases its bitmap exactly once on disposal', a
   });
   expect(owner.audioTrack).toBeNull();
   const frame = await owner.frame(imageMapping);
+  const capture = snapshotCanvas();
+  capture.capture.mockImplementationOnce(() => {
+    throw new Error('private transfer details');
+  });
+  expect(() => frame.snapshot()).toThrow('presentation-media:decode');
   const target = context();
   frame.draw(target as unknown as CanvasRenderingContext2D);
   expect(target.drawImage).toHaveBeenCalledWith(bitmap, 0, 5, 160, 80);
@@ -350,4 +355,169 @@ it('releases the active video lease immediately when cancelled', async () => {
   frame.release();
   owner.dispose();
   expect(sample.close).toHaveBeenCalledOnce();
+});
+
+class SnapshotBitmap implements ImageBitmap {
+  readonly close = vi.fn();
+  constructor(
+    readonly width: number,
+    readonly height: number
+  ) {}
+}
+function snapshotCanvas() {
+  const canvases: TemporaryCanvas[] = [];
+  const transferred: SnapshotBitmap[] = [];
+  const capture = vi.fn((width: number, height: number) => {
+    const bitmap = new SnapshotBitmap(width, height);
+    transferred.push(bitmap);
+    return bitmap;
+  });
+  class TemporaryCanvas {
+    readonly context = { drawImage: vi.fn() };
+    constructor(
+      public width: number,
+      public height: number
+    ) {
+      canvases.push(this);
+    }
+    getContext = vi.fn(() => this.context);
+    transferToImageBitmap() {
+      return capture(this.width, this.height);
+    }
+  }
+  vi.stubGlobal('OffscreenCanvas', TemporaryCanvas);
+  return { canvases, transferred, capture };
+}
+async function snapshotImage(controller = new AbortController()) {
+  const source = new SnapshotBitmap(32, 16);
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async () => source)
+  );
+  const owner = await createReviewPresentationMedia({
+    slot: imageSlot,
+    output,
+    signal: controller.signal,
+    readAsset: async () => new Blob(['png'], { type: 'image/png' }),
+  });
+  return { owner, source, frame: await owner.frame(imageMapping) };
+}
+
+it('detaches only admitted source pixels synchronously without consuming the image lease', async () => {
+  const f = snapshotCanvas();
+  const { owner, source, frame } = await snapshotImage();
+  const bitmap = frame.snapshot();
+  expect(bitmap).toBe(f.transferred[0]);
+  expect(bitmap).not.toBeInstanceOf(Promise);
+  expect(f.capture).toHaveBeenCalledExactlyOnceWith(32, 16);
+  expect(f.canvases[0]!.context.drawImage).toHaveBeenCalledExactlyOnceWith(source, 0, 0, 32, 16);
+  expect(f.canvases[0]).toMatchObject({ width: 0, height: 0 });
+  expect(source.close).not.toHaveBeenCalled();
+  await expect(owner.frame(imageMapping)).rejects.toMatchObject({ code: 'busy' });
+  frame.release();
+  owner.dispose();
+  expect(source.close).toHaveBeenCalledOnce();
+  expect(f.transferred[0]!.close).not.toHaveBeenCalled();
+  bitmap.close();
+  expect(f.transferred[0]!.close).toHaveBeenCalledOnce();
+});
+
+it('delegates source display size and rotation normalization to the retained video sample draw', async () => {
+  const f = snapshotCanvas();
+  const fixture = await videoFixture();
+  const sample = { ...decoded(1, fixture.width, fixture.height), rotation: 90, flip: true };
+  io.getSample.mockResolvedValue(sample);
+  const owner = await createReviewPresentationMedia({
+    slot: fixture.slot,
+    output: { width: 333, height: 777 },
+    signal: new AbortController().signal,
+    readAsset: async () => fixture.blob,
+  });
+  const frame = await owner.frame(mapping(), {
+    ...fixture.slot,
+    video: {
+      ...fixture.slot.video,
+      fit: 'cover',
+      fillColor: '#ff0000ff',
+      crop: { panX: 1, panY: -1 },
+    },
+  });
+  const bitmap = frame.snapshot();
+  expect(sample.draw).toHaveBeenCalledExactlyOnceWith(
+    f.canvases[0]!.context,
+    0,
+    0,
+    fixture.width,
+    fixture.height
+  );
+  expect(f.canvases[0]!.context.drawImage).not.toHaveBeenCalled();
+  expect(f.capture).toHaveBeenCalledExactlyOnceWith(fixture.width, fixture.height);
+  expect(sample.close).not.toHaveBeenCalled();
+  frame.release();
+  owner.dispose();
+  expect(sample.close).toHaveBeenCalledOnce();
+  expect(f.transferred[0]!.close).not.toHaveBeenCalled();
+  bitmap.close();
+});
+
+it.each(['release', 'dispose', 'abort'] as const)(
+  'refuses snapshot after %s without allocating',
+  async (mode) => {
+    const f = snapshotCanvas();
+    const controller = new AbortController();
+    const { owner, frame } = await snapshotImage(controller);
+    if (mode === 'release') frame.release();
+    else if (mode === 'dispose') owner.dispose();
+    else controller.abort();
+    expect(() => frame.snapshot()).toThrow(mode === 'abort' ? 'aborted' : 'disposed');
+    expect(f.canvases).toHaveLength(0);
+    owner.dispose();
+  }
+);
+
+it.each(['release', 'dispose', 'abort'] as const)(
+  'closes detached pixels if %s occurs during transfer',
+  async (mode) => {
+    const f = snapshotCanvas();
+    const controller = new AbortController();
+    const { owner, source, frame } = await snapshotImage(controller);
+    const detached = new SnapshotBitmap(32, 16);
+    f.capture.mockImplementation(() => {
+      if (mode === 'release') frame.release();
+      else if (mode === 'dispose') owner.dispose();
+      else controller.abort();
+      return detached;
+    });
+    expect(() => frame.snapshot()).toThrow(mode === 'abort' ? 'aborted' : 'disposed');
+    expect(detached.close).toHaveBeenCalledOnce();
+    expect(f.canvases[0]).toMatchObject({ width: 0, height: 0 });
+    owner.dispose();
+    expect(source.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps the original lease usable after a fixed snapshot-only transfer failure', async () => {
+  const f = snapshotCanvas();
+  const { owner, source, frame } = await snapshotImage();
+  f.capture.mockImplementationOnce(() => {
+    throw new Error('private transfer details');
+  });
+  expect(() => frame.snapshot()).toThrow('presentation-media:decode');
+  expect(source.close).not.toHaveBeenCalled();
+  expect(f.canvases[0]).toMatchObject({ width: 0, height: 0 });
+  const retry = frame.snapshot();
+  expect(retry).toBe(f.transferred[0]);
+  frame.release();
+  owner.dispose();
+  retry.close();
+});
+
+it('reports a fixed snapshot failure when OffscreenCanvas is unavailable without retiring the lease', async () => {
+  vi.stubGlobal('OffscreenCanvas', undefined);
+  const { owner, source, frame } = await snapshotImage();
+  expect(() => frame.snapshot()).toThrow('presentation-media:decode');
+  expect(source.close).not.toHaveBeenCalled();
+  frame.release();
+  owner.dispose();
+  expect(source.close).toHaveBeenCalledOnce();
 });

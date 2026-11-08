@@ -6307,12 +6307,34 @@
     {
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-bookend-preview-gpu.spec.ts",
       "symbol": "test callback",
-      "astHash": "c54652d04d42ce520d7949871d6dac3d6c09aba1f35aca00acc96915571735e8",
+      "astHash": "4b73aac96cc033b7bc29ce049e26869d77e60baab4a6cc1eae74896fecb14bde",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
       "rule": "structural-function-risk",
       "owner": "tooling:test:e2e",
-      "reason": "tool-noise: One Native preset session proves image selection, fit/pan draft, Escape restoration, commit/Undo, replacement with video and private trim. A single seeded project, pinned main transport, saved baseline, inspector surface and cleanup connect these transitions. Splitting fixtures would lose same-session source replacement proof. The synthetic pixel attachment belongs to that comparison. Reported state authorities are viewport and timeout configuration rather than product writers. Independent read-only structural diagnosis confirmed Keep. Fresh candidate review must validate this exact binding.",
+      "reason": "tool-noise: One Native preset session proves image selection, fit/pan draft, Escape restoration, commit/Undo, replacement with video and private trim. A single seeded project, pinned main transport, saved baseline, inspector surface and cleanup connect these transitions. Splitting fixtures would lose same-session source replacement proof. The synthetic pixel attachment belongs to that comparison. Reported state authorities are viewport and timeout configuration rather than product writers. Independent read-only structural diagnosis confirmed Keep. Fresh candidate review must validate this exact binding. This candidate adds an opaque-output alpha assertion to the same Native preset session. No fixture, transport or cleanup authority changes. Fresh candidate review must verify this updated binding.",
       "removalCondition": "Remove when AST or signature changes. Reassess independent fixtures, scenario state, transport ownership or cleanup lifetimes. Remove when the analyzer models this cohesive acceptance session.",
+      "reviewDate": "2026-11-08"
+    },
+    {
+      "file": "apps/extension/src/gallery/video-review/presentation-media-paint.ts",
+      "symbol": "createPresentationMediaPaintOwner",
+      "astHash": "fce69c32f1afe06d03f3b4066cefdf5958bc89b6faf693ec89f09360d7f25470",
+      "signatureHash": "69c8c50462d2e19a5c269d37611c1e332609753619e95f3c8415c7f07d8dedbc",
+      "rule": "structural-function-risk",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: One source snapshot and serial latest-request lifetime owns acquisition, cancellation, GPU completion and retirement. The source lease ends before GPU work; the detached bitmap remains valid through its fence. These transitions share one cache and generation. The mounted hook owns source admission and UI state; the shared producer and presenter own composition and publication. The outer closure has one cohesion cluster and its length causes this finding. Controlled lifetime tests and actual backend-switch pixel proof cover the invariant. Fresh independent review must validate this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent source, queue, writer, fixture, transport, completion or cleanup lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-08"
+    },
+    {
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-bookend-preview-gpu.spec.ts",
+      "symbol": "test callback",
+      "astHash": "26e12f69acb0dacfb0ee0787045ee3299bd94a7f76e8278901a64f0ba6379efc",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6",
+      "rule": "structural-function-risk",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One seeded Gallery session proves image draft, cancellation, commit and Undo, then source replacement and local seek for rotated and padded video. The same history and main transport baseline verifies actual legacy and GPU preference switches. Pixel references and diagnostics belong to these source transitions. Splitting fixtures would remove the same-session replacement and retirement proof. Viewport and timeout configuration are not product writers. The existing helpers isolate pixel references. Fresh independent review must validate this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent source, queue, writer, fixture, transport, completion or cleanup lifetime. Remove when the analyzer models this cohesive owner.",
       "reviewDate": "2026-11-08"
     }
   ]

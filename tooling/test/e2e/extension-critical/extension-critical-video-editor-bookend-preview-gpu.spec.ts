@@ -200,6 +200,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         })
         .toBe(true);
       const containPixels = await previewPixels(front);
+      expect(
+        Math.min(...containPixels.filter((_, index) => index % 4 === 3))
+      ).toBeGreaterThanOrEqual(254);
       const framing = preset
         .locator('summary')
         .filter({ hasText: label('gallery.videoReview.presentationFraming') });

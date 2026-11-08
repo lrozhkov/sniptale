@@ -30,6 +30,8 @@ class PresentationMediaError extends Error {
 /** One caller-owned drawing lease. Release before requesting the next frame. */
 interface PresentationMediaFrame {
   draw(context: CanvasRenderingContext2D): void;
+  /** Detaches normalized source pixels; the caller owns the returned bitmap. */
+  snapshot(): ImageBitmap;
   release(): void;
 }
 
@@ -217,6 +219,37 @@ export async function createReviewPresentationMedia(args: {
                 else target.drawImage(bitmap!, x, y, width, height);
               }
             );
+          },
+          snapshot() {
+            let canvas: OffscreenCanvas | undefined;
+            let detached: ImageBitmap | undefined;
+            const assertLease = () => {
+              assertLive();
+              if (released) throw new PresentationMediaError('disposed');
+            };
+            try {
+              assertLease();
+              canvas = new OffscreenCanvas(source.width, source.height);
+              const target = canvas.getContext('2d');
+              if (!target) throw new PresentationMediaError('decode');
+              if (heldSample) heldSample.draw(target, 0, 0, source.width, source.height);
+              else target.drawImage(bitmap!, 0, 0, source.width, source.height);
+              assertLease();
+              detached = canvas.transferToImageBitmap();
+              assertLease();
+              return detached;
+            } catch (error) {
+              detached?.close();
+              signal.throwIfAborted();
+              throw error instanceof PresentationMediaError
+                ? error
+                : new PresentationMediaError('decode', { cause: error });
+            } finally {
+              if (canvas) {
+                canvas.width = 0;
+                canvas.height = 0;
+              }
+            }
           },
           release() {
             if (released) return;

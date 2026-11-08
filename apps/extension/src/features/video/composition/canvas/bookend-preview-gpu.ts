@@ -59,6 +59,7 @@ function bookendLayers(
   return [
     {
       source: fill,
+      clampSourceEdges: ['left', 'top', 'right', 'bottom'],
       rect: { x: 0, y: 0, ...input.logical },
       inverse: IDENTITY,
       tint: [color.red / 255, color.green / 255, color.blue / 255, color.alpha],

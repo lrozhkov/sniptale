@@ -68,6 +68,41 @@ const spatialResourceMappings = [
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   {
+    owner: 'review-presentation-source-snapshot',
+    productionFile: 'apps/extension/src/workflows/video-review/presentation-media.ts',
+    allowCrossOwner: true,
+    reason:
+      'The additive source snapshot serves Gallery while existing Canvas leases retain export semantics.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/presentation-media.test.ts',
+      'apps/extension/src/workflows/video-review/presentation-render.test.ts',
+      'apps/extension/src/workflows/video-review/render-presentation-export.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-paint.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-presentation-media-paint',
+    productionFile: 'apps/extension/src/gallery/video-review/presentation-media-paint.ts',
+    reason:
+      'The controlled queue and mounted inspector prove detached source and completed output ownership.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/presentation-media-paint.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-presentation-media-preview',
+    productionFile: 'apps/extension/src/gallery/video-review/presentation-media-preview.tsx',
+    reason:
+      'Mounted source readiness, local seek and authoring consumers preserve inspector transactions.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/presentation-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-presentation.test.tsx',
+    ],
+  },
+  {
     owner: 'shared-bookend-preview-gpu',
     productionFile: 'apps/extension/src/features/video/composition/canvas/bookend-preview-gpu.ts',
     allowCrossOwner: true,
@@ -77,6 +112,8 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
       'apps/extension/src/features/video/composition/canvas/bookend-preview-gpu.test.ts',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.test.ts',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/presentation-media-paint.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
     ],
   },
   {
@@ -141,6 +178,8 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
       'apps/extension/src/gallery/video-review/webcam-crop-paint.test.ts',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-paint.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
     ],
   },
   {
