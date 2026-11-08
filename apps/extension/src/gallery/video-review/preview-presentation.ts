@@ -38,7 +38,11 @@ interface Dependencies<Scene, Prepared, Captured, Completed> {
     request: ReviewPresentationRequest<Scene>,
     signal: AbortSignal
   ): Promise<ReviewPresentationLease<Prepared>>;
-  capture(prepared: Prepared, time: number): ReviewPresentationLease<Captured>;
+  capture(
+    prepared: Prepared,
+    time: number,
+    signal: AbortSignal
+  ): ReviewPresentationLease<Captured> | Promise<ReviewPresentationLease<Captured>>;
   render(
     prepared: Prepared,
     captured: Captured,
@@ -82,6 +86,13 @@ export function createReviewPresentationPaintClock() {
   };
 }
 
+function advancePresentationClock(frameRate: number | null, since: number, now: number) {
+  if (!frameRate || !Number.isFinite(since)) return now;
+  const period = 1000 / frameRate;
+  // Keep the cadence phase; delivery jitter must not add another period to every frame.
+  return since + Math.max(1, Math.floor((now - since + 0.1) / period)) * period;
+}
+
 /** Bounded request leases retain ordered publication; native transport remains an injected read. */
 export function createReviewPreviewPresentation<Scene, Prepared, Captured, Completed>(
   dependencies: Dependencies<Scene, Prepared, Captured, Completed>
@@ -102,13 +113,8 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
   // Browser frame clocks can round a 30 FPS interval to 33.3 ms.
   const due = (since: number) =>
     !state?.frameRate || dependencies.now() - since >= 1000 / state.frameRate - 0.1;
-  const advanceClock = (since: number) => {
-    const now = dependencies.now();
-    if (!state?.frameRate || !Number.isFinite(since)) return now;
-    const period = 1000 / state.frameRate;
-    // Keep the cadence phase; delivery jitter must not add another period to every frame.
-    return since + Math.max(1, Math.floor((now - since + 0.1) / period)) * period;
-  };
+  const advanceClock = (since: number) =>
+    advancePresentationClock(state?.frameRate ?? null, since, dependencies.now());
   const cancelTick = () => {
     if (tick !== null) dependencies.cancelTick(tick);
     tick = null;
@@ -173,7 +179,8 @@ export function createReviewPreviewPresentation<Scene, Prepared, Captured, Compl
       request.time = description.playing ? dependencies.sampleTime() : description.pausedTime;
       if (!Number.isFinite(request.time)) throw new Error('Invalid presentation time');
       if (!current(version)) return;
-      captured = dependencies.capture(prepared.value, request.time);
+      const capture = dependencies.capture(prepared.value, request.time, controller.signal);
+      captured = capture instanceof Promise ? await capture : capture;
       if (!current(version)) return;
       completed = await dependencies.render(
         prepared.value,

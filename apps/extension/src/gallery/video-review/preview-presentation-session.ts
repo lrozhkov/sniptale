@@ -14,7 +14,16 @@ import {
 } from './preview-presentation';
 import type { useReviewCutTransitionProvider } from './cut-transition-preview';
 import { createReviewWebcamPreviewSource } from './webcam-preview';
-import { captureReviewPreviewFrame } from './preview-presentation-frame';
+import {
+  captureReviewPreviewFrame,
+  captureDecodedReviewPreviewFrame,
+} from './preview-presentation-frame';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+  type PreviewSourceDemand,
+  type PreviewSourceLease,
+} from '../../workflows/video/preview-source';
 import { createPresentationAdmission } from './preview-presentation-admission';
 import {
   createReviewExportDiagnostics,
@@ -73,6 +82,11 @@ class ManualPresentationSession {
   private clockActive = false;
   private readonly admission: ReturnType<typeof createPresentationAdmission>;
   private contextLost = false;
+  private sourceProvider: PreviewSourceProvider | null = null;
+  private sourceReady = false;
+  private sourceUnsupported = false;
+  private sourceDiscontinuity = true;
+  private clockSample: { sourceTime: number; resultTime: number } | null = null;
   private sourceFrameCallback: number | null = null;
   private renderer: Renderer;
   private rendererPreference: VideoPreviewRenderer;
@@ -179,8 +193,10 @@ class ManualPresentationSession {
 
   private sampleTime = () => {
     const node = this.latest().input.video.current;
-    const time = node && this.latest().input.sourceToResult(node.currentTime);
-    if (time === null || time === undefined) throw new PendingPresentation();
+    const sourceTime = node?.currentTime;
+    const time = sourceTime === undefined ? null : this.latest().input.sourceToResult(sourceTime);
+    if (time === null || sourceTime === undefined) throw new PendingPresentation();
+    this.clockSample = { sourceTime, resultTime: time };
     return time;
   };
 
@@ -191,6 +207,7 @@ class ManualPresentationSession {
     if (this.rendererPreference !== rendererPreference) {
       // The presentation scheduler drains the previous render before preparing this scene.
       this.renderer.dispose();
+      this.resetSource();
       this.rendererPreference = rendererPreference;
       this.renderer = this.createRenderer();
       this.admission.resetAssets();
@@ -209,6 +226,12 @@ class ManualPresentationSession {
         : request.time;
     if (!this.video || this.video.seeking || this.video.readyState < 2)
       throw new PendingPresentation();
+    if (this.canDecodeSource() && !this.sourceReady && !this.sourceUnsupported)
+      await this.prepareSource(
+        this.latest().input.playing ? this.video.currentTime : request.scene.sourceTime,
+        signal
+      );
+    signal.throwIfAborted();
     const transition = this.latest().cut.read(this.resultTime);
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
@@ -231,7 +254,7 @@ class ManualPresentationSession {
     return { value: prepared, release: () => prepared.release() };
   };
 
-  private capture = (prepared: Prepared, time: number) => {
+  private capture = (prepared: Prepared, time: number, signal: AbortSignal) => {
     const video = this.video;
     if (!this.current || !video || video.seeking || video.readyState < 2)
       throw new PendingPresentation();
@@ -240,15 +263,20 @@ class ManualPresentationSession {
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
-    const captured = captureReviewPreviewFrame({
+    const sourceTime = this.latest().input.playing
+      ? this.clockSample?.resultTime === time
+        ? this.clockSample.sourceTime
+        : video.currentTime
+      : this.current.sourceTime;
+    const args = {
       video,
       description: this.current,
       sequence: this.sequence,
       time,
       transition,
-      sourceTime: () =>
-        this.latest().input.playing ? video.currentTime : this.current!.sourceTime,
-      reserveSource: (bytes) => this.admission.reserveSource(bytes, prepared.allocationAssets),
+      sourceTime: () => sourceTime,
+      reserveSource: (bytes: number) =>
+        this.admission.reserveSource(bytes, prepared.allocationAssets),
       captureCamera: () =>
         capturePresentationCamera(
           this.latest(),
@@ -257,7 +285,10 @@ class ManualPresentationSession {
           this.cameraSource,
           this.admission.cameraResources
         ),
-    });
+    };
+    if (this.sourceReady && this.canDecodeSource())
+      return this.captureDecoded(args, sourceTime, signal);
+    const captured = captureReviewPreviewFrame(args);
     if (!captured) {
       if (
         this.sourceFrameCallback === null &&
@@ -272,6 +303,91 @@ class ManualPresentationSession {
     this.cancelSourceFrameCallback();
     return captured;
   };
+
+  private canDecodeSource() {
+    return (
+      this.rendererPreference === 'gpu' &&
+      typeof navigator !== 'undefined' &&
+      !!navigator.gpu &&
+      typeof VideoDecoder !== 'undefined' &&
+      typeof VideoFrame !== 'undefined'
+    );
+  }
+
+  private resetSource() {
+    this.sourceProvider?.dispose();
+    this.sourceProvider = null;
+    this.sourceReady = this.sourceUnsupported = false;
+    this.sourceDiscontinuity = true;
+    this.clockSample = null;
+  }
+
+  private sourceDemand(time: number): PreviewSourceDemand {
+    const duration = this.video?.duration;
+    return {
+      id: 'source',
+      url: this.sourceIdentity,
+      time,
+      rangeStart: 0,
+      ...(duration !== undefined && Number.isFinite(duration) && duration > 0
+        ? { rangeEnd: duration, holdEnd: true }
+        : {}),
+    };
+  }
+
+  private async prepareSource(time: number, signal: AbortSignal) {
+    const provider = (this.sourceProvider ??= createPreviewSourceProvider());
+    const lease = await provider.acquire([this.sourceDemand(time)], signal, {
+      discontinuity: true,
+    });
+    try {
+      signal.throwIfAborted();
+      if (this.disposed || this.sourceProvider !== provider) throw new PendingPresentation();
+      this.sourceReady = lease !== null;
+      this.sourceUnsupported = lease === null;
+    } finally {
+      lease?.release();
+    }
+  }
+
+  private async captureDecoded(
+    args: Parameters<typeof captureReviewPreviewFrame>[0],
+    sourceTime: number,
+    signal: AbortSignal
+  ) {
+    const provider = this.sourceProvider;
+    if (!provider) throw new PendingPresentation();
+    signal.throwIfAborted();
+    // Camera and source targets are frozen before the decoder can yield to another media tick.
+    let camera = args.captureCamera();
+    let lease: PreviewSourceLease | null = null;
+    const discontinuity = this.sourceDiscontinuity || !this.latest().input.playing;
+    this.sourceDiscontinuity = false;
+    try {
+      lease = await provider.acquire([this.sourceDemand(sourceTime)], signal, { discontinuity });
+      signal.throwIfAborted();
+      if (this.disposed || this.sourceProvider !== provider) throw new PendingPresentation();
+      const binding = lease?.bindings.get('source');
+      if (!binding || !lease) throw new Error('Preview source frame is unavailable.');
+      const ownedSource = lease;
+      lease = null;
+      const captured = captureDecodedReviewPreviewFrame({
+        ...args,
+        binding,
+        releaseSource: () => ownedSource.release(),
+        captureCamera: () => {
+          const accepted = camera;
+          camera = undefined;
+          return accepted;
+        },
+      });
+      this.cancelSourceFrameCallback();
+      return captured;
+    } finally {
+      camera?.release();
+      lease?.release();
+    }
+  }
 
   private cancelSourceFrameCallback() {
     if (this.sourceFrameCallback === null) return;
@@ -396,6 +512,7 @@ class ManualPresentationSession {
   };
 
   private seeking = () => {
+    this.sourceDiscontinuity = true;
     this.renderer.cancelWarmAnnotations?.();
     this.publications.length = 0;
     this.waiting = true;
@@ -492,6 +609,7 @@ class ManualPresentationSession {
     this.waiting = false;
     this.scheduler.invalidate();
     this.renderer.dispose();
+    this.resetSource();
     this.renderer = this.createRenderer();
     this.admission.resetAssets();
     this.contextLost = false;
@@ -505,6 +623,7 @@ class ManualPresentationSession {
     this.reportClock(false);
     this.cancelSourceFrameCallback();
     this.scheduler.dispose();
+    this.resetSource();
     for (const event of ['loadeddata', 'seeked', 'timeupdate'])
       this.video?.removeEventListener(event, this.ready);
     this.video?.removeEventListener('seeking', this.seeking);

@@ -13,6 +13,8 @@ export interface PreviewSourceDemand {
   readonly time: number;
   readonly rangeStart?: number;
   readonly rangeEnd?: number;
+  /** Explicit terminal hold requires a finite retained media endpoint. */
+  readonly holdEnd?: boolean;
 }
 
 /** An immutable drawable and its actual presentation interval, in seconds. */
@@ -23,6 +25,8 @@ export interface PreviewSourceBinding {
   readonly target: number;
   /** Present only when bounded leading-gap admission selects a later first sample. */
   readonly sampleTime?: number;
+  /** Present only when explicit terminal intent holds the last retained video sample. */
+  readonly heldAtEnd?: true;
   readonly url: string;
 }
 
@@ -178,8 +182,13 @@ function validateDemands(demands: readonly PreviewSourceDemand[]): void {
       (demand.rangeStart !== undefined &&
         (!Number.isFinite(demand.rangeStart) ||
           demand.time < demand.rangeStart - ROUNDING_SECONDS)) ||
+      (demand.holdEnd === true &&
+        (demand.rangeEnd === undefined || !Number.isFinite(demand.rangeEnd))) ||
       (demand.rangeEnd !== undefined &&
-        (!Number.isFinite(demand.rangeEnd) || demand.time >= demand.rangeEnd)) ||
+        (!Number.isFinite(demand.rangeEnd) ||
+          (demand.holdEnd === true
+            ? demand.time > demand.rangeEnd
+            : demand.time >= demand.rangeEnd))) ||
       (demand.rangeStart !== undefined &&
         demand.rangeEnd !== undefined &&
         demand.rangeStart >= demand.rangeEnd)
@@ -187,6 +196,23 @@ function validateDemands(demands: readonly PreviewSourceDemand[]): void {
       throw unavailable();
     ids.add(demand.id);
   }
+}
+
+/** Terminal intent is separate from ordinary half-open sample coverage. */
+function terminalSourceTime(demand: PreviewSourceDemand, end: number): number | undefined {
+  if (demand.holdEnd !== true) return undefined;
+  const bound = demand.rangeEnd;
+  if (bound === undefined || !Number.isFinite(bound)) throw unavailable();
+  if (demand.time < end && (demand.time !== bound || bound + ROUNDING_SECONDS < end)) {
+    if (demand.time === bound) throw unavailable();
+    return undefined;
+  }
+  const endpoint = Math.min(end, bound);
+  if (endpoint <= 0) throw unavailable();
+  const view = new DataView(new ArrayBuffer(8));
+  view.setFloat64(0, endpoint);
+  view.setBigUint64(0, view.getBigUint64(0) - 1n);
+  return view.getFloat64(0);
 }
 
 class PreviewSourceOwner implements PreviewSourceProvider {
@@ -520,6 +546,7 @@ class PreviewSourceOwner implements PreviewSourceProvider {
         }
         const discontinuity = request.discontinuity && !visited.has(demand.url);
         visited.add(demand.url);
+        const terminalTime = terminalSourceTime(demand, stream.end);
         const leading = stream.leadingSampleTime;
         const sampleTime =
           leading !== undefined && Number.isFinite(leading) && leading > 0 && demand.time < leading
@@ -532,7 +559,19 @@ class PreviewSourceOwner implements PreviewSourceProvider {
             (demand.rangeEnd !== undefined && sampleTime >= demand.rangeEnd))
         )
           throw unavailable();
-        const entry = await this.select(state, sampleTime ?? demand.time, request, discontinuity);
+        const entry = await this.select(
+          state,
+          terminalTime ?? sampleTime ?? demand.time,
+          request,
+          discontinuity
+        );
+        if (
+          terminalTime !== undefined &&
+          (entry.nextTimestamp !== stream.end ||
+            (demand.rangeStart !== undefined && entry.sample.timestamp < demand.rangeStart) ||
+            (demand.rangeEnd !== undefined && entry.sample.timestamp >= demand.rangeEnd))
+        )
+          throw unavailable();
         if (
           sampleTime !== undefined &&
           Math.abs(entry.sample.timestamp - sampleTime) > ROUNDING_SECONDS
@@ -549,6 +588,7 @@ class PreviewSourceOwner implements PreviewSourceProvider {
             nextTimestamp: entry.nextTimestamp!,
             target: demand.time,
             ...(sampleTime === undefined ? {} : { sampleTime }),
+            ...(terminalTime === undefined ? {} : { heldAtEnd: true as const }),
             url: demand.url,
           })
         );

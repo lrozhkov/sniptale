@@ -1,4 +1,9 @@
-import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
+import { VideoSample } from 'mediabunny';
+import type { PreviewSourceBinding } from '../../workflows/video/preview-source';
+import {
+  prepareDecodedVideoFrame,
+  prepareDecodedVideoSample,
+} from '../../features/video/composition/draw/decoded-sample';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import type { ReviewWebcamFrameLease } from './webcam-preview';
 import type { useReviewCutTransitionProvider } from './cut-transition-preview';
@@ -96,6 +101,101 @@ export function captureReviewPreviewFrame(args: {
   } catch (error) {
     release();
     throw error;
+  }
+}
+
+/** Takes ownership of a decoded source lease, including every failed capture attempt. */
+export function captureDecodedReviewPreviewFrame(args: {
+  binding: PreviewSourceBinding;
+  releaseSource(): void;
+  description: Description;
+  sequence: number;
+  time: number;
+  transition: ReturnType<ReturnType<typeof useReviewCutTransitionProvider>['read']>;
+  reserveSource(bytes: number): { release(): void };
+  captureCamera(): ReviewWebcamFrameLease | undefined;
+}) {
+  let raw: VideoFrame | undefined;
+  let sample: VideoSample | undefined;
+  let gpu: VideoFrame | undefined;
+  let reservation: { release(): void } | undefined;
+  let camera: ReviewWebcamFrameLease | undefined;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    camera?.release();
+    gpu?.close();
+    sample?.close();
+    raw?.close();
+    args.releaseSource();
+    reservation?.release();
+  };
+  try {
+    raw = args.binding.source.toVideoFrame?.();
+    if (!raw) throw new Error('Decoded source is unavailable.');
+    reservation = args.reserveSource(previewSourceFrameBytes(raw));
+    sample = new VideoSample(raw, {
+      timestamp: args.binding.timestamp,
+      rotation: args.binding.source.orientation?.rotation ?? 0,
+      flip: args.binding.source.orientation?.flip ?? false,
+    });
+    raw = undefined;
+    camera = args.captureCamera();
+    const currentSample = () => {
+      if (released || !sample) throw new Error('Preview source frame is unavailable.');
+      return sample;
+    };
+    const frame: RenderFrame = {
+      generation: args.sequence,
+      fps: args.description.fps ?? 30,
+      sourceTime: args.binding.target,
+      resultTime: args.time,
+      source: {
+        timestamp: args.binding.timestamp,
+        ...(args.binding.source.orientation
+          ? { orientation: args.binding.source.orientation }
+          : {}),
+        backing: previewTransitionBacking(args.description, args.time),
+        videoFrame: () => (gpu ??= currentSample().toVideoFrame()),
+        prepare: async (signal) => {
+          const previous = currentSample();
+          gpu?.close();
+          gpu = undefined;
+          // The normalization owner consumes the sample, including cancellation failure.
+          sample = undefined;
+          const prepared = await prepareDecodedVideoSample(previous, signal);
+          if (released) {
+            prepared.close();
+            throw new Error('Preview source frame is unavailable.');
+          }
+          sample = prepared;
+        },
+        draw: (context, x, y, width, height) => currentSample().draw(context, x, y, width, height),
+      },
+      ...(camera
+        ? {
+            camera: {
+              representedMediaTime: camera.representedMediaTime,
+              generation: camera.generation,
+              source: camera.source,
+              placement: camera.placement,
+              drawable: camera.drawable,
+              ...(camera.crop ? { crop: camera.crop } : {}),
+            },
+          }
+        : {}),
+      ...(args.description.cameraTransform
+        ? { cameraTransform: args.description.cameraTransform }
+        : {}),
+      ...(args.transition?.frames
+        ? { transition: { blend: args.transition.blend, frames: args.transition.frames } }
+        : {}),
+    };
+    return { value: frame, release };
+  } catch {
+    release();
+    throw new Error('Preview source frame is unavailable.');
   }
 }
 

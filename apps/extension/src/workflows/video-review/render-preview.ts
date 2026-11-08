@@ -1,3 +1,4 @@
+import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import { createReviewPreviewFrameExecution } from './preview-frame-execution';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import { planReviewExportSource } from './export-source-plan';
@@ -102,8 +103,8 @@ type CanvasPublicationOutput = RenderCanvasLease & {
   isRetiredProvider?: never;
 };
 type PublicationOutput = CanvasPublicationOutput | ReviewGpuPresentedFrame;
-type Drawable = {
-  videoFrame?(): VideoFrame;
+type Drawable = Pick<VideoCompositionFrameSource, 'orientation'> & {
+  videoFrame?(): VideoFrame; // Borrowed until the captured frame lease is released.
   draw(
     context: CanvasRenderingContext2D,
     x: number,
@@ -123,8 +124,6 @@ type Frame = {
     timestamp: number;
     backing: Size;
     prepare?(signal: AbortSignal): Promise<void>;
-    /** Borrowed until the captured frame lease is released, after render completion. */
-    videoFrame?(): VideoFrame;
   };
   camera?: {
     representedMediaTime: number;
@@ -526,6 +525,7 @@ async function drawPreparedFrame(
       dimensions,
       geometry,
       frame: raw,
+      orientation: frame.source.orientation,
       sourceTime: frame.sourceTime,
       header: assets.header,
       image: assets.background,

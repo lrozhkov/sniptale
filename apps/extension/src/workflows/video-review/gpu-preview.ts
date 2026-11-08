@@ -1,3 +1,4 @@
+import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import {
   reviewGpuAnnotationLayer,
   reviewGpuAnnotationGroup,
@@ -46,6 +47,7 @@ interface ReviewGpuRenderInput {
   dimensions: Dimensions;
   geometry: ReviewPresentedGeometry;
   frame: VideoFrame;
+  orientation?: VideoCompositionFrameSource['orientation'];
   sourceTime: number;
   context: CanvasRenderingContext2D;
   header: ImageBitmap | null;
@@ -515,7 +517,7 @@ export function createReviewGpuPreview(args: {
             sourceTime: side.sample.timestamp,
             orientation:
               side.sample === moving
-                ? undefined
+                ? input.orientation
                 : { rotation: side.sample.rotation ?? 0, flip: side.sample.flip ?? false },
           });
           if (annotationHolds.slice(firstHold).every((hold) => hold.independent))
@@ -558,7 +560,7 @@ export function createReviewGpuPreview(args: {
       } else {
         let source = input.frame;
         let sourceTime = input.sourceTime;
-        let orientation: GpuPreviewLayer['orientation'];
+        let orientation = input.orientation;
         if (input.transition) {
           const sides = reviewCutTransitionSides(
             input.transition.blend,
