@@ -1,3 +1,4 @@
+import type { GpuPreviewOutput } from '../../../../features/video/composition/canvas/preview-presentation';
 import { isClipActiveAtTime } from '../../../../features/video/project/timeline/basics';
 import {
   resolveVideoProjectCompositionJoinPlans,
@@ -107,21 +108,29 @@ export function createVideoPreviewCompositionJoinRenderer(
       const signal = input.signal
         ? AbortSignal.any([input.signal, current.controller.signal])
         : current.controller.signal;
+      let untransferredOutput: GpuPreviewOutput | undefined;
       try {
         const frame = await current.materializer.renderFrameWithPresentation(
           input.currentTime,
           signal,
           input.cameraOverride,
-          undefined,
+          input.acquireGpuOutput,
           input.effectPreparation
         );
+        untransferredOutput = frame.presentation.output;
         signal.throwIfAborted();
+        if (untransferredOutput) {
+          untransferredOutput = undefined;
+          return frame.presentation;
+        }
         const published = publishPreviewCompositionFrame({ ...input, signal }, frame.canvas);
         return published === false ? false : frame.presentation;
       } catch (error) {
         if (signal.aborted) return false;
         releaseSampler();
         throw error;
+      } finally {
+        untransferredOutput?.release();
       }
     },
   };

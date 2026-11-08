@@ -68,6 +68,21 @@ const spatialResourceMappings = [
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   {
+    owner: 'native-materialized-frame-publication',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/scene/joins.ts',
+    reason:
+      'Materialized output ownership crosses the stage adapter, scheduler, presenter and viewport geometry.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/scene/joins.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/render-scheduler.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/canvas.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/index.test.tsx',
+      'apps/extension/src/features/video/composition/canvas/preview-presentation.test.ts',
+    ],
+  },
+  {
     owner: 'review-presentation-source-snapshot',
     productionFile: 'apps/extension/src/workflows/video-review/presentation-media.ts',
     allowCrossOwner: true,
