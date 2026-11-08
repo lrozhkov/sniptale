@@ -205,3 +205,135 @@ it.each([0.5, 1 - 0.000003])(
     f.provider.dispose();
   }
 );
+
+it.each(['cold', 'warm', 'pruned'] as const)(
+  'holds the retained predecessor from a %s source',
+  async (mode) => {
+    const f = fixture([0, 0.3, 0.5, 0.9]);
+    if (mode === 'warm') (await f.provider.acquire([demand(0.32)], signal()))?.release();
+    if (mode === 'pruned') (await f.provider.acquire([demand(0.6)], signal()))?.release();
+    const request = { ...demand(0.5, 0.5), holdEnd: false, endpoint: 'retained-end' as const };
+    const lease = await f.provider.acquire([request], signal());
+    expect(binding(lease)).toMatchObject({
+      target: 0.5,
+      timestamp: 0.3,
+      nextTimestamp: 0.5,
+      heldAtRetainedEnd: true,
+    });
+    expect(binding(lease)).not.toHaveProperty('heldAtEnd');
+    expect(binding(lease)).not.toHaveProperty('sampleTime');
+    f.provider.dispose();
+    expect(f.clones.at(-1)!.close).not.toHaveBeenCalled();
+    lease?.release();
+    lease?.release();
+    expect(f.clones.at(-1)!.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps mixed ordinary and retained endpoint requests on their actual intervals', async () => {
+  const f = fixture([0, 0.3, 0.5, 0.9]);
+  const lease = await f.provider.acquire(
+    [
+      { ...demand(0.5, 0.5), holdEnd: false, endpoint: 'retained-end' as const },
+      { id: 'ordinary', url: 'blob:source', time: 0.5 },
+    ],
+    signal()
+  );
+  expect(binding(lease)).toMatchObject({
+    timestamp: 0.3,
+    nextTimestamp: 0.5,
+    target: 0.5,
+    heldAtRetainedEnd: true,
+  });
+  expect(lease?.bindings.get('ordinary')).toMatchObject({
+    timestamp: 0.5,
+    nextTimestamp: 0.9,
+    target: 0.5,
+  });
+  expect(lease?.bindings.get('ordinary')).not.toHaveProperty('heldAtRetainedEnd');
+  lease?.release();
+  f.provider.dispose();
+});
+
+it.each([0.4, 1, 1.2])('holds a bounded retained endpoint at %s without retiming', async (end) => {
+  const f = fixture();
+  const lease = await f.provider.acquire(
+    [{ ...demand(end, end), holdEnd: false, endpoint: 'retained-end' as const }],
+    signal()
+  );
+  expect(binding(lease)).toMatchObject({
+    target: end,
+    timestamp: end === 0.4 ? 0.3 : 0.9,
+    nextTimestamp: end === 0.4 ? 0.9 : 1,
+    heldAtRetainedEnd: true,
+  });
+  lease?.release();
+  f.provider.dispose();
+});
+
+it.each([
+  { ...demand(0.5, 0.5), endpoint: 'retained-end' as const },
+  { ...demand(0.4, 0.5), holdEnd: false, endpoint: 'retained-end' as const },
+  { ...demand(0, 0), holdEnd: false, endpoint: 'retained-end' as const },
+])('rejects invalid retained endpoint intent %j before opening', async (request) => {
+  const f = fixture();
+  await expect(f.provider.acquire([request], signal())).rejects.toThrow(
+    'Preview source frame is unavailable.'
+  );
+  expect(f.open).not.toHaveBeenCalled();
+  f.provider.dispose();
+});
+
+it.each([0.499999, 0.5, 0.500001])('keeps strict retained membership at %s', async (end) => {
+  const f = fixture([0, 0.3, 0.5, 0.9]);
+  (await f.provider.acquire([demand(0.32)], signal()))?.release();
+  const lease = await f.provider.acquire(
+    [{ ...demand(end, end), holdEnd: false, endpoint: 'retained-end' as const }],
+    signal()
+  );
+  expect(binding(lease)).toMatchObject({
+    target: end,
+    timestamp: end <= 0.5 ? 0.3 : 0.5,
+    nextTimestamp: end <= 0.5 ? 0.5 : 0.9,
+  });
+  lease?.release();
+  f.provider.dispose();
+});
+
+it('restarts a pruned predecessor after an ordinary request in the same acquisition', async () => {
+  const f = fixture([0, 0.3, 0.5, 0.9]);
+  const lease = await f.provider.acquire(
+    [
+      { id: 'ordinary', url: 'blob:source', time: 0.5 },
+      { ...demand(0.5, 0.5), holdEnd: false, endpoint: 'retained-end' as const },
+    ],
+    signal()
+  );
+  expect(lease?.bindings.get('ordinary')).toMatchObject({ timestamp: 0.5, nextTimestamp: 0.9 });
+  expect(binding(lease)).toMatchObject({
+    timestamp: 0.3,
+    nextTimestamp: 0.5,
+    heldAtRetainedEnd: true,
+  });
+  expect(f.starts).toHaveLength(2);
+  expect(f.clones.every((sample) => vi.mocked(sample.close).mock.calls.length === 0)).toBe(true);
+  f.provider.dispose();
+  lease?.release();
+  expect(f.clones.every((sample) => vi.mocked(sample.close).mock.calls.length === 1)).toBe(true);
+});
+
+it('releases a retained endpoint loan when a later ordinary demand fails', async () => {
+  const f = fixture();
+  await expect(
+    f.provider.acquire(
+      [
+        { ...demand(0.5, 0.5), holdEnd: false, endpoint: 'retained-end' as const },
+        { id: 'ordinary', url: 'blob:source', time: 1 },
+      ],
+      signal()
+    )
+  ).rejects.toThrow('Preview source frame is unavailable.');
+  expect(f.clones).toHaveLength(1);
+  expect(f.clones[0]!.close).toHaveBeenCalledOnce();
+  f.provider.dispose();
+});

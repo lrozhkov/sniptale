@@ -15,6 +15,8 @@ export interface PreviewSourceDemand {
   readonly rangeEnd?: number;
   /** Explicit terminal hold requires a finite retained media endpoint. */
   readonly holdEnd?: boolean;
+  /** Explicit left-hand limit of the retained interval, including an interior cut endpoint. */
+  readonly endpoint?: 'retained-end';
 }
 
 /** An immutable drawable and its actual presentation interval, in seconds. */
@@ -27,6 +29,8 @@ export interface PreviewSourceBinding {
   readonly sampleTime?: number;
   /** Present only when explicit terminal intent holds the last retained video sample. */
   readonly heldAtEnd?: true;
+  /** The source interval covers the strict left-hand limit of the requested retained end. */
+  readonly heldAtRetainedEnd?: true;
   readonly url: string;
 }
 
@@ -182,11 +186,17 @@ function validateDemands(demands: readonly PreviewSourceDemand[]): void {
       (demand.rangeStart !== undefined &&
         (!Number.isFinite(demand.rangeStart) ||
           demand.time < demand.rangeStart - ROUNDING_SECONDS)) ||
+      (demand.endpoint === 'retained-end' &&
+        (demand.holdEnd === true ||
+          demand.rangeEnd === undefined ||
+          !Number.isFinite(demand.rangeEnd) ||
+          demand.rangeEnd <= 0 ||
+          demand.time !== demand.rangeEnd)) ||
       (demand.holdEnd === true &&
         (demand.rangeEnd === undefined || !Number.isFinite(demand.rangeEnd))) ||
       (demand.rangeEnd !== undefined &&
         (!Number.isFinite(demand.rangeEnd) ||
-          (demand.holdEnd === true
+          (demand.holdEnd === true || demand.endpoint === 'retained-end'
             ? demand.time > demand.rangeEnd
             : demand.time >= demand.rangeEnd))) ||
       (demand.rangeStart !== undefined &&
@@ -209,6 +219,10 @@ function terminalSourceTime(demand: PreviewSourceDemand, end: number): number | 
   }
   const endpoint = Math.min(end, bound);
   if (endpoint <= 0) throw unavailable();
+  return beforeEndpoint(endpoint);
+}
+
+function beforeEndpoint(endpoint: number) {
   const view = new DataView(new ArrayBuffer(8));
   view.setFloat64(0, endpoint);
   view.setBigUint64(0, view.getBigUint64(0) - 1n);
@@ -393,7 +407,18 @@ class PreviewSourceOwner implements PreviewSourceProvider {
     }
   }
 
-  private covering(state: SourceState, target: number): SampleEntry | undefined {
+  private covering(
+    state: SourceState,
+    target: number,
+    retainedEnd?: number
+  ): SampleEntry | undefined {
+    if (retainedEnd !== undefined)
+      return state.ring.findLast(
+        (item) =>
+          item.sample.timestamp < retainedEnd &&
+          item.nextTimestamp !== null &&
+          item.nextTimestamp >= retainedEnd
+      );
     const entry = state.ring.findLast((item) => item.sample.timestamp <= target + ROUNDING_SECONDS);
     return entry?.nextTimestamp !== null &&
       entry?.nextTimestamp !== undefined &&
@@ -473,10 +498,11 @@ class PreviewSourceOwner implements PreviewSourceProvider {
     state: SourceState,
     target: number,
     request: Acquisition,
-    discontinuity: boolean
+    discontinuity: boolean,
+    retainedEnd?: number
   ): Promise<SampleEntry> {
     if (!state.stream || target >= state.stream.end) throw unavailable();
-    const cached = this.covering(state, target);
+    const cached = this.covering(state, target, retainedEnd);
     if (cached) {
       this.pruneConsumed(state, target, cached);
       return cached;
@@ -484,17 +510,21 @@ class PreviewSourceOwner implements PreviewSourceProvider {
     if (
       !state.iterator ||
       discontinuity ||
-      (state.ring.length > 0 && target + ROUNDING_SECONDS < state.ring[0]!.sample.timestamp)
+      (state.ring.length > 0 &&
+        target + (retainedEnd === undefined ? ROUNDING_SECONDS : 0) <
+          state.ring[0]!.sample.timestamp)
     )
       await this.restart(state, target, request);
     while (true) {
       this.check(request, state);
-      const entry = this.covering(state, target);
+      const entry = this.covering(state, target, retainedEnd);
       this.pruneConsumed(state, target, entry);
       if (entry) return entry;
       if (
         state.eof ||
-        (state.ring.length > 0 && target + ROUNDING_SECONDS < state.ring[0]!.sample.timestamp)
+        (state.ring.length > 0 &&
+          target + (retainedEnd === undefined ? ROUNDING_SECONDS : 0) <
+            state.ring[0]!.sample.timestamp)
       )
         throw unavailable();
       await this.advance(state);
@@ -546,6 +576,14 @@ class PreviewSourceOwner implements PreviewSourceProvider {
         }
         const discontinuity = request.discontinuity && !visited.has(demand.url);
         visited.add(demand.url);
+        const retainedEnd =
+          demand.endpoint === 'retained-end' ? Math.min(stream.end, demand.rangeEnd!) : undefined;
+        if (
+          retainedEnd !== undefined &&
+          (retainedEnd <= 0 ||
+            (demand.rangeStart !== undefined && retainedEnd <= demand.rangeStart))
+        )
+          throw unavailable();
         const terminalTime = terminalSourceTime(demand, stream.end);
         const leading = stream.leadingSampleTime;
         const sampleTime =
@@ -561,10 +599,21 @@ class PreviewSourceOwner implements PreviewSourceProvider {
           throw unavailable();
         const entry = await this.select(
           state,
-          terminalTime ?? sampleTime ?? demand.time,
+          retainedEnd !== undefined
+            ? beforeEndpoint(retainedEnd)
+            : (terminalTime ?? sampleTime ?? demand.time),
           request,
-          discontinuity
+          discontinuity,
+          retainedEnd
         );
+        if (
+          retainedEnd !== undefined &&
+          (entry.sample.timestamp >= retainedEnd ||
+            entry.nextTimestamp === null ||
+            entry.nextTimestamp < retainedEnd ||
+            (demand.rangeStart !== undefined && entry.sample.timestamp < demand.rangeStart))
+        )
+          throw unavailable();
         if (
           terminalTime !== undefined &&
           (entry.nextTimestamp !== stream.end ||
@@ -589,6 +638,7 @@ class PreviewSourceOwner implements PreviewSourceProvider {
             target: demand.time,
             ...(sampleTime === undefined ? {} : { sampleTime }),
             ...(terminalTime === undefined ? {} : { heldAtEnd: true as const }),
+            ...(retainedEnd === undefined ? {} : { heldAtRetainedEnd: true as const }),
             url: demand.url,
           })
         );

@@ -11,11 +11,13 @@ import {
 import { getFittedMediaContentFrame } from '../draw/fitted-media';
 import { traceCameraShape } from '../draw/media-shadow';
 import { cameraWindowFrame, type CameraAppearance } from '../../project/camera/appearance';
+import type { VideoCompositionFrameSource } from '../draw/media-source';
 import type { VideoMediaFitMode } from '../../project/types';
 import type { PreviewRendererStatus } from '../../preview/preferences';
 
 interface CameraCropGpuInput {
   media: HTMLVideoElement;
+  source?: VideoCompositionFrameSource;
   size: { width: number; height: number };
   appearance: CameraAppearance;
   mirrored: boolean;
@@ -101,7 +103,7 @@ export function createCameraCropGpuRenderer(
     },
     /** Undefined permits Canvas fallback; false skips stale work without replacing the front. */
     async render(input: CameraCropGpuInput): Promise<GpuPreviewOutput | undefined | false> {
-      if (disposed || input.signal.aborted || !ready(input.media)) return false;
+      if (disposed || input.signal.aborted || (!input.source && !ready(input.media))) return false;
       if (unavailable || typeof VideoFrame === 'undefined') {
         unavailable = true;
         fallbackReason ??= 'unavailable';
@@ -125,7 +127,7 @@ export function createCameraCropGpuRenderer(
       try {
         preparation ??= createBackend();
         backend = await preparation;
-        if (signal.aborted || !ready(input.media)) return false;
+        if (signal.aborted || (!input.source && !ready(input.media))) return false;
         if (!backend?.createSurface) {
           unavailable = true;
           fallbackReason = 'unavailable';
@@ -133,15 +135,17 @@ export function createCameraCropGpuRenderer(
         }
         const time = input.media.currentTime;
         const url = input.media.currentSrc || input.media.src;
-        source = new VideoFrame(input.media);
+        if (input.source && !input.source.toVideoFrame)
+          throw new Error('Camera crop source frame is unavailable.');
+        source = input.source ? input.source.toVideoFrame!() : new VideoFrame(input.media);
         const coverage = silhouette(input);
         const frame = { x: 0, y: 0, width, height };
         const rect = getFittedMediaContentFrame({
           cameraAppearance: input.appearance,
           fitMode: input.fitMode,
           frame,
-          sourceWidth: input.media.videoWidth,
-          sourceHeight: input.media.videoHeight,
+          sourceWidth: input.source?.sourceWidth ?? input.media.videoWidth,
+          sourceHeight: input.source?.sourceHeight ?? input.media.videoHeight,
         });
         target = input.acquire({ width, height }, backend);
         await target.surface.present({
@@ -150,6 +154,7 @@ export function createCameraCropGpuRenderer(
           layers: [
             {
               source,
+              ...(input.source?.orientation ? { orientation: input.source.orientation } : {}),
               rect,
               inverse: input.mirrored
                 ? [-1, 0, width, 0, 1, 0, 0, 0, 1]
@@ -165,9 +170,10 @@ export function createCameraCropGpuRenderer(
         });
         if (
           signal.aborted ||
-          !ready(input.media) ||
-          input.media.currentTime !== time ||
-          (input.media.currentSrc || input.media.src) !== url
+          (!input.source && !ready(input.media)) ||
+          (!input.source &&
+            (input.media.currentTime !== time ||
+              (input.media.currentSrc || input.media.src) !== url))
         )
           return false;
         const completed = target;

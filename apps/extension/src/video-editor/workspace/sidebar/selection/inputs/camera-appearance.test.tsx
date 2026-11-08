@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import * as cameraPreview from './camera-crop-preview';
 import { CameraAppearanceControls } from './camera-appearance';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../../features/video/project/camera/appearance';
 import {
@@ -503,3 +504,87 @@ it('keeps all direct shadow choices disabled when Native camera editing is refus
   }
   expect(onEdit).not.toHaveBeenCalled();
 });
+
+it('maps retained endpoint and held-window requests with the camera offset', () => {
+  const { project, clip } = createProps();
+  clip.startTime = 2;
+  clip.duration = 1;
+  clip.sourceStart = 1;
+  clip.sourceDuration = 2;
+  clip.playbackRate = 2;
+  clip.cameraTiming = { offsetSeconds: 0.25, transitions: 'bounded' };
+  const preview = vi.spyOn(cameraPreview, 'CameraCropPreview');
+  const draw = () =>
+    act(() =>
+      root.render(
+        <CameraAppearanceControls
+          project={project}
+          clip={clip}
+          currentTime={20}
+          disabled={false}
+          onEdit={vi.fn()}
+        />
+      )
+    );
+  draw();
+  expect(preview.mock.lastCall?.[0]).toMatchObject({
+    sourceTime: 2.75,
+    rangeStart: 0.75,
+    rangeEnd: 2.75,
+    endpoint: 'retained-end',
+  });
+  clip.playbackWindow = { offset: 0, extent: 1, holdAt: 0.2 };
+  draw();
+  expect(preview.mock.lastCall?.[0]).toMatchObject({
+    sourceTime: 1.15,
+    rangeStart: 0.75,
+    rangeEnd: 2.75,
+  });
+  expect(preview.mock.lastCall?.[0]).not.toHaveProperty('endpoint');
+});
+
+it.each([0.7, 0.9])(
+  'uses exact retained ends for fractional rate duration %s',
+  (sourceDuration) => {
+    const { project, clip } = createProps();
+    clip.startTime = 0;
+    clip.sourceStart = 0;
+    clip.sourceDuration = sourceDuration;
+    clip.playbackRate = 0.3;
+    clip.duration = sourceDuration / 0.3;
+    const rounded = clip.duration * clip.playbackRate;
+    expect(rounded).not.toBe(sourceDuration);
+    if (sourceDuration === 0.7) expect(rounded).toBeGreaterThan(sourceDuration);
+    else expect(rounded).toBeLessThan(sourceDuration);
+    const preview = vi.spyOn(cameraPreview, 'CameraCropPreview');
+    const render = () =>
+      act(() =>
+        root.render(
+          <CameraAppearanceControls
+            project={project}
+            clip={clip}
+            currentTime={20}
+            disabled={false}
+            onEdit={vi.fn()}
+          />
+        )
+      );
+    const before = structuredClone(clip);
+    render();
+    expect(preview.mock.lastCall?.[0]).toMatchObject({
+      sourceTime: sourceDuration,
+      rangeStart: 0,
+      rangeEnd: sourceDuration,
+      endpoint: 'retained-end',
+    });
+    expect(clip).toEqual(before);
+    clip.playbackWindow = { offset: 0, extent: clip.duration, holdAt: 0.5 };
+    render();
+    expect(preview.mock.lastCall?.[0]).toMatchObject({
+      sourceTime: 0.15,
+      rangeStart: 0,
+      rangeEnd: sourceDuration,
+    });
+    expect(preview.mock.lastCall?.[0]).not.toHaveProperty('endpoint');
+  }
+);

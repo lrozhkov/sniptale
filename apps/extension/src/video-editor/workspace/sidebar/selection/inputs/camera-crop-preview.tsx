@@ -1,3 +1,10 @@
+import { VideoSample } from 'mediabunny';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceLease,
+  type PreviewSourceProvider,
+} from '../../../../../workflows/video/preview-source';
+import { prepareDecodedVideoSample } from '../../../../../features/video/composition/draw/decoded-sample';
 import type { GpuPreviewOutput } from '../../../../../features/video/composition/canvas/preview-presentation';
 import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
 import { createPreviewPresentationSession } from '../../../../../features/video/composition/canvas/preview-presentation';
@@ -19,6 +26,9 @@ import { translate } from '../../../../../platform/i18n';
 interface CameraCropPreviewProps {
   url: string | undefined;
   sourceTime: number;
+  rangeStart?: number;
+  rangeEnd?: number;
+  endpoint?: 'retained-end';
   width: number;
   height: number;
   appearance: CameraAppearance;
@@ -26,6 +36,26 @@ interface CameraCropPreviewProps {
   fitMode?: VideoMediaFitMode;
   disabled: boolean;
   onChange: (appearance: CameraAppearance) => void;
+}
+
+type CropSourceSelection = Pick<
+  CameraCropPreviewProps,
+  'url' | 'sourceTime' | 'rangeStart' | 'rangeEnd' | 'endpoint'
+>;
+
+function sameCropSourceSelection(
+  current: CropSourceSelection | null | undefined,
+  expected: CropSourceSelection
+) {
+  return (
+    current !== null &&
+    current !== undefined &&
+    current.url === expected.url &&
+    current.sourceTime === expected.sourceTime &&
+    current.rangeStart === expected.rangeStart &&
+    current.rangeEnd === expected.rangeEnd &&
+    current.endpoint === expected.endpoint
+  );
 }
 
 export function CameraCropPreview(props: CameraCropPreviewProps) {
@@ -43,7 +73,10 @@ export function CameraCropPreview(props: CameraCropPreviewProps) {
     { x: 0, y: 0, width: props.width, height: props.height },
     appearance.shape
   );
-  const { video, canvas, gpuHost, ready, failed, retry } = useCameraCropFrame(props, appearance);
+  const { video, canvas, gpuHost, ready, failed, retry, sourceSize } = useCameraCropFrame(
+    props,
+    appearance
+  );
   useEffect(() => {
     if (props.disabled) {
       gesture.current = null;
@@ -76,8 +109,8 @@ bg-[var(--sniptale-color-surface-muted)] disabled:cursor-default`}
           const content = cameraContentFrame(
             box.width,
             box.height,
-            video.current.videoWidth,
-            video.current.videoHeight,
+            sourceSize?.width ?? video.current.videoWidth,
+            sourceSize?.height ?? video.current.videoHeight,
             props.appearance,
             props.fitMode === 'STRETCH'
           );
@@ -180,6 +213,9 @@ text-[var(--sniptale-color-text-secondary)]`}
 interface CropFrameInput {
   url: string | undefined;
   sourceTime: number;
+  rangeStart?: number;
+  rangeEnd?: number;
+  endpoint?: 'retained-end';
   appearance: CameraAppearance;
   mirrored: boolean;
   fitMode: VideoMediaFitMode;
@@ -196,11 +232,19 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
   const fitMode = props.fitMode ?? 'COVER';
   const [source, setSource] = useState<{ url: string | undefined; time: number } | null>(null);
   const [failed, setFailed] = useState(false);
+  const [displayed, setDisplayed] = useState<{
+    selection: CropSourceSelection;
+    width: number;
+    height: number;
+  } | null>(null);
   const [revision, setRevision] = useState(0);
   const ready = source?.url === props.url && source?.time === props.sourceTime && !failed;
   const latest = useRef<CropFrameInput>({
     url: props.url,
     sourceTime: props.sourceTime,
+    ...(props.rangeStart === undefined ? {} : { rangeStart: props.rangeStart }),
+    ...(props.rangeEnd === undefined ? {} : { rangeEnd: props.rangeEnd }),
+    ...(props.endpoint === undefined ? {} : { endpoint: props.endpoint }),
     appearance,
     mirrored,
     fitMode,
@@ -210,6 +254,9 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
   latest.current = {
     url: props.url,
     sourceTime: props.sourceTime,
+    ...(props.rangeStart === undefined ? {} : { rangeStart: props.rangeStart }),
+    ...(props.rangeEnd === undefined ? {} : { rangeEnd: props.rangeEnd }),
+    ...(props.endpoint === undefined ? {} : { endpoint: props.endpoint }),
     appearance,
     mirrored,
     fitMode,
@@ -234,6 +281,18 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
       presenter,
       read: () => latest.current,
       fail: () => setFailed(true),
+      accept: (input, width, height) =>
+        setDisplayed({
+          selection: {
+            url: input.url,
+            sourceTime: input.sourceTime,
+            ...(input.rangeStart === undefined ? {} : { rangeStart: input.rangeStart }),
+            ...(input.rangeEnd === undefined ? {} : { rangeEnd: input.rangeEnd }),
+            ...(input.endpoint === undefined ? {} : { endpoint: input.endpoint }),
+          },
+          width,
+          height,
+        }),
     });
     queueRef.current = queue;
     return () => {
@@ -304,6 +363,9 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
     revision,
     props.width,
     props.height,
+    props.rangeStart,
+    props.rangeEnd,
+    props.endpoint,
     fitMode,
     renderer,
   ]);
@@ -325,7 +387,12 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
     video,
     canvas,
     gpuHost,
-    ready,
+    ready:
+      ready &&
+      (typeof VideoDecoder === 'undefined' ||
+        typeof VideoFrame === 'undefined' ||
+        sameCropSourceSelection(displayed?.selection, props)),
+    sourceSize: displayed,
     failed,
     retry: () => {
       queueRef.current?.reset();
@@ -343,8 +410,10 @@ function createCameraCropFrameQueue(options: {
   presenter: ReturnType<typeof createPreviewPresentationSession>;
   read: () => CropFrameInput;
   fail: () => void;
+  accept: (input: CropFrameInput, width: number, height: number) => void;
 }) {
   let gpu: ReturnType<typeof createCameraCropGpuRenderer> | null = null;
+  let provider: PreviewSourceProvider | null = null;
   let controller: AbortController | null = null;
   let version = 0,
     wanted = false,
@@ -374,12 +443,48 @@ function createCameraCropFrameQueue(options: {
         };
         let output: GpuPreviewOutput | undefined | false;
         let accepted = false;
+        let lease: PreviewSourceLease | null = null;
+        let canvasSample: VideoSample | undefined;
         try {
           if (reset) {
             gpu?.dispose();
             gpu = null;
+            provider?.dispose();
+            provider = null;
             reset = false;
           }
+          if (typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined') {
+            if (!input.url) throw new Error('Camera preview source is unavailable.');
+            provider ??= createPreviewSourceProvider();
+            provider.retainSources(new Set([input.url]));
+            lease = await provider.acquire(
+              [
+                {
+                  id: 'camera-crop',
+                  url: input.url,
+                  time: input.sourceTime,
+                  ...(input.rangeStart === undefined ? {} : { rangeStart: input.rangeStart }),
+                  ...(input.rangeEnd === undefined ? {} : { rangeEnd: input.rangeEnd }),
+                  ...(input.endpoint === undefined ? {} : { endpoint: input.endpoint }),
+                  ...(input.endpoint === undefined && Number.isFinite(input.rangeEnd)
+                    ? { holdEnd: true }
+                    : {}),
+                },
+              ],
+              signal,
+              { discontinuity: true }
+            );
+          }
+          if (
+            disposed ||
+            signal.aborted ||
+            ticket !== version ||
+            !sameCropSourceSelection(options.read(), input)
+          )
+            continue;
+          const binding = lease?.bindings.get('camera-crop');
+          if (lease && !binding) throw new Error('Camera preview source binding is unavailable.');
+          const source = binding?.source;
           if (input.renderer === 'legacy') {
             gpu?.dispose();
             gpu = null;
@@ -388,6 +493,7 @@ function createCameraCropFrameQueue(options: {
             gpu ??= createCameraCropGpuRenderer();
             output = await gpu.render({
               media,
+              ...(source ? { source } : {}),
               size,
               appearance: input.appearance,
               fitMode: input.fitMode,
@@ -402,12 +508,26 @@ function createCameraCropFrameQueue(options: {
             signal.aborted ||
             ticket !== version ||
             !current.ready ||
-            current.url !== input.url ||
-            current.sourceTime !== input.sourceTime
+            !sameCropSourceSelection(current, input)
           )
             continue;
           if (output === false) continue;
           if (!output) {
+            if (source) {
+              if (!source.toVideoFrame)
+                throw new Error('Camera preview source frame is unavailable.');
+              canvasSample = await prepareDecodedVideoSample(
+                new VideoSample(source.toVideoFrame(), source.orientation),
+                signal
+              );
+              if (
+                disposed ||
+                signal.aborted ||
+                ticket !== version ||
+                !sameCropSourceSelection(options.read(), input)
+              )
+                continue;
+            }
             target.width = size.width;
             target.height = size.height;
             const context = target.getContext('2d');
@@ -421,19 +541,35 @@ function createCameraCropFrameQueue(options: {
               cameraAppearance: input.appearance,
               shadowIntensity: 0,
               shadowMode: undefined,
-              sourceWidth: media.videoWidth,
-              sourceHeight: media.videoHeight,
+              sourceWidth: source?.sourceWidth ?? media.videoWidth,
+              sourceHeight: source?.sourceHeight ?? media.videoHeight,
               render: (x, y, width, height) =>
                 drawCameraMediaSource(context, { x: 0, y: 0, ...size }, input.mirrored, () =>
-                  context.drawImage(media, x, y, width, height)
+                  canvasSample
+                    ? canvasSample.draw(context, x, y, width, height)
+                    : context.drawImage(media, x, y, width, height)
                 ),
             });
           }
-          options.presenter.publish(output ?? null, () => {});
+          options.presenter.publish(output ?? null, () =>
+            options.accept(
+              input,
+              source?.sourceWidth ?? media.videoWidth,
+              source?.sourceHeight ?? media.videoHeight
+            )
+          );
           accepted = true;
         } catch {
-          if (!disposed && !signal.aborted && ticket === version) options.fail();
+          if (
+            !disposed &&
+            !signal.aborted &&
+            ticket === version &&
+            sameCropSourceSelection(options.read(), input)
+          )
+            options.fail();
         } finally {
+          canvasSample?.close();
+          lease?.release();
           if (output && !accepted) output.release();
           if (controller?.signal === signal) controller = null;
         }
@@ -469,6 +605,8 @@ function createCameraCropFrameQueue(options: {
       cancel();
       gpu?.dispose();
       gpu = null;
+      provider?.dispose();
+      provider = null;
     },
   };
 }

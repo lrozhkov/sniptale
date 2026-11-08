@@ -6067,11 +6067,11 @@
       "file": "apps/extension/src/features/video/composition/canvas/camera-crop-gpu.ts",
       "symbol": "createCameraCropGpuRenderer",
       "owner": "extension:app-core:features",
-      "astHash": "24681d8fc29fe58f13b59bc24c2a3dba8047cd62480ad21b5112b741d2b3461e",
+      "astHash": "b13cb36097e50b53d14fcd218269f5ebae7b4e16116f0301e1141846efa8f24b",
       "signatureHash": "31d4a1edd8e472d4b1e5b146f4fcef7253230150eafd10a347d6c0cac513fe65",
-      "reviewDate": "2026-11-06",
-      "reason": "tool-noise: One source-local renderer owns its GPU provider, captured video frame, retained silhouette and output holds. The frontend owns visibility and authoring. Nested operations share this single lifetime. Controlled completion tests check cancellation, retirement and fallback. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, device, queue, publication or authoring owners. Remove when the analyzer models this cohesive transaction."
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One renderer owns backend setup, masks, frame clones and output holds. The caller supplies one admitted source or the existing HTML adapter. The shared provider retains physical source selection. The presenter retains visible publication. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
     },
     {
       "rule": "structural-function-risk",
@@ -6089,22 +6089,22 @@
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.tsx",
       "symbol": "createCameraCropFrameQueue.drain",
       "owner": "extension:video-editor:workspace",
-      "astHash": "e5f2a1d54128bb35a5495273be895446e592071952aecce3cd51fe7f14dcb571",
+      "astHash": "1c9e8e3209c622ed7b1dbb9422ad12ba3349cbf867712c5895fc465e90ca0abe",
       "signatureHash": "89e2e5ae8b58fd08adeb1290ec6ce42a63fbc6a5042fd96f549b542d48e0e407",
-      "reviewDate": "2026-11-06",
-      "reason": "tool-noise: One queue admits one active crop frame and one latest request. A version and controller reject obsolete results before publication. The GPU adapter owns source resources and the presenter owns visible destinations. The queue commits the accepted result or releases its output. Controlled completions check source replacement, retry, renderer changes and cancellation. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, device, queue, publication or authoring owners. Remove when the analyzer models this cohesive transaction."
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One frame transaction acquires a provider lease and retains it through GPU completion. GPU and Canvas use the same admitted image. Selection guards reject stale publication. The transaction releases samples, leases and untransferred output together. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
     },
     {
       "rule": "structural-file-risk",
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-camera.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "astHash": "e803f82682012fe7e6e17405ae33bf085b4b1a1e933c508a40ad49502ea97afe",
-      "signatureHash": "511f08270dc2b5ec785dd06c98a81f0eb6f0dded609f55c13de1d04417bbf41b",
-      "reviewDate": "2026-11-06",
-      "reason": "tool-noise: One camera editor fixture checks source pixels and authored montage placement. Its helpers sample pixels, camera geometry and shadow coverage. GPU canvas readers preserve the existing sampling coordinates and image thresholds. The same project and clip connect gestures, Undo, reload and retained source assertions. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, device, queue, publication or authoring owners. Remove when the analyzer models this cohesive transaction."
+      "astHash": "a5c78ffa4c79903ba5d715ad81531af65ef9ce894b650a97c41fad2604897201",
+      "signatureHash": "4adf6e1d0c3f281faacf95f8e5773b03949eb7909a3107f4119b5398a0a55d1d",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One camera editor fixture checks source pixels and authored montage placement. Related cases share the same project construction and source observation helpers. Each case owns its page and server cleanup. Source and gesture checks retain existing tolerances. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
     },
     {
       "rule": "structural-function-risk",
@@ -6369,6 +6369,61 @@
       "reviewDate": "2026-11-08",
       "astHash": "024810ce8146d3683b55e6b5a06b1ca8b1fbd036620f16843bbaaf1a0742c3ea",
       "signatureHash": "0e798642fe67e11922b8c7a18c66ad4f06efe9e441acfac0bcdbcdc25d2ff5f2"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:video-editor:workspace",
+      "astHash": "2cd4e38e19ec1daecb81f1f7b2f03f3d24bf4f86077935e8376c30d1f5b28462",
+      "signatureHash": "572af726207cd482891a809dc7a736ec9e143708603a29e7f34b7ca4d89d6156",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One mounted camera control shares a root, media mocks and controlled provider leases across its tests. The cases check source selection, completion, replacement, retry and cleanup through that same lifecycle. No separate fixture or persistence authority exists. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.tsx",
+      "symbol": "CameraCropPreview",
+      "owner": "extension:video-editor:workspace",
+      "astHash": "ec3ac02a7136529942ddd34bc46bbef3e764ed7f5a4b9502ef31d26b9c99c351",
+      "signatureHash": "b421b074ca9b2b404734ee63a5ab1a878f240f0c2ddbecacf81877eeef20a7dc",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One crop control owns pointer capture, draft changes, cancellation and one authored commit. Accepted source dimensions feed the same gesture projection. The hook and queue own frame execution. Actual browser proof checks live drafts, Escape, one Undo and retained pixels. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.tsx",
+      "symbol": "useCameraCropFrame",
+      "owner": "extension:video-editor:workspace",
+      "astHash": "b1801ba366772330b20d966e4618f7d681194c79c0949ebdad36031f43f4c5bb",
+      "signatureHash": "491399e3c87f04438782b32337f1ff18f77033a9c851556a126ba5f19f09f7c4",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One mounted hook binds media readiness, accepted dimensions, retry and presenter cleanup to one crop queue. Its states feed that same control and queue. The shared provider owns physical source selection. Selection identity rejects stale readiness. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.tsx",
+      "symbol": "createCameraCropFrameQueue",
+      "owner": "extension:video-editor:workspace",
+      "astHash": "ee3692a6cc7e7ea6f0a5c3103cb4fed5f325f8d6e685bd806d0365dc401eb78b",
+      "signatureHash": "c8f853c27d02004df499d0cfa1dde9c61c03aab47d05ee338bcf232704c453d8",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One queue owns request replacement, cancellation, reset and disposal for one mounted crop source. The shared provider owns decoding and frame selection. The renderer owns GPU frame clones. The presenter owns visible destinations. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-camera.spec.ts",
+      "symbol": "test callback#2",
+      "owner": "tooling:test:e2e",
+      "astHash": "f585ace755528bfc33067e35efefb0c49a75fe31f825ac6adb8735b6178e4e4e",
+      "signatureHash": "8ce7fbe82a9ac3169f4e857873f03fe064522448e787f418923e9ccafaf643b1",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One camera browser scenario owns one seeded project, selected clip, page and server lifetime. Variants check source admission, physical EOF and crop gestures through that same owner. Pixel and authored data assertions remain together with cleanup. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
     }
   ]
 }

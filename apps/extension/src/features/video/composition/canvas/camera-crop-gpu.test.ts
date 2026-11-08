@@ -333,3 +333,34 @@ it('releases a captured source when silhouette preparation fails without selecti
   expect(f.acquire).not.toHaveBeenCalled();
   expect(f.renderer.fallbackReason).toBeUndefined();
 });
+
+it('prefers an immutable source with its orientation and display dimensions', async () => {
+  const f = fixture();
+  const frame = new VideoFrame(f.media);
+  Object.defineProperty(frame, 'timestamp', { value: 300000 });
+  Object.defineProperty(f.media, 'readyState', { value: 1 });
+  const source = {
+    sourceWidth: 300,
+    sourceHeight: 600,
+    orientation: { rotation: 90 as const, flip: true },
+    toVideoFrame: vi.fn(() => frame),
+    draw: vi.fn(),
+  };
+  const input = { ...f.input, source };
+  const output = await f.renderer.render(input);
+  expect(source.toVideoFrame).toHaveBeenCalledOnce();
+  expect(f.present.mock.calls[0]![0].layers[0]!.rect).toEqual({
+    x: -125,
+    y: -162.5,
+    width: 400,
+    height: 800,
+  });
+  expect(f.present.mock.calls[0]![0].layers[0]).toMatchObject({
+    source: frame,
+    orientation: source.orientation,
+  });
+  expect(f.present.mock.calls[0]![0].layers[0]!.source).toHaveProperty('timestamp', 300000);
+  expect(captures).toHaveLength(1);
+  expect(source.draw).not.toHaveBeenCalled();
+  if (output) output.release();
+});
