@@ -337,3 +337,96 @@ it('releases a retained endpoint loan when a later ordinary demand fails', async
   expect(f.clones[0]!.close).toHaveBeenCalledOnce();
   f.provider.dispose();
 });
+
+it.each(['cold', 'warm', 'pruned'] as const)(
+  'holds verified whole-source EOF from a %s source',
+  async (mode) => {
+    const f = fixture();
+    if (mode === 'warm') (await f.provider.acquire([demand(0.32)], signal()))?.release();
+    if (mode === 'pruned') (await f.provider.acquire([demand(0.95)], signal()))?.release();
+    const request = { id: 'terminal', url: 'blob:source', time: 12, holdSourceEnd: true as const };
+    const lease = await f.provider.acquire([request], signal());
+    expect(binding(lease)).toMatchObject({
+      target: 12,
+      timestamp: 0.9,
+      nextTimestamp: 1,
+      heldAtEnd: true,
+    });
+    expect(binding(lease)).not.toHaveProperty('heldAtRetainedEnd');
+    expect(binding(lease)).not.toHaveProperty('sampleTime');
+    f.provider.dispose();
+    expect(f.clones.at(-1)!.close).not.toHaveBeenCalled();
+    lease?.release();
+    expect(f.clones.at(-1)!.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps whole-source hold ordinary before verified EOF', async () => {
+  const f = fixture();
+  const request = { id: 'terminal', url: 'blob:source', time: 0.32, holdSourceEnd: true as const };
+  const lease = await f.provider.acquire([request], signal());
+  expect(binding(lease)).toMatchObject({ target: 0.32, timestamp: 0.3, nextTimestamp: 0.9 });
+  expect(binding(lease)).not.toHaveProperty('heldAtEnd');
+  lease?.release();
+  f.provider.dispose();
+});
+
+it.each([{ holdEnd: true }, { endpoint: 'retained-end' as const }, { rangeEnd: 1 }])(
+  'rejects competing whole-source terminal intent %j',
+  async (conflict) => {
+    const f = fixture();
+    const request = {
+      id: 'terminal',
+      url: 'blob:source',
+      time: 0.32,
+      holdSourceEnd: true as const,
+      ...conflict,
+    };
+    await expect(f.provider.acquire([request], signal())).rejects.toThrow(
+      'Preview source frame is unavailable.'
+    );
+    expect(f.open).not.toHaveBeenCalled();
+    f.provider.dispose();
+  }
+);
+
+it('keeps whole-source leading admission separate from terminal holding', async () => {
+  const f = fixture([1 / 60, 0.1, 0.9]);
+  Object.assign(f.stream, { leadingSampleTime: 1 / 60 });
+  const lease = await f.provider.acquire(
+    [{ id: 'terminal', url: 'blob:source', time: 0, holdSourceEnd: true }],
+    signal()
+  );
+  expect(binding(lease)).toMatchObject({ target: 0, timestamp: 1 / 60, sampleTime: 1 / 60 });
+  expect(binding(lease)).not.toHaveProperty('heldAtEnd');
+  lease?.release();
+  f.provider.dispose();
+});
+
+it('keeps mixed ordinary and whole-source terminal loans alive through disposal', async () => {
+  const f = fixture();
+  const lease = await f.provider.acquire(
+    [
+      { id: 'ordinary', url: 'blob:source', time: 0.32 },
+      { id: 'terminal', url: 'blob:source', time: 12, holdSourceEnd: true },
+    ],
+    signal()
+  );
+  expect(lease?.bindings.get('ordinary')).toMatchObject({
+    target: 0.32,
+    timestamp: 0.3,
+    nextTimestamp: 0.9,
+  });
+  expect(binding(lease)).toMatchObject({
+    target: 12,
+    timestamp: 0.9,
+    nextTimestamp: 1,
+    heldAtEnd: true,
+  });
+  f.provider.dispose();
+  expect(f.clones).toHaveLength(2);
+  expect(f.clones.every((sample) => vi.mocked(sample.close).mock.calls.length === 0)).toBe(true);
+  lease?.release();
+  lease?.release();
+  expect(f.clones.every((sample) => vi.mocked(sample.close).mock.calls.length === 1)).toBe(true);
+});

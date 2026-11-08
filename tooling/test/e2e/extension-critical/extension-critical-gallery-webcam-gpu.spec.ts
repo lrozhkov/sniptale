@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto';
+import { readFile, writeFile } from 'node:fs/promises';
 import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
@@ -50,6 +52,36 @@ test.describe('Gallery webcam GPU crop publication', () => {
             return [...context.getImageData(0, 0, 32, 32).data];
           } finally {
             sample.width = sample.height = 0;
+          }
+        });
+      const sourceColors = (canvas: Locator) =>
+        canvas.evaluate((node: HTMLCanvasElement) => {
+          const copy = document.createElement('canvas');
+          copy.width = node.width;
+          copy.height = node.height;
+          try {
+            const context = copy.getContext('2d');
+            if (!context) throw new Error('Source color readback is unavailable.');
+            context.drawImage(node, 0, 0);
+            return {
+              raster: { width: node.width, height: node.height },
+              colors: [
+                [20 / 160, 70 / 90],
+                [70 / 160, 80 / 90],
+                [40 / 160, 82 / 90],
+              ].map(([x, y]) =>
+                [
+                  ...context.getImageData(
+                    Math.floor(x! * node.width),
+                    Math.floor(y! * node.height),
+                    1,
+                    1
+                  ).data,
+                ].slice(0, 3)
+              ),
+            };
+          } finally {
+            copy.width = copy.height = 0;
           }
         });
       const error = (a: number[], b: number[]) => {
@@ -157,6 +189,39 @@ test.describe('Gallery webcam GPU crop publication', () => {
             );
           })
           .toBeGreaterThan(20);
+        if (viewport.width === 1920) {
+          const main = dialog.locator(
+            '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+          );
+          await expect(main).toHaveCount(1);
+          await expect
+            .poll(async () => {
+              const [a, b] = await Promise.all([sourceColors(main), sourceColors(front)]);
+              return Math.max(
+                ...a.colors.flatMap((color, index) =>
+                  color.map((value, channel) => Math.abs(value - b.colors[index]![channel]!))
+                )
+              );
+            })
+            .toBeLessThan(4);
+          const bytes = await readFile(
+            new URL('../fixtures/review-vp8-opus.webm', import.meta.url)
+          );
+          await writeFile(
+            info.outputPath('webcam-canonical-source-colors.json'),
+            JSON.stringify(
+              {
+                viewport,
+                sourceSHA256: createHash('sha256').update(bytes).digest('hex'),
+                requestedSourceTime: 1,
+                main: await sourceColors(main),
+                inspector: await sourceColors(front),
+              },
+              null,
+              2
+            )
+          );
+        }
         const preZoomPixels = await painted();
         await zoom.fill('2');
         await zoom.press('Enter');
@@ -235,6 +300,70 @@ test.describe('Gallery webcam GPU crop publication', () => {
         await expect.poll(async () => error(initialPixels, await painted())).toBeLessThanOrEqual(1);
         expect(await camera.getAttribute('src')).toBe(cameraSource);
         expect((await history()).cursor).toBe(initialHistory.cursor);
+        if (viewport.width === 1920) {
+          const changeOffset = async (value: string) => {
+            const offset = inspector.getByRole('textbox', {
+              name: label('gallery.videoReview.webcamOffset'),
+              exact: true,
+            });
+            if (!(await offset.isVisible()))
+              await inspector
+                .getByRole('heading', {
+                  name: label('gallery.videoReview.webcamTiming'),
+                  exact: true,
+                })
+                .click();
+            await offset.fill(value);
+            await offset.press('Enter');
+            await expect
+              .poll(async () => {
+                const stored = await history();
+                const edit = stored.operations
+                  .slice(0, stored.cursor)
+                  .findLast((entry) => entry.target === 'advancedContent');
+                return edit?.target === 'advancedContent' ? edit.after.webcam?.offsetSeconds : null;
+              })
+              .toBe(Number(value));
+            const zoomControl = inspector.getByRole('textbox', {
+              name: label('videoEditor.sidebar.cameraCropZoom'),
+              exact: true,
+            });
+            if (!(await zoomControl.isVisible()))
+              await inspector
+                .getByRole('heading', {
+                  name: label('gallery.videoReview.webcamLayout'),
+                  exact: true,
+                })
+                .click();
+            await crop.scrollIntoViewIfNeeded();
+            await expect(crop).toBeEnabled();
+          };
+          await changeOffset('-10.9');
+          await expect.poll(async () => error(initialPixels, await painted())).toBeGreaterThan(5);
+          const terminal = await painted();
+          await changeOffset('-12');
+          await expect.poll(async () => error(terminal, await painted())).toBeLessThanOrEqual(1);
+          expect(await transport()).toMatchObject({ paused: true, time: 5 });
+          await writeFile(
+            info.outputPath('webcam-canonical-source-tail.json'),
+            JSON.stringify(
+              {
+                viewport,
+                selectedPositionTime: authoredPoint.time,
+                offsetSeconds: -12,
+                requestedSourceTime: authoredPoint.time + 12,
+                verifiedSourceEnd: 12,
+                expectedSourcePTS: 11.9,
+                ptsEvidence:
+                  'Controlled provider and paint-owner tests; browser checks actual retained pixels and editability.',
+                pixelError: error(terminal, await painted()),
+                inspector: await sourceColors(front),
+              },
+              null,
+              2
+            )
+          );
+        }
         await crop.scrollIntoViewIfNeeded();
         await page.screenshot({
           path: info.outputPath('webcam-gpu-crop-restored.png'),

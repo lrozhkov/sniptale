@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewWebcamCropPreview } from './webcam-crop-preview';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
@@ -11,6 +11,23 @@ import type { createCameraCropGpuRenderer } from '../../features/video/compositi
 import type { GpuPreviewRenderer } from '../../features/video/composition/canvas/gpu-preview';
 import type { GpuPreviewOutput } from '../../features/video/composition/canvas/preview-presentation';
 
+const sources = vi.hoisted(() => ({
+  create: vi.fn(),
+  acquire: vi.fn(),
+  retain: vi.fn(),
+  dispose: vi.fn(),
+}));
+vi.mock('../../workflows/video/preview-source', () => ({
+  createPreviewSourceProvider: sources.create,
+}));
+beforeEach(() => {
+  sources.acquire.mockReset().mockResolvedValue(null);
+  sources.create.mockReturnValue({
+    acquire: sources.acquire,
+    retainSources: sources.retain,
+    dispose: sources.dispose,
+  });
+});
 const gpu = vi.hoisted(() => ({
   render: vi.fn<ReturnType<typeof createCameraCropGpuRenderer>['render']>(async () => undefined),
   dispose: vi.fn(),
@@ -268,6 +285,7 @@ async function mountedCrop(renderer: 'gpu' | 'legacy' = 'gpu') {
     revoke,
     context,
     unmount,
+    change: props.onChange,
   };
 }
 
@@ -414,6 +432,159 @@ it('retains ready endpoint pixels when successive requested times clamp to the s
     expect(endpoint.release).not.toHaveBeenCalled();
     expect(drawReviewWebcam).not.toHaveBeenCalled();
     expect(f.create).toHaveBeenCalledOnce();
+  } finally {
+    f.unmount();
+  }
+});
+
+it('acquires offset source pixels without HTML metadata or a ready seek', async () => {
+  vi.stubGlobal('VideoDecoder', class {});
+  vi.stubGlobal('VideoFrame', class {});
+  const source = { sourceWidth: 400, sourceHeight: 200, draw: vi.fn(), toVideoFrame: vi.fn() };
+  const release = vi.fn();
+  sources.acquire.mockResolvedValue({
+    bindings: new Map([
+      ['camera-crop', { source, target: 2, timestamp: 1.9, nextTimestamp: 2.1, url: 'blob:crop' }],
+    ]),
+    release,
+  });
+  const f = await mountedCrop();
+  try {
+    expect(f.jobs).toHaveLength(1);
+    expect(f.button.disabled).toBe(true);
+    expect(gpu.render.mock.calls[0]![0]).toMatchObject({ source });
+    await act(async () => f.jobs[0]!.complete());
+    expect(f.button.disabled).toBe(false);
+    expect(release).toHaveBeenCalledOnce();
+    await f.update({ camera: { ...f.camera, offsetSeconds: 0.5 }, time: 3 });
+    expect(sources.acquire).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ time: 2.5, holdSourceEnd: true })],
+      expect.any(AbortSignal),
+      { discontinuity: true }
+    );
+  } finally {
+    f.unmount();
+  }
+});
+
+it('keeps verified terminal pixels editable while later EOF requests settle', async () => {
+  vi.stubGlobal('VideoDecoder', class {});
+  vi.stubGlobal('VideoFrame', class {});
+  const source = { sourceWidth: 400, sourceHeight: 200, draw: vi.fn(), toVideoFrame: vi.fn() };
+  const releases: ReturnType<typeof vi.fn>[] = [];
+  sources.acquire.mockImplementation(async ([request]: { time: number }[]) => {
+    const release = vi.fn();
+    releases.push(release);
+    return {
+      bindings: new Map([
+        [
+          'camera-crop',
+          {
+            source,
+            target: request!.time,
+            timestamp: request!.time >= 10 ? 9.9 : 1.9,
+            nextTimestamp: request!.time >= 10 ? 10 : 2.1,
+            ...(request!.time >= 10 ? { heldAtEnd: true } : {}),
+            url: 'blob:crop',
+          },
+        ],
+      ]),
+      release,
+    };
+  });
+  const f = await mountedCrop();
+  try {
+    Object.defineProperty(f.video, 'duration', { value: Infinity });
+    await act(async () => f.jobs[0]!.complete());
+    await f.update({ time: 11 });
+    expect(f.button.disabled).toBe(true);
+    await act(async () => f.jobs[1]!.complete());
+    expect(f.button.disabled).toBe(false);
+    const front = f.jobs[1]!;
+    await f.update({ time: 12 });
+    expect(f.button.disabled).toBe(false);
+    expect(front.release).not.toHaveBeenCalled();
+    expect(sources.acquire).toHaveBeenLastCalledWith(
+      [{ id: 'camera-crop', url: 'blob:crop', time: 12, holdSourceEnd: true }],
+      expect.any(AbortSignal),
+      { discontinuity: true }
+    );
+    expect(releases[2]).not.toHaveBeenCalled();
+    await act(async () => f.jobs[2]!.complete());
+    expect(releases[2]).toHaveBeenCalledOnce();
+    expect(front.release).toHaveBeenCalledOnce();
+  } finally {
+    f.unmount();
+  }
+});
+
+it('uses accepted display dimensions for crop gestures without HTML dimensions', async () => {
+  vi.stubGlobal('VideoDecoder', class {});
+  vi.stubGlobal('VideoFrame', class {});
+  const source = { sourceWidth: 400, sourceHeight: 200, draw: vi.fn(), toVideoFrame: vi.fn() };
+  sources.acquire.mockResolvedValue({
+    bindings: new Map([
+      ['camera-crop', { source, target: 2, timestamp: 1.9, nextTimestamp: 2.1, url: 'blob:crop' }],
+    ]),
+    release: vi.fn(),
+  });
+  const f = await mountedCrop();
+  try {
+    await act(async () => f.jobs[0]!.complete());
+    Object.assign(f.button, {
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+    });
+    const pointer = (type: string, x: number) =>
+      act(() => {
+        const event = new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: 50 });
+        Object.defineProperty(event, 'pointerId', { value: 1 });
+        f.button.dispatchEvent(event);
+      });
+    pointer('pointerdown', 50);
+    pointer('pointermove', 60);
+    pointer('pointerup', 60);
+    expect(f.change).toHaveBeenCalledOnce();
+    expect(f.change.mock.lastCall?.[0]).toMatchObject({ panX: -1 / 15, panY: 0 });
+  } finally {
+    f.unmount();
+  }
+});
+
+it('hands actual unsupported decoding to ready HTML and preserves retry', async () => {
+  vi.stubGlobal('VideoDecoder', class {});
+  vi.stubGlobal('VideoFrame', class {});
+  sources.acquire.mockResolvedValue(null);
+  const f = await mountedCrop();
+  try {
+    expect(f.jobs).toHaveLength(0);
+    await f.loaded();
+    expect(f.jobs).toHaveLength(1);
+    expect(gpu.render.mock.calls[0]![0]).not.toHaveProperty('source');
+    await act(async () => f.jobs[0]!.complete());
+    expect(f.button.disabled).toBe(false);
+    act(() => f.video.dispatchEvent(new Event('error')));
+    expect(f.button.disabled).toBe(true);
+    expect(f.host.textContent).toContain('videoEditor.sidebar.framingPreviewFailed');
+    const source = { sourceWidth: 400, sourceHeight: 200, draw: vi.fn(), toVideoFrame: vi.fn() };
+    sources.acquire.mockResolvedValue({
+      bindings: new Map([
+        [
+          'camera-crop',
+          { source, target: 2, timestamp: 1.9, nextTimestamp: 2.1, url: 'blob:crop' },
+        ],
+      ]),
+      release: vi.fn(),
+    });
+    await act(async () =>
+      f.host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.retry"]')!.click()
+    );
+    expect(f.create).toHaveBeenCalledTimes(2);
+    expect(f.jobs).toHaveLength(2);
+    expect(gpu.render.mock.calls.at(-1)![0]).toMatchObject({ source });
+    await act(async () => f.jobs[1]!.complete());
+    expect(f.button.disabled).toBe(false);
   } finally {
     f.unmount();
   }

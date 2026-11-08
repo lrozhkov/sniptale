@@ -6261,26 +6261,26 @@
       "signatureHash": "c055a31aea2caeae49f12b6e1ca29ee08ae064218f31b3a5b5be635664af1611"
     },
     {
-      "file": "apps/extension/src/gallery/video-review/webcam-crop-preview.tsx",
       "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/webcam-crop-preview.tsx",
       "symbol": "ReviewWebcamCropPreview",
-      "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One existing crop gesture surface retains draft, pointer capture, keyboard, cancellation and one authoring callback. This change adds its inert GPU host; gesture state and handlers are unchanged. Extracting part of the gesture only to meet line length would split one authoring transaction. Mounted and real inspector proof check draft, cancellation, one commit and Undo. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or authoring authority. Remove when the analyzer models this cohesive mounted transaction.",
-      "astHash": "7a6da71beb87b0bad07cccfa91b1852c235564faffe828b5cbcfd7cc693af548",
+      "owner": "extension:gallery",
+      "astHash": "eab6912e2e67cfc20bee7396c3691150aadca8d8e952c42fecf02d6508286e30",
       "signatureHash": "f7373f0cf21d182bf35b5e6a7d9892ca38cb1ef8572896d6642a000e8eaf4ec4",
-      "reviewDate": "2026-11-08"
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One crop control owns drafts, pointer capture, cancellation and one authored commit. Accepted source dimensions feed the same gesture projection. Frame execution remains with the hook and paint queue. Actual browser proof checks visible drafts, Escape and Undo. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, asset, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
     },
     {
-      "file": "apps/extension/src/gallery/video-review/webcam-crop-preview.tsx",
       "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/webcam-crop-preview.tsx",
       "symbol": "useWebcamCropFrame",
-      "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One mounted media element owns asset URL, requested source readiness, seek and failure/retry. The same mounted hook binds its renderer queue and presenter to those DOM refs; the separate paint owner owns GPU request admission and the shared owners own capture and publication. There is no second source or authoring authority. Controlled completion, source replacement, durationless seek and endpoint tests check this lifetime. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, resource, queue, publication or authoring authority. Remove when the analyzer models this cohesive mounted transaction.",
-      "astHash": "48b676a02ce774411068c968e250ee2981be32814df86c00e1abeceeee259f22",
+      "owner": "extension:gallery",
+      "astHash": "634980d9e354bac7d7dc2cf8b4a85685412c249968e9e5902c0da81756ab52b3",
       "signatureHash": "be550348426f567891744803ba258a437a2d3963c0fbcd104796c8aa89a158c4",
-      "reviewDate": "2026-11-08"
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One mounted hook owns the asset URL, request identity, accepted dimensions and readiness. Canonical readiness and compatibility readiness feed the same paint queue. The provider owns physical frame selection. Asset replacement and cleanup retire that same mounted lifetime. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, asset, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
     },
     {
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.ts",
@@ -6424,6 +6424,39 @@
       "reviewDate": "2026-11-08",
       "reason": "tool-noise: One camera browser scenario owns one seeded project, selected clip, page and server lifetime. Variants check source admission, physical EOF and crop gestures through that same owner. Pixel and authored data assertions remain together with cleanup. Fresh independent architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/webcam-crop-paint.ts",
+      "symbol": "createWebcamCropPaintOwner",
+      "owner": "extension:gallery",
+      "astHash": "823c2912eff78cc3e56b578dc65d76b5145085b80de863ec800e03e03f007d2e",
+      "signatureHash": "c2ee7afc5f688908156be1acb358a72de45d0f73ba63e72ff8931d18cb48e9e6",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One mounted camera queue owns source acquisition, replacement, rendering and cleanup. The shared provider owns physical selection and budgets. The renderer owns GPU clones and output holds. The presenter owns visible publication. The queue retains borrowed frames through awaited completion. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, asset, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-webcam-gpu.spec.ts",
+      "symbol": "test.describe callback",
+      "owner": "tooling:test:e2e",
+      "astHash": "416f865d47cb818ebfcf69a8b972fb72c6d5a00456bf8ef96aae8cc990839783",
+      "signatureHash": "7b8d8aa5fc0921a9a97965932fd8d4496cd63f265b67fb933beac61441d4eeb9",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One suite registers the two camera viewport cases. Each case owns its fixture, page and server lifetime. The primary case checks source equivalence and physical EOF. The short case checks crop interaction and access. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, asset, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-webcam-gpu.spec.ts",
+      "symbol": "test.describe callback.test callback",
+      "owner": "tooling:test:e2e",
+      "astHash": "55faeb9cee863f15f169b3159ae2197108aaa9fe907a2f1dd4e7f0ff82ef5cd8",
+      "signatureHash": "5480bd18109aad3fb000331a6cac8edaabb2362cd596ee1f072ffb00151ca135",
+      "reviewDate": "2026-11-08",
+      "reason": "tool-noise: One camera case keeps source pixels, crop changes, history and main transport observations with its fixture cleanup. The primary viewport adds matching source colors and a terminal camera offset. The short viewport retains interaction checks. Existing tolerances and authored history assertions remain unchanged. Fresh independent architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, asset, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
     }
   ]
 }

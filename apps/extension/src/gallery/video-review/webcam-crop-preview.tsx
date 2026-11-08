@@ -1,4 +1,4 @@
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { cameraContentFrame } from '../../features/video/project/camera/appearance';
 import type {
   QuickEditWebcam,
@@ -32,7 +32,10 @@ export function ReviewWebcamCropPreview(props: {
     value: QuickEditWebcamCrop;
   } | null>(null);
   const crop = draft ?? props.crop;
-  const { video, canvas, gpuHost, ready, failed, retry } = useWebcamCropFrame(props, crop);
+  const { video, canvas, gpuHost, ready, failed, retry, sourceSize } = useWebcamCropFrame(
+    props,
+    crop
+  );
   const clamp = (value: number) => Math.max(-1, Math.min(1, value));
   const cancel = () => {
     const current = gesture.current;
@@ -68,8 +71,8 @@ export function ReviewWebcamCropPreview(props: {
           const content = cameraContentFrame(
             box.width,
             box.height,
-            video.current.videoWidth,
-            video.current.videoHeight,
+            sourceSize?.width ?? video.current.videoWidth,
+            sourceSize?.height ?? video.current.videoHeight,
             { ...props.camera.appearance, ...props.crop, shape: 'rounded' }
           );
           gesture.current = {
@@ -165,6 +168,10 @@ export function ReviewWebcamCropPreview(props: {
   );
 }
 
+type CropSourceRequest = NonNullable<
+  Parameters<ReturnType<typeof createWebcamCropPaintOwner>['request']>[0]['source']
+>;
+
 /** Asset lifetime is independent from seeking and authored crop changes. */
 function useWebcamCropFrame(
   props: Parameters<typeof ReviewWebcamCropPreview>[0],
@@ -174,6 +181,18 @@ function useWebcamCropFrame(
     canvas = useRef<HTMLCanvasElement>(null),
     gpuHost = useRef<HTMLDivElement>(null);
   const renderer = useContext(ReviewPreviewRendererContext);
+  const canonical = typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
+  const compatibility = useRef(!canonical);
+  const [asset, setAsset] = useState<{ assetId: string; attempt: number; url: string } | null>(
+    null
+  );
+  const [displayed, setDisplayed] = useState<{
+    source: CropSourceRequest;
+    width: number;
+    height: number;
+    nextTimestamp?: number;
+    heldAtEnd?: true;
+  } | null>(null);
   const [source, setSource] = useState<{ assetId: string; attempt: number; time: number } | null>(
     null
   );
@@ -181,6 +200,16 @@ function useWebcamCropFrame(
   const [revision, setRevision] = useState(0),
     [attempt, setAttempt] = useState(0);
   const paint = useRef<ReturnType<typeof createWebcamCropPaintOwner> | null>(null);
+  const time = Math.max(0, props.time - props.camera.offsetSeconds);
+  const currentSource = useMemo(
+    () =>
+      asset?.assetId === props.camera.assetId && asset.attempt === attempt
+        ? { ...asset, time }
+        : null,
+    [asset, props.camera.assetId, attempt, time]
+  );
+  const latestSource = useRef<CropSourceRequest | null>(currentSource);
+  latestSource.current = currentSource;
   useLayoutEffect(() => {
     const target = canvas.current,
       media = video.current;
@@ -197,6 +226,13 @@ function useWebcamCropFrame(
       media,
       presenter,
       fail: () => setFailed(true),
+      readSource: () => latestSource.current,
+      compatibility: () => {
+        compatibility.current = true;
+      },
+      accept: (input, image) => {
+        if (input.source) setDisplayed({ source: input.source, ...image });
+      },
     });
     paint.current = owner;
     return () => {
@@ -205,23 +241,38 @@ function useWebcamCropFrame(
       presenter.dispose();
     };
   }, []);
-  const time = Math.max(0, props.time - props.camera.offsetSeconds);
   const latestTime = useRef(time);
   latestTime.current = time;
-  const ready =
+  const htmlReady =
     source?.assetId === props.camera.assetId &&
     source.attempt === attempt &&
     source.time === time &&
     !failed;
+  const ready = canonical
+    ? !!currentSource &&
+      !failed &&
+      displayed?.source.assetId === currentSource.assetId &&
+      displayed.source.attempt === currentSource.attempt &&
+      displayed.source.url === currentSource.url &&
+      (displayed.source.time === time ||
+        (displayed.heldAtEnd === true &&
+          displayed.nextTimestamp !== undefined &&
+          time >= displayed.nextTimestamp))
+    : htmlReady;
+  const paintReady = canonical ? !!currentSource && !failed : htmlReady;
   useEffect(() => {
     const media = video.current!;
     let disposed = false,
       url: string | undefined;
     paint.current?.cancel();
     setSource(null);
+    setAsset(null);
+    compatibility.current = !canonical;
     setFailed(false);
     const seek = () => {
-      media.currentTime = Math.min(Math.max(0, media.duration - 0.001), latestTime.current);
+      media.currentTime = Number.isFinite(media.duration)
+        ? Math.min(Math.max(0, media.duration - 0.001), latestTime.current)
+        : latestTime.current;
     };
     const loaded = () => {
       if (
@@ -244,10 +295,13 @@ function useWebcamCropFrame(
         setFailed(true);
       }
     };
+    const mediaError = () => {
+      if (compatibility.current) error();
+    };
     media.addEventListener('loadedmetadata', seek);
     media.addEventListener('loadeddata', loaded);
     media.addEventListener('seeked', loaded);
-    media.addEventListener('error', error);
+    media.addEventListener('error', mediaError);
     void resolveReviewAssetBytes(props.camera.assetId)
       .then((blob) => {
         if (disposed) return;
@@ -256,6 +310,7 @@ function useWebcamCropFrame(
           return;
         }
         url = URL.createObjectURL(blob);
+        setAsset({ assetId: props.camera.assetId, attempt, url });
         media.src = url;
         media.load();
       })
@@ -266,18 +321,20 @@ function useWebcamCropFrame(
       media.removeEventListener('loadedmetadata', seek);
       media.removeEventListener('loadeddata', loaded);
       media.removeEventListener('seeked', loaded);
-      media.removeEventListener('error', error);
+      media.removeEventListener('error', mediaError);
       media.pause();
       media.removeAttribute('src');
       media.load();
       if (url) URL.revokeObjectURL(url);
     };
-  }, [props.camera.assetId, attempt]);
+  }, [props.camera.assetId, attempt, canonical]);
   useEffect(() => {
     const media = video.current;
     paint.current?.cancel();
     if (media && media.readyState >= 1 && !Number.isNaN(media.duration)) {
-      const target = Math.min(Math.max(0, media.duration - 0.001), time);
+      const target = Number.isFinite(media.duration)
+        ? Math.min(Math.max(0, media.duration - 0.001), time)
+        : time;
       if (media.currentTime !== target) {
         setSource(null);
         media.currentTime = target;
@@ -292,12 +349,18 @@ function useWebcamCropFrame(
   }, [time, props.camera.assetId, attempt]);
   useEffect(() => {
     const target = canvas.current;
-    if (!target || !ready) {
+    if (!target || !paintReady) {
       paint.current?.cancel();
       return;
     }
     const framing = { zoom: crop.zoom, panX: crop.panX, panY: crop.panY };
-    const draw = () => paint.current?.request({ camera: props.camera, crop: framing, renderer });
+    const draw = () =>
+      paint.current?.request({
+        camera: props.camera,
+        crop: framing,
+        renderer,
+        ...(currentSource ? { source: currentSource } : {}),
+      });
     draw();
     const observer = new ResizeObserver(draw);
     observer.observe(target);
@@ -306,7 +369,8 @@ function useWebcamCropFrame(
       paint.current?.cancel();
     };
   }, [
-    ready,
+    paintReady,
+    currentSource,
     revision,
     props.camera,
     crop.zoom,
@@ -321,6 +385,7 @@ function useWebcamCropFrame(
     canvas,
     gpuHost,
     ready,
+    sourceSize: canonical ? displayed : null,
     failed,
     retry: () => {
       paint.current?.reset();

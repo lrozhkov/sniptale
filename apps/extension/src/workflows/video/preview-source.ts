@@ -17,6 +17,8 @@ export interface PreviewSourceDemand {
   readonly holdEnd?: boolean;
   /** Explicit left-hand limit of the retained interval, including an interior cut endpoint. */
   readonly endpoint?: 'retained-end';
+  /** Whole-source preview holds only after its verified physical end, without an authored range. */
+  readonly holdSourceEnd?: true;
 }
 
 /** An immutable drawable and its actual presentation interval, in seconds. */
@@ -186,6 +188,10 @@ function validateDemands(demands: readonly PreviewSourceDemand[]): void {
       (demand.rangeStart !== undefined &&
         (!Number.isFinite(demand.rangeStart) ||
           demand.time < demand.rangeStart - ROUNDING_SECONDS)) ||
+      (demand.holdSourceEnd === true &&
+        (demand.holdEnd === true ||
+          demand.endpoint !== undefined ||
+          demand.rangeEnd !== undefined)) ||
       (demand.endpoint === 'retained-end' &&
         (demand.holdEnd === true ||
           demand.rangeEnd === undefined ||
@@ -210,6 +216,7 @@ function validateDemands(demands: readonly PreviewSourceDemand[]): void {
 
 /** Terminal intent is separate from ordinary half-open sample coverage. */
 function terminalSourceTime(demand: PreviewSourceDemand, end: number): number | undefined {
+  if (demand.holdSourceEnd === true) return demand.time >= end ? beforeEndpoint(end) : undefined;
   if (demand.holdEnd !== true) return undefined;
   const bound = demand.rangeEnd;
   if (bound === undefined || !Number.isFinite(bound)) throw unavailable();
@@ -585,6 +592,9 @@ class PreviewSourceOwner implements PreviewSourceProvider {
         )
           throw unavailable();
         const terminalTime = terminalSourceTime(demand, stream.end);
+        const strictEnd =
+          retainedEnd ??
+          (demand.holdSourceEnd === true && terminalTime !== undefined ? stream.end : undefined);
         const leading = stream.leadingSampleTime;
         const sampleTime =
           leading !== undefined && Number.isFinite(leading) && leading > 0 && demand.time < leading
@@ -604,7 +614,7 @@ class PreviewSourceOwner implements PreviewSourceProvider {
             : (terminalTime ?? sampleTime ?? demand.time),
           request,
           discontinuity,
-          retainedEnd
+          strictEnd
         );
         if (
           retainedEnd !== undefined &&
