@@ -45,6 +45,7 @@ export function FrameProjection(props: {
   settingsAnchor: HTMLButtonElement | null;
   settingsMenu: ProjectionSettingsMenu;
   onMoveStart: (event: React.PointerEvent) => void;
+  onSelect?: () => void;
   onResizeStart: (
     event: React.PointerEvent,
     direction: ResizeDirection,
@@ -263,6 +264,7 @@ function FrameCalloutOverlay(props: FrameProjectionOverlayProps) {
         portalTarget={sceneRoot}
         controlsPortalTarget={props.controlsRoot}
         selected={props.selected}
+        {...(props.onSelect ? { onSelect: props.onSelect } : {})}
         snapshot={props.snapshot}
         onSnapshotChange={props.onSnapshotChange}
         onSnapshotPreview={props.onSnapshotPreview}
@@ -292,6 +294,8 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       controlsPortalTarget={props.controlsRoot}
       coordinateSpace={props.coordinateSpace}
       frameRect={props.frameRect}
+      frameId={props.snapshot.id}
+      {...(props.onSelect ? { onClick: props.onSelect } : {})}
       {...(props.snapshot.annotationKind === 'step-badge'
         ? {
             onDelete: () => props.onCommand('delete'),

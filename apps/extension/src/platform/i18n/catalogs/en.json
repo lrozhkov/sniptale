@@ -2935,7 +2935,7 @@
       "collapseInspector": "Collapse inspector",
       "file": "File",
       "frame": "Background",
-      "browserFrame": "Browser window",
+      "browserFrame": "Window header",
       "meta": "Page details",
       "textInsertMenu": "Choose text mode",
       "insertImage": "Insert image",

@@ -1,7 +1,11 @@
 import type { Canvas, Control, FabricObject } from 'fabric';
+import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
+import { DRAWING_SELECTION_ACCENT } from '../../../../drawing/object/controls/chrome';
 import type { EditorMagnetManager } from '../../../magnet';
 import { isEditorHiddenEdgeControl } from '../../../document/interaction-border-controls';
 import { mountSelectionVisibility } from './selection-visibility';
+import { mountProjectedSelection } from './projected-selection';
+import type { EditorLayerPresentationBounds } from '../../../../document/canvas-surface/render-region';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const CORNERS = ['tl', 'tr', 'br', 'bl'];
@@ -40,9 +44,22 @@ function screenScale(canvas: Canvas): number {
   return width > 0 && displayedWidth > 0 ? displayedWidth / width : 1;
 }
 
-function appendSelectionBorder(svg: SVGElement, object: FabricObject, zoom: number): void {
-  const corners = object.getCoords();
-  if (!object.hasBorders || corners.length !== 4) return;
+function appendSelectionBorder(
+  svg: SVGElement,
+  object: FabricObject,
+  zoom: number,
+  preview = false,
+  bounds?: EditorLayerPresentationBounds
+): void {
+  const corners = bounds
+    ? [
+        { x: bounds.left, y: bounds.top },
+        { x: bounds.left + bounds.width, y: bounds.top },
+        { x: bounds.left + bounds.width, y: bounds.top + bounds.height },
+        { x: bounds.left, y: bounds.top + bounds.height },
+      ]
+    : object.getCoords();
+  if ((!preview && !bounds && !object.hasBorders) || corners.length !== 4) return;
   const [a, b, c, d, offsetX, offsetY] = object.canvas?.viewportTransform ?? [1, 0, 0, 1, 0, 0];
   svg.appendChild(
     svgElement('polygon', {
@@ -52,9 +69,27 @@ function appendSelectionBorder(svg: SVGElement, object: FabricObject, zoom: numb
         )
         .join(' '),
       fill: 'none',
-      stroke: object.borderColor || '#2563eb',
+      stroke:
+        preview || bounds
+          ? DRAWING_SELECTION_ACCENT
+          : object.borderColor || DRAWING_SELECTION_ACCENT,
       'stroke-width': resolveSelectionChromeMetrics(zoom).borderWidth,
-      'stroke-dasharray': object.borderDashArray?.map((value) => value / zoom).join(' ') ?? '',
+      'stroke-dasharray':
+        (preview || bounds ? [4, 3] : object.borderDashArray)
+          ?.map((value) => value / zoom)
+          .join(' ') ?? '',
+      ...(!preview && bounds
+        ? {
+            'data-ui': 'editor.canvas.projected-selection-outline',
+            'data-layer-id': object.sniptaleId ?? '',
+          }
+        : {}),
+      ...(preview
+        ? {
+            'data-ui': 'editor.canvas.selection-preview-outline',
+            'data-layer-id': object.sniptaleId ?? '',
+          }
+        : {}),
       'vector-effect': 'non-scaling-stroke',
     })
   );
@@ -216,7 +251,8 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     height: '100%',
     overflow: 'visible',
     pointerEvents: 'none',
-    zIndex: String(upperCanvasZIndex + 1),
+    // The annotation plane is z-30; its surfaces must not cover selection contours.
+    zIndex: String(Math.max(31, upperCanvasZIndex + 1)),
   });
   container.appendChild(svg);
   Reflect.set(canvas, 'skipControlsDrawing', true);
@@ -224,8 +260,10 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
   selection.setAttribute('data-ui', 'editor.canvas.selection-controls');
   const disposeVisibility = mountSelectionVisibility(canvas, selection);
   const touchedControls = new Set<Control>();
+  let hoverTarget: FabricObject | undefined;
+  let previewSuspended = false;
   const render = (event?: { ctx: CanvasRenderingContext2D }) => {
-    if (event && event.ctx !== canvas.getContext()) return;
+    if (event && event.ctx !== canvas.getContext() && event.ctx !== canvas.contextTop) return;
     const width = canvas.getWidth();
     const height = canvas.getHeight();
     if (width <= 0 || height <= 0) return;
@@ -234,15 +272,61 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     selection.replaceChildren();
     const activeObject = canvas.getActiveObject();
     if (activeObject) appendSelection(selection, activeObject, zoom, touchedControls);
+    for (const object of canvas.getActiveObjects?.() ?? []) {
+      const bounds = projected?.resolve(object);
+      if (bounds) appendSelectionBorder(selection, object, zoom, false, bounds);
+    }
     const guides = svgElement('g', {
       transform: `matrix(${(canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]).join(' ')})`,
     });
     appendGuides(guides, magnet, zoom * (canvas.viewportTransform?.[0] ?? 1));
-    svg.replaceChildren(selection, guides);
+    const previews = svgElement('g', { 'data-ui': 'editor.canvas.selection-preview' });
+    if (canvas instanceof EditorCanvas && !previewSuspended) {
+      for (const object of canvas.getSelectionPreviewObjects(hoverTarget)) {
+        const bounds = projected?.resolve(object);
+        if (bounds !== null) appendSelectionBorder(previews, object, zoom, true, bounds);
+      }
+    }
+    svg.replaceChildren(previews, selection, guides);
   };
+  const updateHover = (object?: FabricObject) => {
+    if (object === hoverTarget && !previewSuspended) return;
+    previewSuspended = false;
+    hoverTarget = object;
+    render();
+  };
+  const projected =
+    canvas instanceof EditorCanvas ? mountProjectedSelection(canvas, render, updateHover) : null;
+  const clearPreview = () => {
+    hoverTarget = undefined;
+    render();
+  };
+  const blurPreview = () => {
+    previewSuspended = true;
+    clearPreview();
+  };
+  const previewSubscriptions =
+    canvas instanceof EditorCanvas
+      ? [
+          canvas.on('mouse:move', ({ e, target }) => {
+            const next = 'buttons' in e && e.buttons === 0 ? target : undefined;
+            if (next === hoverTarget && !previewSuspended) return;
+            previewSuspended = false;
+            hoverTarget = next;
+            render();
+          }),
+          canvas.on('mouse:out', clearPreview),
+          canvas.on('mouse:down', clearPreview),
+          canvas.on('mouse:up', clearPreview),
+        ]
+      : [];
+  window.addEventListener('blur', blurPreview);
   const unsubscribe = canvas.on('after:render', render);
   mountedChrome.set(canvas, () => {
     disposeVisibility();
+    projected?.dispose();
+    for (const unsubscribePreview of previewSubscriptions) unsubscribePreview();
+    window.removeEventListener('blur', blurPreview);
     unsubscribe();
     svg.remove();
     for (const control of touchedControls) {

@@ -604,8 +604,9 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       hostOrigin,
     }, info) => {
       await page.setViewportSize(viewport.size);
-      await applyHarnessBootstrap(page, {});
+      await applyHarnessBootstrap(page, { storage: { 'sniptale-locale-preference': 'en' } });
       await page.addInitScript(() => {
+        localStorage.setItem('sniptale-locale-preference', 'en');
         const canvas = document.createElement('canvas');
         canvas.width = 800;
         canvas.height = 320;
@@ -647,7 +648,86 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const cursor = ui(page, 'editor.floating.tool-rail.select');
       await cursor.click();
       await expect(tool).toHaveAttribute('aria-pressed', 'false');
+      await page
+        .locator('[data-ui="editor.layers.list-viewport"] > div')
+        .first()
+        .getByRole('button', {
+          name: translate('editor.toolbar.toggleLayerSelection', 'en'),
+          exact: true,
+        })
+        .click();
+      const selectedOutline = ui(page, 'editor.canvas.projected-selection-outline');
+      await expect(selectedOutline).toHaveCount(1);
+      const surface = page.locator(
+        kind === 'callout' ? '.sniptale-callout' : '.sniptale-step-badge'
+      );
+      await expect
+        .poll(async () => {
+          const actual = (await surface.last().boundingBox())!;
+          const selectedRect = await selectedOutline.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+          });
+          return Math.max(
+            Math.abs(actual.x - selectedRect.x),
+            Math.abs(actual.y - selectedRect.y),
+            Math.abs(actual.width - selectedRect.width),
+            Math.abs(actual.height - selectedRect.height)
+          );
+        })
+        .toBeLessThanOrEqual(2);
+      await surface.first().hover();
+      const preview = ui(page, 'editor.canvas.selection-preview-outline');
+      await expect(preview).toHaveCount(1);
+      await page.mouse.move(1, 1);
+      await expect(preview).toHaveCount(0);
+      await surface.first().click();
+      await expect
+        .poll(async () => {
+          const actualFirst = (await surface.first().boundingBox())!;
+          const selectedFirst = await selectedOutline.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            return { x: rect.x, y: rect.y };
+          });
+          return Math.abs(actualFirst.x - selectedFirst.x);
+        })
+        .toBeLessThanOrEqual(2);
+      await page.screenshot({
+        path: info.outputPath('standalone-selected-and-hovered.png'),
+        fullPage: false,
+      });
+      if (kind === 'callout')
+        await surface.first().locator('[contenteditable="true"]').press('Escape');
+      const target = (await surface.first().boundingBox())!;
+      const marqueeStart = { x: target.x - 12, y: target.y - 12 };
+      await page.mouse.move(marqueeStart.x, marqueeStart.y);
+      await page.mouse.down();
+      await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, {
+        steps: 4,
+      });
+      await expect(preview).toHaveCount(0);
+      await page.mouse.up();
+      await page.mouse.move(marqueeStart.x, marqueeStart.y);
+      await page.mouse.down();
+      await page.mouse.move(target.x + target.width + 12, target.y + target.height + 12, {
+        steps: 4,
+      });
+      await expect(preview).toHaveCount(1);
+      await page.screenshot({ path: info.outputPath('standalone-marquee.png'), fullPage: false });
+      await page.mouse.up();
+      await expect(selectedOutline).toHaveCount(1);
+
       await expect.poll(count).toBe(before + 2);
+      const content = page.locator(
+        kind === 'callout' ? '.sniptale-callout' : '.sniptale-step-badge'
+      );
+      for (const tool of ['pencil', 'shape', 'marker', 'arrow', 'blur', 'simplify', 'text']) {
+        await ui(page, `editor.floating.tool-rail.${tool}`).click();
+        await expect(content).toHaveCount(2);
+        await expect(content.first()).toBeVisible();
+        await expect(content.last()).toBeVisible();
+      }
+      await ui(page, 'editor.floating.tool-rail.select').click();
       if (kind === 'step-badge') {
         await ui(page, 'editor.floating.tool-rail.history.undo').click();
         await expect.poll(count).toBe(before + 1);
@@ -656,4 +736,56 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       }
     });
   }
+}
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`editor retains attached annotations while drawing ${viewport.name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(viewport.size);
+    await applyHarnessBootstrap(page, { storage: { 'sniptale-locale-preference': 'en' } });
+    await page.addInitScript(() => {
+      localStorage.setItem('sniptale-locale-preference', 'en');
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 320;
+      window.__sniptaleHarnessBootstrap = {
+        ...window.__sniptaleHarnessBootstrap,
+        editorBootstrapPayload: { dataUrl: canvas.toDataURL(), title: 'Test' },
+      };
+    });
+    await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+    await expect(ui(page, 'editor.page.root')).toBeVisible();
+    await ui(page, 'content.toolbar.future-frame-style').click();
+    const bounds = (await ui(page, 'editor.canvas.document-boundary').boundingBox())!;
+    await page.mouse.move(bounds.x + 180, bounds.y + 80);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + 420, bounds.y + 240, { steps: 4 });
+    await page.mouse.up();
+    const toolbar = page.locator('.sniptale-action-toolbar:visible');
+    await toolbar
+      .getByRole('button', { name: translate('content.callout.settingsTitle', 'en'), exact: true })
+      .click();
+    const editor = page.locator('.sniptale-callout [contenteditable="true"]').last();
+    await editor.fill('Attached comment');
+    await editor.press('Escape');
+    await toolbar
+      .getByRole('button', {
+        name: translate('content.stepBadge.settingsTitle', 'en'),
+        exact: true,
+      })
+      .click();
+    for (const tool of ['pencil', 'shape', 'marker', 'arrow', 'blur', 'simplify', 'text']) {
+      await ui(page, `editor.floating.tool-rail.${tool}`).click();
+      await expect(page.locator('.sniptale-callout')).toContainText('Attached comment');
+      await expect(page.locator('.sniptale-callout')).toBeVisible();
+      await expect(page.locator('.sniptale-step-badge')).toBeVisible();
+      await expect(page.locator('.sniptale-callout [contenteditable="true"]')).toHaveCount(0);
+    }
+    await page.screenshot({
+      path: info.outputPath('attached-content-while-drawing.png'),
+      fullPage: false,
+    });
+  });
 }

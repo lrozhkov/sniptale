@@ -21,6 +21,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
   coordinateSpace?: FrameAnnotationCoordinateSpace;
   fillColor?: string;
   frameRect: StepBadgeFrameRect;
+  frameId?: string;
   isSettingsOpen?: boolean;
   onClick?: () => void;
   onPositionChange?: (placement: StepBadgeManualPlacement) => void;
@@ -89,6 +90,7 @@ export function FrameStepBadgeInteractiveSurface(props: {
       {createPortal(
         <div
           className="sniptale-step-badge-layer"
+          data-frame-id={props.frameId}
           style={{
             position: 'fixed',
             top: frameRect.y,

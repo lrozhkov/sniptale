@@ -15,6 +15,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { useEditorStore } from '../../state/useEditorStore';
+import { useDocumentBarLayout } from './document-bar-layout';
 import { EditorFloatingDocumentQuickActions } from './document-bar-quick-actions';
 import type { EditorFloatingDocumentBarProps } from './document-bar-types';
 import { getMediaLibraryEntry } from '../../../composition/persistence/media-library';
@@ -35,8 +36,10 @@ const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
 );
 
 const DOCUMENT_TITLE_CLASS_NAME = [
-  'flex min-w-[8rem] max-w-[18rem] max-[1799px]:max-w-[11rem] items-center px-2.5',
-  'max-[1499px]:min-w-0 max-[1499px]:max-w-[6rem]',
+  'flex min-w-[min(8rem,var(--editor-title-available,8rem))] items-center px-2.5',
+  'max-w-[min(18rem,var(--editor-title-available,18rem))]',
+  'max-[1799px]:max-w-[min(11rem,var(--editor-title-available,11rem))]',
+  'max-[1499px]:min-w-0 max-[1499px]:max-w-[min(6rem,var(--editor-title-available,6rem))]',
 ].join(' ');
 
 const DOCUMENT_PROMOTION_BUTTON_CLASS_NAME = [
@@ -385,7 +388,7 @@ function EditorDocumentRenameCommand(props: {
           'min-h-8 truncate rounded-[4px] text-left text-[13px] font-medium leading-[18px]',
           'text-[var(--sniptale-color-text-primary)] hover:underline focus-visible:outline',
           'focus-visible:outline-1 focus-visible:outline-[var(--sniptale-color-border-strong)]',
-          'disabled:no-underline',
+          'disabled:no-underline data-[focus-restoration=pointer]:!outline-none',
         ].join(' ')}
       >
         <span className={scoped ? 'sniptale-command-content min-w-0 truncate' : undefined}>
@@ -464,9 +467,10 @@ export function EditorFloatingDocumentBar(props: EditorFloatingDocumentBarProps)
   const documentState = useDocumentBarState();
   const embed = useEditorEmbedContext();
   const standalone = embed.mode !== 'scenario';
+  const layout = useDocumentBarLayout(standalone && props.hasImage);
 
   return (
-    <div data-ui="editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
+    <div ref={layout} data-ui="editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar dataUi="editor.floating.document-bar.surface">
         {standalone && props.hasImage ? <EditorRecentImagesButton /> : null}
         <EditorDocumentTitleEditor

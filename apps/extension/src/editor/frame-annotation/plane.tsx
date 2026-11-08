@@ -57,6 +57,93 @@ function FrameEffectSurfaces(props: {
   );
 }
 
+function InteractiveFrameProjection(props: {
+  entry: ReturnType<typeof useFrameAnnotationInteraction>['projection']['projected'][number];
+  interaction: ReturnType<typeof useFrameAnnotationInteraction>;
+  activeTool: EditorTool;
+  controller: EditorFrameAnnotationPlaneController;
+  coordinateSpace: ReturnType<typeof useEditorFrameCoordinateSpace>;
+  sceneRoot: HTMLDivElement | null;
+  controlsRoot: HTMLDivElement | null;
+  settingsSession: FrameSettingsSession | null;
+  setSettingsSession: React.Dispatch<React.SetStateAction<FrameSettingsSession | null>>;
+}) {
+  const {
+    entry,
+    interaction,
+    coordinateSpace,
+    sceneRoot,
+    controlsRoot,
+    settingsSession,
+    setSettingsSession,
+  } = props;
+  return (
+    <FrameProjection
+      coordinateSpace={coordinateSpace}
+      controlsRoot={controlsRoot}
+      object={entry.object}
+      sceneRoot={sceneRoot}
+      selected={entry.snapshot.id === interaction.projection.effectiveSelectedId}
+      {...(props.activeTool === 'select' && entry.snapshot.annotationKind
+        ? {
+            onSelect: () =>
+              props.controller.selectLayer?.(entry.snapshot.id, { focusViewport: false }),
+          }
+        : {})}
+      interactive={
+        entry.object?.sniptaleLocked !== true &&
+        (props.activeTool === 'frame-annotation' || props.activeTool === 'select')
+      }
+      showVisualOverlays
+      scale={interaction.projection.scale}
+      snapshot={entry.snapshot}
+      settingsAnchor={
+        settingsSession?.frameId === entry.snapshot.id ? settingsSession.anchor : null
+      }
+      settingsMenu={settingsSession?.frameId === entry.snapshot.id ? settingsSession.menu : null}
+      onMoveStart={(event) => {
+        if (entry.object) interaction.objectActions.startMove(entry.object, entry.snapshot, event);
+      }}
+      onResizeStart={(event, direction, calloutCenter) => {
+        if (entry.object)
+          interaction.objectActions.startResize(
+            entry.object,
+            entry.snapshot,
+            event,
+            direction,
+            calloutCenter
+          );
+      }}
+      onCommand={(command) => {
+        if (command === 'close' || command === 'delete') setSettingsSession(null);
+        if (entry.object)
+          interaction.objectActions.runCommand(entry.object, entry.snapshot, command);
+      }}
+      onSnapshotChange={(snapshot) => {
+        if (entry.object) interaction.objectActions.commitSnapshot(entry.object, snapshot);
+      }}
+      onSnapshotPreview={(snapshot) => {
+        if (entry.object) interaction.objectActions.previewSnapshot(entry.object, snapshot);
+      }}
+      onStepBadgeReorder={(direction) => {
+        if (entry.object) interaction.objectActions.reorderStepBadge(entry.object, direction);
+      }}
+      onDraftCommit={interaction.objectActions.commitSnapshotDraft}
+      onMoveEnd={() => props.controller.clearFrameAnnotationSnap?.()}
+      projectMoveRect={(rect) =>
+        props.controller.snapFrameAnnotationRect?.({
+          excludeId: entry.snapshot.id,
+          rect,
+        }) ?? rect
+      }
+      onCloseSettings={() => setSettingsSession(null)}
+      onOpenSettings={(menu, anchor) =>
+        setSettingsSession({ anchor, frameId: entry.snapshot.id, menu })
+      }
+    />
+  );
+}
+
 export function EditorFrameAnnotationPlane(props: {
   activeTool: EditorTool;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -126,66 +213,16 @@ export function EditorFrameAnnotationPlane(props: {
           documentSize={documentSize}
         />
         {interaction.projection.projected.map((entry) => (
-          <FrameProjection
+          <InteractiveFrameProjection
             key={entry.snapshot.id}
+            {...props}
+            entry={entry}
+            interaction={interaction}
             coordinateSpace={coordinateSpace}
-            controlsRoot={controlsRoot}
-            object={entry.object}
             sceneRoot={sceneRoot}
-            selected={entry.snapshot.id === interaction.projection.effectiveSelectedId}
-            interactive={
-              entry.object?.sniptaleLocked !== true &&
-              (props.activeTool === 'frame-annotation' || props.activeTool === 'select')
-            }
-            showVisualOverlays={props.activeTool === 'crop'}
-            scale={interaction.projection.scale}
-            snapshot={entry.snapshot}
-            settingsAnchor={
-              settingsSession?.frameId === entry.snapshot.id ? settingsSession.anchor : null
-            }
-            settingsMenu={
-              settingsSession?.frameId === entry.snapshot.id ? settingsSession.menu : null
-            }
-            onMoveStart={(event) => {
-              if (entry.object)
-                interaction.objectActions.startMove(entry.object, entry.snapshot, event);
-            }}
-            onResizeStart={(event, direction, calloutCenter) => {
-              if (entry.object)
-                interaction.objectActions.startResize(
-                  entry.object,
-                  entry.snapshot,
-                  event,
-                  direction,
-                  calloutCenter
-                );
-            }}
-            onCommand={(command) => {
-              if (command === 'close' || command === 'delete') setSettingsSession(null);
-              if (entry.object)
-                interaction.objectActions.runCommand(entry.object, entry.snapshot, command);
-            }}
-            onSnapshotChange={(snapshot) => {
-              if (entry.object) interaction.objectActions.commitSnapshot(entry.object, snapshot);
-            }}
-            onSnapshotPreview={(snapshot) => {
-              if (entry.object) interaction.objectActions.previewSnapshot(entry.object, snapshot);
-            }}
-            onStepBadgeReorder={(direction) => {
-              if (entry.object) interaction.objectActions.reorderStepBadge(entry.object, direction);
-            }}
-            onDraftCommit={interaction.objectActions.commitSnapshotDraft}
-            onMoveEnd={() => props.controller.clearFrameAnnotationSnap?.()}
-            projectMoveRect={(rect) =>
-              props.controller.snapFrameAnnotationRect?.({
-                excludeId: entry.snapshot.id,
-                rect,
-              }) ?? rect
-            }
-            onCloseSettings={() => setSettingsSession(null)}
-            onOpenSettings={(menu, anchor) =>
-              setSettingsSession({ anchor, frameId: entry.snapshot.id, menu })
-            }
+            controlsRoot={controlsRoot}
+            settingsSession={settingsSession}
+            setSettingsSession={setSettingsSession}
           />
         ))}
       </div>
