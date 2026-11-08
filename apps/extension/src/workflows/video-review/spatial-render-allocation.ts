@@ -45,15 +45,22 @@ export function calculateSpatialRenderAllocations(
     bytes('spatial-level-sizes', 64)
   );
   let { width, height } = plane;
+  let overlayWidth = (value.overlay ?? output).width;
+  let overlayHeight = (value.overlay ?? output).height;
   for (let level = 0; level < 8; level++) {
     result.push(
       bytes(
         `spatial-texture-${level}`,
-        pixels({ width, height }) * (level > 0 && halfFloat ? 8 : 4)
+        Math.max(
+          pixels({ width, height }),
+          pixels({ width: overlayWidth, height: overlayHeight })
+        ) * (level > 0 && halfFloat ? 8 : 4)
       )
     );
     width = Math.max(1, Math.ceil(width / 2));
     height = Math.max(1, Math.ceil(height / 2));
+    overlayWidth = Math.max(1, Math.ceil(overlayWidth / 2));
+    overlayHeight = Math.max(1, Math.ceil(overlayHeight / 2));
   }
   for (const old of value.retained ?? []) {
     checked(old.bytes);

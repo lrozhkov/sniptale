@@ -22,7 +22,7 @@ import {
 } from './scene-frame';
 import { drawReviewAnnotationFrame } from './annotation-renderer';
 import { drawReviewClicks } from './render-click-animation';
-import { pointerFeedbackLensPaintBounds } from '../../features/video/composition/draw/pointer-feedback';
+import { reviewSpatialOverlayBounds } from './spatial-overlay-bounds';
 import { drawSceneBorders } from '../../features/video/composition/draw/border';
 import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import type { ReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
@@ -148,31 +148,13 @@ export function drawReviewSceneOverlays(args: {
     return;
   }
   const overlayDensity = args.exportSampling ? args.exportSampling.plan.overlayDensity : 1;
-  let overlayBounds = { x: 0, y: 0, width: canvas.width, height: canvas.height };
-  if (spatial) {
-    const video = overlayLayout.videoTransform;
-    const scale = video.width / Math.max(1, args.sourceWidth);
-    for (const click of clicks) {
-      const bounds = pointerFeedbackLensPaintBounds({
-        ...click,
-        point: {
-          x: video.x + click.point.x * video.width,
-          y: video.y + click.point.y * video.height,
-        },
-        radius: click.radius * scale,
-        stroke: click.stroke * scale,
-      });
-      if (!bounds) continue;
-      const x = Math.min(overlayBounds.x, bounds.x),
-        y = Math.min(overlayBounds.y, bounds.y);
-      overlayBounds = {
-        x,
-        y,
-        width: Math.max(overlayBounds.x + overlayBounds.width, bounds.x + bounds.width) - x,
-        height: Math.max(overlayBounds.y + overlayBounds.height, bounds.y + bounds.height) - y,
-      };
-    }
-  }
+  const overlayBounds = reviewSpatialOverlayBounds({
+    output: canvas,
+    layout,
+    background,
+    sourceWidth: args.sourceWidth,
+    clicks,
+  });
   const overlay = spatial
     ? spatial.surface(
         'overlay',

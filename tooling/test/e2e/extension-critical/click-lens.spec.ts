@@ -48,7 +48,7 @@ test('managed magnify matches shared export composition through spatial and frag
     format: 'esm',
     platform: 'browser',
     write: false,
-    loader: { '.woff2': 'dataurl', '.svg': 'text' },
+    loader: { '.woff2': 'dataurl', '.svg': 'text', '.bin': 'dataurl' },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const results = await page.evaluate(async (text) => {

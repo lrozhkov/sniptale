@@ -1,3 +1,4 @@
+import { reviewSpatialOverlayBounds } from './spatial-overlay-bounds';
 import { calculateSpatialRenderAllocations } from './spatial-render-allocation';
 import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
@@ -560,6 +561,13 @@ function focusAllocation(
       : 0,
   };
   const spatialRetained = scene.zoomRegions.some(quickEditRegionNeedsSpatialRenderer);
+  const overlayBounds = reviewSpatialOverlayBounds({
+    output: backing,
+    layout,
+    background,
+    sourceWidth: scene.source.width,
+    clicks: evaluateReviewClicks(scene.clicks, input.resultTime),
+  });
   return {
     spatial: spatialRetained
       ? {
@@ -570,6 +578,10 @@ function focusAllocation(
             background,
             sceneScale,
           }),
+          overlay: {
+            width: Math.ceil(overlayBounds.width),
+            height: Math.ceil(overlayBounds.height),
+          },
           halfFloat: input.spatialHalfFloat ?? true,
         }
       : null,

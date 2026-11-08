@@ -59,17 +59,25 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     const front = mini.locator(
       '[data-ui="video-editor.scene-bookends.preview.gpu-host"] [data-preview-inspector-canvas]'
     );
-    const mainVideos = page.locator('[data-ui="video.preview.stage.root"] video');
-    const mainTransport = () =>
-      mainVideos.evaluateAll((videos: HTMLVideoElement[]) =>
-        videos.map((video) => ({
-          time: video.currentTime,
-          paused: video.paused,
-          rate: video.playbackRate,
-          seeking: video.seeking,
-          source: video.currentSrc,
+    const mainCanvas = page.locator('[data-preview-stage-canvas]');
+    const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+    const counter = page.locator('[data-playback-counter="true"]');
+    const mainAudio = page.locator('[data-ui="video.preview.stage.root"] audio');
+    // Audio media time is independent transport evidence, not the decoded video PTS.
+    const mainTransport = async () => ({
+      time: await playhead.getAttribute('aria-valuenow'),
+      counter: await counter.textContent(),
+      pixels: await previewPixels(mainCanvas),
+      audio: await mainAudio.evaluateAll((audios: HTMLAudioElement[]) =>
+        audios.map((audio) => ({
+          time: audio.currentTime,
+          paused: audio.paused,
+          rate: audio.playbackRate,
+          seeking: audio.seeking,
+          source: audio.currentSrc,
         }))
-      );
+      ),
+    });
     const choose = (key: Parameters<typeof translate>[0], value: Parameters<typeof translate>[0]) =>
       chooseInspectorValue(page, preset, label(key), label(value));
     try {
@@ -109,14 +117,25 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=light`
       );
       await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
-      await expect(mainVideos).toHaveCount(1);
+      await expect(mainCanvas).toBeVisible();
+      await expect(playhead).toHaveAttribute('aria-valuenow', '0');
+      await expect(counter).toBeVisible();
+      await expect(mainAudio).toHaveCount(1);
       await expect
         .poll(() =>
-          mainVideos.evaluate(
-            (video: HTMLVideoElement) => video.readyState >= 2 && !video.seeking && video.paused
+          mainAudio.evaluate(
+            (audio: HTMLAudioElement) =>
+              audio.readyState >= 2 && !audio.seeking && audio.paused && !!audio.currentSrc
           )
         )
         .toBe(true);
+      await expect
+        .poll(async () => {
+          const pixels = await previewPixels(mainCanvas);
+          const colors = pixels.filter((_, index) => index % 4 !== 3);
+          return Math.max(...colors) - Math.min(...colors);
+        })
+        .toBeGreaterThan(20);
       const pinned = await mainTransport();
       const png = await page.evaluate(() => {
         const canvas = document.createElement('canvas');

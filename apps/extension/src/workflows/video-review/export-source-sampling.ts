@@ -1,3 +1,4 @@
+import { reviewSpatialOverlayBounds } from './spatial-overlay-bounds';
 import { resolveReviewSpatialFilterLevels } from '../../features/video/composition/canvas/spatial-filter-levels';
 import { reviewSpatialSourceRect } from './scene-shadow';
 import {
@@ -351,13 +352,20 @@ export function reviewExportSamplingAllocation(
       }
     }
   }
+  const overlayBounds = reviewSpatialOverlayBounds({
+    output,
+    layout: plan.layout,
+    background,
+    sourceWidth: plan.identity.sourceSize.width,
+    clicks: plan.clickFrames,
+  });
   return {
     active: hasMagnificationDemand(plan.demands),
     window: { width: windowWidth, height: windowHeight },
     plane: { width, height },
     overlay: {
-      width: Math.ceil(output.width * plan.overlayDensity),
-      height: Math.ceil(output.height * plan.overlayDensity),
+      width: Math.ceil(overlayBounds.width * plan.overlayDensity),
+      height: Math.ceil(overlayBounds.height * plan.overlayDensity),
     },
   };
 }

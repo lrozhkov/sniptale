@@ -131,48 +131,49 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       expect(
         Math.abs(bounds.height - (bounds.width * project.height) / project.width)
       ).toBeLessThanOrEqual(1);
-      const source = page.locator('[data-ui="video.preview.stage.root"] video').first();
-      await expect
-        .poll(() =>
-          source.evaluate((video: HTMLVideoElement) => video.readyState >= 2 && !!video.currentSrc)
-        )
-        .toBe(true);
-      const reference = await source.evaluate(async (video: HTMLVideoElement, size) => {
-        const decoded = document.createElement('video');
-        const fitted = document.createElement('canvas');
-        const sample = document.createElement('canvas');
-        decoded.muted = true;
-        decoded.preload = 'auto';
-        try {
-          await new Promise<void>((resolve, reject) => {
-            decoded.onloadeddata = () => resolve();
-            decoded.onerror = () => reject(new Error('Held source reference failed to decode'));
-            decoded.src = video.currentSrc;
-          });
-          await new Promise<void>((resolve) => {
-            decoded.onseeked = () => resolve();
-            decoded.currentTime = 1;
-          });
-          fitted.width = size.width;
-          fitted.height = size.height;
-          sample.width = sample.height = 32;
-          const full = fitted.getContext('2d'),
-            context = sample.getContext('2d');
-          if (!full || !context) throw new Error('Held source reference readback is unavailable');
-          full.drawImage(decoded, 0, 0, size.width, size.height);
-          context.drawImage(fitted, 0, 0, 32, 32);
-          return {
-            width: decoded.videoWidth,
-            height: decoded.videoHeight,
-            time: decoded.currentTime,
-            pixels: [...context.getImageData(0, 0, 32, 32).data],
-          };
-        } finally {
-          decoded.removeAttribute('src');
-          decoded.load();
-          fitted.width = fitted.height = sample.width = sample.height = 0;
-        }
-      }, backing);
+      const reference = await page.evaluate(
+        async ({ size, bytes }) => {
+          const sourceUrl = URL.createObjectURL(
+            new Blob([Uint8Array.from(bytes)], { type: 'video/mp4' })
+          );
+          const decoded = document.createElement('video');
+          const fitted = document.createElement('canvas');
+          const sample = document.createElement('canvas');
+          decoded.muted = true;
+          decoded.preload = 'auto';
+          try {
+            await new Promise<void>((resolve, reject) => {
+              decoded.onloadeddata = () => resolve();
+              decoded.onerror = () => reject(new Error('Held source reference failed to decode'));
+              decoded.src = sourceUrl;
+            });
+            await new Promise<void>((resolve) => {
+              decoded.onseeked = () => resolve();
+              decoded.currentTime = 1;
+            });
+            fitted.width = size.width;
+            fitted.height = size.height;
+            sample.width = sample.height = 32;
+            const full = fitted.getContext('2d'),
+              context = sample.getContext('2d');
+            if (!full || !context) throw new Error('Held source reference readback is unavailable');
+            full.drawImage(decoded, 0, 0, size.width, size.height);
+            context.drawImage(fitted, 0, 0, 32, 32);
+            return {
+              width: decoded.videoWidth,
+              height: decoded.videoHeight,
+              time: decoded.currentTime,
+              pixels: [...context.getImageData(0, 0, 32, 32).data],
+            };
+          } finally {
+            URL.revokeObjectURL(sourceUrl);
+            decoded.removeAttribute('src');
+            decoded.load();
+            fitted.width = fitted.height = sample.width = sample.height = 0;
+          }
+        },
+        { size: backing, bytes: [...bytes] }
+      );
       expect([reference.width, reference.height, reference.time]).toEqual([1904, 984, 1]);
       // Match both scaling stages; allow five channel LSB for decoder/GPU conversion.
       await expect

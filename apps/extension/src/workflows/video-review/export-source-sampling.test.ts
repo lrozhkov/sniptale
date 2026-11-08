@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { planReviewExportSource } from './export-source-plan';
+import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { expect, it, vi } from 'vitest';
 import {
   prepareReviewExportSourceSampling,
@@ -370,5 +372,94 @@ it('keeps logical 3D source rectangles separate from dense body and sharp-lens r
     }
   } finally {
     prepared!.dispose();
+  }
+});
+
+it('declares density-scaled expanded click overlay dimensions used by spatial painting', async () => {
+  const output = document.createElement('canvas');
+  output.width = 320;
+  output.height = 180;
+  const sourceSize = { width: 640, height: 360 };
+  const value = {
+    ...scene,
+    sourceSize,
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
+    zoomRegions: [
+      {
+        ...createQuickEditZoomRegion({ id: 'tilt', at: 0, duration: 8, endMax: 8 }),
+        enter: { type: 'none' as const, duration: 0 },
+        exit: { type: 'none' as const, duration: 0 },
+        perspective: { enabled: true, rotateX: 12, rotateY: -18, rotateZ: 5, strength: 0.7 },
+      },
+    ],
+    clickCues: [
+      {
+        settings: {
+          ...REVIEW_CLICK_DEFAULT,
+          effect: 'magnify' as const,
+          lensOptics: 'optical' as const,
+          magnification: 2,
+          radius: 120,
+        },
+        point: { x: 0.5, y: 0.025 },
+        anchor: 1,
+        start: 0,
+        end: 2,
+      },
+    ],
+  };
+  const plan = planReviewExportSource({
+    identity: { sourceKey: {}, sourceTime: 1, passTime: 1, sourceSize },
+    scene: value,
+    output,
+    resultTime: 1,
+  });
+  const allocation = reviewExportSamplingAllocation(plan, output, value.background);
+  const draw = vi.fn();
+  const renderer = {
+    surface: (_role: string, width: number, height: number) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      return { canvas, context: canvas.getContext('2d')! };
+    },
+    draw,
+  } as unknown as ReviewSpatialRenderer;
+  const model = enhancer();
+  const prepared = await prepareReviewExportSourceSampling({
+    enhancer: model,
+    scene: value,
+    output,
+    sample: { timestamp: 1, draw: vi.fn() },
+    sourceTime: 1,
+    resultTime: 1,
+    signal: new AbortController().signal,
+  });
+  try {
+    expect(prepared).not.toBeNull();
+    paintReviewExportScene({
+      scene: value,
+      context: output.getContext('2d')!,
+      canvas: output,
+      sample: { draw: vi.fn() },
+      resultTime: 1,
+      sourceTime: 1,
+      spatialRenderer: renderer,
+      scratch: null,
+      blurEnabled: false,
+      exportSampling: prepared!,
+    });
+    const overlay = draw.mock.calls.at(-1)![1];
+    expect(overlay.sharp).toBe(true);
+    expect(overlay.sourceRect.y).toBeLessThan(0);
+    expect(allocation.overlay).toEqual({
+      width: overlay.source.width,
+      height: overlay.source.height,
+    });
+    expect(allocation.overlay.height).toBeGreaterThan(
+      Math.ceil(output.height * plan.overlayDensity)
+    );
+  } finally {
+    prepared?.dispose();
   }
 });
