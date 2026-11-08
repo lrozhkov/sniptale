@@ -509,3 +509,125 @@ test('a canvas smaller than padding stays cropped through fitted header changes 
   expect((await bounds()).canvas).toEqual([100, 100]);
   await page.screenshot({ path: info.outputPath('small-canvas.png'), fullPage: false });
 });
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const paint of ['solid', 'gradient'] as const) {
+    test(`header theme preserves ${paint} background pixels ${name}`, async ({
+      page,
+      hostOrigin,
+    }, info) => {
+      await page.setViewportSize(size);
+      const dataUrl = await page.evaluate(() => {
+        const image = document.createElement('canvas');
+        image.width = 2560;
+        image.height = 1305;
+        const context = image.getContext('2d')!;
+        context.fillStyle = '#445566';
+        context.fillRect(0, 0, image.width, image.height);
+        return image.toDataURL();
+      });
+      await applyHarnessBootstrap(page, {
+        storage: { 'sniptale-locale-preference': 'en' },
+        editorBootstrapPayload: { dataUrl, title: 'Header background proof' },
+      });
+      await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+      await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+      await expect
+        .poll(() =>
+          page.evaluate(() => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0)
+        )
+        .toBeGreaterThan(0);
+      await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
+      await page.getByRole('button', { name: 'Color', exact: true }).click();
+      const presets = page.locator('[data-ui="editor.frame.paint-presets"]');
+      await (
+        paint === 'solid'
+          ? presets.locator('button[aria-label^="#"]').last()
+          : presets.locator('button[aria-label]:not([aria-label^="#"])').first()
+      ).click();
+      await page.locator('[data-ui="editor.floating.layers.mode.browser-frame"]').click();
+      const settings = page.locator('[data-ui="window-header-settings"]');
+      await settings.getByRole('button', { name: 'Application', exact: true }).click();
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            window
+              .__sniptaleEditorHarness!.getCanvasObjects()
+              .some((o) => o['sniptaleType'] === 'browser-frame')
+          )
+        )
+        .toBe(true);
+      const snapshot = () =>
+        page.evaluate(() => {
+          const boundary = document
+            .querySelector('[data-ui="editor.canvas.document-boundary"]')!
+            .getBoundingClientRect();
+          const canvas = document.querySelector<HTMLCanvasElement>('canvas.lower-canvas')!;
+          const rect = canvas.getBoundingClientRect();
+          const context = canvas.getContext('2d')!;
+          const samples = [0.05, 0.5, 0.95].map((fraction) =>
+            Array.from(
+              context.getImageData(
+                Math.round(((boundary.right - 3 - rect.left) * canvas.width) / rect.width),
+                Math.round(
+                  ((boundary.top + boundary.height * fraction - rect.top) * canvas.height) /
+                    rect.height
+                ),
+                1,
+                1
+              ).data
+            )
+          );
+          const state = window.__sniptaleEditorHarness!.getInteractionState();
+          return {
+            samples,
+            frame: state.frame,
+            objects: window
+              .__sniptaleEditorHarness!.getCanvasObjects()
+              .filter((o) => o['sniptaleType'] !== 'browser-frame')
+              .map(({ src: _src, ...geometry }) => geometry),
+          };
+        });
+      await page.evaluate(() => window.__sniptaleEditorHarness!.setZoomLevel(0.25));
+      await expect
+        .poll(() =>
+          page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyMuted)
+        )
+        .toBe(0);
+      await expect
+        .poll(async () => (await snapshot()).samples.every((sample) => sample[3] === 255))
+        .toBe(true);
+      const before = await snapshot();
+      for (const theme of ['Dark', 'Light']) {
+        const index = await page.evaluate(
+          () => window.__sniptaleEditorHarness!.getInteractionState().historyIndex
+        );
+        await settings.getByRole('button', { name: theme, exact: true }).click();
+        await expect
+          .poll(() =>
+            page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
+          )
+          .toBe(index + 1);
+        await expect.poll(snapshot).toEqual(before);
+        await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+        await expect
+          .poll(() =>
+            page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
+          )
+          .toBe(index);
+        await expect.poll(snapshot).toEqual(before);
+        await page.locator('[data-ui="editor.floating.tool-rail.history.redo"]').click();
+        await expect
+          .poll(() =>
+            page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
+          )
+          .toBe(index + 1);
+        await expect.poll(snapshot).toEqual(before);
+      }
+      await page.screenshot({
+        path: info.outputPath(`${paint}-background-header-theme.png`),
+        fullPage: false,
+      });
+    });
+  }
+}
