@@ -369,3 +369,104 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       .toBe(2);
   });
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`editor pencil move obeys central magnet and click preserves chrome ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const bounds = await openTransformFixture(page, hostOrigin, size);
+    const tool = (kind: string) => page.locator(`[data-ui="editor.floating.tool-rail.${kind}"]`);
+    const polygon = page.locator('[data-ui="editor.canvas.selection-controls"] > polygon').first();
+    const center = async () => {
+      const rect = (await polygon.boundingBox())!;
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    };
+    const pencil = { x: bounds.x + 150, y: bounds.y + 100 };
+    const arrow = { x: bounds.x + 550, y: bounds.y + 200 };
+    await tool('pencil').click();
+    await dragMarquee(
+      page,
+      { x: pencil.x - 50, y: pencil.y - 20 },
+      {
+        x: pencil.x + 50,
+        y: pencil.y + 20,
+      }
+    );
+    await tool('arrow').click();
+    await dragMarquee(
+      page,
+      { x: arrow.x - 90, y: arrow.y - 50 },
+      {
+        x: arrow.x + 90,
+        y: arrow.y + 50,
+      }
+    );
+    await tool('select').click();
+    await page.mouse.click(bounds.x + 30, bounds.y + 30);
+    await page.mouse.move(arrow.x, arrow.y);
+    const arrowPreview = page.locator('[data-ui="editor.canvas.selection-preview"] polygon');
+    await expect(arrowPreview).toBeVisible();
+    const targetBounds = (await arrowPreview.boundingBox())!;
+    const target = {
+      x: targetBounds.x + targetBounds.width / 2,
+      y: targetBounds.y + targetBounds.height / 2,
+    };
+    await page.mouse.click(pencil.x, pencil.y);
+    const initial = await center();
+    const control = page.locator('[data-ui="editor.canvas.selection-controls"]');
+    await page.mouse.move(initial.x, initial.y);
+    await page.mouse.down();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+    await expect(control).toHaveCSS('opacity', '1');
+    await page.mouse.up();
+    await expect(control).toHaveCSS('opacity', '1');
+    const magnet = page.locator('[data-ui="editor.floating.view-controls.magnet"]');
+    if ((await magnet.getAttribute('aria-pressed')) === 'true') await magnet.click();
+    await expect(magnet).toHaveAttribute('aria-pressed', 'false');
+    await page.keyboard.down('Shift');
+    await page.mouse.move(initial.x, initial.y);
+    await page.mouse.down();
+    await page.mouse.move(target.x + 4, target.y + 3, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(async () => Math.abs((await center()).y - initial.y)).toBeLessThanOrEqual(1);
+    await page.keyboard.up('Shift');
+    await tool('history.undo').click();
+    await page.mouse.click(pencil.x, pencil.y);
+    await page.keyboard.down('Shift');
+    await page.mouse.move(initial.x, initial.y);
+    await page.mouse.down();
+    await page.mouse.move(target.x + 4, target.y + 3, { steps: 8 });
+    await page.keyboard.up('Shift');
+    await page.mouse.move(target.x + 4, target.y + 4);
+    await page.mouse.up();
+    expect(Math.abs((await center()).x - target.x)).toBeGreaterThan(2);
+    expect(Math.abs((await center()).y - target.y)).toBeGreaterThan(2);
+    await tool('history.undo').click();
+    await page.mouse.click(pencil.x, pencil.y);
+    await magnet.click();
+    await expect(magnet).toHaveAttribute('aria-pressed', 'true');
+    const restored = await center();
+    await page.mouse.move(restored.x, restored.y);
+    await page.mouse.down();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+    await expect(control).toHaveCSS('opacity', '1');
+    await page.mouse.move(target.x + 4, target.y + 4, { steps: 8 });
+    await expect(control).toHaveCSS('opacity', '0');
+    await page.mouse.up();
+    await expect(control).toHaveCSS('opacity', '1');
+    await expect.poll(async () => Math.abs((await center()).x - target.x)).toBeLessThanOrEqual(1);
+    await expect.poll(async () => Math.abs((await center()).y - target.y)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath('pencil-arrow-magnet.png'), fullPage: false });
+  });
+}

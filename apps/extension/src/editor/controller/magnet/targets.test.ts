@@ -173,7 +173,7 @@ function registerVisibilityFilterTest() {
 }
 
 function registerGroupedTargetHandlingTest() {
-  it('keeps nested editable group children, excludes selected group children, and rejects mixed groups', () => {
+  it('uses whole nested groups as targets and excludes the selected hierarchy', () => {
     const {
       mixedGroup,
       nestedEditable,
@@ -188,8 +188,11 @@ function registerGroupedTargetHandlingTest() {
 
     const targets = Array.from(collectMagnetTargets(selectedGroup, { width: 120, height: 80 }));
 
-    expect(targets).toContain(siblingChild);
-    expect(targets).toContain(nestedEditable);
+    expect(targets).toContain(siblingGroup);
+    expect(targets).not.toContain(siblingChild);
+    expect(targets).not.toContain(nestedEditable);
+    expect(targets).not.toContain(selectedGroup);
+    expect(isMagnetTarget(siblingGroup)).toBe(true);
     expect(targets).not.toContain(selectedChild);
     expect(targets).not.toContain(sourceChild);
     expect(isMagnetTarget(selectedGroup)).toBe(true);

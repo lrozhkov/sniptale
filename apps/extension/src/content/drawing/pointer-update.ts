@@ -12,7 +12,6 @@ import {
 } from '../../features/drawing/public';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import {
-  isDrawingAlignmentObject,
   resolveDrawingMoveAlignment,
   resolveDrawingResizeAlignment,
   getDrawingResizeHandleGeometry,
@@ -66,16 +65,27 @@ function updateCreateDraft(
   return { ...draft, object };
 }
 
+function getDrawingMoveDelta(
+  start: DrawingPoint,
+  point: DrawingPoint,
+  shiftKey: boolean
+): DrawingPoint {
+  const delta = { x: point.x - start.x, y: point.y - start.y };
+  if (!shiftKey) return delta;
+  return Math.abs(delta.x) >= Math.abs(delta.y) ? { x: delta.x, y: 0 } : { x: 0, y: delta.y };
+}
+
 export function updateDrawingMarqueeDraft(
   draft: Extract<PointerDraft, { kind: 'marquee' }>,
   point: DrawingPoint,
-  documentObjects: readonly DrawingObject[]
+  documentObjects: readonly DrawingObject[],
+  shiftKey = false
 ): { draft: PointerDraft; selection?: readonly string[] } {
   if (draft.clickObjectId && Math.hypot(point.x - draft.start.x, point.y - draft.start.y) < 4) {
     return { draft };
   }
   if (draft.moveObjects) {
-    const delta = { x: point.x - draft.start.x, y: point.y - draft.start.y };
+    const delta = getDrawingMoveDelta(draft.start, point, shiftKey);
     const [original] = draft.moveObjects;
     if (original) {
       return {
@@ -150,15 +160,15 @@ function updateRawDrawingPointerDraft(args: DrawingPointerUpdateInput): {
     return {
       draft: {
         ...draft,
-        object: translateDrawingObject(draft.original, {
-          x: point.x - draft.start.x,
-          y: point.y - draft.start.y,
-        }),
+        object: translateDrawingObject(
+          draft.original,
+          getDrawingMoveDelta(draft.start, point, modifiers.shiftKey)
+        ),
       },
     };
   }
   if (draft.kind === 'move-selection') {
-    const delta = { x: point.x - draft.start.x, y: point.y - draft.start.y };
+    const delta = getDrawingMoveDelta(draft.start, point, modifiers.shiftKey);
     return {
       draft: {
         ...draft,
@@ -167,7 +177,7 @@ function updateRawDrawingPointerDraft(args: DrawingPointerUpdateInput): {
     };
   }
   if (draft.kind === 'marquee')
-    return updateDrawingMarqueeDraft(draft, point, args.documentObjects);
+    return updateDrawingMarqueeDraft(draft, point, args.documentObjects, modifiers.shiftKey);
   return {
     draft:
       draft.kind === 'resize'
@@ -184,8 +194,6 @@ function alignTransformedDraft(
   modifiers: { ctrlKey: boolean; shiftKey: boolean }
 ): { draft: PointerDraft; guides: DrawingAlignmentGuide[] } {
   if (draft.kind === 'resize') {
-    if (!isDrawingAlignmentObject(draft.original) || draft.original.kind === 'text')
-      return { draft, guides: [] };
     const bounds = getDrawingSelectionBounds([draft.object]);
     if (!bounds) return { draft, guides: [] };
     const geometry = getDrawingResizeHandleGeometry(draft, point, modifiers.ctrlKey);
@@ -214,24 +222,30 @@ function alignTransformedDraft(
   const moving =
     draft.kind === 'move' ? [draft.object] : draft.kind === 'move-selection' ? draft.objects : [];
   const bounds = getDrawingSelectionBounds(moving);
-  if (!bounds || !moving.every(isDrawingAlignmentObject)) return { draft, guides: [] };
-  const alignment = resolveDrawingMoveAlignment({
+  if (!bounds) return { draft, guides: [] };
+  const axis = modifiers.shiftKey
+    ? Math.abs(point.x - draft.start.x) >= Math.abs(point.y - draft.start.y)
+      ? 'x'
+      : 'y'
+    : undefined;
+  const { delta, guides } = resolveDrawingMoveAlignment({
     moving,
+    ...(axis ? { axis } : {}),
     objects,
     domBounds: collectDrawingDomAlignmentBounds(bounds, root),
   });
   if (draft.kind === 'move')
     return {
-      draft: { ...draft, object: translateDrawingObject(draft.object, alignment.delta) },
-      guides: alignment.guides,
+      draft: { ...draft, object: translateDrawingObject(draft.object, delta) },
+      guides,
     };
   if (draft.kind === 'move-selection')
     return {
       draft: {
         ...draft,
-        objects: draft.objects.map((object) => translateDrawingObject(object, alignment.delta)),
+        objects: draft.objects.map((object) => translateDrawingObject(object, delta)),
       },
-      guides: alignment.guides,
+      guides,
     };
   return { draft, guides: [] };
 }

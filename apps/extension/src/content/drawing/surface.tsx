@@ -230,7 +230,7 @@ function createDrawingPointerHandlers(args: {
       }
       pointer.onPointerDown(event);
       const draft = pointer.draftRef.current;
-      setSelectionDragHidden(isNonTextSelectionDrag(draft));
+      setSelectionDragHidden(false);
       textGestureRef.current =
         draft?.kind === 'rotate' || draft?.kind === 'rotate-selection' || draft?.kind === 'bend'
           ? { dragged: true, start: toDrawingScenePoint(event, root) }
@@ -255,6 +255,12 @@ function createDrawingPointerHandlers(args: {
           Math.hypot(point.x - gesture.start.x, point.y - gesture.start.y) >= TEXT_DRAG_THRESHOLD;
       }
       pointer.onPointerMove(event);
+      const draft = pointer.draftRef.current;
+      if (draft && isNonTextSelectionDrag(draft)) {
+        const point = toDrawingScenePoint(event, root);
+        if (Math.hypot(point.x - draft.start.x, point.y - draft.start.y) >= TEXT_DRAG_THRESHOLD)
+          setSelectionDragHidden(true);
+      }
       event.currentTarget.style.cursor = selectionDragHiddenRef.current
         ? 'none'
         : resolveDrawingCanvasHoverCursor({

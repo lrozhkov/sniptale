@@ -247,10 +247,16 @@ it('fades selected shape controls and hides the cursor only during its pointer d
   expect(chrome?.style.pointerEvents).toBe('none');
 
   act(() => canvas.dispatchEvent(pointer('pointerdown', 20, 30)));
-  expect(canvas.style.cursor).toBe('none');
+  expect(canvas.style.cursor).not.toBe('none');
+  expect(chrome?.style.opacity).toBe('1');
+  act(() => canvas.dispatchEvent(pointer('pointermove', 22, 31)));
+  expect(chrome?.style.opacity).toBe('1');
+  act(() => canvas.dispatchEvent(pointer('pointerup', 22, 31)));
+  expect(chrome?.style.opacity).toBe('1');
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 22, 31)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 60, 70)));
   expect(chrome?.style.opacity).toBe('0');
   expect(chrome?.style.transition).toContain('150ms');
-  act(() => canvas.dispatchEvent(pointer('pointermove', 60, 70)));
   expect(canvas.style.cursor).toBe('none');
   act(() => canvas.dispatchEvent(pointer('pointerup', 60, 70)));
   expect(canvas.style.cursor).not.toBe('none');

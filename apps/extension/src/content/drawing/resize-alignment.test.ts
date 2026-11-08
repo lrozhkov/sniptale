@@ -9,6 +9,7 @@ import {
 } from '../../features/drawing/public';
 import { resizeDrawingObject, type PointerDraft } from './interaction';
 import { resolveDrawingResizeAlignment } from './move-alignment';
+import { createDefaultSimplifySettings } from '../../features/simplify/settings';
 
 type Shape = Extract<
   DrawingObject,
@@ -29,7 +30,7 @@ function handlePoint(object: DrawingObject, handle: string): DrawingPoint {
   });
 }
 function gesture(
-  original: Shape,
+  original: DrawingObject,
   handle: DrawingResizeHandle,
   point: DrawingPoint,
   modifiers = { ctrlKey: false, shiftKey: false }
@@ -185,4 +186,125 @@ it('aligns the height to a drawn rectangle in a separate column', () => {
     height: 160,
   });
   expect(result.guides.map((guide) => [guide.axis, guide.coordinate])).toEqual([['y', 260]]);
+});
+
+it.each(['blur', 'pencil', 'marker', 'text', 'simplify'] as const)(
+  'snaps supported %s resize through the canonical resizer',
+  (kind) => {
+    const original: DrawingObject =
+      kind === 'blur'
+        ? { id: kind, kind, bounds: shape().bounds }
+        : kind === 'simplify'
+          ? { id: kind, kind, bounds: shape().bounds, settings: createDefaultSimplifySettings() }
+          : kind === 'text'
+            ? {
+                id: kind,
+                kind,
+                bounds: shape().bounds,
+                text: 'Title',
+                fontSize: 16,
+                color: '#000',
+                backgroundColor: null,
+              }
+            : {
+                id: kind,
+                kind,
+                samples: [
+                  { x: 100, y: 100, t: 0 },
+                  { x: 200, y: 180, t: 1 },
+                ],
+                color: '#000',
+                width: 2,
+                opacity: 0.5,
+              };
+    const result = resolveDrawingResizeAlignment({
+      ...gesture(original, 'e', { x: 296, y: 140 }),
+      domBounds: [{ x: 300, y: 100, width: 40, height: 80 }],
+    });
+    const bounds = getDrawingObjectBounds(result.object);
+    const originalBounds = getDrawingObjectBounds(original);
+    const tolerance = kind === 'pencil' || kind === 'marker' ? 0.5 : 1e-6;
+    if (kind !== 'pencil' && kind !== 'marker')
+      expect(Math.abs(bounds.x - originalBounds.x)).toBeLessThanOrEqual(tolerance);
+    else {
+      expect(result.object).toMatchObject({ kind, width: 2 });
+      if (result.object.kind === 'pencil' || result.object.kind === 'marker')
+        expect(result.object.samples.map((sample) => sample.t)).toEqual([0, 1]);
+    }
+    expect(Math.abs(bounds.x + bounds.width - 300)).toBeLessThanOrEqual(tolerance);
+    expect(result.guides.map((guide) => guide.axis)).toEqual(['x']);
+  }
+);
+it.each(['start', 'end'] as const)(
+  'snaps arrow %s endpoint without changing its other endpoint or bends',
+  (handle) => {
+    const original: Extract<DrawingObject, { kind: 'arrow' }> = {
+      id: 'arrow',
+      kind: 'arrow',
+      start: { x: 100, y: 100 },
+      end: { x: 200, y: 180 },
+      bendPoints: [{ x: 150, y: 70 }],
+      color: '#000',
+      width: 2,
+      dynamicWidth: false,
+    };
+    const start = original[handle];
+    const point = { x: 296, y: 256 };
+    const draft: Extract<PointerDraft, { kind: 'resize' }> = {
+      kind: 'resize',
+      original,
+      object: original,
+      handle,
+      start,
+    };
+    draft.object = resizeDrawingObject(draft, point);
+    const result = resolveDrawingResizeAlignment({
+      draft,
+      point,
+      modifiers: { ctrlKey: false, shiftKey: false },
+      objects: [original],
+      domBounds: [{ x: 300, y: 260, width: 40, height: 40 }],
+    });
+    expect(result.object).toMatchObject({
+      [handle]: { x: 300, y: 260 },
+      [handle === 'start' ? 'end' : 'start']: original[handle === 'start' ? 'end' : 'start'],
+      bendPoints: original.bendPoints,
+    });
+    expect(result.guides).toHaveLength(2);
+  }
+);
+
+it('retains Shift arrow endpoint direction while accepting only reached guides', () => {
+  const original: Extract<DrawingObject, { kind: 'arrow' }> = {
+    id: 'arrow',
+    kind: 'arrow',
+    start: { x: 100, y: 100 },
+    end: { x: 200, y: 200 },
+    color: '#000',
+    width: 2,
+    dynamicWidth: false,
+  };
+  const point = { x: 296, y: 296 },
+    modifiers = { ctrlKey: false, shiftKey: true };
+  const draft: Extract<PointerDraft, { kind: 'resize' }> = {
+    kind: 'resize',
+    original,
+    object: original,
+    handle: 'end',
+    start: original.end,
+  };
+  draft.object = resizeDrawingObject(draft, point, modifiers);
+  const result = resolveDrawingResizeAlignment({
+    draft,
+    point,
+    modifiers,
+    objects: [original],
+    domBounds: [{ x: 300, y: 360, width: 40, height: 40 }],
+  });
+  expect(result.object.kind).toBe('arrow');
+  if (result.object.kind !== 'arrow') throw new Error('Expected an arrow');
+  expect(result.object.start).toEqual(original.start);
+  expect(result.object.end.x).toBeCloseTo(300, 6);
+  expect(result.object.end.y).toBeCloseTo(300, 6);
+  expect(result.guides.map((guide) => guide.axis)).toEqual(['x']);
 });

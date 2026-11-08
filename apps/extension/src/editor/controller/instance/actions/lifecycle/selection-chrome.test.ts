@@ -60,7 +60,13 @@ it('fades controls for a selected shape during a pointer gesture and restores th
   const controls = container.querySelector(
     '[data-ui="editor.canvas.selection-controls"]'
   ) as SVGGElement;
+  listeners.get('mouse:down')?.({ e: { button: 0, clientX: 10, clientY: 10 }, target: object });
+  listeners.get('object:moving')?.({ e: { clientX: 11, clientY: 11 }, target: object });
+  expect(controls.style.opacity).not.toBe('0');
+  listeners.get('mouse:up')?.();
+  expect(controls.style.opacity).not.toBe('0');
   listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  listeners.get('object:moving')?.({ target: object });
   expect(controls.style.opacity).toBe('0');
   expect(controls.style.transition).toContain('150ms');
   expect(upperCanvasEl.style.cursor).toBe('none');
@@ -123,6 +129,7 @@ it('leaves text selection visible and respects the workspace switch', () => {
   listeners.get('mouse:up')?.();
   useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: true });
   listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  listeners.get('object:moving')?.({ target: object });
   canvas.setCursor('move');
   expect(controls.style.opacity).toBe('0');
   expect(upperCanvasEl.style.cursor).toBe('none');
@@ -404,6 +411,8 @@ it('keeps the Simplify resize border visible while hiding controls until release
     '[data-ui="editor.canvas.selection-controls"]'
   )!;
   listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).not.toBe('0');
+  listeners.get('object:scaling')?.({ target: object });
   expect(controls.style.opacity).toBe('1');
   expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).toBe('0');
   expect(controls.querySelector('polygon')?.getAttribute('stroke')).toBe('#2563eb');

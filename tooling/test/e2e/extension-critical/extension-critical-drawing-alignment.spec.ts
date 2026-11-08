@@ -571,6 +571,12 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     }, info) => {
       const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
       try {
+        await page.evaluate(() => {
+          const host = document.querySelector('main');
+          const measurement = document.getElementById('measurement-target')?.parentElement;
+          if (host instanceof HTMLElement) host.style.display = 'none';
+          if (measurement) measurement.style.display = 'none';
+        });
         if (mode === 'page') await enterDrawing(page);
         else {
           if (!(await page.locator('[data-ui="content.toolbar.timer-button"]').count())) {
@@ -630,8 +636,63 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect.poll(() => inkAt(chrome, 550, 180)).toBeGreaterThan(0);
         await page.mouse.move(550, 210);
         await expect(ink).toHaveCSS('cursor', 'move');
+        await page.mouse.down();
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+            )
+        );
+        await expect(chrome).toHaveCSS('opacity', '1');
+        await page.mouse.up();
+        await expect(chrome).toHaveCSS('opacity', '1');
+        await page.evaluate(() => {
+          const target = document.createElement('div');
+          target.style.cssText =
+            'position:fixed;left:820px;top:340px;width:160px;height:100px;background:#ddd';
+          document.body.append(target);
+        });
+        await page.mouse.down();
+        await page.mouse.move(646, 306, { steps: 6 });
+        const guides = surface.locator('[data-ui="content.drawing.alignment-guides"]');
+        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '820');
+        await expect(guides.locator('[data-axis="y"]')).toHaveAttribute('y1', '340');
+        await expect(chrome).toHaveCSS('opacity', '0');
         await page.keyboard.down('Alt');
-        await drag(page, { x: 550, y: 210 }, { x: 585, y: 235 });
+        await expect(guides).toHaveCount(0);
+        await page.keyboard.up('Alt');
+        await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '820');
+        await page.screenshot({
+          path: info.outputPath('group-bounds-snapped.png'),
+          fullPage: false,
+        });
+        await page.mouse.up();
+        await expect(chrome).toHaveCSS('opacity', '1');
+        await expect.poll(() => inkAt(ink, 500, 300)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(ink, 820, 300)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(chrome, 660, 280)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(chrome, 660, 340)).toBeGreaterThan(0);
+        if (mode === 'crop') await page.locator('[data-ui="content.crop.undo"]').click();
+        else await page.keyboard.press('Control+z');
+        await expect.poll(() => inkAt(ink, 400, 210)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(ink, 720, 210)).toBeGreaterThan(0);
+        await page.mouse.click(400, 210);
+        await page.keyboard.down('Control');
+        await page.mouse.click(650, 210);
+        await page.keyboard.up('Control');
+        await expect.poll(() => inkAt(chrome, 550, 180)).toBeGreaterThan(0);
+        await page.keyboard.down('Alt');
+        await page.keyboard.down('Shift');
+        await page.mouse.move(550, 210);
+        await page.mouse.down();
+        await page.mouse.move(585, 234, { steps: 6 });
+        await expect.poll(() => inkAt(ink, 455, 180)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(ink, 400, 210)).toBe(0);
+        await expect.poll(() => inkAt(ink, 455, 205)).toBe(0);
+        await page.screenshot({ path: info.outputPath('group-shift-locked.png'), fullPage: false });
+        await page.keyboard.up('Shift');
+        await page.mouse.move(585, 235);
+        await page.mouse.up();
         await page.keyboard.up('Alt');
         await expect.poll(() => inkAt(ink, 435, 230)).toBeGreaterThan(0);
         await expect.poll(() => inkAt(ink, 685, 230)).toBeGreaterThan(0);
@@ -643,6 +704,35 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect.poll(() => inkAt(ink, 400, 210)).toBeGreaterThan(0);
         await expect.poll(() => inkAt(ink, 650, 210)).toBeGreaterThan(0);
         await expect.poll(() => inkAt(ink, 435, 230)).toBe(0);
+        for (const kind of ['pencil', 'arrow']) {
+          await page.mouse.click(300, 300);
+          const drawingTool = toolbar.locator(`[data-ui="content.toolbar.drawing.${kind}"]`);
+          await drawingTool.click();
+          const options = toolbar.locator(`[data-ui="content.toolbar.drawing-options.${kind}"]`);
+          if (await options.isVisible()) await drawingTool.click();
+          await page.mouse.move(400, 340);
+          await page.mouse.down();
+          await page.mouse.move(500, 380, { steps: 8 });
+          await expect(guides).toHaveCount(0);
+          await page.mouse.up();
+          await toolbar.locator('[data-ui="content.toolbar.drawing.select"]').click();
+          await page.mouse.click(450, 360);
+          await page.mouse.move(450, 360);
+          await page.mouse.down();
+          await expect(chrome).toHaveCSS('opacity', '1');
+          await page.mouse.move(904, 394, { steps: 8 });
+          await expect(guides.locator('[data-axis="x"]')).toHaveAttribute('x1', '900');
+          await expect(guides.locator('[data-axis="y"]')).toHaveAttribute('y1', '390');
+          await page.screenshot({
+            path: info.outputPath(`${kind}-center-snapped.png`),
+            fullPage: false,
+          });
+          await page.mouse.up();
+          await expect(guides).toHaveCount(0);
+          await expect(chrome).toHaveCSS('opacity', '1');
+          await expect.poll(() => inkAt(ink, 900, 390)).toBeGreaterThan(0);
+          await page.keyboard.press('Delete');
+        }
       } finally {
         await popup.close();
         await page.close();

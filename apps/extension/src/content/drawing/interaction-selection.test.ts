@@ -108,16 +108,24 @@ it.each([
   }
 );
 
-it('continues to move an already selected layer and prioritize its resize handle', () => {
-  const { session } = createNestedSelectionSession();
-  const start = (point: { x: number; y: number }) =>
-    beginDrawingPointer({ point, snapshot: session.getSnapshot(), timestamp: 0 });
-  expect(start({ x: 320, y: 320 }).draft).toMatchObject({
-    kind: 'move',
-    original: { id: 'outside' },
-  });
-  expect(start({ x: 340, y: 340 }).draft).toMatchObject({ kind: 'resize', handle: 'se' });
-});
+it.each([false, true])(
+  'continues to move an already selected layer and prioritize its resize handle, Shift=%s',
+  (shiftKey) => {
+    const { session } = createNestedSelectionSession();
+    const start = (point: { x: number; y: number }) =>
+      beginDrawingPointer({
+        point,
+        snapshot: session.getSnapshot(),
+        timestamp: 0,
+        modifiers: { ctrlKey: false, shiftKey },
+      });
+    expect(start({ x: 320, y: 320 }).draft).toMatchObject({
+      kind: 'move',
+      original: { id: 'outside' },
+    });
+    expect(start({ x: 340, y: 340 }).draft).toMatchObject({ kind: 'resize', handle: 'se' });
+  }
+);
 
 function createOverlapSelectionSession(multi = false) {
   const { session, onDocumentCommit } = createNestedSelectionSession();
@@ -250,9 +258,14 @@ it('preserves rotation and shear while dragging selected geometry beneath an upp
   ).toMatchObject({ bounds: { x: 320, y: 310, width: 40, height: 40 }, rotation: 30, skewX: 20 });
 });
 
-it.each([false, true])(
-  'moves a selected group from its gap, including below an unselected layer: %s',
-  (overlap) => {
+it.each([
+  { overlap: false, shiftKey: false },
+  { overlap: true, shiftKey: false },
+  { overlap: false, shiftKey: true },
+  { overlap: true, shiftKey: true },
+])(
+  'moves a selected group from its gap, including below an unselected layer: %j',
+  ({ overlap, shiftKey }) => {
     const onDocumentCommit = vi.fn(() => true);
     const session = createDrawingSession({ onDocumentCommit });
     for (const [id, x] of [
@@ -281,6 +294,7 @@ it.each([false, true])(
     const before = session.getSnapshot();
     onDocumentCommit.mockClear();
     const started = beginDrawingPointer({
+      modifiers: { ctrlKey: false, shiftKey },
       point: { x: 140, y: 70 },
       snapshot: before,
       timestamp: 0,
@@ -292,32 +306,77 @@ it.each([false, true])(
       documentObjects: before.document.objects,
       draft: started.draft,
       event: {} as ReactPointerEvent<HTMLCanvasElement>,
-      point: { x: 160, y: 90 },
+      modifiers: { ctrlKey: false, shiftKey },
+      point: { x: 160, y: 80 },
       root: { kind: 'viewport', element: null },
     });
     expect(moved.draft.kind).toBe('move-selection');
     commitDrawingPointerDraft(session, moved.draft);
     expect(session.getSnapshot().selectedObjectIds).toEqual(['left', 'right']);
-    expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 60, y: 70 } });
-    expect(session.getSnapshot().document.objects[1]).toMatchObject({ bounds: { x: 220, y: 70 } });
+    expect(session.getSnapshot().document.objects[0]).toMatchObject({
+      bounds: { x: 60, y: shiftKey ? 50 : 60 },
+    });
+    expect(session.getSnapshot().document.objects[1]).toMatchObject({
+      bounds: { x: 220, y: shiftKey ? 50 : 60 },
+    });
     if (overlap)
       expect(session.getSnapshot().document.objects[2]).toEqual(before.document.objects[2]);
     expect(onDocumentCommit).toHaveBeenCalledOnce();
   }
 );
 
-it.each([
-  { ctrlKey: true, shiftKey: false },
-  { ctrlKey: false, shiftKey: true },
-])('retains modifier marquee inside a selected group gap: %j', (modifiers) => {
-  const { session } = createNestedSelectionSession();
-  session.setSelection(['small', 'outside']);
-  const started = beginDrawingPointer({
-    point: { x: 200, y: 200 },
-    snapshot: session.getSnapshot(),
-    timestamp: 0,
-    modifiers,
-  });
-  expect(started.draft?.kind).toBe('marquee');
-  expect(started.draft).not.toHaveProperty('moveObjects');
-});
+it.each([{ ctrlKey: true, shiftKey: false }])(
+  'retains modifier marquee inside a selected group gap: %j',
+  (modifiers) => {
+    const { session } = createNestedSelectionSession();
+    session.setSelection(['small', 'outside']);
+    const started = beginDrawingPointer({
+      point: { x: 200, y: 200 },
+      snapshot: session.getSnapshot(),
+      timestamp: 0,
+      modifiers,
+    });
+    expect(started.draft?.kind).toBe('marquee');
+    expect(started.draft).not.toHaveProperty('moveObjects');
+  }
+);
+
+it.each([false, true])(
+  'moves existing selected geometry below an upper hit with Shift already held, multi=%s',
+  (multi) => {
+    const scene = createOverlapSelectionSession(multi);
+    const modifiers = { ctrlKey: false, shiftKey: true };
+    const started = beginDrawingPointer({
+      modifiers,
+      point: { x: 320, y: 320 },
+      snapshot: scene.before,
+      timestamp: 0,
+    });
+    expect(started.draft).toMatchObject({
+      kind: 'marquee',
+      mode: 'add',
+      moveObjects: expect.any(Array),
+    });
+    if (!started.draft) throw new Error('Expected pending movement');
+    const moved = updateDrawingPointerDraft({
+      documentObjects: scene.before.document.objects,
+      draft: started.draft,
+      event: {} as ReactPointerEvent<HTMLCanvasElement>,
+      point: { x: 340, y: 324 },
+      modifiers,
+      root: { kind: 'viewport', element: null },
+    });
+    expect(moved.draft.kind).toBe(multi ? 'move-selection' : 'move');
+    commitDrawingPointerDraft(scene.session, moved.draft);
+    expect(scene.session.getSnapshot().selectedObjectIds).toEqual(
+      multi ? ['small', 'outside'] : ['outside']
+    );
+    expect(
+      scene.session.getSnapshot().document.objects.find((object) => object.id === 'outside')
+    ).toMatchObject({ bounds: { x: 320, y: 300 } });
+    expect(scene.session.getSnapshot().document.objects.at(-1)).toEqual(
+      scene.before.document.objects.at(-1)
+    );
+    expect(scene.onDocumentCommit).toHaveBeenCalledOnce();
+  }
+);

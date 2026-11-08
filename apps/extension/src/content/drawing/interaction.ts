@@ -535,9 +535,7 @@ function beginSelectionPointer(
         current: point,
         initialSelectionIds: snapshot.selectedObjectIds,
         clickObjectId: hit.id,
-        ...(!modifiers.ctrlKey &&
-        !modifiers.shiftKey &&
-        (withinGroup || hitTestDrawingDocument(selectedObjects, point))
+        ...(!modifiers.ctrlKey && (withinGroup || hitTestDrawingDocument(selectedObjects, point))
           ? { moveObjects: selectedObjects }
           : {}),
         mode,
@@ -549,14 +547,6 @@ function beginSelectionPointer(
       draft: null,
       selection: snapshot.selectedObjectIds.includes(hit.id)
         ? snapshot.selectedObjectIds.filter((id) => id !== hit.id)
-        : [...snapshot.selectedObjectIds, hit.id],
-    };
-  }
-  if (hit && modifiers.shiftKey) {
-    return {
-      draft: null,
-      selection: snapshot.selectedObjectIds.includes(hit.id)
-        ? snapshot.selectedObjectIds
         : [...snapshot.selectedObjectIds, hit.id],
     };
   }
@@ -573,7 +563,7 @@ function beginSelectionPointer(
       selection,
     };
   }
-  if (withinGroup && mode === 'replace')
+  if (withinGroup && !modifiers.ctrlKey)
     return {
       draft: {
         kind: 'move-selection',

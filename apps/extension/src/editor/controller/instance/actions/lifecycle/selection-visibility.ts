@@ -6,6 +6,7 @@ export function mountSelectionVisibility(canvas: Canvas, selection: SVGElement):
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)');
   let dragging = false;
   let keepBorder = false;
+  let pressedAt: { x: number; y: number } | null = null;
   const originalSetCursor = canvas.setCursor;
   let desiredCursor = canvas.upperCanvasEl.style.cursor;
 
@@ -33,18 +34,25 @@ export function mountSelectionVisibility(canvas: Canvas, selection: SVGElement):
     originalSetCursor.call(canvas, next && enabled ? 'none' : desiredCursor);
   };
 
-  const onMouseDown = (event: { e?: Event; target?: FabricObject }) => {
-    const pointer = event.e as MouseEvent | undefined;
-    if (pointer?.button !== 0 || !event.target) return;
-    const active = canvas.getActiveObject();
-    if (active !== event.target || active.sniptaleType === 'text') return;
-    setDragging(
-      true,
-      active.sniptaleType === 'simplify' &&
-        /^(scale|resiz)/.test(canvas._currentTransform?.action ?? '')
-    );
+  const onMouseDown = ({ e }: { e: Event }) => {
+    const pointer = e as MouseEvent;
+    pressedAt = pointer.button === 0 ? { x: pointer.clientX, y: pointer.clientY } : null;
   };
-  const onRelease = () => setDragging(false);
+  const onTransform = ({ target, e }: { target: FabricObject; e?: Event }, resize = false) => {
+    if (target !== canvas.getActiveObject() || target.sniptaleType === 'text') return;
+    const pointer = e as MouseEvent | undefined;
+    if (
+      pressedAt &&
+      pointer &&
+      Math.hypot(pointer.clientX - pressedAt.x, pointer.clientY - pressedAt.y) < 4
+    )
+      return;
+    setDragging(true, resize && target.sniptaleType === 'simplify');
+  };
+  const onRelease = () => {
+    pressedAt = null;
+    setDragging(false);
+  };
   const unsubscribePreference = useEditorStore.subscribe((state, previous) => {
     if (
       state.workspace.hideSelectionWhileDragging !== previous.workspace.hideSelectionWhileDragging
@@ -53,10 +61,14 @@ export function mountSelectionVisibility(canvas: Canvas, selection: SVGElement):
     }
   });
   const unsubscribeMouseDown = canvas.on('mouse:down', onMouseDown);
-  const onResize = ({ target }: { target: FabricObject }) => {
-    if (target.sniptaleType === 'simplify' && target === canvas.getActiveObject())
-      setDragging(true, true);
-  };
+  const unsubscribeMoving = canvas.on('object:moving', onTransform);
+  const unsubscribeRotating = canvas.on('object:rotating', onTransform);
+  const unsubscribeMouseMove = canvas.on('mouse:move', ({ e }) => {
+    const transform = canvas._currentTransform;
+    if (transform?.action?.startsWith('modifyDrawingArrow'))
+      onTransform({ target: transform.target, e });
+  });
+  const onResize = (event: { target: FabricObject; e?: Event }) => onTransform(event, true);
   const unsubscribeScaling = canvas.on('object:scaling', onResize);
   const unsubscribeResizing = canvas.on('object:resizing', onResize);
   const unsubscribeMouseUp = canvas.on('mouse:up', onRelease);
@@ -70,6 +82,9 @@ export function mountSelectionVisibility(canvas: Canvas, selection: SVGElement):
     canvas.setCursor = originalSetCursor;
     unsubscribePreference();
     unsubscribeMouseDown();
+    unsubscribeMoving();
+    unsubscribeRotating();
+    unsubscribeMouseMove();
     unsubscribeMouseUp();
     unsubscribeScaling();
     unsubscribeResizing();

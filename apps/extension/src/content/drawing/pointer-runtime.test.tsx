@@ -9,6 +9,7 @@ import {
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
+import { mousePointerEvent, setupAlignmentSurface } from './pointer-runtime.test-support';
 import * as trustedEvents from '../platform/trusted-events';
 vi.mock('../platform/trusted-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/trusted-events')>()),
@@ -36,20 +37,6 @@ function touchEvent(type: string, pointerId: number, clientY: number): MouseEven
   Object.defineProperties(event, {
     pointerId: { value: pointerId },
     pointerType: { value: 'touch' },
-  });
-  return event;
-}
-
-function mousePointerEvent(
-  type: string,
-  clientX: number,
-  clientY: number,
-  modifiers: MouseEventInit = {}
-): MouseEvent {
-  const event = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY, ...modifiers });
-  Object.defineProperties(event, {
-    pointerId: { value: 1 },
-    pointerType: { value: 'mouse' },
   });
   return event;
 }
@@ -226,76 +213,6 @@ it('tracks two-finger scrolling in client coordinates while the scroll root move
   expect(element.scrollTop).toBe(-5);
   act(() => root.unmount());
 });
-
-function setupAlignmentSurface(enabled = true) {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-    callback(0);
-    return 1;
-  });
-  vi.stubGlobal('cancelAnimationFrame', vi.fn());
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-  Object.defineProperty(HTMLCanvasElement.prototype, 'setPointerCapture', {
-    configurable: true,
-    value: vi.fn(),
-  });
-  const commit = vi.fn(() => true);
-  const session = createDrawingSession({ onDocumentCommit: commit });
-  session.commitObject({
-    id: 'target',
-    kind: 'rectangle',
-    bounds: { x: 300, y: 200, width: 200, height: 160 },
-    color: '#f00',
-    fillColor: '#f00',
-    width: 2,
-  });
-  session.commitObject({
-    id: 'moving',
-    kind: 'rectangle',
-    bounds: { x: 80, y: 80, width: 80, height: 60 },
-    color: '#f00',
-    fillColor: '#f00',
-    width: 2,
-  });
-  session.setActiveTool('select');
-  session.select('moving');
-  const controller: ContentDrawingController = {
-    session,
-    applyPalette: vi.fn(),
-    finalizeInteraction: vi.fn(),
-    getPalette: () => ['#f00'],
-    getScrollRoot: () => ({ kind: 'viewport', element: null }),
-    prepareActivation: () => true,
-    registerInteractionFinalizer: vi.fn(),
-  };
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  const render = (chromeHidden = false) =>
-    act(() =>
-      root.render(
-        <DrawingSurface
-          active
-          alignMovesToPage={enabled}
-          chromeHidden={chromeHidden}
-          controller={controller}
-        />
-      )
-    );
-  render();
-  const canvas = host.querySelector('canvas')!;
-  commit.mockClear();
-  return {
-    commit,
-    session,
-    host,
-    render,
-    event: (type: string, x: number, y: number, modifiers: MouseEventInit = {}) =>
-      act(() => canvas.dispatchEvent(mousePointerEvent(type, x, y, modifiers))),
-    moving: () => session.getSnapshot().document.objects.find((object) => object.id === 'moving'),
-    dispose: () => act(() => root.unmount()),
-  };
-}
 
 it.each([true, false])('commits one aligned page move with opt-in=%s', (enabled) => {
   const scene = setupAlignmentSurface(enabled);
