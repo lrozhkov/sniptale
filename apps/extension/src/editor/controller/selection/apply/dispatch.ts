@@ -1,4 +1,5 @@
 import { ActiveSelection, type Canvas, type FabricObject } from 'fabric';
+import { resolveUpdatedQuickObject } from '../../../../features/drawing/public';
 import type { EditorObjectType } from '../../../../features/editor/document/types';
 import type { EditorToolSettings } from '../../../../features/editor/document/tool-settings-types';
 import {
@@ -21,13 +22,7 @@ function applyDrawingSettings(object: FabricObject, settings: EditorToolSettings
   } else if (drawing.kind === 'marker') {
     nextDrawing = { ...drawing, ...settings.marker };
   } else if (drawing.kind === 'arrow') {
-    nextDrawing = {
-      ...drawing,
-      color: settings.arrow.color,
-      design: settings.arrow.design,
-      dynamicWidth: settings.arrow.dynamicWidth,
-      width: settings.arrow.width,
-    };
+    nextDrawing = resolveUpdatedQuickObject(drawing, settings.arrow);
   } else if (drawing.kind === 'text') {
     nextDrawing = { ...drawing, ...settings.text };
   } else {

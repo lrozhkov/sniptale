@@ -62,6 +62,7 @@ function InteractiveFrameProjection(props: {
   interaction: ReturnType<typeof useFrameAnnotationInteraction>;
   activeTool: EditorTool;
   controller: EditorFrameAnnotationPlaneController;
+  layers: EditorLayerItem[];
   coordinateSpace: ReturnType<typeof useEditorFrameCoordinateSpace>;
   sceneRoot: HTMLDivElement | null;
   controlsRoot: HTMLDivElement | null;
@@ -91,6 +92,10 @@ function InteractiveFrameProjection(props: {
           }
         : {})}
       interactive={
+        !(
+          props.layers.filter((layer) => layer.selected).length > 1 &&
+          props.layers.some((layer) => layer.id === entry.snapshot.id && layer.selected)
+        ) &&
         entry.object?.sniptaleLocked !== true &&
         (props.activeTool === 'frame-annotation' || props.activeTool === 'select')
       }

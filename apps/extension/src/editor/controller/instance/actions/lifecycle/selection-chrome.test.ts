@@ -480,6 +480,19 @@ it('renders hover as a border only and clears it on selection, leave, blur and d
 it.each(['callout', 'step-badge'] as const)(
   'uses rendered %s bounds for layer outline, hover and full containment',
   async (kind) => {
+    let mutationDeliveries = 0;
+    const NativeMutationObserver = globalThis.MutationObserver;
+    vi.stubGlobal(
+      'MutationObserver',
+      class extends NativeMutationObserver {
+        constructor(callback: MutationCallback) {
+          super((records, observer) => {
+            mutationDeliveries += 1;
+            callback(records, observer);
+          });
+        }
+      }
+    );
     const observed = new Set<Element>();
     vi.stubGlobal(
       'ResizeObserver',
@@ -550,6 +563,17 @@ it.each(['callout', 'step-badge'] as const)(
     expect(outline?.getAttribute('points')).toBe('80,40 160,40 160,80 80,80');
     expect(outline?.getAttribute('stroke')).toBe('#2563eb');
     expect(object.width).toBe(1);
+    await Promise.resolve();
+    mutationDeliveries = 0;
+    for (let index = 0; index < 100; index += 1) outline?.setAttribute('data-probe', String(index));
+    await Promise.resolve();
+    expect(mutationDeliveries).toBe(0);
+    marker.style.left = '1px';
+    await Promise.resolve();
+    expect(mutationDeliveries).toBe(1);
+    await Promise.resolve();
+    expect(mutationDeliveries).toBe(1);
+
     surface.getBoundingClientRect = () => new DOMRect(80, 40, 0, 0);
     canvas.renderAll();
     expect(

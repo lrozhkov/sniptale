@@ -43,6 +43,8 @@ type FrameDragCoordinateSpace = {
   documentSize: { width: number; height: number };
 };
 
+import { useFrameAnnotationCanvasUpdates } from './projection-space';
+
 export const MIN_FRAME_SIZE = 8;
 
 export function useFrameAnnotationInteraction(props: {
@@ -53,6 +55,7 @@ export function useFrameAnnotationInteraction(props: {
 }) {
   const creationKind = useEditorStore((state) => state.frameAnnotationCreationKind);
   const [, forceRender] = React.useReducer((value) => value + 1, 0);
+  useFrameAnnotationCanvasUpdates(props.controller.canvas, forceRender);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [draft, setDraft] = React.useState<FrameAnnotationSnapshotV1 | null>(null);
   const draftRef = React.useRef<FrameAnnotationSnapshotV1 | null>(null);

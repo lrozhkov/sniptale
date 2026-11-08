@@ -138,3 +138,13 @@ it('assigns automatic step values by annotation-plane ordering', () => {
   expect(readFrameAnnotationSnapshot(first)?.stepBadge?.value).toBe('1');
   expect(readFrameAnnotationSnapshot(second)?.stepBadge?.value).toBe('2');
 });
+
+it('reuses parsed metadata until a canonical write changes it', () => {
+  const proxy = createProxy('cached');
+  const first = readFrameAnnotationSnapshot(proxy)!;
+  for (let index = 0; index < 100; index += 1)
+    expect(readFrameAnnotationSnapshot(proxy)).toBe(first);
+  commitFrameAnnotationProxy(proxy, { ...first, x: 60 });
+  expect(readFrameAnnotationSnapshot(proxy)).not.toBe(first);
+  expect(readFrameAnnotationSnapshot(proxy)?.x).toBe(60);
+});

@@ -29,6 +29,37 @@ function hasActiveGeometryAnimation(element: HTMLElement): boolean {
     );
 }
 
+function observeFrameAnnotationScene(
+  viewport: Element | null,
+  refresh: () => void
+): MutationObserver {
+  let scene: Element | null = null;
+  const observer = new MutationObserver(() => {
+    const next = viewport?.querySelector('[data-ui="editor.frame-annotation-scene"]') ?? null;
+    const changed = scene !== next;
+    if (changed) watch(next);
+    if (next || changed) refresh();
+  });
+  function watch(next: Element | null) {
+    observer.disconnect();
+    scene = next;
+    if (!viewport) return;
+    if (!scene) {
+      observer.observe(viewport, { childList: true, subtree: true });
+      return;
+    }
+    observer.observe(scene, { childList: true, subtree: true, attributes: true });
+    let parent = scene.parentElement;
+    while (parent && viewport.contains(parent)) {
+      observer.observe(parent, { childList: true });
+      if (parent === viewport) break;
+      parent = parent.parentElement;
+    }
+  }
+  watch(viewport?.querySelector('[data-ui="editor.frame-annotation-scene"]') ?? null);
+  return observer;
+}
+
 /** Connects annotation presentation geometry to the canvas selection and its transient chrome. */
 export function mountProjectedSelection(
   canvas: EditorCanvas,
@@ -112,30 +143,17 @@ export function mountProjectedSelection(
     if (hovering) hover();
     hovering = false;
   };
-  const observer = new MutationObserver((changes) => {
-    if (
-      changes.some(
-        (change) =>
-          change.target instanceof Element &&
-          (change.target.closest('[data-ui="editor.frame-annotation-scene"]') ||
-            Array.from(change.addedNodes).some(
-              (node) =>
-                node instanceof Element && node.matches('[data-ui="editor.frame-annotation-scene"]')
-            ))
-      )
-    ) {
-      const ids = new Set(canvas.getObjects().map((object) => object.sniptaleId));
-      for (const [id, { element }] of elements) {
-        if (!ids.has(id) || !element.isConnected) {
-          resize.unobserve(element);
-          elements.delete(id);
-        }
+  const observer = observeFrameAnnotationScene(viewport, () => {
+    const ids = new Set(canvas.getObjects().map((object) => object.sniptaleId));
+    for (const [id, { element }] of elements) {
+      if (!ids.has(id) || !element.isConnected) {
+        resize.unobserve(element);
+        elements.delete(id);
       }
-      render();
     }
+    render();
   });
   if (viewport) {
-    observer.observe(viewport, { childList: true, subtree: true, attributes: true });
     viewport.addEventListener('pointermove', move, true);
     viewport.addEventListener('pointerleave', leave);
   }

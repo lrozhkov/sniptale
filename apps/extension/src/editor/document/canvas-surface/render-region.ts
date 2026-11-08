@@ -79,6 +79,13 @@ export class EditorCanvas extends Canvas {
     this.presentationBounds = resolve;
   }
 
+  /** Returns presentation bounds for a projected layer, without changing document geometry. */
+  getLayerPresentationBounds(
+    object: FabricObject
+  ): EditorLayerPresentationBounds | null | undefined {
+    return this.presentationBounds?.(object);
+  }
+
   override collectObjects(
     ...args: Parameters<Canvas['collectObjects']>
   ): ReturnType<Canvas['collectObjects']> {
