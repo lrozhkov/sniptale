@@ -249,3 +249,75 @@ it('preserves rotation and shear while dragging selected geometry beneath an upp
     scene.session.getSnapshot().document.objects.find((object) => object.id === 'transformed')
   ).toMatchObject({ bounds: { x: 320, y: 310, width: 40, height: 40 }, rotation: 30, skewX: 20 });
 });
+
+it.each([false, true])(
+  'moves a selected group from its gap, including below an unselected layer: %s',
+  (overlap) => {
+    const onDocumentCommit = vi.fn(() => true);
+    const session = createDrawingSession({ onDocumentCommit });
+    for (const [id, x] of [
+      ['left', 40],
+      ['right', 200],
+    ] as const)
+      session.commitObject({
+        id,
+        kind: 'rectangle',
+        color: '#000',
+        fillColor: '#fff',
+        width: 2,
+        bounds: { x, y: 50, width: 40, height: 40 },
+      });
+    if (overlap)
+      session.commitObject({
+        id: 'upper',
+        kind: 'rectangle',
+        color: '#000',
+        fillColor: '#fff',
+        width: 2,
+        bounds: { x: 100, y: 40, width: 80, height: 80 },
+      });
+    session.setActiveTool('select');
+    session.setSelection(['left', 'right']);
+    const before = session.getSnapshot();
+    onDocumentCommit.mockClear();
+    const started = beginDrawingPointer({
+      point: { x: 140, y: 70 },
+      snapshot: before,
+      timestamp: 0,
+    });
+    if (started.selection) session.setSelection(started.selection);
+    expect(session.getSnapshot().selectedObjectIds).toEqual(['left', 'right']);
+    if (!started.draft) throw new Error('Expected group gesture');
+    const moved = updateDrawingPointerDraft({
+      documentObjects: before.document.objects,
+      draft: started.draft,
+      event: {} as ReactPointerEvent<HTMLCanvasElement>,
+      point: { x: 160, y: 90 },
+      root: { kind: 'viewport', element: null },
+    });
+    expect(moved.draft.kind).toBe('move-selection');
+    commitDrawingPointerDraft(session, moved.draft);
+    expect(session.getSnapshot().selectedObjectIds).toEqual(['left', 'right']);
+    expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 60, y: 70 } });
+    expect(session.getSnapshot().document.objects[1]).toMatchObject({ bounds: { x: 220, y: 70 } });
+    if (overlap)
+      expect(session.getSnapshot().document.objects[2]).toEqual(before.document.objects[2]);
+    expect(onDocumentCommit).toHaveBeenCalledOnce();
+  }
+);
+
+it.each([
+  { ctrlKey: true, shiftKey: false },
+  { ctrlKey: false, shiftKey: true },
+])('retains modifier marquee inside a selected group gap: %j', (modifiers) => {
+  const { session } = createNestedSelectionSession();
+  session.setSelection(['small', 'outside']);
+  const started = beginDrawingPointer({
+    point: { x: 200, y: 200 },
+    snapshot: session.getSnapshot(),
+    timestamp: 0,
+    modifiers,
+  });
+  expect(started.draft?.kind).toBe('marquee');
+  expect(started.draft).not.toHaveProperty('moveObjects');
+});

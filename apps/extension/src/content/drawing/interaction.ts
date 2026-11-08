@@ -498,6 +498,22 @@ type DrawingPointerStart = {
   text?: { id: string | null; point: DrawingPoint; value: string };
 };
 
+/** The aggregate selection body can be dragged even between its member objects. */
+export function isDrawingMultiSelectionBody(
+  objects: readonly DrawingObject[],
+  point: DrawingPoint
+): boolean {
+  if (objects.length < 2) return false;
+  const bounds = getDrawingSelectionBounds(objects);
+  return Boolean(
+    bounds &&
+    point.x >= bounds.x &&
+    point.y >= bounds.y &&
+    point.x <= bounds.x + bounds.width &&
+    point.y <= bounds.y + bounds.height
+  );
+}
+
 function beginSelectionPointer(
   point: DrawingPoint,
   snapshot: DrawingSessionSnapshot,
@@ -510,6 +526,7 @@ function beginSelectionPointer(
     : modifiers.shiftKey
       ? 'add'
       : 'replace';
+  const withinGroup = isDrawingMultiSelectionBody(selectedObjects, point);
   if (hit && !snapshot.selectedObjectIds.includes(hit.id)) {
     return {
       draft: {
@@ -520,7 +537,7 @@ function beginSelectionPointer(
         clickObjectId: hit.id,
         ...(!modifiers.ctrlKey &&
         !modifiers.shiftKey &&
-        hitTestDrawingDocument(selectedObjects, point)
+        (withinGroup || hitTestDrawingDocument(selectedObjects, point))
           ? { moveObjects: selectedObjects }
           : {}),
         mode,
@@ -556,6 +573,15 @@ function beginSelectionPointer(
       selection,
     };
   }
+  if (withinGroup && mode === 'replace')
+    return {
+      draft: {
+        kind: 'move-selection',
+        start: point,
+        originals: selectedObjects,
+        objects: selectedObjects,
+      },
+    };
   return {
     draft: {
       kind: 'marquee',

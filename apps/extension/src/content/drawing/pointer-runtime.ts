@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import {
   resolveDrawingArrowBendTarget,
+  hitTestDrawingDocument,
   type DrawingPoint,
   type DrawingSimplifySource,
   type DrawingSessionSnapshot,
@@ -240,17 +241,55 @@ function useDrawingAlignmentModifiers(args: {
   }, [enabled, activePointerRef, draftRef, lastPointerEventRef, onPointerMove]);
 }
 
+function useDrawingHover(
+  args: Pick<DrawingPointerRuntimeOptions, 'active' | 'controller' | 'root'>,
+  changed: () => void
+) {
+  const { active, controller, root } = args;
+  const session = controller.session;
+  const hoverBendRef = useRef<DrawingArrowHover | null>(null);
+  const hoverPointRef = useRef<{ clientX: number; clientY: number } | null>(null);
+  const updateHover = useCallback(
+    (event: ReactPointerEvent<HTMLCanvasElement>, point: DrawingPoint) => {
+      const previous = hoverBendRef.current;
+      const previousPoint = hoverPointRef.current;
+      const snapshot = session.getSnapshot();
+      hoverPointRef.current =
+        active && snapshot.activeTool === 'select' && event.pointerType !== 'touch'
+          ? { clientX: event.clientX, clientY: event.clientY }
+          : null;
+      const previousHit = previousPoint
+        ? hitTestDrawingDocument(
+            snapshot.document.objects,
+            toDrawingScenePoint(previousPoint, root)
+          )
+        : null;
+      const nextHit = hoverPointRef.current
+        ? hitTestDrawingDocument(snapshot.document.objects, point)
+        : null;
+      hoverBendRef.current = active ? resolveArrowHover(snapshot, point, event) : null;
+      if (hoverBendRef.current || previous || previousHit?.id !== nextHit?.id) changed();
+    },
+    [active, changed, root, session]
+  );
+  const clearHover = useCallback(() => {
+    hoverBendRef.current = null;
+    hoverPointRef.current = null;
+  }, []);
+  return { hoverBendRef, hoverPointRef, updateHover, clearHover };
+}
+
 export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   const { active, controller, root, onCancelText, onText } = args;
   const draftRef = useRef<PointerDraft | null>(null);
   const alignmentGuidesRef = useRef<DrawingAlignmentGuide[]>([]);
-  const hoverBendRef = useRef<DrawingArrowHover | null>(null);
   const activePointerRef = useRef<number | null>(null);
   const lastPointerEventRef = useRef<ReactPointerEvent<HTMLCanvasElement> | null>(null);
   const touchPointsRef = useRef(new Map<number, DrawingPoint>());
   const touchCentroidRef = useRef<DrawingPoint | null>(null);
   const [draftRevision, setDraftRevision] = useState(0);
   const changed = useCallback(() => setDraftRevision((value) => value + 1), []);
+  const { hoverBendRef, hoverPointRef, updateHover, clearHover } = useDrawingHover(args, changed);
   const simplifyDraft = usePointerSimplifyDraft({ active, controller, draftRef, changed });
   const cancelDraft = useCallback(() => {
     controller.simplify?.cancel();
@@ -259,12 +298,12 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     draftRef.current = null;
     simplifyDraft.clear();
     alignmentGuidesRef.current = [];
-    hoverBendRef.current = null;
+    clearHover();
     activePointerRef.current = null;
     lastPointerEventRef.current = null;
     onCancelText();
     changed();
-  }, [changed, controller, onCancelText, simplifyDraft]);
+  }, [changed, controller, onCancelText, simplifyDraft, clearHover]);
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -283,13 +322,13 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       alignmentGuidesRef.current = [];
       activePointerRef.current = event.pointerId;
       lastPointerEventRef.current = event;
-      hoverBendRef.current = null;
+      clearHover();
       if (start.selection) controller.session.setSelection(start.selection);
       if (start.text) onText(start.text);
       event.currentTarget.setPointerCapture(event.pointerId);
       changed();
     },
-    [active, cancelDraft, changed, controller, onText, root, simplifyDraft]
+    [active, cancelDraft, changed, controller, onText, root, simplifyDraft, clearHover]
   );
 
   const onPointerMove = useCallback(
@@ -302,11 +341,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       const draft = draftRef.current;
       const point = toDrawingScenePoint(event, root);
       if (!draft) {
-        const previous = hoverBendRef.current;
-        hoverBendRef.current = active
-          ? resolveArrowHover(controller.session.getSnapshot(), point, event)
-          : null;
-        if (hoverBendRef.current || previous) changed();
+        updateHover(event, point);
         return;
       }
       if (draft.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
@@ -331,7 +366,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       if (update.selection) controller.session.setSelection(update.selection);
       changed();
     },
-    [active, args.alignMoves, changed, controller, root, simplifyDraft]
+    [args.alignMoves, changed, controller, root, simplifyDraft, updateHover]
   );
 
   useDrawingAlignmentModifiers({
@@ -349,12 +384,12 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       draftRef.current = null;
       simplifyDraft.clear();
       alignmentGuidesRef.current = [];
-      hoverBendRef.current = null;
+      clearHover();
       activePointerRef.current = null;
       lastPointerEventRef.current = null;
       changed();
     },
-    [changed, controller, simplifyDraft]
+    [changed, controller, simplifyDraft, clearHover]
   );
 
   const { finishPointer, cancelPointer } = useDrawingPointerCompletion(
@@ -382,6 +417,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     draftRef,
     visualDraftRef: simplifyDraft.visualDraftRef,
     hoverBendRef,
+    hoverPointRef,
     draftRevision,
     finalizeDraft,
     finishPointer,

@@ -561,3 +561,92 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     });
   }
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const mode of ['page', 'crop'] as const) {
+    test(`drawing hover outlines and group gap drag ${mode} ${name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      try {
+        if (mode === 'page') await enterDrawing(page);
+        else {
+          if (!(await page.locator('[data-ui="content.toolbar.timer-button"]').count())) {
+            await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+            await page.locator('[data-ui="content.toolbar.settings.show-hidden-buttons"]').click();
+            const compact = page.getByRole('button', { name: /^Compact menu view/u });
+            if ((await compact.getAttribute('aria-pressed')) !== 'true') await compact.click();
+            await page.keyboard.press('Escape');
+          }
+          await page.locator('[data-ui="content.toolbar.timer-button"]').click();
+          await page
+            .locator('[data-ui="content.toolbar.timer-menu"]')
+            .getByText('No delay', { exact: true })
+            .click();
+          await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
+          await drag(page, { x: 250, y: 120 }, { x: 1050, y: 500 });
+          const drawingMode = page.locator('[data-ui="content.crop.mode.drawing"]');
+          if ((await drawingMode.getAttribute('data-active')) !== 'true') await drawingMode.click();
+          await expect(page.locator('[data-ui="content.crop.drawing-slot"]')).toBeVisible();
+        }
+        const surface = page.locator(
+          mode === 'crop'
+            ? '[data-ui="content.crop.drawing-layer"]'
+            : '[data-ui="content.drawing.surface"]'
+        );
+        const toolbar = page.locator(
+          mode === 'crop'
+            ? '[data-ui="content.crop.drawing-slot"]'
+            : '[data-ui="content.toolbar.root"]'
+        );
+        const shapes = toolbar.locator('[data-ui="content.toolbar.drawing.shape"]');
+        const rectangle = toolbar.locator(
+          '[data-ui="content.toolbar.drawing-options.shape.kind-rectangle"]'
+        );
+        if (!(await rectangle.isVisible())) await shapes.click();
+        await rectangle.click();
+        const fill = toolbar.locator(
+          '[data-ui="content.toolbar.drawing-options.shape.fill-toggle"]'
+        );
+        if ((await fill.getAttribute('aria-pressed')) === 'true') await fill.click();
+        await drag(page, { x: 400, y: 180 }, { x: 470, y: 240 });
+        await drag(page, { x: 650, y: 180 }, { x: 720, y: 240 });
+        await toolbar.locator('[data-ui="content.toolbar.drawing.select"]').click();
+        await page.mouse.click(300, 300);
+        const chrome = surface.locator('[data-ui="content.drawing.selection-chrome"]');
+        const ink = surface.locator('canvas.sniptale-drawing-canvas');
+        await page.mouse.move(400, 210);
+        await expect.poll(() => inkAt(chrome, 400, 210)).toBeGreaterThan(0);
+        expect(await inkAt(chrome, 397, 177)).toBe(0);
+        await page.screenshot({ path: info.outputPath('hover-outline.png'), fullPage: false });
+        await page.mouse.move(300, 300);
+        await expect.poll(() => inkAt(chrome, 400, 210)).toBe(0);
+        await page.mouse.click(400, 210);
+        await page.keyboard.down('Control');
+        await page.mouse.click(650, 210);
+        await page.keyboard.up('Control');
+        await expect.poll(() => inkAt(chrome, 550, 180)).toBeGreaterThan(0);
+        await page.mouse.move(550, 210);
+        await expect(ink).toHaveCSS('cursor', 'move');
+        await page.keyboard.down('Alt');
+        await drag(page, { x: 550, y: 210 }, { x: 585, y: 235 });
+        await page.keyboard.up('Alt');
+        await expect.poll(() => inkAt(ink, 435, 230)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(ink, 685, 230)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(ink, 400, 210)).toBe(0);
+        await expect.poll(() => inkAt(chrome, 585, 205)).toBeGreaterThan(0);
+        await page.screenshot({ path: info.outputPath('group-gap-moved.png'), fullPage: false });
+        if (mode === 'crop') await page.locator('[data-ui="content.crop.undo"]').click();
+        else await page.keyboard.press('Control+z');
+        await expect.poll(() => inkAt(ink, 400, 210)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(ink, 650, 210)).toBeGreaterThan(0);
+        await expect.poll(() => inkAt(ink, 435, 230)).toBe(0);
+      } finally {
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
+}

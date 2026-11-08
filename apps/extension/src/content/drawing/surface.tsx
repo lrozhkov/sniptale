@@ -20,6 +20,7 @@ import { handleDrawingKeyDown, useDrawingEscapeOwnership } from './keyboard';
 import {
   getDrawingViewportProjection,
   isDrawingMultiRotationHandle,
+  isDrawingMultiSelectionBody,
   resolveDrawingResizeHandle,
   resolveDrawingRotationHandle,
   toDrawingScenePoint,
@@ -147,6 +148,16 @@ function resolveDrawingCanvasHoverCursor(args: {
       )
     );
     if (bounds && isDrawingMultiRotationHandle(bounds, args.point)) return 'grab';
+    if (
+      args.snapshot.activeTool === 'select' &&
+      isDrawingMultiSelectionBody(
+        args.snapshot.document.objects.filter((object) =>
+          args.snapshot.selectedObjectIds.includes(object.id)
+        ),
+        args.point
+      )
+    )
+      return 'move';
   }
   const handle = selected ? resolveDrawingResizeHandle(selected, args.point) : null;
   if (handle && selected)
@@ -349,6 +360,7 @@ function DrawingCanvasLayer(props: {
         onMouseUp={stopDrawingHostEvent}
         onPointerLeave={() => {
           props.pointer.hoverBendRef.current = null;
+          props.pointer.hoverPointRef.current = null;
           props.pointer.changed();
         }}
         onLostPointerCapture={props.pointer.cancelLostPointer}
@@ -539,6 +551,7 @@ export function DrawingSurface(props: {
     draftRef: pointer.visualDraftRef,
     draftRevision,
     hoverBendRef: pointer.hoverBendRef,
+    hoverPointRef: pointer.hoverPointRef,
     objects: frameObjects,
     selectedIds: snapshot.selectedObjectIds,
     showSelectionChrome: props.showSelectionChrome ?? true,

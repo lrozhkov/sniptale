@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { renderDrawingObject, renderDrawingSelection } from './render';
+import { renderDrawingObject, renderDrawingSelection, renderDrawingHoverOutline } from './render';
 import type { DrawingObject } from '../../features/drawing/public';
 
 const stencilText: Extract<DrawingObject, { kind: 'text' }> = {
@@ -393,3 +393,33 @@ it.each(['rectangle', 'ellipse', 'triangle'] as const)(
     ).toBe(true);
   }
 );
+
+it('renders a dashed blue hover boundary without fill or handles and preserves canvas state', () => {
+  const context = createPixelCanvas();
+  context.strokeStyle = '#ff0000';
+  context.lineWidth = 3;
+  context.setLineDash([2, 1]);
+  renderDrawingHoverOutline(
+    context,
+    {
+      id: 'hover',
+      kind: 'rectangle',
+      color: '#ff8800',
+      fillColor: '#ff8800',
+      width: 4,
+      bounds: { x: 70, y: 80, width: 100, height: 60 },
+    },
+    { x: 10, y: 20 }
+  );
+  const edge = context.getImageData(62, 59, 96, 1).data;
+  const visible = Array.from({ length: 96 }, (_, index) => edge[index * 4 + 3]! > 0);
+  expect(visible.some(Boolean)).toBe(true);
+  expect(visible.some((value) => !value)).toBe(true);
+  const first = visible.findIndex(Boolean) * 4;
+  expect(Array.from(edge.slice(first, first + 3))).toEqual([37, 99, 235]);
+  expect(context.getImageData(90, 90, 1, 1).data[3]).toBe(0);
+  expect(context.getImageData(57, 57, 1, 1).data[3]).toBe(0);
+  expect(context.getLineDash()).toEqual([2, 1]);
+  expect(context.lineWidth).toBe(3);
+  expect(context.strokeStyle).toBe('#ff0000');
+});

@@ -1,12 +1,17 @@
-import { getDrawingSelectionBounds, type DrawingObject } from '../../features/drawing/public';
+import {
+  getDrawingSelectionBounds,
+  hitTestDrawingDocument,
+  type DrawingObject,
+} from '../../features/drawing/public';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { PointerDraft, DrawingArrowHover } from './interaction';
-import { getDrawingViewportProjection } from './interaction';
+import { getDrawingViewportProjection, toDrawingScenePoint } from './interaction';
 import {
   renderDrawingMarquee,
   renderDrawingMultiSelection,
   renderDrawingObject,
   renderDrawingSelection,
+  renderDrawingHoverOutline,
 } from './render';
 import { resolveDrawingFrameRenderables } from './frame-renderables';
 import { clipDrawingObjectToRoot } from './layout';
@@ -20,6 +25,7 @@ export function drawDrawingFrame(args: {
   showChrome: boolean;
   bendOnly?: boolean;
   hoverBend?: DrawingArrowHover | null;
+  hoverPoint?: { clientX: number; clientY: number } | null;
   renderObjects?: boolean;
   suppressText?: boolean;
   pixelBudget?: number;
@@ -74,6 +80,23 @@ export function drawDrawingFrame(args: {
     renderDrawingMarquee(context, draft.start, draft.current, projection);
   }
   context.restore();
+  if (showChrome && !draft && !args.bendOnly && args.hoverPoint) {
+    const hovered = hitTestDrawingDocument(objects, toDrawingScenePoint(args.hoverPoint, root));
+    if (hovered && !selectedIds.includes(hovered.id)) {
+      context.save();
+      if (
+        root.kind === 'element' &&
+        clipDrawingObjectToRoot(hovered, root, args.getObjectAnchor?.(hovered))
+      ) {
+        const rect = root.element.getBoundingClientRect();
+        context.beginPath();
+        context.rect(rect.left, rect.top, rect.width, rect.height);
+        context.clip();
+      }
+      renderDrawingHoverOutline(context, hovered, projection);
+      context.restore();
+    }
+  }
   if (showChrome && selectedIds.length > 0) {
     const selected = resolveDrawingFrameRenderables(objects, draft)
       .map(({ object }) => object)
