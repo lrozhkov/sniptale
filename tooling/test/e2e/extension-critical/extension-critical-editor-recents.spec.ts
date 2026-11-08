@@ -43,7 +43,7 @@ async function seedImages(page: Page, prefix: string) {
         tags: [],
         lifecycle: {
           storageClass: i === 15 ? 'temporary' : 'library',
-          savedAt: 1000,
+          savedAt: i === 15 ? null : 1000,
           updatedAt: 1000,
           ...(i === 14 ? { trashedAt: 1000 } : {}),
         },
@@ -305,4 +305,94 @@ for (const locale of ['en', 'ru'] as const) {
       await page.close();
     });
   }
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`recent chooser opens a never-edited temporary capture ${viewport.width}`, async ({
+    context,
+    extensionId,
+  }, info) => {
+    const page = await context.newPage();
+    await page.setViewportSize(viewport);
+    const base = `chrome-extension://${extensionId}/apps/extension/src`;
+    await page.goto(`${base}/gallery/index.html`);
+    await expect(page.locator('[data-ui="gallery.page.root"]')).toBeVisible();
+    const prefix = `fresh-capture-${viewport.width}`;
+    await seedImages(page, prefix);
+    await page.goto(`${base}/editor/index.html?assetId=${prefix}-0`);
+    const trigger = page.locator('[data-ui="editor.recent-images.trigger"]');
+    await expect(trigger).toBeVisible();
+    const before = await page.evaluate(async (prefix) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('sniptale-db');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const tx = db.transaction(['media_library', 'image_workspaces'], 'readwrite');
+      const read = <T>(request: IDBRequest<T>) =>
+        new Promise<T>((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      const id = `${prefix}-15`;
+      const entry: unknown = await read(tx.objectStore('media_library').get(id));
+      if (
+        !entry ||
+        typeof entry !== 'object' ||
+        !('lifecycle' in entry) ||
+        !entry.lifecycle ||
+        typeof entry.lifecycle !== 'object' ||
+        !('storageClass' in entry.lifecycle) ||
+        !('workspaceRevision' in entry)
+      )
+        throw new Error('Missing capture fixture');
+      const workspace = await read(tx.objectStore('image_workspaces').get(id));
+      const now = Date.now();
+      tx.objectStore('media_library').put({
+        ...entry,
+        createdAt: now,
+        updatedAt: now + 60_000,
+        lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: now },
+      });
+      await new Promise<void>((resolve, reject) => {
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+      return {
+        storageClass: entry.lifecycle.storageClass,
+        revision: entry.workspaceRevision,
+        hasWorkspace: workspace !== undefined,
+      };
+    }, prefix);
+    expect(before).toEqual({ storageClass: 'temporary', revision: 0, hasWorkspace: false });
+    await trigger.click();
+    const popup = page.locator('[data-ui="editor.recent-images.panel"]');
+    const fresh = popup.locator(`[data-asset-id="${prefix}-15"]`);
+    await expect(fresh).toBeVisible();
+    await expect(fresh.locator('img')).toBeVisible();
+    await expect(popup.locator('[data-asset-id]').first()).toHaveAttribute(
+      'data-asset-id',
+      `${prefix}-15`
+    );
+    await expect(popup.locator(`[data-asset-id="${prefix}-14"]`)).toHaveCount(0);
+    await page.screenshot({
+      path: info.outputPath('never-edited-capture-listed.png'),
+      fullPage: false,
+    });
+    await fresh.click();
+    await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-15$`));
+    await expect(popup).toHaveCount(0);
+    await expect(page.locator('[data-ui="editor.floating.document-bar.title"]')).toContainText(
+      'Recent image 15'
+    );
+    await page.reload();
+    await expect(page.locator('[data-ui="editor.floating.document-bar.title"]')).toContainText(
+      'Recent image 15'
+    );
+    await page.close();
+  });
 }

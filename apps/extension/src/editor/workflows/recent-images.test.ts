@@ -60,6 +60,7 @@ it('reuses library-only image metadata and revision-matched edited previews', as
       updatedAt: 10,
       thumbnailId: 'target',
     },
+    { id: 'temp', title: 'Target.png', detail: '640 × 360', updatedAt: 10, thumbnailId: 'temp' },
   ]);
   mocks.entry.mockResolvedValue({ ...entry, workspaceRevision: 3 });
   const preview = new Blob(['edited']);
@@ -90,11 +91,20 @@ it('includes never-opened image captures and imports from the whole library', as
   mocks.list.mockResolvedValue([
     { ...entry, id: 'new-capture', workspaceRevision: 0, updatedAt: 300 },
     { ...entry, id: 'new-import', kind: 'image', workspaceRevision: 0, updatedAt: 200 },
+    {
+      ...entry,
+      id: 'fresh-temporary',
+      workspaceRevision: 0,
+      updatedAt: 400,
+      lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 400 },
+    },
+    { ...entry, id: 'trashed-temporary', lifecycle: { storageClass: 'temporary', trashedAt: 1 } },
     { ...entry, id: 'edited', workspaceRevision: 4, updatedAt: 100 },
   ]);
   expect((await listRecentEditorImages('source', 'en')).map((item) => item.id)).toEqual([
     'new-capture',
     'new-import',
+    'fresh-temporary',
     'edited',
   ]);
 });

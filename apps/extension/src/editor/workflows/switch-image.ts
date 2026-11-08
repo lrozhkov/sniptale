@@ -45,8 +45,7 @@ async function assertEligibleImage(id: string): Promise<void> {
   if (
     !entry ||
     (entry.kind !== 'image' && entry.kind !== 'screenshot') ||
-    entry.lifecycle?.trashedAt !== undefined ||
-    entry.lifecycle?.storageClass === 'temporary'
+    entry.lifecycle?.trashedAt !== undefined
   )
     throw new Error('The library image is unavailable.');
 }

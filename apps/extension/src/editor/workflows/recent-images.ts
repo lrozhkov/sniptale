@@ -17,8 +17,7 @@ export async function listRecentEditorImages(
     .filter(
       (item) =>
         (item.kind === 'image' || item.kind === 'screenshot') &&
-        item.lifecycle?.trashedAt === undefined &&
-        item.lifecycle?.storageClass !== 'temporary'
+        item.lifecycle?.trashedAt === undefined
     )
     .map((item) => ({
       id: item.id,

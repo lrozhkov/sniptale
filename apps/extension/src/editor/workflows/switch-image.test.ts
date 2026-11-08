@@ -109,15 +109,13 @@ it('prepares and saves before loading, then adopts the destination and changes U
   expect(a.release).not.toHaveBeenCalled();
   expect(a.finish).toHaveBeenCalledWith(true);
 });
-it.each(['missing', 'trashed', 'temporary', 'read', 'save', 'deleted-during-save'])(
+it.each(['missing', 'trashed', 'read', 'save', 'deleted-during-save'])(
   'preserves the current document on %s refusal',
   async (failure) => {
     const a = setup();
     if (failure === 'missing') mocks.entry.mockResolvedValue(undefined);
     if (failure === 'trashed')
       mocks.entry.mockResolvedValue({ ...entry, lifecycle: { trashedAt: 1 } });
-    if (failure === 'temporary')
-      mocks.entry.mockResolvedValue({ ...entry, lifecycle: { storageClass: 'temporary' } });
     if (failure === 'read') mocks.prepare.mockRejectedValue(new Error('read refused'));
     if (failure === 'save') a.flush.mockRejectedValue(new Error('conflict'));
     if (failure === 'deleted-during-save')
@@ -205,28 +203,32 @@ it('explicitly saves disabled-autosave edits before a switch', async () => {
     a.flush.mock.invocationCallOrder[0]!
   );
 });
-it('opens an original-image fallback with the same controller and adopts its existing root', async () => {
-  const a = setup();
-  mocks.prepare.mockResolvedValue({
-    kind: 'asset',
-    dataUrl: 'data:image/png;base64,target',
-    filename: 'Target.png',
-    nativeRevision: 0,
-    sourceTitle: 'Original',
-    sourceUrl: '',
-    sourceFaviconUrl: null,
-    capturedAt: 2,
-  });
-  await openRecentEditorImage({ id: 'target', controller: a.controller });
-  expect(a.controller.openImage).toHaveBeenCalledOnce();
-  expect(a.controller.loadDocument).not.toHaveBeenCalled();
-  expect(a.autosave.adoptPreparedDocument).toHaveBeenCalledWith({
-    aggregateId: 'target',
-    revision: 0,
-    sourceTitle: 'Original',
-    sourceUrl: '',
-  });
-});
+it.each(['library', 'temporary'])(
+  'opens an original-image fallback from %s storage and adopts its existing root',
+  async (storageClass) => {
+    const a = setup();
+    mocks.entry.mockResolvedValue({ ...entry, lifecycle: { storageClass } });
+    mocks.prepare.mockResolvedValue({
+      kind: 'asset',
+      dataUrl: 'data:image/png;base64,target',
+      filename: 'Target.png',
+      nativeRevision: 0,
+      sourceTitle: 'Original',
+      sourceUrl: '',
+      sourceFaviconUrl: null,
+      capturedAt: 2,
+    });
+    await openRecentEditorImage({ id: 'target', controller: a.controller });
+    expect(a.controller.openImage).toHaveBeenCalledOnce();
+    expect(a.controller.loadDocument).not.toHaveBeenCalled();
+    expect(a.autosave.adoptPreparedDocument).toHaveBeenCalledWith({
+      aggregateId: 'target',
+      revision: 0,
+      sourceTitle: 'Original',
+      sourceUrl: '',
+    });
+  }
+);
 it('leaves the already selected project untouched', async () => {
   const a = setup();
   await openRecentEditorImage({ id: 'current', controller: a.controller });
