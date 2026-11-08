@@ -225,7 +225,7 @@ async function verifiesDefaultPresetLoading() {
     borderPreset: expect.objectContaining({ id: 'default-border' }),
   });
   expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({
-    backgroundColor: '#f2f4f7',
+    backgroundColor: '#808080',
     hideSelectionWhileDragging: true,
   });
 }
