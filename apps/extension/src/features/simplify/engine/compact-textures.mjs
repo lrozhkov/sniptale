@@ -113,7 +113,9 @@ function subpixelTextEvidence(image, box, target) {
       if (image.data[i + 3] >= 128 && box.bg.some((v, c) => Math.abs(image.data[i + c] - v) > 40))
         mask[y * w + x] = 1;
     }
-  const phase = subpixelPhase(image, box, target);
+  const phase = subpixelPhase(image, box, target, false);
+  const targetInk = subpixelChannelPeaks(image, box, target),
+    targetLength = Math.hypot(...targetInk);
   if (!phase) return false;
   let witnesses = 0;
   for (let k = 0; k < mask.length; k++) {
@@ -134,12 +136,28 @@ function subpixelTextEvidence(image, box, target) {
       )
     )
       continue;
-    if (subpixelPhase(image, box, part) === phase && ++witnesses >= 2) return true;
+    if (subpixelPhase(image, box, part) !== phase) continue;
+    const ink = subpixelChannelPeaks(image, box, part),
+      length = Math.hypot(...ink);
+    if (Math.hypot(...ink.map((v, c) => v / length - targetInk[c] / targetLength)) > 0.08) continue;
+    if (++witnesses >= 2) return true;
   }
   return false;
 }
 
-function subpixelPhase(image, box, part) {
+function subpixelChannelPeaks(image, box, part) {
+  const peaks = [0, 0, 0];
+  for (let y = part.top; y <= part.bottom; y++)
+    for (let x = Math.max(0, part.left - 1); x <= Math.min(box.w - 1, part.right + 1); x++) {
+      const i = ((box.y + y) * image.width + box.x + x) * 4;
+      for (let c = 0; c < 3; c++) peaks[c] = Math.max(peaks[c], image.data[i + c] - box.bg[c]);
+    }
+  return peaks;
+}
+
+function subpixelPhase(image, box, part, strong = true) {
+  const peaks = subpixelChannelPeaks(image, box, part);
+  if (Math.min(...peaks) < 12) return 0;
   let error = 0,
     energy = 0;
   const dots = [0, 0, 0],
@@ -148,7 +166,7 @@ function subpixelPhase(image, box, part) {
   const at = (x, y, c) => {
     if (x < 0 || x >= box.w) return 0;
     const i = ((box.y + y) * image.width + box.x + x) * 4;
-    return Math.max(0, image.data[i + c] - box.bg[c]);
+    return Math.max(0, image.data[i + c] - box.bg[c]) / peaks[c];
   };
   for (let y = part.top; y <= part.bottom; y++)
     for (let x = Math.max(0, part.left - 1); x <= Math.min(box.w - 1, part.right + 1); x++) {
@@ -167,9 +185,12 @@ function subpixelPhase(image, box, part) {
     }
   if (!energy || error > energy * 0.2) return 0;
   const scores = dots.map((v, j) => v / Math.sqrt(redEnergy[j] * blueEnergy[j] || 1));
-  if (scores[0] >= 0.85 && scores[0] >= scores[1] + 0.08 && scores[0] >= scores[2] + 0.08)
+  // A target may borrow a consistent phase only from two independent strong witnesses.
+  const margin = strong ? 0.08 : Number.EPSILON;
+  if (scores[0] >= 0.85 && scores[0] >= scores[1] + margin && scores[0] >= scores[2] + margin)
     return -1;
-  if (scores[2] >= 0.85 && scores[2] >= scores[1] + 0.08 && scores[2] >= scores[0] + 0.08) return 1;
+  if (scores[2] >= 0.85 && scores[2] >= scores[1] + margin && scores[2] >= scores[0] + margin)
+    return 1;
   return 0;
 }
 

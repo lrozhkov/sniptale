@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { createCanvas, loadImage } from 'canvas';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { SimplifyPixelSource } from '../raster';
 
@@ -157,3 +159,36 @@ it('gives a complete clipped frame ownership over a contained partial surface', 
   media.surfaces = [box(100, 200, 140, 200)];
   expect(detectMedia(image(400, 400, white), null)).toEqual([frame]);
 });
+
+it.each(['original', 'reversed-fringe', 'recolored'] as const)(
+  'accepts a small colored subpixel notice with independent glyph witnesses: %s',
+  async (variant) => {
+    const raster = await loadImage(
+      await readFile(new URL('../fixtures/subpixel-colored-notice.png', import.meta.url))
+    );
+    const canvas = createCanvas(raster.width, raster.height);
+    canvas.getContext('2d').drawImage(raster, 0, 0);
+    const image = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+    const bg = [...background];
+    if (variant === 'reversed-fringe') {
+      [bg[0], bg[2]] = [bg[2]!, bg[0]!];
+      for (let i = 0; i < image.data.length; i += 4)
+        [image.data[i], image.data[i + 2]] = [image.data[i + 2]!, image.data[i]!];
+    } else if (variant === 'recolored') {
+      const gains = [1.4, 0.8, 0.65];
+      for (let i = 0; i < image.data.length; i += 4)
+        for (let c = 0; c < 3; c++)
+          image.data[i + c] = Math.round(bg[c]! + (image.data[i + c]! - bg[c]!) * gains[c]!);
+    }
+    const box: Box = {
+      x: 0,
+      y: 0,
+      w: canvas.width,
+      h: canvas.height,
+      bg,
+      shape: 'text',
+      typeMetrics: { xHeight: 6 },
+    };
+    expect(uncertainColorTexture(image, box)).toBe(false);
+  }
+);
