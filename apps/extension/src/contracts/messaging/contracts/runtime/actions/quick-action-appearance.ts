@@ -34,6 +34,7 @@ export const runtimeQuickActionAppearanceContracts = {
           },
           optional: {
             faviconWebsite: (address) => isString(address) && address.length <= 2048,
+            faviconHintUrl: (address) => isString(address) && address.length <= 2048,
             faviconRedirectGuardReady: (ready) => typeof ready === 'boolean',
           },
         });

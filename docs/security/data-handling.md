@@ -268,6 +268,8 @@ Settings transfer removes embedded background and icon bytes. The projected pres
 
 Favicon acquisition requires an explicit editor request or the configured option during capture. Requests omit credentials and use bounded public HTTPS resources. GET requests do not follow redirects. A guarded HEAD request can resolve a canonical public HTTPS address before the final GET request. The background installs the network guard before it dispatches favicon work to offscreen.
 
+An explicit icon request or configured capture can read the favicon URL of an open tab from the requested origin. An exact page match takes priority. Other pages supply a hint only when their icon URLs agree. Acquisition checks the hint with the same URL and request limits. Remote SVG icons pass through the existing icon sanitizer before raster conversion. Offscreen receives only the bounded hint and does not query tabs.
+
 Opening the Settings form does not fetch a favicon. Missing page data is omitted. Desktop decoration does not read a web page. Rendering checks encoded input, dimensions, and the combined raster budget before bitmap or canvas allocation.
 
 ## Experimental sync capture retention

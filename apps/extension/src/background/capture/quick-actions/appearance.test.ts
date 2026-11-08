@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   ensure: vi.fn(),
   ready: vi.fn(),
   guard: vi.fn(),
+  findIcon: vi.fn(),
+}));
+vi.mock('../../../workflows/browser-frame/open-page-icon', () => ({
+  findOpenPageFavicon: mocks.findIcon,
 }));
 vi.mock('../../../platform/network/https-redirect-guard', () => ({
   ensurePublicHttpsHeadGuard: mocks.guard,
@@ -59,6 +63,7 @@ function output(text = 'Caption') {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.findIcon.mockResolvedValue(null);
   mocks.snapshot.mockImplementation(() => structuredClone(output()));
   mocks.current.mockImplementation(() => undefined);
   mocks.render.mockResolvedValue('styled');
@@ -276,6 +281,7 @@ it('prepares the offscreen header before publishing its raster and retains sourc
     expect(mocks.ensure.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.ready.mock.invocationCallOrder[0]!
     );
+    expect(mocks.findIcon).not.toHaveBeenCalled();
     expect(mocks.ready.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.send.mock.invocationCallOrder[0]!
     );
@@ -354,6 +360,7 @@ it.each([true, false])(
   async (ready) => {
     mocks.ensure.mockResolvedValue(undefined);
     mocks.ready.mockResolvedValue(undefined);
+    mocks.findIcon.mockResolvedValue('https://example.test/brand.svg');
     if (ready) mocks.guard.mockResolvedValue(undefined);
     else mocks.guard.mockRejectedValue(new Error('guard unavailable'));
     mocks.send.mockResolvedValue({ success: true, dataUrl: 'header-raster' });
@@ -370,7 +377,10 @@ it.each([true, false])(
         dataUrl: 'header-raster',
       });
       expect(mocks.send).toHaveBeenCalledWith(
-        expect.objectContaining({ faviconRedirectGuardReady: ready })
+        expect.objectContaining({
+          faviconRedirectGuardReady: ready,
+          faviconHintUrl: 'https://example.test/brand.svg',
+        })
       );
       expect(mocks.guard.mock.invocationCallOrder[0]).toBeLessThan(
         mocks.send.mock.invocationCallOrder[0]!

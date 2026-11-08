@@ -13,10 +13,15 @@ export async function renderQuickActionHeader(
     let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const icon = await Promise.race([
-        acquireWindowHeaderFavicon(input.faviconWebsite, controller.signal, async () => {
-          if (input.faviconRedirectGuardReady !== true)
-            throw new Error('HTTPS redirect guard was not installed');
-        }).catch(() => null),
+        acquireWindowHeaderFavicon(
+          input.faviconWebsite,
+          controller.signal,
+          async () => {
+            if (input.faviconRedirectGuardReady !== true)
+              throw new Error('HTTPS redirect guard was not installed');
+          },
+          input.faviconHintUrl
+        ).catch(() => null),
         new Promise<null>((resolve) => {
           timeout = setTimeout(() => {
             resolve(null);

@@ -1,6 +1,7 @@
 import { resolvePublicHttpsRedirect } from '../../platform/network/https-redirects';
 import { isPrivateNetworkHost } from '@sniptale/platform/security/private-network-host';
 import { rasterizeWindowHeaderIcon } from './icon-raster';
+import { importWindowHeaderIcon } from './local-icon';
 
 const MAX_PAGE_BYTES = 512 * 1024;
 const MAX_ICON_BYTES = 256 * 1024;
@@ -81,13 +82,20 @@ async function rasterIcon(
   const mime = response.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase();
   if (
     !mime ||
-    !['image/png', 'image/jpeg', 'image/webp', 'image/x-icon', 'image/vnd.microsoft.icon'].includes(
-      mime
-    )
+    ![
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'image/x-icon',
+      'image/vnd.microsoft.icon',
+      'image/svg+xml',
+    ].includes(mime)
   )
     return null;
   const bytes = await readBounded(response, MAX_ICON_BYTES);
   signal.throwIfAborted();
+  if (mime === 'image/svg+xml')
+    return importWindowHeaderIcon(new File([bytes], 'favicon.svg', { type: mime }), signal);
   return rasterizeWindowHeaderIcon(new Blob([bytes], { type: mime }), signal);
 }
 
@@ -95,7 +103,8 @@ async function rasterIcon(
 export async function acquireWindowHeaderFavicon(
   address: string,
   signal: AbortSignal,
-  ensureGuardInstalled?: () => Promise<void>
+  ensureGuardInstalled?: () => Promise<void>,
+  hintUrl?: string | null
 ): Promise<string | null> {
   const url = publicUrl(address.includes('://') ? address.trim() : `https://${address.trim()}`);
   if (!url) return null;
@@ -124,8 +133,11 @@ export async function acquireWindowHeaderFavicon(
   } catch {
     combined.throwIfAborted();
   }
+  const hint = hintUrl && hintUrl.length <= 2048 ? publicUrl(hintUrl) : null;
+  if (hint && !candidates.some((item) => item.href === hint.href)) candidates.push(hint);
   const fallback = publicUrl('/favicon.ico', pageUrl.href);
-  if (fallback) candidates.push(fallback);
+  if (fallback && !candidates.some((item) => item.href === fallback.href))
+    candidates.push(fallback);
   for (const candidate of candidates) {
     try {
       const result = await rasterIcon(candidate, combined, ensureGuardInstalled);

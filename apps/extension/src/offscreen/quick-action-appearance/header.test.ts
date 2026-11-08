@@ -62,7 +62,8 @@ it('omits unavailable favicon and still completes the configured header', async 
   expect(mocks.favicon).toHaveBeenCalledWith(
     'https://example.test',
     expect.any(AbortSignal),
-    expect.any(Function)
+    expect.any(Function),
+    undefined
   );
 });
 it('releases the object URL after raster failure and allows an explicit retry', async () => {
@@ -124,3 +125,18 @@ it.each([true, false, undefined])(
     else await expect(callback()).rejects.toThrow('guard was not installed');
   }
 );
+
+it('forwards the optional browser metadata hint without accessing tabs from offscreen', async () => {
+  await renderQuickActionHeader({
+    header: { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true },
+    source: { width: 1280, height: 560 },
+    faviconWebsite: 'https://example.test',
+    faviconHintUrl: 'https://example.test/brand.svg',
+  });
+  expect(mocks.favicon).toHaveBeenCalledWith(
+    'https://example.test',
+    expect.any(AbortSignal),
+    expect.any(Function),
+    'https://example.test/brand.svg'
+  );
+});
