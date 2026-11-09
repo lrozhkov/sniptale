@@ -6,7 +6,7 @@ const LOCAL_PROVIDER_DEFAULTS = new Map([
   ['lm-studio', { label: 'LM Studio', baseUrl: 'http://localhost:1234/v1', catalog: 'openai' }],
   ['ollama', { label: 'Ollama', baseUrl: 'http://localhost:11434/api', catalog: 'ollama' }],
 ]);
-const OLLAMA_FACTORY_DIGEST = 'de90b043cf815f0959c85f36afcc7970c037d4ac48fbf3b20a2b6d5cfc36aed1';
+const OLLAMA_FACTORY_DIGEST = 'af1606539e1a57bf4a551961deee16cc3ca5a321b5398f1e49a7deb527965d62';
 
 function isTextLiteral(node) {
   return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node);
