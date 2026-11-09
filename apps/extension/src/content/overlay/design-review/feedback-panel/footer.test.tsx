@@ -41,21 +41,24 @@ import { FeedbackPanelFooter } from './footer';
 
 const actions = [
   ['download', 'Download', '.lucide-download'],
-  ['copy', 'Copy', '.lucide-copy'],
   ['pdf', 'Pdf', '.lucide-file-down'],
+  ['copy', 'Copy', '.lucide-copy'],
 ] as const;
 let container: HTMLDivElement;
 let root: Root;
 let fixture: ReturnType<typeof setup>;
 let session: ReviewSessionState;
 
-function renderFooter(options: { recordCount?: number; withoutRuntime?: boolean } = {}) {
+function renderFooter(
+  options: { recordCount?: number; withoutRuntime?: boolean; onClear?: () => void } = {}
+) {
   act(() => {
     root.render(
       <FeedbackPanelFooter
         runtime={options.withoutRuntime ? null : fixture.runtime}
         session={options.withoutRuntime ? null : session}
         recordCount={options.recordCount ?? 2}
+        {...(options.onClear ? { onClear: options.onClear } : {})}
       />
     );
   });
@@ -94,11 +97,12 @@ afterEach(() => {
   act(() => root.unmount());
   fixture.runtime.dispose();
   container.remove();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
-it('keeps the footer mounted with three ordered, named icon actions when feedback is empty', () => {
+it('keeps the footer mounted with three ordered, named report actions when feedback is empty', () => {
   renderFooter({ recordCount: 0, withoutRuntime: true });
   const footer = container.querySelector('footer');
   expect(footer?.dataset['ui']).toBe('content.design-review.feedback-footer');
@@ -111,7 +115,9 @@ it('keeps the footer mounted with three ordered, named icon actions when feedbac
     const button = exportButton(action);
     expect(button.getAttribute('aria-label')).toBe(`content.toolbar.annotationExport${label}Label`);
     expect(button.title).toBe(button.getAttribute('aria-label'));
-    expect(button.textContent).toBe('');
+    expect(button.textContent).toBe(
+      action === 'copy' ? `content.toolbar.annotationExport${label}Label` : ''
+    );
     expect(button.querySelector(icon)?.getAttribute('aria-hidden')).toBe('true');
     expect(button.disabled).toBe(true);
     act(() => button.click());
@@ -182,10 +188,17 @@ it.each(actions)(
   }
 );
 
-it('disables report and Undo actions during pending session work', () => {
+it('disables Clear, report and Undo actions during pending session work', () => {
   session = { ...session, pending: true, canUndo: true };
   const undo = vi.spyOn(fixture.runtime, 'undoDelete').mockResolvedValue(undefined);
-  renderFooter();
+  const clear = vi.fn();
+  renderFooter({ onClear: clear });
+  const clearButton = container.querySelector<HTMLButtonElement>(
+    '[aria-label="content.designReview.panelClearAll"]'
+  )!;
+  expect(clearButton.disabled).toBe(true);
+  act(() => clearButton.click());
+  expect(clear).not.toHaveBeenCalled();
   for (const [action] of actions) {
     expect(exportButton(action).disabled).toBe(true);
     act(() => exportButton(action).click());
@@ -201,7 +214,11 @@ it('rejects duplicate clicks before React commits and disables all controls unti
   const completion = deferred<void>();
   mocks.executeAction.mockReturnValue(completion.promise);
   const undo = vi.spyOn(fixture.runtime, 'undoDelete').mockResolvedValue(undefined);
-  renderFooter();
+  const clear = vi.fn();
+  renderFooter({ onClear: clear });
+  const clearButton = container.querySelector<HTMLButtonElement>(
+    '[aria-label="content.designReview.panelClearAll"]'
+  )!;
   act(() => {
     exportButton('download').click();
     exportButton('download').click();
@@ -213,9 +230,15 @@ it('rejects duplicate clicks before React commits and disables all controls unti
   expect(exportButton('download').querySelector('.animate-spin')).not.toBeNull();
   for (const [action] of actions) expect(exportButton(action).disabled).toBe(true);
   expect(undoButton()?.disabled).toBe(true);
-  act(() => undoButton()?.click());
+  expect(clearButton.disabled).toBe(true);
+  act(() => {
+    undoButton()?.click();
+    clearButton.click();
+  });
   expect(undo).not.toHaveBeenCalled();
+  expect(clear).not.toHaveBeenCalled();
   await act(async () => completion.resolve());
+  expect(clearButton.disabled).toBe(false);
   for (const [action] of actions) expect(exportButton(action).disabled).toBe(false);
   expect(undoButton()?.disabled).toBe(false);
   expect(exportButton('download').getAttribute('aria-busy')).toBe('false');
@@ -239,6 +262,8 @@ it.each(['rejected promise', 'synchronous throw'])(
       'content.toolbar.annotationExportCopyError',
       'error'
     );
+    expect(exportButton('copy').querySelector('.lucide-check')).toBeNull();
+    expect(exportButton('copy').querySelector('.lucide-copy')).not.toBeNull();
     expect(session.records).toEqual(feedback);
     expect(clear).not.toHaveBeenCalled();
     expect(container.querySelector('footer')).not.toBeNull();
@@ -274,4 +299,91 @@ it('shows icon-only Undo when deletion is available and keeps the same footer af
   expect(
     container.querySelectorAll('[data-ui^="content.design-review.feedback-export."]')
   ).toHaveLength(3);
+});
+
+it('places Clear before dynamic Undo and calls only the supplied confirmation callback', () => {
+  const clear = vi.fn();
+  const runtimeClear = vi.spyOn(fixture.runtime, 'clear');
+  session = { ...session, canUndo: true };
+  renderFooter({ onClear: clear });
+  const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('footer button'));
+  expect(buttons[0]?.getAttribute('aria-label')).toBe('content.designReview.panelClearAll');
+  expect(buttons[0]?.querySelector('.lucide-brush-cleaning')).not.toBeNull();
+  expect(buttons[1]).toBe(undoButton());
+  act(() => buttons[0]?.click());
+  expect(clear).toHaveBeenCalledOnce();
+  expect(runtimeClear).not.toHaveBeenCalled();
+  session = { ...session, canUndo: false };
+  renderFooter({ onClear: clear });
+  expect(container.querySelector('footer button')).toBe(buttons[0]);
+  expect(undoButton()).toBeNull();
+});
+
+it('shows Check only after copy succeeds and restores Copy after two seconds without changing its label', async () => {
+  vi.useFakeTimers();
+  const completion = deferred<void>();
+  mocks.executeAction.mockReturnValueOnce(completion.promise);
+  renderFooter();
+  const copy = exportButton('copy');
+  const label = copy.textContent;
+  act(() => copy.click());
+  expect(copy.querySelector('.lucide-check')).toBeNull();
+  await act(async () => completion.resolve());
+  expect(copy.querySelector('.lucide-check')).not.toBeNull();
+  expect(copy.textContent).toBe(label);
+  act(() => vi.advanceTimersByTime(1999));
+  expect(copy.querySelector('.lucide-check')).not.toBeNull();
+  act(() => vi.advanceTimersByTime(1));
+  expect(copy.querySelector('.lucide-copy')).not.toBeNull();
+  expect(copy.querySelector('.lucide-check')).toBeNull();
+  expect(copy.textContent).toBe(label);
+});
+
+it('restarts copied feedback after another successful copy and cancels its timer on unmount', async () => {
+  vi.useFakeTimers();
+  renderFooter();
+  await act(async () => exportButton('copy').click());
+  act(() => vi.advanceTimersByTime(1500));
+  const completion = deferred<void>();
+  mocks.executeAction.mockReturnValueOnce(completion.promise);
+  act(() => exportButton('copy').click());
+  expect(exportButton('copy').querySelector('.lucide-check')).toBeNull();
+  await act(async () => completion.resolve());
+  act(() => vi.advanceTimersByTime(500));
+  expect(exportButton('copy').querySelector('.lucide-check')).not.toBeNull();
+  act(() => vi.advanceTimersByTime(1499));
+  expect(exportButton('copy').querySelector('.lucide-check')).not.toBeNull();
+  act(() => root.render(null));
+  expect(vi.getTimerCount()).toBe(0);
+  act(() => vi.advanceTimersByTime(1));
+  expect(container.querySelector('footer')).toBeNull();
+});
+
+it('removes previous copied feedback when the next copy fails and permits another retry', async () => {
+  vi.useFakeTimers();
+  renderFooter();
+  await act(async () => exportButton('copy').click());
+  expect(exportButton('copy').querySelector('.lucide-check')).not.toBeNull();
+  mocks.executeAction.mockRejectedValueOnce(new Error('Copy failed'));
+  await act(async () => exportButton('copy').click());
+  expect(exportButton('copy').querySelector('.lucide-check')).toBeNull();
+  expect(exportButton('copy').querySelector('.lucide-copy')).not.toBeNull();
+  expect(exportButton('copy').disabled).toBe(false);
+  expect(vi.getTimerCount()).toBe(0);
+  await act(async () => exportButton('copy').click());
+  expect(exportButton('copy').querySelector('.lucide-check')).not.toBeNull();
+});
+
+it('restarts the confirmation timer for immediately completed repeat copies', async () => {
+  vi.useFakeTimers();
+  renderFooter();
+  await act(async () => exportButton('copy').click());
+  act(() => vi.advanceTimersByTime(1500));
+  await act(async () => exportButton('copy').click());
+  act(() => vi.advanceTimersByTime(500));
+  expect(exportButton('copy').querySelector('.lucide-check')).not.toBeNull();
+  act(() => vi.advanceTimersByTime(1499));
+  expect(exportButton('copy').querySelector('.lucide-check')).not.toBeNull();
+  act(() => vi.advanceTimersByTime(1));
+  expect(exportButton('copy').querySelector('.lucide-check')).toBeNull();
 });

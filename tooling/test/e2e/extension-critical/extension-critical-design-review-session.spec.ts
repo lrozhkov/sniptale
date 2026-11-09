@@ -137,6 +137,41 @@ async function proveFooterUndo(args: {
   const footer = panel.locator('[data-ui="content.design-review.feedback-footer"]');
   const undo = footer.getByRole('button', { name: /Undo deletion|Отменить удаление/u });
   await expect(undo).toHaveCount(0);
+  const iconSizes = await footer
+    .locator(
+      '[data-ui="content.design-review.feedback-export.download"], [data-ui="content.design-review.feedback-export.pdf"]'
+    )
+    .evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const box = button.getBoundingClientRect();
+        const icon = button.querySelector('svg')!.getBoundingClientRect();
+        const style = getComputedStyle(button);
+        return {
+          width: box.width,
+          height: box.height,
+          iconWidth: icon.width,
+          iconHeight: icon.height,
+          paddingLeft: style.paddingLeft,
+          paddingRight: style.paddingRight,
+        };
+      })
+    );
+  expect(iconSizes).toHaveLength(2);
+  for (const size of iconSizes)
+    expect(size).toEqual({
+      width: 32,
+      height: 32,
+      iconWidth: 18,
+      iconHeight: 18,
+      paddingLeft: '0px',
+      paddingRight: '0px',
+    });
+  await expect(
+    panel.locator('header').getByRole('button', { name: /Clear all feedback|Удалить все отзывы/u })
+  ).toHaveCount(0);
+  await expect(
+    footer.locator('[data-ui="content.design-review.feedback-clear"] .lucide-brush-cleaning')
+  ).toBeVisible();
   const footerBefore = (await footer.boundingBox())!;
   const copyBefore = (await footer
     .locator('[data-ui="content.design-review.feedback-export.copy"]')
@@ -149,6 +184,10 @@ async function proveFooterUndo(args: {
     (await footer.locator('[data-ui="content.design-review.feedback-export.copy"]').boundingBox())!
       .x
   ).toBe(copyBefore.x);
+  const copyAfter = (await footer
+    .locator('[data-ui="content.design-review.feedback-export.copy"]')
+    .boundingBox())!;
+  expect(copyAfter.x + copyAfter.width).toBeLessThanOrEqual(footerBefore.x + footerBefore.width);
   await page.screenshot({ path: info.outputPath('footer-undo.png'), fullPage: false });
   await expect(rows).toHaveCount(1);
   await expect(panel).not.toContainText(COMMENT_B);
@@ -168,7 +207,14 @@ async function proveAggregateReportExport(args: {
   const { page, popup, hostOrigin, viewport, info } = args;
   const panel = page.locator('[data-ui="content.design-review.feedback-panel"]');
   const rows = panel.locator('[data-ui="content.design-review.feedback-item"]');
-  await panel.locator('[data-ui="content.design-review.feedback-export.copy"]').click();
+  const copyButton = panel.locator('[data-ui="content.design-review.feedback-export.copy"]');
+  const copyWidth = (await copyButton.boundingBox())!.width;
+  expect(copyWidth).toBeGreaterThan(80);
+  await expect(copyButton).toContainText(/Copy report|Копировать отч[её]т/u);
+  await copyButton.click();
+  await expect(copyButton.locator('.lucide-check')).toBeVisible();
+  expect((await copyButton.boundingBox())!.width).toBe(copyWidth);
+  await page.screenshot({ path: info.outputPath('copy-confirmed.png'), fullPage: false });
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(COMMENT_A);
   const report = await page.evaluate(() => navigator.clipboard.readText());
   expect(report).toContain(COMMENT_B);
@@ -302,6 +348,22 @@ async function proveClearRestartsMarkers(
   await page.screenshot({ path: info.outputPath('clear-restarts-markers.png'), fullPage: false });
 }
 
+async function proveInertHeaderGap(
+  page: Page,
+  panel: Locator,
+  x: number,
+  y: number
+): Promise<void> {
+  const before = (await panel.boundingBox())!;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 36, y + 12, { steps: 3 });
+  await page.mouse.up();
+  const after = (await panel.boundingBox())!;
+  expect(after.x).toBe(before.x);
+  expect(after.y).toBe(before.y);
+}
+
 async function proveCompactPanel(page: Page, popup: Page, info: TestInfo): Promise<void> {
   const panel = page.locator('[data-ui="content.design-review.feedback-panel"]');
   for (let index = 0; index < 2; index++) {
@@ -318,6 +380,12 @@ async function proveCompactPanel(page: Page, popup: Page, info: TestInfo): Promi
       `Compact feedback ${index}: a long summary
 with more detail kept in the preview.`
     );
+    await expect
+      .poll(
+        async () =>
+          ((await savedSession(popup, page)).match(/data:image\/png;base64,/gu) ?? []).length
+      )
+      .toBe(index + 2);
   }
   const rows = panel.locator('[data-ui="content.design-review.feedback-item"]');
   await expect(rows).toHaveCount(3);
@@ -341,10 +409,36 @@ with more detail kept in the preview.`
     )
     .toBe(true);
   await expect(panel.locator('input')).toHaveCount(0);
+  const headerActions = panel.locator('[data-ui="content.design-review.feedback-header-actions"]');
+  await expect(headerActions).toHaveCSS('cursor', 'default');
   const search = panel.getByRole('button', { name: /Find feedback|Найти замечание/u });
+  const searchBox = (await search.boundingBox())!;
+  const filterBox = (await headerActions
+    .getByRole('button', { name: /Filter by action|Фильтр по действию/u })
+    .boundingBox())!;
+  await proveInertHeaderGap(
+    page,
+    panel,
+    (searchBox.x + searchBox.width + filterBox.x) / 2,
+    searchBox.y + searchBox.height / 2
+  );
   await search.click();
   const input = panel.getByRole('textbox', { name: /Find feedback|Найти замечание/u });
   await expect(input).toBeFocused();
+  const searchControls = panel.locator(
+    '[data-ui="content.design-review.feedback-search-controls"]'
+  );
+  await expect(searchControls).toHaveCSS('cursor', 'default');
+  const backBox = (await searchControls
+    .getByRole('button', { name: /Close search|Закрыть поиск/u })
+    .boundingBox())!;
+  const inputBox = (await input.boundingBox())!;
+  await proveInertHeaderGap(
+    page,
+    panel,
+    (backBox.x + backBox.width + inputBox.x) / 2,
+    backBox.y + backBox.height / 2
+  );
   await input.fill('Compact feedback 1');
   await expect(rows).toHaveCount(1);
   await page.screenshot({ path: info.outputPath('compact-panel-search.png'), fullPage: false });

@@ -49,3 +49,39 @@
   font: 400 12px / 20px var(--sniptale-font-document-sans);
   user-select: text;
 }
+
+/* Fixed icon hit areas must not inherit the toolbar's text-button padding. */
+.sniptale-design-review-chrome .sniptale-feedback-icon-button,
+.sniptale-design-review-chrome .sniptale-feedback-header-actions .sniptale-btn {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
+.sniptale-design-review-chrome .sniptale-feedback-copy-button {
+  width: auto;
+  min-width: 0;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 10px;
+  gap: 8px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.sniptale-design-review-chrome
+  :is(
+    .sniptale-feedback-icon-button,
+    .sniptale-feedback-copy-button,
+    .sniptale-feedback-header-actions .sniptale-btn
+  )
+  svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}

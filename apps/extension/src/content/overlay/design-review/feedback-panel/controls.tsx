@@ -15,7 +15,7 @@ export function FeedbackPanelSearch(props: {
     <>
       <ContentToolbarButton
         type="button"
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]"
+        className="sniptale-feedback-icon-button"
         aria-label={translate('content.designReview.panelSearchClose')}
         title={translate('content.designReview.panelSearchClose')}
         onClick={props.onClose}

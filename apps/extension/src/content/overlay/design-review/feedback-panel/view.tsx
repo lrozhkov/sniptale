@@ -100,8 +100,6 @@ export function DesignReviewFeedbackPanel(props: {
       <FeedbackPanelHeader
         count={records.length}
         onClose={lifecycle.closePanel}
-        {...(runtime && session?.active ? { onClear: () => setConfirmClear(true) } : {})}
-        clearDisabled={records.length === 0 || (session?.pending ?? false)}
         onPointerDown={drag.onPointerDown}
         onPointerMove={drag.onPointerMove}
         onPointerUp={drag.onPointerUp}

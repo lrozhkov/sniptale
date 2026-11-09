@@ -51,7 +51,12 @@ export function SessionFeedbackActions(props: {
         </div>
       ) : null}
       {children}
-      <FeedbackPanelFooter runtime={runtime} session={session} recordCount={props.recordCount} />
+      <FeedbackPanelFooter
+        runtime={runtime}
+        session={session}
+        recordCount={props.recordCount}
+        {...(runtime && session?.active ? { onClear: () => onConfirmClearChange(true) } : {})}
+      />
       {confirmClear
         ? createPortal(
             <ProductConfirmDialog

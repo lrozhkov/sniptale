@@ -255,7 +255,7 @@ it('closes the feedback panel with Escape while the action switch is present', a
   expect(onClose).toHaveBeenCalledOnce();
 });
 
-it('searches feedback and drags the panel by its header', () => {
+it('searches feedback and drags only the title while action and search gaps stay still', () => {
   const target = document.createElement('div');
   document.body.append(target);
   browserAnnotationSession.setComment({
@@ -297,18 +297,38 @@ it('searches feedback and drags the panel by its header', () => {
   const panel = container.querySelector<HTMLElement>(
     '[data-ui="content.design-review.feedback-panel"]'
   );
+  const drag = (element: HTMLElement) =>
+    act(() => {
+      element.dispatchEvent(
+        new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 30, clientY: 80 })
+      );
+      element.dispatchEvent(
+        new MouseEvent('pointermove', { bubbles: true, clientX: 90, clientY: 140 })
+      );
+      element.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+    });
+  const initialPosition = [panel?.style.left, panel?.style.top];
+  const searchControls = container.querySelector<HTMLElement>(
+    '[data-ui="content.design-review.feedback-search-controls"]'
+  )!;
+  drag(searchControls);
+  expect([panel?.style.left, panel?.style.top]).toEqual(initialPosition);
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelSearchClose"]')
+      ?.click()
+  );
+  const actions = container.querySelector<HTMLElement>(
+    '[data-ui="content.design-review.feedback-header-actions"]'
+  )!;
+  drag(actions);
+  expect([panel?.style.left, panel?.style.top]).toEqual(initialPosition);
   const handle = container.querySelector<HTMLElement>(
     '[data-ui="content.design-review.feedback-panel-drag-handle"]'
-  );
-  act(() => {
-    handle?.dispatchEvent(
-      new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 30, clientY: 80 })
-    );
-    handle?.dispatchEvent(
-      new MouseEvent('pointermove', { bubbles: true, clientX: 90, clientY: 140 })
-    );
-    handle?.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
-  });
+  )!;
+  expect(handle.tagName).toBe('DIV');
+  expect(handle.contains(actions)).toBe(false);
+  drag(handle);
   expect(panel?.style.left).toBe('84px');
   expect(panel?.style.top).toBe('132px');
 });
@@ -412,6 +432,9 @@ it('retains records during a save failure and offers retry, undo, and explicit c
       <DesignReviewFeedbackPanel open onClose={vi.fn()} onOpenRecord={vi.fn(() => true)} />
     );
   act(render);
+  const clear = container.querySelector('[aria-label="content.designReview.panelClearAll"]');
+  expect(clear?.closest('footer')).not.toBeNull();
+  expect(clear?.closest('header')).toBeNull();
   expect(container.textContent).toContain('content.designReview.sessionSaveFailed');
   expect(container.textContent).toContain('Keep this feedback after navigation');
   const buttonWithText = (key: string) =>
