@@ -6622,6 +6622,17 @@
       "reviewDate": "2026-11-09",
       "reason": "tool-noise: One camera source lifetime owns asset acquisition, compatible capture, admission and frame leases. Shared color policy remains in its existing workflow owner. Native normalization and rollback stay within the same resource transaction. Independent diagnosis found no responsibility split at the file length threshold. Fresh architecture review must assess this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess a route with an independent lifecycle or consumer contract. Remove when the analyzer models this cohesive boundary."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/video-editor/preview/stage/media/html-source.ts",
+      "symbol": "captureHtmlSource",
+      "owner": "extension:video-editor:preview",
+      "astHash": "6c53add5a91398e2f0dd7e550ed273088ea3b0575f076097ca73c9062c998e94",
+      "signatureHash": "0124f2796f9de646d0ab613c0c9ecbb7f29edd2ecf58118867f2babbb445b6b1",
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One sampling transaction owns decoder evidence, native frame admission and resource reservation. Shared resolvers retain source and color policy. One cleanup boundary releases resources before admission. The returned lease owns resources after admission. Independent diagnosis found no separate change reason or state authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent sampling policy, recovery workflow, persistence effect, transport effect or state authority. Remove when the analyzer models this cohesive transaction."
     }
   ]
 }

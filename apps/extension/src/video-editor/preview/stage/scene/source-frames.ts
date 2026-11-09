@@ -1,7 +1,4 @@
-import type {
-  PreviewSourceBinding,
-  PreviewSourceDemand,
-} from '../../../../workflows/video/preview-source';
+import type { PreviewSourceDemand } from '../../../../workflows/video/preview-source';
 import type {
   VideoCompositionFrame,
   VideoCompositionVisualLayer,
@@ -9,6 +6,7 @@ import type {
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import { getVideoClipSourceTime } from '../../../../features/video/project/timeline';
 import type { PreviewSceneRenderInput } from './types';
+import type { NativePreviewSourceLease } from '../media/html-source';
 import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 
 type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;
@@ -16,7 +14,7 @@ type VideoLayer = Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
 /** Exact source bindings belong to this resolved composition, never presentation metadata. */
 export interface PreviewSceneSourceFrames {
   readonly nominal: ReadonlyMap<string, VideoCompositionFrameSource>;
-  readonly intervals: ReadonlyMap<string, PreviewSourceBinding>;
+  readonly intervals: NativePreviewSourceLease['bindings'];
   media(
     frame: Pick<VideoCompositionFrame, 'visualLayers'>,
     time: number,

@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef } from 'react';
 import {
   createPreviewSourceProvider,
   PreviewSourceSupersededError,
   type PreviewSourceAcquireOptions,
   type PreviewSourceDemand,
-  type PreviewSourceLease,
   type PreviewSourceProvider,
 } from '../../../../workflows/video/preview-source';
 import { getVideoClipSourceTime, isVideoClip } from '../../../../features/video/project/timeline';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { resolveActivePreviewClips } from '../runtime/index';
+import { createNativeHtmlSourceProvider, type NativePreviewSourceLease } from './html-source';
 
 /** One immutable Native request context borrows the mounted source provider. */
 export interface NativePreviewSourceRuntime {
@@ -18,7 +18,7 @@ export interface NativePreviewSourceRuntime {
     demands: readonly PreviewSourceDemand[],
     signal: AbortSignal,
     options?: PreviewSourceAcquireOptions
-  ): Promise<PreviewSourceLease | null>;
+  ): Promise<NativePreviewSourceLease | null>;
   prepare(time: number, signal: AbortSignal): Promise<'ready' | 'retry'>;
 }
 
@@ -105,7 +105,7 @@ function createNativeSourceReadiness(
     demands: readonly PreviewSourceDemand[],
     signal: AbortSignal,
     options?: PreviewSourceAcquireOptions
-  ) => Promise<PreviewSourceLease | null>
+  ) => Promise<NativePreviewSourceLease | null>
 ) {
   let scene: SceneSourceInterest | undefined;
   let readiness: SourceReadinessInterest | undefined;
@@ -178,17 +178,22 @@ function createNativeSourceReadiness(
   };
 }
 
-function createNativeSourceOwner(unsupported: (key: string) => void) {
+function createNativeSourceOwner() {
   let active = true;
   let mountedBefore = false;
   let current: SourceContext | undefined;
   let bound: SourceContext | undefined;
   let unsupportedKey: string | undefined;
   let provider: { projectId: string; value: PreviewSourceProvider } | undefined;
+  let html:
+    | { projectId: string; value: ReturnType<typeof createNativeHtmlSourceProvider> }
+    | undefined;
   const retire = () => {
     const previous = provider;
     provider = undefined;
     previous?.value.dispose();
+    html?.value.dispose();
+    html = undefined;
   };
   const isCurrent = (context: SourceContext) => active && current === context;
   const acquire = async (
@@ -199,11 +204,14 @@ function createNativeSourceOwner(unsupported: (key: string) => void) {
   ) => {
     signal.throwIfAborted();
     if (!isCurrent(context)) throw staleSourceRequest();
-    if (!context.selected || unsupportedKey === context.key) return null;
+    if (!context.selected) return null;
     if (provider && provider.projectId !== context.project.id) retire();
     provider ??= { projectId: context.project.id, value: createPreviewSourceProvider() };
     provider.value.retainSources(new Set(Object.values(context.assetUrls)));
-    const lease = await provider.value.acquire(demands, signal, options);
+    let lease: NativePreviewSourceLease | null =
+      unsupportedKey === context.key
+        ? null
+        : await provider.value.acquire(demands, signal, options);
     if (!isCurrent(context) || signal.aborted) {
       lease?.release();
       signal.throwIfAborted();
@@ -211,7 +219,14 @@ function createNativeSourceOwner(unsupported: (key: string) => void) {
     }
     if (!lease) {
       unsupportedKey = context.key;
-      unsupported(context.key);
+      html ??= { projectId: context.project.id, value: createNativeHtmlSourceProvider() };
+      html.value.retainSources(new Set(Object.values(context.assetUrls)));
+      lease = await html.value.acquire(demands, signal);
+    }
+    if (!isCurrent(context) || signal.aborted) {
+      lease?.release();
+      signal.throwIfAborted();
+      throw staleSourceRequest();
     }
     return lease;
   };
@@ -227,7 +242,6 @@ function createNativeSourceOwner(unsupported: (key: string) => void) {
           signal.throwIfAborted();
           if (!isCurrent(context)) return 'retry';
           if (!context.selected) return 'ready';
-          if (unsupportedKey === context.key) return 'retry';
           const demands = nominalSourceDemands(context, time);
           if (!demands) return 'retry';
           return coordination.prepare(context, demands, signal);
@@ -243,7 +257,11 @@ function createNativeSourceOwner(unsupported: (key: string) => void) {
     suspend(context: SourceContext) {
       if (!isCurrent(context)) return;
       if (!context.selected || provider?.projectId !== context.project.id) retire();
-      else provider.value.retainSources(new Set(Object.values(context.assetUrls)));
+      else {
+        const urls = new Set(Object.values(context.assetUrls));
+        provider.value.retainSources(urls);
+        html?.value.retainSources(urls);
+      }
     },
     dispose() {
       active = false;
@@ -260,10 +278,9 @@ export function useNativePreviewSourceRuntime(params: {
   enabled: boolean;
   retryVersion: number;
 }): NativePreviewSourceRuntime {
-  const [unsupportedKey, setUnsupportedKey] = useState<string>();
   const [mountGeneration, refreshMount] = useReducer((value: number) => value + 1, 0);
   const ownerRef = useRef<ReturnType<typeof createNativeSourceOwner> | null>(null);
-  ownerRef.current ??= createNativeSourceOwner(setUnsupportedKey);
+  ownerRef.current ??= createNativeSourceOwner();
   const owner = ownerRef.current;
   const sourceKey = useMemo(
     () =>
@@ -280,18 +297,10 @@ export function useNativePreviewSourceRuntime(params: {
       project: params.project,
       assetUrls: params.assetUrls,
       key: sourceKey,
-      selected: params.enabled && capable && unsupportedKey !== sourceKey,
+      selected: params.enabled && capable,
       mountGeneration,
     }),
-    [
-      params.project,
-      params.assetUrls,
-      params.enabled,
-      capable,
-      sourceKey,
-      unsupportedKey,
-      mountGeneration,
-    ]
+    [params.project, params.assetUrls, params.enabled, capable, sourceKey, mountGeneration]
   );
   const runtime = useMemo(() => owner.bind(context), [owner, context]);
   useEffect(() => {

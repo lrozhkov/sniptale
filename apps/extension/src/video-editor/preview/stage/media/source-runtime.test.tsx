@@ -12,6 +12,7 @@ import { createPreviewEffectRuntimeFeedbackTestStub } from '../scene/test-suppor
 import { usePreviewStageMediaRuntime } from './runtime';
 import { useNativePreviewSourceRuntime, type NativePreviewSourceRuntime } from './source-runtime';
 import * as sourceProvider from '../../../../workflows/video/preview-source';
+import * as htmlSource from './html-source';
 import type {
   PreviewSourceLease,
   PreviewSourceProvider,
@@ -213,7 +214,19 @@ it('primes exact nominal mapping and releases only its own lease', async () => {
   expect(lease.release).toHaveBeenCalledOnce();
 });
 
-it('restores the actual HTML bank after upfront unsupported decoding and retries old priming', async () => {
+it('keeps the managed bank empty through pending HTML admission after upfront decline', async () => {
+  const entered = Promise.withResolvers<void>();
+  const admission = Promise.withResolvers<PreviewSourceLease>();
+  const htmlAcquire = vi.fn().mockImplementation(async () => sourceLease());
+  htmlAcquire.mockImplementationOnce(() => {
+    entered.resolve();
+    return admission.promise;
+  });
+  vi.spyOn(htmlSource, 'createNativeHtmlSourceProvider').mockReturnValue({
+    acquire: htmlAcquire,
+    retainSources: vi.fn(),
+    dispose: vi.fn(),
+  });
   const { acquire } = mockProvider();
   acquire.mockResolvedValueOnce(null);
   const clip = createVideoClip();
@@ -242,14 +255,19 @@ it('restores the actual HTML bank after upfront unsupported decoding and retries
   await act(async () => root.render(<Harness />));
   expect(current!.videoBankClips).toEqual([]);
   const precise = current!.sourceRuntime;
+  const pending = precise.prepare(2, new AbortController().signal);
+  await entered.promise;
+  expect(current!.sourceRuntime.selected).toBe(true);
+  expect(current!.videoBankClips).toEqual([]);
   let result: 'ready' | 'retry' | undefined;
   await act(async () => {
-    result = await precise.prepare(2, new AbortController().signal);
+    admission.resolve(sourceLease());
+    result = await pending;
   });
-  expect(result).toBe('retry');
-  expect(current!.sourceRuntime.selected).toBe(false);
-  expect(current!.videoBankClips.map(({ id }) => id)).toEqual([clip.id]);
-  expect(await precise.prepare(2, new AbortController().signal)).toBe('retry');
+  expect(result).toBe('ready');
+  expect(current!.sourceRuntime.selected).toBe(true);
+  expect(current!.videoBankClips).toEqual([]);
+  expect(await precise.prepare(2, new AbortController().signal)).toBe('ready');
   expect(await current!.sourceRuntime.prepare(2, new AbortController().signal)).toBe('ready');
   expect(acquire).toHaveBeenCalledOnce();
 });
@@ -604,7 +622,14 @@ it.each(['edit', 'unmount'] as const)('does not publish readiness after Scene %s
   expect(await scene).toMatchObject({ name: 'AbortError' });
   expect(lease.release).toHaveBeenCalledOnce();
 });
-it('restores unsupported mode through the matching Scene outcome', async () => {
+it('shares HTML admission with matching Scene readiness after canonical decline', async () => {
+  const htmlLease = sourceLease();
+  const htmlAcquire = vi.fn().mockResolvedValue(htmlLease);
+  vi.spyOn(htmlSource, 'createNativeHtmlSourceProvider').mockReturnValue({
+    acquire: htmlAcquire,
+    retainSources: vi.fn(),
+    dispose: vi.fn(),
+  });
   const f = mockProvider();
   const gate = Promise.withResolvers<PreviewSourceLease | null>();
   f.acquire.mockReturnValueOnce(gate.promise);
@@ -627,10 +652,13 @@ it('restores unsupported mode through the matching Scene outcome', async () => {
   const ready = runtime!.prepare(2, new AbortController().signal);
   await act(async () => {
     gate.resolve(null);
-    expect(await scene).toBeNull();
-    expect(await ready).toBe('retry');
+    expect(await scene).toBe(htmlLease);
+    expect(await ready).toBe('ready');
   });
-  expect(runtime!.selected).toBe(false);
+  expect(runtime!.selected).toBe(true);
+  expect(htmlAcquire).toHaveBeenCalledOnce();
+  expect(htmlLease.release).not.toHaveBeenCalled();
+  htmlLease.release();
   expect(f.acquire).toHaveBeenCalledOnce();
 });
 it('does not enqueue an empty nominal readiness request', async () => {
