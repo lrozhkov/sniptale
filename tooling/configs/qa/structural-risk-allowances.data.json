@@ -4967,10 +4967,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "layerValues",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One encoder checks and packs optional fields for the fixed shader ABI. Field defaults increase the branch count. Separate field owners would distribute the same uniform offsets.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes uniform ABI. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-05",
-      "astHash": "7821cb58a43fe7476968bb1d12830321b48e9b6d466b88733a827f597e851f12",
+      "reason": "tool-noise: One encoder packs the fixed 336-byte shader uniform layout. One source color fact sets bit 16 beside the four existing edge bits. The offsets do not change. The operation adds no state or resource owner. Independent structural validation classified this owner as Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess changes to uniform layout, color policy, source mutation, queue, publication, allocation or resource ownership. Remove when the analyzer models this cohesive boundary. Revert this binding if the candidate is reverted.",
+      "reviewDate": "2026-11-09",
+      "astHash": "cfb01e504865faea1b14c8799b85274805f973a1751b2e4f5ea3d024154d6512",
       "signatureHash": "eeca5577f46043894b769e22dc186a21aac6b992b12ea2825c7a0d84330c268e"
     },
     {
@@ -5726,10 +5726,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One existing fake GPU device fixture tests presentation admission, 4K storage, completion and reservation cleanup. Added cases share its resource lifecycle. Independent read-only structural diagnosis confirmed Keep. Fresh candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-08",
-      "astHash": "5b601fa1d2e0ae278b6480a47bc3400020185eb7ccc4a22dded122ff7ec7428c",
+      "reason": "tool-noise: One existing GPU fixture checks the renderer and shader contract. Added cases check source facts, packed flags, gamut vectors and one padded conversion. They use the same fixture lifecycle. Independent structural validation classified this owner as Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess changes to uniform layout, color policy, source mutation, queue, publication, allocation or resource ownership. Remove when the analyzer models this cohesive boundary. Revert this binding if the candidate is reverted.",
+      "reviewDate": "2026-11-09",
+      "astHash": "8b1a0bc1bc3a7b9564570d678761a2088c6913ada52e3b6d0ad0a47061187914",
       "signatureHash": "715ffc809cd0ea56092816b7341ec3c8ae905925220a8c5501d6f101dec2bd50"
     },
     {
@@ -6122,10 +6122,10 @@
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: One GPU backend owns device, slot resources, uploads, encoding and completion. Validated presentation surface and byte limits configure the existing presentation owner. Job and texture admission retain their owners. Independent read-only structural diagnosis confirmed Keep. Fresh candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-08",
-      "astHash": "523c55ec201d3a80c1cd2f6069b53490fcc5d156489e41bfe42a4a22896629dd",
+      "reason": "tool-noise: One GPU renderer owns device and slot resources. The added source fact sets one bit in the existing uniform layout. Resource, queue, publication and cleanup owners do not change. Independent structural validation classified this owner as Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess changes to uniform layout, color policy, source mutation, queue, publication, allocation or resource ownership. Remove when the analyzer models this cohesive boundary. Revert this binding if the candidate is reverted.",
+      "reviewDate": "2026-11-09",
+      "astHash": "da2e7e2af8cb761c1a8f367bae435c4a4bc968be173c1fcb1ac07fecf46d85a6",
       "signatureHash": "f2cedc19aea17ca74edd24dde4169bfe2a379a549e4c64af11c1cdcf087fe5ce"
     },
     {

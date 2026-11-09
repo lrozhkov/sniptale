@@ -222,7 +222,10 @@ function layerValues(layer: GpuPreviewLayer, output: Size, logical: Size) {
     Math.cos(angle),
     Math.sin(angle),
     orientation?.flip ? 1 : 0,
-    sourceEdgeFlags(layer.clampSourceEdges),
+    sourceEdgeFlags(layer.clampSourceEdges) |
+      (layer.source instanceof VideoFrame && layer.source.colorSpace?.primaries === 'smpte170m'
+        ? 16
+        : 0),
     maskRect.x,
     maskRect.y,
     maskRect.width,

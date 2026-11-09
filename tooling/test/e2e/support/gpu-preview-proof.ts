@@ -243,8 +243,8 @@ export async function observeEffectGpuPlans(
       .length;
 }
 
-/** Run actual editor interactions on WebGPU; Linux software proves behavior, not hardware FPS. */
-export function enableGpuPreviewProof() {
+/** Configure the browser at file scope, independently of per-scenario GPU witnesses. */
+export function configureGpuPreviewProofBrowser() {
   test.use({
     launchOptions: {
       args:
@@ -259,6 +259,11 @@ export function enableGpuPreviewProof() {
           : [],
     },
   });
+}
+
+/** Run actual editor interactions on WebGPU; Linux software proves behavior, not hardware FPS. */
+export function enableGpuPreviewProof(options: { configureBrowser?: boolean } = {}) {
+  if (options.configureBrowser !== false) configureGpuPreviewProofBrowser();
   const witnesses = new WeakMap<
     Page,
     {

@@ -3,6 +3,8 @@ import { readNativeVideoProject } from '../support/native-video-project';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
 import { writeFile } from 'node:fs/promises';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
+import { observePreviewPlayback } from '../support/quick-preview-playback-proof';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import {
@@ -31,6 +33,7 @@ import {
 import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/click-animation';
 import { REVIEW_KEY_DEFAULT } from '../../../../apps/extension/src/features/video/project/action-feedback/key-animation';
 test.use({ actionTimeout: 15000 });
+enableGpuPreviewProof();
 
 const combinations = [
   {
@@ -258,35 +261,15 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
             fullPage: false,
           });
         }
-        await page.evaluate(() => {
-          const times: number[] = [];
-          const observer = new MutationObserver((records) => {
-            for (const record of records)
-              if (
-                record.target instanceof HTMLElement &&
-                record.target.dataset['previewFront'] === 'true'
-              )
-                times.push(performance.now());
-          });
-          observer.observe(
-            document.querySelector('[data-ui="gallery.videoReview.manualPreview"]')!,
-            { subtree: true, attributes: true, attributeFilter: ['data-preview-front'] }
-          );
-          Object.assign(window, { effectCombinationProbe: { times, observer } });
-        });
-        await button('gallery.videoReview.play').click();
-        await page.waitForFunction(
-          () => document.querySelector<HTMLVideoElement>('dialog video')!.currentTime >= 4
+        const playbackStart = await video.evaluate((node) => node.currentTime);
+        const playback = await observePreviewPlayback(page, 2000, () =>
+          button('gallery.videoReview.play').click()
         );
+        await expect
+          .poll(() => video.evaluate((node) => node.currentTime))
+          .toBeGreaterThanOrEqual(playbackStart + 2);
         await button('gallery.videoReview.pause').click();
-        const times = await page.evaluate(() => {
-          const probe: { times: number[]; observer: MutationObserver } = Reflect.get(
-            window,
-            'effectCombinationProbe'
-          );
-          probe.observer.disconnect();
-          return probe.times;
-        });
+        const times = playback.samples.map((sample) => sample.wall);
         expect(times.length).toBeGreaterThan(3);
         metrics.push({
           name: combination.name,

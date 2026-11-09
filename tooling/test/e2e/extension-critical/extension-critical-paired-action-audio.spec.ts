@@ -13,6 +13,9 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 import { persistedReviewContent } from '../support/voiceover-speech-fixture';
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
+
+enableGpuPreviewProof();
 
 for (const viewport of [
   { width: 1280, height: 560 },
@@ -54,7 +57,10 @@ for (const viewport of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.historyOpen').click();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.trackHeader"]')
+        .getByRole('button', { name: label('gallery.videoReview.telemetry'), exact: true })
+        .click();
       await dialog
         .locator('[data-ui="gallery.videoReview.actionHistory"] li')
         .filter({ hasText: 'Selection proof' })
@@ -79,7 +85,10 @@ for (const viewport of [
         ['mouse-soft-paired-v2', 'gallery.videoReview.actionAudioMouseSoftPaired', [6484, 7995]],
       ] as const) {
         if (!(await audio.isVisible())) {
-          await button('gallery.videoReview.historyOpen').click();
+          await dialog
+            .locator('[data-ui="gallery.videoReview.trackHeader"]')
+            .getByRole('button', { name: label('gallery.videoReview.telemetry'), exact: true })
+            .click();
           await dialog
             .locator('[data-ui="gallery.videoReview.actionHistory"] li')
             .filter({ hasText: 'Selection proof' })
@@ -98,7 +107,10 @@ for (const viewport of [
           .poll(async () => (await persistedReviewContent(page))?.actionAudio?.[0]?.presetId)
           .toBe(preset);
         await verifyPairedPlayback(dialog, probe, label, expectedFrames);
-        await button('gallery.videoReview.historyOpen').click();
+        await dialog
+          .locator('[data-ui="gallery.videoReview.trackHeader"]')
+          .getByRole('button', { name: label('gallery.videoReview.telemetry'), exact: true })
+          .click();
         await dialog
           .locator('[data-ui="gallery.videoReview.actionHistory"] li')
           .filter({ hasText: 'Selection proof' })
@@ -365,7 +377,8 @@ for (const width of [1280, 1920]) {
             })
             .click();
           await page
-            .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+            .locator('[data-ui="gallery.videoReview.trackHeader"]')
+            .getByRole('button', { name: label('gallery.videoReview.telemetry'), exact: true })
             .click();
           await page
             .locator('[data-ui="gallery.videoReview.actionHistory"] li')
@@ -474,7 +487,8 @@ for (const width of [1280, 1920]) {
             )
             .toBe(0.1);
           await page
-            .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+            .locator('[data-ui="gallery.videoReview.trackHeader"]')
+            .getByRole('button', { name: label('gallery.videoReview.telemetry'), exact: true })
             .click();
           await page
             .locator('[data-ui="gallery.videoReview.actionHistory"] li')
@@ -501,15 +515,23 @@ for (const width of [1280, 1920]) {
           await expect
             .poll(() =>
               page.locator('[data-preview-stage-canvas]').evaluate((canvas: HTMLCanvasElement) => {
-                const pixel = canvas
-                  .getContext('2d')!
-                  .getImageData(
+                const readback = document.createElement('canvas');
+                readback.width = canvas.width;
+                readback.height = canvas.height;
+                try {
+                  const context = readback.getContext('2d');
+                  if (!context) throw new Error('Selection frame pixel readback is unavailable');
+                  context.drawImage(canvas, 0, 0);
+                  const pixel = context.getImageData(
                     Math.round(canvas.width * 0.12),
                     Math.round(canvas.height * 0.3),
                     1,
                     1
                   ).data;
-                return Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+                  return Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+                } finally {
+                  readback.width = readback.height = 0;
+                }
               })
             )
             .toBeGreaterThan(160);
@@ -539,7 +561,8 @@ for (const width of [1280, 1920]) {
           }
           await expect(page.locator('[data-ui="gallery.videoReview.dialog"]')).toBeVisible();
           await page
-            .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+            .locator('[data-ui="gallery.videoReview.trackHeader"]')
+            .getByRole('button', { name: label('gallery.videoReview.telemetry'), exact: true })
             .click();
           await page
             .locator('[data-ui="gallery.videoReview.actionHistory"] li')

@@ -58,6 +58,32 @@ fn samplingCoverage(uv: vec2f, size: vec2f) -> f32 {
 }
 `;
 
+// Native Canvas RGB treats SMPTE170M primaries as BT709; external textures retain the gamut.
+// Undo the D65 SMPTE-C-to-BT709 gamut transform, without changing the borrowed source metadata.
+const externalSampling = `
+fn externalSrgbToLinear(value: vec3f) -> vec3f {
+  let magnitude = abs(value);
+  return sign(value) * select(magnitude / 12.92,
+    pow((magnitude + .055) / 1.055, vec3f(2.4)), magnitude > vec3f(.04045));
+}
+fn externalLinearToSrgb(value: vec3f) -> vec3f {
+  let magnitude = abs(value);
+  return sign(value) * select(magnitude * 12.92,
+    1.055 * pow(magnitude, vec3f(1.0 / 2.4)) - .055, magnitude > vec3f(.0031308));
+}
+fn sampleExternalColor(uv: vec2f) -> vec4f {
+  let color = textureSampleBaseClampToEdge(pixels, linearSampler, uv);
+  if ((u32(u.orientation.w) & 16u) == 0u) { return color; }
+  // inverse(M_SMPTE_C) * M_BT709, from D65 and the declared xy primaries.
+  let compatible = mat3x3f(
+    vec3f(1.065379034, -.019632550, .001632051),
+    vec3f(-.055400873, 1.036363095, .004412373),
+    vec3f(-.009978161, -.016730545, .993955576)
+  ) * externalSrgbToLinear(color.rgb);
+  return vec4f(externalLinearToSrgb(compatible), color.a);
+}
+`;
+
 const filteredSampling = `
 var<private> sampleLevel: f32;
 fn transparentSample(uv: vec2f, level: f32) -> vec4f {
@@ -145,6 +171,7 @@ fn applyAlphaMask(point: vec2f, color: vec4f) -> vec4f {
   if (!effects)
     return `${frameGeometry}
 @group(0) @binding(2) var pixels: ${external ? 'texture_external' : 'texture_2d<f32>'};${alphaMask}
+${external ? externalSampling : ''}
 @fragment fn fragment(@builtin(position) position: vec4f) -> @location(0) vec4f {
   let projected = sourcePoint(position.xy);
   let point = projected.xy / projected.z;
@@ -156,7 +183,7 @@ fn applyAlphaMask(point: vec2f, color: vec4f) -> vec4f {
     -u.orientation.y * centered.x + u.orientation.x * centered.y) + .5;
   ${
     external
-      ? `return ${withMask('textureSampleBaseClampToEdge(pixels, linearSampler, uv) * alpha')};`
+      ? `return ${withMask('sampleExternalColor(uv) * alpha')};`
       : `
   let size = vec2f(textureDimensions(pixels));
   return ${withMask('textureSampleLevel(pixels, linearSampler, uv, 0) * samplingCoverage(uv, size) * alpha')};`
@@ -164,6 +191,7 @@ fn applyAlphaMask(point: vec2f, color: vec4f) -> vec4f {
 }`;
   return `${frameGeometry}
 @group(0) @binding(2) var pixels: ${external ? 'texture_external' : 'texture_2d<f32>'};${alphaMask}
+${external ? externalSampling : ''}
 ${external ? '' : filteredSampling}
 fn sampleColor(point: vec2f) -> vec4f {
   let displayUV = (point - u.rect.xy) / u.rect.zw;
@@ -171,7 +199,7 @@ fn sampleColor(point: vec2f) -> vec4f {
   let centered = vec2f(select(displayUV.x, 1 - displayUV.x, u.orientation.z == 1), displayUV.y) - .5;
   let uv = vec2f(u.orientation.x * centered.x + u.orientation.y * centered.y,
     -u.orientation.y * centered.x + u.orientation.x * centered.y) + .5;
-  return ${external ? 'textureSampleBaseClampToEdge(pixels, linearSampler, uv)' : 'filteredColor(uv)'};
+  return ${external ? 'sampleExternalColor(uv)' : 'filteredColor(uv)'};
 }
 fn lensColor(point: vec2f) -> vec4f {
   if (u.lensOptions.x == 0) { return sampleColor(point); }

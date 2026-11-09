@@ -794,6 +794,118 @@ it.each([
   }
 );
 
+it.each([
+  { primaries: 'smpte170m' as const, flags: 31 },
+  { primaries: 'bt709' as const, flags: 15 },
+  { primaries: undefined, flags: 15 },
+])(
+  'keeps borrowed frame facts while packing $primaries RGB interpretation with edge flags',
+  async ({ primaries, flags }) => {
+    const g = graphics();
+    const native = nativeFrames();
+    const renderer = await owner();
+    const source = new VideoFrame(raster());
+    const frame = native.frames[0]!;
+    frame.format = 'I420';
+    frame.colorSpace = {
+      matrix: 'smpte170m',
+      transfer: 'smpte170m',
+      fullRange: false,
+      ...(primaries ? { primaries } : {}),
+    };
+    const facts = {
+      colorSpace: { ...frame.colorSpace },
+      timestamp: frame.timestamp,
+      duration: frame.duration,
+      visibleRect: { ...frame.visibleRect },
+    };
+    await renderer.render(
+      request([
+        {
+          ...layer(source),
+          orientation: { rotation: 90, flip: true },
+          clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+        },
+      ])
+    );
+    const values: unknown = g.queue.writeBuffer.mock.calls.at(-1)?.[2];
+    if (!(values instanceof Float32Array)) throw new Error('Expected layer uniforms.');
+    expect(Array.from(values.slice(68, 72))).toEqual([expect.closeTo(0), 1, 1, flags]);
+    expect({
+      colorSpace: frame.colorSpace,
+      timestamp: frame.timestamp,
+      duration: frame.duration,
+      visibleRect: frame.visibleRect,
+    }).toEqual(facts);
+    expect(g.device.importExternalTexture).toHaveBeenCalledExactlyOnceWith({ source });
+    expect(native.frames).toHaveLength(1);
+    expect(native.copy).not.toHaveBeenCalled();
+    expect(frame.close).not.toHaveBeenCalled();
+  }
+);
+
+it('restores D65 SMPTE-C primaries from linear BT709 without losing negative gamut coordinates', () => {
+  // SMPTE-C xy (.63,.34), (.31,.595), (.155,.07), transformed into BT709 with D65 white.
+  // These reference vectors include negative coordinates; clipping them prevents the inverse.
+  const references = [
+    { input: [0.939542063773, 0.017772223144, -0.001621599943], expected: [1, 0, 0] },
+    { input: [0.05018135686, 0.965792862497, -0.00436974966], expected: [0, 1, 0] },
+    { input: [0.010276579367, 0.01643491436, 1.005991349603], expected: [0, 0, 1] },
+    { input: [1, 1, 1], expected: [1, 1, 1] },
+  ];
+  for (const effects of [false, true]) {
+    const shader = gpuPreviewShader(true, effects);
+    const matrix = shader.match(/let compatible = mat3x3f\(([\s\S]*?)\) \* externalSrgbToLinear/);
+    if (!matrix) throw new Error('Expected external RGB gamut transform.');
+    const columns = Array.from(matrix[1]!.matchAll(/vec3f\(([^)]+)\)/g), (column) =>
+      column[1]!.split(',').map(Number)
+    );
+    expect(columns).toHaveLength(3);
+    for (const { input, expected } of references) {
+      for (let row = 0; row < 3; row++) {
+        const restored = columns.reduce(
+          (sum, column, index) => sum + column[row]! * input[index]!,
+          0
+        );
+        expect(restored).toBeCloseTo(expected[row]!, 7);
+      }
+    }
+  }
+});
+
+it('does not interpret raster color metadata as an external video gamut', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const source = raster();
+  Reflect.set(source, 'colorSpace', { primaries: 'smpte170m' });
+  await renderer.render(request([layer(source)]));
+  const values: unknown = g.queue.writeBuffer.mock.calls.at(-1)?.[2];
+  if (!(values instanceof Float32Array)) throw new Error('Expected layer uniforms.');
+  expect(values[71]).toBe(0);
+  expect(g.device.importExternalTexture).not.toHaveBeenCalled();
+});
+
+it('interprets SMPTE170M once in the padded native conversion before RGB sampling', async () => {
+  const g = graphics();
+  const native = nativeFrames();
+  const renderer = await owner();
+  const source = new VideoFrame(raster());
+  native.frames[0]!.colorSpace = {
+    primaries: 'smpte170m',
+    matrix: 'smpte170m',
+    transfer: 'smpte170m',
+    fullRange: true,
+  };
+  await renderer.render(request([layer(source)]));
+  const values: unknown = g.queue.writeBuffer.mock.calls[0]?.[2];
+  if (!(values instanceof Float32Array)) throw new Error('Expected native conversion uniforms.');
+  expect(values[71]).toBe(16);
+  expect(g.device.importExternalTexture).toHaveBeenCalledExactlyOnceWith({ source });
+  expect(native.copy).not.toHaveBeenCalled();
+  expect(native.frames).toHaveLength(1);
+  expect(native.frames[0]!.close).not.toHaveBeenCalled();
+});
+
 it.each([null, true, 'bottom', ['unknown'], ['bottom', null]])(
   'rejects malformed source edge coverage before submission: %j',
   async (edges) => {
