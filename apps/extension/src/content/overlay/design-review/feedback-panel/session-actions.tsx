@@ -41,8 +41,10 @@ export function SessionFeedbackActions(props: {
         </div>
       ) : null}
       {session?.available && session.records.length === 0 ? (
-        <div className="px-4 py-2">
+        <div className="flex justify-center px-4 py-3">
           <ContentToolbarButton
+            dataUi="content.design-review.feedback-resume"
+            className="sniptale-feedback-resume-button"
             disabled={session.pending}
             onClick={() => void runtime?.resume().catch(() => undefined)}
           >

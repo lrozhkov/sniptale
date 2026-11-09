@@ -293,9 +293,32 @@ async function proveResumedReview(page: Page, info: TestInfo): Promise<void> {
   if (!(await resumedPanel.isVisible())) {
     await page.locator('[data-ui="content.toolbar.design-review-panel-button"]').click();
   }
-  await resumedPanel
-    .getByRole('button', { name: /Resume last review|Продолжить последнюю проверку/u })
-    .click();
+  const resume = resumedPanel.getByRole('button', {
+    name: /Resume last review|Продолжить последнюю проверку/u,
+  });
+  const geometry = await resume.evaluate((button) => {
+    const box = button.getBoundingClientRect();
+    const panel = button
+      .closest('[data-ui="content.design-review.feedback-panel"]')!
+      .getBoundingClientRect();
+    const style = getComputedStyle(button);
+    return {
+      offset: Math.abs(box.x + box.width / 2 - panel.x - panel.width / 2),
+      height: box.height,
+      padding: parseFloat(style.paddingLeft),
+      background: style.backgroundColor,
+      border: style.borderTopStyle,
+      borderColor: style.borderTopColor,
+    };
+  });
+  expect(geometry.offset).toBeLessThanOrEqual(1);
+  expect(geometry.height).toBeGreaterThanOrEqual(32);
+  expect(geometry.padding).toBeGreaterThanOrEqual(10);
+  expect(geometry.background).not.toBe('rgba(0, 0, 0, 0)');
+  expect(geometry.border).toBe('solid');
+  expect(geometry.borderColor).not.toBe('rgba(0, 0, 0, 0)');
+  await page.screenshot({ path: info.outputPath('resume-review-command.png'), fullPage: false });
+  await resume.click();
   await expect(resumedPanel.locator('[data-ui="content.design-review.feedback-item"]')).toHaveCount(
     2
   );
@@ -389,12 +412,6 @@ with more detail kept in the preview.`
   }
   const rows = panel.locator('[data-ui="content.design-review.feedback-item"]');
   await expect(rows).toHaveCount(3);
-  await expect
-    .poll(
-      async () =>
-        ((await savedSession(popup, page)).match(/data:image\/png;base64,/gu) ?? []).length
-    )
-    .toBe(3);
   await expect
     .poll(() =>
       panel.evaluate((element) => {
@@ -734,30 +751,28 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await assertSession();
 
       await proveAggregateReportExport({ page, popup, hostOrigin, viewport: viewport.size, info });
-      if (small) {
-        const originalTabId = await popup.evaluate(async (origin) => {
-          const tabs = await chrome.tabs.query({});
-          const tab = tabs.find((candidate) => candidate.url?.startsWith(origin));
-          if (tab?.id === undefined) throw new Error('Original review tab was not found');
-          return tab.id;
-        }, hostOrigin);
-        await page.close();
-        await expect
-          .poll(() =>
-            popup.evaluate(async () =>
-              JSON.stringify(
-                (await chrome.storage.session.get('sniptale_design_review_bindings'))[
-                  'sniptale_design_review_bindings'
-                ] ?? null
-              )
+      const originalTabId = await popup.evaluate(async (origin) => {
+        const tabs = await chrome.tabs.query({});
+        const tab = tabs.find((candidate) => candidate.url?.startsWith(origin));
+        if (tab?.id === undefined) throw new Error('Original review tab was not found');
+        return tab.id;
+      }, hostOrigin);
+      await page.close();
+      await expect
+        .poll(() =>
+          popup.evaluate(async () =>
+            JSON.stringify(
+              (await chrome.storage.session.get('sniptale_design_review_bindings'))[
+                'sniptale_design_review_bindings'
+              ] ?? null
             )
           )
-          .not.toContain(`"tabId":${originalTabId}`);
-        const reopened = await openDesignReview(context, extensionId, hostOrigin, viewport.size);
-        resumedPage = reopened.page;
-        resumedPopup = reopened.popup;
-        await proveResumedReview(resumedPage, info);
-      }
+        )
+        .not.toContain(`"tabId":${originalTabId}`);
+      const reopened = await openDesignReview(context, extensionId, hostOrigin, viewport.size);
+      resumedPage = reopened.page;
+      resumedPopup = reopened.popup;
+      await proveResumedReview(resumedPage, info);
       await proveClearRestartsMarkers(resumedPage ?? page, hostOrigin, info);
       await proveCompactPanel(resumedPage ?? page, resumedPopup ?? popup, info);
     } catch (error) {

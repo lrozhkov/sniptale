@@ -85,3 +85,21 @@
   height: 18px;
   flex-shrink: 0;
 }
+
+.sniptale-design-review-chrome .sniptale-feedback-resume-button {
+  width: auto;
+  min-width: 0;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 4px;
+  border-color: var(--sniptale-color-border-soft);
+  /* The injected toolbar legacy reset marks transparent button backgrounds important. */
+  background: var(--sniptale-color-surface-input) !important;
+  color: var(--sniptale-color-text-primary);
+  white-space: nowrap;
+}
+
+.sniptale-design-review-chrome .sniptale-feedback-resume-button:hover:not(:disabled) {
+  background: var(--sniptale-color-surface-hover) !important;
+}
