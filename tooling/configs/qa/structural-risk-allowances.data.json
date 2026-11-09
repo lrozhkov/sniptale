@@ -39,10 +39,10 @@
       "file": "apps/extension/src/background/runtime/routing/runtime-wiring/initialize.test.ts",
       "symbol": "<file>",
       "owner": "extension:background:runtime",
-      "reason": "tool-noise: initializeBackgroundRuntime fixture checks registration/startup/privacy/permission/JOIN wiring. Protection defaults extend the same wiring contract and assert no second producer. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification. Final repair diagnosis: The existing startup fixture receives the newly exposed coordinator method. It still tests runtime registration, readiness and privacy wiring through the same fake ports. No new resource lifetime or product authority is introduced by this mock update. Fresh independent architecture review must validate this exact changed body after checkpoint.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess a new independent writer, state receiver, transport, recovery or resource lifetime, or independent fixture setup/cleanup. Remove when the analyzer models this cohesive owner. Final AST/signature binding and independent architecture review are required; this report does not renew an allowance.",
-      "reviewDate": "2026-11-02",
-      "astHash": "2e9a43398e8867cbdc421e22f37dc3474dc207b540b78ccf1c10447e96d86b24",
+      "reason": "tool-noise: Independent topology wrapper diagnosis inspected this exact diff. The candidate only adds Design Review service and registration mocks and exposes the privacy configuration mock in the existing runtime-wiring fixture. No test assertion, independent fixture setup or cleanup, resource lifetime, or product authority is added. The score remains two with cohesion one. Growth beyond the file line cap causes this finding. Splitting this mock update would separate the existing initialization proof from its required dependencies. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent fixture setup or cleanup, resource lifetime, state authority, transport, or recovery contract. Remove when the analyzer models this cohesive fixture.",
+      "reviewDate": "2026-11-09",
+      "astHash": "56aaf0f1104e56baa98608fc89b3bb9a004f7cc35d0d83a0793158d1d40ec75d",
       "signatureHash": "e98cdb0de1ba2eabbf10b453b1cbd1db9a41052a03b841564745a29a8fe6807e"
     },
     {
@@ -6039,6 +6039,17 @@
       "reviewDate": "2026-11-05",
       "astHash": "6d8708e1978d36a85233073daaeb74e1539c88bb2187f3bab7f6f23658b8ea23",
       "signatureHash": "5bac1ad33b92d8aac330c4b8cc56d8edbee7c4e8f12dd6442dfa1b652d01164b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/content/selection/design-review/picker.ts",
+      "symbol": "startDesignReviewPicker",
+      "owner": "extension:content:selection",
+      "reason": "tool-noise: Independent topology wrapper diagnosis inspected this exact function and diff. Navigate mode adds an input gate to the existing cursor, measurements, frame, and event listeners. Saved measurement preferences support disabling and restoring the same picker interaction. These resources share creation, refresh, and disposal within one picker lifetime. No separate authority, transport, or resource lifetime is added. The score remains one, with cyclomatic one and nesting zero; function growth beyond the default hard line cap causes this finding. Splitting listener registration from its cleanup would add navigation without an independent change reason. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent picking operation, resource lifetime, state authority, transport, or recovery contract. Remove when the analyzer models this cohesive picker lifecycle.",
+      "reviewDate": "2026-11-09",
+      "astHash": "a3bf5beeb837549b1e0f057f31210816b2606cbe9de1ba6ba0fac8f5020a701a",
+      "signatureHash": "4d19826f873b2ad29b001d1faa0a77d2707d27f46ff49073d9e4f9f58fd92eaf"
     }
   ]
 }

@@ -42,8 +42,70 @@ function positionPreview(anchor: HTMLElement, layer: HTMLElement, scale: number)
   layer.style.top = `${Math.max(top, Math.min(y, bottom - size.height))}px`;
 }
 
+/** Keeps saved evidence from other origins outside the current page's readable DOM. */
+export function FeedbackEvidenceText(props: { record: BrowserDomAnnotationRecord; text: string }) {
+  const hostRef = useRef<HTMLSpanElement>(null);
+  const privateRootRef = useRef<ShadowRoot | null>(null);
+  let foreign = true;
+  try {
+    foreign = new URL(props.record.evidence.pageUrl).origin !== location.origin;
+  } catch {
+    /* Unparseable saved origins do not grant page-readable access. */
+  }
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!foreign || !host) return;
+    const previous = privateRootRef.current;
+    const root =
+      previous?.host === host
+        ? previous
+        : host.attachShadow({
+            mode: 'closed',
+            clonable: false,
+            serializable: false,
+          });
+    privateRootRef.current = root;
+    root.replaceChildren(document.createTextNode(props.text));
+    return () => root.replaceChildren();
+  }, [foreign, props.text]);
+  return foreign ? <span ref={hostRef} /> : <>{props.text}</>;
+}
+
+function CapturedFeedbackPreview(props: {
+  preview: { dataUrl: string; width: number; height: number };
+  label: string;
+}) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const privateRootRef = useRef<ShadowRoot | null>(null);
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    // Captured pixels must remain outside the host page's readable and cloneable DOM.
+    const root =
+      privateRootRef.current ??
+      host.attachShadow({
+        mode: 'closed',
+        clonable: false,
+        serializable: false,
+      });
+    privateRootRef.current = root;
+    const image = document.createElement('img');
+    image.src = props.preview.dataUrl;
+    image.width = props.preview.width;
+    image.height = props.preview.height;
+    image.alt = props.label;
+    image.style.cssText =
+      'display:block;height:auto;max-height:160px;width:100%;object-fit:contain;border-radius:4px';
+    root.replaceChildren(image);
+    return () => root.replaceChildren();
+  }, [props.preview, props.label]);
+  return <div ref={hostRef} className="mt-3" data-ui="content.design-review.feedback-snapshot" />;
+}
+
 export function FeedbackPreview(props: {
   record: BrowserDomAnnotationRecord;
+  preview?: { dataUrl: string; width: number; height: number };
+  unavailable?: boolean;
   anchor: HTMLElement;
   summary: string;
   label: string;
@@ -100,13 +162,23 @@ export function FeedbackPreview(props: {
         <Icon size={18} />
         {translate(option.labelKey)}
       </div>
-      <div className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">{props.label}</div>
-      <div className="mt-1 truncate font-mono text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
-        {props.record.evidence.targetPath}
+      <div className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
+        <FeedbackEvidenceText record={props.record} text={props.label} />
       </div>
+      <div className="mt-1 truncate font-mono text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
+        <FeedbackEvidenceText record={props.record} text={props.record.evidence.targetPath} />
+      </div>
+      {props.preview ? (
+        <CapturedFeedbackPreview preview={props.preview} label={props.label} />
+      ) : null}
+      {props.unavailable ? (
+        <p className="mt-2 text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
+          {translate('content.designReview.targetUnavailable')}
+        </p>
+      ) : null}
       <div className="my-3 border-t border-solid border-[color:var(--sniptale-color-border-soft)]" />
       <p className="sniptale-design-review-authored-text whitespace-pre-wrap break-words text-xs leading-5">
-        {props.summary}
+        <FeedbackEvidenceText record={props.record} text={props.summary} />
       </p>
       <div className="mt-3 text-right text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
         {translate('content.designReview.panelClickHint')}

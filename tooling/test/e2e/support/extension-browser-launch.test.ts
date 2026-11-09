@@ -144,3 +144,17 @@ it(
     ).toBe(false);
   }
 );
+
+it('enables Back/Forward Cache only for an explicitly selected browser profile', async () => {
+  preparePersistentBrowser();
+  await launchExtensionBrowser({
+    userDataDir: '/tmp/bfcache-profile',
+    enableBackForwardCache: true,
+  });
+  expect(browserIo.launch.mock.calls[0]?.[1]?.ignoreDefaultArgs).toEqual([
+    '--disable-extensions',
+    '--disable-back-forward-cache',
+  ]);
+  await launchExtensionBrowser({ userDataDir: '/tmp/ordinary-profile' });
+  expect(browserIo.launch.mock.calls[1]?.[1]?.ignoreDefaultArgs).toEqual(['--disable-extensions']);
+});

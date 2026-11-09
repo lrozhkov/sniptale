@@ -74,6 +74,7 @@ const MODE_ITEMS: Record<PageToolbarMode, PageToolbarLayoutItem[]> = {
     'editing-ai-text',
   ],
   'design-review': [
+    'review-navigate',
     'review-comment',
     'review-inspect',
     'review-compare',

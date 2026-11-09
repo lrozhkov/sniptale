@@ -9,7 +9,16 @@ const mocks = vi.hoisted(() => ({
     kind: 'trusted-content-event',
   })),
   executeAction: vi.fn(),
+  reviewActive: false,
+  snapshot: vi.fn(),
   showToast: vi.fn(),
+}));
+
+vi.mock('../../../application/design-review-session/use-session', () => ({
+  useReviewSessionRuntime: () => ({
+    getSnapshot: () => ({ active: mocks.reviewActive }),
+    exportSnapshot: mocks.snapshot,
+  }),
 }));
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
@@ -91,6 +100,8 @@ beforeEach(() => {
   mocks.createIntentSource.mockReset();
   mocks.createIntentSource.mockReturnValue({ kind: 'trusted-content-event' });
   mocks.executeAction.mockReset();
+  mocks.reviewActive = false;
+  mocks.snapshot.mockReset();
   mocks.showToast.mockReset();
 });
 
@@ -314,4 +325,20 @@ it('rejects two page-export activations before React commits the busy state', as
   });
   expect(mocks.executeAction).toHaveBeenCalledTimes(1);
   await act(async () => finish());
+});
+
+it('injects the active review runtime export snapshot into the user action', async () => {
+  mocks.reviewActive = true;
+  mocks.executeAction.mockResolvedValue(undefined);
+  const view = renderMenu();
+  const download = view.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.annotation-export.download"]'
+  )!;
+  await act(async () => download.click());
+  expect(mocks.executeAction).toHaveBeenCalledWith(
+    'download',
+    { kind: 'trusted-content-event' },
+    mocks.snapshot
+  );
+  expect(mocks.snapshot).not.toHaveBeenCalled();
 });

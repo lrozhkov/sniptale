@@ -37,7 +37,7 @@ import {
 } from './measure';
 export type { DesignReviewSelectionOrigin } from './picker';
 
-export type DesignReviewTool = 'comment' | 'inspect' | 'compare' | 'move';
+export type DesignReviewTool = 'navigate' | 'comment' | 'inspect' | 'compare' | 'move';
 
 export interface DesignReviewModeState {
   tool: DesignReviewTool;
@@ -168,6 +168,7 @@ export function enableDesignReviewMode(): void {
     onInspectorDismissRequested: requestInspectorDismiss,
     hasInspector: () => state.checkOpen,
     onSelection: setSelection,
+    isPageInteractionEnabled: () => state.tool !== 'navigate',
     replaceSelectionOnClick: () => state.tool !== 'comment',
     trackHover: () => !state.checkOpen && state.tool === 'compare',
     isFrameSuppressed: () =>

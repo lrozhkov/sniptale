@@ -141,7 +141,7 @@ it('exposes independent review tools with exclusive page interaction semantics',
       />
     );
   });
-  for (const tool of ['inspect', 'compare', 'move', 'comment']) {
+  for (const tool of ['navigate', 'inspect', 'compare', 'move', 'comment']) {
     const button = container.querySelector<HTMLButtonElement>(
       `[data-ui="content.toolbar.review-tool.${tool}"]`
     );

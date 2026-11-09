@@ -191,3 +191,51 @@ it('renders frame evidence as inert cards with its recorded geometry and empty f
   expect(doc.querySelector('article')).toBeNull();
   expect(doc.querySelector('main')?.textContent).not.toBe('');
 });
+
+it('groups multiple source pages and preserves saved preview keys and sequential report numbering', () => {
+  const snapshot: BrowserAnnotationSessionSnapshot = {
+    schemaVersion: 1,
+    nextAnnotationId: 4,
+    nextCreationOrder: 4,
+    nextMarkerNumber: 4,
+    frameOrders: [],
+    domRecords: [1, 2, 3].map((annotationId) => ({
+      annotationId,
+      creationOrder: annotationId,
+      comment: `Saved note ${annotationId}`,
+      propertyChanges: [],
+      evidence: {
+        fileLabel: annotationId === 2 ? 'Second page' : 'First page',
+        frame: { kind: 'top-document' },
+        locator: 'private',
+        nodePosition: { x: 0, y: 0 },
+        pageUrl: annotationId === 2 ? 'https://example.test/two' : 'https://example.test/one',
+        targetPath: 'p',
+        targetSelector: '#missing',
+        targetText: 'Missing target',
+        viewport: { width: 1280, height: 560 },
+      },
+    })),
+  };
+  const doc = document.implementation.createHTMLDocument();
+  renderReviewPrintReport(doc, snapshot, 'All feedback', {
+    previews: new Map([[3, { dataUrl: 'data:image/png;base64,aGVsbG8=', width: 120, height: 40 }]]),
+  });
+  const pages = doc.querySelectorAll('.page-group');
+  expect(pages).toHaveLength(2);
+  expect(pages[0]?.querySelector('h2')?.textContent).toBe('First page');
+  expect(pages[1]?.querySelector('h2')?.textContent).toBe('Second page');
+  expect(
+    Array.from(doc.querySelectorAll('article'), (item) => item.dataset['annotationId'])
+  ).toEqual(['1', '3', '2']);
+  expect(Array.from(doc.querySelectorAll('.item-number'), (item) => item.textContent)).toEqual([
+    '1.',
+    '2.',
+    '3.',
+  ]);
+  expect(doc.querySelector('article[data-annotation-id="3"] img')?.getAttribute('src')).toBe(
+    'data:image/png;base64,aGVsbG8='
+  );
+  expect(pages[1]?.textContent).toContain('Saved note 2');
+  expect(pages[1]?.textContent).toContain('https://example.test/two');
+});

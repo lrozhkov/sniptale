@@ -108,6 +108,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/voice-input`
 - `apps/extension/src/contracts/aggregate-promotion.ts`
 - `apps/extension/src/contracts/ai`
+- `apps/extension/src/contracts/design-review-session.ts`
 - `apps/extension/src/contracts/diagnostics.test.ts`
 - `apps/extension/src/contracts/diagnostics.ts`
 - `apps/extension/src/contracts/effect-runtime`

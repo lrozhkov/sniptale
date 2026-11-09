@@ -41,7 +41,11 @@ export function DesignReviewSurface(props: {
           />
           {controller.enabled ? (
             <DesignReviewToolPanel
-              tool={controller.tool === 'comment' ? 'inspect' : controller.tool}
+              tool={
+                controller.tool === 'comment' || controller.tool === 'navigate'
+                  ? 'inspect'
+                  : controller.tool
+              }
               open={controller.toolPanelOpen}
               checkOpen={controller.checkOpen}
               checks={controller.checks}

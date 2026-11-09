@@ -2,6 +2,11 @@ import { requestSyncCheckpointFlush } from '../../../../composition/persistence/
 import { createBackgroundSecretProtection } from '../../../secret-protection/composition';
 import { createAiSettingsMutator } from '../../../ai/settings/mutations';
 import { initializeSyncConnectionRuntime } from './sync-connection';
+import {
+  createDesignReviewSessionService,
+  registerDesignReviewSessionPorts,
+} from '../../../design-review-session/ports';
+import { restorePinnedToolbarAfterNavigation } from '../../page-access/pinned-toolbar-restore';
 import { registerPageRecoveryPorts } from '../../../page-recovery/ports';
 import { createAudioJobService } from '../../../ai/audio/service';
 import { registerAudioJobPorts } from '../../../ai/audio/port';
@@ -22,6 +27,7 @@ import { initializeNativeAppPermissionLifecycle } from '../../native-app/permiss
 import {
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureAudioJobPrivacyErasurePort,
+  configureDesignReviewSessionPrivacyErasurePort,
   configureScreenshotPrivacyErasureCleanupPort,
 } from '../../../application/privacy-erasure/composition';
 import { configureDownloadPort } from '../../../routing-contracts/download-port';
@@ -89,6 +95,11 @@ export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   registerVoiceInputTelemetryPorts();
   registerAggregateEditorPresencePorts();
   registerPageRecoveryPorts();
+  const designReviewSessions = createDesignReviewSessionService();
+  configureDesignReviewSessionPrivacyErasurePort(designReviewSessions);
+  registerDesignReviewSessionPorts(designReviewSessions, async (tabId) => {
+    await restorePinnedToolbarAfterNavigation(tabId, state, true);
+  });
   registerExtensionCommandListener(state);
   initializePageAccessLifecycle(logger);
   configureScreenshotPrivacyErasureCleanupPort({

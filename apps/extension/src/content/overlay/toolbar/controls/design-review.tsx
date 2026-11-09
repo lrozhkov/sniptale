@@ -2,6 +2,7 @@ import { PageToolbarGroup } from './page-layout';
 import { useContext, useSyncExternalStore } from 'react';
 import {
   Ruler,
+  MousePointer2,
   ScanLine,
   MessageSquare,
   ScanSearch,
@@ -27,6 +28,7 @@ import { AnnotationExportMenu } from '../design-review/export-menu';
 import type { ToolbarMenuState } from '../state/menu';
 
 const REVIEW_TOOLS: Array<{ tool: DesignReviewTool; icon: typeof Ruler; label: TranslationKey }> = [
+  { tool: 'navigate', icon: MousePointer2, label: 'content.designReview.toolNavigate' },
   { tool: 'comment', icon: MessageSquare, label: 'content.designReview.toolComment' },
   { tool: 'inspect', icon: ScanSearch, label: 'content.designReview.toolInspect' },
   { tool: 'compare', icon: Ruler, label: 'content.designReview.toolCompare' },
@@ -50,6 +52,7 @@ export function ToolbarDesignReviewControls(props: {
     visibility &&
     !(
       [
+        'review-navigate',
         'review-comment',
         'review-inspect',
         'review-compare',

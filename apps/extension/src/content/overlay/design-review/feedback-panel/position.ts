@@ -34,26 +34,34 @@ function clampPanelPosition(
 export function useFeedbackPanelPosition(
   panelRef: RefObject<HTMLElement | null>,
   open: boolean,
-  uiScale = 1
+  uiScale = 1,
+  persisted?: { position: PanelPosition; setPosition: (position: PanelPosition) => void }
 ) {
-  const [position, setPosition] = useState<PanelPosition>({ x: 24, y: 72 });
+  const [localPosition, setLocalPosition] = useState<PanelPosition>({ x: 24, y: 72 });
+  const position = persisted?.position ?? localPosition;
+  const persistPosition = persisted?.setPosition;
+  const updatePosition = (next: PanelPosition) => {
+    if (persistPosition) persistPosition(next);
+    else setLocalPosition(next);
+  };
 
   useLayoutEffect(() => {
     if (!open) return;
-    const clampCurrent = () =>
-      setPosition((current) => {
-        const next = clampPanelPosition(panelRef.current, current, uiScale);
-        return next.x === current.x && next.y === current.y ? current : next;
-      });
+    const clampCurrent = () => {
+      const next = clampPanelPosition(panelRef.current, position, uiScale);
+      if (next.x === position.x && next.y === position.y) return;
+      if (persistPosition) persistPosition(next);
+      else setLocalPosition(next);
+    };
     clampCurrent();
     window.addEventListener('resize', clampCurrent);
     return () => window.removeEventListener('resize', clampCurrent);
-  }, [open, panelRef, uiScale]);
+  }, [open, panelRef, uiScale, position, persistPosition]);
 
   const drag = useDesignReviewPointerDrag({
     canStart: (event) => !(event.target as Element).closest('button, input, select'),
     move: (origin, deltaX, deltaY) => {
-      setPosition(
+      updatePosition(
         clampPanelPosition(
           panelRef.current,
           {

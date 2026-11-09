@@ -120,6 +120,7 @@ export const PAGE_TOOLBAR_CONTROLS = [
   'editing-ai',
   'editing-marker',
   'editing-ai-text',
+  'review-navigate',
   'review-comment',
   'review-inspect',
   'review-compare',

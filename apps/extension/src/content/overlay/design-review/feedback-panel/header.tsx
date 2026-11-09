@@ -1,5 +1,5 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { X } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import type { PointerEventHandler } from 'react';
 import { FeedbackCollectionIcon } from '../icons';
 import { translate } from '../../../../platform/i18n';
@@ -7,6 +7,8 @@ import { translate } from '../../../../platform/i18n';
 export function FeedbackPanelHeader(props: {
   count: number;
   onClose: () => void;
+  onClear?: () => void;
+  clearDisabled?: boolean;
   onPointerDown: PointerEventHandler<HTMLElement>;
   onPointerMove: PointerEventHandler<HTMLElement>;
   onPointerUp: PointerEventHandler<HTMLElement>;
@@ -25,10 +27,26 @@ export function FeedbackPanelHeader(props: {
         {translate('content.designReview.panelTitle')}
       </strong>
       <span className="text-xs text-[var(--sniptale-color-text-dim)]">{props.count}</span>
+      {props.onClear ? (
+        <ContentToolbarButton
+          type="button"
+          className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-[4px]"
+          aria-label={translate('content.designReview.panelClearAll')}
+          title={translate('content.designReview.panelClearAll')}
+          onClick={props.onClear}
+          disabled={props.clearDisabled}
+        >
+          <Trash2 size={16} />
+        </ContentToolbarButton>
+      ) : null}
       <ContentToolbarButton
         tone="close"
         type="button"
-        className="sniptale-dismiss-button ml-auto inline-flex h-8 w-8 items-center justify-center rounded-[4px]"
+        className={[
+          'sniptale-dismiss-button',
+          props.onClear ? '' : 'ml-auto',
+          'inline-flex h-8 w-8 items-center justify-center rounded-[4px]',
+        ].join(' ')}
         aria-label={translate('content.designReview.panelClose')}
         title={translate('content.designReview.panelClose')}
         onClick={props.onClose}

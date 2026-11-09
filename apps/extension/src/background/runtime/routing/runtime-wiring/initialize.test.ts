@@ -12,6 +12,10 @@ vi.mock('../../../secret-protection/composition', async () => {
 });
 vi.mock('./startup', () => ({ runStartupMaintenance: vi.fn() }));
 vi.mock('../../../page-access/lifecycle', () => ({ initializePageAccessLifecycle: vi.fn() }));
+vi.mock('../../../design-review-session/ports', () => ({
+  createDesignReviewSessionService: vi.fn(() => ({})),
+  registerDesignReviewSessionPorts: vi.fn(),
+}));
 vi.mock('../../../page-recovery/ports', () => ({ registerPageRecoveryPorts: vi.fn() }));
 vi.mock('../../../ai/audio/port', () => ({ registerAudioJobPorts: vi.fn() }));
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -23,6 +27,7 @@ import type { SyncWorkspaceSelection } from '../../../../composition/persistence
 const {
   configureDownloadPort,
   configureAudioJobPrivacyErasurePort,
+  configureDesignReviewSessionPrivacyErasurePort,
   configureSyncPrivacyErasurePort,
   eraseLocalExtensionDataFromBackground,
   registerContentTextPorts,
@@ -44,6 +49,7 @@ const {
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
   configureAudioJobPrivacyErasurePort: vi.fn(),
+  configureDesignReviewSessionPrivacyErasurePort: vi.fn(),
   configureSyncPrivacyErasurePort: vi.fn(),
   eraseLocalExtensionDataFromBackground: vi.fn(),
   registerContentTextPorts: vi.fn(),
@@ -230,6 +236,7 @@ vi.mock('../../../application/privacy-erasure/composition', () => ({
   configureScreenshotPrivacyErasureCleanupPort,
   eraseLocalExtensionDataFromBackground,
   configureAudioJobPrivacyErasurePort,
+  configureDesignReviewSessionPrivacyErasurePort,
   configureSyncPrivacyErasurePort,
 }));
 vi.mock('../../native-app/privacy-erasure', () => ({

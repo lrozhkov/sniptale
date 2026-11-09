@@ -340,7 +340,7 @@ function createDesignReviewModeToggle({
     }
 
     enableDesignReviewMode();
-    setNavigationLockEnabled(true);
+    setNavigationLockEnabled(false);
     setDesignReviewMode(true);
   };
 }

@@ -1,0 +1,77 @@
+import type { ReactNode } from 'react';
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { translate } from '../../../../platform/i18n';
+import type {
+  ReviewSessionRuntime,
+  ReviewSessionState,
+} from '../../../application/design-review-session/runtime';
+
+/** Session commands share the panel's single confirmation and dismissal state. */
+export function SessionFeedbackActions(props: {
+  runtime: ReviewSessionRuntime | null;
+  session: ReviewSessionState | null;
+  confirmClear: boolean;
+  onConfirmClearChange: (open: boolean) => void;
+  children: ReactNode;
+}) {
+  const { runtime, session, confirmClear, onConfirmClearChange, children } = props;
+  return (
+    <>
+      {session?.error ? (
+        <div role="status" className="flex items-center gap-2 px-4 py-2 text-xs leading-4">
+          <span className="flex-1">{translate('content.designReview.sessionSaveFailed')}</span>
+          <ContentToolbarButton
+            disabled={session.pending}
+            onClick={() => void runtime?.retry().catch(() => undefined)}
+          >
+            {translate('content.designReview.sessionRetry')}
+          </ContentToolbarButton>
+        </div>
+      ) : session?.pending ? (
+        <div
+          role="status"
+          className="px-4 py-2 text-xs leading-4 text-[var(--sniptale-color-text-secondary)]"
+        >
+          {translate('content.designReview.sessionSavePending')}
+        </div>
+      ) : null}
+      {session?.available && session.records.length === 0 ? (
+        <div className="px-4 py-2">
+          <ContentToolbarButton
+            disabled={session.pending}
+            onClick={() => void runtime?.resume().catch(() => undefined)}
+          >
+            {translate('content.designReview.sessionResume')}
+          </ContentToolbarButton>
+        </div>
+      ) : null}
+      {children}
+      {session?.canUndo ? (
+        <div className="border-t border-[color:var(--sniptale-color-border-soft)] px-4 py-2">
+          <ContentToolbarButton
+            disabled={session.pending}
+            onClick={() => void runtime?.undoDelete().catch(() => undefined)}
+          >
+            {translate('content.designReview.panelUndoDelete')}
+          </ContentToolbarButton>
+        </div>
+      ) : null}
+      <ProductConfirmDialog
+        isOpen={confirmClear}
+        title={translate('content.designReview.panelClearAll')}
+        message={translate('content.designReview.panelClearConfirm')}
+        confirmText={translate('content.designReview.panelClearAll')}
+        cancelText={translate('common.actions.cancel')}
+        confirmDisabled={session?.pending ?? false}
+        onCancel={() => onConfirmClearChange(false)}
+        onConfirm={async () => {
+          await runtime?.clear();
+          onConfirmClearChange(false);
+        }}
+        dialogClassName="sniptale-compact-workspace"
+        backdropClassName="!z-[2147483648]"
+      />
+    </>
+  );
+}

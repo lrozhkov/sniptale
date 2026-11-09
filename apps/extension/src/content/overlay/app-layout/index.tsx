@@ -1,3 +1,7 @@
+import {
+  ReviewSessionContext,
+  useCreateReviewSessionRuntime,
+} from '../../application/design-review-session/use-session';
 import { Suspense } from 'react';
 import { ContentDialogStack } from './dialogs';
 import { DesignReviewSurface, useDesignReviewController } from '../design-review/view';
@@ -107,13 +111,17 @@ function VideoRecordingSurfaceSlot(props: {
 }
 
 export function ContentAppLayout(props: ContentAppLayoutProps) {
+  const reviewSession = useCreateReviewSessionRuntime((enabled) =>
+    props.toolbar.modeController.handleToggleDesignReviewMode(enabled)
+  );
   const isCaptureUiHidden = props.toolbar.isCompletelyHidden;
   const designReview = useDesignReviewController({
     enabled: props.toolbar.modes.designReviewMode,
+    session: reviewSession,
   });
 
   return (
-    <>
+    <ReviewSessionContext.Provider value={reviewSession}>
       <VideoRecordingSurfaceSlot chromeHidden={isCaptureUiHidden} toolbar={props.toolbar} />
       {props.toolbar.modes.screenshotMode && props.toolbar.drawingController ? (
         <DrawingSurface
@@ -156,6 +164,6 @@ export function ContentAppLayout(props: ContentAppLayoutProps) {
         countdownActive={props.dialogs.countdown !== null}
       />
       {isCaptureUiHidden ? null : <ContentDialogStack dialogs={props.dialogs} />}
-    </>
+    </ReviewSessionContext.Provider>
   );
 }

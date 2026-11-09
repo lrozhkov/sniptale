@@ -526,3 +526,18 @@ it('publishes explicit same-tool return from a finding after Check closes', () =
   unsubscribe();
   allow();
 });
+
+it('keeps review enabled and finalizes through the tool-switch owner before navigation', () => {
+  selectTextTarget();
+  const accept = vi.fn(() => true);
+  const unregister = registerDesignReviewToolSwitchRequestHandler(accept);
+  const picker = mocks.startDesignReviewPicker.mock.calls.at(-1)![0];
+  expect(setDesignReviewTool('navigate')).toBe(true);
+  expect(accept).toHaveBeenCalledWith('navigate');
+  expect(getDesignReviewModeState()).toMatchObject({ enabled: true, tool: 'navigate' });
+  expect(picker.isPageInteractionEnabled()).toBe(false);
+  expect(mocks.disposePicker).not.toHaveBeenCalled();
+  expect(setDesignReviewTool('comment')).toBe(true);
+  expect(picker.isPageInteractionEnabled()).toBe(true);
+  unregister();
+});
