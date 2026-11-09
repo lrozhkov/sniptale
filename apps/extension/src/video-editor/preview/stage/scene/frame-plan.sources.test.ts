@@ -98,7 +98,7 @@ it('uses the covering source sample instead of a late HTML frame on the first Na
   expect(prepared.input.preparedFrame?.compositionTime).toBe(projectTime);
   expect(sourceRuntime.acquire).toHaveBeenCalledOnce();
   expect(geometry).toHaveBeenCalledOnce();
-  expect([...prepared.input.preparedFrame!.sourceFrames!.intervals.values()][0]).toMatchObject({
+  expect([...prepared.input.preparedFrame!.sourceFrames!.bindings.values()][0]).toMatchObject({
     timestamp: 39.283333,
     nextTimestamp: 39.316667,
   });
@@ -174,3 +174,69 @@ it('keeps Standard canonical sources serial and skips GPU effect preparation', a
   prepared?.release();
   expect(release).toHaveBeenCalledOnce();
 });
+
+it('marks a window held at its retained source end explicitly without changing the pose clock', async () => {
+  const f = fixture();
+  f.clip.sourceStart = 0;
+  f.clip.sourceDuration = 1;
+  f.clip.duration = 2;
+  f.clip.playbackWindow = { offset: 0, holdAt: 1 };
+  f.input.currentTime = 1.5;
+  const prepared = await prepareNativePreviewSceneFrame(f.input);
+  expect(f.sourceRuntime.acquire).toHaveBeenCalledWith(
+    [expect.objectContaining({ time: 1, rangeEnd: 1, endpoint: 'retained-end' })],
+    expect.any(AbortSignal),
+    { discontinuity: true }
+  );
+  expect(prepared?.input.preparedFrame?.compositionTime).toBe(1.5);
+  prepared?.release();
+});
+
+it.each(['gpu', 'legacy'] as const)(
+  'borrows resolved endpoint bindings through %s preparation without successor evidence',
+  async (renderer) => {
+    const f = fixture();
+    const lease = await f.sourceRuntime.acquire([{ id: 'endpoint' }]);
+    const canonical = lease.bindings.get('endpoint')!;
+    const binding = {
+      source: canonical.source,
+      timestamp: canonical.timestamp,
+      target: canonical.target,
+    };
+    const media = new Map([['source', binding.source]]);
+    const release = vi.fn();
+    const camera = {
+      ...timeline.resolveVideoCompositionRenderPasses(f.input.project, f.input.currentTime)
+        .overlayFrame.camera,
+      scale: 1.5,
+    };
+    const prepareSources = vi.fn(
+      async (passes: ReturnType<typeof timeline.resolveVideoCompositionRenderPasses>) => {
+        expect(passes.overlayFrame.camera).toBe(camera);
+        expect(passes.visualPasses.every((pass) => pass.frame.camera === camera)).toBe(true);
+        return {
+          nominal: media,
+          bindings: new Map([['endpoint', binding]]),
+          media: () => media,
+          release,
+        };
+      }
+    );
+    const { sourceRuntime: _runtime, ...input } = f.input;
+    const prepared = await prepareNativePreviewSceneFrame({
+      ...input,
+      previewRenderer: renderer,
+      cameraOverride: camera,
+      prepareSourceFrames: prepareSources,
+    });
+    expect(prepareSources).toHaveBeenCalledOnce();
+    expect(f.sourceRuntime.acquire).toHaveBeenCalledTimes(1);
+    expect(prepared?.input.preparedFrame?.sourceFrames?.bindings.get('endpoint')).toBe(binding);
+    expect(binding).not.toHaveProperty('nextTimestamp');
+    expect(release).not.toHaveBeenCalled();
+    prepared?.release();
+    prepared?.release();
+    expect(release).toHaveBeenCalledOnce();
+    lease.release();
+  }
+);

@@ -13,6 +13,7 @@ import { hasCursorFollowingCameraAt } from '../../../features/video/composition/
 import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import type { PreviewSceneRenderInput, PreviewScenePresentation } from '../stage/scene/types';
 import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
+import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
 import { createMaterializerGpuComposer } from './materializer-gpu';
 import { createMaterializerGpuOutputs } from './materializer-gpu-outputs';
 import type {
@@ -321,7 +322,6 @@ export function createVideoPreviewFrameMaterializer(params: {
             signal,
             cameraOverride,
             undefined,
-            undefined,
             acquireGpuOutput
           ));
     } finally {
@@ -430,7 +430,6 @@ function createMaterializedJoinPresentation(
         signal,
         cameraOverride,
         'omit',
-        undefined,
         directSamples ? state.gpuOutputs.acquire : undefined
       );
     }
@@ -447,28 +446,18 @@ function createMaterializedJoinPresentation(
     });
     const source = cutSampler;
     try {
-      const frames = await source.sample(
+      return await renderMaterializedFrame(
+        params,
+        state,
+        canvas,
+        stage,
         time,
         signal,
-        time < cutPlan.seam ? 'last' : 'first',
-        params.project
+        cameraOverride,
+        'omit',
+        directSamples ? state.gpuOutputs.acquire : undefined,
+        { source, fallback: time < cutPlan.seam ? 'last' : 'first' }
       );
-      try {
-        return await renderMaterializedFrame(
-          params,
-          state,
-          canvas,
-          stage,
-          time,
-          signal,
-          cameraOverride,
-          'omit',
-          frames.media,
-          directSamples ? state.gpuOutputs.acquire : undefined
-        );
-      } finally {
-        frames.release();
-      }
     } catch (error) {
       if (cutSampler === source) cutSampler = undefined;
       source.dispose();
@@ -666,7 +655,6 @@ function createMaterializedJoinPresentation(
             signal,
             cameraOverride,
             sceneEdges === 'omit' ? 'omit' : undefined,
-            undefined,
             acquireGpuOutput
           );
         }
@@ -924,13 +912,22 @@ async function renderMaterializedFrame(
   signal: AbortSignal,
   cameraOverride?: VideoCompositionCameraState,
   sceneEdges: 'apply' | 'omit' = 'apply',
-  decodedVideoFrames?: ReadonlyMap<string, VideoCompositionFrameSource>,
-  acquireGpuOutput?: GpuPreviewTargetFactory
+  acquireGpuOutput?: GpuPreviewTargetFactory,
+  endpointSource?: {
+    source: ReturnType<typeof createCompositionCutSampleSource>;
+    fallback: 'first' | 'last';
+  }
 ): Promise<MaterializedPreviewFrame> {
   const assertActive = () => {
     throwIfAborted(signal);
     if (state.disposed) throw new DOMException('Preview preparation was cancelled', 'AbortError');
   };
+  const sourceRoute = endpointSource
+    ? { kind: 'endpoint' as const, ...endpointSource }
+    : typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined'
+      ? { kind: 'canonical' as const }
+      : { kind: 'compatibility' as const };
+  let decodedVideoFrames: ReadonlyMap<string, VideoCompositionFrameSource> | undefined;
   let sampled:
     | Awaited<ReturnType<ReturnType<typeof createCompositionCutSampleSource>['sample']>>
     | undefined;
@@ -940,7 +937,7 @@ async function renderMaterializedFrame(
   try {
     assertActive();
     if (
-      !decodedVideoFrames &&
+      sourceRoute.kind === 'compatibility' &&
       params.project.clips.some(
         (clip) => clip.type === 'VIDEO' && clip.playbackWindow && isClipActiveAtTime(clip, time)
       )
@@ -960,11 +957,7 @@ async function renderMaterializedFrame(
       decodedVideoFrames = sampled.media;
     }
     assertActive();
-    const preciseSource =
-      !decodedVideoFrames &&
-      typeof VideoDecoder !== 'undefined' &&
-      typeof VideoFrame !== 'undefined';
-    if (!decodedVideoFrames && !preciseSource)
+    if (sourceRoute.kind === 'compatibility' && !decodedVideoFrames)
       await prepareMaterializedVideos(params, state, stage, time, signal);
     else state.videoRefs = {};
     assertActive();
@@ -1021,8 +1014,45 @@ async function renderMaterializedFrame(
       stage,
       videoRefs: { current: state.videoRefs },
       ...(decodedVideoFrames ? { decodedVideoFrames } : {}),
+      ...(sourceRoute.kind === 'endpoint'
+        ? {
+            prepareSourceFrames: async (passes) => {
+              sampled = await sourceRoute.source.sample(
+                time,
+                signal,
+                sourceRoute.fallback,
+                renderProject,
+                [
+                  { frame: passes.overlayFrame, time },
+                  ...passes.visualPasses.map((pass) => ({ frame: pass.frame, time: pass.time })),
+                ]
+              );
+              const lease = sampled;
+              return {
+                nominal: lease.media,
+                bindings: lease.bindings,
+                media: lease.forFrame,
+                release: () => {
+                  if (sampled === lease) sampled = undefined;
+                  lease.release();
+                },
+              };
+            },
+          }
+        : {}),
     };
-    if (preciseSource) {
+    if (sourceRoute.kind === 'endpoint') {
+      if (typeof VideoFrame === 'undefined') {
+        const passes = resolveVideoCompositionRenderPasses(renderProject, time);
+        const bindings = await input.prepareSourceFrames!(passes);
+        input = { ...input, decodedVideoFrames: bindings.nominal };
+      } else {
+        prepared = await prepareNativePreviewSceneFrame(input);
+        assertActive();
+        if (!prepared) throw new Error('Preview endpoint source preparation is unavailable');
+        input = prepared.input;
+      }
+    } else if (sourceRoute.kind === 'canonical') {
       state.sourceProvider ??= createPreviewSourceProvider();
       const provider = state.sourceProvider;
       provider.retainSources(new Set(Object.values(params.assetUrls)));

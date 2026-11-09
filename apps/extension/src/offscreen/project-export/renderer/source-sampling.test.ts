@@ -219,17 +219,14 @@ function preparationFixture() {
     }),
     draw: vi.fn(),
   };
-  const media = new Map([[f.clip.id, source]]);
+  const media = new Map<string, VideoCompositionFrameSource>([[f.clip.id, source]]);
   const sample = vi.fn(
     async (
       _time: number,
       _signal: AbortSignal,
       _policy: 'first' | 'last',
       _project?: VideoProject
-    ): Promise<{
-      media: Map<string, VideoCompositionFrameSource>;
-      release(): void;
-    }> => ({ media, release: vi.fn() })
+    ) => ({ media, bindings: new Map<string, never>(), forFrame: () => media, release: vi.fn() })
   );
   const sampleDispose = vi.fn();
   const createSamples = vi.fn(() => ({ sample, dispose: sampleDispose }));
@@ -1035,7 +1032,12 @@ it.each(['missing', 'no-frame', 'width', 'height'] as const)(
               ...(condition === 'width' ? { sourceWidth: 320 } : { sourceHeight: 180 }),
             }
       );
-    f.sample.mockResolvedValueOnce({ media, release });
+    f.sample.mockResolvedValueOnce({
+      media,
+      bindings: new Map<string, never>(),
+      forFrame: () => media,
+      release,
+    });
     await expect(
       f.owner.prepare({
         project: f.project,

@@ -47,7 +47,7 @@ it('Canvas fallback draws each exact exposure source without HTML readiness or r
   const release = vi.fn();
   const sourceFrames = {
     nominal: new Map([[clip.id, sources.get(passes.overlayFrame)!]]),
-    intervals: new Map(),
+    bindings: new Map(),
     media: (frame: Pick<typeof passes.overlayFrame, 'visualLayers'>) => {
       const source = sources.get(frame);
       if (!source) throw new Error('Missing pose');
@@ -172,7 +172,7 @@ function paddedFallbackFixture(fallback: 'unavailable' | 'device-failed' = 'unav
     contexts.map((frame, index) => [frame, makeSource(1_000_000 + index * 33333)])
   );
   const effectSource = makeSource(2_000_000);
-  const intervals = new Map<string, PreviewSourceBinding>(
+  const bindings = new Map<string, PreviewSourceBinding>(
     [...sources.values(), effectSource].map((source, index) => [
       String(index),
       {
@@ -201,7 +201,7 @@ function paddedFallbackFixture(fallback: 'unavailable' | 'device-failed' = 'unav
         ],
       ])
   );
-  const sourceFrames = { nominal, intervals, media, release };
+  const sourceFrames = { nominal, bindings, media, release };
   const canvas = document.createElement('canvas');
   Object.defineProperties(canvas, { clientWidth: { value: 80 }, clientHeight: { value: 40 } });
   const controller = new AbortController();
@@ -252,7 +252,7 @@ function paddedFallbackFixture(fallback: 'unavailable' | 'device-failed' = 'unav
     passes,
     sources,
     effectSource,
-    intervals,
+    bindings,
     sourceFrames,
     capturedNominal,
     release,
@@ -280,15 +280,15 @@ it.each(['unavailable', 'device-failed'] as const)(
         .sourceFrames!.media(f.passes.overlayFrame, 1, f.passes.overlayFrame.effectInputLayers)
         .get(f.clip.id)!;
       expect(effect).not.toBe(f.effectSource);
-      expect(args.sourceFrames!.intervals).toBe(f.intervals);
+      expect(args.sourceFrames!.bindings).toBe(f.bindings);
       return draw(args);
     });
     await expect(renderPreviewScene(f.input)).resolves.toMatchObject({
       renderer: { backend: 'legacy', fallback },
     });
-    expect(f.normalizer).toHaveBeenCalledTimes(f.intervals.size);
+    expect(f.normalizer).toHaveBeenCalledTimes(f.bindings.size);
     expect(f.formats.every((format) => format === 'NV12')).toBe(true);
-    expect(f.owned.filter((frame) => frame.codedHeight === 40)).toHaveLength(f.intervals.size);
+    expect(f.owned.filter((frame) => frame.codedHeight === 40)).toHaveLength(f.bindings.size);
     expect(f.owned.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
     expect(f.input.preparedFrame).toBe(original);
     expect(f.input.preparedFrame!.sourceFrames).toBe(f.sourceFrames);
@@ -312,9 +312,9 @@ it('keeps successful GPU source preparation native without acquiring Canvas copi
 
 it('shares one normalized source identity across duplicate interval bindings', async () => {
   const f = paddedFallbackFixture();
-  f.intervals.set('alias', f.intervals.values().next().value!);
+  f.bindings.set('alias', f.bindings.values().next().value!);
   await renderPreviewScene(f.input);
-  expect(f.normalizer).toHaveBeenCalledTimes(f.intervals.size - 1);
+  expect(f.normalizer).toHaveBeenCalledTimes(f.bindings.size - 1);
   for (const source of [...f.sources.values(), f.effectSource])
     expect(source.toVideoFrame).toHaveBeenCalledOnce();
   expect(f.owned.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
@@ -379,7 +379,7 @@ it('retains normalized sources through asynchronous Canvas work and discards an 
     return draw(args);
   });
   const pending = renderPreviewScene(f.input);
-  await vi.waitFor(() => expect(f.normalizer).toHaveBeenCalledTimes(f.intervals.size));
+  await vi.waitFor(() => expect(f.normalizer).toHaveBeenCalledTimes(f.bindings.size));
   expect(
     f.owned
       .filter((frame) => frame.codedHeight === 40)

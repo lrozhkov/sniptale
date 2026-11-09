@@ -1,3 +1,5 @@
+import { createEffectHostClip } from '../../features/video/project/factories/overlay-clip';
+import { resolveVideoCompositionFrame } from '../../features/video/composition/timeline/frame';
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
@@ -536,4 +538,101 @@ it('samples the explicit project snapshot while retaining the accepted source de
   expect(cutDecode.dispose).not.toHaveBeenCalled();
   source.dispose();
   expect(cutDecode.dispose).toHaveBeenCalledOnce();
+});
+
+it('binds explicit endpoint contexts to resolved exposure clips and effect-only owners', async () => {
+  const clip = createVideoClip({
+    id: 'pose',
+    assetId: 'asset',
+    startTime: 0,
+    duration: 3,
+    sourceDuration: 3,
+  });
+  const project = createProject([clip]);
+  const frame = resolveVideoCompositionFrame(project, 1);
+  const layer = frame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  const exposure = {
+    ...frame,
+    visualLayers: [{ ...layer, clip: { ...clip, sourceStart: 1, sourceDuration: 2 } }],
+  };
+  const inputOnly = { ...frame, visualLayers: [], effectInputLayers: [layer] };
+  cutDecode.getSample.mockImplementation(async (time: number) =>
+    cutFrame(Math.floor(time * 10) / 10)
+  );
+  const source = createCompositionCutSampleSource({ project, sourceUrl: () => 'blob:poses' });
+  const lease = await source.sample(1, new AbortController().signal, 'last', project, [
+    { frame, time: 1 },
+    { frame: exposure, time: 1.21 },
+    { frame: inputOnly, time: 1.31 },
+  ]);
+  expect(cutDecode.getSample.mock.calls.map(([time]) => time)).toEqual([1, 2.21, 1.31]);
+  expect(
+    [...lease.bindings.values()].map((binding) => [binding.target, binding.timestamp])
+  ).toEqual([
+    [1, 1],
+    [2.21, 2.2],
+    [1.31, 1.3],
+  ]);
+  expect(lease.forFrame(exposure, 1.21).get('pose')).not.toBe(lease.media.get('pose'));
+  expect(lease.forFrame(inputOnly, 1.31, inputOnly.effectInputLayers).has('pose')).toBe(true);
+  lease.release();
+  source.dispose();
+});
+
+it('includes an attached video owner absent from visual video and effect input layers', async () => {
+  const clip = createVideoClip({ id: 'owner', startTime: 0, duration: 2, sourceDuration: 2 });
+  const project = createProject([clip]);
+  const frame = resolveVideoCompositionFrame(project, 0.5);
+  const owner = frame.visualLayers[0]!;
+  if (owner.kind !== 'video') throw new Error('Expected video');
+  const effectClip = createEffectHostClip({
+    duration: 2,
+    effectInstanceId: 'attached',
+    name: 'Attached',
+    startTime: 0,
+    trackId: clip.trackId,
+    projectWidth: 16,
+    projectHeight: 16,
+  });
+  const attached = {
+    ...frame,
+    effectInputLayers: [],
+    visualLayers: [
+      {
+        ...owner,
+        kind: 'effect' as const,
+        clip: effectClip,
+        clipId: effectClip.id,
+        sourceAttachment: {
+          owner,
+          mapping: {
+            frame: clip.transform,
+            fitMode: clip.fitMode,
+            sourceWidth: 16,
+            sourceHeight: 16,
+            renderState: owner.renderState,
+          },
+        },
+      },
+    ],
+  };
+  const sample = cutFrame(0.4);
+  const close = vi.spyOn(sample, 'close');
+  cutDecode.getSample.mockResolvedValue(sample);
+  const source = createCompositionCutSampleSource({ project, sourceUrl: () => 'blob:attached' });
+  const lease = await source.sample(0.5, new AbortController().signal, 'first', project, [
+    { frame: attached, time: 0.5 },
+  ]);
+  expect(lease.forFrame(attached, 0.5).has('owner')).toBe(true);
+  expect([...lease.bindings.values()][0]).toMatchObject({
+    target: 0.5,
+    timestamp: 0.4,
+    endpoint: 'first',
+  });
+  expect(close).not.toHaveBeenCalled();
+  lease.release();
+  lease.release();
+  expect(close).toHaveBeenCalledOnce();
+  source.dispose();
 });

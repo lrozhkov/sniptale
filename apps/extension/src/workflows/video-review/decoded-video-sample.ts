@@ -7,6 +7,10 @@ import type { VideoCompositionFrameSource } from '../../features/video/compositi
 import { readRetainedTransitionSample } from './cut-transition-frames';
 import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
 import type { VideoSample, VideoSampleSink } from 'mediabunny';
+import type {
+  VideoCompositionFrame,
+  VideoCompositionVisualLayer,
+} from '../../features/video/composition/types';
 import { classifyReviewExportFailure, reviewExportPhase } from './export-diagnostics';
 
 type ReviewSampleSink = Pick<VideoSampleSink, 'getSample' | 'samples' | 'samplesAtTimestamps'>;
@@ -77,6 +81,25 @@ export function createReviewDecodedSampleSink(
   };
 }
 
+/** Unmigrated export callers retain their original nominal clip selection. */
+function resolveNominalCutContext(project: VideoProject, time: number) {
+  const passes = resolveVideoCompositionRenderPasses(project, time);
+  const layers = [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)]
+    .flatMap((frame) => frame.visualLayers)
+    .filter((layer) => layer.kind === 'video');
+  const visualLayers = project.clips.flatMap((clip) => {
+    if (
+      clip.type !== 'VIDEO' ||
+      !isClipActiveAtTime(clip, time) ||
+      !hasCameraMediaAt(project, clip, time)
+    )
+      return [];
+    const layer = layers.find((layer) => layer.clipId === clip.id);
+    return layer ? [{ ...layer, clip }] : [];
+  });
+  return { time, frame: { ...passes.overlayFrame, visualLayers, effectInputLayers: [] } };
+}
+
 /** Owns decoder inputs for cut scenes. Scene leases own their returned drawable samples. */
 export function createCompositionCutSampleSource(params: {
   project: VideoProject;
@@ -132,10 +155,50 @@ export function createCompositionCutSampleSource(params: {
       time: number,
       signal: AbortSignal,
       fallback: 'first' | 'last',
-      project: VideoProject = params.project
+      project: VideoProject = params.project,
+      contexts?: readonly { frame: VideoCompositionFrame; time: number }[]
     ) {
       const owned: { close(): void }[] = [];
-      const media = new Map<string, VideoCompositionFrameSource>();
+      const bindings = new Map<
+        string,
+        {
+          source: VideoCompositionFrameSource;
+          target: number;
+          timestamp: number;
+          url: string;
+          endpoint: 'first' | 'last';
+        }
+      >();
+      const videoLayers = (layers: readonly VideoCompositionVisualLayer[]) =>
+        layers.flatMap((layer) =>
+          layer.kind === 'video'
+            ? [layer]
+            : layer.kind === 'effect' && layer.sourceAttachment?.owner.kind === 'video'
+              ? [layer.sourceAttachment.owner]
+              : []
+        );
+      const keyFor = (clip: VideoProjectVideoClip, passTime: number) =>
+        JSON.stringify([
+          clip.id,
+          clip.assetId,
+          getVideoClipSourceTime(clip, passTime),
+          clip.sourceStart,
+          clip.sourceDuration,
+          clip.cameraTiming?.offsetSeconds ?? 0,
+        ]);
+      const forFrame = (
+        frame: Pick<VideoCompositionFrame, 'visualLayers'>,
+        passTime: number,
+        layers: readonly VideoCompositionVisualLayer[] = frame.visualLayers
+      ) => {
+        const media = new Map<string, VideoCompositionFrameSource>();
+        for (const layer of videoLayers(layers)) {
+          const binding = bindings.get(keyFor(layer.clip, passTime));
+          if (!binding) throw new Error('Cut source context is unavailable.');
+          media.set(layer.clipId, binding.source);
+        }
+        return media;
+      };
       let released = false;
       const release = () => {
         if (released) return;
@@ -150,53 +213,54 @@ export function createCompositionCutSampleSource(params: {
       if (signal.aborted) dispose();
       try {
         check();
-        const passes = resolveVideoCompositionRenderPasses(project, time);
-        const needed = new Set(
-          [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)].flatMap((frame) =>
-            frame.visualLayers
-              .filter((layer) => layer.kind === 'video')
-              .map((layer) => layer.clipId)
-          )
-        );
-        for (const clip of project.clips) {
-          if (
-            clip.type !== 'VIDEO' ||
-            !needed.has(clip.id) ||
-            !isClipActiveAtTime(clip, time) ||
-            !hasCameraMediaAt(project, clip, time)
-          )
-            continue;
-          const url = params.sourceUrl(clip);
-          if (!url) throw new Error('Cut source media is unavailable.');
-          const sink = await open(url);
-          check();
-          const offset = clip.cameraTiming?.offsetSeconds ?? 0;
-          const range = {
-            start: clip.sourceStart - offset,
-            end: clip.sourceStart + clip.sourceDuration - offset,
-          };
-          const sample = await readRetainedTransitionSample(
-            sink,
-            range,
-            getVideoClipSourceTime(clip, time),
-            clip.playbackWindow?.holdAt !== undefined &&
-              getClipPlaybackOffset(clip, time) >= clip.playbackWindow.holdAt
-              ? 'last'
-              : fallback,
-            check
-          );
-          if (!sample) throw new Error('Cut source has no retained video frame.');
-          owned.push(sample);
-          check();
-          media.set(clip.id, {
-            sourceWidth: sample.displayWidth,
-            sourceHeight: sample.displayHeight,
-            orientation: { rotation: sample.rotation, flip: sample.flip },
-            toVideoFrame: () => sample.toVideoFrame(),
-            draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
-          });
+        const selected = contexts ?? [resolveNominalCutContext(project, time)];
+        for (const context of selected) {
+          for (const layer of videoLayers([
+            ...context.frame.visualLayers,
+            ...context.frame.effectInputLayers,
+          ])) {
+            const clip = layer.clip;
+            const key = keyFor(clip, context.time);
+            if (bindings.has(key)) continue;
+            const url = params.sourceUrl(clip);
+            if (!url) throw new Error('Cut source media is unavailable.');
+            const sink = await open(url);
+            check();
+            const offset = clip.cameraTiming?.offsetSeconds ?? 0;
+            const range = {
+              start: clip.sourceStart - offset,
+              end: clip.sourceStart + clip.sourceDuration - offset,
+            };
+            const target = getVideoClipSourceTime(clip, context.time);
+            const endpoint =
+              clip.playbackWindow?.holdAt !== undefined &&
+              getClipPlaybackOffset(clip, context.time) >= clip.playbackWindow.holdAt
+                ? 'last'
+                : fallback;
+            const sample = await readRetainedTransitionSample(sink, range, target, endpoint, check);
+            if (!sample) throw new Error('Cut source has no retained video frame.');
+            owned.push(sample);
+            check();
+            bindings.set(key, {
+              target,
+              timestamp: sample.timestamp,
+              url,
+              endpoint,
+              source: {
+                sourceWidth: sample.displayWidth,
+                sourceHeight: sample.displayHeight,
+                orientation: { rotation: sample.rotation, flip: sample.flip },
+                toVideoFrame: () => sample.toVideoFrame(),
+                draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
+              },
+            });
+          }
         }
-        return { media, release };
+        const nominal = selected[0];
+        const media = nominal
+          ? forFrame(nominal.frame, nominal.time)
+          : new Map<string, VideoCompositionFrameSource>();
+        return { media, bindings, forFrame, release };
       } catch (error) {
         release();
         throw error;

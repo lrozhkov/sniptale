@@ -134,7 +134,7 @@ it('refuses unsafe source-only GPU overlap while a safe prior output is submitte
   };
   const sourceFrames = {
     nominal: new Map([[f.passes.overlayFrame.visualLayers[0]!.clipId, source]]),
-    intervals: new Map(),
+    bindings: new Map(),
     media: () => new Map(),
     release: vi.fn(),
   };
@@ -197,7 +197,7 @@ it('selects different video source poses for actual exposure passes on the GPU g
       gpuIsolated: true,
       sourceFrames: {
         nominal: frames.get(passes.overlayFrame)!,
-        intervals: new Map(),
+        bindings: new Map(),
         media: (frame: Pick<typeof passes.overlayFrame, 'visualLayers'>) => {
           const media = frames.get(frame);
           if (!media) throw new Error('Missing frame');

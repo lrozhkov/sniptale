@@ -132,7 +132,9 @@ export function prepareNativePreviewSceneFrame(
   input: PreviewSceneRenderInput
 ): Promise<PreviewScenePreparedFrame | undefined> | undefined {
   if (
-    (input.previewRenderer === 'legacy' && !input.sourceRuntime?.selected) ||
+    (input.previewRenderer === 'legacy' &&
+      !input.sourceRuntime?.selected &&
+      !input.prepareSourceFrames) ||
     typeof VideoFrame === 'undefined'
   )
     return undefined;
@@ -147,7 +149,8 @@ export function prepareNativePreviewSceneFrame(
   const frames = [passes.overlayFrame, ...passes.visualPasses.map((pass) => pass.frame)];
   const gpuIsolated =
     input.previewRenderer !== 'legacy' && canPrepareEffectRuntimeGpuComposition(frames);
-  if (!gpuIsolated && !input.sourceRuntime?.selected) return undefined;
+  if (!gpuIsolated && !input.sourceRuntime?.selected && !input.prepareSourceFrames)
+    return undefined;
   const hasPlans = frames.some((frame) => (frame.effectRuntimePlans ?? []).length > 0);
   const executor =
     hasPlans && input.previewRenderer !== 'legacy'
@@ -155,22 +158,29 @@ export function prepareNativePreviewSceneFrame(
         ? input.effectRuntimeExecutor()
         : input.effectRuntimeExecutor
       : undefined;
-  if (hasPlans && !executor?.prepareGpuFrame && !input.sourceRuntime?.selected) return undefined;
+  if (
+    hasPlans &&
+    !executor?.prepareGpuFrame &&
+    !input.sourceRuntime?.selected &&
+    !input.prepareSourceFrames
+  )
+    return undefined;
   const rasterScale = resolvePreviewEffectRuntimeRasterScale({
     canvas: input.canvas,
     ...(input.previewRasterSize ? { previewRasterSize: input.previewRasterSize } : {}),
     project: input.project,
     stage: input.stage,
   });
-  const immediate = input.sourceRuntime?.selected
-    ? undefined
-    : captureNativePreviewSources(input, passes);
-  if (!input.sourceRuntime?.selected && !immediate) return undefined;
+  const managed = Boolean(input.sourceRuntime?.selected || input.prepareSourceFrames);
+  const immediate = managed ? undefined : captureNativePreviewSources(input, passes);
+  if (!managed && !immediate) return undefined;
   return (async () => {
-    const sourceFrames = input.sourceRuntime?.selected
-      ? await preparePreviewSourceFrames(input, passes)
-      : undefined;
-    if (input.sourceRuntime?.selected && !sourceFrames) return undefined;
+    const sourceFrames = input.prepareSourceFrames
+      ? await input.prepareSourceFrames(passes)
+      : input.sourceRuntime?.selected
+        ? await preparePreviewSourceFrames(input, passes)
+        : undefined;
+    if (managed && !sourceFrames) return undefined;
     if (sourceFrames)
       input = {
         ...input,

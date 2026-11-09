@@ -51,7 +51,7 @@ function prepared(input: PreviewSceneRenderInput, isolated: boolean) {
       gpuIsolated: isolated,
       sourceFrames: {
         nominal: new Map(),
-        intervals: new Map(),
+        bindings: new Map(),
         media: () => new Map(),
         release: vi.fn(),
       },

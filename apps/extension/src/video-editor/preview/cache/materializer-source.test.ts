@@ -304,3 +304,38 @@ it('retains one provider and actual asset bindings across supported composition 
   }
   expect(f.provider.dispose).toHaveBeenCalledOnce();
 });
+
+it.each(['gpu', 'legacy'] as const)(
+  'uses shared ordinary source preparation for a %s playback window',
+  async (renderer) => {
+    const f = fixture(renderer);
+    const clip = f.project.clips[0]!;
+    if (clip.type !== 'VIDEO') throw new Error('Expected video');
+    clip.playbackWindow = { offset: 0 };
+    try {
+      await f.owner.renderFrameWithPresentation(1.26, new AbortController().signal);
+      expect(f.provider.acquire).toHaveBeenCalledOnce();
+      expect(io.render.mock.lastCall![0].preparedFrame?.sourceFrames).toBeDefined();
+      expect(f.release).toHaveBeenCalledOnce();
+    } finally {
+      f.owner.dispose();
+    }
+  }
+);
+
+it('does not replace a real ordinary playback-window source failure with a retained endpoint', async () => {
+  const f = fixture();
+  const clip = f.project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.playbackWindow = { offset: 0 };
+  const failure = new Error('ordinary leading gap is too large');
+  vi.mocked(f.provider.acquire).mockRejectedValueOnce(failure);
+  try {
+    await expect(f.owner.renderFrameWithPresentation(0, new AbortController().signal)).rejects.toBe(
+      failure
+    );
+    expect(io.render).not.toHaveBeenCalled();
+  } finally {
+    f.owner.dispose();
+  }
+});

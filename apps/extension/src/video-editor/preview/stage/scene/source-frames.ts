@@ -1,3 +1,4 @@
+import { getClipPlaybackOffset } from '../../../../features/video/project/timeline/rate';
 import type { PreviewSourceDemand } from '../../../../workflows/video/preview-source';
 import type {
   VideoCompositionFrame,
@@ -6,7 +7,6 @@ import type {
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import { getVideoClipSourceTime } from '../../../../features/video/project/timeline';
 import type { PreviewSceneRenderInput } from './types';
-import type { PreparedPreviewSourceLease } from '../../../../workflows/video/preview-html-source';
 import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 
 type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;
@@ -14,7 +14,14 @@ type VideoLayer = Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
 /** Exact source bindings belong to this resolved composition, never presentation metadata. */
 export interface PreviewSceneSourceFrames {
   readonly nominal: ReadonlyMap<string, VideoCompositionFrameSource>;
-  readonly intervals: PreparedPreviewSourceLease['bindings'];
+  readonly bindings: ReadonlyMap<
+    string,
+    {
+      readonly source: VideoCompositionFrameSource;
+      readonly target: number;
+      readonly timestamp: number;
+    }
+  >;
   media(
     frame: Pick<VideoCompositionFrame, 'visualLayers'>,
     time: number,
@@ -60,12 +67,19 @@ export async function preparePreviewSourceFrames(
       const id = String(demands.length);
       frameKeys.set(key, id);
       const offset = layer.clip.cameraTiming?.offsetSeconds ?? 0;
+      const sourceTime = getVideoClipSourceTime(layer.clip, time);
+      const rangeEnd = layer.clip.sourceStart + layer.clip.sourceDuration - offset;
+      const retainedEnd =
+        layer.clip.playbackWindow?.holdAt !== undefined &&
+        getClipPlaybackOffset(layer.clip, time) >= layer.clip.playbackWindow.holdAt &&
+        sourceTime === rangeEnd;
       demands.push({
         id,
         url,
-        time: getVideoClipSourceTime(layer.clip, time),
+        time: sourceTime,
         rangeStart: layer.clip.sourceStart - offset,
-        rangeEnd: layer.clip.sourceStart + layer.clip.sourceDuration - offset,
+        rangeEnd,
+        ...(retainedEnd ? { endpoint: 'retained-end' as const } : {}),
       });
     }
   }
@@ -91,7 +105,7 @@ export async function preparePreviewSourceFrames(
     input.signal?.throwIfAborted();
     return {
       nominal: media(passes.overlayFrame, input.currentTime),
-      intervals: lease.bindings,
+      bindings: lease.bindings,
       media,
       release: lease.release,
     };

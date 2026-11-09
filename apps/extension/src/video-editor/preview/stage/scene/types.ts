@@ -116,6 +116,10 @@ export type PreviewSceneRenderInput = {
   };
   /** Borrowed preparation; its caller releases it after render completion. */
   preparedFrame?: PreviewSceneFramePlan;
+  /** The materializer prepares explicit endpoint sources from these resolved, hydrated poses. */
+  prepareSourceFrames?: (
+    passes: ReturnType<typeof resolveVideoCompositionRenderPasses>
+  ) => Promise<PreviewSceneSourceFrames>;
   /** Final GPU work was submitted; publication and source release still await completion. */
   onGpuSubmitted?: () => void;
   /** Transient scheduler notification; never retained in presentation/cache metadata. */

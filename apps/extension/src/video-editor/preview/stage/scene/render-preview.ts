@@ -751,7 +751,7 @@ function capturePreviewSourcesIfNeeded(
   const prepared = input.preparedFrame;
   if (!prepared?.sourceFrames) return capturePreviewSceneVideos(media, videos, input.signal);
   const exact = prepared.sourceFrames;
-  if (!exact.intervals.size) return undefined;
+  if (!exact.bindings.size) return undefined;
   const signal = input.signal ?? new AbortController().signal;
   const owned: VideoSample[] = [];
   const converted = new Map<VideoCompositionFrameSource, VideoCompositionFrameSource>();
@@ -766,7 +766,7 @@ function capturePreviewSourcesIfNeeded(
     return result;
   };
   const ready = (async () => {
-    for (const { source } of exact.intervals.values()) {
+    for (const { source } of exact.bindings.values()) {
       if (converted.has(source)) continue;
       if (!source.toVideoFrame) throw new Error('Exact Canvas source frame is unavailable.');
       const sample = await prepareDecodedVideoSample(
