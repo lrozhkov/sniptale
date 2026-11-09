@@ -185,8 +185,8 @@ export class ReviewSessionDocumentController {
         nextAnnotationId: Math.max(next, existing.nextAnnotationId),
         nextCreationOrder: Math.max(next, existing.nextCreationOrder),
         nextMarkerNumber: Math.max(
-          next,
-          ...records.map((record) => (record.markerNumber ?? 0) + 1)
+          existing.nextMarkerNumber,
+          ...this.document.entries.map((entry) => (entry.record.markerNumber ?? 0) + 1)
         ),
       },
     };

@@ -138,14 +138,13 @@ class ReviewSessionRuntimeOwner {
     };
     this.listeners.forEach((listener) => listener());
   }
-  private restorePage() {
+  private restorePage(resetMarkers = false) {
     this.applying = true;
     try {
       this.currentPage = this.ports.pageUrl();
-      const { snapshot, records } = this.controller.projectPage(
-        this.currentPage,
-        this.ports.annotations.captureSnapshot()
-      );
+      const existing = this.ports.annotations.captureSnapshot();
+      if (resetMarkers) existing.nextMarkerNumber = 1;
+      const { snapshot, records } = this.controller.projectPage(this.currentPage, existing);
       this.ports.annotations.resetForDocument();
       this.ports.annotations.applySnapshot(snapshot);
       this.ports.annotations.rebindTargets(this.ports.resolve);
@@ -345,7 +344,7 @@ class ReviewSessionRuntimeOwner {
       this.controller.clear();
       this.publish();
       await this.persistence.persist('clear');
-      this.restorePage();
+      this.restorePage(true);
     } catch (error) {
       this.controller.document = before;
       this.restorePage();

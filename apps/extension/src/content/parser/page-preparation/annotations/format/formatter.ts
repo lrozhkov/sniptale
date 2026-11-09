@@ -301,7 +301,7 @@ function formatPropertyChanges(changes: readonly BrowserAnnotationPropertyChange
 
 function formatDomHeading(record: BrowserDomAnnotationRecord): string {
   if (record.comment || record.designReview?.action || record.propertyChanges.length > 0) {
-    return `## Design review feedback ${record.creationOrder}`;
+    return `## Design review feedback ${record.markerNumber ?? record.creationOrder}`;
   }
   return record.propertyChanges.length > 0 || record.textChange || record.textMarkers?.length
     ? `## Requested annotation ${record.creationOrder}`

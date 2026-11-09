@@ -1,9 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { translate } from '../../../../platform/i18n';
 import { disableNavigationLock, enableNavigationLock } from '../../../selection/locker';
+import {
+  getDesignReviewModeState,
+  subscribeToDesignReviewMode,
+  type DesignReviewTool,
+} from '../../../selection/design-review';
+
+function getDesignReviewTool(): DesignReviewTool {
+  return getDesignReviewModeState().tool;
+}
 
 export function resolveToolbarNavigationLockMode(params: {
   designReviewMode: boolean;
+  designReviewTool?: DesignReviewTool;
   drawingMode: boolean;
   highlighterMode: boolean;
   quickEditMode: boolean;
@@ -19,7 +29,11 @@ export function resolveToolbarNavigationLockMode(params: {
     return null;
   }
 
-  if (params.designReviewMode || params.highlighterMode || params.quickEditMode) {
+  if (params.designReviewMode) {
+    return params.designReviewTool === 'navigate' ? null : false;
+  }
+
+  if (params.highlighterMode || params.quickEditMode) {
     return false;
   }
 
@@ -60,8 +74,14 @@ export function useToolbarManagedNavigationEffect(params: {
     screenshotMode,
     setNavigationLockEnabled,
   } = params;
+  const designReviewTool = useSyncExternalStore(
+    subscribeToDesignReviewMode,
+    getDesignReviewTool,
+    getDesignReviewTool
+  );
   const nextLockMode = resolveToolbarNavigationLockMode({
     designReviewMode,
+    designReviewTool,
     drawingMode,
     highlighterMode,
     isCursorMode,

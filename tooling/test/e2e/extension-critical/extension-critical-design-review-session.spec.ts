@@ -214,6 +214,39 @@ async function proveResumedReview(page: Page, info: TestInfo): Promise<void> {
   });
 }
 
+async function proveClearRestartsMarkers(
+  page: Page,
+  hostOrigin: string,
+  info: TestInfo
+): Promise<void> {
+  await page.goto(`${hostOrigin}/`);
+  const panel = page.locator('[data-ui="content.design-review.feedback-panel"]');
+  const rows = panel.locator('[data-ui="content.design-review.feedback-item"]');
+  await expect(rows).toHaveCount(2);
+  const clearName = /Clear all feedback|Удалить все отзывы/u;
+  await panel.getByRole('button', { name: clearName }).click();
+  const confirmation = page.getByRole('alertdialog');
+  await confirmation.getByRole('button', { name: clearName }).click();
+  await expect(confirmation).toBeHidden();
+  await expect(rows).toHaveCount(0);
+  await addComment(page, '#review-a-target', 'First feedback after Clear');
+  const marker = page.locator('[data-ui="content.annotation-marker-button"]');
+  await expect(marker).toHaveCount(1);
+  await expect(marker).toHaveAttribute('aria-label', /(?:Feedback|Замечание|Отзыв) 1:/u);
+  await page.locator('[data-ui="content.toolbar.annotation-export-button"]').click();
+  await page.locator('[data-ui="content.toolbar.annotation-export.copy"]').click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toContain('First feedback after Clear');
+  const report = await page.evaluate(() => navigator.clipboard.readText());
+  expect(report).toContain('## Design review feedback 1');
+  expect(report).toContain('Feedback marker: 1');
+  await page.reload();
+  await expect(rows).toHaveCount(1);
+  await expect(marker).toHaveAttribute('aria-label', /(?:Feedback|Замечание|Отзыв) 1:/u);
+  await page.screenshot({ path: info.outputPath('clear-restarts-markers.png'), fullPage: false });
+}
+
 async function captureSessionFailure(args: {
   page: Page;
   popup: Page;
@@ -393,6 +426,19 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(panel).toContainText(COMMENT_A);
       await expect(panel).toContainText(COMMENT_B);
 
+      // A selected tool is insufficient proof: the restored page must accept native link clicks.
+      await Promise.all([
+        page.waitForURL(`${hostOrigin}/`, { timeout: 10000 }),
+        page.locator('#review-next').click({ timeout: 10000 }),
+      ]);
+      await expect(navigate).toHaveAttribute('aria-pressed', 'true');
+      await Promise.all([
+        page.waitForURL(`${hostOrigin}/review-b`, { timeout: 10000 }),
+        page.locator('#review-next').click({ timeout: 10000 }),
+      ]);
+      await expect(navigate).toHaveAttribute('aria-pressed', 'true');
+      await expect(rows).toHaveCount(2);
+
       await page.locator('#review-b-target').evaluate((element) => element.remove());
       const missing = rows.filter({ hasText: COMMENT_B });
       await missing.getByRole('button').first().click();
@@ -459,6 +505,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         resumedPopup = reopened.popup;
         await proveResumedReview(resumedPage, info);
       }
+      await proveClearRestartsMarkers(resumedPage ?? page, hostOrigin, info);
     } catch (error) {
       await captureSessionFailure({
         page: resumedPage ?? page,

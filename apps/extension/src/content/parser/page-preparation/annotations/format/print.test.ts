@@ -239,3 +239,36 @@ it('groups multiple source pages and preserves saved preview keys and sequential
   expect(pages[1]?.textContent).toContain('Saved note 2');
   expect(pages[1]?.textContent).toContain('https://example.test/two');
 });
+
+it('uses the visible feedback marker rather than renumbering retained PDF items', () => {
+  const snapshot: BrowserAnnotationSessionSnapshot = {
+    schemaVersion: 1,
+    nextAnnotationId: 2,
+    nextCreationOrder: 2,
+    nextMarkerNumber: 20,
+    frameOrders: [],
+    domRecords: [
+      {
+        annotationId: 1,
+        creationOrder: 1,
+        markerNumber: 19,
+        comment: 'Retained feedback',
+        propertyChanges: [],
+        evidence: {
+          fileLabel: 'Review',
+          frame: { kind: 'top-document' },
+          locator: '#target',
+          nodePosition: { x: 0, y: 0 },
+          pageUrl: 'https://example.test/',
+          targetPath: 'button',
+          targetSelector: '#target',
+          targetText: 'Target',
+          viewport: { width: 1280, height: 560 },
+        },
+      },
+    ],
+  };
+  const doc = document.implementation.createHTMLDocument();
+  renderReviewPrintReport(doc, snapshot, 'Review');
+  expect(doc.querySelector('.item-number')?.textContent).toBe('19.');
+});

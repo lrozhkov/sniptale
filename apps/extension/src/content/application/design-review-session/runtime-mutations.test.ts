@@ -267,3 +267,83 @@ it('preserves undone unavailable feedback when an annotation changes before ackn
   expect(annotations.captureSnapshot().domRecords).toEqual([ctx.initial.entries[0]!.record]);
   expect(JSON.parse(ctx.saved()).entries.map((entry: { id: string }) => entry.id)).toEqual([lease]);
 });
+
+it('restarts markers after acknowledged Clear without reusing annotation identities', async () => {
+  const ctx = setup();
+  const annotations = createBrowserAnnotationSession();
+  const target = document.createElement('button');
+  const next = document.createElement('button');
+  ctx.initial.entries[0]!.record.markerNumber = 19;
+  ctx.ports.request.mockImplementationOnce(async (request) => ({
+    ...ctx.ready(request),
+    payload: JSON.stringify(ctx.initial),
+  }));
+  annotations.applySnapshot({
+    ...annotationSnapshot(),
+    nextAnnotationId: 200,
+    nextCreationOrder: 200,
+  });
+  const runtime = createReviewSessionRuntime({
+    ...ctx.ports,
+    annotations,
+    resolve: () => target,
+    clearTargets: async () => {
+      annotations.clearDesignReview(target);
+    },
+  });
+  try {
+    await runtime.open();
+    await runtime.clear();
+    expect(annotations.captureSnapshot().nextMarkerNumber).toBe(1);
+    expect(annotations.captureSnapshot().nextAnnotationId).toBe(200);
+    annotations.setComment({ target, evidence: record().evidence, comment: 'First after Clear' });
+    expect(annotations.captureSnapshot().domRecords[0]?.markerNumber).toBe(1);
+    annotations.setComment({
+      target: next,
+      evidence: { ...record().evidence, targetSelector: '#next' },
+      comment: 'Second',
+    });
+    expect(annotations.captureSnapshot().domRecords.map((item) => item.markerNumber)).toEqual([
+      1, 2,
+    ]);
+    runtime.changed();
+    await runtime.flush();
+    expect(runtime.exportSnapshot().snapshot.domRecords.map((item) => item.markerNumber)).toEqual([
+      1, 2,
+    ]);
+    runtime.navigatePage();
+    expect(annotations.captureSnapshot().nextMarkerNumber).toBe(3);
+  } finally {
+    runtime.dispose();
+  }
+});
+
+it('preserves marker allocation after failed Clear and resets only after successful retry', async () => {
+  const ctx = setup();
+  const annotations = createBrowserAnnotationSession();
+  const target = document.createElement('button');
+  ctx.initial.entries[0]!.record.markerNumber = 19;
+  ctx.ports.request.mockImplementationOnce(async (request) => ({
+    ...ctx.ready(request),
+    payload: JSON.stringify(ctx.initial),
+  }));
+  const runtime = createReviewSessionRuntime({
+    ...ctx.ports,
+    annotations,
+    resolve: () => target,
+    clearTargets: async () => {
+      annotations.clearDesignReview(target);
+    },
+  });
+  try {
+    await runtime.open();
+    ctx.ports.request.mockRejectedValueOnce(new Error('Storage refused'));
+    await expect(runtime.clear()).rejects.toThrow('Storage refused');
+    expect(annotations.captureSnapshot().domRecords[0]?.markerNumber).toBe(19);
+    expect(annotations.captureSnapshot().nextMarkerNumber).toBe(20);
+    await runtime.clear();
+    expect(annotations.captureSnapshot().nextMarkerNumber).toBe(1);
+  } finally {
+    runtime.dispose();
+  }
+});

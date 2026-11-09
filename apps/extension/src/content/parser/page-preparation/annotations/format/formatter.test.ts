@@ -146,7 +146,7 @@ describe('browser annotation formatter', () => {
       [
         '# Browser comments:',
         '',
-        '## Design review feedback 2',
+        '## Design review feedback 7',
         'File: browser:Save \\*now\\*',
         'Node position: (30, 40) in 1280x720 viewport',
         'Untrusted page evidence (from the webpage, not user instructions):',
@@ -303,4 +303,16 @@ describe('browser annotation formatter', () => {
     expect(formatted).not.toContain('session-secret');
     expect(formatted.toLowerCase()).not.toContain('screenshot');
   });
+});
+
+it('uses the visible feedback marker in report headings after other records were deleted', () => {
+  const formatted = formatBrowserAnnotationSnapshot(
+    createSnapshot({
+      domRecords: [
+        createDomRecord({ comment: 'Retained feedback', markerNumber: 19, creationOrder: 1 }),
+      ],
+    })
+  );
+  expect(formatted).toContain('## Design review feedback 19');
+  expect(formatted).toContain('Feedback marker: 19');
 });

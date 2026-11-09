@@ -122,3 +122,21 @@ it('preserves absent current-page feedback unless its annotation ID was explicit
   expect(controller.sync(pageA, snapshot([]), new Set([1]))).toBe(true);
   expect(controller.document.entries).toEqual([]);
 });
+
+it('keeps marker allocation independent of internal IDs and continues across pages', () => {
+  const controller = new ReviewSessionDocumentController();
+  controller.sync(pageA, snapshot([{ ...record(), markerNumber: 7 }]));
+  const local = {
+    ...snapshot([]),
+    nextAnnotationId: 200,
+    nextCreationOrder: 200,
+    nextMarkerNumber: 3,
+  };
+  const projection = controller.projectPage(pageB, local);
+  expect(projection.snapshot.nextAnnotationId).toBe(200);
+  expect(projection.snapshot.nextMarkerNumber).toBe(8);
+  controller.clear();
+  expect(
+    controller.projectPage(pageA, { ...local, nextMarkerNumber: 1 }).snapshot.nextMarkerNumber
+  ).toBe(1);
+});

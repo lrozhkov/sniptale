@@ -158,7 +158,7 @@ function renderReportRecord(
   section.dataset['annotationId'] = String(record.annotationId);
   const heading = node('h2');
   heading.append(
-    node('span', `${index + 1}.`, 'item-number'),
+    node('span', `${record.markerNumber ?? index + 1}.`, 'item-number'),
     node('span', record.evidence.targetText.slice(0, 100) || record.evidence.targetSelector)
   );
   section.append(heading);
