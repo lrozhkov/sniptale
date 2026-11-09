@@ -237,6 +237,8 @@ it.each([
     });
     expect(selected).toHaveProperty(request.time === 0.5 ? 'heldAtRetainedEnd' : 'heldAtEnd', true);
     expect(selected).not.toHaveProperty('nextTimestamp');
+    if (request.time !== 0.5) expect(selected).toHaveProperty('heldSourceEnd', 2);
+    else expect(selected).not.toHaveProperty('heldSourceEnd');
     expect(video.currentTime).toBe(selected.timestamp);
     expect(metadata.floor).toHaveBeenLastCalledWith(request.time === 0.5 ? 0.499 : 1.999, {
       metadataOnly: true,

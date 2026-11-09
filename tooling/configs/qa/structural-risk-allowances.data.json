@@ -6429,12 +6429,12 @@
       "rule": "structural-function-risk",
       "file": "apps/extension/src/gallery/video-review/webcam-crop-paint.ts",
       "symbol": "createWebcamCropPaintOwner",
-      "owner": "extension:gallery",
-      "astHash": "823c2912eff78cc3e56b578dc65d76b5145085b80de863ec800e03e03f007d2e",
-      "signatureHash": "c2ee7afc5f688908156be1acb358a72de45d0f73ba63e72ff8931d18cb48e9e6",
-      "reviewDate": "2026-11-08",
-      "reason": "tool-noise: One mounted camera queue owns source acquisition, replacement, rendering and cleanup. The shared provider owns physical selection and budgets. The renderer owns GPU clones and output holds. The presenter owns visible publication. The queue retains borrowed frames through awaited completion. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, asset, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+      "owner": "extension:gallery:video-review",
+      "astHash": "fc338fb1f317573ca1076e44484bc2129a19ab4554ef540582fae8246498fbe2",
+      "signatureHash": "4a3f42c379e255f198835c7c31afa31f3418143bc26a39f80c8ba2ccc9e94687",
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One source request owns acquisition, cancellation, backend rendering, publication and retirement. Compatibility adds an acquisition branch in that lifetime. Source policy and GPU presentation retain their existing owners. Independent diagnosis found no separate mutable authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, publication, recovery or lifecycle authority. Reassess an unrelated product workflow or independently configured fixture. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-function-risk",
@@ -6606,11 +6606,11 @@
       "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-webcam-gpu.spec.ts",
       "symbol": "<file>",
       "owner": "tooling:test:e2e",
-      "astHash": "08d90f9616898463330bf46b718c985b7afa82859ff87587a3d1f237bc7de413",
-      "signatureHash": "05d9fada7b14622cd2e2d39b182bf1763d9af182cd366554f2b82eaea02b5e67",
+      "astHash": "2aa4f755e53d11e13a9370c0432ce28ca339f5df482d99efab9451cbd2422afe",
+      "signatureHash": "c64b17cd48c415c7817ce25cde2c5a041e427b964bf5b2d487dbd9912023e988",
       "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One workflow tests Gallery camera acquisition and presentation. The compatibility case reuses existing settings, source references and rectangle readback. Browser, server and observer effects belong to this fixture. Independent diagnosis found no production clock or decoder authority. Fresh architecture review must assess this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess another workflow or independently configured fixture. Remove when the analyzer models this cohesive boundary."
+      "reason": "tool-noise: One Gallery camera acceptance suite tests main and private source presentation. Cases share settings, references, rectangle readback and asset fixtures. Browser and server effects belong to those cases. Independent diagnosis found no unrelated product workflow. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, decoder, publication, recovery or lifecycle authority. Reassess an unrelated product workflow or independently configured fixture. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-file-risk",
@@ -6622,17 +6622,6 @@
       "reviewDate": "2026-11-09",
       "reason": "tool-noise: One camera source lifetime owns asset acquisition, compatible capture, admission and frame leases. Shared color policy remains in its existing workflow owner. Native normalization and rollback stay within the same resource transaction. Independent diagnosis found no responsibility split at the file length threshold. Fresh architecture review must assess this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess a route with an independent lifecycle or consumer contract. Remove when the analyzer models this cohesive boundary."
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/workflows/video/preview-html-source.ts",
-      "symbol": "captureHtmlSource",
-      "owner": "extension:app-core:workflows",
-      "astHash": "651399ab00fd03fdc8d1036adf0d30c4079e0047918807c46301e4e5028fcad9",
-      "signatureHash": "e76d3ba91f007a5cbdb21e20622f7eb74e4d7457fe68d36d0baea69c2cd954c3",
-      "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One sampling transaction owns decoder evidence, native frame admission and resource reservation. Shared resolvers retain source and color policy. Cleanup transfers ownership to one immutable lease. Independent diagnosis confirms unchanged sampling semantics after the approved owner move. Fresh architecture review must assess this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent sampling policy, recovery workflow, persistence effect, transport effect or state authority. Remove when the analyzer models this cohesive boundary."
     }
   ]
 }

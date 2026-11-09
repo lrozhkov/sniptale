@@ -21,6 +21,8 @@ export interface PreviewHtmlSourceBinding {
   readonly target: number;
   readonly sampleTime?: number;
   readonly heldAtEnd?: true;
+  /** Verified physical end, present only for an explicitly held terminal request. */
+  readonly heldSourceEnd?: number;
   readonly heldAtRetainedEnd?: true;
   readonly url: string;
 }
@@ -216,7 +218,9 @@ async function captureHtmlSource(
         target: demand.time,
         url: demand.url,
         ...(selection.sampleTime === undefined ? {} : { sampleTime: selection.sampleTime }),
-        ...(selection.terminalTime === undefined ? {} : { heldAtEnd: true }),
+        ...(selection.terminalTime === undefined
+          ? {}
+          : { heldAtEnd: true, heldSourceEnd: index.end }),
         ...(selection.retainedEnd === undefined ? {} : { heldAtRetainedEnd: true }),
       }),
       release() {

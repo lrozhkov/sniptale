@@ -20,8 +20,23 @@ const sources = vi.hoisted(() => ({
 vi.mock('../../workflows/video/preview-source', () => ({
   createPreviewSourceProvider: sources.create,
 }));
+const compatible = vi.hoisted(() => ({
+  create: vi.fn(),
+  acquire: vi.fn(),
+  retain: vi.fn(),
+  dispose: vi.fn(),
+}));
+vi.mock('../../workflows/video/preview-html-source', () => ({
+  createPreviewHtmlSourceProvider: compatible.create,
+}));
 beforeEach(() => {
   sources.acquire.mockReset().mockResolvedValue(null);
+  compatible.acquire.mockReset();
+  compatible.create.mockReturnValue({
+    acquire: compatible.acquire,
+    retainSources: compatible.retain,
+    dispose: compatible.dispose,
+  });
   sources.create.mockReturnValue({
     acquire: sources.acquire,
     retainSources: sources.retain,
@@ -552,22 +567,32 @@ it('uses accepted display dimensions for crop gestures without HTML dimensions',
   }
 });
 
-it('hands actual unsupported decoding to ready HTML and preserves retry', async () => {
+it('keeps verified compatibility independent of witness errors and preserves real-failure retry', async () => {
   vi.stubGlobal('VideoDecoder', class {});
   vi.stubGlobal('VideoFrame', class {});
   sources.acquire.mockResolvedValue(null);
+  const source = { sourceWidth: 400, sourceHeight: 200, draw: vi.fn(), toVideoFrame: vi.fn() };
+  compatible.acquire.mockResolvedValue({
+    bindings: new Map([
+      [
+        'camera-crop',
+        { membership: 'packet-floor', source, target: 2, timestamp: 1.9, url: 'blob:crop' },
+      ],
+    ]),
+    release: vi.fn(),
+  });
   const f = await mountedCrop();
   try {
-    expect(f.jobs).toHaveLength(0);
-    await f.loaded();
     expect(f.jobs).toHaveLength(1);
-    expect(gpu.render.mock.calls[0]![0]).not.toHaveProperty('source');
+    expect(gpu.render.mock.calls[0]![0].source).toBe(source);
     await act(async () => f.jobs[0]!.complete());
     expect(f.button.disabled).toBe(false);
     act(() => f.video.dispatchEvent(new Event('error')));
+    expect(f.button.disabled).toBe(false);
+    compatible.acquire.mockRejectedValueOnce(new Error('decode failed'));
+    await f.update({ crop: { zoom: 3, panX: 0, panY: 0 } });
     expect(f.button.disabled).toBe(true);
     expect(f.host.textContent).toContain('videoEditor.sidebar.framingPreviewFailed');
-    const source = { sourceWidth: 400, sourceHeight: 200, draw: vi.fn(), toVideoFrame: vi.fn() };
     sources.acquire.mockResolvedValue({
       bindings: new Map([
         [
@@ -585,6 +610,47 @@ it('hands actual unsupported decoding to ready HTML and preserves retry', async 
     expect(gpu.render.mock.calls.at(-1)![0]).toMatchObject({ source });
     await act(async () => f.jobs[1]!.complete());
     expect(f.button.disabled).toBe(false);
+  } finally {
+    f.unmount();
+  }
+});
+
+it('keeps verified compatible EOF editable without inventing ordinary interval coverage', async () => {
+  vi.stubGlobal('VideoDecoder', undefined);
+  vi.stubGlobal('VideoFrame', class {});
+  const source = { sourceWidth: 400, sourceHeight: 200, draw: vi.fn(), toVideoFrame: vi.fn() };
+  compatible.acquire.mockImplementation(async ([request]: { time: number }[]) => ({
+    bindings: new Map([
+      [
+        'camera-crop',
+        {
+          membership: 'packet-floor',
+          source,
+          target: request!.time,
+          timestamp: request!.time >= 10 ? 9.9 : 1.9,
+          ...(request!.time >= 10 ? { heldAtEnd: true, heldSourceEnd: 10 } : {}),
+          url: 'blob:crop',
+        },
+      ],
+    ]),
+    release: vi.fn(),
+  }));
+  const f = await mountedCrop();
+  try {
+    expect(f.jobs).toHaveLength(1);
+    await act(async () => f.jobs[0]!.complete());
+    act(() => f.video.dispatchEvent(new Event('error')));
+    expect(f.button.disabled).toBe(false);
+    await f.update({ time: 11 });
+    expect(f.button.disabled).toBe(true);
+    await act(async () => f.jobs[1]!.complete());
+    expect(f.button.disabled).toBe(false);
+    await f.update({ time: 12 });
+    expect(f.button.disabled).toBe(false);
+    expect(compatible.acquire).toHaveBeenLastCalledWith(
+      [{ id: 'camera-crop', url: 'blob:crop', time: 12, holdSourceEnd: true }],
+      expect.any(AbortSignal)
+    );
   } finally {
     f.unmount();
   }

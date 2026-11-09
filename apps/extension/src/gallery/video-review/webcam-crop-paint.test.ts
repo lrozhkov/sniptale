@@ -24,8 +24,23 @@ const sources = vi.hoisted(() => ({
 vi.mock('../../workflows/video/preview-source', () => ({
   createPreviewSourceProvider: sources.create,
 }));
+const compatible = vi.hoisted(() => ({
+  create: vi.fn(),
+  acquire: vi.fn(),
+  retain: vi.fn(),
+  dispose: vi.fn(),
+}));
+vi.mock('../../workflows/video/preview-html-source', () => ({
+  createPreviewHtmlSourceProvider: compatible.create,
+}));
 beforeEach(() => {
   sources.acquire.mockReset().mockResolvedValue(null);
+  compatible.acquire.mockReset();
+  compatible.create.mockReturnValue({
+    acquire: compatible.acquire,
+    retainSources: compatible.retain,
+    dispose: compatible.dispose,
+  });
   sources.create.mockReturnValue({
     acquire: sources.acquire,
     retainSources: sources.retain,
@@ -405,31 +420,54 @@ function canonicalCamera(f: ReturnType<typeof fixture>) {
   return { input, source, release };
 }
 
-it.each(['cancel', 'time', 'asset', 'attempt', 'unmount', 'reject'] as const)(
-  'keeps the borrowed canonical source through delayed %s settlement',
-  async (mode) => {
-    let current = { assetId: 'project-asset:camera', attempt: 0, time: 0.5, url: 'blob:camera' };
-    const f = fixture(undefined, { readSource: () => current });
-    const c = canonicalCamera(f);
-    current = c.input.source;
-    f.owner.request(c.input);
-    await vi.waitFor(() => expect(f.records).toHaveLength(1));
-    const late = f.output(0, false);
-    if (mode === 'cancel') f.owner.cancel();
-    if (mode === 'time') current = { ...current, time: 2 };
-    if (mode === 'asset') current = { ...current, assetId: 'replacement' };
-    if (mode === 'attempt') current = { ...current, attempt: 1 };
-    if (mode === 'unmount') f.owner.dispose();
-    expect(c.release).not.toHaveBeenCalled();
-    if (mode === 'reject') f.records[0]!.reject(new Error('invalid crop'));
-    else f.records[0]!.resolve(late);
-    await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
-    expect(f.publish).not.toHaveBeenCalled();
-    expect(drawReviewWebcam).not.toHaveBeenCalled();
-    if (mode !== 'reject') expect(late.release).toHaveBeenCalledOnce();
-    else expect(f.fail).toHaveBeenCalledOnce();
-  }
-);
+function compatibleCamera(c: ReturnType<typeof canonicalCamera>) {
+  sources.acquire.mockResolvedValue(null);
+  const lease = {
+    bindings: new Map([
+      [
+        'camera-crop',
+        {
+          membership: 'packet-floor',
+          source: c.source,
+          timestamp: 0.3,
+          target: 0.5,
+          url: 'blob:camera',
+        },
+      ],
+    ]),
+    release: c.release,
+  };
+  compatible.acquire.mockResolvedValue(lease);
+  return lease;
+}
+
+it.each(
+  (['cancel', 'time', 'asset', 'attempt', 'unmount', 'reject'] as const).flatMap((mode) =>
+    (['canonical', 'compatible'] as const).map((route) => ({ mode, route }))
+  )
+)('keeps the borrowed $route source through delayed $mode settlement', async ({ mode, route }) => {
+  let current = { assetId: 'project-asset:camera', attempt: 0, time: 0.5, url: 'blob:camera' };
+  const f = fixture(undefined, { readSource: () => current });
+  const c = canonicalCamera(f);
+  if (route === 'compatible') compatibleCamera(c);
+  current = c.input.source;
+  f.owner.request(c.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(1));
+  const late = f.output(0, false);
+  if (mode === 'cancel') f.owner.cancel();
+  if (mode === 'time') current = { ...current, time: 2 };
+  if (mode === 'asset') current = { ...current, assetId: 'replacement' };
+  if (mode === 'attempt') current = { ...current, attempt: 1 };
+  if (mode === 'unmount') f.owner.dispose();
+  expect(c.release).not.toHaveBeenCalled();
+  if (mode === 'reject') f.records[0]!.reject(new Error('invalid crop'));
+  else f.records[0]!.resolve(late);
+  await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
+  expect(f.publish).not.toHaveBeenCalled();
+  expect(drawReviewWebcam).not.toHaveBeenCalled();
+  if (mode !== 'reject') expect(late.release).toHaveBeenCalledOnce();
+  else expect(f.fail).toHaveBeenCalledOnce();
+});
 
 it('releases a late acquisition without starting an obsolete GPU render', async () => {
   const f = fixture();
@@ -468,6 +506,7 @@ it('retains the accepted front on decode failure and resets the source owner on 
   expect(f.publish).toHaveBeenCalledOnce();
   expect(front.release).not.toHaveBeenCalled();
   expect(drawReviewWebcam).not.toHaveBeenCalled();
+  expect(compatible.acquire).not.toHaveBeenCalled();
   f.owner.reset();
   f.owner.request(c.input);
   await vi.waitFor(() => expect(f.records).toHaveLength(2));
@@ -477,57 +516,123 @@ it('retains the accepted front on decode failure and resets the source owner on 
   await vi.waitFor(() => expect(f.publish).toHaveBeenCalledTimes(2));
 });
 
-it.each(['unavailable', 'device-failed', 'legacy', 'draw-failed'] as const)(
-  'uses the same normalized source for Canvas after %s',
-  async (mode) => {
-    const backend = vi.fn<typeof createGpuPreviewRenderer>(async () => null);
-    if (mode === 'device-failed') backend.mockRejectedValue(new GpuPreviewDeviceError('lost'));
-    const f = fixture(() => createCameraCropGpuRenderer(backend));
-    const c = canonicalCamera(f);
-    class Frame {
-      format = 'RGBA';
-      codedWidth = 400;
-      codedHeight = 800;
-      displayWidth = 400;
-      displayHeight = 800;
-      timestamp = 300000;
-      duration = 400000;
-      visibleRect = { x: 0, y: 0, width: 400, height: 800 };
-      colorSpace = { matrix: 'bt709', primaries: 'bt709', transfer: 'bt709', fullRange: false };
-      close = vi.fn();
-    }
-    vi.stubGlobal('VideoFrame', Frame);
-    const frame = new Frame();
-    c.source.toVideoFrame.mockReturnValue(frame);
-    const normalize = normalization.prepareDecodedVideoSample;
-    const sampleDraw = vi.fn();
-    vi.spyOn(normalization, 'prepareDecodedVideoSample').mockImplementation(
-      async (sample, signal) => {
-        expect(sample.timestamp).toBe(0.3);
-        expect(sample.rotation).toBe(90);
-        expect(sample.flip).toBe(true);
-        expect(sample.colorSpace).toMatchObject(frame.colorSpace);
-        const prepared = await normalize(sample, signal);
-        vi.spyOn(prepared, 'draw').mockImplementation(sampleDraw);
-        return prepared;
-      }
-    );
-    vi.mocked(drawReviewWebcam).mockImplementationOnce(
-      (context, _output, _camera, _placement, size, drawable) => {
-        expect(size).toEqual({ width: 800, height: 400 });
-        drawable.draw(context, 0, 0, 120, 90);
-        if (mode === 'draw-failed') throw new Error('draw failed');
-      }
-    );
-    f.owner.request({ ...c.input, renderer: mode === 'legacy' ? 'legacy' : 'gpu' });
-    await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
-    expect(normalization.prepareDecodedVideoSample).toHaveBeenCalledOnce();
-    expect(sampleDraw).toHaveBeenCalledOnce();
-    expect(frame.close).toHaveBeenCalledOnce();
-    expect(c.source.draw).not.toHaveBeenCalled();
-    if (mode === 'draw-failed') {
-      expect(f.fail).toHaveBeenCalledOnce();
-      expect(f.publish).not.toHaveBeenCalled();
-    } else expect(f.publish).toHaveBeenCalledWith(null, expect.any(Function));
+it.each(
+  (['unavailable', 'device-failed', 'legacy', 'draw-failed'] as const).flatMap((mode) =>
+    (['canonical', 'compatible'] as const).map((route) => ({ mode, route }))
+  )
+)('uses the same normalized $route source for Canvas after $mode', async ({ mode, route }) => {
+  const backend = vi.fn<typeof createGpuPreviewRenderer>(async () => null);
+  if (mode === 'device-failed') backend.mockRejectedValue(new GpuPreviewDeviceError('lost'));
+  const f = fixture(() => createCameraCropGpuRenderer(backend));
+  const c = canonicalCamera(f);
+  class Frame {
+    format = 'RGBA';
+    codedWidth = 400;
+    codedHeight = 800;
+    displayWidth = 400;
+    displayHeight = 800;
+    timestamp = 300000;
+    duration = 400000;
+    visibleRect = { x: 0, y: 0, width: 400, height: 800 };
+    colorSpace = { matrix: 'bt709', primaries: 'bt709', transfer: 'bt709', fullRange: false };
+    close = vi.fn();
   }
-);
+  vi.stubGlobal('VideoFrame', Frame);
+  const frame = new Frame();
+  c.source.toVideoFrame.mockReturnValue(frame);
+  if (route === 'compatible') compatibleCamera(c);
+  const normalize = normalization.prepareDecodedVideoSample;
+  const sampleDraw = vi.fn();
+  vi.spyOn(normalization, 'prepareDecodedVideoSample').mockImplementation(
+    async (sample, signal) => {
+      expect(sample.timestamp).toBe(0.3);
+      expect(sample.rotation).toBe(90);
+      expect(sample.flip).toBe(true);
+      expect(sample.colorSpace).toMatchObject(frame.colorSpace);
+      const prepared = await normalize(sample, signal);
+      vi.spyOn(prepared, 'draw').mockImplementation(sampleDraw);
+      return prepared;
+    }
+  );
+  vi.mocked(drawReviewWebcam).mockImplementationOnce(
+    (context, _output, _camera, _placement, size, drawable) => {
+      expect(size).toEqual({ width: 800, height: 400 });
+      drawable.draw(context, 0, 0, 120, 90);
+      if (mode === 'draw-failed') throw new Error('draw failed');
+    }
+  );
+  f.owner.request({ ...c.input, renderer: mode === 'legacy' ? 'legacy' : 'gpu' });
+  await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
+  expect(normalization.prepareDecodedVideoSample).toHaveBeenCalledOnce();
+  expect(sampleDraw).toHaveBeenCalledOnce();
+  expect(frame.close).toHaveBeenCalledOnce();
+  expect(c.source.draw).not.toHaveBeenCalled();
+  if (mode === 'draw-failed') {
+    expect(f.fail).toHaveBeenCalledOnce();
+    expect(f.publish).not.toHaveBeenCalled();
+  } else expect(f.publish).toHaveBeenCalledWith(null, expect.any(Function));
+});
+
+it('borrows verified HTML pixels without witness readiness, decoder API, clock or error authority', async () => {
+  const accept = vi.fn();
+  const f = fixture(undefined, { accept });
+  const c = canonicalCamera(f);
+  vi.stubGlobal('VideoDecoder', undefined);
+  const lease = {
+    bindings: new Map([
+      [
+        'camera-crop',
+        {
+          membership: 'packet-floor',
+          source: c.source,
+          timestamp: 0.3,
+          target: 0.5,
+          url: 'blob:camera',
+        },
+      ],
+    ]),
+    release: c.release,
+  };
+  compatible.acquire.mockResolvedValueOnce(lease);
+  f.source.readyState = 0;
+  f.source.seeking = true;
+  Object.defineProperty(f.media, 'error', { value: { code: 4 } });
+  f.owner.request(c.input);
+  await vi.waitFor(() => expect(compatible.acquire).toHaveBeenCalledOnce());
+  expect(compatible.acquire).toHaveBeenCalledWith(
+    [{ id: 'camera-crop', url: 'blob:camera', time: 0.5, holdSourceEnd: true }],
+    expect.any(AbortSignal)
+  );
+  expect(f.records[0]!.input.source).toBe(c.source);
+  f.media.currentTime = 99;
+  expect(c.release).not.toHaveBeenCalled();
+  f.output(0);
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledOnce());
+  expect(accept.mock.calls[0]![1]).not.toHaveProperty('nextTimestamp');
+  expect(c.release).toHaveBeenCalledOnce();
+  expect(f.fail).not.toHaveBeenCalled();
+});
+
+it('releases late canceled compatible leases and retries failed acquisition', async () => {
+  const f = fixture();
+  const c = canonicalCamera(f);
+  const lease = compatibleCamera(c);
+  const gate = Promise.withResolvers<typeof lease>();
+  compatible.acquire.mockReturnValueOnce(gate.promise);
+  f.owner.request(c.input);
+  await vi.waitFor(() => expect(compatible.acquire).toHaveBeenCalledOnce());
+  f.owner.cancel();
+  gate.resolve(lease);
+  await vi.waitFor(() => expect(c.release).toHaveBeenCalledOnce());
+  expect(f.records).toHaveLength(0);
+  expect(f.fail).not.toHaveBeenCalled();
+  compatible.acquire.mockRejectedValueOnce(new Error('compatibility failed'));
+  f.owner.request(c.input);
+  await vi.waitFor(() => expect(f.fail).toHaveBeenCalledOnce());
+  f.owner.reset();
+  f.owner.request(c.input);
+  await vi.waitFor(() => expect(f.records).toHaveLength(1));
+  expect(compatible.dispose).toHaveBeenCalledOnce();
+  f.output(0);
+  await vi.waitFor(() => expect(f.publish).toHaveBeenCalledOnce());
+});

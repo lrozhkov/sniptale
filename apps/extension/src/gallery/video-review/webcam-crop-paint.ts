@@ -1,9 +1,12 @@
 import { VideoSample } from 'mediabunny';
 import {
   createPreviewSourceProvider,
-  type PreviewSourceLease,
   type PreviewSourceProvider,
 } from '../../workflows/video/preview-source';
+import {
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+} from '../../workflows/video/preview-html-source';
 import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
 import { createCameraCropGpuRenderer } from '../../features/video/composition/canvas/camera-crop-gpu';
 import type {
@@ -39,7 +42,6 @@ export function createWebcamCropPaintOwner(options: {
   fail(): void;
   createRenderer?: typeof createCameraCropGpuRenderer;
   readSource?: () => WebcamCropSourceRequest | null;
-  compatibility?: () => void;
   accept?: (
     input: WebcamCropPaintInput,
     image: {
@@ -48,11 +50,13 @@ export function createWebcamCropPaintOwner(options: {
       timestamp?: number;
       nextTimestamp?: number;
       heldAtEnd?: true;
+      heldSourceEnd?: number;
     }
   ) => void;
 }) {
   let gpu: ReturnType<typeof createCameraCropGpuRenderer> | null = null;
   let provider: PreviewSourceProvider | null = null;
+  let compatible: ReturnType<typeof createPreviewHtmlSourceProvider> | null = null;
   let pending: WebcamCropPaintInput | null = null;
   let controller: AbortController | null = null;
   let running = false,
@@ -86,9 +90,8 @@ export function createWebcamCropPaintOwner(options: {
   const renderFrame = async (input: WebcamCropPaintInput, ticket: number) => {
     const media = options.media,
       target = options.target;
-    const canonical =
-      !!input.source && typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
-    if (!canonical && (media.seeking || media.readyState < 2)) return;
+    const managed = !!input.source && typeof VideoFrame !== 'undefined';
+    if (!managed && (media.seeking || media.readyState < 2)) return;
     controller = new AbortController();
     const signal = controller.signal;
     const time = media.currentTime,
@@ -101,40 +104,46 @@ export function createWebcamCropPaintOwner(options: {
     };
     let output: GpuPreviewOutput | undefined | false;
     let accepted = false;
-    let lease: PreviewSourceLease | null = null;
+    let lease: PreparedPreviewSourceLease | null = null;
     let canvasSample: VideoSample | undefined;
     try {
       if (reset) {
         provider?.dispose();
         provider = null;
+        compatible?.dispose();
+        compatible = null;
       }
       if (reset || input.renderer === 'legacy') {
         gpu?.dispose();
         gpu = null;
         reset = false;
       }
-      if (canonical && input.source) {
-        provider ??= createPreviewSourceProvider();
-        provider.retainSources(new Set([input.source.url]));
-        lease = await provider.acquire(
-          [
-            {
-              id: 'camera-crop',
-              url: input.source.url,
-              time: input.source.time,
-              holdSourceEnd: true,
-            },
-          ],
-          signal,
-          { discontinuity: true }
-        );
+      if (managed && input.source) {
+        const demands = [
+          {
+            id: 'camera-crop',
+            url: input.source.url,
+            time: input.source.time,
+            holdSourceEnd: true as const,
+          },
+        ];
+        if (typeof VideoDecoder !== 'undefined') {
+          provider ??= createPreviewSourceProvider();
+          provider.retainSources(new Set([input.source.url]));
+          lease = await provider.acquire(demands, signal, { discontinuity: true });
+        }
+        if (!lease) {
+          signal.throwIfAborted();
+          compatible ??= createPreviewHtmlSourceProvider();
+          compatible.retainSources(new Set([input.source.url]));
+          lease = await compatible.acquire(demands, signal);
+        }
       }
       if (disposed || signal.aborted || ticket !== version || !acceptsRequest(input)) return;
       const binding = lease?.bindings.get('camera-crop');
       if (lease && !binding) throw new Error('Camera preview source binding is unavailable.');
       const source = binding?.source;
       if (!source) {
-        options.compatibility?.();
         if (media.error) throw new Error('Camera compatibility source is unavailable.');
       }
       if (!source && !acceptsSource(ticket, signal, time, url)) return;
@@ -197,7 +206,10 @@ export function createWebcamCropPaintOwner(options: {
           ...(binding
             ? {
                 timestamp: binding.timestamp,
-                nextTimestamp: binding.nextTimestamp,
+                ...('nextTimestamp' in binding ? { nextTimestamp: binding.nextTimestamp } : {}),
+                ...('heldSourceEnd' in binding && binding.heldSourceEnd !== undefined
+                  ? { heldSourceEnd: binding.heldSourceEnd }
+                  : {}),
                 ...(binding.heldAtEnd ? { heldAtEnd: true as const } : {}),
               }
             : {}),
@@ -253,6 +265,8 @@ export function createWebcamCropPaintOwner(options: {
       gpu = null;
       provider?.dispose();
       provider = null;
+      compatible?.dispose();
+      compatible = null;
     },
   };
 }

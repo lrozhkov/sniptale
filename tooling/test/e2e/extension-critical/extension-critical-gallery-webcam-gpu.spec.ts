@@ -1,9 +1,10 @@
+import { chooseInspectorValue } from '../support/inspector-utilities';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
+import { enableGpuPreviewProof, installCameraFrameObserver } from '../support/gpu-preview-proof';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
@@ -849,6 +850,167 @@ test('Gallery unsupported camera admits actual VFR source in GPU and Standard', 
     );
     await page.screenshot({
       path: info.outputPath('manual-camera-vfr-source.png'),
+      fullPage: false,
+    });
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      host.server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});
+
+test('Gallery declined private camera keeps selected source and EOF in GPU and Standard', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await page.addInitScript(installCameraFrameObserver);
+  await page.addInitScript(() => {
+    VideoDecoder.isConfigSupported = async (config) => ({ supported: false, config });
+  });
+  const host = await startHostServer();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+  const dialog = page.locator('dialog');
+  const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
+  const owner = inspector.locator('[data-ui="gallery.videoReview.webcamCrop"]');
+  const gpu = owner.locator(
+    '[data-ui="gallery.videoReview.webcamCrop.gpuHost"] [data-preview-inspector-canvas]'
+  );
+  const error = (expected: number[][], actual: number[][]) =>
+    Math.max(
+      ...expected.flatMap((color, i) =>
+        color.map((channel, c) => Math.abs(channel - actual[i]![c]!))
+      )
+    );
+  const colors = (canvas: Locator) =>
+    cameraRectangleColors(canvas, { x: 0, y: 0, width: 1, height: 1 });
+  const openCamera = async () => {
+    await dialog.locator('[data-review-header-track="webcam"] [data-review-track-select]').click();
+    await dialog
+      .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
+      .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
+      .click();
+    await expect(inspector).toBeVisible();
+  };
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: {
+        'sniptale-locale-preference': 'en',
+        'sniptale-theme-preference': 'light',
+      },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewWebcamBundle(page, 'review-cut-vfr.webm');
+    await page.reload();
+    await page.getByRole('button', { name: /: Screen$/ }).click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    await dialog
+      .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+      .click();
+    await openCamera();
+    const layout = inspector.getByRole('button', {
+      name: label('gallery.videoReview.webcamLayout'),
+      exact: true,
+    });
+    if (!(await owner.isVisible())) await layout.click();
+    const master = dialog.locator('[data-ui="gallery.videoReview.stage"] video').first();
+    const samples = [];
+    for (const [target, pts] of [
+      [1.02, 0.9],
+      [1.91, 1.8],
+      [8, 5.9],
+    ] as const) {
+      await master.evaluate((video: HTMLVideoElement, time) => {
+        video.currentTime = time;
+      }, target);
+      await expect
+        .poll(() => master.evaluate((video: HTMLVideoElement) => video.paused && !video.seeking))
+        .toBe(true);
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.webcamAddPosition'), exact: true })
+        .click();
+      await expect
+        .poll(async () =>
+          (await currentCameraSettings(page)).positions.some(
+            (point) => Math.abs(point.time - target) < 0.001
+          )
+        )
+        .toBe(true);
+      await expect(gpu).toHaveCount(1);
+      await expect
+        .poll(() =>
+          gpu.evaluate((canvas) => {
+            const read: unknown = Reflect.get(window, 'sniptaleCurrentInspectorFrame');
+            if (typeof read !== 'function')
+              throw new Error('Private camera PTS evidence is unavailable.');
+            const value: unknown = read(canvas);
+            if (value !== null && typeof value !== 'number')
+              throw new Error('Invalid private camera PTS.');
+            return value;
+          })
+        )
+        .toBe(pts * 1e6);
+      const reference = cameraReferenceColors(pts, 'review-cut-vfr.webm');
+      await expect.poll(async () => error(reference, (await colors(gpu)).colors)).toBeLessThan(4);
+      samples.push({ target, expectedPTS: pts, reference, actual: await colors(gpu) });
+    }
+    const camera = await currentCameraSettings(page);
+    const point = camera.positions.find((point) => Math.abs(point.time - 8) < 0.001);
+    if (!point) throw new Error('The selected EOF camera position is unavailable.');
+    const initial = await readWebcamWorkspace(page);
+    const mainTime = await master.evaluate((video: HTMLVideoElement) => video.currentTime);
+    await dialog.locator('[data-ui="gallery.videoReview.previewSettings"]').click();
+    const panel = dialog.locator('[data-ui="gallery.videoReview.previewInspector"]');
+    await panel
+      .getByRole('button', { name: label('editor.scene.previewRenderer'), exact: true })
+      .click();
+    await page
+      .getByRole('option', { name: label('editor.scene.previewRendererLegacy'), exact: true })
+      .click();
+    await panel.press('Escape');
+    await openCamera();
+    if (!(await owner.isVisible())) await layout.click();
+    const index = camera.positions.findIndex((item) => item.id === point.id);
+    await chooseInspectorValue(
+      page,
+      inspector,
+      label('gallery.videoReview.webcamPosition'),
+      `${index + 1} · ${point.time.toFixed(3)} s`
+    );
+    const standard = owner.locator('button > canvas');
+    const reference = cameraReferenceColors(5.9, 'review-cut-vfr.webm');
+    await expect
+      .poll(async () => error(reference, (await colors(standard)).colors))
+      .toBeLessThan(4);
+    expect(await master.evaluate((video: HTMLVideoElement) => video.currentTime)).toBe(mainTime);
+    const final = await readWebcamWorkspace(page);
+    expect(final?.history).toEqual(initial?.history);
+    expect(final?.cursor).toBe(initial?.cursor);
+    expect(await currentCameraSettings(page)).toEqual(camera);
+    expect(errors).toEqual([]);
+    await writeFile(
+      info.outputPath('gallery-private-camera-source.json'),
+      JSON.stringify(
+        {
+          viewport: page.viewportSize(),
+          sourceRaster: { width: 160, height: 90 },
+          samples,
+          standard: await colors(standard),
+          mainTime,
+          errors,
+          limit:
+            'Frame available. Forced refusal. Selected positions, EOF and color only. No FPS or all-family claim.',
+        },
+        null,
+        2
+      )
+    );
+    await owner.scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath('gallery-private-camera-source.png'),
       fullPage: false,
     });
   } finally {

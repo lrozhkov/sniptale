@@ -181,8 +181,7 @@ function useWebcamCropFrame(
     canvas = useRef<HTMLCanvasElement>(null),
     gpuHost = useRef<HTMLDivElement>(null);
   const renderer = useContext(ReviewPreviewRendererContext);
-  const canonical = typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
-  const compatibility = useRef(!canonical);
+  const managed = typeof VideoFrame !== 'undefined';
   const [asset, setAsset] = useState<{ assetId: string; attempt: number; url: string } | null>(
     null
   );
@@ -192,6 +191,7 @@ function useWebcamCropFrame(
     height: number;
     nextTimestamp?: number;
     heldAtEnd?: true;
+    heldSourceEnd?: number;
   } | null>(null);
   const [source, setSource] = useState<{ assetId: string; attempt: number; time: number } | null>(
     null
@@ -227,9 +227,6 @@ function useWebcamCropFrame(
       presenter,
       fail: () => setFailed(true),
       readSource: () => latestSource.current,
-      compatibility: () => {
-        compatibility.current = true;
-      },
       accept: (input, image) => {
         if (input.source) setDisplayed({ source: input.source, ...image });
       },
@@ -248,18 +245,17 @@ function useWebcamCropFrame(
     source.attempt === attempt &&
     source.time === time &&
     !failed;
-  const ready = canonical
+  const displayedEnd = displayed?.heldSourceEnd ?? displayed?.nextTimestamp;
+  const ready = managed
     ? !!currentSource &&
       !failed &&
       displayed?.source.assetId === currentSource.assetId &&
       displayed.source.attempt === currentSource.attempt &&
       displayed.source.url === currentSource.url &&
       (displayed.source.time === time ||
-        (displayed.heldAtEnd === true &&
-          displayed.nextTimestamp !== undefined &&
-          time >= displayed.nextTimestamp))
+        (displayed.heldAtEnd === true && displayedEnd !== undefined && time >= displayedEnd))
     : htmlReady;
-  const paintReady = canonical ? !!currentSource && !failed : htmlReady;
+  const paintReady = managed ? !!currentSource && !failed : htmlReady;
   useEffect(() => {
     const media = video.current!;
     let disposed = false,
@@ -267,7 +263,6 @@ function useWebcamCropFrame(
     paint.current?.cancel();
     setSource(null);
     setAsset(null);
-    compatibility.current = !canonical;
     setFailed(false);
     const seek = () => {
       media.currentTime = Number.isFinite(media.duration)
@@ -275,6 +270,7 @@ function useWebcamCropFrame(
         : latestTime.current;
     };
     const loaded = () => {
+      if (managed) return;
       if (
         disposed ||
         !url ||
@@ -296,7 +292,7 @@ function useWebcamCropFrame(
       }
     };
     const mediaError = () => {
-      if (compatibility.current) error();
+      if (!managed) error();
     };
     media.addEventListener('loadedmetadata', seek);
     media.addEventListener('loadeddata', loaded);
@@ -327,7 +323,7 @@ function useWebcamCropFrame(
       media.load();
       if (url) URL.revokeObjectURL(url);
     };
-  }, [props.camera.assetId, attempt, canonical]);
+  }, [props.camera.assetId, attempt, managed]);
   useEffect(() => {
     const media = video.current;
     paint.current?.cancel();
@@ -385,7 +381,7 @@ function useWebcamCropFrame(
     canvas,
     gpuHost,
     ready,
-    sourceSize: canonical ? displayed : null,
+    sourceSize: managed ? displayed : null,
     failed,
     retry: () => {
       paint.current?.reset();
