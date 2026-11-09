@@ -67,6 +67,39 @@ export function reviewWindowHeaderUrl(
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
+/** Loads borrowed local artwork. The caller retains image caching and disposal policy. */
+export function loadReviewArtworkImage(
+  url: string,
+  signal: AbortSignal,
+  loadErrorMessage: string,
+  checkAbortedAfterStart = false
+): Promise<HTMLImageElement> {
+  const image = new Image();
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const clean = () => {
+      image.onload = null;
+      image.onerror = null;
+      signal.removeEventListener('abort', abort);
+    };
+    const abort = () => {
+      clean();
+      image.src = '';
+      reject(signal.reason);
+    };
+    image.onload = () => {
+      clean();
+      resolve(image);
+    };
+    image.onerror = () => {
+      clean();
+      reject(new Error(loadErrorMessage));
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    image.src = url;
+    if (checkAbortedAfterStart && signal.aborted) abort();
+  });
+}
+
 /** Rasterize the complete SVG once; the caller owns the bitmap and must close it. */
 export async function loadReviewWindowHeader(
   url: string,
@@ -80,29 +113,7 @@ export async function loadReviewWindowHeader(
     ![backing.width, backing.height].every((value) => Number.isSafeInteger(value) && value > 0)
   )
     throw new Error('Invalid window header backing.');
-  const image = new Image();
-  await new Promise<void>((resolve, reject) => {
-    const clean = () => {
-      image.onload = null;
-      image.onerror = null;
-      signal.removeEventListener('abort', abort);
-    };
-    const abort = () => {
-      clean();
-      image.src = '';
-      reject(signal.reason);
-    };
-    image.onload = () => {
-      clean();
-      resolve();
-    };
-    image.onerror = () => {
-      clean();
-      reject(new Error('Window header is unavailable.'));
-    };
-    signal.addEventListener('abort', abort, { once: true });
-    image.src = url;
-  });
+  const image = await loadReviewArtworkImage(url, signal, 'Window header is unavailable.');
   try {
     signal.throwIfAborted();
     // Re-rasterizing nested SVG viewports for each fractional zoom opens antialiased

@@ -52,6 +52,27 @@ export function spatialReviewCommentSpace(
   };
 }
 
+function exposureSampling(
+  sampling: ReviewExportSamplingPaint | undefined,
+  index: number,
+  fallbackDemandId: string | undefined
+): { exportSampling?: ReviewExportSamplingPaint } {
+  if (!sampling) return {};
+  const lensDemandId = sampling.lens
+    ? index
+      ? `${sampling.lens.id}:${index}`
+      : sampling.lens.id
+    : undefined;
+  return {
+    exportSampling: {
+      ...sampling,
+      exposureIndex: index,
+      sourceAbsent: !!sampling.lens && !sampling.lens.demands.some((d) => d.id === lensDemandId),
+      demandId: sampling.lens ? lensDemandId : (sampling.demandId ?? fallbackDemandId),
+    },
+  };
+}
+
 /** Paints one decorated scene, accumulating only camera motion; annotations stay readable. */
 export function drawReviewSceneFrame(
   context: CanvasRenderingContext2D,
@@ -246,28 +267,7 @@ function drawSpatialScene(
           layout: rasterLayout,
           background: fixed,
           planeOnly: true,
-          ...(args.exportSampling
-            ? {
-                exportSampling: {
-                  ...args.exportSampling,
-                  exposureIndex: index,
-                  sourceAbsent:
-                    !!args.exportSampling.lens &&
-                    !args.exportSampling.lens.demands.some(
-                      (d) =>
-                        d.id ===
-                        (index
-                          ? `${args.exportSampling!.lens!.id}:${index}`
-                          : args.exportSampling!.lens!.id)
-                    ),
-                  demandId: args.exportSampling.lens
-                    ? index
-                      ? `${args.exportSampling.lens.id}:${index}`
-                      : args.exportSampling.lens.id
-                    : (args.exportSampling.demandId ?? planExposure?.body.id),
-                },
-              }
-            : {}),
+          ...exposureSampling(args.exportSampling, index, planExposure?.body.id),
         },
         windowRaster
       );
@@ -348,29 +348,11 @@ function drawReviewSceneExposure(
                   camera: pass.camera,
                 }),
               },
-              ...(args.exportSampling
-                ? {
-                    exportSampling: {
-                      ...args.exportSampling,
-                      exposureIndex: index,
-                      sourceAbsent:
-                        !!args.exportSampling.lens &&
-                        !args.exportSampling.lens.demands.some(
-                          (d) =>
-                            d.id ===
-                            (index
-                              ? `${args.exportSampling!.lens!.id}:${index}`
-                              : args.exportSampling!.lens!.id)
-                        ),
-                      demandId: args.exportSampling.lens
-                        ? index
-                          ? `${args.exportSampling.lens.id}:${index}`
-                          : args.exportSampling.lens.id
-                        : (args.exportSampling.demandId ??
-                          args.exportSampling.frame.plan.exposures[index]?.body.id),
-                    },
-                  }
-                : {}),
+              ...exposureSampling(
+                args.exportSampling,
+                index,
+                args.exportSampling?.frame.plan.exposures[index]?.body.id
+              ),
             },
             windowRaster
           )

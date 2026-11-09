@@ -1,3 +1,4 @@
+import { loadReviewArtworkImage } from '../../workflows/video-review/window-header';
 import type {
   RenderCanvasLease,
   RenderResources,
@@ -50,30 +51,12 @@ export function createZoomPreviewGpuArtwork(
   const backgroundImage = async (url: string | null | undefined, signal: AbortSignal) => {
     if (!url) return null;
     if (loadedImage?.url === url) return loadedImage.image;
-    const image = new Image();
-    await new Promise<void>((resolve, reject) => {
-      const clean = () => {
-        image.onload = null;
-        image.onerror = null;
-        signal.removeEventListener('abort', abort);
-      };
-      const abort = () => {
-        clean();
-        image.src = '';
-        reject(signal.reason);
-      };
-      image.onload = () => {
-        clean();
-        resolve();
-      };
-      image.onerror = () => {
-        clean();
-        reject(new Error('Inspector background is unavailable.'));
-      };
-      signal.addEventListener('abort', abort, { once: true });
-      image.src = url;
-      if (signal.aborted) abort();
-    });
+    const image = await loadReviewArtworkImage(
+      url,
+      signal,
+      'Inspector background is unavailable.',
+      true
+    );
     signal.throwIfAborted();
     if (loadedImage) loadedImage.image.src = '';
     loadedImage = { url, image };

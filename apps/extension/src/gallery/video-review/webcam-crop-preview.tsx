@@ -5,7 +5,7 @@ import type {
   QuickEditWebcamCrop,
 } from '../../features/video/review/advanced/webcam';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
-import { createPreviewPresentationSession } from '../../features/video/composition/canvas/preview-presentation';
+import { createInspectorPreviewPresentationSession } from '../../features/video/composition/canvas/preview-presentation';
 import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { createWebcamCropPaintOwner } from './webcam-crop-paint';
 import { translate } from '../../platform/i18n';
@@ -214,13 +214,10 @@ function useWebcamCropFrame(
     const target = canvas.current,
       media = video.current;
     if (!target || !media) return;
-    const presenter = createPreviewPresentationSession({
+    const presenter = createInspectorPreviewPresentationSession({
       fallback: () => canvas.current,
       host: () => gpuHost.current,
-      role: 'inspector',
-      background: 'transparent',
     });
-    presenter.mount();
     const owner = createWebcamCropPaintOwner({
       target,
       media,

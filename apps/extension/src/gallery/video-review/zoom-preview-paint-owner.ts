@@ -8,6 +8,7 @@ import {
   type PreparedPreviewSourceLease,
 } from '../../workflows/video/preview-html-source';
 import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
+import { zoomPreviewSourceSelection } from './use-zoom-preview-source';
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import {
   createZoomPreviewGpuRenderer,
@@ -136,21 +137,7 @@ export function createZoomPreviewPaintOwner(args: {
       if (binding)
         receipt = {
           ...input,
-          sourceSelection: Object.freeze({
-            url: binding.url,
-            target: binding.target,
-            timestamp: binding.timestamp,
-            ...('membership' in binding
-              ? {
-                  membership: binding.membership,
-                  ...(binding.heldSourceEnd === undefined
-                    ? {}
-                    : { heldSourceEnd: binding.heldSourceEnd }),
-                }
-              : { nextTimestamp: binding.nextTimestamp }),
-            ...(binding.sampleTime === undefined ? {} : { sampleTime: binding.sampleTime }),
-            ...(binding.heldAtEnd === undefined ? {} : { heldAtEnd: binding.heldAtEnd }),
-          }),
+          sourceSelection: zoomPreviewSourceSelection(binding),
         };
       const bitmap =
         !args.renderer && (typeof navigator === 'undefined' || !navigator.gpu)

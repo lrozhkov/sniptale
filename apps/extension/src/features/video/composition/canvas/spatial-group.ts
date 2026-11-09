@@ -1,7 +1,10 @@
 import type { CameraSpatialRect } from '../../project/motion/spatial';
 import type { VideoCompositionCameraState } from '../types';
 import { motionCameraProjection, motionCameraPlaneTransform } from '../motion/spatial';
-import { invertQuickEditProjection } from '../motion/spatial-geometry';
+import {
+  invertQuickEditProjection,
+  resolveSpatialCameraRenderFrames,
+} from '../motion/spatial-geometry';
 import type { ReviewSpatialRenderer } from './spatial-renderer';
 
 /** Capture one contiguous scene group without applying an affine viewport clip first. */
@@ -82,23 +85,11 @@ export function drawSpatialCameraGroup(args: {
   } finally {
     source.context.restore();
   }
-  const base = spatial.reference;
   args.renderer.draw(output.context, {
     source: source.canvas,
     sourceRect,
     output: args.output,
-    base: {
-      x: base.x * scale,
-      y: base.y * scale,
-      width: base.width * scale,
-      height: base.height * scale,
-    },
-    target: {
-      x: (base.x - args.camera.viewportX) * args.camera.scale * scale,
-      y: (base.y - args.camera.viewportY) * args.camera.scale * scale,
-      width: base.width * args.camera.scale * scale,
-      height: base.height * args.camera.scale * scale,
-    },
+    ...resolveSpatialCameraRenderFrames(args.camera, spatial.reference, scale),
     frame: spatial,
     projection,
     ...(planeInverse ? { planeInverse } : {}),

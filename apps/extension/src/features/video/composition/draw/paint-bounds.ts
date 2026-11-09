@@ -1,3 +1,5 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
+import { unionQuickEditRects } from '../motion/spatial-geometry';
 import { cameraShadowLocalOffset } from '../../project/camera/shadow-direction';
 import { MAX_VIDEO_PROJECT_DIMENSION } from '../../project/validation/primitives';
 import type { CameraSpatialRect as Rect } from '../../project/motion/spatial';
@@ -27,14 +29,7 @@ const pad = (r: Rect, amount: number): Rect => ({
 function union(a: Rect, b: Rect): Rect {
   if (![a.x, a.y, a.width, a.height, b.x, b.y, b.width, b.height].every(Number.isFinite))
     throw new Error('Perspective source bounds are unavailable.');
-  const x = Math.min(a.x, b.x),
-    y = Math.min(a.y, b.y);
-  return {
-    x,
-    y,
-    width: Math.max(a.x + a.width, b.x + b.width) - x,
-    height: Math.max(a.y + a.height, b.y + b.height) - y,
-  };
+  return unionQuickEditRects([a, b]);
 }
 function about(r: Rect, sx: number, sy: number, degrees: number, tx: number, ty: number): Matrix {
   const c = Math.cos((degrees * Math.PI) / 180),
@@ -67,14 +62,7 @@ function mapRect(r: Rect, m: Matrix): Rect {
     [r.x, r.y + r.height],
     [r.x + r.width, r.y + r.height],
   ].map(([x = 0, y = 0]) => ({ x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] }));
-  const x = Math.min(...points.map((p) => p.x)),
-    y = Math.min(...points.map((p) => p.y));
-  return {
-    x,
-    y,
-    width: Math.max(...points.map((p) => p.x)) - x,
-    height: Math.max(...points.map((p) => p.y)) - y,
-  };
+  return getCanvasPointsBounds(points);
 }
 const matrixScale = (m: Matrix) => Math.max(1, Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3]));
 

@@ -77,24 +77,13 @@ export async function materializeEffectRuntimeGpuPlan(
           { width: pass.width, height: pass.height },
           (source) => {
             if (source.kind === 'resource') {
-              const resource = resources.get(source.id);
-              if (!resource) throw new Error('Effect GPU resource reference is unavailable.');
-              return {
-                source: resource.bitmap,
-                width: resource.width,
-                height: resource.height,
-              };
+              return resolveGpuPlanResource(resources, source.id);
             }
             const bitmap = completed.get(source.id);
             if (!bitmap) throw new Error('Effect GPU pass reference is unavailable.');
             return { source: bitmap, width: bitmap.width, height: bitmap.height };
           },
-          (id) => {
-            const resource = resources.get(id);
-            if (!resource || resource.kind !== 'coverage')
-              throw new Error('Effect GPU coverage reference is unavailable.');
-            return resource.bitmap;
-          }
+          (id) => resolveGpuPlanCoverage(resources, id)
         );
         if (operationLayers.clear) {
           layers = [];
@@ -167,20 +156,13 @@ export function buildEffectRuntimeGpuPlan(plan: EffectRuntimeGpuPlanResult): Gpu
         { width: pass.width, height: pass.height },
         (source) => {
           if (source.kind === 'resource') {
-            const resource = resources.get(source.id);
-            if (!resource) throw new Error('Effect GPU resource reference is unavailable.');
-            return { source: resource.bitmap, width: resource.width, height: resource.height };
+            return resolveGpuPlanResource(resources, source.id);
           }
           const group = completed.get(source.id);
           if (!group) throw new Error('Effect GPU pass reference is unavailable.');
           return { source: group, ...group.output };
         },
-        (id) => {
-          const resource = resources.get(id);
-          if (!resource || resource.kind !== 'coverage')
-            throw new Error('Effect GPU coverage reference is unavailable.');
-          return resource.bitmap;
-        }
+        (id) => resolveGpuPlanCoverage(resources, id)
       );
       if (prepared.clear) layers = [];
       else layers.push(...prepared.layers);
@@ -263,4 +245,19 @@ export async function prepareEffectRuntimeGpuScene(args: {
     release();
     throw error;
   }
+}
+
+type GpuPlanResources = ReadonlyMap<number, EffectRuntimeGpuPlanResult['resources'][number]>;
+
+function resolveGpuPlanResource(resources: GpuPlanResources, id: number) {
+  const resource = resources.get(id);
+  if (!resource) throw new Error('Effect GPU resource reference is unavailable.');
+  return { source: resource.bitmap, width: resource.width, height: resource.height };
+}
+
+function resolveGpuPlanCoverage(resources: GpuPlanResources, id: number) {
+  const resource = resources.get(id);
+  if (!resource || resource.kind !== 'coverage')
+    throw new Error('Effect GPU coverage reference is unavailable.');
+  return resource.bitmap;
 }

@@ -1,6 +1,7 @@
 import { motionCameraPlaneTransform } from '../motion/spatial';
 import {
   invertQuickEditProjection,
+  resolveSpatialCameraRenderFrames,
   projectQuickEditPoint,
   type QuickEditHomography,
 } from '../motion/spatial-geometry';
@@ -188,23 +189,11 @@ function drawSharpSpatialCameraGroup(
   } finally {
     input.context.restore();
   }
-  const base = spatial.reference;
   args.renderer.draw(output.context, {
     source: input.canvas,
     sourceRect,
     output: stage.output,
-    base: {
-      x: base.x * scale,
-      y: base.y * scale,
-      width: base.width * scale,
-      height: base.height * scale,
-    },
-    target: {
-      x: (base.x - args.camera.viewportX) * args.camera.scale * scale,
-      y: (base.y - args.camera.viewportY) * args.camera.scale * scale,
-      width: base.width * args.camera.scale * scale,
-      height: base.height * args.camera.scale * scale,
-    },
+    ...resolveSpatialCameraRenderFrames(args.camera, spatial.reference, scale),
     frame,
     projection: stage.projection,
     ...(planeInverse ? { planeInverse } : {}),

@@ -1,5 +1,9 @@
-import { VideoSample } from 'mediabunny';
-import { prepareDecodedVideoSample } from '../../../features/video/composition/draw/decoded-sample';
+import type { VideoSample } from 'mediabunny';
+import {
+  prepareDecodedVideoSample,
+  borrowDecodedSourceSample,
+  decodedSampleFrameSource,
+} from '../../../features/video/composition/draw/decoded-sample';
 import {
   createPreviewSourceProvider,
   type PreviewSourceDemand,
@@ -317,28 +321,17 @@ export function createProjectExportSourceSampling(args: {
         const binding = acquired.bindings.get(id);
         if (!binding?.source.toVideoFrame)
           throw new Error('Original export sample is unavailable.');
-        let raw: VideoFrame | undefined = binding.source.toVideoFrame();
-        let sample: VideoSample;
-        try {
-          const borrowed = new VideoSample(raw, {
-            timestamp: binding.timestamp,
-            rotation: binding.source.orientation?.rotation ?? 0,
-            flip: binding.source.orientation?.flip ?? false,
-          });
-          raw = undefined;
-          sample = await prepareDecodedVideoSample(borrowed, signal);
-        } finally {
-          raw?.close();
-        }
+        const sample = await prepareDecodedVideoSample(
+          borrowDecodedSourceSample(
+            binding.source.toVideoFrame(),
+            binding.timestamp,
+            binding.source.orientation
+          ),
+          signal
+        );
         owned.push(sample);
         signal.throwIfAborted();
-        media.set(clipId, {
-          sourceWidth: sample.displayWidth,
-          sourceHeight: sample.displayHeight,
-          orientation: { rotation: sample.rotation, flip: sample.flip },
-          toVideoFrame: () => sample.toVideoFrame(),
-          draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
-        });
+        media.set(clipId, decodedSampleFrameSource(sample));
       }
       return { media, release };
     } catch (error) {

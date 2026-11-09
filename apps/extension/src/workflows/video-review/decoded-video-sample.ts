@@ -5,7 +5,10 @@ import { getVideoClipSourceTime, isClipActiveAtTime } from '../../features/video
 import type { VideoProject, VideoProjectVideoClip } from '../../features/video/project/types';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import { readRetainedTransitionSample } from './cut-transition-frames';
-import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
+import {
+  prepareDecodedVideoSample,
+  decodedSampleFrameSource,
+} from '../../features/video/composition/draw/decoded-sample';
 import type { VideoSample, VideoSampleSink } from 'mediabunny';
 import type {
   VideoCompositionFrame,
@@ -246,13 +249,7 @@ export function createCompositionCutSampleSource(params: {
               timestamp: sample.timestamp,
               url,
               endpoint,
-              source: {
-                sourceWidth: sample.displayWidth,
-                sourceHeight: sample.displayHeight,
-                orientation: { rotation: sample.rotation, flip: sample.flip },
-                toVideoFrame: () => sample.toVideoFrame(),
-                draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
-              },
+              source: decodedSampleFrameSource(sample),
             });
           }
         }

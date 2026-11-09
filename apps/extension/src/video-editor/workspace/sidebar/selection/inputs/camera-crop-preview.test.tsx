@@ -565,16 +565,18 @@ it('rejects a pending GPU result resolved from the newer visual commit layout ph
   const g = pendingGpu(),
     p = props(),
     published: HTMLCanvasElement[] = [];
-  const create = presentation.createPreviewPresentationSession;
-  vi.spyOn(presentation, 'createPreviewPresentationSession').mockImplementation((options) => {
-    const owner = create(options),
-      publish = owner.publish;
-    vi.spyOn(owner, 'publish').mockImplementation((output, geometry) => {
-      if (output) published.push(output.canvas);
-      publish(output, geometry);
+  const create = presentation.createInspectorPreviewPresentationSession;
+  const createSessionSpy = vi
+    .spyOn(presentation, 'createInspectorPreviewPresentationSession')
+    .mockImplementation((options) => {
+      const owner = create(options),
+        publish = owner.publish;
+      vi.spyOn(owner, 'publish').mockImplementation((output, geometry) => {
+        if (output) published.push(output.canvas);
+        publish(output, geometry);
+      });
+      return owner;
     });
-    return owner;
-  });
   let stale: ReturnType<typeof g.output> | undefined;
   function Probe({ zoom }: { zoom: number }) {
     useLayoutEffect(() => {
@@ -585,6 +587,7 @@ it('rejects a pending GPU result resolved from the newer visual commit layout ph
   act(() => root.render(<Probe zoom={2} />));
   ready();
   await flush();
+  expect(createSessionSpy).toHaveBeenCalledOnce();
   stale = g.output(0);
   await act(async () => root.render(<Probe zoom={3} />));
   expect(stale.release).toHaveBeenCalledTimes(1);

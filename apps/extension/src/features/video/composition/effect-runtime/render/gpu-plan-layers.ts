@@ -1,3 +1,5 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
+import { unionQuickEditRects } from '../../motion/spatial-geometry';
 import type {
   EffectRuntimeGpuDraw,
   EffectRuntimeGpuOperation,
@@ -194,14 +196,12 @@ function transformedBounds(
     [rect.x, rect.y + rect.height],
     [rect.x + rect.width, rect.y + rect.height],
   ];
-  const xs = points.map(([x, y]) => a * x! + c * y! + e);
-  const ys = points.map(([x, y]) => b * x! + d * y! + f);
-  return {
-    x: Math.min(...xs),
-    y: Math.min(...ys),
-    width: Math.max(...xs) - Math.min(...xs),
-    height: Math.max(...ys) - Math.min(...ys),
-  };
+  return getCanvasPointsBounds(
+    points.map(([x, y]) => ({
+      x: a * x! + c * y! + e,
+      y: b * x! + d * y! + f,
+    }))
+  );
 }
 
 function intersection(
@@ -215,14 +215,7 @@ function intersection(
   return width > 0 && height > 0 ? { x, y, width, height } : null;
 }
 function union(a: EffectRuntimeGpuRect, b: EffectRuntimeGpuRect): EffectRuntimeGpuRect {
-  const x = Math.min(a.x, b.x),
-    y = Math.min(a.y, b.y);
-  return {
-    x,
-    y,
-    width: Math.max(a.x + a.width, b.x + b.width) - x,
-    height: Math.max(a.y + a.height, b.y + b.height) - y,
-  };
+  return unionQuickEditRects([a, b]);
 }
 function padding(sigma: number) {
   return sigma > 0 ? Math.ceil(sigma * 6) + 2 : 0;

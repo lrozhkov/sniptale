@@ -161,12 +161,8 @@ export function reviewPresentedStageProjection(
   );
 }
 
-/** Conservative explicit raster/texture estimate, admitted before the GPU owner allocates. */
-export function reviewGpuPreviewAllocation(
-  scene: PreviewScene,
-  dimensions: Dimensions,
-  maximumInFlight: 1 | 2 = 1
-) {
+/** Canonical decoration geometry shared by resource admission and artwork preparation. */
+export function reviewGpuArtworkGeometry(scene: PreviewScene, dimensions: Dimensions) {
   const base = computeQuickEditSceneLayout({
     ...scene,
     output: dimensions.canonical,
@@ -188,6 +184,16 @@ export function reviewGpuPreviewAllocation(
     background,
     sceneScale: scale,
   });
+  return { base, scale, background, decor };
+}
+
+/** Conservative explicit raster/texture estimate, admitted before the GPU owner allocates. */
+export function reviewGpuPreviewAllocation(
+  scene: PreviewScene,
+  dimensions: Dimensions,
+  maximumInFlight: 1 | 2 = 1
+) {
+  const { decor } = reviewGpuArtworkGeometry(scene, dimensions);
   const outputBytes = dimensions.backing.width * dimensions.backing.height * 4;
   const hasAnnotations =
     scene.annotationEffects?.lane.enabled &&

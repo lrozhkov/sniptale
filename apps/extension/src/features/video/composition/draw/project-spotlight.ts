@@ -1,3 +1,4 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import { rectCorners } from '../motion/math';
 import { projectSourceContentRect } from '../motion/source-window';
 import type { VideoProject } from '../../project/types';
@@ -196,14 +197,7 @@ function spotlightViewportExtent(
     .map((point) => projectQuickEditPoint(output, point))
     .map((point) => point && projectQuickEditPoint(inverse, point));
   if (corners.some((point) => !point)) return null;
-  const xs = corners.map((point) => point!.x),
-    ys = corners.map((point) => point!.y);
-  return {
-    x: Math.min(...xs),
-    y: Math.min(...ys),
-    width: Math.max(...xs) - Math.min(...xs),
-    height: Math.max(...ys) - Math.min(...ys),
-  };
+  return getCanvasPointsBounds(corners.map((point) => point!));
 }
 
 /** Both Native runtimes apply scene masks once, before viewport overlays and viewport borders. */

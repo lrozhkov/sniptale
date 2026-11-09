@@ -10,7 +10,7 @@ import {
 import { prepareDecodedVideoSample } from '../../../../../features/video/composition/draw/decoded-sample';
 import type { GpuPreviewOutput } from '../../../../../features/video/composition/canvas/preview-presentation';
 import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
-import { createPreviewPresentationSession } from '../../../../../features/video/composition/canvas/preview-presentation';
+import { createInspectorPreviewPresentationSession } from '../../../../../features/video/composition/canvas/preview-presentation';
 
 import { createCameraCropGpuRenderer } from '../../../../../features/video/composition/canvas/camera-crop-gpu';
 import type { VideoMediaFitMode } from '../../../../../features/video/project/types';
@@ -245,19 +245,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
   const ready =
     (managed ? !!props.url : source?.url === props.url && source?.time === props.sourceTime) &&
     !failed;
-  const latest = useRef<CropFrameInput>({
-    url: props.url,
-    sourceTime: props.sourceTime,
-    ...(props.rangeStart === undefined ? {} : { rangeStart: props.rangeStart }),
-    ...(props.rangeEnd === undefined ? {} : { rangeEnd: props.rangeEnd }),
-    ...(props.endpoint === undefined ? {} : { endpoint: props.endpoint }),
-    appearance,
-    mirrored,
-    fitMode,
-    renderer,
-    ready,
-  });
-  latest.current = {
+  const input: CropFrameInput = {
     url: props.url,
     sourceTime: props.sourceTime,
     ...(props.rangeStart === undefined ? {} : { rangeStart: props.rangeStart }),
@@ -269,18 +257,17 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
     renderer,
     ready,
   };
+  const latest = useRef(input);
+  latest.current = input;
   const queueRef = useRef<ReturnType<typeof createCameraCropFrameQueue> | null>(null);
   useLayoutEffect(() => {
     const target = canvas.current,
       media = video.current;
     if (!target || !media) return;
-    const presenter = createPreviewPresentationSession({
+    const presenter = createInspectorPreviewPresentationSession({
       fallback: () => canvas.current,
       host: () => gpuHost.current,
-      role: 'inspector',
-      background: 'transparent',
     });
-    presenter.mount();
     const queue = createCameraCropFrameQueue({
       target,
       media,
@@ -416,7 +403,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
 function createCameraCropFrameQueue(options: {
   target: HTMLCanvasElement;
   media: HTMLVideoElement;
-  presenter: ReturnType<typeof createPreviewPresentationSession>;
+  presenter: ReturnType<typeof createInspectorPreviewPresentationSession>;
   read: () => CropFrameInput;
   fail: () => void;
   accept: (input: CropFrameInput, width: number, height: number) => void;

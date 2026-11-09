@@ -1,3 +1,5 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
+import { projectedOpening } from '../../features/video/composition/draw/spotlight';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import type { RetainedRasterMaterialLease } from '../../features/video/composition/canvas/retained-raster-material';
 import type {
@@ -582,35 +584,6 @@ export function reviewGpuFinishLayers(args: {
   return layers;
 }
 
-/** Projected vector openings use the same bounded curve sampling as the existing spotlight painter. */
-function projectedPath(rect: Rect, radius: number, matrix?: QuickEditHomography) {
-  const path = new Path2D();
-  const r = Math.max(0, Math.min(radius, rect.width / 2, rect.height / 2));
-  const centers = [
-    [rect.x + rect.width - r, rect.y + r],
-    [rect.x + rect.width - r, rect.y + rect.height - r],
-    [rect.x + r, rect.y + rect.height - r],
-    [rect.x + r, rect.y + r],
-  ];
-  let first = true;
-  for (let corner = 0; corner < 4; corner++)
-    for (let step = 0; step <= 12; step++) {
-      const angle = ((corner - 1 + step / 12) * Math.PI) / 2;
-      const local = {
-        x: centers[corner]![0]! + r * Math.cos(angle),
-        y: centers[corner]![1]! + r * Math.sin(angle),
-      };
-      const point = matrix ? projectQuickEditPoint(matrix, local) : local;
-      if (!point) continue;
-      if (first) {
-        path.moveTo(point.x, point.y);
-        first = false;
-      } else path.lineTo(point.x, point.y);
-    }
-  path.closePath();
-  return path;
-}
-
 /** Spotlight lenses sample GPU scene groups; mask generation has no access to video pixels. */
 export function reviewGpuSpotlightLayers(args: {
   scene: PreviewScene;
@@ -667,19 +640,12 @@ export function applyReviewGpuSpotlightFrames(args: {
       { x: frame.opening.x + frame.opening.width, y: frame.opening.y + frame.opening.height },
     ].map((p) => (frame.projection ? projectQuickEditPoint(frame.projection, p) : p));
     if (corners.some((p) => !p)) throw new Error('Spotlight GPU bounds are unavailable.');
-    const xs = corners.map((p) => p!.x),
-      ys = corners.map((p) => p!.y);
-    const bounds = {
-      x: Math.min(...xs),
-      y: Math.min(...ys),
-      width: Math.max(...xs) - Math.min(...xs),
-      height: Math.max(...ys) - Math.min(...ys),
-    };
+    const bounds = getCanvasPointsBounds(corners.map((point) => point!));
     const mask = primitives.raster('preview-gpu-lens-mask', output, (context) => {
       if (frame.clip)
-        context.clip(projectedPath(frame.clip.rect, frame.clip.radius, frame.projection));
+        context.clip(projectedOpening(frame.clip.rect, frame.clip.radius, frame.projection));
       context.fillStyle = '#ffffff';
-      context.fill(projectedPath(frame.opening, frame.radius, frame.projection));
+      context.fill(projectedOpening(frame.opening, frame.radius, frame.projection));
     });
     const lens = group(
       [

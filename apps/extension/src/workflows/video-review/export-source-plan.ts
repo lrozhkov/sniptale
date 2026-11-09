@@ -1,3 +1,4 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import type {
   QuickEditAdvancedState,
   QuickEditCameraTransform,
@@ -16,6 +17,7 @@ import { quickEditMotionBlurCameras } from '../../features/video/review/advanced
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import { evaluateReviewClicks } from '../../features/video/review/click-animation';
 import {
+  scaleQuickEditRectAboutCenter,
   invertQuickEditProjection,
   multiplyQuickEditProjections,
   projectQuickEditPoint,
@@ -95,31 +97,12 @@ function bounds(rect: SourceSamplingRect, h: QuickEditHomography): SourceSamplin
     if (!value) throw new Error('Export source projection crosses the camera horizon.');
     return value;
   });
-  const x = Math.min(...points.map((p) => p.x)),
-    y = Math.min(...points.map((p) => p.y));
-  return {
-    x,
-    y,
-    width: Math.max(...points.map((p) => p.x)) - x,
-    height: Math.max(...points.map((p) => p.y)) - y,
-  };
+  return getCanvasPointsBounds(points);
 }
 function affine(rect: SourceSamplingRect, size: Size): QuickEditHomography {
   return [rect.width / size.width, 0, rect.x, 0, rect.height / size.height, rect.y, 0, 0, 1];
 }
-function lensTransform(rect: SourceSamplingRect, scale: number): QuickEditHomography {
-  return [
-    scale,
-    0,
-    (rect.x + rect.width / 2) * (1 - scale),
-    0,
-    scale,
-    (rect.y + rect.height / 2) * (1 - scale),
-    0,
-    0,
-    1,
-  ];
-}
+
 function demand(
   identity: SourceSamplingIdentity,
   id: string,
@@ -254,7 +237,7 @@ export function planReviewExportSource(args: {
           quickEditPlaneProjection(spatialWindow, spatialWindow, layout.spatial)
         )
       : frame.opening;
-    const transform = lensTransform(opening, frame.lens.scale);
+    const transform = scaleQuickEditRectAboutCenter(opening, frame.lens.scale);
     add('scene', index, opening, transform);
   });
   const video = nominalPlane.videoTransform;
@@ -268,7 +251,7 @@ export function planReviewExportSource(args: {
       width: radius * 2,
       height: radius * 2,
     };
-    const transform = lensTransform(opening, frame.lens.scale);
+    const transform = scaleQuickEditRectAboutCenter(opening, frame.lens.scale);
     add('click', index, opening, transform);
   });
   return {

@@ -5877,17 +5877,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/composition/draw/video.ts",
-      "symbol": "resolveVideoSourceLensPaintBounds",
-      "owner": "extension:app-core:features",
-      "reason": "tool-noise: This pure source-feedback bounds calculation uses the painter fitted source geometry, maps lens artwork through mirroring and the inner transform, then returns its union. Canvas and GPU consumers use the same calculation. It owns no allocation, publication, state or effects. Splitting the operation would distribute one geometry contract. Independent architecture review must validate this classification.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess a distinct geometry policy or consumer contract, effects, lifecycle authority or unrelated layer responsibility. Remove when the analyzer models this cohesive calculation.",
-      "reviewDate": "2026-11-05",
-      "astHash": "d9e11496a61dd1f82d2e77d80b4658b3a430a27d2fd0b8b3bcc9d89fa611d5a3",
-      "signatureHash": "a67e68dc0e47bd284475e913ac5f625e33fe66b28ac5819d42084d75069e20cd"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
       "symbol": "createGpuPreviewRenderer.createSlot",
       "owner": "extension:app-core:features",
@@ -6124,20 +6113,9 @@
       "owner": "extension:app-core:features",
       "reason": "tool-noise: The canonical video painter and its pure feedback bounds use the same private media, header, mirror and source-framing mapping. The candidate adds no state, effect or recovery owner. File score stays five and cohesion is0.99. Moving only this bounds calculation would duplicate or expose private coordinate mapping. Fresh independent architecture review must validate this exact binding.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent coordinate contract, state, effect, resource lifetime or owner. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-07",
-      "astHash": "9532b6581aea057b4252f7b8743ed92b38205a07f72e9d71a352783b04d59bd8",
+      "reviewDate": "2026-11-09",
+      "astHash": "4a1b8fd73adc128e5ac901bf8f8fab78fd0a2cc6dbae92a9ea5c5fe6f167aa61",
       "signatureHash": "0368d2132f87929fb42de34bb9e5caa0544f419388818e1a75a74a1679b254c1"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/composition/draw/video.ts",
-      "symbol": "resolveVideoSourceActionPaintBounds",
-      "owner": "extension:app-core:features",
-      "reason": "tool-noise: One pure geometry transaction maps source feedback through the canonical fit, camera mirror and affine framing, then intersects the existing paint clip and unions integer bounds. Conservative refusal branches preserve the full-raster path. There are zero effects and state authorities, one owner and cohesion1.00. Extracting mechanical rectangle steps would fragment this one coordinate invariant. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent coordinate contract, state, effect, resource lifetime or owner. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-07",
-      "astHash": "30aa3d280e1178fddc575efc21eaffc7802c7673381a6fbd358a8c8b408a5e56",
-      "signatureHash": "52dec368e48e0dc5847c66a91a27a7cbf809cd0e55518d37298a3fb7dab2fbe2"
     },
     {
       "rule": "structural-file-risk",
@@ -6287,7 +6265,7 @@
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.test.tsx",
       "symbol": "<file>",
       "owner": "extension:video-editor:workspace",
-      "astHash": "38fb361870adde2888dc97d8312f8ff25806e673e799099f1f27a17aa725602a",
+      "astHash": "974d32941875fac21aac3ce8cc4abcbf04b35946511ca9390976a56429d1e834",
       "signatureHash": "572af726207cd482891a809dc7a736ec9e143708603a29e7f34b7ca4d89d6156",
       "reviewDate": "2026-11-09",
       "reason": "tool-noise: One mounted camera fixture tests interaction, readiness, geometry and resource lifetime. Controlled GPU completions and source doubles belong to that contract. Independent diagnosis found no separate reusable test infrastructure. Fresh architecture review must assess this exact binding.",

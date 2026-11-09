@@ -340,6 +340,24 @@ function videoSourceActionGeometry(
   };
 }
 
+function resolveVideoSourceFeedbackGeometry(
+  layer: VideoLayer,
+  source: Parameters<typeof resolveVideoWindowMedia>[1],
+  displayScale: number,
+  images: Record<string, HTMLImageElement>
+) {
+  const frame = {
+    x: layer.x * displayScale,
+    y: layer.y * displayScale,
+    width: layer.width * displayScale,
+    height: layer.height * displayScale,
+  };
+  const media = resolveVideoWindowMedia(layer, source, displayScale, images);
+  const content = videoSourceActionGeometry(media, frame).source;
+  const scale = (content.width / media.sourceWidth + content.height / media.sourceHeight) / 2;
+  return { frame, content, scale };
+}
+
 /** Integer artwork bounds before the layer transform; undefined preserves unbounded painting. */
 export function resolveVideoSourceActionPaintBounds(
   layer: VideoLayer,
@@ -350,15 +368,12 @@ export function resolveVideoSourceActionPaintBounds(
   if (layer.borders?.length) return undefined;
   const inner = layer.sourceContentTransform;
   if (inner && (inner[6] !== 0 || inner[7] !== 0 || inner[8] !== 1)) return undefined;
-  const frame = {
-    x: layer.x * displayScale,
-    y: layer.y * displayScale,
-    width: layer.width * displayScale,
-    height: layer.height * displayScale,
-  };
-  const media = resolveVideoWindowMedia(layer, source, displayScale, images);
-  const content = videoSourceActionGeometry(media, frame).source;
-  const scale = (content.width / media.sourceWidth + content.height / media.sourceHeight) / 2;
+  const { frame, content, scale } = resolveVideoSourceFeedbackGeometry(
+    layer,
+    source,
+    displayScale,
+    images
+  );
   const mirrored = layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored === true;
   const sourceX = (x: number) => {
     const projected = content.x + x * content.width;
@@ -424,15 +439,12 @@ export function resolveVideoSourceLensPaintBounds(
   images: Record<string, HTMLImageElement>
 ) {
   if (!layer.actions?.some((action) => action.gestureFeedback?.effect === 'magnify')) return null;
-  const frame = {
-    x: layer.x * displayScale,
-    y: layer.y * displayScale,
-    width: layer.width * displayScale,
-    height: layer.height * displayScale,
-  };
-  const media = resolveVideoWindowMedia(layer, source, displayScale, images);
-  const content = videoSourceActionGeometry(media, frame).source;
-  const scale = (content.width / media.sourceWidth + content.height / media.sourceHeight) / 2;
+  const { frame, content, scale } = resolveVideoSourceFeedbackGeometry(
+    layer,
+    source,
+    displayScale,
+    images
+  );
   let bounds: VideoFrame | null = null;
   for (const action of layer.actions ?? []) {
     const feedback = action.gestureFeedback;

@@ -20,6 +20,33 @@ function cameraDescription(camera: ReviewWebcamFrameLease): NonNullable<RenderFr
   };
 }
 
+function reviewPreviewRenderFrame(
+  args: {
+    description: Description;
+    sequence: number;
+    time: number;
+    transition: ReturnType<ReturnType<typeof useReviewCutTransitionProvider>['read']>;
+  },
+  sourceTime: number,
+  source: RenderFrame['source'],
+  camera: ReviewWebcamFrameLease | undefined
+): RenderFrame {
+  return {
+    generation: args.sequence,
+    fps: args.description.fps ?? 30,
+    sourceTime,
+    resultTime: args.time,
+    source,
+    ...(camera ? { camera: cameraDescription(camera) } : {}),
+    ...(args.description.cameraTransform
+      ? { cameraTransform: args.description.cameraTransform }
+      : {}),
+    ...(args.transition?.frames
+      ? { transition: { blend: args.transition.blend, frames: args.transition.frames } }
+      : {}),
+  };
+}
+
 /** Joins an already frozen primary image and camera lease without transferring native ownership to UI. */
 export function attachReviewPreviewCamera(
   captured: { value: RenderFrame; release(): void },
@@ -126,12 +153,10 @@ export function captureReviewPreviewFrame(args: {
       context.drawImage(args.video, 0, 0, rgb.width, rgb.height);
     }
     camera = args.captureCamera();
-    const frame: RenderFrame = {
-      generation: args.sequence,
-      fps: args.description.fps ?? 30,
-      sourceTime: args.sourceTime(),
-      resultTime: args.time,
-      source: {
+    const frame = reviewPreviewRenderFrame(
+      args,
+      args.sourceTime(),
+      {
         ...(source
           ? {
               videoFrame: () => source!,
@@ -150,18 +175,8 @@ export function captureReviewPreviewFrame(args: {
         draw: (context, x, y, width, height) =>
           context.drawImage(source ?? rgb!, x, y, width, height),
       },
-      ...(camera
-        ? {
-            camera: cameraDescription(camera),
-          }
-        : {}),
-      ...(args.description.cameraTransform
-        ? { cameraTransform: args.description.cameraTransform }
-        : {}),
-      ...(args.transition?.frames
-        ? { transition: { blend: args.transition.blend, frames: args.transition.frames } }
-        : {}),
-    };
+      camera
+    );
     return { value: frame, release };
   } catch (error) {
     release();
@@ -211,12 +226,10 @@ export function captureDecodedReviewPreviewFrame(args: {
       if (released || !sample) throw new Error('Preview source frame is unavailable.');
       return sample;
     };
-    const frame: RenderFrame = {
-      generation: args.sequence,
-      fps: args.description.fps ?? 30,
-      sourceTime: args.binding.target,
-      resultTime: args.time,
-      source: {
+    const frame = reviewPreviewRenderFrame(
+      args,
+      args.binding.target,
+      {
         timestamp: args.binding.timestamp,
         ...(args.binding.source.orientation
           ? { orientation: args.binding.source.orientation }
@@ -238,18 +251,8 @@ export function captureDecodedReviewPreviewFrame(args: {
         },
         draw: (context, x, y, width, height) => currentSample().draw(context, x, y, width, height),
       },
-      ...(camera
-        ? {
-            camera: cameraDescription(camera),
-          }
-        : {}),
-      ...(args.description.cameraTransform
-        ? { cameraTransform: args.description.cameraTransform }
-        : {}),
-      ...(args.transition?.frames
-        ? { transition: { blend: args.transition.blend, frames: args.transition.frames } }
-        : {}),
-    };
+      camera
+    );
     return { value: frame, release };
   } catch {
     release();

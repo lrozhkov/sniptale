@@ -1,4 +1,4 @@
-import { ALL_FORMATS, BlobSource, Input, type InputAudioTrack, VideoSample } from 'mediabunny';
+import { ALL_FORMATS, BlobSource, Input, type InputAudioTrack, type VideoSample } from 'mediabunny';
 import type { QuickEditPresentationSettings } from '../../features/video/review/advanced/presentation';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
 import {
@@ -6,7 +6,10 @@ import {
   type PreviewSourceProvider,
   type PreviewSourceLease,
 } from '../video/preview-source';
-import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
+import {
+  prepareDecodedVideoSample,
+  borrowDecodedSourceSample,
+} from '../../features/video/composition/draw/decoded-sample';
 import { reviewExportPhase } from './export-diagnostics';
 import { drawReviewPresentationFrame } from './presentation-frame';
 
@@ -176,7 +179,6 @@ export async function createReviewPresentationMedia(args: {
       )
         throw new PresentationMediaError('mapping');
       pending = true;
-      let raw: VideoFrame | undefined;
       try {
         if (slot.mode === 'video' && mapping.kind === 'video') {
           const { start, end } = mapping.range;
@@ -223,14 +225,14 @@ export async function createReviewPresentationMedia(args: {
             (mapping.holdLast && (!binding.heldAtRetainedEnd || binding.nextTimestamp < trim.end))
           )
             throw new PresentationMediaError('metadata');
-          raw = binding.source.toVideoFrame();
-          const borrowed = new VideoSample(raw, {
-            timestamp: binding.timestamp,
-            rotation: binding.source.orientation?.rotation ?? 0,
-            flip: binding.source.orientation?.flip ?? false,
-          });
-          raw = undefined;
-          sample = await prepareDecodedVideoSample(borrowed, signal);
+          sample = await prepareDecodedVideoSample(
+            borrowDecodedSourceSample(
+              binding.source.toVideoFrame(),
+              binding.timestamp,
+              binding.source.orientation
+            ),
+            signal
+          );
           assertLive();
           if (
             !Number.isFinite(sample.timestamp) ||
@@ -302,7 +304,6 @@ export async function createReviewPresentationMedia(args: {
         currentLease = lease;
         return lease;
       } catch (error) {
-        raw?.close();
         sample?.close();
         sample = null;
         sourceLease?.release();

@@ -1,3 +1,4 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import type {
   EffectRuntimeGpuPreparedComposition,
   EffectRuntimeGpuPreparedFrame,
@@ -378,14 +379,7 @@ export async function buildNativeGpuPreviewLayers(args: {
         { x: opening.x, y: opening.y + opening.height },
       ].map((point) => (frame.projection ? projectQuickEditPoint(frame.projection, point) : point));
       if (points.some((point) => !point)) throw new Error('Lens projection is unavailable.');
-      const xs = points.map((point) => point!.x),
-        ys = points.map((point) => point!.y);
-      const bounds = {
-        x: Math.min(...xs),
-        y: Math.min(...ys),
-        width: Math.max(...xs) - Math.min(...xs),
-        height: Math.max(...ys) - Math.min(...ys),
-      };
+      const bounds = getCanvasPointsBounds(points.map((point) => point!));
       const mask = createSceneSpotlightMasks(logical, [
         {
           ...frame,
@@ -550,23 +544,26 @@ export async function buildNativeGpuPreviewLayers(args: {
     }
     return [...painted.content, groupLayer(painted.sharp, true, bounds)];
   };
+  const sceneSpotlights = (
+    project: Parameters<typeof resolveCompositionSceneSpotlights>[0]['project'],
+    frame: Parameters<typeof resolveCompositionSceneSpotlights>[0]['frame'],
+    afterClipId?: string
+  ) =>
+    resolveCompositionSceneSpotlights({
+      project,
+      frame: {
+        ...frame,
+        sceneSpotlights: (frame.sceneSpotlights ?? []).filter(
+          (state) => state.afterClipId === afterClipId
+        ),
+      },
+      images: input.imageBank,
+      viewport: { x: 0, y: 0, ...logical },
+      composition: { x: 0, y: 0, scale: 1 },
+      transform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+    });
   const sceneMasks = (layers: readonly GpuPreviewLayer[], afterClipId?: string) =>
-    spotlight(
-      layers,
-      resolveCompositionSceneSpotlights({
-        project: input.project,
-        frame: {
-          ...passes.overlayFrame,
-          sceneSpotlights: (passes.overlayFrame.sceneSpotlights ?? []).filter(
-            (state) => state.afterClipId === afterClipId
-          ),
-        },
-        images: input.imageBank,
-        viewport: { x: 0, y: 0, ...logical },
-        composition: { x: 0, y: 0, scale: 1 },
-        transform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
-      })
-    );
+    spotlight(layers, sceneSpotlights(input.project, passes.overlayFrame, afterClipId));
   try {
     if (args.inputComposition) {
       const request = args.inputComposition;
@@ -612,19 +609,7 @@ export async function buildNativeGpuPreviewLayers(args: {
             underlay.push(...result);
             result = spotlight(
               result,
-              resolveCompositionSceneSpotlights({
-                project: scene.project,
-                frame: {
-                  ...scene.frame,
-                  sceneSpotlights: (scene.frame.sceneSpotlights ?? []).filter(
-                    (state) => state.afterClipId === part.afterClipId
-                  ),
-                },
-                images: input.imageBank,
-                viewport: { x: 0, y: 0, ...logical },
-                composition: { x: 0, y: 0, scale: 1 },
-                transform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
-              }),
+              sceneSpotlights(scene.project, scene.frame, part.afterClipId),
               underlay
             );
           }

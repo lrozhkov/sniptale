@@ -55,6 +55,23 @@ export interface ReviewExportSamplingPaint {
   lens?: ReviewExportSourcePlan['lenses'][number];
 }
 
+function inverseAperturePoints(
+  clip: SourceSamplingRect,
+  inverse: QuickEditHomography,
+  horizonMessage: string
+) {
+  return [
+    { x: clip.x, y: clip.y },
+    { x: clip.x + clip.width, y: clip.y },
+    { x: clip.x, y: clip.y + clip.height },
+    { x: clip.x + clip.width, y: clip.y + clip.height },
+  ].map((point) => {
+    const value = projectQuickEditPoint(inverse, point);
+    if (!value) throw new Error(horizonMessage);
+    return value;
+  });
+}
+
 /** Limit a projected sharp stage to the pixels that can reach its existing lens opening. */
 export function reviewExportProjectedRegion(
   clip: SourceSamplingRect,
@@ -64,16 +81,11 @@ export function reviewExportProjectedRegion(
 ): SourceSamplingRect | null {
   const inverse = invertQuickEditProjection(projection);
   if (!inverse) throw new Error('Export sharp projection is unavailable.');
-  const points = [
-    { x: clip.x, y: clip.y },
-    { x: clip.x + clip.width, y: clip.y },
-    { x: clip.x, y: clip.y + clip.height },
-    { x: clip.x + clip.width, y: clip.y + clip.height },
-  ].map((p) => {
-    const value = projectQuickEditPoint(inverse, p);
-    if (!value) throw new Error('Export sharp source crosses the camera horizon.');
-    return value;
-  });
+  const points = inverseAperturePoints(
+    clip,
+    inverse,
+    'Export sharp source crosses the camera horizon.'
+  );
   const x = Math.max(source.x, Math.min(...points.map((p) => p.x)) - support),
     y = Math.max(source.y, Math.min(...points.map((p) => p.y)) - support);
   const right = Math.min(source.x + source.width, Math.max(...points.map((p) => p.x)) + support),
@@ -120,16 +132,7 @@ export function reviewExportWindowSampling(
   const inverse = invertQuickEditProjection(total);
   if (!inverse) throw new Error('Export window sampling projection is unavailable.');
   const clip = paint.lens?.bounds ?? motion.windowClip;
-  const points = [
-    { x: clip.x, y: clip.y },
-    { x: clip.x + clip.width, y: clip.y },
-    { x: clip.x, y: clip.y + clip.height },
-    { x: clip.x + clip.width, y: clip.y + clip.height },
-  ].map((p) => {
-    const v = projectQuickEditPoint(inverse, p);
-    if (!v) throw new Error('Export window crosses the camera horizon.');
-    return v;
-  });
+  const points = inverseAperturePoints(clip, inverse, 'Export window crosses the camera horizon.');
   const x = Math.max(base.x, Math.min(...points.map((p) => p.x))),
     y = Math.max(base.y, Math.min(...points.map((p) => p.y)));
   const right = Math.min(base.x + base.width, Math.max(...points.map((p) => p.x))),

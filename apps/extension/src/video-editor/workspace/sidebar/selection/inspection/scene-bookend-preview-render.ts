@@ -1,4 +1,5 @@
-import { VideoSample } from 'mediabunny';
+import { inspectorPreviewBackingSize } from '../../../../../features/video/composition/canvas/preview-presentation';
+import type { VideoSample } from 'mediabunny';
 import {
   createPreviewSourceProvider,
   type PreviewSourceProvider,
@@ -7,7 +8,10 @@ import {
   createPreviewHtmlSourceProvider,
   type PreparedPreviewSourceLease,
 } from '../../../../../workflows/video/preview-html-source';
-import { prepareDecodedVideoSample } from '../../../../../features/video/composition/draw/decoded-sample';
+import {
+  prepareDecodedVideoSample,
+  borrowDecodedSourceSample,
+} from '../../../../../features/video/composition/draw/decoded-sample';
 import { resolveMediaFitFrame } from '../../../../../features/video/project/window-geometry';
 import { createBookendPreviewGpuRenderer } from '../../../../../features/video/composition/canvas/bookend-preview-gpu';
 import type {
@@ -90,7 +94,6 @@ async function normalizedVideoSnapshot(
   source: BookendPreviewFrameInput['source'],
   signal: AbortSignal
 ): Promise<ImageBitmap> {
-  let raw: VideoFrame | undefined;
   let sample: VideoSample | undefined;
   let canvas: OffscreenCanvas | undefined;
   let pixels: ImageBitmap | undefined;
@@ -98,14 +101,14 @@ async function normalizedVideoSnapshot(
     signal.throwIfAborted();
     const binding = lease.bindings.get('bookend');
     if (!binding?.source.toVideoFrame) throw new Error('Bookend preview source is unavailable.');
-    raw = binding.source.toVideoFrame();
-    const borrowed = new VideoSample(raw, {
-      timestamp: binding.timestamp,
-      rotation: binding.source.orientation?.rotation ?? 0,
-      flip: binding.source.orientation?.flip ?? false,
-    });
-    raw = undefined;
-    sample = await prepareDecodedVideoSample(borrowed, signal);
+    sample = await prepareDecodedVideoSample(
+      borrowDecodedSourceSample(
+        binding.source.toVideoFrame(),
+        binding.timestamp,
+        binding.source.orientation
+      ),
+      signal
+    );
     signal.throwIfAborted();
     canvas = new OffscreenCanvas(source.size.width, source.size.height);
     const context = canvas.getContext('2d');
@@ -118,7 +121,6 @@ async function normalizedVideoSnapshot(
     return completed;
   } finally {
     pixels?.close();
-    raw?.close();
     sample?.close();
     lease.release();
     if (canvas) canvas.width = canvas.height = 0;
@@ -270,12 +272,7 @@ export function createBookendPreviewFrameQueue(options: {
   };
   const paint = async (input: BookendPreviewFrameInput, ticket: number) => {
     if (!ready(input.source)) return;
-    const box = options.stage.getBoundingClientRect();
-    const scale = Math.min(2, window.devicePixelRatio || 1);
-    const size = {
-      width: Math.max(1, Math.round(box.width * scale)),
-      height: Math.max(1, Math.round(box.height * scale)),
-    };
+    const size = inspectorPreviewBackingSize(options.stage);
     const key = frameKey(input);
     let output: GpuPreviewOutput | undefined | false;
     let accepted = false;

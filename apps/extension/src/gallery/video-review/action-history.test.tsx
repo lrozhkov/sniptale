@@ -446,6 +446,7 @@ it('refreshes a paused lens when its target frame finishes decoding without a Re
     rect: vi.fn(),
     clip: vi.fn(),
     arc: vi.fn(),
+    moveTo: vi.fn(),
     stroke: vi.fn(),
     fill: vi.fn(),
     drawImage: vi.fn(),

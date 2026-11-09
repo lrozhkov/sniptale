@@ -1,4 +1,10 @@
-import { invertQuickEditProjection, projectQuickEditPoint } from '../motion/spatial-geometry';
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
+import { rectCorners } from '../motion/math';
+import {
+  unionQuickEditRects,
+  invertQuickEditProjection,
+  projectQuickEditPoint,
+} from '../motion/spatial-geometry';
 import type { GpuPreviewGroup, GpuPreviewLayer } from './gpu-preview-types';
 
 type Size = { width: number; height: number };
@@ -7,14 +13,7 @@ const full = (size: Size): Rect => ({ x: 0, y: 0, ...size });
 
 function union(rects: readonly Rect[]): Rect {
   if (!rects.length) return { x: 0, y: 0, width: 0, height: 0 };
-  const x = Math.min(...rects.map((rect) => rect.x));
-  const y = Math.min(...rects.map((rect) => rect.y));
-  return {
-    x,
-    y,
-    width: Math.max(...rects.map((rect) => rect.x + rect.width)) - x,
-    height: Math.max(...rects.map((rect) => rect.y + rect.height)) - y,
-  };
+  return unionQuickEditRects(rects);
 }
 
 function padded(rect: Rect, logical: Size, output: Size): Rect {
@@ -64,27 +63,11 @@ export function createGpuPreviewDrawBounds() {
     }
     const forward = invertQuickEditProjection(layer.inverse);
     if (!forward) return full(logical);
-    const corners = [
-      { x: rect.x, y: rect.y },
-      { x: rect.x + rect.width, y: rect.y },
-      { x: rect.x, y: rect.y + rect.height },
-      { x: rect.x + rect.width, y: rect.y + rect.height },
-    ].map((point) => projectQuickEditPoint(forward, point));
+    const corners = rectCorners(rect).map((point) => projectQuickEditPoint(forward, point));
     if (corners.some((point) => !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)))
       return full(logical);
     const points = corners.map((point) => point!);
-    const x = Math.min(...points.map((point) => point.x));
-    const y = Math.min(...points.map((point) => point.y));
-    return padded(
-      {
-        x,
-        y,
-        width: Math.max(...points.map((point) => point.x)) - x,
-        height: Math.max(...points.map((point) => point.y)) - y,
-      },
-      logical,
-      output
-    );
+    return padded(getCanvasPointsBounds(points), logical, output);
   };
   return (
     layer: GpuPreviewLayer,

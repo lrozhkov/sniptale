@@ -9,7 +9,11 @@ import { createRetainedRasterMaterialOwner } from '../../features/video/composit
 import type { PreviewGpuCanvasFactory, PreviewGpuCanvasLease } from './preview-render-resources';
 import { buildReviewGpuScene, reviewGpuStaticBackgroundDrift } from './gpu-preview-scene';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
-import { reviewPresentedGeometry, type ReviewPresentedGeometry } from './gpu-preview-geometry';
+import {
+  reviewGpuArtworkGeometry,
+  reviewPresentedGeometry,
+  type ReviewPresentedGeometry,
+} from './gpu-preview-geometry';
 import {
   createGpuPreviewRenderer,
   GpuPreviewDeviceError,
@@ -25,7 +29,7 @@ import type { QuickEditHomography } from '../../features/video/composition/motio
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
-import { drawReviewSceneShadow, reviewSpatialSourceRect } from './scene-shadow';
+import { drawReviewSceneShadow } from './scene-shadow';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
 import type { prepareReviewCaptions } from './render-captions';
 import { createReviewBackgroundPainter } from './scene-background';
@@ -326,27 +330,12 @@ export function createReviewGpuPreview(args: {
         fallbackReason = 'unavailable';
         return false;
       }
-      const scale = dimensions.canonical.width / (scene.canvas?.width ?? scene.source.width);
-      const background = scene.background.enabled
-        ? {
-            ...scene.background,
-            layout: {
-              ...scene.background.layout,
-              cornerRadius: scene.background.layout.cornerRadius * scale,
-            },
-          }
-        : scene.background;
-      const base = computeQuickEditSceneLayout({
-        ...scene,
-        output: dimensions.canonical,
-        camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
-      });
-      const decorRect = reviewSpatialSourceRect({
-        output: dimensions.canonical,
-        window: base.windowRect,
+      const {
+        scale,
         background,
-        sceneScale: scale,
-      });
+        base,
+        decor: decorRect,
+      } = reviewGpuArtworkGeometry(scene, dimensions);
       const drift = reviewGpuStaticBackgroundDrift(scene.background);
       const paintDensity = drift
         ? Math.min(1, 2048 / Math.max(dimensions.backing.width, dimensions.backing.height))

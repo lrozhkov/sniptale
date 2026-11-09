@@ -9,9 +9,10 @@ import {
 } from '../../workflows/video/preview-html-source';
 import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
 import { createCameraCropGpuRenderer } from '../../features/video/composition/canvas/camera-crop-gpu';
-import type {
-  GpuPreviewFramePresenter,
-  GpuPreviewOutput,
+import {
+  inspectorPreviewBackingSize,
+  type GpuPreviewFramePresenter,
+  type GpuPreviewOutput,
 } from '../../features/video/composition/canvas/preview-presentation';
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import type {
@@ -96,12 +97,7 @@ export function createWebcamCropPaintOwner(options: {
     const signal = controller.signal;
     const time = media.currentTime,
       url = media.currentSrc || media.src;
-    const box = target.getBoundingClientRect();
-    const scale = Math.min(2, window.devicePixelRatio || 1);
-    const size = {
-      width: Math.max(1, Math.round(box.width * scale)),
-      height: Math.max(1, Math.round(box.height * scale)),
-    };
+    const size = inspectorPreviewBackingSize(target);
     let output: GpuPreviewOutput | undefined | false;
     let accepted = false;
     let lease: PreparedPreviewSourceLease | null = null;

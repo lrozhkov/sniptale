@@ -255,3 +255,26 @@ class PreviewPresentationSession implements GpuPreviewFramePresenter {
 export function createPreviewPresentationSession(options: PresentationOptions) {
   return new PreviewPresentationSession(options);
 }
+
+/** Mount a transparent inspector destination while retaining live frontend identity checks. */
+export function createInspectorPreviewPresentationSession(
+  options: Pick<PresentationOptions, 'fallback' | 'host'>
+) {
+  const session = createPreviewPresentationSession({
+    ...options,
+    role: 'inspector',
+    background: 'transparent',
+  });
+  session.mount();
+  return session;
+}
+
+/** Measure inspector pixels at paint time with the existing two-times display-density cap. */
+export function inspectorPreviewBackingSize(target: HTMLElement) {
+  const box = target.getBoundingClientRect();
+  const scale = Math.min(2, window.devicePixelRatio || 1);
+  return {
+    width: Math.max(1, Math.round(box.width * scale)),
+    height: Math.max(1, Math.round(box.height * scale)),
+  };
+}

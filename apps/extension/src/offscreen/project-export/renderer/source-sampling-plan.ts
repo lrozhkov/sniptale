@@ -1,3 +1,4 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import { sourceClickSamplingDemandId } from '../../../features/video/composition/draw/effects/actions';
 import { parseEnhancementMode } from '../../../features/video/composition/export-enhancement/mode';
 import { hasMagnificationDemand } from '../../../features/video/composition/export-enhancement/prepared-source';
@@ -15,6 +16,7 @@ import {
   sampleCompositionSpotlightLayer,
 } from '../../../features/video/composition/draw/project-spotlight';
 import {
+  scaleQuickEditRectAboutCenter,
   invertQuickEditProjection,
   multiplyQuickEditProjections,
   projectQuickEditPoint,
@@ -40,16 +42,6 @@ type Rect = { x: number; y: number; width: number; height: number };
 type VideoLayer = Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
 const IDENTITY: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
-function bounds(points: readonly { x: number; y: number }[]): Rect {
-  const xs = points.map((p) => p.x),
-    ys = points.map((p) => p.y);
-  return {
-    x: Math.min(...xs),
-    y: Math.min(...ys),
-    width: Math.max(...xs) - Math.min(...xs),
-    height: Math.max(...ys) - Math.min(...ys),
-  };
-}
 function inverseROI(matrix: QuickEditHomography, aperture: Rect, source: Rect): Rect | null {
   const inverse = invertQuickEditProjection(matrix);
   if (!inverse) throw new Error('Export sampling projection is unavailable.');
@@ -60,12 +52,29 @@ function inverseROI(matrix: QuickEditHomography, aperture: Rect, source: Rect): 
     [aperture.x + aperture.width, aperture.y + aperture.height],
   ].map(([x, y]) => projectQuickEditPoint(inverse, { x: x!, y: y! }));
   if (points.some((p) => !p)) throw new Error('Export sampling projection crosses its horizon.');
-  const area = bounds(points.flatMap((p) => (p ? [p] : [])));
+  const area = getCanvasPointsBounds(points.flatMap((p) => (p ? [p] : [])));
   const x = Math.max(source.x, area.x),
     y = Math.max(source.y, area.y);
   const right = Math.min(source.x + source.width, area.x + area.width),
     bottom = Math.min(source.y + source.height, area.y + area.height);
   return right > x && bottom > y ? { x, y, width: right - x, height: bottom - y } : null;
+}
+function fittedLayerMapping(
+  layer: VideoLayer,
+  size: { width: number; height: number },
+  windowHeader: ReturnType<typeof admittedVisualWindowHeader>['windowHeader']
+) {
+  return {
+    frame: layer,
+    fitMode: layer.clip.fitMode,
+    sourceWidth: size.width,
+    sourceHeight: size.height,
+    ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
+    ...(windowHeader ? { windowHeader } : {}),
+    ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
+      ? { cameraAppearance: layer.clip.cameraAppearance }
+      : {}),
+  };
 }
 function layerMapping(
   layer: VideoLayer,
@@ -78,17 +87,7 @@ function layerMapping(
     images,
     layer.trackRole === 'CAMERA'
   );
-  const params = {
-    frame: layer,
-    fitMode: layer.clip.fitMode,
-    sourceWidth: size.width,
-    sourceHeight: size.height,
-    ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
-    ...(windowHeader ? { windowHeader } : {}),
-    ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
-      ? { cameraAppearance: layer.clip.cameraAppearance }
-      : {}),
-  };
+  const params = fittedLayerMapping(layer, size, windowHeader);
   const content = windowHeaderImage
     ? resolveFittedWindowRaster(params, deviceScale, windowHeaderImage.naturalHeight).source
     : getFittedMediaContentFrame(params);
@@ -136,21 +135,9 @@ export function projectNativeSamplingRect(matrix: QuickEditHomography, rect: Rec
     [rect.x + rect.width, rect.y + rect.height],
   ].map(([x, y]) => projectQuickEditPoint(matrix, { x: x!, y: y! }));
   if (points.some((p) => !p)) throw new Error('Sampling aperture crosses its horizon.');
-  return bounds(points.flatMap((p) => (p ? [p] : [])));
+  return getCanvasPointsBounds(points.flatMap((p) => (p ? [p] : [])));
 }
-function centerScale(rect: Rect, scale: number): QuickEditHomography {
-  return [
-    scale,
-    0,
-    (rect.x + rect.width / 2) * (1 - scale),
-    0,
-    scale,
-    (rect.y + rect.height / 2) * (1 - scale),
-    0,
-    0,
-    1,
-  ];
-}
+
 export function nativeSamplingTargetIncludes(
   plan: EffectRuntimeFramePlan,
   clipId: string,
@@ -262,7 +249,7 @@ function resolveSourceClickSamplingApertures(
       width: feedback.radius * 2,
       height: feedback.radius * 2,
     };
-    const sourceLens = centerScale(aperture, lens.scale),
+    const sourceLens = scaleQuickEditRectAboutCenter(aperture, lens.scale),
       id = sourceClickSamplingDemandId(action);
     candidates.push([
       id,
@@ -474,7 +461,7 @@ export function resolveNativeSourceSamplingDemands(args: {
           ? projectNativeSamplingRect(lens.projection, lens.opening)
           : lens.opening;
         const effective = multiplyQuickEditProjections(
-          centerScale(aperture, lens.lens.scale),
+          scaleQuickEditRectAboutCenter(aperture, lens.lens.scale),
           cameraOutput
         );
         append(`sceneLens:${state.id}`, aperture, effective);
@@ -485,17 +472,7 @@ export function resolveNativeSourceSamplingDemands(args: {
         args.images ?? {},
         layer.trackRole === 'CAMERA'
       );
-      const mapping = {
-        frame: layer,
-        fitMode: layer.clip.fitMode,
-        sourceWidth: sourceSize.width,
-        sourceHeight: sourceSize.height,
-        ...(layer.clip.sourceCrop ? { sourceCrop: layer.clip.sourceCrop } : {}),
-        ...(windowHeader ? { windowHeader } : {}),
-        ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
-          ? { cameraAppearance: layer.clip.cameraAppearance }
-          : {}),
-      };
+      const mapping = fittedLayerMapping(layer, sourceSize, windowHeader);
       const window =
         state.coordinateSpace === 'source-window'
           ? getFittedMediaOriginalWindowFrame(mapping)
@@ -517,7 +494,7 @@ export function resolveNativeSourceSamplingDemands(args: {
       const worldAperture = projectNativeSamplingRect(layerTransform(layer), sampled.opening);
       const effective = multiplyQuickEditProjections(
         cameraOutput,
-        centerScale(worldAperture, sampled.lens.scale)
+        scaleQuickEditRectAboutCenter(worldAperture, sampled.lens.scale)
       );
       append(
         `sceneLens:${state.id}`,

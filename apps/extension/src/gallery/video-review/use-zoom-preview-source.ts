@@ -34,6 +34,25 @@ export type ZoomPreviewFrameLoader = (
   signal: AbortSignal
 ) => Promise<ZoomPreviewFrame>;
 
+/** Copy scalar selection evidence without retaining the source binding or its lease. */
+export function zoomPreviewSourceSelection(
+  binding: PreviewSourceBinding | PreviewHtmlSourceBinding
+): NonNullable<ZoomPreviewFrame['selection']> {
+  return Object.freeze({
+    url: binding.url,
+    target: binding.target,
+    timestamp: binding.timestamp,
+    ...('membership' in binding
+      ? {
+          membership: binding.membership,
+          ...(binding.heldSourceEnd === undefined ? {} : { heldSourceEnd: binding.heldSourceEnd }),
+        }
+      : { nextTimestamp: binding.nextTimestamp }),
+    ...(binding.sampleTime === undefined ? {} : { sampleTime: binding.sampleTime }),
+    ...(binding.heldAtEnd === undefined ? {} : { heldAtEnd: binding.heldAtEnd }),
+  });
+}
+
 /** A bounded, cancellable media wait; already decoded frames do not require another seek. */
 function waitForVideo(
   video: HTMLVideoElement,
@@ -137,21 +156,7 @@ export function useZoomPreviewSource(file: File | null): ZoomPreviewFrameLoader 
               image: canvas,
               width: canvas.width,
               height: canvas.height,
-              selection: Object.freeze({
-                url: binding.url,
-                target: binding.target,
-                timestamp: binding.timestamp,
-                ...('membership' in binding
-                  ? {
-                      membership: binding.membership,
-                      ...(binding.heldSourceEnd === undefined
-                        ? {}
-                        : { heldSourceEnd: binding.heldSourceEnd }),
-                    }
-                  : { nextTimestamp: binding.nextTimestamp }),
-                ...(binding.sampleTime === undefined ? {} : { sampleTime: binding.sampleTime }),
-                ...(binding.heldAtEnd === undefined ? {} : { heldAtEnd: binding.heldAtEnd }),
-              }),
+              selection: zoomPreviewSourceSelection(binding),
             };
           } finally {
             sample?.close();

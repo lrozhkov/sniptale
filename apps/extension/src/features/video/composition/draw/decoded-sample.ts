@@ -1,4 +1,5 @@
 import { VideoSample } from 'mediabunny';
+import type { VideoCompositionFrameSource } from './media-source';
 
 /** Takes ownership of a native frame and packs padded NV12 visible planes before canvas conversion. */
 export async function prepareDecodedVideoFrame(
@@ -80,4 +81,35 @@ export async function prepareDecodedVideoSample(
   } finally {
     frame?.close();
   }
+}
+
+/** Takes ownership of a source frame and retains its binding PTS and orientation for its preparation. */
+export function borrowDecodedSourceSample(
+  frame: VideoFrame,
+  timestamp: number,
+  orientation: VideoCompositionFrameSource['orientation']
+): VideoSample {
+  let raw: VideoFrame | undefined = frame;
+  try {
+    const sample = new VideoSample(raw, {
+      timestamp,
+      rotation: orientation?.rotation ?? 0,
+      flip: orientation?.flip ?? false,
+    });
+    raw = undefined;
+    return sample;
+  } finally {
+    raw?.close();
+  }
+}
+
+/** Borrows the sample. Its existing caller retains cancellation and disposal authority. */
+export function decodedSampleFrameSource(sample: VideoSample): VideoCompositionFrameSource {
+  return {
+    sourceWidth: sample.displayWidth,
+    sourceHeight: sample.displayHeight,
+    orientation: { rotation: sample.rotation, flip: sample.flip },
+    toVideoFrame: () => sample.toVideoFrame(),
+    draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
+  };
 }

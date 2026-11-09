@@ -22,24 +22,6 @@
       }
     },
     {
-      "id": "02464b6daa7769984d711ba164f60a71db47a1104b0d13784a2f0b418e2020d0",
-      "classification": "tool-noise",
-      "owner": "features/video/composition/motion/window-camera-geometry",
-      "reason": "The matched range declares overlapping geometry inputs for region geometry and endpoint-link geometry. Their phase, endpoint, connectivity and window-weight contracts differ. The range contains no duplicate executable operation.",
-      "removalCondition": "Remove when this exact detector pair changes or disappears. Reassess if the two inputs become one independently owned public contract.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
-        "start": 513,
-        "end": 523
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
-        "start": 88,
-        "end": 98
-      }
-    },
-    {
       "id": "02c6d78fc7fd1cc1ed32671ad173887ba42eba391224f3fad21c6bfc059d5003",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures",
@@ -436,24 +418,6 @@
       }
     },
     {
-      "id": "227bc1400356437f47a586518c48f691e5814c74807340c7207a720ca7b70054",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera-follow inspectors",
-      "reason": "The common CameraFollowSettings field names and conversion adapter describe one public settings schema. Gallery uses ReviewNumberRow with explicit numeric precision and a reset callback; Native uses NumberInput/SliderField and clears inheritance through onChange(undefined). Shared zone and movement behavior already uses CameraFollowZoneChoice and CameraFollowMovementChoice.",
-      "removalCondition": "Remove this record if a common fine-tune component can represent both interactions without renderer slots or changing precision/reset behavior.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 370,
-        "end": 389
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
-        "start": 414,
-        "end": 433
-      }
-    },
-    {
       "id": "229b651abcc2e706563d9fb192a816333bae6c12bf047aed34a40e5b8ae188a2",
       "classification": "tool-noise",
       "owner": "packages/ui glass and content toolbar surfaces",
@@ -487,6 +451,24 @@
         "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
         "start": 1882,
         "end": 1893
+      }
+    },
+    {
+      "id": "24a489c2cf4fc442750fe5c8e92e990611531914e509ee1d179c648bce615d2c",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera appearance controls",
+      "reason": "The four camera shape labels are shared enum metadata. Gallery performs its own shape admission/update while Native calls its camera appearance patch owner and applies disabled policy. Both reuse their existing select control; shape geometry is not copied.",
+      "removalCondition": "Remove this record if camera silhouette/crop computation is duplicated in the inspectors.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
+        "start": 407,
+        "end": 414
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
+        "start": 71,
+        "end": 78
       }
     },
     {
@@ -760,6 +742,24 @@
       }
     },
     {
+      "id": "3631130708073fb0b8384e1489029d3fc92e22bfc1837fc7a990dcd8919dd7d8",
+      "classification": "tool-noise",
+      "owner": "composition WebGL backend adapters",
+      "reason": "The fragment configures standard WebGL texture filtering and edge clamping. Spatial WebGL1 owns multiple texture units and replacement. Export WebGL2 owns one source texture and separate upload state. Sharing this API tail would couple independent texture owners.",
+      "removalCondition": "Remove if this exact match disappears or an established common texture initialization owner serves both backends.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/spatial-textures.ts",
+        "start": 253,
+        "end": 258
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/export-enhancement/bicubic.ts",
+        "start": 103,
+        "end": 108
+      }
+    },
+    {
       "id": "3793d7ffc77f4d16a3a7450c359b02a635cd3fd148c86a93ad6305c1162d7e64",
       "classification": "tool-noise",
       "owner": "settings callout and numbering catalogs",
@@ -850,6 +850,24 @@
       }
     },
     {
+      "id": "3c66c0320a30f51280a889d869ad18898282f4e5e8e5763bedd33bf187c75fdb",
+      "classification": "tool-noise",
+      "owner": "features/video/composition/motion",
+      "reason": "The shared prefix validates finite coordinates/camera scale. Forward mapping applies projection; inverse mapping must invert it and fail for singular matrices. Scalar translations also run in opposite directions.",
+      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/motion/index.ts",
+        "start": 382,
+        "end": 394
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/motion/index.ts",
+        "start": 417,
+        "end": 429
+      }
+    },
+    {
       "id": "3febd4469c029199cfb19f8fd579b10b0c6e816581477f5c421a1886339eb67a",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/glass",
@@ -901,24 +919,6 @@
         "path": "apps/extension/src/content/overlay/scenario-recorder/sidebar/surface.tsx",
         "start": 141,
         "end": 147
-      }
-    },
-    {
-      "id": "4269fd2736131a8a79789665df8a1d9e6ac2eb0834287af250400fd51eb108d9",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera appearance controls",
-      "reason": "The classic/angle/center/nearest-edge labels and icons are declarative enum metadata for the camera shadow contract. Gallery writes camera state; Native adds disabled policy and writes clip edits. No shadow direction calculation or rendering is duplicated.",
-      "removalCondition": "Remove this record if shadow vector or geometry calculation appears in either inspector.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
-        "start": 447,
-        "end": 460
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
-        "start": 144,
-        "end": 157
       }
     },
     {
@@ -1246,6 +1246,24 @@
       }
     },
     {
+      "id": "5ba2884fd52bf2f0e5bbfc3a95220acae5fc0146ca66b78a8ed01065f71432aa",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native background inspector adapters",
+      "reason": "The fragment declares background motion enum labels and configures the existing SegmentedRow. Gallery submits a patch. Native commits scene settings and resets its preview. Selection behavior already belongs to the shared control.",
+      "removalCondition": "Remove if this exact match disappears or both hosts acquire the same settings update and preview lifecycle contract.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/background-inspector.tsx",
+        "start": 135,
+        "end": 149
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/scene-background/fields.tsx",
+        "start": 109,
+        "end": 123
+      }
+    },
+    {
       "id": "5cae0326e58a9965a709563c60dbc36da4afe7fd54f0cf586d6f0d404d5f1288",
       "classification": "tool-noise",
       "owner": "offscreen/recording/encoding",
@@ -1264,6 +1282,24 @@
       }
     },
     {
+      "id": "618bedd8995d2a67ee95051972826c1a5fd1b1d439a6524b4266a624d9c7614d",
+      "classification": "tool-noise",
+      "owner": "composition canvas GPU pipelines",
+      "reason": "The fragment sets a pipeline and starts a standard bind-group descriptor. Filter and compositor use different remaining bindings, texture kinds, coverage, and draw contracts. A shared descriptor wrapper would not unify rendering ownership.",
+      "removalCondition": "Remove if this exact match disappears or both passes acquire the same shader bindings and draw contract.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
+        "start": 216,
+        "end": 225
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview.ts",
+        "start": 1073,
+        "end": 1082
+      }
+    },
+    {
       "id": "633782ebf4a500f9c1ce0b76b6a39d58ee1619d395b17206b3a966718c56c05f",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/toolbar/transient",
@@ -1279,6 +1315,24 @@
         "path": "packages/ui/src/styles/toolbar/transient/feedback.css",
         "start": 58,
         "end": 63
+      }
+    },
+    {
+      "id": "64e8ba1c36709f209de6ec96a207d5f6496a022eec4a078ded0e283288e70948",
+      "classification": "tool-noise",
+      "owner": "composition canvas filter resource owners",
+      "reason": "The fragment ends independent render-filter and compute-filter cache lifecycles. Entry destruction, byte accounting, prepared identity, and GPU resources differ. A shared disposal tail would add a lifecycle abstraction without a common resource owner.",
+      "removalCondition": "Remove if this exact match disappears or one concrete resource and cache owner replaces both implementations.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-css-filter.ts",
+        "start": 332,
+        "end": 341
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/canvas/gpu-preview-filter.ts",
+        "start": 242,
+        "end": 251
       }
     },
     {
@@ -1390,21 +1444,21 @@
       }
     },
     {
-      "id": "6e8e5ee499fc1c27fb000c12e04f7c367b33130d5b363720ebf58b7e50b65ef6",
+      "id": "6f53fb9f53906e6c9e1b9e7724c3df00f59f90c43c9b676ba0dc2b38afce510a",
       "classification": "tool-noise",
-      "owner": "features/video/project/motion and features/video/review/advanced",
-      "reason": "The endpoints return a rectangle record after different validators. Project crop permits positive values viazero check; review webcam requires Number.EPSILON and owns its own boundary. Both check normalized extents.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
+      "owner": "composition spotlight painting",
+      "reason": "The fragment projects a point and appends it to a closed Path2D. Rounded openings sample corner curves. Outlines traverse authored vertices. Their point-generation contracts remain distinct.",
+      "removalCondition": "Remove if this exact match disappears or an accepted common point-generation contract replaces both algorithms.",
+      "reviewBy": "2026-12-09",
       "firstFile": {
-        "path": "apps/extension/src/features/video/project/motion/spatial.ts",
-        "start": 238,
-        "end": 244
+        "path": "apps/extension/src/features/video/composition/draw/spotlight.ts",
+        "start": 471,
+        "end": 480
       },
       "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/webcam.ts",
-        "start": 82,
-        "end": 88
+        "path": "apps/extension/src/features/video/composition/draw/spotlight.ts",
+        "start": 515,
+        "end": 524
       }
     },
     {
@@ -1570,24 +1624,6 @@
       }
     },
     {
-      "id": "786239c9cdd0b2d9fcf3fb1ff38755e16869d517f0b9a9c4c2ff7edd3f3d26b4",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/project/validation",
-      "reason": "The shared prefix checks optional style and easing leaves. Complete presentation requires enabled, clickPreset, duration, offset, suppression interval, and showKeystrokes. Sparse override permits omissions and uses preset and optional point.",
-      "removalCondition": "Remove when this exact finding disappears or both validators acquire the same complete contract.",
-      "reviewBy": "2027-05-02",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
-        "start": 258,
-        "end": 263
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
-        "start": 275,
-        "end": 280
-      }
-    },
-    {
       "id": "79fee99b537268e7a057172b1246e62f439b82a3543f5db158709c1de5f198fc",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal-content/fields.css",
@@ -1603,6 +1639,24 @@
         "path": "packages/ui/src/styles/ai-modal-content/fields.css",
         "start": 45,
         "end": 52
+      }
+    },
+    {
+      "id": "7af778b79393a93ec88deca56ff9f78e0bb887285d22a1a307c915a452f7dd40",
+      "classification": "tool-noise",
+      "owner": "features/video/composition/motion/window-camera-geometry",
+      "reason": "The matched range declares overlapping geometry inputs for region geometry and endpoint-link geometry. Their phase, endpoint, connectivity and window-weight contracts differ. The range contains no duplicate executable operation.",
+      "removalCondition": "Remove when this exact detector pair changes or disappears. Reassess if the two inputs become one independently owned public contract.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
+        "start": 249,
+        "end": 258
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
+        "start": 562,
+        "end": 571
       }
     },
     {
@@ -1765,24 +1819,6 @@
         "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
         "start": 99,
         "end": 105
-      }
-    },
-    {
-      "id": "8f6f9c17bc842db89437217fbe0c00b8f2aaec6299b84a758aeccd552043317e",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera appearance controls",
-      "reason": "The four camera shape labels are shared enum metadata. Gallery performs its own shape admission/update while Native calls its camera appearance patch owner and applies disabled policy. Both reuse their existing select control; shape geometry is not copied.",
-      "removalCondition": "Remove this record if camera silhouette/crop computation is duplicated in the inspectors.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
-        "start": 407,
-        "end": 414
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
-        "start": 67,
-        "end": 74
       }
     },
     {
@@ -2236,6 +2272,42 @@
       }
     },
     {
+      "id": "9f3f646953aa2d728a7f5d7c18a21ebea2430a6352cb97dca3f7e416d7d016b3",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native inspector paint transaction owners",
+      "reason": "The fragment schedules independent inspector paint transactions and completes their cleanup. Retirement, source acquisition, acceptance, failure, cancellation, reset, and resource ownership remain local. Matching scheduling syntax does not establish shared lifecycle authority.",
+      "removalCondition": "Remove if this exact match disappears or an accepted common transaction owner replaces the distinct lifecycle policies.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/presentation-media-paint.ts",
+        "start": 184,
+        "end": 203
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.ts",
+        "start": 336,
+        "end": 355
+      }
+    },
+    {
+      "id": "a01bd7f4b2f316648582f430ae4f53cd99a5baef702d8e1c84840c9a90c091a5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/project/validation",
+      "reason": "The shared prefix checks optional style and easing leaves. Complete presentation requires enabled, clickPreset, duration, offset, suppression interval, and showKeystrokes. Sparse override permits omissions and uses preset and optional point.",
+      "removalCondition": "Remove when this exact finding disappears or both validators acquire the same complete contract.",
+      "reviewBy": "2027-05-02",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
+        "start": 259,
+        "end": 264
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/project/validation/interaction.ts",
+        "start": 276,
+        "end": 281
+      }
+    },
+    {
       "id": "a3a3d7200d26a543142f4019776f235babe71b7bf9234ab27e1b4b50bf73a899",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/video-review/cursor-path-overlay.tsx",
@@ -2323,24 +2395,6 @@
         "path": "packages/ui/src/styles/glass/input-controls.css",
         "start": 78,
         "end": 83
-      }
-    },
-    {
-      "id": "a595e5e7cab1ae2befc9d66c5084e6e40960fa3e7c2974a34828ff8f8458091e",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
-      "reason": "Track-list public props include refs, onScroll and insertion; the inner label projection declares only selection/utility callbacks needed for rows. Overlapping signatures describe a narrowed structural port rather than duplicated track state.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
-        "start": 170,
-        "end": 180
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
-        "start": 39,
-        "end": 49
       }
     },
     {
@@ -2578,6 +2632,24 @@
       }
     },
     {
+      "id": "b43f89a1a7eb564ef151adad397fe1c9a09be5a595fbd9eccde4fd9c1cfb8c05",
+      "classification": "tool-noise",
+      "owner": "composition geometry and Native source sampling",
+      "reason": "The fragment enumerates four rectangle corners. Effect bounds use affine arithmetic. Native sampling uses homography projection and horizon refusal. Both already share point-bound reduction. A common transform would change their contracts.",
+      "removalCondition": "Remove if this exact match disappears or an established corner operation preserves their current order and serves an accepted requirement.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/effect-runtime/render/gpu-plan-layers.ts",
+        "start": 192,
+        "end": 198
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/project-export/renderer/source-sampling-plan.ts",
+        "start": 130,
+        "end": 136
+      }
+    },
+    {
       "id": "b60904894119301d62a46253d72529e9890da8c98bf409997ac3f89d1f11234d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/features/editor/document/rich-shape/catalog/screenshot-mark-geometry.ts",
@@ -2632,6 +2704,24 @@
       }
     },
     {
+      "id": "b7c8f983df2973de4ad1b99ba731a500a20e3d9b2ce9bffb87fd5e158b9d0b04",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera appearance controls",
+      "reason": "The classic/angle/center/nearest-edge labels and icons are declarative enum metadata for the camera shadow contract. Gallery writes camera state; Native adds disabled policy and writes clip edits. No shadow direction calculation or rendering is duplicated.",
+      "removalCondition": "Remove this record if shadow vector or geometry calculation appears in either inspector.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/webcam-inspector.tsx",
+        "start": 447,
+        "end": 460
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-appearance.tsx",
+        "start": 148,
+        "end": 161
+      }
+    },
+    {
       "id": "b88fd738889e0922ada54808460d21f8073ea0d4989a0b108e6c9bc5aaab006c",
       "classification": "tool-noise",
       "owner": "apps/extension/src/gallery/library/sidebar/types.ts",
@@ -2650,6 +2740,24 @@
       }
     },
     {
+      "id": "b99ce558827c12152322d451a5ba167ebc26951ee12dc4d9ac4d2f22f2f51213",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
+      "reason": "Track-list public props include refs, onScroll and insertion; the inner label projection declares only selection/utility callbacks needed for rows. Overlapping signatures describe a narrowed structural port rather than duplicated track state.",
+      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
+        "start": 302,
+        "end": 312
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/timeline/project/tracks/list.tsx",
+        "start": 39,
+        "end": 49
+      }
+    },
+    {
       "id": "b9d1cd1cf46261a9f3d21e47a897306e2cf10188d8e74d5d315260c8f5479046",
       "classification": "tool-noise",
       "owner": "content/public/preparation-surface scrollbar effects",
@@ -2665,24 +2773,6 @@
         "path": "apps/extension/src/content/public/preparation-surface/effects.css",
         "start": 115,
         "end": 124
-      }
-    },
-    {
-      "id": "bbbc1ef066c170cf2652f7416959b0e04bdd5b434ffc22daac2956347fa90dc7",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera-follow inspectors",
-      "reason": "The overlapping numeric/toggle adapters project the same settings fields into different number and toggle contracts. Gallery has explicit precision and value-based ToggleField; Native uses its own NumberInput and checked-based ToggleField. Reset/inheritance ownership also differs.",
-      "removalCondition": "Remove this record if shared field behavior can be reused directly without generic renderer-slot infrastructure or changing precision.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 396,
-        "end": 408
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
-        "start": 439,
-        "end": 451
       }
     },
     {
@@ -2776,6 +2866,42 @@
       }
     },
     {
+      "id": "c258dc8584be44dc5a4473cdf7e2f41d4a8a3f34c70b066760dc7e993dd7aeb4",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera-follow inspectors",
+      "reason": "The matched field names, ranges, and conversions describe CameraFollowSettings. Both hosts use DraftNumericRow for zone size. Gallery resets through onReset. Native clears inherited values through onChange(undefined). The fragment adds no rendering or source authority.",
+      "removalCondition": "Remove this record if a directly reusable existing fine-tune control can replace both without renderer factories.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 438,
+        "end": 460
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 484,
+        "end": 506
+      }
+    },
+    {
+      "id": "c4c4ff40ba53c47cbf1fb57e14f99788ee5105b3c16e21cee481e974a25f1c77",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera-follow inspectors",
+      "reason": "The matched fields describe CameraFollowSettings and its scalar conversions. Both hosts use DraftNumericRow. Gallery sets explicit precision and resets through onReset. Native clears inherited values through onChange(undefined). Zone and movement interactions already share their control owners.",
+      "removalCondition": "Remove this record if a common fine-tune component can represent both interactions without renderer slots or changing precision/reset behavior.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 370,
+        "end": 389
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 415,
+        "end": 434
+      }
+    },
+    {
       "id": "c4e80d896081c6b42238717acab8cfbd8b64500eb96667bd6345028ee88f68a0",
       "classification": "tool-noise",
       "owner": "tooling/design-reference example entry pages",
@@ -2827,24 +2953,6 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/action-panel.tsx",
         "start": 298,
         "end": 309
-      }
-    },
-    {
-      "id": "c7bec9892d4185479cc843ba45503a6641f71a15519ce31948e735579e67ece2",
-      "classification": "tool-noise",
-      "owner": "features/video/composition/motion",
-      "reason": "The shared prefix validates finite coordinates/camera scale. Forward mapping applies projection; inverse mapping must invert it and fail for singular matrices. Scalar translations also run in opposite directions.",
-      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/composition/motion/index.ts",
-        "start": 340,
-        "end": 352
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/composition/motion/index.ts",
-        "start": 375,
-        "end": 387
       }
     },
     {
@@ -2938,6 +3046,24 @@
       }
     },
     {
+      "id": "cc4f2cc520c2a9b75f344001fea60b821010e4515de6ab47bea356a448e3d2b8",
+      "classification": "tool-noise",
+      "owner": "Gallery and Native camera-follow inspectors",
+      "reason": "The matched fields project CameraFollowSettings into host adapters. Numeric edits use the shared DraftNumericRow owner. Gallery supplies explicit precision and a value-based toggle. Native uses a checked-based toggle. Reset and inheritance policies remain local.",
+      "removalCondition": "Remove this record if shared field behavior can be reused directly without generic renderer-slot infrastructure or changing precision.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
+        "start": 396,
+        "end": 408
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
+        "start": 440,
+        "end": 452
+      }
+    },
+    {
       "id": "cda58e96d82511f013e73202bebb74fd5b1f7a47cad175d3edae112643c8199d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence",
@@ -2953,6 +3079,24 @@
         "path": "apps/extension/src/composition/persistence/highlighter/mutation-write.ts",
         "start": 37,
         "end": 51
+      }
+    },
+    {
+      "id": "cf985685bc57875f954f87cc4cc3461a4245e216af1e7523d025b68e11bc3728",
+      "classification": "tool-noise",
+      "owner": "project and review camera adapters",
+      "reason": "The fragment publishes a success result and bounds a four-entry cache. Project and review adapters own different conflict records, keys, contexts, and observation inputs. A shared cache wrapper would not unify those contracts.",
+      "removalCondition": "Remove if this exact match disappears or an accepted common camera result and cache owner replaces both adapters.",
+      "reviewBy": "2026-12-09",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/motion/project-follow.ts",
+        "start": 689,
+        "end": 696
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/scene.ts",
+        "start": 365,
+        "end": 371
       }
     },
     {
@@ -2989,24 +3133,6 @@
         "path": "packages/ui/src/styles/ai-modal-content/preview-spoilers.css",
         "start": 77,
         "end": 83
-      }
-    },
-    {
-      "id": "d4af7f82bfad5e5d83775cb909127a3d5080c98de3df64efcd8f9427e8a66e9f",
-      "classification": "tool-noise",
-      "owner": "Gallery and Native camera-follow inspectors",
-      "reason": "The fine-tune ranges and field names intentionally describe one CameraFollowSettings contract. Gallery exposes zone size as ReviewNumberRow, explicit precision and onReset; Native uses SliderField and onChange(undefined). This repeated declarative schema does not justify a new cross-editor state abstraction.",
-      "removalCondition": "Remove this record if a directly reusable existing fine-tune control can replace both without renderer factories.",
-      "reviewBy": "2027-04-15",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/cursor-path-editor.tsx",
-        "start": 438,
-        "end": 460
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/cursor-path.tsx",
-        "start": 483,
-        "end": 505
       }
     },
     {
@@ -3151,6 +3277,24 @@
         "path": "apps/extension/src/offscreen/runtime/routing.ts",
         "start": 160,
         "end": 172
+      }
+    },
+    {
+      "id": "e2ceae1b7bc5a6c95e7635310038c58b479513159ce58a3bc4ec7379797925f1",
+      "classification": "tool-noise",
+      "owner": "features/video/project/motion and features/video/review/advanced",
+      "reason": "The endpoints return a rectangle record after different validators. Project crop permits positive values viazero check; review webcam requires Number.EPSILON and owns its own boundary. Both check normalized extents.",
+      "removalCondition": "Remove the exact pair when its endpoints change or disappear; reassess if both contracts acquire one accepted authority.",
+      "reviewBy": "2027-04-15",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/project/motion/spatial.ts",
+        "start": 331,
+        "end": 337
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/webcam.ts",
+        "start": 82,
+        "end": 88
       }
     },
     {

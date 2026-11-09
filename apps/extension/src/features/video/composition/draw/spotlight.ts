@@ -1,3 +1,5 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
+import { rectCorners } from '../motion/math';
 import {
   sceneSpotlightPath,
   sceneSpotlightOpeningPath,
@@ -439,25 +441,17 @@ function drawSpotlightLenses(
 }
 
 function projectedLensBounds(rect: SceneSpotlightRect, projection: QuickEditHomography) {
-  const points = [
-    { x: rect.x, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y },
-    { x: rect.x, y: rect.y + rect.height },
-    { x: rect.x + rect.width, y: rect.y + rect.height },
-  ].map((point) => projectQuickEditPoint(projection, point));
+  const points = rectCorners(rect).map((point) => projectQuickEditPoint(projection, point));
   if (points.some((point) => !point)) return null;
-  const x = points.map((point) => point!.x);
-  const y = points.map((point) => point!.y);
-  return {
-    x: Math.min(...x),
-    y: Math.min(...y),
-    width: Math.max(...x) - Math.min(...x),
-    height: Math.max(...y) - Math.min(...y),
-  };
+  return getCanvasPointsBounds(points.map((point) => point!));
 }
 
 /** Rounded openings become a bounded polygon in the same projected space as the window. */
-function projectedOpening(rect: SceneSpotlightRect, radius: number, matrix: QuickEditHomography) {
+export function projectedOpening(
+  rect: SceneSpotlightRect,
+  radius: number,
+  matrix?: QuickEditHomography
+) {
   const path = new Path2D();
   const r = Math.max(0, Math.min(radius, rect.width / 2, rect.height / 2));
   const corners = [
@@ -470,10 +464,11 @@ function projectedOpening(rect: SceneSpotlightRect, radius: number, matrix: Quic
   for (let corner = 0; corner < 4; corner++)
     for (let step = 0; step <= 12; step++) {
       const angle = ((corner - 1 + step / 12) * Math.PI) / 2;
-      const point = projectQuickEditPoint(matrix, {
+      const local = {
         x: corners[corner]![0]! + r * Math.cos(angle),
         y: corners[corner]![1]! + r * Math.sin(angle),
-      });
+      };
+      const point = matrix ? projectQuickEditPoint(matrix, local) : local;
       if (!point) continue;
       if (first) {
         path.moveTo(point.x, point.y);
