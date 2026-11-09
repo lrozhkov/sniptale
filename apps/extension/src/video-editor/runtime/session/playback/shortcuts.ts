@@ -1,3 +1,4 @@
+import { getComposedEventTargetElement } from '@sniptale/ui/dom-events';
 import { usePlaybackSpaceShortcut } from '../../../../composition/library-preview/shortcuts';
 import { useEffect } from 'react';
 import type { MutableRefObject } from 'react';
@@ -79,7 +80,11 @@ function handlePlaybackShortcutKeyDown(
   togglePlayback: () => void
 ): void {
   const latestState = latestStateRef.current;
-  if (!latestState.project || isEditableTarget(event.target) || isControlNavigation(event)) {
+  if (
+    !latestState.project ||
+    isEditableTarget(getComposedEventTargetElement(event)) ||
+    isControlNavigation(event)
+  ) {
     return;
   }
 

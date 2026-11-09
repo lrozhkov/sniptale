@@ -192,3 +192,63 @@ for (const width of [1280, 1920])
         );
       }
     });
+
+test('shadow review comment keeps Space and text navigation outside video shortcuts', async ({
+  page,
+}, info) => {
+  const host = await startHostServer();
+  try {
+    await page.setViewportSize({ width: 1920, height: 900 });
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'ru' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(
+      page,
+      'review-vp8-opus.webm',
+      { width: 160, height: 90, duration: 12 },
+      false,
+      true
+    );
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    await page
+      .getByRole('button', {
+        name: translate('gallery.videoReview.advancedEditing', 'ru'),
+        exact: true,
+      })
+      .click();
+    const editor = page.locator('[data-ui="gallery.videoReview.dialog"]');
+    await editor.evaluate((node) => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;left:30px;top:30px;z-index:2147483647';
+      const field = document.createElement('textarea');
+      field.setAttribute('aria-label', 'Design review comment');
+      overlay.attachShadow({ mode: 'open' }).append(field);
+      node.append(overlay);
+    });
+    const comment = page.getByRole('textbox', { name: 'Design review comment' });
+    await comment.fill('Замечание');
+    await comment.press('Space');
+    await comment.pressSequentially('по кадру');
+    await expect(comment).toHaveValue('Замечание по кадру');
+    await comment.press('Home');
+    await comment.press('Delete');
+    await expect(comment).toHaveValue('амечание по кадру');
+    const play = page.getByRole('button', {
+      name: translate('gallery.videoReview.play', 'ru'),
+      exact: true,
+    });
+    await expect(play).toBeVisible();
+    await page.screenshot({ path: info.outputPath('shadow-comment-typing.png'), fullPage: false });
+    await play.click();
+    await expect(
+      page.getByRole('button', { name: translate('gallery.videoReview.pause', 'ru'), exact: true })
+    ).toBeVisible();
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});
