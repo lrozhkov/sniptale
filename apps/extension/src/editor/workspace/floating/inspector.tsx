@@ -43,7 +43,7 @@ const INSPECTOR_COLLAPSED_HEADER_CLASS_NAME = [
 ].join(' ');
 
 const INSPECTOR_SCROLL_CLASS_NAME =
-  'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable]';
+  'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable_both-edges]';
 
 const LAYERS_PANEL_CLASS_NAME = floatingChromeClassNames(
   'absolute bottom-3 right-3 z-40 flex h-[15.5rem] min-h-14 flex-col',

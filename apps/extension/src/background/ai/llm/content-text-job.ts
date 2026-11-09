@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../../composition/persistence/secret-protection/model';
 import { createTextJobLifecycle } from './text-job-lifecycle';
 import {
   CONTENT_TEXT_FAILURE_CODES,
@@ -22,10 +23,13 @@ interface Dependencies {
   history: typeof saveRequestHistory;
 }
 /** Owns each content request from admission through cancellation and metadata settlement. */
-export function createContentTextJobService(overrides: Partial<Dependencies> = {}) {
+export function createContentTextJobService(
+  overrides: Partial<Dependencies> = {},
+  protection?: SecretProtectionPort
+) {
   const deps: Dependencies = {
     authorize: authorizeContentText,
-    resolveModel: resolveModelConfig,
+    resolveModel: (id, approved) => resolveModelConfig(id, approved, protection),
     prepare: prepareProviderContentAiEgress,
     request: requestChatCompletion,
     history: saveRequestHistory,

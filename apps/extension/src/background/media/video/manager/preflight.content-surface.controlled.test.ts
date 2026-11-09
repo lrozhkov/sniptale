@@ -112,6 +112,8 @@ async function expectDedicatedControlledCursorBootstrap(captureMode: CaptureMode
 
   expect(sendTabMessageMock).toHaveBeenCalledWith(5, {
     type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
+    cursorTrajectoryMode: 'blocks',
+    recordingEventsMode: 'blocks',
     recordingId: 'recording-1',
   });
 }

@@ -1,4 +1,14 @@
-export type DrawingTool = 'select' | 'pencil' | 'marker' | 'shape' | 'arrow' | 'blur' | 'text';
+import { createDefaultSimplifySettings, type SimplifySettings } from '../simplify/settings';
+
+export type DrawingTool =
+  | 'select'
+  | 'pencil'
+  | 'marker'
+  | 'shape'
+  | 'arrow'
+  | 'blur'
+  | 'text'
+  | 'simplify';
 
 export interface DrawingPoint {
   readonly x: number;
@@ -106,20 +116,53 @@ export interface DrawingTextObject extends DrawingRotatableObjectBase {
   readonly fontSize: number;
 }
 
+/** A local PNG raster. Result coordinates are local to the selected region. */
+export interface DrawingSimplifySnapshot {
+  readonly dataUrl: string;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** The retained source raster mapped into document coordinates. */
+export interface DrawingSimplifySource extends DrawingSimplifySnapshot {
+  readonly bounds: DrawingBounds;
+}
+
+export interface DrawingSimplifyObject extends DrawingRotatableObjectBase {
+  readonly kind: 'simplify';
+  readonly bounds: DrawingBounds;
+  readonly settings: SimplifySettings;
+  readonly result?: DrawingSimplifySnapshot;
+  readonly source?: DrawingSimplifySource;
+  /** The retained result needs recomputation after its lower-layer source changed. */
+  readonly sourceDirty?: boolean;
+  /** Identifies the engine that produced the retained PNG result. */
+  readonly engineVersion?: string;
+}
+
 export type DrawingObject =
   | DrawingPencilObject
   | DrawingMarkerObject
   | DrawingShapeObject
   | DrawingArrowObject
   | DrawingBlurObject
-  | DrawingTextObject;
+  | DrawingTextObject
+  | DrawingSimplifyObject;
 
 export interface DrawingDocumentV1 {
   readonly version: 1;
+  readonly objects: readonly Exclude<DrawingObject, DrawingSimplifyObject>[];
+}
+
+export interface DrawingDocumentV2 {
+  readonly version: 2;
   readonly objects: readonly DrawingObject[];
 }
 
+export type DrawingDocument = DrawingDocumentV1 | DrawingDocumentV2;
+
 export interface DrawingToolDefaults {
+  readonly simplify: SimplifySettings;
   readonly pencil: { readonly color: string; readonly width: number };
   readonly marker: {
     readonly color: string;
@@ -201,6 +244,7 @@ export function createDefaultDrawingToolDefaults(
   const red = palette[4] ?? palette[0] ?? DEFAULT_DRAWING_COLORS[4];
   const yellow = palette[3] ?? red;
   return {
+    simplify: createDefaultSimplifySettings(),
     pencil: { color: red, width: 4 },
     marker: { color: yellow, opacity: 0.3, width: 28 },
     shape: { color: red, fillColor: null, kind: 'rectangle', width: 4 },

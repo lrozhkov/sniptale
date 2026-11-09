@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import {
   createReviewPreviewPresentation,
+  createReviewPresentationPaintClock,
   type ReviewPresentationState,
 } from './preview-presentation';
 
@@ -17,7 +18,7 @@ const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
-function fixture() {
+function fixture(allowPreparedPlayingFrames = false, maximumInFlight: 1 | 2 = 1) {
   let time = 0;
   let id = 0;
   const ticks = new Map<number, () => void>();
@@ -33,6 +34,8 @@ function fixture() {
   const completed = lease('completed');
   const publishTimes: number[] = [];
   const dependencies = {
+    allowPreparedPlayingFrames,
+    maximumInFlight: () => maximumInFlight,
     requestTick: (callback: () => void) => {
       ticks.set(++id, callback);
       return id;
@@ -61,7 +64,7 @@ function fixture() {
         return completed;
       }
     ),
-    publish: vi.fn(() => {
+    publish: vi.fn((_completed: string) => {
       events.push('publish');
       publishTimes.push(time);
     }),
@@ -137,16 +140,17 @@ it.each(['invalidate', 'dispose'] as const)(
 );
 
 it.each([15, 24, 30, 60])(
-  'caps all publications at %i FPS while synthetic time advances without source callbacks',
+  'keeps %i FPS publication slots within one browser tick without source callbacks',
   async (frameRate) => {
     const f = fixture();
     f.scheduler.update({ ...f.state, frameRate });
     for (let now = 0; now <= 1000; now += 5) await f.step(now);
-    expect(f.publishTimes.length).toBeGreaterThan(10);
-    for (let i = 1; i < f.publishTimes.length; i++)
-      expect(f.publishTimes[i]! - f.publishTimes[i - 1]!).toBeGreaterThanOrEqual(
-        1000 / frameRate - 1e-7
-      );
+    expect(f.publishTimes.length).toBe(Math.floor(frameRate) + 1);
+    for (let i = 0; i < f.publishTimes.length; i++) {
+      const slot = (i * 1000) / frameRate;
+      expect(f.publishTimes[i]!).toBeGreaterThanOrEqual(slot - 0.1);
+      expect(f.publishTimes[i]!).toBeLessThanOrEqual(slot + 5);
+    }
     expect(f.dependencies.capture.mock.calls.at(-1)![1]).toBeGreaterThan(0.9);
     expect(f.dependencies.onError).not.toHaveBeenCalled();
     f.scheduler.dispose();
@@ -316,7 +320,7 @@ it.each(['playing', 'interacting'] as const)(
   }
 );
 
-it('drops early completions while preserving publication spacing and releasing leases', async () => {
+it('holds early completed frames until publication cadence instead of discarding rendered work', async () => {
   const f = fixture();
   f.dependencies.render.mockImplementationOnce(() => {
     f.advance(50);
@@ -327,11 +331,13 @@ it('drops early completions while preserving publication spacing and releasing l
   await f.step(66);
   expect(f.dependencies.render).toHaveBeenCalledTimes(2);
   expect(f.publishTimes).toEqual([50]);
-  expect(f.completed.release).toHaveBeenCalledTimes(2);
-  expect(f.captured.release).toHaveBeenCalledTimes(2);
-  expect(f.prepared.release).toHaveBeenCalledTimes(2);
+  expect(f.completed.release).toHaveBeenCalledTimes(1);
+  expect(f.captured.release).toHaveBeenCalledTimes(1);
+  expect(f.prepared.release).toHaveBeenCalledTimes(1);
   await f.step(100);
   expect(f.publishTimes).toEqual([50, 100]);
+  expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+  expect(f.completed.release).toHaveBeenCalledTimes(2);
   expect(f.dependencies.onError).not.toHaveBeenCalled();
   f.scheduler.dispose();
 });
@@ -398,5 +404,323 @@ it('retains a changed paused interaction after a completion falls before the pub
   await f.step(100);
   expect(f.publishTimes).toEqual([50, 100]);
   expect(f.dependencies.onError).not.toHaveBeenCalled();
+  f.scheduler.dispose();
+});
+
+it.each(['invalidate', 'hidden', 'dispose'] as const)(
+  'releases a completed frame waiting for cadence after %s',
+  async (reason) => {
+    const f = fixture();
+    f.dependencies.render.mockImplementationOnce(() => {
+      f.advance(50);
+      return f.completed;
+    });
+    f.scheduler.update(f.state);
+    await f.step(0);
+    await f.step(66);
+    expect(f.completed.release).toHaveBeenCalledTimes(1);
+    if (reason === 'dispose') f.scheduler.dispose();
+    else if (reason === 'hidden') f.scheduler.update({ ...f.state, visible: false });
+    else f.scheduler.invalidate();
+    await flush();
+    expect(f.completed.release).toHaveBeenCalledTimes(2);
+    expect(f.captured.release).toHaveBeenCalledTimes(2);
+    expect(f.prepared.release).toHaveBeenCalledTimes(2);
+    expect(f.publishTimes).toEqual([50]);
+    expect(f.dependencies.onError).not.toHaveBeenCalled();
+    f.scheduler.dispose();
+    expect(f.ticks.size).toBe(0);
+  }
+);
+
+it('keeps 30 FPS cadence when browser ticks are quantized to tenths of a millisecond', async () => {
+  const f = fixture();
+  f.scheduler.update(f.state);
+  for (let frame = 0; frame <= 10; frame++) await f.step(Math.round((frame * 1000) / 3) / 10);
+  expect(f.publishTimes).toHaveLength(11);
+  f.scheduler.dispose();
+});
+
+it('publishes every available tick when no frame-rate limit is selected', async () => {
+  const f = fixture();
+  f.scheduler.update({ ...f.state, frameRate: null });
+  for (let now = 0; now <= 30; now += 5) await f.step(now);
+  expect(f.publishTimes).toEqual([0, 5, 10, 15, 20, 25, 30]);
+  f.scheduler.dispose();
+});
+
+it('admits browser preparation after paint and cancels both callback phases', () => {
+  vi.useFakeTimers();
+  const frames = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (key: number) => frames.delete(key));
+  try {
+    const clock = createReviewPresentationPaintClock();
+    const run = vi.fn();
+    const cancelledFrame = clock.requestTick(run);
+    clock.cancelTick(cancelledFrame);
+    expect(frames.size).toBe(0);
+    const cancelledTask = clock.requestTick(run);
+    frames.get(id)!(0);
+    clock.cancelTick(cancelledTask);
+    vi.runOnlyPendingTimers();
+    expect(run).not.toHaveBeenCalled();
+    clock.requestTick(run);
+    frames.get(id)!(0);
+    expect(run).not.toHaveBeenCalled();
+    vi.runOnlyPendingTimers();
+    expect(run).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  }
+});
+
+function browserClockFixture(allowPreparedPlayingFrames: boolean) {
+  vi.useFakeTimers();
+  const frames = new Map<number, FrameRequestCallback>();
+  let id = 0;
+  let now = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (key: number) => frames.delete(key));
+  const f = fixture(allowPreparedPlayingFrames);
+  Object.assign(f.dependencies, createReviewPresentationPaintClock());
+  return {
+    ...f,
+    frames,
+    async frame(time: number) {
+      f.advance(time - now);
+      now = time;
+      const callbacks = [...frames.values()];
+      frames.clear();
+      callbacks.forEach((callback) => callback(time));
+      await flush();
+    },
+    async task() {
+      await vi.runOnlyPendingTimersAsync();
+      await flush();
+    },
+    dispose() {
+      f.scheduler.dispose();
+      vi.useRealTimers();
+      vi.unstubAllGlobals();
+    },
+  };
+}
+
+it('admits only opted-in successfully published steady playing frames without another task', async () => {
+  const f = browserClockFixture(true);
+  try {
+    f.scheduler.update(f.state);
+    await f.frame(0);
+    expect(f.dependencies.prepare).not.toHaveBeenCalled();
+    await f.task();
+    expect(f.dependencies.publish).toHaveBeenCalledOnce();
+    await f.frame(40);
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(0);
+    f.scheduler.update({ ...f.state, generation: '2', scene: 'latest' });
+    await f.frame(80);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(2);
+    await f.task();
+    expect(f.dependencies.prepare.mock.lastCall![0]).toMatchObject({
+      generation: '2',
+      scene: 'latest',
+    });
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(3);
+    f.scheduler.invalidate();
+    await f.frame(120);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(3);
+    await f.task();
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(4);
+    f.scheduler.dispose();
+    expect(f.frames.size).toBe(0);
+  } finally {
+    f.dispose();
+  }
+});
+
+it('keeps non-opted-in playing producers behind the after-paint task', async () => {
+  const f = browserClockFixture(false);
+  try {
+    f.scheduler.update(f.state);
+    await f.frame(0);
+    await f.task();
+    await f.frame(40);
+    expect(f.dependencies.publish).toHaveBeenCalledOnce();
+    await f.task();
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+  } finally {
+    f.dispose();
+  }
+});
+
+it.each([
+  { playing: false, interacting: false, detailedPaused: true },
+  { playing: true, interacting: true, detailedPaused: false },
+])('keeps paused and interacting admission after paint: %j', async (mode) => {
+  const f = browserClockFixture(true);
+  try {
+    f.scheduler.update({ ...f.state, ...mode });
+    await f.frame(0);
+    expect(f.dependencies.prepare).not.toHaveBeenCalled();
+    await f.task();
+    f.scheduler.update({ ...f.state, ...mode, scene: 'changed', generation: '2' });
+    await f.frame(40);
+    expect(f.dependencies.prepare).toHaveBeenCalledOnce();
+    await f.task();
+    expect(f.dependencies.publish).toHaveBeenCalledTimes(2);
+  } finally {
+    f.dispose();
+  }
+});
+
+it('revokes prepared frame admission across visibility and failed publication', async () => {
+  const f = browserClockFixture(true);
+  try {
+    f.scheduler.update(f.state);
+    await f.frame(0);
+    await f.task();
+    f.scheduler.update({ ...f.state, visible: false });
+    f.scheduler.update(f.state);
+    await f.frame(40);
+    expect(f.dependencies.publish).toHaveBeenCalledOnce();
+    f.dependencies.publish.mockImplementationOnce(() => {
+      throw new Error('publication failed');
+    });
+    await f.task();
+    expect(f.dependencies.onError).toHaveBeenCalledOnce();
+    f.scheduler.invalidate();
+    await f.frame(80);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(2);
+    await f.task();
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(3);
+  } finally {
+    f.dispose();
+  }
+});
+
+async function warmConcurrentFixture() {
+  const f = fixture(true, 2);
+  f.scheduler.update({ ...f.state, frameRate: 60 });
+  await f.step(0);
+  expect(f.dependencies.publish).toHaveBeenCalledOnce();
+  f.dependencies.prepare.mockClear();
+  f.dependencies.capture.mockClear();
+  f.dependencies.render.mockClear();
+  f.dependencies.publish.mockClear();
+  f.prepared.release.mockClear();
+  f.captured.release.mockClear();
+  f.completed.release.mockClear();
+  return f;
+}
+
+it('overlaps two playing renders, backpressures a third and publishes reversed completions in order', async () => {
+  const f = await warmConcurrentFixture();
+  const first = deferred<typeof f.completed>();
+  const second = deferred<typeof f.completed>();
+  const one = f.lease('one'),
+    two = f.lease('two');
+  f.dependencies.render.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+  f.scheduler.update({ ...f.state, frameRate: 60 });
+  await f.step(17);
+  await f.step(34);
+  expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+  await f.step(51);
+  expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+  second.resolve(two);
+  await flush();
+  expect(f.dependencies.publish).not.toHaveBeenCalled();
+  first.resolve(one);
+  await flush();
+  await flush();
+  expect(f.dependencies.publish.mock.calls[0]?.[0]).toBe('one');
+  await f.step(68);
+  await flush();
+  expect(f.dependencies.publish.mock.calls[1]?.[0]).toBe('two');
+  f.scheduler.dispose();
+  await flush();
+  expect(one.release).toHaveBeenCalledOnce();
+  expect(two.release).toHaveBeenCalledOnce();
+});
+
+it.each(['invalidate', 'dispose'] as const)(
+  'drains both active requests after %s before another generation can prepare',
+  async (operation) => {
+    const f = await warmConcurrentFixture();
+    const one = deferred<typeof f.completed>(),
+      two = deferred<typeof f.completed>();
+    const first = f.lease('one'),
+      second = f.lease('two');
+    f.dependencies.render.mockReturnValueOnce(one.promise).mockReturnValueOnce(two.promise);
+    f.scheduler.update({ ...f.state, frameRate: 60 });
+    await f.step(17);
+    await f.step(34);
+    expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+    if (operation === 'dispose') f.scheduler.dispose();
+    else f.scheduler.update({ ...f.state, generation: 'next', frameRate: 60 });
+    for (const call of f.dependencies.render.mock.calls) expect(call[3].aborted).toBe(true);
+    two.resolve(second);
+    await flush();
+    await f.step(51);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(2);
+    one.resolve(first);
+    await flush();
+    await flush();
+    expect(f.dependencies.publish).not.toHaveBeenCalled();
+    expect(first.release).toHaveBeenCalledOnce();
+    expect(second.release).toHaveBeenCalledOnce();
+    expect(f.captured.release).toHaveBeenCalledTimes(2);
+    await f.step(68);
+    expect(f.dependencies.prepare).toHaveBeenCalledTimes(operation === 'dispose' ? 2 : 3);
+    f.scheduler.dispose();
+    await flush();
+  }
+);
+
+it('aborts the sibling request after a render failure and retains its input until it settles', async () => {
+  const f = await warmConcurrentFixture();
+  const one = deferred<typeof f.completed>(),
+    two = deferred<typeof f.completed>();
+  f.dependencies.render.mockReturnValueOnce(one.promise).mockReturnValueOnce(two.promise);
+  f.scheduler.update({ ...f.state, frameRate: 60 });
+  await f.step(17);
+  await f.step(34);
+  const failure = new Error('queue failed');
+  one.reject(failure);
+  await flush();
+  expect(f.dependencies.onError).toHaveBeenCalledExactlyOnceWith(failure);
+  expect(f.dependencies.render.mock.calls[1]![3].aborted).toBe(true);
+  expect(f.captured.release).toHaveBeenCalledTimes(1);
+  two.resolve(f.completed);
+  await flush();
+  await flush();
+  expect(f.captured.release).toHaveBeenCalledTimes(2);
+  expect(f.dependencies.publish).not.toHaveBeenCalled();
+  await f.step(68);
+  expect(f.dependencies.render).toHaveBeenCalledTimes(2);
+  f.scheduler.dispose();
+});
+
+it('keeps cold scene preparation single until its first frame has published', async () => {
+  const f = fixture(true, 2);
+  const preparing = deferred<typeof f.prepared>();
+  f.dependencies.prepare.mockReturnValueOnce(preparing.promise);
+  f.scheduler.update({ ...f.state, frameRate: 60 });
+  await f.step(0);
+  await f.step(17);
+  expect(f.dependencies.prepare).toHaveBeenCalledOnce();
+  expect(f.dependencies.render).not.toHaveBeenCalled();
+  preparing.resolve(f.prepared);
+  await flush();
+  await flush();
+  expect(f.dependencies.publish).toHaveBeenCalledOnce();
   f.scheduler.dispose();
 });

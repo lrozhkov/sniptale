@@ -1,4 +1,7 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { runCommand } from '../../qa/runtime/process/shared-process.mjs';
 
 import { expect, it } from 'vitest';
 
@@ -30,6 +33,8 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
       'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-page-toolbar-fit.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-gallery-header-gpu.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-click-lens-overflow.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-export-cancellation.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-focus-border.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-image-editor-persistence.spec.ts',
@@ -52,6 +57,21 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
     suite: 'security',
   });
 });
+
+it.each([
+  'tooling/test/e2e/extension-critical/extension-critical-gallery-header-gpu.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-click-lens-overflow.spec.ts',
+])(
+  'routes the pixel guard %s through critical and all without expanding smoke or security',
+  (spec) => {
+    for (const suite of ['critical', 'all']) {
+      const matches = parseE2eOptions(['--suite', suite]).specs.filter((file) => file === spec);
+      expect(matches).toEqual([spec]);
+    }
+    for (const suite of ['smoke', 'security'])
+      expect(parseE2eOptions(['--suite', suite]).specs).not.toContain(spec);
+  }
+);
 
 it('builds both production and instrumented artifacts for the security suite', () => {
   const builds: string[][] = [];
@@ -144,6 +164,8 @@ it('records Playwright result after a green E2E build', () => {
       'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-page-toolbar-fit.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-gallery-header-gpu.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-click-lens-overflow.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-export-cancellation.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-focus-border.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-image-editor-persistence.spec.ts',
@@ -204,3 +226,122 @@ it('isolates every browser E2E build from the canonical product dist directory',
   expect(viteSource).not.toContain("'dist-security-e2e'");
   expect(viteSource).not.toContain("'dist-release-e2e'");
 });
+
+it('keeps performance opt-in and forwards an individual case with one worker', () => {
+  expect(parseE2eOptions(['--suite', 'all']).specs).not.toContain(
+    'tooling/test/e2e/preview-performance.spec.ts'
+  );
+  expect(playwrightConfig.testIgnore).toContain('**/preview-performance*.spec.ts');
+  const commands: string[][] = [];
+  const builds: string[][] = [];
+  runE2e({
+    argv: ['--suite', 'preview-performance', '--case', 'quick preview native: plain', '--list'],
+    buildRunner: (args) => {
+      builds.push(args);
+      return { status: 0 };
+    },
+    commandRunner: (_command, args) => {
+      commands.push(args);
+      return { status: 0 };
+    },
+  });
+  expect(builds).toEqual([]);
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toEqual(
+    expect.arrayContaining([
+      '--workers=1',
+      '--list',
+      '--grep',
+      '(?:^| )quick preview native: plain$',
+      '--config=tooling/test/e2e/preview-performance.config.ts',
+    ])
+  );
+  expect(() => parseE2eOptions(['--suite', 'critical', '--case', 'plain'])).toThrow(
+    /require --suite preview-performance/u
+  );
+});
+
+it('treats a dot in a selected performance test name as a literal', () => {
+  let grep: string | undefined;
+  runE2e({
+    argv: ['--suite', 'preview-performance', '--case', 'sample.case'],
+    buildRunner: () => ({ status: 0 }),
+    commandRunner: (_command, args) => {
+      grep = args[args.indexOf('--grep') + 1];
+      return { status: 0 };
+    },
+  });
+  expect(grep).toBe(String.raw`(?:^| )sample\.case$`);
+});
+
+it('lists optional cases without a display server or an artifact build', () => {
+  const commands: string[] = [];
+  const result = runE2e({
+    argv: ['--suite', 'preview-performance', '--list', '--headed'],
+    buildRunner: () => {
+      throw new Error('List must not build');
+    },
+    commandRunner: (command) => {
+      commands.push(command);
+      return { status: 0 };
+    },
+  });
+  expect(result.steps.map((step) => step.status)).toEqual(['ok', 'ok']);
+  expect(commands).toEqual(['npm']);
+});
+
+it('selects only the named performance case when catalog names overlap', () => {
+  let grep = '';
+  const title = 'full editor manual1080p30: annotation';
+  runE2e({
+    argv: ['--suite', 'preview-performance', '--case', title, '--list'],
+    commandRunner: (_command, args) => {
+      grep = args[args.indexOf('--grep') + 1]!;
+      return { status: 0 };
+    },
+  });
+  const cli = createRequire(import.meta.url).resolve('@playwright/test/cli');
+  const suffixes = ['-border', '-drag', '-border-drag'];
+  const catalogs: string[][] = [];
+  for (const filter of [[], ['--grep', grep]]) {
+    const listed = runCommand(
+      process.execPath,
+      [
+        cli,
+        'test',
+        '--config=tooling/test/e2e/preview-performance.config.ts',
+        '--list',
+        '--reporter=json',
+        ...filter,
+      ],
+      {
+        env: {
+          SNIPTALE_PREVIEW_PERFORMANCE_CASES:
+            'annotation,annotation-border,annotation-drag,annotation-border-drag',
+          SNIPTALE_PREVIEW_PERFORMANCE_MODES: 'manual1080p30',
+          SNIPTALE_PREVIEW_PERFORMANCE_EDITORS: 'native',
+        },
+      }
+    );
+    expect(listed.status, listed.stderr).toBe(0);
+    const report: unknown = JSON.parse(listed.stdout);
+    if (!isRecord(report) || !Array.isArray(report['suites']))
+      throw new Error('Playwright did not return its collected performance catalog.');
+    expect(report['errors']).toEqual([]);
+    expect(report['suites']).toHaveLength(1);
+    const suite = report['suites'][0];
+    if (!isRecord(suite) || !Array.isArray(suite['specs']))
+      throw new Error('Playwright performance catalog has no collected cases.');
+    catalogs.push(
+      suite['specs'].map((spec: unknown) => {
+        if (!isRecord(spec) || typeof spec['title'] !== 'string')
+          throw new Error('Playwright returned a case without a title.');
+        return spec['title'];
+      })
+    );
+  }
+  expect(catalogs[0]).toEqual(
+    expect.arrayContaining([title, ...suffixes.map((suffix) => title + suffix)])
+  );
+  expect(catalogs[1]).toEqual([title]);
+}, 30_000);

@@ -31,6 +31,9 @@ it('keeps test fixtures out of production typecheck projects', () => {
   expect(config.exclude).toContain(repoPath('packages/platform/src/**/test-fixtures*'));
   expect(config.compilerOptions).not.toHaveProperty('composite');
   expect(config.files).toContain(`${REPO_ROOT}/apps/extension/src/vite-env.d.ts`);
+  expect(config.files).toContain(
+    repoPath('apps/extension/src/platform/i18n/catalog-projections.d.ts')
+  );
   expect(config.files).toContain(`${REPO_ROOT}/packages/ui/src/styles/imports.d.ts`);
   expect(config.files).toContain(
     `${REPO_ROOT}/packages/runtime-contracts/src/video/messages/index.literals.d.ts`
@@ -51,6 +54,9 @@ it('keeps app ambient declarations out of package typecheck projects', () => {
 
   const config = createProjectConfig(foundationProject!);
   expect(config.files).not.toContain(`${REPO_ROOT}/apps/extension/src/vite-env.d.ts`);
+  expect(config.files).not.toContain(
+    repoPath('apps/extension/src/platform/i18n/catalog-projections.d.ts')
+  );
   expect(config.files).not.toContain(`${REPO_ROOT}/packages/ui/src/styles/imports.d.ts`);
   expect(config.files).not.toContain(
     `${REPO_ROOT}/packages/runtime-contracts/src/video/messages/index.literals.d.ts`

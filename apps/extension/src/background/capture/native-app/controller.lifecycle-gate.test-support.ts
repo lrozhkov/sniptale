@@ -20,7 +20,7 @@ export function createScreenshotStart(captureId: string): AppScreenshotStartMess
     mimeType: 'image/png',
     mode: 'screen',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     sha256: SHA256,
     totalBytes: 1,
     type: 'app.screenshot.start',
@@ -37,7 +37,7 @@ export function createScreenshotChunk(captureId: string): AppScreenshotChunkMess
     chunkRawBytes: 1,
     chunkSha256: SHA256,
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.chunk',
   };
 }
@@ -46,7 +46,7 @@ export function createScreenshotCommit(captureId: string): AppScreenshotCommitMe
   return {
     captureId,
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.commit',
   };
 }
@@ -66,7 +66,7 @@ export function createRecordingStarted(recordingId: string): AppRecordingStarted
       videoBitrateMbpsOverride: null,
       warnings: [],
     },
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId,
     requestedQuality: {
       audioBitrateKbps: 160,
@@ -96,7 +96,7 @@ export function createRecordingChunk(recordingId: string): AppRecordingChunkMess
     chunkRawBytes: 1,
     chunkSha256: SHA256,
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId,
     type: 'app.recording.chunk',
   };
@@ -112,7 +112,7 @@ export function createRecordingStopped(recordingId: string): AppRecordingStopped
     height: 720,
     mimeType: 'video/mp4',
     openEditor: false,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId,
     sha256: SHA256,
     telemetry: null,

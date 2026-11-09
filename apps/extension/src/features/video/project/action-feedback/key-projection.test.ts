@@ -1,3 +1,4 @@
+import { applyVideoProjectMutationPatch } from '../mutation';
 import { isExportReadyVideoProject } from '../validation/root';
 import { resolveVideoCompositionActions } from '../../composition/timeline/frame/actions';
 import { expect, it } from 'vitest';
@@ -181,3 +182,76 @@ it.each([1, 2])(
     expect(candidate).toEqual(before);
   }
 );
+
+it('updates source-wide key defaults without enumerating recorded commands and preserves per-key inheritance', () => {
+  const inline = fixture();
+  const event = inline.actionEvents[0]!;
+  const group = inline.actionFeedback![0]!;
+  const project = applyVideoProjectMutationPatch(
+    { ...inline, actionEvents: [] },
+    {
+      actionFeedback: [
+        {
+          ...group,
+          signals: [],
+          events: {
+            format: 'recording-events-v1',
+            formatVersion: 1,
+            algorithm: 'lossless-v1',
+            encoding: 'json-utf8-v1',
+            eventStreamId: 'a'.repeat(32),
+            state: 'complete',
+            finalized: true,
+            totalBlocks: 10000,
+            totalRecords: 1000000,
+            totalBytes: 50000000,
+            streamSha256: 'b'.repeat(64),
+          },
+        },
+      ],
+    }
+  );
+  const targets = getVideoProjectKeyFeedbackTargets(project);
+  expect(targets).toEqual([
+    {
+      recordingId: group.recordingId,
+      sourceInstanceId: group.sourceInstanceId,
+      sourceEventId: null,
+    },
+  ]);
+  const enabled = patchVideoProjectKeyFeedback(project, targets, {
+    enabled: true,
+    style: { color: '#12345680' },
+  });
+  expect(enabled.actionFeedback![0]!.keyDefaults).toMatchObject({
+    enabled: true,
+    style: { color: '#12345680' },
+  });
+  expect(getVideoProjectKeyStyle(enabled, event)).toEqual(enabled.actionFeedback![0]!.keyDefaults);
+  expect(isExportReadyVideoProject(enabled)).toBe(true);
+  expect(isExportReadyVideoProject({ ...enabled, version: 49 })).toBe(false);
+  const individual = {
+    recordingId: group.recordingId,
+    sourceInstanceId: group.sourceInstanceId,
+    sourceEventId: 'key',
+  };
+  const changed = patchVideoProjectKeyFeedback(enabled, [individual], { style: { fontSize: 48 } });
+  expect(getVideoProjectKeyStyle(changed, event)).toMatchObject({
+    enabled: true,
+    style: { color: '#12345680', fontSize: 48 },
+  });
+  const disabled = patchVideoProjectKeyFeedback(changed, targets, { enabled: false });
+  expect(disabled.actionFeedback![0]!.keyDefaults?.enabled).toBe(false);
+  expect(disabled.actionFeedback![0]!.keyStyles?.[0]?.enabled).toBe(false);
+  const reset = patchVideoProjectKeyFeedback(disabled, targets, null);
+  expect(reset.actionFeedback![0]).not.toHaveProperty('keyDefaults');
+  expect(reset.actionFeedback![0]).not.toHaveProperty('keyStyles');
+  expect(reset.actionEvents).toEqual([]);
+  expect(reset.actionFeedback![0]!.signals).toEqual([]);
+  expect(project.actionFeedback![0]).not.toHaveProperty('keyDefaults');
+  expect(
+    patchVideoProjectKeyFeedback(project, [{ ...individual, sourceEventId: 'unsafe text' }], {
+      enabled: true,
+    })
+  ).toBe(project);
+});

@@ -1,4 +1,6 @@
-import { parseReviewKeyAnimations } from './key-animation';
+import { isVideoProjectActionPresentationOverride } from '../validation/interaction';
+import { parseReviewKeyAnimations, parseReviewKeyDefaults } from './key-animation';
+import { isRecordingEventsDescriptor } from '../recording-events/records';
 import { isRecord, isBoundedNumber } from '../validation/primitives';
 import { isRecordingTelemetrySignal } from '../validation/recording-telemetry';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
@@ -271,7 +273,8 @@ export function parseVideoProjectActionFeedback(
   const ids = new Set<string>();
   let settingsCount = 0,
     styleCount = 0,
-    keyStyleCount = 0;
+    keyStyleCount = 0,
+    overrideCount = 0;
   for (const item of raw) {
     if (
       !isRecord(item) ||
@@ -284,6 +287,9 @@ export function parseVideoProjectActionFeedback(
             'signals',
             'gestureStyles',
             'keyStyles',
+            'events',
+            'keyDefaults',
+            'actionOverrides',
           ].includes(key)
       ) ||
       typeof item['recordingId'] !== 'string' ||
@@ -297,19 +303,30 @@ export function parseVideoProjectActionFeedback(
     const settings = parseReviewActionAudio(item['settings']);
     const styles = parseReviewClickAnimations(item['gestureStyles']);
     const keys = parseReviewKeyAnimations(item['keyStyles']);
+    const keyDefaults = parseReviewKeyDefaults(item['keyDefaults']);
+    const actionOverrides = parseActionOverrides(item['actionOverrides']);
     const signals = item['signals'];
+    const events = item['events'];
     if (
       !settings ||
       styles === null ||
       keys === null ||
+      keyDefaults === null ||
+      actionOverrides === null ||
+      (actionOverrides !== undefined && item['events'] === undefined) ||
+      (keyDefaults !== undefined && item['events'] === undefined) ||
       !Array.isArray(signals) ||
-      !signals.every(isRecordingTelemetrySignal)
+      !signals.every(isRecordingTelemetrySignal) ||
+      (events !== undefined &&
+        (!isRecordingEventsDescriptor(events) || !events.finalized || signals.length !== 0))
     )
       return null;
     settingsCount += settings.length;
     styleCount += styles?.length ?? 0;
-    keyStyleCount += keys?.length ?? 0;
+    overrideCount += actionOverrides?.length ?? 0;
+    keyStyleCount += (keys?.length ?? 0) + (keyDefaults ? 1 : 0);
     if (
+      overrideCount > 10000 ||
       settingsCount > 10000 ||
       styleCount > 10000 ||
       keyStyleCount > 10000 ||
@@ -324,8 +341,13 @@ export function parseVideoProjectActionFeedback(
       sourceInstanceId: item['sourceInstanceId'],
       settings,
       signals: signals.map((signal) => structuredClone(signal)),
+      ...(events !== undefined && isRecordingEventsDescriptor(events)
+        ? { events: structuredClone(events) }
+        : {}),
       ...(styles ? { gestureStyles: styles } : {}),
       ...(keys ? { keyStyles: keys } : {}),
+      ...(keyDefaults ? { keyDefaults } : {}),
+      ...(actionOverrides ? { actionOverrides } : {}),
     });
   }
   return groups;
@@ -363,4 +385,46 @@ export function reviewGestureAreaBounds(
   const min = key === 'width' || key === 'height' ? 0.1 : 0;
   const opposite = key === 'x' ? 'width' : key === 'y' ? 'height' : key === 'width' ? 'x' : 'y';
   return { min, max: (1 - area[opposite]) * 100 };
+}
+
+/** Limits authored settings independently of the source history length. */
+function parseActionOverrides(raw: unknown): VideoProjectActionFeedback['actionOverrides'] | null {
+  if (raw === undefined) return undefined;
+  if (!Array.isArray(raw) || raw.length > 10000) return null;
+  const result: NonNullable<VideoProjectActionFeedback['actionOverrides']> = [];
+  const ids = new Set<string>();
+  for (const item of raw) {
+    if (
+      !isRecord(item) ||
+      Object.keys(item).some((key) => key !== 'id' && key !== 'presentation') ||
+      typeof item['id'] !== 'string' ||
+      !/^[A-Za-z0-9._:-]{1,128}$/.test(item['id']) ||
+      ids.has(item['id'])
+    )
+      return null;
+    const presentation = item['presentation'];
+    if (
+      !isVideoProjectActionPresentationOverride(presentation) ||
+      Object.keys(presentation).some(
+        (key) =>
+          ![
+            'clickStyle',
+            'keyStyle',
+            'easing',
+            'enabled',
+            'preset',
+            'duration',
+            'offset',
+            'point',
+          ].includes(key)
+      ) ||
+      (presentation.point !== undefined &&
+        (!isBoundedNumber(presentation.point.x, 0, 1) ||
+          !isBoundedNumber(presentation.point.y, 0, 1)))
+    )
+      return null;
+    ids.add(item['id']);
+    result.push({ id: item['id'], presentation: structuredClone(presentation) });
+  }
+  return result;
 }

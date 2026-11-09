@@ -24,15 +24,18 @@ export function CompactWorkspacePopoverContent({
   hasImage?: boolean;
 }) {
   const params = createFloatingWorkspaceCommandParams({ documentController, hasImage });
-  // The color field already exposes the same palette in its picker.
-  const commands = buildGridCompactCommands(params).filter(
-    (command) =>
-      command.id !== 'grid-presets' &&
-      (params.workspace.gridEnabled || command.id === 'grid-toggle')
-  );
+  const allCommands = buildGridCompactCommands(params);
+  const visibleIds = [
+    'grid-toggle',
+    'grid-snap-toggle',
+    ...(params.workspace.gridEnabled || params.workspace.gridSnapEnabled ? ['grid-size'] : []),
+    ...(params.workspace.gridEnabled ? ['grid-color'] : []),
+  ];
+  const commands = visibleIds.flatMap((id) => allCommands.filter((command) => command.id === id));
 
   return (
     <div
+      data-picker-boundary
       className={[
         'sniptale-inspector-surface editor-inspector-surface',
         'max-h-[calc(100dvh-6.5rem)] max-[720px]:max-h-[calc(100dvh-10.5rem)]',
@@ -41,20 +44,33 @@ export function CompactWorkspacePopoverContent({
     >
       <section aria-label={translate('editor.toolbar.viewSettings')}>
         <div className="space-y-3">
-          <CompactWorkspaceColorPanel params={params} />
-          <div className="space-y-2 border-t border-[color:var(--sniptale-color-border-soft)] pt-2">
+          <section className="sniptale-parameter-stack">
+            <h3 className="m-0 px-2 text-[13px] font-medium leading-8">
+              {translate('windowHeader.appearance')}
+            </h3>
+            <CompactWorkspaceColorPanel params={params} />
+          </section>
+          <section className="sniptale-parameter-stack">
+            <h3 className="m-0 px-2 text-[13px] font-medium leading-8">
+              {translate('editor.compact.workspaceSelection')}
+            </h3>
             <SelectionVisibilitySetting />
-            <div className="space-y-2 border-t border-[color:var(--sniptale-color-border-soft)] pt-2">
-              {commands.map((command) => (
-                <div key={command.id}>
-                  {command.active === undefined ? (
-                    renderFloatingToolbarCommandBody(command, { hideLabel: true })
-                  ) : (
-                    <div
-                      data-inspector-toggle
-                      className="flex min-h-8 items-center justify-between gap-3"
-                    >
-                      <span className="min-w-0 text-xs">{command.title}</span>
+          </section>
+          <section className="sniptale-parameter-stack">
+            <h3 className="m-0 px-2 text-[13px] font-medium leading-8">
+              {translate('editor.compact.workspaceGrid')}
+            </h3>
+            {commands.map((command) => (
+              <div key={command.id}>
+                {command.active === undefined ? (
+                  renderFloatingToolbarCommandBody(command, { hideLabel: true })
+                ) : (
+                  <div
+                    data-inspector-toggle
+                    className="sniptale-parameter-row sniptale-boolean-parameter"
+                  >
+                    <span className="sniptale-parameter-name">{command.title}</span>
+                    <div className="sniptale-parameter-value">
                       <ProductGlassSwitch
                         aria-label={command.title}
                         aria-pressed={command.active}
@@ -63,11 +79,11 @@ export function CompactWorkspacePopoverContent({
                         onClick={() => void command.onClick?.()}
                       />
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
         </div>
       </section>
     </div>

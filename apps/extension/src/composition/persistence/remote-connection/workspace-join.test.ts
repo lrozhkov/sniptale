@@ -77,6 +77,7 @@ function setup() {
   const rows = new Map<string, Map<string, unknown>>([
     ['sync_capture', new Map()],
     ['sync_connection', new Map()],
+    ['secret_protection', new Map()],
     ['sync_outbox', new Map()],
   ]);
   const modes: string[] = [];
@@ -87,6 +88,12 @@ function setup() {
   const makeDatabase = () => {
     const database = {
       closed: false,
+      async get(name: string, key: string) {
+        if (database.closed) throw new DOMException('Closed database', 'InvalidStateError');
+        const table = rows.get(name);
+        if (!table) throw new Error('Unknown fixture store');
+        return structuredClone(table.get(key));
+      },
       transaction(stores: string[], mode: string) {
         if (database.closed) throw new DOMException('Closed database', 'InvalidStateError');
         modes.push(mode);
@@ -406,4 +413,66 @@ it('refuses cold opening without initializing storage', async () => {
   await expect(createSyncWorkspaceJoin(input)).rejects.toThrow('refused');
   expect(io.database).not.toHaveBeenCalled();
   expect(f.modes).toEqual([]);
+});
+
+it.each(['transitioning', 'malformed'] as const)(
+  'refuses secret %s control before workspace admission',
+  async (phase) => {
+    const f = setup();
+    f.table('secret_protection').set(
+      'control',
+      phase === 'malformed'
+        ? { invalid: true }
+        : {
+            version: 1,
+            epoch: 1,
+            phase,
+            participants: { ai: false, webdav: null },
+          }
+    );
+    const before = structuredClone(f.rows);
+    await expect(createSyncWorkspaceJoin(input)).rejects.toThrow();
+    expect(f.rows).toEqual(before);
+    expect(f.modes).toEqual([]);
+    expect(f.writes()).toBe(0);
+    expect(io.database).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses control transition after writer admission while native connection lock is held', async () => {
+  const f = setup();
+  const entered = deferred();
+  const release = deferred();
+  const held = withSyncConnectionAdmissionLock(async () => {
+    entered.resolve();
+    await release.promise;
+  });
+  await entered.promise;
+  const queued = deferred();
+  lockObserved = (name) => {
+    if (name === 'sniptale.sync-connection.admission') queued.resolve();
+  };
+  const opening = createSyncWorkspaceJoin(input);
+  const observed = opening.then(
+    () => 'written',
+    () => 'refused'
+  );
+  try {
+    await queued.promise;
+    f.table('secret_protection').set('control', {
+      version: 1,
+      epoch: 1,
+      phase: 'transitioning',
+      participants: { ai: false, webdav: null },
+    });
+  } finally {
+    release.resolve();
+  }
+  await held;
+  expect(await observed).toBe('refused');
+  expect(f.table().size).toBe(0);
+  expect(f.writes()).toBe(0);
+  expect(f.aborted()).toBe(1);
+  expect(f.drained()).toBeGreaterThan(0);
+  expect(io.database).not.toHaveBeenCalled();
 });

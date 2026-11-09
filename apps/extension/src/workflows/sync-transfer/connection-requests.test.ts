@@ -723,3 +723,117 @@ it.each([false, true])(
     expect(issue).not.toHaveBeenCalled();
   }
 );
+
+it('closes admission and drains lock during permission wait', async () => {
+  const f = setup();
+  const entered = deferred<void>();
+  const allowed = deferred<boolean>();
+  let open = true;
+  const requests = createSyncConnectionRequests({
+    identity,
+    hasOriginPermission: async () => {
+      entered.resolve();
+      return allowed.promise;
+    },
+    checkProtection: async () => open,
+  });
+  const issue = vi.fn(async () => emptyResponse());
+  const pending = requests.request(signal(), issue);
+  const rejected = expect(pending).rejects.toMatchObject({ code: 'secrets-locked' });
+  await entered.promise;
+  open = false;
+  allowed.resolve(true);
+  await rejected;
+  await requests.close();
+  expect(issue).not.toHaveBeenCalled();
+  expect(f.locks.maximumHeld()).toBe(1);
+});
+
+it('closes admission and drains lock during dispatch', async () => {
+  const f = setup();
+  let open = true;
+  const issued = deferred<void>();
+  const transport = deferred<Response>();
+  const requests = createSyncConnectionRequests({
+    identity,
+    hasOriginPermission: f.permission,
+    checkProtection: async () => open,
+  });
+  const pending = requests.request(signal(), async () => {
+    issued.resolve();
+    return transport.promise;
+  });
+  const rejected = expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+  await issued.promise;
+  open = false;
+  const closing = requests.close();
+  transport.resolve(emptyResponse());
+  await rejected;
+  await closing;
+  const next = vi.fn(async () => emptyResponse());
+  await expect(requests.request(signal(), next)).rejects.toMatchObject({ code: 'cancelled' });
+  expect(next).not.toHaveBeenCalled();
+});
+
+it('closes admission and drains lock during headers', async () => {
+  const f = setup();
+  let open = true;
+  const issued = deferred<AbortSignal>();
+  const headers = deferred<Response>();
+  const requests = createSyncConnectionRequests({
+    identity,
+    hasOriginPermission: f.permission,
+    checkProtection: async () => open,
+  });
+  const pending = requests.request(signal(), (requestSignal) => {
+    issued.resolve(requestSignal);
+    return headers.promise;
+  });
+  const rejected = expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+  const requestSignal = await issued.promise;
+  open = false;
+  let finished = false;
+  const closing = requests.close().then(() => {
+    finished = true;
+  });
+  expect(requestSignal.aborted).toBe(true);
+  expect(finished).toBe(false);
+  headers.reject(new Error('Transport abort acknowledged'));
+  await rejected;
+  await closing;
+});
+
+it('closes admission and drains lock during response body', async () => {
+  const f = setup();
+  let open = true;
+  const cancelling = deferred<void>();
+  const cancelled = deferred<void>();
+  const requests = createSyncConnectionRequests({
+    identity,
+    hasOriginPermission: f.permission,
+    checkProtection: async () => open,
+  });
+  const response = await requests.request(
+    signal(),
+    async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          cancel() {
+            cancelling.resolve();
+            return cancelled.promise;
+          },
+        })
+      )
+  );
+  const reading = expect(response.text()).rejects.toMatchObject({ code: 'cancelled' });
+  open = false;
+  let finished = false;
+  const closing = requests.close().then(() => {
+    finished = true;
+  });
+  await cancelling.promise;
+  expect(finished).toBe(false);
+  cancelled.resolve();
+  await closing;
+  await reading;
+});

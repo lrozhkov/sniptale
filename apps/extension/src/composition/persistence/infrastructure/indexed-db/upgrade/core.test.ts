@@ -1,3 +1,4 @@
+import { setImmediate as nextEventTurn } from 'node:timers/promises';
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
@@ -11,6 +12,11 @@ import {
   type DatabaseMigrationDescriptor,
 } from '../schema-contracts.ts';
 import { executeDatabaseUpgrade, handleDatabaseUpgrade } from './core.ts';
+import {
+  REFERENCE_INDEX_STORES,
+  ROW_REFERENCE_FIELD,
+  ROW_REFERENCE_INDEX,
+} from '../row-index-contract';
 
 function createUpgradeHarness() {
   const stores = new Map<
@@ -47,12 +53,27 @@ it('creates the complete current beta schema and persists every domain contract'
 
   handleDatabaseUpgrade(harness.db, 0, DB_VERSION, harness.transaction);
 
-  expect(harness.db.createObjectStore.mock.calls.map(([name]) => name)).toEqual(EXPECTED_STORES);
+  expect(harness.db.createObjectStore.mock.calls.map(([name]) => name).sort()).toEqual(
+    [...EXPECTED_STORES].sort()
+  );
   for (const [storeName, expectedIndexes] of Object.entries(EXPECTED_INDEXES)) {
-    expect(harness.stores.get(storeName)?.createIndex.mock.calls.map(([name]) => name)).toEqual(
-      expectedIndexes
+    expect(
+      [
+        ...(harness.stores.get(storeName)?.createIndex.mock.calls.map(([name]) => name) ?? []),
+      ].sort()
+    ).toEqual([...expectedIndexes].sort());
+  }
+  for (const storeName of REFERENCE_INDEX_STORES) {
+    expect(harness.stores.get(storeName)?.createIndex).toHaveBeenCalledWith(
+      ROW_REFERENCE_INDEX,
+      ROW_REFERENCE_FIELD,
+      { multiEntry: true }
     );
   }
+  expect(harness.stores.get('recording_recovery_sessions')?.createIndex).toHaveBeenCalledWith(
+    'recoveryId',
+    'recoveryId'
+  );
   expect(harness.db.createObjectStore).toHaveBeenCalledWith('video_project_revisions', {
     keyPath: 'projectId',
   });
@@ -252,4 +273,94 @@ it('aborts failed outgoing store creation and permits retry without source mutat
   expect(() => migration.validate(interrupted.db, interrupted.transaction)).toThrow(
     'Sync outbox store is unavailable.'
   );
+});
+
+it.each([0, 1])(
+  'observes rejected schema requests and transaction completion from source %s',
+  async (source) => {
+    const harness = createUpgradeHarness();
+    const requests: Array<ReturnType<typeof Promise.withResolvers<unknown>>> = [];
+    const completion = Promise.withResolvers<void>();
+    const transaction = Object.assign(harness.transaction, { done: completion.promise });
+    const queueRequest = () => {
+      const request = Promise.withResolvers<unknown>();
+      requests.push(request);
+      return request.promise;
+    };
+    const createStore = harness.db.createObjectStore.getMockImplementation()!;
+    harness.db.createObjectStore.mockImplementation((name) => {
+      const store = createStore(name);
+      store.put.mockImplementation(queueRequest);
+      return store;
+    });
+    transaction.objectStore.mockReturnValue({ put: queueRequest });
+    const unhandled: unknown[] = [];
+    const observe = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', observe);
+    try {
+      expect(
+        executeDatabaseUpgrade(harness.db, source, source === 0 ? DB_VERSION : 2, transaction, [
+          createMigration(),
+        ])
+      ).toBeUndefined();
+      expect(requests).toHaveLength(CURRENT_SCHEMA_CONTRACTS.length);
+      const error = new DOMException('Interrupted versionchange', 'AbortError');
+      requests.forEach((request) => request.reject(error));
+      completion.reject(error);
+      await nextEventTurn();
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', observe);
+    }
+  }
+);
+
+it('publishes the checkpoint contract without reading or rewriting native captures or bytes', () => {
+  const harness = createUpgradeHarness();
+  harness.db.objectStoreNames.push('sync_capture', 'sync_outbox', 'sync_connection');
+  const contracts = { put: vi.fn((_value: unknown) => undefined) };
+  harness.transaction.objectStore.mockImplementation((name: string) => {
+    if (name !== SCHEMA_CONTRACTS_STORE) throw new Error('Unexpected native store access.');
+    return contracts;
+  });
+
+  handleDatabaseUpgrade(harness.db, 48, 49, harness.transaction);
+
+  expect(harness.db.createObjectStore).not.toHaveBeenCalled();
+  expect(harness.db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(contracts.put.mock.calls.map(([value]) => value)).toContainEqual({
+    domainId: 'syncCapture',
+    schemaVersion: 10,
+  });
+  expect(harness.transaction.abort).not.toHaveBeenCalled();
+});
+
+it('aborts checkpoint admission when its existing capture store is unavailable', () => {
+  const harness = createUpgradeHarness();
+  harness.db.objectStoreNames.push('sync_outbox', 'sync_connection');
+
+  expect(() => handleDatabaseUpgrade(harness.db, 48, 49, harness.transaction)).toThrow(
+    'Sync checkpoint stores are unavailable.'
+  );
+  expect(harness.transaction.abort).toHaveBeenCalledOnce();
+  expect(harness.transaction.objectStore).not.toHaveBeenCalled();
+});
+
+it('upgrades version 49 with empty dedicated secret protection store', () => {
+  const harness = createUpgradeHarness();
+  harness.db.objectStoreNames.push(
+    ...EXPECTED_STORES.filter((name) => name !== 'secret_protection')
+  );
+  const contracts = { put: vi.fn() };
+  harness.transaction.objectStore.mockReturnValue(contracts);
+  executeDatabaseUpgrade(harness.db, 49, 50, harness.transaction, DATABASE_MIGRATIONS);
+  expect(harness.db.createObjectStore).toHaveBeenCalledExactlyOnceWith('secret_protection', {
+    keyPath: 'key',
+  });
+  expect(harness.db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(harness.stores.get('secret_protection')?.put).not.toHaveBeenCalled();
+  expect(contracts.put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(harness.transaction.abort).not.toHaveBeenCalled();
 });

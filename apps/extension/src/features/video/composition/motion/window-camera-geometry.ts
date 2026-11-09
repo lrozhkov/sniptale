@@ -1,4 +1,11 @@
 import {
+  cursorOrientationInterval,
+  createCursorActivationPlan,
+  cursorActivationAt,
+  createWindowCursorProjection,
+  type CursorOrientationPlan,
+} from './cursor-orientation';
+import {
   proveCameraPlan,
   type CameraPlanSpan,
   type CameraProofGeometry,
@@ -6,6 +13,7 @@ import {
 } from './camera-plan-proof';
 import {
   cameraTransitionDerivative,
+  cameraTransitionProgress,
   type CameraTransition,
   type CameraTransitionType,
 } from '../../project/motion/transitions';
@@ -14,8 +22,8 @@ import {
   type ResolvedCameraFollowPolicy,
 } from '../../project/camera/cursor-policy';
 import {
-  interpolateCameraSpatial as interpolateQuickEditSpatial,
   hasCameraPerspective as hasQuickEditPerspective,
+  CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH,
   type CameraSpatialRect,
   type CameraSpatialSettings,
 } from '../../project/motion/spatial';
@@ -26,6 +34,7 @@ import {
   cameraTrajectoryBounds,
 } from './camera-trajectory';
 import type { WorkingZoneCameraGeometry, FollowCursorFrame } from './follow-cursor';
+import { cameraExpansionScales } from './follow-cursor';
 import {
   boundQuickEditCameraMotion,
   boundQuickEditCameraProjection,
@@ -34,7 +43,6 @@ import {
 import {
   invertQuickEditProjection,
   projectQuickEditPoint,
-  quickEditPlaneProjection,
   type QuickEditHomography,
 } from './spatial-geometry';
 
@@ -84,55 +92,44 @@ function mergeWindowProjectionBounds(
   };
 }
 
-/** Shared decorated-window geometry; each editor owns its topology and observations. */
-export function createWindowCameraGeometry(input: {
-  output: { width: number; height: number };
-  window: CameraSpatialRect;
-  video: CameraSpatialRect;
-  cornerRadius: number;
-  planeTransform?: QuickEditHomography;
-  intervalPlane?: (
-    start: number,
-    end: number
-  ) => Pick<QuickEditCameraProjectionInterval, 'planeTransform' | 'planeTransition'> | null;
-  planeBreaks?: readonly number[];
-  phaseHoldAt?: number;
-  windowWeight: 'window' | 'content' | 'spatial';
-  region: CameraSpatialSettings & {
-    start: number;
-    end: number;
-    enter: CameraTransition;
-    exit: CameraTransition;
-  };
-  connectedIn: boolean;
-  connectedOut: boolean;
-  policy: ResolvedCameraFollowPolicy;
-}): WorkingZoneCameraGeometry {
+type WindowCameraClockInput = Pick<
+  Parameters<typeof createWindowCameraGeometry>[0],
+  'region' | 'connectedIn' | 'connectedOut' | 'phaseHoldAt' | 'orientationPlan' | 'policy'
+>;
+
+/** Build one finite nominal phase; connected and instantaneous phases have no continuous trajectory. */
+function windowCameraPhase(input: WindowCameraClockInput, phase: 'enter' | 'exit') {
+  const entering = phase === 'enter';
+  const transition = input.region[phase];
+  const connected = entering ? input.connectedIn : input.connectedOut;
+  if (
+    connected ||
+    transition.type === 'none' ||
+    transition.type === 'instant' ||
+    transition.duration <= 0
+  )
+    return null;
+  const start = entering ? input.region.start : input.region.end - transition.duration;
+  return createWindowPhaseTrajectory(start, start + transition.duration, transition.type, entering);
+}
+
+/** Own nominal and automatic phase clocks independently of projection, including frozen-clock witnesses. */
+function createWindowCameraClock(input: WindowCameraClockInput) {
   const { region } = input;
-  const enter =
-    !input.connectedIn &&
-    region.enter.type !== 'none' &&
-    region.enter.type !== 'instant' &&
-    region.enter.duration > 0
-      ? createWindowPhaseTrajectory(
-          region.start,
-          region.start + region.enter.duration,
-          region.enter.type,
-          true
-        )
-      : null;
-  const exit =
-    !input.connectedOut &&
-    region.exit.type !== 'none' &&
-    region.exit.type !== 'instant' &&
-    region.exit.duration > 0
-      ? createWindowPhaseTrajectory(
-          region.end - region.exit.duration,
-          region.end,
-          region.exit.type,
-          false
-        )
-      : null;
+  const activationPlan = input.orientationPlan
+    ? createCursorActivationPlan({
+        start: region.start,
+        end: region.end,
+        enterDuration: region.enter.duration,
+        exitDuration: region.exit.duration,
+        amount: region.cursorComposition?.amount,
+        movementDuration: input.policy.settings.transitionDuration,
+        connectedIn: input.connectedIn,
+        connectedOut: input.connectedOut,
+      })
+    : undefined;
+  const enter = windowCameraPhase(input, 'enter');
+  const exit = windowCameraPhase(input, 'exit');
   const exitStart = region.end - region.exit.duration;
   const phaseTrajectoryAt = (time: number) => {
     if (
@@ -169,15 +166,116 @@ export function createWindowCameraGeometry(input: {
     const phase = phaseAt(time);
     return typeof phase === 'number' ? phase : evaluateCameraTrajectory(phase, time).x;
   };
-  const perspective = hasQuickEditPerspective(region.perspective)
-    ? {
-        rotateX: region.perspective.rotateX,
-        rotateY: region.perspective.rotateY,
-        rotateZ: ((region.perspective.rotateZ + 540) % 360) - 180,
-        strength: region.perspective.strength,
-      }
-    : { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 };
+  const minimumScale = (start: number, end: number, targetScale: number) => {
+    const values = [phaseValue(start), phaseValue(end)];
+    end = Math.min(end, input.phaseHoldAt ?? Infinity);
+    for (const trajectory of [enter, exit]) {
+      if (trajectory && start < trajectory.end && end > trajectory.start)
+        values.push(
+          cameraTrajectoryBounds(
+            trajectory,
+            Math.max(start, trajectory.start),
+            Math.min(end, trajectory.end)
+          ).minX
+        );
+    }
+    return 1 + (targetScale - 1) * Math.max(0, Math.min(...values));
+  };
+  return {
+    enter,
+    exit,
+    exitStart,
+    activationPlan,
+    phaseAt,
+    phaseTrajectoryAt,
+    phaseValue,
+    instantBoundaries,
+    minimumScale,
+    breaks: [
+      region.start,
+      input.phaseHoldAt,
+      enter?.end,
+      exit?.start,
+      ...(!input.connectedOut && region.exit.type === 'instant' ? [exitStart] : []),
+      region.end,
+      ...(activationPlan?.breaks ?? []),
+    ].filter((time): time is number => time !== undefined),
+  };
+}
+
+/** A discontinuity witness records one-sided phase jets; it does not change the camera pose. */
+function windowCameraClockDiscontinuities(
+  input: WindowCameraClockInput,
+  clock: ReturnType<typeof createWindowCameraClock>,
+  targetScale: number
+) {
+  const { region } = input;
+  const { enter, exit, exitStart, phaseTrajectoryAt } = clock;
+  if (targetScale === 1 && !hasQuickEditPerspective(region.perspective) && !input.orientationPlan)
+    return [];
+  const times: number[] = [];
+  const hold = input.phaseHoldAt;
+  if (hold !== undefined) {
+    const phase = phaseTrajectoryAt(hold);
+    if (
+      typeof phase !== 'number' &&
+      [1, 2].some(
+        (order) =>
+          Math.abs(evaluateCameraTrajectoryDerivative(phase, hold, order === 1 ? 1 : 2).x) > 1e-9
+      )
+    )
+      times.push(hold);
+  }
+  for (const phase of [enter, exit]) {
+    if (!phase) continue;
+    for (const time of [phase.start, phase.end])
+      if (
+        [1, 2].some(
+          (order) =>
+            Math.abs(evaluateCameraTrajectoryDerivative(phase, time, order === 1 ? 1 : 2).x) > 1e-9
+        )
+      )
+        times.push(time);
+  }
+  if (!enter && !input.connectedIn) times.push(region.start);
+  if (!exit && !input.connectedOut)
+    times.push(region.exit.type === 'instant' && region.exit.duration > 0 ? exitStart : region.end);
+  return times;
+}
+
+/** Shared decorated-window geometry; each editor owns its topology and observations. */
+export function createWindowCameraGeometry(input: {
+  orientationPlan?: CursorOrientationPlan;
+  output: { width: number; height: number };
+  window: CameraSpatialRect;
+  video: CameraSpatialRect;
+  cornerRadius: number;
+  planeTransform?: QuickEditHomography;
+  intervalPlane?: (
+    start: number,
+    end: number
+  ) => Pick<QuickEditCameraProjectionInterval, 'planeTransform' | 'planeTransition'> | null;
+  planeBreaks?: readonly number[];
+  phaseHoldAt?: number;
+  windowWeight: 'window' | 'content' | 'spatial';
+  region: CameraSpatialSettings & {
+    start: number;
+    end: number;
+    enter: CameraTransition;
+    exit: CameraTransition;
+  };
+  connectedIn: boolean;
+  connectedOut: boolean;
+  policy: ResolvedCameraFollowPolicy;
+}): WorkingZoneCameraGeometry {
+  const { region } = input;
+  const clock = createWindowCameraClock(input);
+  const { activationPlan, phaseAt, phaseValue, instantBoundaries, minimumScale } = clock;
   const windowWeight = input.windowWeight;
+  const { perspective, at: projectionAt } = createWindowCursorProjection({
+    ...input,
+    ...(activationPlan ? { activationPlan } : {}),
+  });
   const outputPlane = (time: number) => {
     const plane = input.intervalPlane?.(time, time);
     const transition = plane?.planeTransition;
@@ -230,6 +328,8 @@ export function createWindowCameraGeometry(input: {
     // Proof cells must split where the camera clock stops.
     if (input.phaseHoldAt !== undefined && start < input.phaseHoldAt && end > input.phaseHoldAt)
       return null;
+    const orbit = cursorOrientationInterval(input.orientationPlan, start, end);
+    if (orbit === null) return null;
     const plane = input.intervalPlane?.(start, end);
     if (input.intervalPlane && !plane) return null;
     return {
@@ -242,72 +342,32 @@ export function createWindowCameraGeometry(input: {
       cornerRadius: input.cornerRadius,
       ...(input.planeTransform ? { planeTransform: input.planeTransform } : {}),
       perspective,
+      ...(orbit
+        ? {
+            orbit: {
+              angles: orbit,
+              ...(activationPlan
+                ? { phase: cursorActivationAt(activationPlan, (start + end) / 2) }
+                : {}),
+            },
+          }
+        : {}),
       windowWeight,
       phase: phaseAt((start + end) / 2),
       ...plane,
     };
   };
-  const minimumScale = (start: number, end: number, targetScale: number) => {
-    const values = [phaseValue(start), phaseValue(end)];
-    end = Math.min(end, input.phaseHoldAt ?? Infinity);
-    for (const trajectory of [enter, exit]) {
-      if (trajectory && start < trajectory.end && end > trajectory.start)
-        values.push(
-          cameraTrajectoryBounds(
-            trajectory,
-            Math.max(start, trajectory.start),
-            Math.min(end, trajectory.end)
-          ).minX
-        );
-    }
-    return 1 + (targetScale - 1) * Math.max(0, Math.min(...values));
-  };
   return {
+    supportsObservationBounds: true,
     viewport: { ...input.output },
     window: { width: input.window.width, height: input.window.height },
     breaks: [
-      region.start,
-      input.phaseHoldAt,
-      enter?.end,
-      exit?.start,
-      ...(!input.connectedOut && region.exit.type === 'instant' ? [exitStart] : []),
-      region.end,
+      ...clock.breaks,
       ...(input.planeBreaks ?? []),
-    ].filter((time): time is number => time !== undefined),
+      ...(input.orientationPlan?.breaks ?? []),
+    ],
     discontinuities(targetScale) {
-      if (targetScale === 1 && !hasQuickEditPerspective(region.perspective)) return [];
-      const times: number[] = [];
-      const hold = input.phaseHoldAt;
-      if (hold !== undefined) {
-        const phase = phaseTrajectoryAt(hold);
-        if (
-          typeof phase !== 'number' &&
-          [1, 2].some(
-            (order) =>
-              Math.abs(evaluateCameraTrajectoryDerivative(phase, hold, order === 1 ? 1 : 2).x) >
-              1e-9
-          )
-        )
-          times.push(hold);
-      }
-      for (const phase of [enter, exit]) {
-        if (!phase) continue;
-        for (const time of [phase.start, phase.end])
-          if (
-            [1, 2].some(
-              (order) =>
-                Math.abs(evaluateCameraTrajectoryDerivative(phase, time, order === 1 ? 1 : 2).x) >
-                1e-9
-            )
-          )
-            times.push(time);
-      }
-      if (!enter && !input.connectedIn) times.push(region.start);
-      if (!exit && !input.connectedOut)
-        times.push(
-          region.exit.type === 'instant' && region.exit.duration > 0 ? exitStart : region.end
-        );
-      return times;
+      return windowCameraClockDiscontinuities(input, clock, targetScale);
     },
     panDomain: (targetScale) => ({
       minX: 0,
@@ -326,27 +386,19 @@ export function createWindowCameraGeometry(input: {
       if (!frame.actual) return domain;
       const progress = phaseValue(frame.time);
       if (progress <= 1e-12) return domain;
-      const spatial = interpolateQuickEditSpatial(null, region, progress);
       const scale = 1 + (targetScale - 1) * progress;
       const native = {
         x: input.video.x + frame.actual.x * input.video.width,
         y: input.video.y + frame.actual.y * input.video.height,
       };
-      if (windowWeight !== 'window' && hasQuickEditPerspective(region.perspective)) return null;
+      if (
+        windowWeight !== 'window' &&
+        (hasQuickEditPerspective(region.perspective) || input.orientationPlan)
+      )
+        return null;
       const point =
         windowWeight === 'window'
-          ? projectQuickEditPoint(
-              quickEditPlaneProjection(
-                input.window,
-                {
-                  ...input.window,
-                  width: input.window.width * scale,
-                  height: input.window.height * scale,
-                },
-                spatial
-              ),
-              native
-            )
+          ? projectQuickEditPoint(projectionAt(progress, scale, frame.time), native)
           : {
               x: input.window.x + scale * (native.x - input.window.x),
               y: input.window.y + scale * (native.y - input.window.y),
@@ -376,15 +428,12 @@ export function createWindowCameraGeometry(input: {
     },
     preferredPan(frame, targetScale) {
       const { outputCenter } = outputPlane(frame.time);
-      const spatial = interpolateQuickEditSpatial(null, region, 1);
       const basePoint = {
         x: input.video.x + frame.x * input.video.width,
         y: input.video.y + frame.y * input.video.height,
       };
       if (windowWeight === 'content') {
-        const inverse = invertQuickEditProjection(
-          quickEditPlaneProjection(input.window, input.window, spatial)
-        );
+        const inverse = invertQuickEditProjection(projectionAt(1, 1, frame.time));
         const desired =
           inverse &&
           projectQuickEditPoint(inverse, { x: input.output.width / 2, y: input.output.height / 2 });
@@ -395,15 +444,7 @@ export function createWindowCameraGeometry(input: {
             }
           : { x: 0, y: 0 };
       }
-      const target = {
-        ...input.window,
-        width: input.window.width * targetScale,
-        height: input.window.height * targetScale,
-      };
-      const projected = projectQuickEditPoint(
-        quickEditPlaneProjection(input.window, target, spatial),
-        basePoint
-      );
+      const projected = projectQuickEditPoint(projectionAt(1, targetScale, frame.time), basePoint);
       return projected
         ? {
             x: projected.x - (outputCenter?.x ?? input.output.width / 2),
@@ -411,7 +452,7 @@ export function createWindowCameraGeometry(input: {
           }
         : { x: 0, y: 0 };
     },
-    clearanceBounds({ start, end, targetScale, pan, actual }) {
+    clearanceBounds({ start, end, targetScale, pan, actual, actualIsBounds }) {
       const current = interval(start, end, targetScale);
       if (!current) return null;
       let bounds = boundQuickEditCameraProjection({
@@ -433,7 +474,11 @@ export function createWindowCameraGeometry(input: {
         const endpoint = boundQuickEditCameraProjection({
           ...edge,
           pan,
-          ...(point ? { actual: { from: point, to: point } } : {}),
+          ...(actualIsBounds && actual
+            ? { actual }
+            : point
+              ? { actual: { from: point, to: point } }
+              : {}),
         });
         if (!endpoint) return null;
         bounds = mergeWindowProjectionBounds(bounds, endpoint);
@@ -531,30 +576,45 @@ export function createWindowCameraLinkGeometry(input: {
     scale: number;
     pan: { x: number; y: number };
     perspective?: CameraSpatialSettings['perspective'];
+    cursorOffset?: { x: number; y: number };
   };
   to: {
     start: number;
     scale: number;
     pan: { x: number; y: number };
     perspective?: CameraSpatialSettings['perspective'];
+    cursorOffset?: { x: number; y: number };
   };
   policy: ResolvedCameraFollowPolicy;
+  /** Automatic pieces count their complete motion; authored nominal phases keep existing limits. */
+  automaticPhase?: ReturnType<typeof createCameraTrajectory>;
+  /** The original linked spatial clock survives a temporary scale/pan fit. */
+  spatialPhase?: number | ReturnType<typeof createCameraTrajectory>;
 }) {
   const start = input.from.end,
     end = input.to.start;
   const phase =
-    input.type === 'instant' || input.type === 'none'
+    input.automaticPhase ??
+    (input.type === 'instant' || input.type === 'none'
       ? 1
-      : createWindowPhaseTrajectory(start, end, input.type, true);
-  const perspective = (value: CameraSpatialSettings['perspective']) =>
-    hasQuickEditPerspective(value)
+      : createWindowPhaseTrajectory(start, end, input.type, true));
+  const perspective = (
+    value: CameraSpatialSettings['perspective'],
+    cursorOffset: { x: number; y: number } | undefined
+  ) =>
+    (cursorOffset && value?.enabled) || hasQuickEditPerspective(value)
       ? {
           rotateX: value.rotateX,
           rotateY: value.rotateY,
           rotateZ: value.rotateZ,
           strength: value.strength,
         }
-      : { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 };
+      : {
+          rotateX: 0,
+          rotateY: 0,
+          rotateZ: 0,
+          strength: cursorOffset ? CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH : 0,
+        };
   const interval = (
     a: number,
     b: number,
@@ -569,15 +629,27 @@ export function createWindowCameraLinkGeometry(input: {
     ...(input.planeTransform ? { planeTransform: input.planeTransform } : {}),
     targetScale: input.to.scale,
     phase: input.type === 'instant' && b === start ? 0 : phase,
+    ...(input.spatialPhase === undefined ? {} : { spatialPhase: input.spatialPhase }),
+    automaticMotion: input.automaticPhase !== undefined,
     pan,
     windowWeight: input.windowWeight,
-    perspective: perspective(input.to.perspective),
-    targetWindowMotion: hasQuickEditPerspective(input.to.perspective) ? 1 : 0,
+    perspective: perspective(input.to.perspective, input.to.cursorOffset),
+    ...(input.from.cursorOffset || input.to.cursorOffset
+      ? {
+          orbit: {
+            from: input.from.cursorOffset ?? { x: 0, y: 0 },
+            to: input.to.cursorOffset ?? { x: 0, y: 0 },
+          },
+        }
+      : {}),
+    targetWindowMotion:
+      hasQuickEditPerspective(input.to.perspective) || input.to.cursorOffset ? 1 : 0,
     from: {
       scale: input.from.scale,
       pan: input.from.pan,
-      perspective: perspective(input.from.perspective),
-      windowMotion: hasQuickEditPerspective(input.from.perspective) ? 1 : 0,
+      perspective: perspective(input.from.perspective, input.from.cursorOffset),
+      windowMotion:
+        hasQuickEditPerspective(input.from.perspective) || input.from.cursorOffset ? 1 : 0,
     },
   });
   const geometry: CameraProofGeometry = {
@@ -607,6 +679,7 @@ export function createWindowCameraLinkGeometry(input: {
     },
   };
   return {
+    input,
     geometry,
     limits: cameraFollowMotionLimits(input.policy, {
       viewportWidth: input.output.width,
@@ -635,10 +708,12 @@ export function proveWindowCameraGap(input: {
     const current = observations[index]!,
       next = observations[index + 1];
     if (next?.segmentId === current.segmentId) continue;
-    const end = next?.time ?? input.end;
+    const end = Math.min(next?.time ?? input.end, input.end);
+    if (end < cursor) continue;
     if (end > cursor || spans.length === 0)
       spans.push({ kind: 'hold', pan: toPan, start: cursor, end, segmentId: current.segmentId });
     cursor = end;
+    if (cursor >= input.end) break;
   }
   if (!spans.length)
     spans.push({ kind: 'hold', pan: toPan, start: input.start, end: input.end, segmentId: '' });
@@ -650,4 +725,101 @@ export function proveWindowCameraGap(input: {
     limits: adapter.limits,
     preservePointer: input.policy.settings.preservePointer,
   });
+}
+
+/** Pixel-space camera knots retain the exact frozen link endpoints. */
+export interface WindowCameraLinkFit {
+  phases: readonly ReturnType<typeof createCameraTrajectory>[];
+  window: { width: number; height: number };
+  poses: readonly { time: number; scale: number; pan: { x: number; y: number } }[];
+}
+
+/** Evaluate exactly the piecewise interpolation admitted by the gap proof. */
+export function evaluateWindowCameraLinkFit(fit: WindowCameraLinkFit, time: number) {
+  const first = fit.poses[0]!;
+  const last = fit.poses.at(-1)!;
+  if (time <= first.time) return first;
+  if (time >= last.time) return last;
+  const index = fit.poses.findIndex((pose) => pose.time > time);
+  const from = fit.poses[index - 1]!,
+    to = fit.poses[index]!;
+  const progress = evaluateCameraTrajectory(fit.phases[index - 1]!, time).x;
+  const mix = (a: number, b: number) => a + (b - a) * progress;
+  return {
+    time,
+    scale: mix(from.scale, to.scale),
+    pan: { x: mix(from.pan.x, to.pan.x), y: mix(from.pan.y, to.pan.y) },
+  };
+}
+
+/** Fit only a proved temporary interior expansion; the nominal plan remains the failure result. */
+export function planWindowCameraGap(input: Parameters<typeof proveWindowCameraGap>[0]) {
+  const nominal = proveWindowCameraGap(input);
+  if (nominal.status === 'proven') return { ...nominal, fit: undefined };
+  const original = input.adapter.input;
+  const duration = input.end - input.start;
+  if (!(duration > 0) || original.type === 'instant' || original.type === 'none') return nominal;
+  const spatialPhase =
+    original.spatialPhase ??
+    createWindowPhaseTrajectory(input.start, input.end, original.type, true);
+  const from = { time: input.start, scale: original.from.scale, pan: original.from.pan };
+  const to = { time: input.end, scale: original.to.scale, pan: original.to.pan };
+  for (const scale of cameraExpansionScales(Math.max(from.scale, to.scale), input.policy).filter(
+    (value) => value <= Math.min(from.scale, to.scale)
+  )) {
+    for (const factor of [1, 1.5, 2, 3]) {
+      const ramp = Math.min(input.policy.settings.transitionDuration * factor, duration / 2);
+      if (!(ramp > 0)) continue;
+      const interior = (time: number) => {
+        const progress = cameraTransitionProgress((time - input.start) / duration, original.type);
+        const nominalScale = from.scale + (to.scale - from.scale) * progress;
+        const ratio = nominalScale > 1 ? (scale - 1) / (nominalScale - 1) : 0;
+        return {
+          time,
+          scale,
+          pan: {
+            x: (from.pan.x + (to.pan.x - from.pan.x) * progress) * ratio,
+            y: (from.pan.y + (to.pan.y - from.pan.y) * progress) * ratio,
+          },
+        };
+      };
+      const poses = [
+        from,
+        interior(input.start + ramp),
+        ...(ramp < duration / 2 ? [interior(input.end - ramp)] : []),
+        to,
+      ];
+      const phases = poses.slice(1).map((target, index) =>
+        createCameraTrajectory({
+          start: poses[index]!.time,
+          end: target.time,
+          from: { x: 0, y: 0 },
+          to: { x: 1, y: 0 },
+        })
+      );
+      const fit: WindowCameraLinkFit = { phases, poses, window: original.window };
+      const proven = poses.slice(1).every((target, index) => {
+        const source = poses[index]!;
+        const adapter = createWindowCameraLinkGeometry({
+          ...original,
+          automaticPhase: phases[index]!,
+          spatialPhase,
+          from: { ...original.from, end: source.time, scale: source.scale, pan: source.pan },
+          to: { ...original.to, start: target.time, scale: target.scale, pan: target.pan },
+        });
+        const result = proveWindowCameraGap({
+          ...input,
+          adapter,
+          start: source.time,
+          end: target.time,
+          targetScale: target.scale,
+          toPan: target.pan,
+        });
+        return result.status === 'proven';
+      });
+      if (proven) return { status: 'proven' as const, fit };
+      if (ramp === duration / 2) break;
+    }
+  }
+  return nominal;
 }

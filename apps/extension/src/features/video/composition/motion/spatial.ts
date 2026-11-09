@@ -4,18 +4,25 @@ import {
   multiplyQuickEditProjections,
   type QuickEditHomography,
 } from './spatial-geometry';
-import { hasCameraPerspective, interpolateCameraSpatial } from '../../project/motion/spatial';
+import {
+  hasCursorComposition,
+  hasCameraPerspective,
+  interpolateCameraSpatial,
+} from '../../project/motion/spatial';
 import type { MotionSpatialSettings, CameraSpatialRect } from '../../project/motion/spatial';
 import type { VideoCompositionCameraState } from '../types';
 
 /** Montage owns its canvas reference and clock; shared interpolation owns only the pose. */
 export function evaluateMotionSpatial(
   project: { width: number; height: number },
-  from: MotionSpatialSettings | null,
-  to: MotionSpatialSettings,
-  progress: number
+  from: (MotionSpatialSettings & { focusMode?: string }) | null,
+  to: MotionSpatialSettings & { focusMode?: string },
+  progress: number,
+  cursorActivation?: number
 ): VideoCompositionCameraState['spatial'] {
   if (
+    !(from?.focusMode === 'CURSOR' && hasCursorComposition(from.cursorComposition)) &&
+    !(to.focusMode === 'CURSOR' && hasCursorComposition(to.cursorComposition)) &&
     !hasCameraPerspective(from?.perspective) &&
     !hasCameraPerspective(to.perspective) &&
     !from?.depthOfField?.enabled &&
@@ -34,7 +41,14 @@ export function evaluateMotionSpatial(
     width: mix(left.width, right.width) * project.width,
     height: mix(left.height, right.height) * project.height,
   };
-  return { ...interpolateCameraSpatial(from, to, t), reference };
+  return {
+    ...interpolateCameraSpatial(from, to, t, {
+      from: from?.focusMode === 'CURSOR' && hasCursorComposition(from.cursorComposition),
+      ...(cursorActivation !== undefined ? { progress: cursorActivation } : {}),
+      to: to.focusMode === 'CURSOR' && hasCursorComposition(to.cursorComposition),
+    }),
+    reference,
+  };
 }
 
 /** Project-coordinate homography for the same plane that preview and export render. */

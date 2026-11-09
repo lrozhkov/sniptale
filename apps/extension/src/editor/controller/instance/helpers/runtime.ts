@@ -1,3 +1,4 @@
+import { notifyEditorSimplifyDocumentCommit } from '../../../drawing/simplify-runtime';
 import type { EditorControllerInstance } from '../types';
 import { zoomToFitForController } from '../actions/scene';
 import {
@@ -24,6 +25,8 @@ export function withHistoryMutedForController<T>(
 }
 
 export function commitHistoryForController(controller: EditorControllerInstance): void {
+  if (controller.canvas && controller.historyMuted === 0)
+    notifyEditorSimplifyDocumentCommit(controller.canvas);
   let snapshot: ReturnType<EditorControllerInstance['exportDocument']> | null = null;
   const getSnapshot = () => {
     snapshot ??= controller.exportDocument();

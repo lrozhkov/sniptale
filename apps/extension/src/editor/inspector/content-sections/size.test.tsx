@@ -33,7 +33,10 @@ function createSetFrameDraftMock() {
   );
 }
 
-function createSizeSectionHarness() {
+function createSizeSectionHarness(
+  previewFrameDraft?: React.Dispatch<React.SetStateAction<typeof DEFAULT_EDITOR_FRAME_SETTINGS>>,
+  options: Partial<Parameters<typeof renderEditorInspectorFrameSection>[0]> = {}
+) {
   const controller = {
     resizeCanvas: vi.fn(),
     resizeImage: vi.fn(),
@@ -63,7 +66,9 @@ function createSizeSectionHarness() {
       recentColors: ['#111111'],
       scenePresetHeader: null,
       setFrameDraft,
+      previewFrameDraft,
       toNumber: (value: string) => Number(value),
+      ...options,
     }),
     section: renderEditorInspectorSizeSection({
       aspectRatio: 16 / 9,
@@ -106,8 +111,26 @@ function registerSizeSectionHelperTests() {
     expect(harness.controller.resizeCanvas).toHaveBeenCalledWith(800, 600);
     expect(harness.setDraft).toHaveBeenCalledTimes(2);
     expect(harness.setLocked).toHaveBeenCalledTimes(1);
-    expect(harness.setFrameDraft).toHaveBeenCalledTimes(4);
+    expect(harness.setFrameDraft).toHaveBeenCalledTimes(3);
   });
 }
 
 describe('content size section helpers', registerSizeSectionHelperTests);
+
+it('previews a frame patch through its dedicated dispatcher without accepting it', () => {
+  const preview = createSetFrameDraftMock();
+  const reset = vi.fn();
+  const harness = createSizeSectionHarness(preview, {
+    lineStyleOptions: [{ label: 'Solid', value: 'solid' }],
+    shapeStrokePalette: ['#123456'],
+    resetFrameDraft: reset,
+  });
+  harness.frameSection.props.previewFramePatch({ paddingTop: 96 });
+  expect(preview).toHaveBeenCalledOnce();
+  expect(preview.mock.results[0]?.value).toMatchObject({ paddingTop: 96 });
+  expect(harness.setFrameDraft).not.toHaveBeenCalled();
+  expect(harness.frameSection.props.lineStyleOptions).toEqual([{ label: 'Solid', value: 'solid' }]);
+  expect(harness.frameSection.props.shapeStrokePalette).toEqual(['#123456']);
+  harness.frameSection.props.onCancelFrame?.();
+  expect(reset).toHaveBeenCalledOnce();
+});

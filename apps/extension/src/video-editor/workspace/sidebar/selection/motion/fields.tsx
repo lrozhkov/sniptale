@@ -20,12 +20,16 @@ import { OptionButtonsField } from '../shared/option-buttons';
 import { SelectInput } from '../shared/controls';
 import { SliderField } from '../shared/sliders';
 import { getAreaCenter, getDefaultFocusArea } from './utils';
+import { CameraFollowTargetControls } from '../../../../../ui/camera-composition-controls';
+import { DEFAULT_CURSOR_COMPOSITION } from '../../../../../features/video/project/motion/spatial';
+import { useMotionRegionCursorAvailability } from '../../../../runtime/cursor-availability';
 
 function handleMotionFocusModeChange(
   panel: WorkspaceSidebarSelectionPanelProps,
   motionRegion: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedMotionRegion']>,
   value: VideoMotionFocusMode
 ) {
+  panel.onClearPlacementMode();
   if (value === VideoMotionFocusMode.MANUAL_AREA) {
     panel.onUpdateMotionRegion(motionRegion.id, {
       focusArea: motionRegion.focusArea ?? getDefaultFocusArea(panel),
@@ -36,6 +40,9 @@ function handleMotionFocusModeChange(
 
   panel.onUpdateMotionRegion(motionRegion.id, {
     focusMode: value,
+    ...(value === VideoMotionFocusMode.CURSOR && !motionRegion.cursorComposition
+      ? { spatialEdit: { kind: 'cursor-composition' as const, ...DEFAULT_CURSOR_COMPOSITION } }
+      : {}),
     focusPoint:
       value === VideoMotionFocusMode.MANUAL && motionRegion.focusArea
         ? getAreaCenter(motionRegion.focusArea)
@@ -47,30 +54,45 @@ export function MotionFocusModeField(props: {
   motionRegion: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedMotionRegion']>;
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
+  const { motionRegion, panel } = props;
+  const cursor = useMotionRegionCursorAvailability(panel.project, motionRegion);
+  const following = motionRegion.focusMode === VideoMotionFocusMode.CURSOR;
   return (
-    <OptionButtonsField
-      label={translate('videoEditor.sidebar.motionFocusLabel')}
-      value={props.motionRegion.focusMode}
-      onChange={(value) => handleMotionFocusModeChange(props.panel, props.motionRegion, value)}
-      options={[
-        {
-          value: VideoMotionFocusMode.MANUAL,
-          label: translate('videoEditor.sidebar.motionFocusManual'),
-        },
-        {
-          value: VideoMotionFocusMode.MANUAL_AREA,
-          label: translate('videoEditor.sidebar.motionFocusManualArea'),
-        },
-        {
-          value: VideoMotionFocusMode.CURSOR,
-          label: translate('videoEditor.sidebar.motionFocusCursor'),
-        },
-        {
-          value: VideoMotionFocusMode.ACTION,
-          label: translate('videoEditor.sidebar.motionFocusAction'),
-        },
-      ]}
-    />
+    <div className="sniptale-parameter-stack">
+      <CameraFollowTargetControls
+        following={following}
+        cursorAvailable={cursor.available}
+        cursorPending={cursor.pending}
+        onChange={(follow) =>
+          handleMotionFocusModeChange(
+            panel,
+            motionRegion,
+            follow ? VideoMotionFocusMode.CURSOR : VideoMotionFocusMode.MANUAL
+          )
+        }
+      />
+      {!following ? (
+        <OptionButtonsField
+          label={translate('editor.scene.cameraManualPlacement')}
+          value={props.motionRegion.focusMode}
+          onChange={(value) => handleMotionFocusModeChange(props.panel, props.motionRegion, value)}
+          options={[
+            {
+              value: VideoMotionFocusMode.MANUAL,
+              label: translate('videoEditor.sidebar.motionFocusManual'),
+            },
+            {
+              value: VideoMotionFocusMode.MANUAL_AREA,
+              label: translate('videoEditor.sidebar.motionFocusManualArea'),
+            },
+            {
+              value: VideoMotionFocusMode.ACTION,
+              label: translate('videoEditor.sidebar.motionFocusAction'),
+            },
+          ]}
+        />
+      ) : null}
+    </div>
   );
 }
 

@@ -1,3 +1,4 @@
+import { readScenarioVideoDependencyRows } from '../media-library/deletion-index';
 import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import type { IDBPTransaction } from 'idb';
 import { captureVideoProjectInTransaction } from '../sync-capture/capture';
@@ -66,7 +67,7 @@ export async function detachScenarioVideoAssets(
 ): Promise<void> {
   if (!removeProject && childIds.size === 0) return;
   const retained = new Map<string, VideoProjectAssetSource>();
-  for (const raw of await tx.objectStore(VIDEO_PROJECTS_STORE).getAll()) {
+  for (const raw of await readScenarioVideoDependencyRows(tx, projectId, childIds, removeProject)) {
     const envelope = parseVideoDependencyEnvelope(raw);
     if (!envelope)
       throw new Error('Video project dependencies cannot be checked for scenario deletion.');

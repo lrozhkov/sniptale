@@ -2,7 +2,11 @@ import { expect, it } from 'vitest';
 import { createGuideProject } from '../../features/scenario/project/factories';
 import { createScenarioProjectEntry } from '../../composition/persistence/scenario/projects/entry';
 import { encodePortableScenarioProjectEntry } from '../media-hub-backup/v6/root-codecs/projects';
-import { parsePortableSyncRoot, portableSyncDependencyIds } from './prepared-root';
+import {
+  parsePortableSyncRoot,
+  portableSyncDependencyIds,
+  portableSyncEditingObjectIds,
+} from './prepared-root';
 
 function envelope(borrowedMediaId?: string) {
   const project = createGuideProject('Portable Guide', 'guide', 1);
@@ -74,4 +78,106 @@ it('refuses wrong Scenario resource MIME and size before physical object reads',
   wrongSize.objects[0]!.size = 6;
   wrongSize.descriptor.totalBytes = 6;
   await expect(parsePortableSyncRoot(wrongSize)).rejects.toThrow();
+});
+
+it('omits Scenario thumbnails without removing a shared authored child object', async () => {
+  const source = envelope();
+  const root = await parsePortableSyncRoot({
+    ...source,
+    metadata: {
+      ...source.metadata,
+      thumbnail: { objectId: 'body', createdAt: 1, updatedAt: 1, width: 10, height: 10 },
+      exportThumbnails: [],
+      presentation: {
+        entry: {
+          aggregateId: source.metadata.entry.id,
+          aggregateKind: 'scenario',
+          presentationRevision: 0,
+          updatedAt: 1,
+        },
+        thumbnailObjectId: 'preview',
+      },
+    },
+    descriptor: { ...source.descriptor, objectCount: 2, totalBytes: 10 },
+    objects: [
+      ...source.objects,
+      {
+        ...source.objects[0],
+        objectId: 'preview',
+        path: '_sniptale/assets/preview/preview.png',
+        filename: 'preview.png',
+      },
+    ],
+  });
+  expect(portableSyncEditingObjectIds(root, undefined, true)).toEqual(['body']);
+  expect(portableSyncEditingObjectIds(root)).toEqual(['body', 'preview']);
+});
+
+it('excludes saved HTML from Scenario editing closure independently of disposable presentation', async () => {
+  const source = envelope();
+  const root = await parsePortableSyncRoot({
+    ...source,
+    descriptor: { ...source.descriptor, objectCount: 2, totalBytes: 9 },
+    metadata: {
+      ...source.metadata,
+      exports: [
+        {
+          id: 'saved',
+          projectId: 'guide',
+          filename: 'saved.html',
+          format: 'html',
+          size: 4,
+          createdAt: 1,
+          html: { mode: 'guide', objectId: 'saved-body' },
+        },
+      ],
+    },
+    objects: [
+      ...source.objects,
+      {
+        objectId: 'saved-body',
+        path: 'Scenarios/guide/saved.html',
+        filename: 'saved.html',
+        mimeType: 'text/html',
+        size: 4,
+      },
+    ],
+  });
+  expect(portableSyncEditingObjectIds(root)).toEqual(['body']);
+  expect(portableSyncEditingObjectIds(root, undefined, true)).toEqual(['body']);
+  expect(root.envelope.objects).toHaveLength(2);
+});
+
+it('still validates saved HTML object inventory before removing it from editing reads', async () => {
+  const source = envelope();
+  await expect(
+    parsePortableSyncRoot({
+      ...source,
+      descriptor: { ...source.descriptor, objectCount: 2, totalBytes: 9 },
+      metadata: {
+        ...source.metadata,
+        exports: [
+          {
+            id: 'saved',
+            projectId: 'guide',
+            filename: 'saved.html',
+            format: 'html',
+            size: 4,
+            createdAt: 1,
+            html: { mode: 'guide', objectId: 'saved-body' },
+          },
+        ],
+      },
+      objects: [
+        ...source.objects,
+        {
+          objectId: 'saved-body',
+          path: 'Scenarios/guide/saved.html',
+          filename: 'saved.html',
+          mimeType: 'image/png',
+          size: 4,
+        },
+      ],
+    })
+  ).rejects.toThrow();
 });

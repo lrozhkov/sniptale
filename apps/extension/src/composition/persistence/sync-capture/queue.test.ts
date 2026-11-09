@@ -16,6 +16,7 @@ import {
 } from './queue';
 import {
   parseSyncQueueOperation,
+  parseSyncQueueConnection,
   queueConnectionKey,
   queueOperationKey,
   queueHash,
@@ -741,3 +742,102 @@ it('persists invalid workspace refusal without scheduling an automatic retry', a
   });
   expect(parseSyncQueueOperation(failed)).toEqual(failed);
 });
+
+it('preserves exact checkpoint progress and refuses malformed or unrelated cursors', () => {
+  vi.stubGlobal('IDBKeyRange', { only: (key: unknown) => ({ lower: key, upper: key }) });
+  const key = queueConnectionKey(scope);
+  const checkpointProgress = {
+    authorization: { incarnation: '22222222-2222-4222-8222-222222222222', revision: 1 },
+    revision: 1,
+    afterKey: '["pending-checkpoint",\"root\"]',
+  };
+  const row = {
+    ...scope,
+    key,
+    kind: 'queue-connection',
+    version: 1,
+    revision: 0,
+    paused: false,
+    scheduleProgress: null,
+    eventSequence: 0,
+    pendingTransitions: [],
+    droppedTransitions: 0,
+    checkpointProgress,
+  };
+  expect(parseSyncQueueConnection(row)?.checkpointProgress).toEqual(checkpointProgress);
+  expect(
+    parseSyncQueueConnection({
+      ...row,
+      checkpointProgress: { ...checkpointProgress, afterKey: null },
+    })
+  ).not.toBeNull();
+  for (const afterKey of ['profile', 1, ['pending-checkpoint'], '["change","operation"]'])
+    expect(
+      parseSyncQueueConnection({ ...row, checkpointProgress: { ...checkpointProgress, afterKey } })
+    ).toBeNull();
+  expect(
+    parseSyncQueueConnection({ ...row, checkpointProgress: { ...checkpointProgress, revision: 0 } })
+  ).toBeNull();
+});
+
+it('retains a locked queue failure without scheduling background retries', async () => {
+  const f = setup();
+  await enqueueSyncQueueOperation(f.capture);
+  const run = await beginSyncQueueRun(scope, 'op', 1);
+  await expect(failSyncQueueRun(run, 'secrets-locked')).resolves.toMatchObject({
+    status: 'failed',
+    failureCode: 'secrets-locked',
+    nextDueAt: null,
+    runId: null,
+  });
+});
+
+it('refuses a stale-incarnation retry without changing retained queue or source evidence', async () => {
+  const f = setup();
+  configureConnection(f);
+  await enqueueSyncQueueOperation(f.capture);
+  const run = await beginSyncQueueRun(scope, 'op', 1, authorization);
+  const failed = await failSyncQueueRun(run, 'authentication');
+  configureConnection(f, { ...authorization, incarnation: '55555555-5555-4555-8555-555555555555' });
+  const before = structuredClone(f.rows);
+  await expect(commandSyncQueueOperation(scope, 'op', failed.revision, 'retry')).rejects.toThrow(
+    'connection changed'
+  );
+  expect(f.rows).toEqual(before);
+  expect(await commandSyncQueueOperation(scope, 'op', failed.revision, 'cancel')).toMatchObject({
+    status: 'cancelled',
+  });
+});
+
+it(
+  'rechecks retry connection identity after delayed admission and permits the same ' +
+    'revision after the original connection returns',
+  async () => {
+    const f = setup();
+    configureConnection(f);
+    await enqueueSyncQueueOperation(f.capture);
+    const run = await beginSyncQueueRun(scope, 'op', 1, authorization);
+    const failed = await failSyncQueueRun(run, 'temporary');
+    const gate = deferred<typeof f.database>();
+    io.database.mockImplementationOnce(() => gate.promise);
+    const retry = commandSyncQueueOperation(scope, 'op', failed.revision, 'retry');
+    configureConnection(f, {
+      ...authorization,
+      incarnation: '55555555-5555-4555-8555-555555555555',
+    });
+    const before = structuredClone(f.rows);
+    gate.resolve(f.database);
+    await expect(retry).rejects.toThrow('connection changed');
+    expect(f.rows).toEqual(before);
+    configureConnection(f, { ...authorization, revision: 2 });
+    const queued = await commandSyncQueueOperation(scope, 'op', failed.revision, 'retry');
+    expect(queued).toMatchObject({
+      status: 'queued',
+      authorization,
+      revision: failed.revision + 1,
+    });
+    await expect(
+      beginSyncQueueRun(scope, 'op', queued.revision, { ...authorization, revision: 2 })
+    ).resolves.toMatchObject({ authorization: { ...authorization, revision: 2 } });
+  }
+);

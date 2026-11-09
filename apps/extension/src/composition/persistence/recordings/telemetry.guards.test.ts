@@ -177,3 +177,105 @@ it('roundtrips browser source semantics and document capabilities without claimi
     })
   ).toBeNull();
 });
+
+it('binds a local immutable cursor snapshot to its finalized framed hash and geometry', () => {
+  const descriptor = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: 'a'.repeat(32),
+    state: 'complete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalSamples: 1,
+    totalBytes: 512,
+    streamSha256: 'b'.repeat(64),
+  };
+  const ref = {
+    assetId: 'cursor-file',
+    createdAt: 1,
+    location: { kind: 'opfs', objectKey: 'objects/cursor-file' },
+    mimeType: 'application/octet-stream',
+    size: 516,
+    sha256: descriptor.streamSha256,
+  };
+  const snapshot = { ref, sourceRecordingId: 'canonical-recording', width: 160, height: 90 };
+  const entry = {
+    ...createTelemetryEntry(),
+    cursorTrack: null,
+    cursorTrajectory: descriptor,
+    cursorTrajectorySnapshot: snapshot,
+  };
+  expect(parseRecordingTelemetryEntry(entry)?.cursorTrajectorySnapshot).toEqual(snapshot);
+  for (const cursorTrajectorySnapshot of [
+    { ...snapshot, width: 0 },
+    { ...snapshot, height: 0x100000000 },
+    { ...snapshot, sourceRecordingId: '../private' },
+    { ...snapshot, writerGeneration: 'private' },
+    { ...snapshot, ref: { ...ref, size: 512 } },
+    { ...snapshot, ref: { ...ref, sha256: null } },
+    { ...snapshot, ref: { ...ref, sha256: 'c'.repeat(64) } },
+    { ...snapshot, ref: { ...ref, mimeType: 'video/webm' } },
+  ])
+    expect(parseRecordingTelemetryEntry({ ...entry, cursorTrajectorySnapshot })).toBeNull();
+  expect(parseRecordingTelemetryEntry({ ...entry, cursorTrajectory: undefined })).toBeNull();
+  expect(
+    parseRecordingTelemetryEntry({
+      ...entry,
+      cursorTrajectory: { ...descriptor, finalized: false },
+    })
+  ).toBeNull();
+});
+
+it('binds event snapshot references to the exact finalized descriptor and original stream size', () => {
+  const recordingEvents = {
+    format: 'recording-events-v1',
+    formatVersion: 1,
+    algorithm: 'lossless-v1',
+    encoding: 'json-utf8-v1',
+    eventStreamId: 'b'.repeat(32),
+    state: 'incomplete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalBytes: 512,
+    streamSha256: 'd'.repeat(64),
+  };
+  const recordingEventsSnapshot = {
+    sourceRecordingId: 'canonical',
+    ref: {
+      assetId: 'events-file',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/events-file' },
+      mimeType: 'application/octet-stream',
+      size: 516,
+      sha256: recordingEvents.streamSha256,
+    },
+  };
+  const value = { ...createTelemetryEntry(), recordingEvents, recordingEventsSnapshot };
+  expect(parseRecordingTelemetryEntry(value)).not.toBeNull();
+  expect(parseRecordingTelemetryEntry({ ...value, recordingEvents: undefined })).toBeNull();
+  expect(
+    parseRecordingTelemetryEntry({
+      ...value,
+      recordingEvents: { ...recordingEvents, finalized: false },
+    })
+  ).toBeNull();
+  expect(
+    parseRecordingTelemetryEntry({
+      ...value,
+      recordingEventsSnapshot: {
+        ...recordingEventsSnapshot,
+        ref: { ...recordingEventsSnapshot.ref, size: 512 },
+      },
+    })
+  ).toBeNull();
+  expect(
+    parseRecordingTelemetryEntry({
+      ...value,
+      recordingEventsSnapshot: { ...recordingEventsSnapshot, rawBlocks: [] },
+    })
+  ).toBeNull();
+});

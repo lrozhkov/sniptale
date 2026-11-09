@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { writeEditorDrawingObject } from '../../drawing/object/metadata';
+import { createDefaultSimplifySettings } from '../../../features/simplify/settings';
 import { Canvas, Point, Rect, Textbox } from 'fabric';
 import { expect, it } from 'vitest';
 import {
@@ -161,4 +163,51 @@ it('completes text, crop, and regular drawing sessions through their canonical o
     })
   ).toEqual(expect.objectContaining({ cropGuide: crop, kind: 'crop' }));
   expect(crop.hasBorders).toBe(false);
+});
+
+it('requires both Simplify region dimensions to meet the drawing minimum', () => {
+  for (const [width, height] of [
+    [80, 1],
+    [1, 80],
+    [8, 8],
+  ] as const) {
+    const object = new Rect({ width, height, strokeWidth: 0 });
+    const completion = completeEditorDrawSession({
+      canvasDocumentSize,
+      minDrawSize: 8,
+      drawSession: {
+        tool: 'simplify',
+        pointerId: null,
+        object,
+        objectId: 'region',
+        start: new Point(0, 0),
+        lastPoint: new Point(width, height),
+      },
+    });
+    expect(completion.kind).toBe(width >= 8 && height >= 8 ? 'complete' : 'discard');
+  }
+});
+
+it('does not count the Simplify draft border toward its minimum region', () => {
+  const object = new Rect({ width: 7, height: 20, strokeWidth: 1 });
+  writeEditorDrawingObject(object, {
+    id: 'small',
+    kind: 'simplify',
+    bounds: { x: 0, y: 0, width: 7, height: 20 },
+    settings: createDefaultSimplifySettings(),
+  });
+  expect(
+    completeEditorDrawSession({
+      canvasDocumentSize,
+      minDrawSize: 8,
+      drawSession: {
+        tool: 'simplify',
+        pointerId: null,
+        object,
+        objectId: 'small',
+        start: new Point(0, 0),
+        lastPoint: new Point(7, 20),
+      },
+    }).kind
+  ).toBe('discard');
 });

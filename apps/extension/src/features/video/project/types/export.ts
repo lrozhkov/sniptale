@@ -91,6 +91,8 @@ interface VideoProjectExportSettingsBase {
   fps: number;
   frameRateMode?: 'constant' | 'adaptive';
   quality: VideoExportQualityPreset;
+  /** Selects export sampling for this session. A missing value preserves the original path. */
+  detailEnhancement?: VideoExportDetailMode;
   resolution: VideoResolutionPreset;
   scope?: VideoExportScope;
   selectedClipIds?: string[];
@@ -132,3 +134,5 @@ export interface VideoProjectExportStatus {
   message: string;
   timeEstimate?: VideoProjectExportTimeEstimate;
 }
+
+export type VideoExportDetailMode = 'off' | 'bicubic-sharpen' | 'clark-x2';

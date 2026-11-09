@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
 
 import { createContentProps } from '../../../../../../tooling/test/harness/editor/ownership/fixtures';
@@ -60,3 +61,49 @@ describe('inspector/sidebar-expanded-content helpers', () => {
     expect(controller.setLayersExpanded).toHaveBeenCalledWith(false);
   });
 });
+
+it.each([true, false])(
+  'forwards preview without accepting it and preserves optional actions: %s',
+  (present) => {
+    const preview = vi.fn();
+    const commit = vi.fn();
+    const action = vi.fn();
+    const element = document.createElement('input');
+    const input = vi.spyOn(element, 'click');
+    const controller = {
+      ...createController({
+        setFrameDraft: commit,
+        previewFrameDraft: present ? preview : undefined,
+        applyImagePatch: present ? action : undefined,
+        previewImagePatch: present ? action : undefined,
+        insertOrUpdateBrowserFrame: present ? action : undefined,
+        resetFrameDraft: present ? action : undefined,
+        copyRenderedImageDisabledReason: present ? 'Unavailable' : undefined,
+      }),
+      layers: [],
+      lastFillModeRef: { current: 'color' as const },
+      requestConfirm: vi.fn(async () => true),
+      openImageInputRef: { current: present ? element : null },
+      importSessionInputRef: { current: present ? element : null },
+      backgroundImageInputRef: { current: present ? element : null },
+    } as Parameters<typeof createEditorInspectorContentPanelProps>[1];
+    const props = createEditorInspectorContentPanelProps(true, controller);
+    expect(props.previewFrameDraft).toBe(present ? preview : undefined);
+    props.previewFrameDraft?.((frame) => ({ ...frame, paddingTop: 40 }));
+    expect(preview).toHaveBeenCalledTimes(present ? 1 : 0);
+    expect(commit).not.toHaveBeenCalled();
+    props.onOpenImage();
+    props.onImportSession();
+    props.onPickBackgroundImage();
+    expect(input).toHaveBeenCalledTimes(present ? 3 : 0);
+    for (const key of [
+      'applyImagePatch',
+      'previewImagePatch',
+      'insertOrUpdateBrowserFrame',
+      'resetFrameDraft',
+      'copyRenderedImageDisabledReason',
+    ]) {
+      expect(Object.hasOwn(props, key)).toBe(present);
+    }
+  }
+);

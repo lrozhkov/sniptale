@@ -78,6 +78,7 @@ export function useReviewEditorWiring(args: {
   setTimelineSelection(value: import('../../features/video/review/types').ReviewAnchor): void;
   setCutting(cutting: false): void;
   telemetry: LoadedReview['telemetry'];
+  historyPending?: boolean;
   sourceDuration: number;
   sourceGeometry?: { width: number; height: number };
   actionsVisible: boolean;
@@ -156,6 +157,7 @@ export function useReviewEditorWiring(args: {
     markers: projected.markers,
     cursorFocusPath,
     cursorFocusKeys,
+    historyPending: args.historyPending ?? false,
     deleteCursorFocus: (id) =>
       args.advancedState.setCursorFocusPath(deleteCursorFocusKey(cursorFocusPath, id)),
     setSelection: args.setActiveSelection,

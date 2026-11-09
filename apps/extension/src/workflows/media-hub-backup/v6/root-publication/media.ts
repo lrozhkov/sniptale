@@ -1,7 +1,30 @@
+import { createRecordingEventsStore } from '../../../../composition/persistence/recordings/recording-events/store';
+import { stageRecordingEventsStream } from '../../../../composition/persistence/recordings/recording-events/snapshot';
+import {
+  publishStagedRecordingEventsInTransaction,
+  linkRecordingEventsSnapshotInTransaction,
+} from '../../../../composition/persistence/recordings/recording-events/publication';
+import {
+  recordingEventsStagingIdentity,
+  retireJournalRecordingEventStagesInTransaction,
+} from '../../../../composition/persistence/recordings/recording-events/staging';
+import type { RecordingEventsWriter } from '../../../../composition/persistence/recordings/recording-events/contracts';
 import {
   readAssetResidencyCopyInTransaction,
   retireAssetResidencyCopyInTransaction,
 } from '../../../../composition/persistence/assets/residency';
+import { initDB } from '../../../../composition/persistence/infrastructure/indexed-db/core';
+import { createRecordingCursorTrajectoryStore } from '../../../../composition/persistence/recordings/cursor-trajectory/store';
+import {
+  publishStagedCursorTrajectoryInTransaction,
+  linkCursorTrajectorySnapshotInTransaction,
+} from '../../../../composition/persistence/recordings/cursor-trajectory/publication';
+import {
+  cursorTrajectoryStagingIdentity,
+  retireJournalCursorTrajectoryStagesInTransaction,
+} from '../../../../composition/persistence/recordings/cursor-trajectory/staging';
+import type { RecordingCursorTrajectoryWriter } from '../../../../composition/persistence/recordings/cursor-trajectory/contracts';
+import { stageCursorTrajectoryStream } from '../cursor-trajectory';
 import { assetResidencyCopyId } from '../../../../composition/persistence/assets/residency-records';
 import { ASSET_RESIDENCY_STORE } from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
 import {
@@ -61,10 +84,15 @@ import {
   IMAGE_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   RECORDING_TELEMETRY_STORE,
+  RECORDING_CURSOR_TRAJECTORIES_STORE,
+  RECORDING_CURSOR_BLOCKS_STORE,
+  RECORDING_EVENTS_STORE,
+  NATIVE_TRANSFER_SESSIONS_STORE,
   STORE_NAME,
   THUMBNAILS_STORE,
   WEB_SNAPSHOTS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/mutation';
 import type {
@@ -469,7 +497,9 @@ type PreparedMediaRoot = Awaited<ReturnType<typeof prepareMediaRoot>>;
 
 function isCaptureImage(media: MediaLibraryEntry): boolean {
   return (
-    (media.source.kind === 'screenshot' || media.source.kind === 'stored-asset') &&
+    (media.source.kind === 'screenshot' ||
+      media.source.kind === 'stored-asset' ||
+      media.source.kind === 'project-asset') &&
     (media.kind === 'image' || media.kind === 'screenshot')
   );
 }
@@ -606,6 +636,8 @@ async function commitPreparedMediaRoot(args: {
   prepared: PreparedMediaRoot;
   rootKey: string;
   session: { operationId: string; strategy: 'replace' | 'skip' | 'duplicate' };
+  cursorStage?: { writer: RecordingCursorTrajectoryWriter; journalId: string };
+  eventsStage?: { writer: RecordingEventsWriter; journalId: string };
 }) {
   return runWithIndexedDbMutation(async (db, permit) => {
     const tx = db.transaction(
@@ -613,6 +645,7 @@ async function commitPreparedMediaRoot(args: {
         MEDIA_LIBRARY_STORE,
         ASSET_RESIDENCY_STORE,
         SYNC_CAPTURE_STORE,
+        SYNC_OUTBOX_STORE,
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
         VIDEO_WORKSPACES_STORE,
@@ -625,6 +658,10 @@ async function commitPreparedMediaRoot(args: {
         AGGREGATE_PRESENTATIONS_STORE,
         STORE_NAME,
         RECORDING_TELEMETRY_STORE,
+        RECORDING_CURSOR_TRAJECTORIES_STORE,
+        RECORDING_CURSOR_BLOCKS_STORE,
+        RECORDING_EVENTS_STORE,
+        NATIVE_TRANSFER_SESSIONS_STORE,
         WEB_SNAPSHOTS_STORE,
         ASSET_REFS_STORE,
         ASSET_OWNERS_STORE,
@@ -651,6 +688,10 @@ async function commitPreparedMediaRoot(args: {
     try {
       const conflict = await detectMediaConflicts(stores, args.prepared);
       if (conflict.conflict && args.session.strategy === 'skip') {
+        if (args.cursorStage)
+          await retireJournalCursorTrajectoryStagesInTransaction(tx, args.cursorStage.journalId);
+        if (args.eventsStage)
+          await retireJournalRecordingEventStagesInTransaction(tx, args.eventsStage.journalId);
         await appendCommittedArchiveRootInTransaction(
           tx.objectStore(ASSET_OPERATIONS_STORE),
           args.session.operationId,
@@ -709,6 +750,36 @@ async function commitPreparedMediaRoot(args: {
       if (previousInlineCopy)
         await retireAssetResidencyCopyInTransaction(tx, previousInlineCopy, permit);
       await publishPreparedMedia({ ...args, stores });
+      if (args.cursorStage) {
+        if (!args.prepared.recording || !args.metadata.recording?.cursorAttachment)
+          throw new Error('Restored cursor source has no recording owner.');
+        const publishedCursor = await publishStagedCursorTrajectoryInTransaction({
+          tx,
+          stagingWriter: args.cursorStage.writer,
+          recordingId: args.prepared.recording.id,
+          descriptor: args.metadata.recording.cursorAttachment.descriptor,
+          mintGeneration: () => crypto.randomUUID(),
+        });
+        const snapshot = args.prepared.telemetry?.cursorTrajectorySnapshot;
+        if (!snapshot) throw new Error('Restored cursor snapshot file is missing.');
+        await linkCursorTrajectorySnapshotInTransaction(tx, publishedCursor, snapshot.ref.assetId);
+        await retireJournalCursorTrajectoryStagesInTransaction(tx, args.cursorStage.journalId);
+      }
+      if (args.eventsStage) {
+        if (!args.prepared.recording || !args.metadata.recording?.eventsAttachment)
+          throw new Error('Restored events source has no recording owner.');
+        const published = await publishStagedRecordingEventsInTransaction({
+          tx,
+          stagingWriter: args.eventsStage.writer,
+          recordingId: args.prepared.recording.id,
+          descriptor: args.metadata.recording.eventsAttachment.descriptor,
+          mintGeneration: () => crypto.randomUUID(),
+        });
+        const snapshot = args.prepared.telemetry?.recordingEventsSnapshot;
+        if (!snapshot) throw new Error('Restored event snapshot file is missing.');
+        await linkRecordingEventsSnapshotInTransaction(tx, published, snapshot.ref.assetId);
+        await retireJournalRecordingEventStagesInTransaction(tx, args.eventsStage.journalId);
+      }
       if (args.operation.assetIds.length > 0) {
         await tx.objectStore(ASSET_OPERATIONS_STORE).put(args.operation);
       }
@@ -752,6 +823,12 @@ function retainedMediaAssetIds(args: {
 }): string[] {
   if (!args.imported) return [];
   return [
+    ...(args.prepared.telemetry?.cursorTrajectorySnapshot
+      ? [args.prepared.telemetry.cursorTrajectorySnapshot.ref.assetId]
+      : []),
+    ...(args.prepared.telemetry?.recordingEventsSnapshot
+      ? [args.prepared.telemetry.recordingEventsSnapshot.ref.assetId]
+      : []),
     ...(args.prepared.media.source.kind === 'stored-asset' ||
     args.prepared.recording ||
     args.prepared.projectAsset ||
@@ -794,7 +871,7 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
       return true;
     });
   },
-  async publish({ envelope, session, staged, lifecyclePermit }) {
+  async publish({ envelope, session, staged, journal, lifecyclePermit }) {
     const metadata = parsePortableMediaMetadata(envelope.metadata);
     const objects = objectMap(staged);
     const prepared = await prepareMediaRoot({
@@ -804,6 +881,75 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
       rootIdMap: session.rootIdMap,
     });
     const operation = buildPhysicalDeleteOperation([]);
+    const attachment = metadata.recording?.cursorAttachment;
+    let cursorStage: { writer: RecordingCursorTrajectoryWriter; journalId: string } | undefined;
+    if (attachment) {
+      const object = requireObject(objects, attachment.objectId);
+      const file = await readAssetFile(object.ref, 'cursor.bin');
+      const privateIdentity = cursorTrajectoryStagingIdentity(journal.journalId, {
+        recordingId: attachment.recordingId,
+        trajectoryId: attachment.descriptor.trajectoryId,
+      });
+      const writer = await stageCursorTrajectoryStream({
+        store: createRecordingCursorTrajectoryStore({
+          database: initDB,
+          mintGeneration: () => crypto.randomUUID(),
+        }),
+        attachment,
+        source: {
+          size: file.size,
+          pipeTo: (sink, signal) => file.stream().pipeTo(sink, signal ? { signal } : {}),
+        },
+        stagingRecordingId: `${privateIdentity.recordingId}:${crypto.randomUUID()}`,
+        stagingJournalId: journal.journalId,
+      });
+      cursorStage = { writer, journalId: journal.journalId };
+      if (!prepared.telemetry) throw new Error('Restored cursor snapshot has no telemetry owner.');
+      prepared.telemetry = {
+        ...prepared.telemetry,
+        cursorTrajectorySnapshot: {
+          sourceRecordingId: attachment.sourceRecordingId,
+          width: attachment.width,
+          height: attachment.height,
+          ref: { ...object.ref, sha256: attachment.descriptor.streamSha256 },
+        },
+      };
+    }
+    const eventsAttachment = metadata.recording?.eventsAttachment;
+    let eventsStage: { writer: RecordingEventsWriter; journalId: string } | undefined;
+    if (eventsAttachment) {
+      const object = requireObject(objects, eventsAttachment.objectId);
+      const file = await readAssetFile(object.ref, 'events.bin');
+      const privateIdentity = recordingEventsStagingIdentity(journal.journalId, {
+        recordingId: eventsAttachment.recordingId,
+        eventStreamId: eventsAttachment.descriptor.eventStreamId,
+      });
+      const writer = await stageRecordingEventsStream({
+        store: createRecordingEventsStore({
+          database: initDB,
+          mintGeneration: () => crypto.randomUUID(),
+        }),
+        identity: {
+          ...privateIdentity,
+          recordingId: `${privateIdentity.recordingId}:${crypto.randomUUID()}`,
+        },
+        sourceIdentity: eventsAttachment,
+        source: {
+          size: file.size,
+          pipeTo: (sink, signal) => file.stream().pipeTo(sink, signal ? { signal } : {}),
+        },
+        stagingJournalId: journal.journalId,
+      });
+      eventsStage = { writer, journalId: journal.journalId };
+      if (!prepared.telemetry) throw new Error('Restored event snapshot has no telemetry owner.');
+      prepared.telemetry = {
+        ...prepared.telemetry,
+        recordingEventsSnapshot: {
+          sourceRecordingId: eventsAttachment.sourceRecordingId,
+          ref: { ...object.ref, sha256: eventsAttachment.descriptor.streamSha256 },
+        },
+      };
+    }
     const result = await commitPreparedMediaRoot({
       metadata,
       objects,
@@ -811,6 +957,8 @@ export const mediaLibraryRootPublisher: ArchiveRootPublisher = {
       prepared,
       rootKey: `media:library-item:${envelope.descriptor.rootId}`,
       session,
+      ...(cursorStage ? { cursorStage } : {}),
+      ...(eventsStage ? { eventsStage } : {}),
     });
     if (operation.assetIds.length > 0) {
       await completePhysicalDeleteOperation(operation, lifecyclePermit).catch(() => undefined);

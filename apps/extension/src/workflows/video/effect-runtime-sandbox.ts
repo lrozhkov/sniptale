@@ -7,7 +7,11 @@ export { EFFECT_RUNTIME_SANDBOX_PAGE_PATH } from './effect-runtime-sandbox-sessi
 export type { EffectRuntimeSandboxExecutor } from '../../contracts/effect-runtime/types';
 
 export function createEffectRuntimeSandboxExecutor(
-  args: { ownerDocument?: Document; timeoutMs?: number } = {}
+  args: {
+    ownerDocument?: Document;
+    timeoutMs?: number;
+    compositionBackend?: 'gpu-preview' | 'gpu-scene' | 'gpu-scene-plan';
+  } = {}
 ): EffectRuntimeSandboxExecutor {
   const ownerDocument = args.ownerDocument ?? document;
   const loadTimeoutMs = resolveTimeout(
@@ -21,9 +25,21 @@ export function createEffectRuntimeSandboxExecutor(
   const manager = new EffectRuntimeSandboxSessionManager(ownerDocument, {
     loadTimeoutMs,
     requestTimeoutMs,
+    ...(args.compositionBackend ? { compositionBackend: args.compositionBackend } : {}),
   });
+  const scene =
+    args.compositionBackend === 'gpu-scene' || args.compositionBackend === 'gpu-scene-plan';
+  if (scene) manager.preload();
   return {
     dispose: () => manager.dispose(),
+    ...(scene
+      ? {
+          maximumGpuFramesInFlight: 2 as const,
+          preload: () => manager.preload(),
+          prepareGpuFrame: (request: Parameters<EffectRuntimeSandboxExecutor['renderFrame']>[0]) =>
+            manager.prepareGpuFrame(request),
+        }
+      : {}),
     renderFrame: (request) => manager.renderFrame(request),
   };
 }

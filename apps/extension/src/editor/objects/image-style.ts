@@ -92,7 +92,12 @@ export function applyImageSettings(object: FabricObject, settings: EditorImageSe
     opacity: settings.opacity,
     shadow: createFabricShadow(settings.shadow, shadowColor, {
       angle: settings.shadowAngle ?? 90,
-      blur: sourceImage ? resolveEditorSourceImageGlowBlur(settings) : (settings.shadowBlur ?? 12),
+      blur: sourceImage
+        ? resolveEditorSourceImageGlowBlur(
+            settings,
+            Math.min(object.width ?? 0, object.height ?? 0)
+          )
+        : (settings.shadowBlur ?? 12),
       distance: sourceImage ? 0 : (settings.shadowDistance ?? 4),
     }),
     objectCaching: false,

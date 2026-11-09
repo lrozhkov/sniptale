@@ -1,3 +1,10 @@
+import type { PortableRecordingEventsAttachment } from '../root-codecs/recording-events';
+import { portableRecordingTelemetry } from '../root-codecs/cursor-trajectory';
+import {
+  openStoredCursorTrajectoryStream,
+  type CursorTrajectoryArchiveStore,
+} from '../cursor-trajectory';
+import type { PortableCursorTrajectoryAttachment } from '../root-codecs/cursor-trajectory';
 import type { MediaHubBackupRootPreparation } from '../contracts';
 import { readWorkspaceStorage } from '../../../../composition/persistence/review-workspaces/storage';
 import {
@@ -66,7 +73,7 @@ import type { ArchiveRootObjectSource, MediaHubBackupRootInventoryItem } from '.
 import { METADATA_ROOT, withDraftRoot } from '../layout';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import { buildPortableAggregatePresentation } from './presentation';
-import { createObjectCollector } from './helpers';
+import { createObjectCollector, type DeferredInventoryAssets } from './helpers';
 
 interface MediaInventoryDatabase extends VideoReviewBackupDatabase {
   get(store: string, key: unknown): Promise<unknown>;
@@ -101,7 +108,11 @@ async function readRefFile(
   return readAssetFile(ref, filename);
 }
 
-function selected(item: MediaLibraryItem, options: MediaHubBackupExportOptions): boolean {
+/** One metadata-only selector serves archive inventory and explicit Library preparation. */
+export function isMediaBackupItemSelected(
+  item: { id: string; source: { kind: string }; lifecycle?: { storageClass: string } },
+  options: MediaHubBackupExportOptions
+): boolean {
   if (item.source.kind === 'web-snapshot' && !options.includeWebSnapshots) return false;
   const explicitlySelected = Boolean(options.selected?.mediaAssetIds.includes(item.id));
   if (item.lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return false;
@@ -142,15 +153,23 @@ function mediaObjectDirectory(
 
 interface MediaObjectCollector {
   add(blob: Blob, filename: string, mimeType?: string, directory?: readonly string[]): string;
+  addStream: ReturnType<typeof createObjectCollector>['addStreamObject'];
+  addAsset: ReturnType<typeof createObjectCollector>['addAsset'];
   objects: ArchiveRootObjectSource[];
+  references: ReturnType<typeof createObjectCollector>['references'];
   sizeOf(objectId: string): number;
 }
 
 function createMediaObjectCollector(
   rootIndex: number,
-  paths: ArchivePathAllocator
+  paths: ArchivePathAllocator,
+  deferredAssets?: DeferredInventoryAssets
 ): MediaObjectCollector {
-  const collector = createObjectCollector(`media-${String(rootIndex + 1).padStart(6, '0')}`, paths);
+  const collector = createObjectCollector(
+    `media-${String(rootIndex + 1).padStart(6, '0')}`,
+    paths,
+    deferredAssets
+  );
   return {
     add(blob, filename, mimeType, directory) {
       return collector.addObject(
@@ -160,9 +179,12 @@ function createMediaObjectCollector(
         directory
       );
     },
+    addStream: collector.addStreamObject,
+    addAsset: collector.addAsset,
     objects: collector.objects,
+    references: collector.references,
     sizeOf(objectId) {
-      const object = collector.objects.find((candidate) => candidate.ref.objectId === objectId);
+      const object = collector.references.find((candidate) => candidate.ref.objectId === objectId);
       if (!object) throw new Error(`Media backup object is missing from inventory: ${objectId}.`);
       return object.ref.size;
     },
@@ -172,14 +194,15 @@ function createMediaObjectCollector(
 async function buildRecordingSource(args: {
   collector: MediaObjectCollector;
   db: MediaInventoryDatabase;
+  cursorStore?: CursorTrajectoryArchiveStore;
   entry: MediaLibraryEntry;
   options: MediaHubBackupExportOptions;
   recording: StoredRecordingEntry;
 }) {
   const stored = args.recording;
-  const file = await readRefFile(args.db, stored.assetId, stored.filename);
-  const originalObjectId = args.collector.add(
-    file,
+  const originalObjectId = await args.collector.addAsset(
+    args.db,
+    stored.assetId,
     stored.filename,
     stored.mimeType,
     mediaObjectDirectory(args.entry, args.options)
@@ -194,14 +217,71 @@ async function buildRecordingSource(args: {
         }
       : {}),
   };
-  const telemetry = args.options.includeTelemetry
+  const rawTelemetry = args.options.includeTelemetry
     ? parseRecordingTelemetryEntry(await args.db.get(RECORDING_TELEMETRY_STORE, stored.id))
     : null;
+  const telemetry = rawTelemetry ? portableRecordingTelemetry(rawTelemetry) : null;
+  let cursorAttachment: PortableCursorTrajectoryAttachment | undefined;
+  const descriptor = telemetry?.cursorTrajectory;
+  const snapshot = rawTelemetry?.cursorTrajectorySnapshot;
+  if (descriptor && snapshot) {
+    const file = await readAssetFile(snapshot.ref, `${stored.id}-cursor.bin`);
+    cursorAttachment = {
+      recordingId: stored.id,
+      sourceRecordingId: snapshot.sourceRecordingId,
+      width: snapshot.width,
+      height: snapshot.height,
+      descriptor,
+      objectId: args.collector.add(file, `${stored.id}-cursor.bin`, 'application/octet-stream'),
+    };
+  } else if (descriptor && descriptor.totalBlocks > 0) {
+    const store = args.cursorStore;
+    if (!store) throw new Error('Cursor trajectory export requires its frozen source.');
+    const head = await store.getHead({
+      recordingId: stored.id,
+      trajectoryId: descriptor.trajectoryId,
+    });
+    if (!head || !head.finalized || head.stagingJournalId !== undefined)
+      throw new Error('Cursor trajectory export source is unavailable.');
+    const attachment: PortableCursorTrajectoryAttachment = {
+      recordingId: stored.id,
+      sourceRecordingId: head.sourceRecordingId,
+      width: head.width,
+      height: head.height,
+      descriptor,
+      objectId: args.collector.addStream(
+        descriptor.totalBytes + descriptor.totalBlocks * 4,
+        `${stored.id}-cursor.bin`,
+        'application/octet-stream',
+        async (signal) => {
+          signal?.throwIfAborted();
+          return openStoredCursorTrajectoryStream(store, attachment, head.writerGeneration);
+        }
+      ),
+    };
+    cursorAttachment = attachment;
+  }
+  let eventsAttachment: PortableRecordingEventsAttachment | undefined;
+  const eventsDescriptor = telemetry?.recordingEvents;
+  const eventsSnapshot = rawTelemetry?.recordingEventsSnapshot;
+  if (eventsDescriptor && eventsDescriptor.totalBlocks > 0) {
+    if (!eventsSnapshot)
+      throw new Error('Recording events export requires its immutable snapshot.');
+    const file = await readAssetFile(eventsSnapshot.ref, `${stored.id}-events.bin`);
+    eventsAttachment = {
+      recordingId: stored.id,
+      sourceRecordingId: eventsSnapshot.sourceRecordingId,
+      descriptor: eventsDescriptor,
+      objectId: args.collector.add(file, `${stored.id}-events.bin`, 'application/octet-stream'),
+    };
+  }
   return {
     originalObjectId,
     recording: {
       entry: portableRecording,
       ...(telemetry ? { telemetry } : {}),
+      ...(cursorAttachment ? { cursorAttachment } : {}),
+      ...(eventsAttachment ? { eventsAttachment } : {}),
     } satisfies NonNullable<PortableMediaMetadata['recording']>,
   };
 }
@@ -219,10 +299,11 @@ async function buildWebSnapshotSource(args: {
   if (!stored) {
     throw new Error(`Web snapshot backup metadata is missing: ${args.snapshotId}.`);
   }
-  const [packageFile, screenshotFile] = await Promise.all([
-    readRefFile(args.db, stored.packageAssetId, `${stored.id}.sniptale-page-package.zip`),
-    readRefFile(args.db, stored.screenshotAssetId, `${stored.id}-screenshot`),
-  ]);
+  const packageFile = await readRefFile(
+    args.db,
+    stored.packageAssetId,
+    `${stored.id}.sniptale-page-package.zip`
+  );
   const sanitized = await sanitizeWebSnapshotPackageProvenance(packageFile, stored.manifest, {
     includeSourceMetadata: args.options.includeSourceMetadata,
   });
@@ -232,8 +313,9 @@ async function buildWebSnapshotSource(args: {
     PAGE_PACKAGE_ARCHIVE_MIME_TYPE,
     mediaObjectDirectory(args.entry, args.options)
   );
-  const screenshotObjectId = args.collector.add(
-    screenshotFile,
+  const screenshotObjectId = await args.collector.addAsset(
+    args.db,
+    stored.screenshotAssetId,
     args.options.includeSourceMetadata
       ? `${args.entry.sourceTitle || 'screenshot'}${imageExtension(stored.screenshotMimeType)}`
       : `screenshot${imageExtension(stored.screenshotMimeType)}`,
@@ -259,6 +341,7 @@ async function buildMediaSource(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   collector: MediaObjectCollector;
   db: MediaInventoryDatabase;
+  cursorStore?: CursorTrajectoryArchiveStore;
   entry: MediaLibraryEntry;
   options: MediaHubBackupExportOptions;
 }): Promise<
@@ -310,10 +393,10 @@ async function buildMediaSource(args: {
     return buildWebSnapshotSource({ ...args, entry, snapshotId: entry.source.snapshotId });
   }
   if (entry.source.kind === 'stored-asset') {
-    const file = await readRefFile(args.db, entry.source.assetId, entry.filename);
     return {
-      originalObjectId: args.collector.add(
-        file,
+      originalObjectId: await args.collector.addAsset(
+        args.db,
+        entry.source.assetId,
         entry.filename,
         entry.mimeType,
         mediaObjectDirectory(entry, args.options)
@@ -325,19 +408,22 @@ async function buildMediaSource(args: {
       ? parseProjectAssetEntry(await args.db.get(PROJECT_ASSETS_STORE, entry.source.projectAssetId))
       : parseProjectExportEntry(await args.db.get(PROJECT_EXPORTS_STORE, entry.source.exportId));
   if (!child) throw new Error('Project source is missing.');
-  const file = await readRefFile(args.db, child.assetId, entry.filename);
-  const storedReview = await readVideoReviewForBackup({
-    db: args.db,
-    aggregateId: entry.id,
-    sourceAssetId: child.assetId,
-    expectedSnapshot: args.expectedReview,
-  });
+  const storedReview =
+    entry.kind === 'image' || entry.kind === 'screenshot'
+      ? undefined
+      : await readVideoReviewForBackup({
+          db: args.db,
+          aggregateId: entry.id,
+          sourceAssetId: child.assetId,
+          expectedSnapshot: args.expectedReview,
+        });
   const videoReview = encodePortableReviewAssetRefs(storedReview);
   const reviewAssets = storedReview
     ? await buildReviewAssets(args.db, args.collector, storedReview.workspace)
     : [];
-  const originalObjectId = args.collector.add(
-    file,
+  const originalObjectId = await args.collector.addAsset(
+    args.db,
+    child.assetId,
     entry.filename,
     entry.mimeType,
     mediaObjectDirectory(entry, args.options)
@@ -378,7 +464,6 @@ async function buildReviewAssets(
     if (!entry) throw new Error(`Review-referenced project asset is missing: ${reference}.`);
     const media = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, reference));
     const filename = media?.filename ?? id;
-    const file = await readRefFile(db, entry.assetId, filename);
     const { assetId: _assetId, ...portable } = entry;
     const videoReview =
       !media && entry.mimeType.startsWith('video/')
@@ -396,7 +481,7 @@ async function buildReviewAssets(
       filename,
       ...(media ? { libraryMediaId: reference } : { publishToLibrary: false }),
       ...(videoReview ? { videoReview: encodePortableReviewAssetRefs(videoReview) } : {}),
-      objectId: collector.add(file, filename, entry.mimeType),
+      objectId: await collector.addAsset(db, entry.assetId, filename, entry.mimeType),
     });
   }
   return assets;
@@ -431,10 +516,9 @@ async function buildWorkspace(args: {
   const objectsByAssetId = new Map<string, string>();
   for (const asset of privateWorkspace.document.assets) {
     if (objectsByAssetId.has(asset.assetId)) continue;
-    const file = await readRefFile(args.db, asset.assetId, `${args.entry.id}-${asset.role}`);
     objectsByAssetId.set(
       asset.assetId,
-      args.collector.add(file, `${args.entry.id}-${asset.role}`, file.type || 'image/png')
+      await args.collector.addAsset(args.db, asset.assetId, `${args.entry.id}-${asset.role}`)
     );
   }
   const { document, ...workspaceMetadata } = privateWorkspace;
@@ -475,10 +559,12 @@ async function buildMediaRoot(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   sourceMediaId?: string;
   db: MediaInventoryDatabase;
+  cursorStore?: CursorTrajectoryArchiveStore;
   item: MediaLibraryItem;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
   prepareRoot?: MediaHubBackupRootPreparation;
+  deferredAssets?: DeferredInventoryAssets;
   rootIndex: number;
 }): Promise<MediaHubBackupRootInventoryItem> {
   await args.prepareRoot?.({
@@ -490,17 +576,20 @@ async function buildMediaRoot(args: {
   );
   if (!sourceEntry) throw new Error(`Media backup row is invalid: ${args.item.id}.`);
   const entry = { ...sourceEntry, id: args.item.id };
-  const collector = createMediaObjectCollector(args.rootIndex, args.paths);
+  const collector = createMediaObjectCollector(args.rootIndex, args.paths, args.deferredAssets);
   const source = await buildMediaSource({
     collector,
     db: args.db,
+    ...(args.cursorStore ? { cursorStore: args.cursorStore } : {}),
     entry,
     options: args.options,
     expectedReview:
       args.expectedReview?.workspace.aggregateId === entry.id ? args.expectedReview : undefined,
   });
   const isImageAggregate =
-    (entry.source.kind === 'screenshot' || entry.source.kind === 'stored-asset') &&
+    (entry.source.kind === 'screenshot' ||
+      entry.source.kind === 'stored-asset' ||
+      entry.source.kind === 'project-asset') &&
     (entry.kind === 'image' || entry.kind === 'screenshot');
   const thumbnail = await buildThumbnail({ collector, db: args.db, entry, isImageAggregate });
   const workspace = await buildWorkspace({
@@ -559,6 +648,12 @@ async function buildMediaRoot(args: {
       metadata.recording = {
         ...metadata.recording,
         entry: { ...metadata.recording.entry, id: localId },
+        ...(metadata.recording.cursorAttachment
+          ? { cursorAttachment: { ...metadata.recording.cursorAttachment, recordingId: localId } }
+          : {}),
+        ...(metadata.recording.eventsAttachment
+          ? { eventsAttachment: { ...metadata.recording.eventsAttachment, recordingId: localId } }
+          : {}),
         ...(metadata.recording.telemetry
           ? { telemetry: { ...metadata.recording.telemetry, recordingId: localId } }
           : {}),
@@ -575,10 +670,10 @@ async function buildMediaRoot(args: {
     descriptor: {
       mediaSubtype: 'library-item',
       metadataPath: `${METADATA_ROOT}/media/${encodeURIComponent(entry.id)}.json`,
-      objectCount: collector.objects.length,
+      objectCount: collector.references.length,
       rootId: entry.id,
       rootKind: 'media',
-      totalBytes: collector.objects.reduce((total, object) => total + object.ref.size, 0),
+      totalBytes: collector.references.reduce((total, object) => total + object.ref.size, 0),
     },
     load: async () => ({ metadata: metadata as unknown as JsonValue, objects: collector.objects }),
     summary: buildRootSummary({ entry, options: args.options, presentation, source, thumbnail }),
@@ -616,15 +711,20 @@ export async function buildMediaRootInventory(args: {
   expectedReview?: VideoWorkspaceSnapshot | undefined;
   reviewWorkspaceHeads?: readonly unknown[];
   db: MediaInventoryDatabase;
+  cursorStore?: CursorTrajectoryArchiveStore;
   items: MediaLibraryItem[];
   coveredProjectMediaIds?: ReadonlySet<string>;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
   prepareRoot?: MediaHubBackupRootPreparation;
+  deferredAssets?: DeferredInventoryAssets;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const roots: MediaHubBackupRootInventoryItem[] = [];
   const items = args.items
-    .filter((item) => selected(item, args.options) && !args.coveredProjectMediaIds?.has(item.id))
+    .filter(
+      (item) =>
+        isMediaBackupItemSelected(item, args.options) && !args.coveredProjectMediaIds?.has(item.id)
+    )
     .sort((a, b) => a.id.localeCompare(b.id));
   for (const [rootIndex, item] of items.entries()) {
     roots.push(await buildMediaRoot({ ...args, item, rootIndex }));
@@ -650,7 +750,7 @@ export async function buildMediaRootInventory(args: {
       id: archived.workspace.aggregateId,
       ...(archived.workspace.project ? { lifecycle: archived.workspace.project.lifecycle } : {}),
     };
-    if (!selected(item, args.options)) continue;
+    if (!isMediaBackupItemSelected(item, args.options)) continue;
     roots.push(
       await buildMediaRoot({
         ...args,

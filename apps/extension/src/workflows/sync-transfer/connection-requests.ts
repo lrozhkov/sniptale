@@ -24,6 +24,7 @@ interface ActiveRequest {
 export function createSyncConnectionRequests(options: {
   identity: SyncConnectionIdentity;
   hasOriginPermission: (origin: string) => Promise<boolean>;
+  checkProtection?: () => Promise<boolean>;
 }) {
   const parsedIdentity = parseSyncConnectionIdentity(structuredClone(options.identity));
   if (!parsedIdentity) throw new SyncRemoteError('invalid-configuration');
@@ -35,6 +36,8 @@ export function createSyncConnectionRequests(options: {
     if (!(await hasOriginPermission(new URL(before.binding.rootUrl).origin)))
       throw new SyncRemoteError('access-denied');
     await current();
+    if (options.checkProtection && !(await options.checkProtection()))
+      throw new SyncRemoteError('secrets-locked');
     check();
   }
 

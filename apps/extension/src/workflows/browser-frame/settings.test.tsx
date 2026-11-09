@@ -11,6 +11,8 @@ import {
   type WindowHeader,
 } from '@sniptale/runtime-contracts/window-header';
 const acquire = vi.hoisted(() => vi.fn());
+const findIcon = vi.hoisted(() => vi.fn(async () => 'https://example.test/brand.svg'));
+vi.mock('./open-page-icon', () => ({ findOpenPageFavicon: findIcon }));
 const importIcon = vi.hoisted(() => vi.fn());
 vi.mock('./local-icon', () => ({
   WINDOW_HEADER_ICON_ACCEPT: '.png,.ico,.svg',
@@ -42,6 +44,7 @@ it('keeps saved icon offline, clears on disable, and reacquires only on explicit
   try {
     await act(async () => root.render(<Harness />));
     expect(acquire).not.toHaveBeenCalled();
+    expect(findIcon).not.toHaveBeenCalled();
     const button = host.querySelector<HTMLButtonElement>('button[aria-pressed="true"][title]')!;
     // Segmented controls have titles too; favicon is the final button.
     const toggle = () =>
@@ -52,9 +55,16 @@ it('keeps saved icon offline, clears on disable, and reacquires only on explicit
     expect(current?.faviconEnabled).toBe(false);
     expect(current?.faviconDataUrl).toBeUndefined();
     expect(acquire).not.toHaveBeenCalled();
+    expect(findIcon).not.toHaveBeenCalled();
     acquire.mockResolvedValue(icon);
     await act(async () => toggle().click());
     expect(acquire).toHaveBeenCalledTimes(1);
+    expect(acquire).toHaveBeenCalledWith(
+      'example.test',
+      expect.any(AbortSignal),
+      undefined,
+      'https://example.test/brand.svg'
+    );
     expect(current?.faviconDataUrl).toBe(icon);
     expect(button).toBeTruthy();
   } finally {
@@ -377,7 +387,8 @@ it('keeps the address and icon actions in one inspector value owner', async () =
       host.querySelector<HTMLInputElement>(
         `input[aria-label="${translate('windowHeader.tabTitle')}"]`
       )?.placeholder
-    ).toBe(translate('windowHeader.tabTitle'));
+    ).toBe(translate('windowHeader.tabTitlePlaceholder'));
+    expect(host.querySelectorAll('details')).toHaveLength(0);
   } finally {
     await act(async () => root.unmount());
   }
@@ -394,7 +405,10 @@ it.each(['favicon', 'fileIcon'] as const)(
       await act(async () =>
         root.render(
           <CommandPressScope value={true}>
-            <WindowHeaderSettings header={DEFAULT_WINDOW_HEADER} onChange={vi.fn()} />
+            <WindowHeaderSettings
+              header={{ ...DEFAULT_WINDOW_HEADER, url: 'example.test' }}
+              onChange={vi.fn()}
+            />
           </CommandPressScope>
         )
       );

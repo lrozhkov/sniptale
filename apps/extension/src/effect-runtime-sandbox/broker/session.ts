@@ -6,6 +6,7 @@ import {
 } from '../../contracts/effect-runtime/identity';
 import type {
   EffectRuntimeFrameResult,
+  EffectRuntimeSceneResult,
   EffectRuntimeRenderRequest,
   EffectRuntimeWorkerMessage,
 } from '../../contracts/effect-runtime/types';
@@ -15,13 +16,16 @@ import { createEffectRuntimeDocumentCache } from './cache/documents';
 import { createEffectRuntimeAssetSelectionCache } from './cache/asset-selections';
 import { parseEffectRuntimeRenderRequest } from './request-boundary';
 import { createEffectRuntimeWorkerSession, type EffectRuntimeWorkerLike } from './worker-request';
+import type { createEffectRuntimeGpuPlanRenderer } from './gpu-plan-renderer';
 
 export interface EffectRuntimeBrokerSession {
-  execute(value: unknown): Promise<EffectRuntimeFrameResult>;
+  execute(value: unknown): Promise<EffectRuntimeSceneResult>;
   snapshot(): { activeRequests: number; consecutiveFailures: number; circuitOpen: boolean };
 }
 
 interface SessionDependencies {
+  compositionBackend?: 'gpu-scene' | 'gpu-scene-plan';
+  gpu?: ReturnType<typeof createEffectRuntimeGpuPlanRenderer>;
   prepare?(request: EffectRuntimeRenderRequest): Promise<EffectRuntimeWorkerMessage>;
   workerFactory(): EffectRuntimeWorkerLike;
 }
@@ -38,12 +42,19 @@ export function createEffectRuntimeBrokerSession(
   const documentCache = createEffectRuntimeDocumentCache();
   const assetSelectionCache = createEffectRuntimeAssetSelectionCache();
   const workerSession = createEffectRuntimeWorkerSession({
+    planOnly: dependencies.compositionBackend === 'gpu-scene-plan',
+    ...(dependencies.gpu ? { gpu: dependencies.gpu } : {}),
     onReset: () => {
       documentCache.clear();
       assetSelectionCache.clear();
     },
     workerFactory: dependencies.workerFactory,
   });
+  if (
+    dependencies.compositionBackend === 'gpu-scene' ||
+    dependencies.compositionBackend === 'gpu-scene-plan'
+  )
+    workerSession.preload();
   return {
     execute: (value) =>
       executeSessionRequest(
@@ -67,10 +78,25 @@ async function executeSessionRequest(
   value: unknown,
   dependencies: SessionDependencies,
   state: SessionState,
-  executeWorker: (request: EffectRuntimeWorkerMessage) => Promise<EffectRuntimeFrameResult>,
+  executeWorker: {
+    (request: EffectRuntimeWorkerMessage): Promise<EffectRuntimeFrameResult>;
+    (request: EffectRuntimeWorkerMessage, output: 'gpu-scene'): Promise<EffectRuntimeSceneResult>;
+  },
   documentCache: ReturnType<typeof createEffectRuntimeDocumentCache>,
   assetSelectionCache: ReturnType<typeof createEffectRuntimeAssetSelectionCache>
-): Promise<EffectRuntimeFrameResult> {
+): Promise<EffectRuntimeSceneResult> {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    ((value.kind === 'prepareGpuFrame' &&
+      dependencies.compositionBackend !== 'gpu-scene' &&
+      dependencies.compositionBackend !== 'gpu-scene-plan') ||
+      (dependencies.compositionBackend === 'gpu-scene-plan' && value.kind !== 'prepareGpuFrame'))
+  ) {
+    closeEffectRuntimeBitmaps(value);
+    return createEffectRuntimeFailure(value, 'inputRejected');
+  }
   const unavailable = rejectUnavailableRequest(value, state);
   if (unavailable) return unavailable;
   state.activeRequests += 1;
@@ -87,8 +113,11 @@ async function executeSessionRequest(
     request = parsed.request;
     const workerRequest = await prepareSessionWorkerRequest(request, dependencies, state);
     if ('kind' in workerRequest) return workerRequest;
-    const result = await executeWorker(workerRequest);
-    if (result.kind === 'frame') state.consecutiveFailures = 0;
+    const result =
+      request.kind === 'prepareGpuFrame'
+        ? await executeWorker(workerRequest, 'gpu-scene')
+        : await executeWorker(workerRequest);
+    if (result.kind !== 'error') state.consecutiveFailures = 0;
     else if (result.code !== 'cacheMiss') recordFailure(state);
     return result;
   } catch {

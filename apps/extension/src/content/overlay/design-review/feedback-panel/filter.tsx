@@ -34,7 +34,6 @@ export function FeedbackFilter(props: {
   return (
     <div className="relative shrink-0" ref={props.rootRef}>
       <ContentToolbarButton
-        tone="property"
         active={props.filter !== 'all'}
         ref={props.triggerRef}
         type="button"
@@ -42,8 +41,7 @@ export function FeedbackFilter(props: {
         aria-haspopup="menu"
         aria-label={translate('content.designReview.panelFilter')}
         className={[
-          'inline-flex h-8 w-8 items-center justify-center rounded-[4px] border',
-          'border-[color:var(--sniptale-color-border-soft)]',
+          'inline-flex h-8 w-8 items-center justify-center rounded-[4px]',
           props.filter === 'all' ? '' : 'text-[var(--sniptale-color-accent)]',
         ].join(' ')}
         onClick={() => props.onOpenChange(!props.open)}

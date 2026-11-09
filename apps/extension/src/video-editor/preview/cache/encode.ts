@@ -1,9 +1,10 @@
 import {
   BufferTarget,
-  CanvasSource,
   Mp4OutputFormat,
   Output,
   QUALITY_MEDIUM,
+  VideoSample,
+  VideoSampleSource,
   canEncodeVideo,
 } from 'mediabunny';
 
@@ -35,7 +36,8 @@ export async function encodePersistentVideoPreview(params: {
   canvas: HTMLCanvasElement;
   endFrame: number;
   fps: number;
-  onFrame: (frameIndex: number) => Promise<void>;
+  /** Transfers the returned canvas resource until encoding of this frame settles. */
+  onFrame: (frameIndex: number) => Promise<void | { canvas: HTMLCanvasElement; release(): void }>;
   signal: AbortSignal;
   startFrame: number;
 }): Promise<EncodedVideoPreview> {
@@ -45,7 +47,7 @@ export async function encodePersistentVideoPreview(params: {
     format: new Mp4OutputFormat({ fastStart: 'fragmented', minimumFragmentDuration: 0.5 }),
     target,
   });
-  const source = new CanvasSource(params.canvas, {
+  const source = new VideoSampleSource({
     bitrate: QUALITY_MEDIUM,
     codec: 'avc',
     ...PERSISTENT_PREVIEW_ENCODER_POLICY,
@@ -58,11 +60,28 @@ export async function encodePersistentVideoPreview(params: {
     for (let frameIndex = params.startFrame; frameIndex < params.endFrame; frameIndex += 1) {
       if (params.signal.aborted)
         throw new DOMException('Preview encoding was cancelled', 'AbortError');
-      await params.onFrame(frameIndex);
-      const relativeFrame = frameIndex - params.startFrame;
-      await source.add(relativeFrame / params.fps, 1 / params.fps, {
-        keyFrame: relativeFrame % Math.max(1, Math.round(params.fps * 0.5)) === 0,
-      });
+      const frame = await params.onFrame(frameIndex);
+      let sample: VideoSample | undefined;
+      try {
+        if (params.signal.aborted)
+          throw new DOMException('Preview encoding was cancelled', 'AbortError');
+        const relativeFrame = frameIndex - params.startFrame;
+        sample = new VideoSample(frame?.canvas ?? params.canvas, {
+          timestamp: relativeFrame / params.fps,
+          duration: 1 / params.fps,
+        });
+        await source.add(sample, {
+          keyFrame: relativeFrame % Math.max(1, Math.round(params.fps * 0.5)) === 0,
+        });
+        if (params.signal.aborted)
+          throw new DOMException('Preview encoding was cancelled', 'AbortError');
+      } finally {
+        try {
+          sample?.close();
+        } finally {
+          frame?.release();
+        }
+      }
     }
     await output.finalize();
   } catch (error) {

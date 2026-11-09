@@ -4,7 +4,7 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { GalleryHeaderSearchField } from './header-search';
-import { galleryAppMessages } from '../../../platform/i18n/messages/gallery/app';
+import { getResolvedDictionaries } from '../../../platform/i18n/dictionaries';
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -80,8 +80,14 @@ it('commits Enter immediately while ignoring an active IME composition', () => {
   act(() => root?.render(<SearchProbe trashMode />));
   const input = container?.querySelector<HTMLInputElement>('input');
   expect(input?.getAttribute('aria-label')).toBe('gallery.app.trashSearchLabel');
-  expect(galleryAppMessages.trashSearchPlaceholder).toEqual({ ru: 'Поиск', en: 'Search' });
-  expect(galleryAppMessages.trashSearchLabel).toEqual({
+  expect({
+    en: getResolvedDictionaries().en.gallery.app.trashSearchPlaceholder,
+    ru: getResolvedDictionaries().ru.gallery.app.trashSearchPlaceholder,
+  }).toEqual({ ru: 'Поиск', en: 'Search' });
+  expect({
+    en: getResolvedDictionaries().en.gallery.app.trashSearchLabel,
+    ru: getResolvedDictionaries().ru.gallery.app.trashSearchLabel,
+  }).toEqual({
     ru: 'Поиск в корзине',
     en: 'Search Trash Bin',
   });

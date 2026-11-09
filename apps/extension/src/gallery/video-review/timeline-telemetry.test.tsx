@@ -1,19 +1,26 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, Suspense, startTransition } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewTelemetryStrip } from './timeline-telemetry';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 
+const localeProbe = vi.hoisted(() => ({ locale: 'en' as 'en' | 'ru', translations: 0 }));
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
-  translate: (key: string) => key,
+  translate: (key: string) => {
+    if (key === 'gallery.videoReview.historyMouse') localeProbe.translations++;
+    return key;
+  },
+  useAppLocale: () => localeProbe.locale,
 }));
 
 let root: Root;
 let host: HTMLDivElement;
 
 beforeEach(() => {
+  localeProbe.locale = 'en';
+  localeProbe.translations = 0;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -40,7 +47,11 @@ const marker = (
   end,
 });
 
-const render = (markers: ReviewTelemetryMarker[]) =>
+const render = (
+  markers: ReviewTelemetryMarker[],
+  cursorArchiveAvailable = false,
+  sourceId = 'recording-a'
+) =>
   act(() => {
     root.render(
       <ReviewTelemetryStrip
@@ -50,6 +61,8 @@ const render = (markers: ReviewTelemetryMarker[]) =>
         width={1000}
         zoom={1}
         onMarker={vi.fn()}
+        cursorArchiveAvailable={cursorArchiveAvailable}
+        sourceId={sourceId}
       />
     );
   });
@@ -73,6 +86,28 @@ it('packs populated families in semantic order without empty rows', () => {
   expect(host.querySelector<HTMLElement>('[data-history-family="cursor"] button')!.style.top).toBe(
     '24px'
   );
+});
+
+it('retains archived semantic rows while bounded history windows refresh without retaining markers', () => {
+  const markers: ReviewTelemetryMarker[] = [
+    { ...marker('action', 'mouse', 1), eventType: 'CLICK' },
+    { ref: { kind: 'cursor', id: 'cursor' }, eventType: 'cursor', start: 2, end: 3 },
+  ];
+  render(markers, true);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  render([], true);
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(2);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  expect(host.querySelector('[data-history-family="cursor"]')).not.toBeNull();
+  expect(host.querySelector('[data-history-family="mouse"] button')).toBeNull();
+  render(markers, true);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  render([], true, 'recording-b');
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(1);
+  expect(host.querySelector('[data-history-family="cursor"]')).not.toBeNull();
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
+  render([], false, 'recording-b');
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(0);
 });
 
 it('reserves semantic row pitch and groups collisions within the mouse row', () => {
@@ -366,4 +401,163 @@ it('continues the cursor line through deliberately authored empty coverage', () 
   expect(line.style.left).toBe('300px');
   expect(line.style.width).toBe('400px');
   expect(host.querySelector('[data-cursor-focus-key="manual"]')).not.toBeNull();
+});
+
+it('keeps static cursor coverage unread across playhead ticks and uses the latest marker command', () => {
+  let reads = 0;
+  const keys: NonNullable<Parameters<typeof ReviewTelemetryStrip>[0]['cursorFocusKeys']> =
+    Array.from({ length: 1000 }, (_, index) => ({
+      id: String(index),
+      timelineId: String(index),
+      segmentId: 'recorded',
+      binding: { kind: 'project' },
+      time: index / 100,
+      sourceTime: index / 100,
+      x: 0.2,
+      y: 0.3,
+      get anchor() {
+        reads++;
+        return 'movement' as const;
+      },
+      interpolation: 'smooth',
+    }));
+  const markers = [{ ...marker('action', 'click', 1), eventType: 'CLICK' }];
+  const first = vi.fn(),
+    second = vi.fn(),
+    select = vi.fn(),
+    add = vi.fn();
+  const renderAt = (time: number, onMarker = first) =>
+    act(() =>
+      root.render(
+        <ReviewTelemetryStrip
+          markers={markers}
+          cursorFocusKeys={keys}
+          duration={10}
+          time={time}
+          playing
+          width={1000}
+          zoom={1}
+          onMarker={onMarker}
+          onCursorFocusKey={select}
+          onAddCursorFocusKey={add}
+        />
+      )
+    );
+  renderAt(0);
+  const initialReads = reads;
+  renderAt(0.1, second);
+  renderAt(0.2, second);
+  expect(reads).toBe(initialReads);
+  act(() => host.querySelector<HTMLButtonElement>('[data-history-family="mouse"] button')!.click());
+  expect(first).not.toHaveBeenCalled();
+  expect(second).toHaveBeenCalledWith(markers[0]);
+});
+
+it('does not dispatch a marker through a handler from an uncommitted suspended render', async () => {
+  const markers = [{ ...marker('action', 'command', 1), eventType: 'CLICK' }];
+  const committed = vi.fn(),
+    abandoned = vi.fn();
+  const pending = new Promise<void>(() => {});
+  function Wait({ suspend }: { suspend: boolean }) {
+    if (suspend) throw pending;
+    return null;
+  }
+  const view = (onMarker: typeof committed, suspend: boolean) => (
+    <Suspense fallback={<div>waiting</div>}>
+      <ReviewTelemetryStrip
+        markers={markers}
+        duration={10}
+        time={0}
+        width={1000}
+        zoom={1}
+        onMarker={onMarker}
+      />
+      <Wait suspend={suspend} />
+    </Suspense>
+  );
+  await act(async () => root.render(view(committed, false)));
+  await act(async () => {
+    startTransition(() => root.render(view(abandoned, true)));
+  });
+  act(() => host.querySelector<HTMLButtonElement>('[data-history-family="mouse"] button')!.click());
+  expect(committed).toHaveBeenCalledWith(markers[0]);
+  expect(abandoned).not.toHaveBeenCalled();
+});
+
+it('refreshes memoized telemetry labels, selection, capability and coverage geometry from their real inputs', () => {
+  const command = vi.fn(),
+    select = vi.fn(),
+    add = vi.fn();
+  const key: NonNullable<Parameters<typeof ReviewTelemetryStrip>[0]['cursorFocusKeys']>[number] = {
+    id: 'manual',
+    timelineId: 'manual',
+    segmentId: 'gap',
+    binding: { kind: 'project' },
+    time: 5,
+    sourceTime: 5,
+    x: 0.2,
+    y: 0.3,
+    anchor: 'manual',
+    interpolation: 'smooth',
+    sourceCoverage: { start: 3, end: 7 },
+  };
+  const markers = [{ ...marker('action', 'click', 1), eventType: 'CLICK' }];
+  const base = {
+    markers,
+    cursorFocusKeys: [key],
+    duration: 10,
+    time: 0,
+    playing: true,
+    width: 1000,
+    zoom: 1,
+    onMarker: command,
+    onCursorFocusKey: select,
+    onAddCursorFocusKey: add,
+  };
+  act(() => root.render(<ReviewTelemetryStrip {...base} />));
+  const initialTranslations = localeProbe.translations;
+  act(() => root.render(<ReviewTelemetryStrip {...base} time={1} />));
+  expect(localeProbe.translations).toBe(initialTranslations);
+  localeProbe.locale = 'ru';
+  act(() => root.render(<ReviewTelemetryStrip {...base} time={2} />));
+  expect(localeProbe.translations).toBeGreaterThan(initialTranslations);
+  act(() =>
+    root.render(
+      <ReviewTelemetryStrip
+        {...base}
+        width={500}
+        selectedTelemetryRef={markers[0]!.ref}
+        captureCapabilities={{
+          version: 1,
+          pointer: 'unavailable',
+          wheel: 'unavailable',
+          keyboard: 'available',
+          coverage: 'document',
+        }}
+      />
+    )
+  );
+  expect(
+    host.querySelector('[data-history-family="mouse"]')!.getAttribute('data-history-coverage')
+  ).toBe('unavailable');
+  expect(
+    host.querySelector('[data-history-family="mouse"] button')!.getAttribute('aria-pressed')
+  ).toBe('true');
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.authoredCoverage"]')!.style.width
+  ).toBe('200px');
+  act(() =>
+    root.render(
+      <ReviewTelemetryStrip
+        {...base}
+        cursorFocusKeys={[{ ...key, sourceCoverage: { start: 1, end: 2 } }]}
+      />
+    )
+  );
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.authoredCoverage"]')!.style.left
+  ).toBe('100px');
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.authoredCoverage"]')!.style.width
+  ).toBe('100px');
 });

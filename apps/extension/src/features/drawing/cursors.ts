@@ -94,6 +94,8 @@ export function resolveDrawingToolCursor(
       return cursors.marker;
     case 'arrow':
       return arrowDrawFromTip ? cursors.arrowFromTip : cursors.arrow;
+    case 'simplify':
+      return 'crosshair';
     case 'blur':
       return cursors.blur;
     case 'text':

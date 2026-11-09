@@ -412,3 +412,18 @@ it('keeps retained source-less takes editable when the audio duration is unknown
   expect(accepted.clips).toEqual([]);
   expect(isExportReadyVideoProject(accepted)).toBe(true);
 });
+
+it('distinguishes the audio category from its timing file disclosure', () => {
+  const { project } = panelFixture();
+  mountPanel(project);
+  const audio = host.querySelector(
+    'nav button[aria-label="videoEditor.sidebar.inspectorGroupAudio"] svg'
+  )!;
+  expect(audio).not.toBeNull();
+  const audioGlyph = audio.innerHTML;
+  category('videoEditor.sidebar.inspectorGroupTiming');
+  const file = [...host.querySelectorAll('summary')].find((node) =>
+    node.textContent?.includes('videoEditor.sidebar.sourceVoiceoverFile')
+  )!;
+  expect(file.querySelector('svg')!.innerHTML).not.toBe(audioGlyph);
+});

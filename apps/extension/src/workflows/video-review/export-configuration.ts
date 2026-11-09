@@ -1,3 +1,4 @@
+import { classifyReviewExportMagnification } from './export-source-plan';
 import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import {
   resolveQuickEditExportPlan,
@@ -14,6 +15,8 @@ export function configuredReviewExportPlan(
     'audioProcessingAvailable' | 'videoRenderAvailable'
   > & {
     includeBookends?: boolean;
+    /** A missing history fact cannot establish a complete no-growth window. */
+    recordingHistory?: boolean;
     index: ReviewMediaIndex | null;
     renderSettings?: ReviewRenderSettings | undefined;
   }
@@ -58,19 +61,34 @@ export function configuredReviewExportPlan(
     videoRenderAvailable: videoAvailable,
   });
   if (plan.kind === 'unavailable') return plan;
-  const profileRequiresRender = !!(
-    settings &&
-    index &&
-    output &&
-    (settings.quality !== undefined ||
-      output.format !== index.container ||
-      (settings.codec !== undefined && settings.codec !== index.videoCodec) ||
-      (settings.resolution !== undefined &&
-        settings.resolution !== 'SOURCE' &&
-        (output.width !== (index.width ?? 1920) || output.height !== (index.height ?? 1080))) ||
-      settings.frameRate !== 0 ||
-      settings.frameRateMode === 'adaptive')
+  const enhancementRequiresRender = !!(
+    settings?.detailEnhancement &&
+    settings.detailEnhancement !== 'off' &&
+    (!index?.width ||
+      !index.height ||
+      !output ||
+      classifyReviewExportMagnification({
+        advanced,
+        sourceSize: { width: index.width, height: index.height },
+        output,
+        recordingHistory: args.recordingHistory !== false,
+      }) !== 'none')
   );
+  const profileRequiresRender =
+    enhancementRequiresRender ||
+    !!(
+      settings &&
+      index &&
+      output &&
+      (settings.quality !== undefined ||
+        output.format !== index.container ||
+        (settings.codec !== undefined && settings.codec !== index.videoCodec) ||
+        (settings.resolution !== undefined &&
+          settings.resolution !== 'SOURCE' &&
+          (output.width !== (index.width ?? 1920) || output.height !== (index.height ?? 1080))) ||
+        settings.frameRate !== 0 ||
+        settings.frameRateMode === 'adaptive')
+    );
   if (!profileRequiresRender) return plan;
   if (!videoAvailable) return { kind: 'unavailable', reasons: ['video-encoder'] };
   const transcodeAudio = output?.format === 'webm' && index?.audioCodec === 'aac';

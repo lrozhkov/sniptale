@@ -10,23 +10,43 @@ export function EditorStartThumbnail({
   fallback: ReactNode;
 }) {
   const anchor = useRef<HTMLSpanElement>(null);
-  const [result, setResult] = useState<{ item: EditorStartItem; url: string | null } | null>(null);
+  const [result, setResult] = useState<{ id: string; url: string | null } | null>(null);
+  const owned = useRef<{ id: string; url: string } | null>(null);
+  useEffect(
+    () => () => {
+      if (owned.current) URL.revokeObjectURL(owned.current.url);
+      owned.current = null;
+    },
+    []
+  );
   useEffect(() => {
-    if (!item.loadThumbnail || item.unavailable) return;
+    if (
+      owned.current &&
+      (owned.current.id !== item.id || !item.loadThumbnail || item.unavailable)
+    ) {
+      URL.revokeObjectURL(owned.current.url);
+      owned.current = null;
+    }
+    if (!item.loadThumbnail || item.unavailable) {
+      setResult(null);
+      return;
+    }
     const loadThumbnail = item.loadThumbnail;
     const controller = new AbortController();
-    let url: string | null = null;
     let started = false;
     const load = async () => {
       if (started) return;
       started = true;
       try {
         const blob = await loadThumbnail(controller.signal);
-        if (controller.signal.aborted) return;
-        url = blob ? URL.createObjectURL(blob) : null;
-        setResult({ item, url });
+        if (controller.signal.aborted || !blob) return;
+        const next = { id: item.id, url: URL.createObjectURL(blob) };
+        const previous = owned.current;
+        owned.current = next;
+        setResult(next);
+        if (previous) URL.revokeObjectURL(previous.url);
       } catch {
-        if (!controller.signal.aborted) setResult({ item, url: null });
+        // A failed refresh retains the last usable preview of this identity.
       }
     };
     const observer =
@@ -46,10 +66,9 @@ export function EditorStartThumbnail({
     return () => {
       controller.abort();
       observer?.disconnect();
-      if (url) URL.revokeObjectURL(url);
     };
   }, [item]);
-  const url = result?.item === item ? result.url : item.thumbnailUrl;
+  const url = item.unavailable ? null : result?.id === item.id ? result.url : item.thumbnailUrl;
   return (
     <span
       ref={anchor}
@@ -61,8 +80,11 @@ export function EditorStartThumbnail({
           alt=""
           className="h-full w-full object-contain"
           onError={() => {
-            if (result?.item === item && result.url) URL.revokeObjectURL(result.url);
-            setResult({ item, url: null });
+            if (owned.current?.url === url) {
+              URL.revokeObjectURL(owned.current.url);
+              owned.current = null;
+            }
+            setResult({ id: item.id, url: null });
           }}
         />
       ) : (

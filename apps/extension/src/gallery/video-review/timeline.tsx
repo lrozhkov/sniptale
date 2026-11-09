@@ -2,7 +2,7 @@ import { ReviewTrackVisibilityButton } from './track-row';
 import { ReviewTimelinePanes } from './timeline-panes';
 import { ReviewTimelineResizeGuide } from './timeline-resize-guide';
 import type { RecordingTelemetryCapabilities } from '../../features/video/project/types';
-import { Fragment, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState, useMemo } from 'react';
 import { REVIEW_TRACK_ORDER } from './track-order';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import {
@@ -14,7 +14,7 @@ import type { ReviewClickAnimation } from '../../features/video/review/advanced/
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
-import { Activity, Search, Filter, Eye, EyeOff } from 'lucide-react';
+import { Activity, Filter, Eye, EyeOff } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
@@ -34,10 +34,11 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = ReviewCursorTimelineInteractions & {
+  onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
+  cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
   actionsEnabled?: boolean | undefined;
   onToggleActions?: (() => void) | undefined;
-  onOpenHistory?: (() => void) | undefined;
   keyAnimations?:
     | readonly import('../../features/video/project/action-feedback/key-animation').ReviewKeyAnimation[]
     | undefined;
@@ -76,6 +77,8 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   boundaries?: readonly number[];
   snapTimes?: readonly number[] | undefined;
   onRangeCommit?(range: ReviewAnchor): void;
+  onTextRangeCommit?: ((range: Extract<ReviewAnchor, { kind: 'range' }>) => void) | undefined;
+  onTrackRangeCommit?: ((range: Extract<ReviewAnchor, { kind: 'range' }>) => void) | undefined;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
   onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
   originalRangeTool?: boolean;
@@ -108,6 +111,20 @@ export function ReviewTimeline(props: TimelineProps) {
       width,
     }
   );
+  const { onHistoryRange, duration } = props;
+  const reportHistoryRange = useCallback(() => {
+    if (!onHistoryRange) return;
+    const start = Math.max(
+      0,
+      Math.min(
+        duration,
+        ((viewport.current?.scrollLeft ?? 0) / Math.max(1, width * zoom)) * duration
+      )
+    );
+    const end = Math.max(start, Math.min(duration, start + duration / zoom));
+    onHistoryRange({ start, end });
+  }, [onHistoryRange, duration, width, zoom, viewport]);
+  useEffect(() => reportHistoryRange(), [reportHistoryRange]);
   const ruler = useReviewRulerRange({
     ...props,
     range: props.playbackRange ?? null,
@@ -179,6 +196,7 @@ export function ReviewTimeline(props: TimelineProps) {
           onScroll={() => {
             follow.onScroll();
             hover.clear();
+            reportHistoryRange();
           }}
           {...follow.interaction}
           className={`w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain
@@ -237,7 +255,7 @@ export function ReviewTimeline(props: TimelineProps) {
             onPointerLeave={hover.clear}
           >
             <ReviewPlaybackRangeOverlay
-              range={ruler.range}
+              range={plane.trackPreview ?? ruler.range}
               duration={props.duration}
               gutter={gutter}
               width={Math.max(1, width * zoom)}
@@ -281,11 +299,16 @@ export function ReviewTimeline(props: TimelineProps) {
 function reviewTimelineHeightClass(
   props: Pick<
     TimelineProps,
-    'fillHeight' | 'markers' | 'onAddCursorFocusKey' | 'actionsTrackVisible'
+    | 'fillHeight'
+    | 'markers'
+    | 'onAddCursorFocusKey'
+    | 'actionsTrackVisible'
+    | 'cursorArchiveAvailable'
   >
 ) {
   if (props.fillHeight) return 'h-full';
-  return props.actionsTrackVisible !== false && (props.markers.length || props.onAddCursorFocusKey)
+  return props.actionsTrackVisible !== false &&
+    (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable)
     ? 'max-h-[max(160px,min(42dvh,calc(100dvh-420px)))]'
     : 'max-h-[min(42dvh,calc(100dvh-420px))]';
 }
@@ -308,23 +331,36 @@ function ReviewTimelineEvents(
     | 'time'
     | 'selectedTelemetryRef'
     | 'onMarker'
-    | 'onOpenHistory'
     | 'actionsEnabled'
     | 'onToggleActions'
     | 'keyAnimations'
     | 'clickAnimations'
+    | 'cursorArchiveAvailable'
+    | 'sourceId'
   > & { width: number; zoom: number }
 ) {
   const [animatedOnly, setAnimatedOnly] = useState(false);
-  const animated = new Set([
-    ...(props.clickAnimations ?? []).filter((item) => item.effect !== 'off').map((item) => item.id),
-    ...(props.keyAnimations ?? []).filter((item) => item.enabled).map((item) => item.id),
-  ]);
-  const markers = animatedOnly
-    ? props.markers.filter((marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id))
-    : props.markers;
+  const animated = useMemo(
+    () =>
+      new Set([
+        ...(props.clickAnimations ?? [])
+          .filter((item) => item.effect !== 'off')
+          .map((item) => item.id),
+        ...(props.keyAnimations ?? []).filter((item) => item.enabled).map((item) => item.id),
+      ]),
+    [props.clickAnimations, props.keyAnimations]
+  );
+  const markers = useMemo(
+    () =>
+      animatedOnly
+        ? props.markers.filter(
+            (marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id)
+          )
+        : props.markers,
+    [animatedOnly, props.markers, animated]
+  );
   return props.actionsTrackVisible !== false &&
-    (props.markers.length || props.onAddCursorFocusKey) ? (
+    (props.markers.length || props.onAddCursorFocusKey || props.cursorArchiveAvailable) ? (
     <ReviewTrackRow
       track="actions"
       muted={props.actionsEnabled === false}
@@ -332,13 +368,6 @@ function ReviewTimelineEvents(
       icon={<Activity size={14} aria-hidden="true" />}
       controls={
         <>
-          <ReviewButton
-            label={translate('gallery.videoReview.historyOpen')}
-            className={reviewIconButtonClassName}
-            onClick={props.onOpenHistory}
-          >
-            <Search size={14} aria-hidden="true" />
-          </ReviewButton>
           <ReviewButton
             label={translate('gallery.videoReview.historyAnimatedOnly')}
             className={reviewIconButtonClassName}
@@ -362,7 +391,17 @@ function ReviewTimelineEvents(
       }
     >
       <div className="min-h-7" data-ui="gallery.videoReview.historyTrack">
+        {props.cursorArchiveAvailable ? (
+          <div
+            data-ui="gallery.videoReview.archivedCursorHistory"
+            className="text-xs text-[var(--sniptale-color-text-secondary)]"
+          >
+            {translate('gallery.videoReview.recordingCursorArchived')}
+          </div>
+        ) : null}
         <ReviewTelemetryStrip
+          cursorArchiveAvailable={props.cursorArchiveAvailable}
+          sourceId={props.sourceId}
           captureCapabilities={props.captureCapabilities}
           markers={markers}
           animatedIds={animated}

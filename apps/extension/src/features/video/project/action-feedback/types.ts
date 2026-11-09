@@ -1,4 +1,4 @@
-import type { ReviewKeyAnimation } from './key-animation';
+import type { ReviewKeyAnimation, ReviewKeyStyle } from './key-animation';
 import type { RecordingTelemetrySignal } from '../types/interaction';
 
 /** Recorded identity is scoped by kind; an action and signal may share their opaque ID. */
@@ -72,6 +72,13 @@ export interface VideoProjectActionFeedback {
   sourceInstanceId: string;
   settings: ReviewActionAudioSetting[];
   signals: RecordingTelemetrySignal[];
+  /** Immutable source facts stay in recordings storage; inline signals must be empty. */
+  events?: import('../recording-events/types').RecordingEventsDescriptor;
   gestureStyles?: ReviewClickAnimation[];
   keyStyles?: ReviewKeyAnimation[];
+  keyDefaults?: ReviewKeyStyle;
+  actionOverrides?: {
+    id: string;
+    presentation: import('../types/interaction').VideoProjectActionPresentationOverride;
+  }[];
 }

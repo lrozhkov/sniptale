@@ -1,3 +1,6 @@
+import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { readFileSync } from 'node:fs';
 import {
@@ -20,6 +23,8 @@ import { createQuickEditZoomRegion } from '../../features/video/review/advanced/
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createCanvasComment } from '../../features/video/review/comments';
+import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
+import { reviewPresentedGeometry } from './gpu-preview-geometry';
 
 const io = vi.hoisted(() => ({
   order: [] as string[],
@@ -34,6 +39,11 @@ const io = vi.hoisted(() => ({
   spatial: vi.fn(),
   background: vi.fn(),
   captionPreparation: vi.fn(),
+  gpu: vi.fn(),
+}));
+vi.mock('./gpu-preview', async (original) => ({
+  ...(await original<typeof import('./gpu-preview')>()),
+  createReviewGpuPreview: (...args: unknown[]) => io.gpu(...args),
 }));
 vi.mock('./render-captions', async (original) => {
   const actual = await original<typeof import('./render-captions')>();
@@ -100,6 +110,10 @@ function setup() {
       const context = {
         save: vi.fn(),
         restore: vi.fn(),
+        setTransform: vi.fn(),
+        clearRect: vi.fn(),
+        rect: vi.fn(),
+        clip: vi.fn(),
         scale: vi.fn(),
         drawImage: vi.fn(),
         fillRect: vi.fn(() => io.order.push('outer-fade')),
@@ -316,6 +330,116 @@ beforeEach(() => {
     fonts: { ready: Promise.resolve(), load: vi.fn(async () => [{ status: 'loaded' }]) },
   });
 });
+
+it.each([false, true])(
+  'returns Standard geometry for the effective follow/orbit frame and actual camera override: %s',
+  async (overridden) => {
+    const advanced = createQuickEditAdvancedState();
+    advanced.ui.mode = 'advanced';
+    advanced.ui.tracks.zoom = true;
+    advanced.zoom.enabled = true;
+    advanced.cursorFocusPath = {
+      version: 1,
+      mode: 'follow',
+      gapPolicy: 'hold',
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      segments: [
+        {
+          id: 'path',
+          binding: { kind: 'project' },
+          start: 0,
+          end: 6,
+          keys: [
+            {
+              id: 'a',
+              time: 0,
+              x: 0.2,
+              y: 0.4,
+              anchor: 'manual',
+              authored: true,
+              interpolation: 'smooth',
+            },
+            {
+              id: 'b',
+              time: 6,
+              x: 0.8,
+              y: 0.4,
+              anchor: 'manual',
+              authored: true,
+              interpolation: 'smooth',
+            },
+          ],
+        },
+      ],
+    };
+    advanced.zoom.regions = [
+      {
+        ...createQuickEditZoomRegion({ id: 'follow', at: 0, duration: 6, endMax: 6 }),
+        followCursor: true,
+        transform: { scale: 2.5, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+        cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.5 },
+      },
+    ];
+    const effective = resolveQuickEditEffectiveState(advanced);
+    const input = scene();
+    const effectiveScene = { ...input, zoomRegions: effective.zoomRegions };
+    const actual = frame();
+    const following = evaluateQuickEditCameraAtTime(effective.zoomRegions, actual.resultTime, {
+      ...input,
+      output: dimensions.backing,
+    });
+    expect(following.centerX).not.toBe(0.5);
+    expect(following.spatial?.rotation).not.toEqual([0, 0, 0, 1]);
+    if (overridden) actual.cameraTransform = { ...following, scale: 1.75, centerX: 0.45 };
+    actual.recordingHistory = {
+      read: vi.fn(async () => ({
+        telemetry: {
+          recordingId: 'recording',
+          createdAt: 1,
+          updatedAt: 1,
+          captureMode: null,
+          viewport: null,
+          cursorTrack: null,
+          actionEvents: [],
+          signals: [],
+        },
+        effective,
+        keyCues: [],
+        clickCues: [],
+      })),
+      dispose() {},
+    };
+    const expected = reviewPresentedGeometry(
+      effectiveScene,
+      dimensions,
+      actual.resultTime,
+      actual.cameraTransform ?? following
+    );
+    const { resources } = setup();
+    const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+    const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
+    const output = await renderer.render(prepared, actual);
+    try {
+      expect(output.renderer.backend).toBe('legacy');
+      expect(output.geometry).toEqual({
+        ...expected,
+        generation: actual.generation,
+        sceneGeneration: prepared.generation,
+      });
+      expect(output.geometry?.scene.zoomRegions[0]?.cursorFocus).toBeDefined();
+      expect(output.geometry?.scene.zoomRegions[0]?.cursorComposition?.mode).toBe('orbit');
+      expect(io.frame.mock.lastCall![1].commentSpace.layout).toEqual(expected.layout);
+      expect(io.frame.mock.lastCall![1].cameraScale).toBe(expected.camera.scale);
+    } finally {
+      output.release();
+      prepared.release();
+      renderer.dispose();
+    }
+  }
+);
 
 it('paints cached captions before blackout and retains editor comment visibility', async () => {
   const { resources, leases } = setup();
@@ -1085,7 +1209,7 @@ it('refreshes captions without disposing camera-independent resources', async ()
   renderer.dispose();
 });
 
-it('retains effect resources for camera edits and invalidates changed effect inputs', async () => {
+it('retains effect resources across camera and annotation edits while painting current inputs', async () => {
   const f = await annotationsFixture();
   const { resources } = setup();
   const createExecutor = vi.fn(() => f.executor);
@@ -1102,7 +1226,26 @@ it('retains effect resources for camera edits and invalidates changed effect inp
   expect(f.executor.dispose).not.toHaveBeenCalled();
   const changed = structuredClone(nextScene);
   changed.annotationEffects!.lane.instances[0]!.transform.x = 0.4;
-  await renderer.prepare(changed, dimensions, new AbortController().signal);
+  const moved = await renderer.prepare(changed, dimensions, new AbortController().signal);
+  expect(f.executor.dispose).not.toHaveBeenCalled();
+  (await renderer.render(moved, frame())).release();
+  expect(io.overlays.mock.lastCall![0].annotationFrames[0].instance.transform.x).toBe(0.4);
+  expect(createExecutor).toHaveBeenCalledOnce();
+  const edited = structuredClone(changed);
+  const instance = edited.annotationEffects!.lane.instances[0]!;
+  instance.transform.width *= 0.75;
+  instance.transform.rotation = 0.3;
+  instance.controls['title'] = 'Live title';
+  const resized = await renderer.prepare(edited, dimensions, new AbortController().signal);
+  (await renderer.render(resized, frame())).release();
+  expect(f.executor.renderFrame.mock.calls.at(-2)![0].controls['title']).toBe('Live title');
+  expect(io.overlays.mock.lastCall![0].annotationFrames[0].instance.transform).toEqual(
+    instance.transform
+  );
+  expect(createExecutor).toHaveBeenCalledOnce();
+  const disabled = structuredClone(edited);
+  disabled.annotationEffects!.lane.instances[0]!.enabled = false;
+  await renderer.prepare(disabled, dimensions, new AbortController().signal);
   expect(f.executor.dispose).toHaveBeenCalledOnce();
   renderer.dispose();
   expect(f.executor.dispose).toHaveBeenCalledOnce();
@@ -1417,5 +1560,1125 @@ it('retains isolated native camera snapshots across a neighboring geometry refre
   expect(io.overlays.mock.lastCall![0].regions[0].cursorFocus).toBe(previous);
   first.release();
   second.release();
+  renderer.dispose();
+});
+
+it('reads archive history for both dissolve endpoint clocks before drawing their independent cameras', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const prepared = await renderer.prepare(scene(), dimensions, new AbortController().signal);
+  const read = vi.fn(
+    async (
+      sourceTime: number,
+      _result: number,
+      _output: { width: number; height: number; frameDuration: number },
+      _signal?: AbortSignal
+    ) => ({
+      telemetry: {
+        recordingId: 'recording',
+        createdAt: 1,
+        updatedAt: 1,
+        captureMode: null,
+        viewport: null,
+        cursorTrack: null,
+        actionEvents: [],
+        signals: [],
+      },
+      effective: {
+        ...resolveQuickEditEffectiveState(createQuickEditAdvancedState()),
+        zoomRegions: [
+          {
+            ...createQuickEditZoomRegion({ id: 'archived', at: 0, duration: 20 }),
+            transform: { scale: sourceTime < 4 ? 2 : 3, centerX: 0.5, centerY: 0.5 },
+            enter: { type: 'none' as const, duration: 0 },
+            exit: { type: 'none' as const, duration: 0 },
+          },
+        ],
+      },
+      keyCues: [],
+      clickCues: [],
+    })
+  );
+  const blend = reviewCutTransitionAt(2, [
+    {
+      id: 'cut',
+      type: 'dissolve',
+      seam: 2,
+      before: 0.5,
+      after: 0.5,
+      left: { start: 0, end: 2 },
+      right: { start: 4, end: 6 },
+    },
+  ])!;
+  const output = await renderer.render(prepared, {
+    ...frame(),
+    resultTime: 2,
+    sourceTime: 4,
+    recordingHistory: { read, dispose() {} },
+    transition: {
+      blend,
+      frames: {
+        left: { timestamp: 1.9, draw: vi.fn(), close: vi.fn() },
+        right: { timestamp: 4, draw: vi.fn(), close: vi.fn() },
+      },
+    },
+  });
+  expect(read.mock.calls.map((call) => call[0])).toEqual([4, 1.9, 4]);
+  expect(io.frame.mock.calls.map((call) => call[1].cameraScale)).toEqual([2, 3]);
+  output.release();
+  prepared.release();
+  renderer.dispose();
+});
+
+it('preserves explicit annotation executor ownership during prepared-scene replacement', async () => {
+  const f = await annotationsFixture();
+  const { resources } = setup();
+  const factory = vi.fn(() => f.executor);
+  const renderer = createReviewPreviewRenderer({ resources, annotationExecutor: factory });
+  const first = await renderer.prepare(f.input, dimensions, new AbortController().signal);
+  const completed = await renderer.render(first, frame());
+  completed.release();
+  expect(factory).toHaveBeenCalledWith();
+  expect(factory).toHaveBeenCalledOnce();
+  const changed = structuredClone(f.input);
+  changed.annotationEffects!.lane.enabled = false;
+  const replacement = await renderer.prepare(changed, dimensions, new AbortController().signal);
+  await expect(renderer.render(first, frame())).rejects.toThrow('stale');
+  (await renderer.render(replacement, frame())).release();
+  renderer.dispose();
+  expect(f.executor.dispose).toHaveBeenCalledOnce();
+  expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
+});
+
+it('retains two publication leases while serializing their shared Canvas fallback', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'gpu', maximumInFlight: 2 });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const one = Promise.withResolvers<void>(),
+    two = Promise.withResolvers<void>();
+  const beganOne = Promise.withResolvers<void>(),
+    beganTwo = Promise.withResolvers<void>();
+  const prepareOne = vi.fn(() => {
+      beganOne.resolve();
+      return one.promise;
+    }),
+    prepareTwo = vi.fn(() => {
+      beganTwo.resolve();
+      return two.promise;
+    });
+  const first = renderer.render(
+    prepared,
+    { ...frame(), source: { ...frame().source, prepare: prepareOne } },
+    signal
+  );
+  const second = renderer.render(
+    prepared,
+    { ...frame(), sourceTime: 2, source: { ...frame().source, prepare: prepareTwo } },
+    signal
+  );
+  void first.catch(() => {});
+  void second.catch(() => {});
+  try {
+    await beganOne.promise;
+    expect(prepareOne).toHaveBeenCalledOnce();
+    expect(prepareTwo).not.toHaveBeenCalled();
+    await expect(renderer.render(prepared, frame(), signal)).rejects.toThrow('already admitted');
+    one.resolve();
+    const earlier = await first;
+    await beganTwo.promise;
+    expect(prepareTwo).toHaveBeenCalledOnce();
+    two.resolve();
+    const later = await second;
+    expect(earlier.canvas).not.toBe(later.canvas);
+    expect(earlier.sourceTime).toBe(1);
+    expect(later.sourceTime).toBe(2);
+    earlier.release();
+    later.release();
+  } finally {
+    one.resolve();
+    two.resolve();
+    await Promise.allSettled([first, second]);
+    prepared.release();
+    renderer.dispose();
+  }
+});
+
+it.each(['dispose', 'replace'] as const)(
+  'retains prepared assets until both pending GPU requests retire after %s',
+  async (operation) => {
+    const { resources } = setup();
+    const one = Promise.withResolvers<boolean>();
+    const two = Promise.withResolvers<boolean>();
+    const gpu = {
+      allocatedBytes: 0,
+      render: vi.fn().mockReturnValueOnce(one.promise).mockReturnValueOnce(two.promise),
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+    };
+    io.gpu.mockReturnValue(gpu);
+    vi.stubGlobal('navigator', { gpu: {} });
+    const renderer = createReviewPreviewRenderer({ resources, maximumInFlight: 2 });
+    const signal = new AbortController().signal;
+    const prepared = await renderer.prepare(scene(), dimensions, signal);
+    const painter = io.background.mock.results[0]!.value;
+    const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+    const first = renderer.render(prepared, { ...frame(), source }, signal);
+    const second = renderer.render(
+      prepared,
+      { ...frame(), source, sourceTime: 3, resultTime: 3 },
+      signal
+    );
+    const firstRejected = expect(first).rejects.toThrow();
+    const secondRejected = expect(second).rejects.toThrow();
+    try {
+      await vi.waitFor(() => expect(gpu.render).toHaveBeenCalledTimes(2));
+      if (operation === 'dispose') renderer.dispose();
+      else
+        await renderer.prepare(
+          { ...scene(), source: { width: 1280, height: 720 } },
+          dimensions,
+          signal
+        );
+      expect(gpu.releaseScene).toHaveBeenCalledOnce();
+      expect(painter.dispose).not.toHaveBeenCalled();
+      one.resolve(true);
+      await firstRejected;
+      expect(painter.dispose).not.toHaveBeenCalled();
+      two.resolve(true);
+      await secondRejected;
+      expect(painter.dispose).toHaveBeenCalledOnce();
+      expect(gpu.releaseScene).toHaveBeenCalledOnce();
+    } finally {
+      one.resolve(true);
+      two.resolve(true);
+      await Promise.allSettled([first, second]);
+      await Promise.all([firstRejected, secondRejected]);
+      renderer.dispose();
+    }
+    expect(gpu.releaseScene).toHaveBeenCalledTimes(operation === 'replace' ? 2 : 1);
+  }
+);
+
+it.each([false, true])(
+  'serializes simultaneous annotated GPU fallback and preserves each captured clock (abort next: %s)',
+  async (abortNext) => {
+    const { resources } = setup();
+    const annotations = await annotationsFixture();
+    const gpuOne = Promise.withResolvers<boolean>(),
+      gpuTwo = Promise.withResolvers<boolean>();
+    const gpuStarted = Promise.withResolvers<void>();
+    let gpuCalls = 0;
+    const gpu = {
+      allocatedBytes: 0,
+      fallbackReason: 'device-failed' as const,
+      render: vi.fn(
+        (_input: {
+          annotations?: Awaited<
+            ReturnType<typeof import('./annotation-renderer').createReviewAnnotationRenderer>
+          > | null;
+          signal: AbortSignal;
+        }) => {
+          gpuCalls++;
+          if (gpuCalls === 2) gpuStarted.resolve();
+          return gpuCalls === 1 ? gpuOne.promise : gpuTwo.promise;
+        }
+      ),
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+    };
+    io.gpu.mockReturnValue(gpu);
+    vi.stubGlobal('navigator', { gpu: {} });
+    const renderer = createReviewPreviewRenderer({
+      resources,
+      maximumInFlight: 2,
+      annotationExecutor: () => ({
+        ...annotations.executor,
+        maximumGpuFramesInFlight: 2,
+        prepareGpuFrame: async (request) => annotations.success(request),
+      }),
+    });
+    const signal = new AbortController().signal;
+    const nextController = new AbortController();
+    const prepared = await renderer.prepare(annotations.input, dimensions, signal);
+    gpu.render.mockImplementationOnce(async (input) => {
+      const density = { content: { width: 1, height: 1 }, viewport: { width: 1, height: 1 } };
+      const batch = await input.annotations!.prepareGpu(2, density, 30, input.signal);
+      batch.release();
+      return true;
+    });
+    (
+      await renderer.render(
+        prepared,
+        {
+          ...frame(),
+          source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+        },
+        signal
+      )
+    ).release();
+    expect(renderer.maximumInFlight(annotations.input)).toBe(2);
+    const one = Promise.withResolvers<void>(),
+      two = Promise.withResolvers<void>();
+    const beganOne = Promise.withResolvers<void>(),
+      beganTwo = Promise.withResolvers<void>();
+    const prepareOne = vi.fn(() => {
+      beganOne.resolve();
+      return one.promise;
+    });
+    const prepareTwo = vi.fn(() => {
+      beganTwo.resolve();
+      return two.promise;
+    });
+    const first = renderer.render(
+      prepared,
+      {
+        ...frame(),
+        source: { ...frame().source, prepare: prepareOne, videoFrame: () => ({}) as VideoFrame },
+      },
+      signal
+    );
+    const second = renderer.render(
+      prepared,
+      {
+        ...frame(),
+        sourceTime: 3,
+        resultTime: 3,
+        source: {
+          ...frame().source,
+          timestamp: 2.98,
+          prepare: prepareTwo,
+          videoFrame: () => ({}) as VideoFrame,
+        },
+      },
+      nextController.signal
+    );
+    const secondResult = second.then(
+      (value) => ({ ok: true as const, value }),
+      (error) => ({ ok: false as const, error })
+    );
+    try {
+      await gpuStarted.promise;
+      gpuOne.resolve(false);
+      gpuTwo.resolve(false);
+      await beganOne.promise;
+      expect(prepareTwo).not.toHaveBeenCalled();
+      if (abortNext) nextController.abort();
+      one.resolve();
+      const earlier = await first;
+      expect(earlier).toMatchObject({
+        sourceTime: 1,
+        resultTime: 2,
+        representedMediaTime: 0.98,
+        renderer: { backend: 'legacy', fallback: 'device-failed' },
+      });
+      earlier.release();
+      if (!abortNext) {
+        await beganTwo.promise;
+        two.resolve();
+      }
+      const later = await secondResult;
+      if (abortNext) {
+        expect(later.ok).toBe(false);
+        if (!later.ok) expect(later.error).toMatchObject({ name: 'AbortError' });
+        expect(prepareTwo).not.toHaveBeenCalled();
+      } else {
+        expect(later.ok).toBe(true);
+        if (later.ok) {
+          expect(later.value).toMatchObject({
+            sourceTime: 3,
+            resultTime: 3,
+            representedMediaTime: 2.98,
+            renderer: { backend: 'legacy', fallback: 'device-failed' },
+          });
+          later.value.release();
+        }
+      }
+    } finally {
+      gpuOne.resolve(false);
+      gpuTwo.resolve(false);
+      one.resolve();
+      two.resolve();
+      await Promise.allSettled([first, second]);
+      renderer.dispose();
+    }
+  }
+);
+
+it('does not enter the annotation producer when all instances are disabled during GPU overlap', async () => {
+  const f = await annotationsFixture();
+  for (const instance of f.input.annotationEffects!.lane.instances) instance.enabled = false;
+  const { resources } = setup();
+  const finished = Promise.withResolvers<boolean>();
+  const started = Promise.withResolvers<void>();
+  let requests = 0;
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn((_request: { annotations?: unknown }) => {
+      if (++requests === 2) started.resolve();
+      return finished.promise;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    maximumInFlight: 2,
+    annotationExecutor: () => f.executor,
+  });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(f.input, dimensions, signal);
+  const input = { ...frame(), source: { ...frame().source, videoFrame: () => ({}) as VideoFrame } };
+  const first = renderer.render(prepared, input, signal);
+  const second = renderer.render(prepared, { ...input, sourceTime: 3, resultTime: 3 }, signal);
+  try {
+    await started.promise;
+    expect(gpu.render.mock.calls.every(([request]) => request.annotations === null)).toBe(true);
+    expect(f.executor.renderFrame).not.toHaveBeenCalled();
+    finished.resolve(true);
+    const results = await Promise.all([first, second]);
+    for (const result of results) {
+      expect(result.renderer.backend).toBe('gpu');
+      result.release();
+    }
+  } finally {
+    finished.resolve(true);
+    await Promise.allSettled([first, second]);
+    renderer.dispose();
+  }
+});
+
+it('publishes a completed GPU surface without acquiring a Canvas2D publication lease', async () => {
+  const { resources } = setup();
+  const output = {
+    canvas: { ...dimensions.backing } as HTMLCanvasElement,
+    release: vi.fn(),
+    outputKind: 'gpu-surface' as const,
+    retainedProviderBytes: () => 1234,
+    isRetiredProvider: () => false,
+  };
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn(),
+    renderPresentation: vi.fn(async () => output),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({ resources });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  vi.mocked(resources.canvas).mockClear();
+  const acquireOutput = vi.fn();
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const completed = await renderer.renderPresentation(
+    prepared,
+    { ...frame(), source },
+    signal,
+    acquireOutput
+  );
+  expect(resources.canvas).not.toHaveBeenCalled();
+  expect(gpu.render).not.toHaveBeenCalled();
+  expect(gpu.renderPresentation).toHaveBeenCalledWith(
+    expect.objectContaining({ acquireOutput, sourceTime: 1 })
+  );
+  expect(completed).toMatchObject({
+    canvas: output.canvas,
+    outputKind: 'gpu-surface',
+    generation: 7,
+    sceneGeneration: prepared.generation,
+    sourceTime: 1,
+    resultTime: 2,
+    representedMediaTime: 0.98,
+  });
+  expect(completed.geometry?.generation).toBe(7);
+  expect(completed.retainedProviderBytes?.()).toBe(1234);
+  expect(completed.isRetiredProvider?.()).toBe(false);
+  expect(output.release).not.toHaveBeenCalled();
+  completed.release();
+  expect(output.release).toHaveBeenCalledOnce();
+  renderer.dispose();
+});
+
+it.each(['abort', 'dispose', 'replace'] as const)(
+  'releases a stale direct receipt after GPU completion on %s',
+  async (operation) => {
+    const { resources } = setup();
+    const ready = Promise.withResolvers<void>(),
+      finished = Promise.withResolvers<void>();
+    const output = {
+      canvas: { ...dimensions.backing } as HTMLCanvasElement,
+      release: vi.fn(),
+      outputKind: 'gpu-surface' as const,
+      retainedProviderBytes: () => 10,
+      isRetiredProvider: () => false,
+    };
+    const gpu = {
+      allocatedBytes: 0,
+      render: vi.fn(),
+      renderPresentation: vi.fn(async () => {
+        ready.resolve();
+        await finished.promise;
+        return output;
+      }),
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+    };
+    io.gpu.mockReturnValue(gpu);
+    vi.stubGlobal('navigator', { gpu: {} });
+    const renderer = createReviewPreviewRenderer({ resources });
+    const control = new AbortController();
+    const prepared = await renderer.prepare(scene(), dimensions, control.signal);
+    const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+    const pending = renderer.renderPresentation(
+      prepared,
+      { ...frame(), source },
+      control.signal,
+      vi.fn()
+    );
+    const rejected = expect(pending).rejects.toThrow();
+    await ready.promise;
+    if (operation === 'abort') control.abort();
+    else if (operation === 'dispose') renderer.dispose();
+    else
+      await renderer.prepare(
+        { ...scene(), source: { width: 1280, height: 720 } },
+        dimensions,
+        new AbortController().signal
+      );
+    expect(output.release).not.toHaveBeenCalled();
+    finished.resolve();
+    await rejected;
+    expect(output.release).toHaveBeenCalledOnce();
+    renderer.dispose();
+  }
+);
+
+it('lazily acquires a separate Canvas2D publication when direct GPU rendering is unavailable', async () => {
+  const { resources } = setup();
+  const gpu = {
+    allocatedBytes: 0,
+    fallbackReason: 'unavailable' as const,
+    render: vi.fn(),
+    renderPresentation: vi.fn(async () => {
+      expect(
+        vi.mocked(resources.canvas).mock.calls.some(([role]) => role === 'preview-publication')
+      ).toBe(false);
+      return false as const;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({ resources });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  vi.mocked(resources.canvas).mockClear();
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const completed = await renderer.renderPresentation(
+    prepared,
+    { ...frame(), source },
+    signal,
+    vi.fn()
+  );
+  expect(completed.outputKind).toBe('canvas2d');
+  expect(completed.renderer).toEqual({ backend: 'legacy', fallback: 'unavailable' });
+  expect(resources.canvas).toHaveBeenCalledWith('preview-publication', dimensions.backing, {
+    alpha: false,
+  });
+  expect(io.frame).toHaveBeenCalledOnce();
+  completed.release();
+  renderer.dispose();
+});
+
+it('does not hide a direct composition error behind a Canvas fallback', async () => {
+  const { resources } = setup();
+  const failure = new Error('invalid direct composition');
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn(),
+    renderPresentation: vi.fn(async () => {
+      throw failure;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({ resources });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  vi.mocked(resources.canvas).mockClear();
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  await expect(
+    renderer.renderPresentation(prepared, { ...frame(), source }, signal, vi.fn())
+  ).rejects.toBe(failure);
+  expect(resources.canvas).not.toHaveBeenCalled();
+  expect(io.frame).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('preserves the real Canvas2D context for the default GPU bitmap caller', async () => {
+  const { resources, leases } = setup();
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn(async () => true),
+    renderPresentation: vi.fn(),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({ resources });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const source = { ...frame().source, videoFrame: () => ({}) as VideoFrame };
+  const output = await renderer.render(prepared, { ...frame(), source }, signal);
+  expect(output.context).toBe(leases.at(-1)?.context);
+  expect(gpu.render).toHaveBeenCalledWith(expect.objectContaining({ context: output.context }));
+  expect(gpu.renderPresentation).not.toHaveBeenCalled();
+  expect(output.renderer.backend).toBe('gpu');
+  output.release();
+  renderer.dispose();
+});
+
+it.each([
+  { previousProviderBytes: 0, expectedRetainedBytes: 1000 },
+  { previousProviderBytes: 1500, expectedRetainedBytes: 2500 },
+])(
+  'accounts preparation once for GPU front with retired provider bytes $previousProviderBytes',
+  async ({ previousProviderBytes, expectedRetainedBytes }) => {
+    const { resources } = setup();
+    const bitmap = { width: 100, height: 50, close: vi.fn() };
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => bitmap)
+    );
+    vi.stubGlobal('navigator', { gpu: {} });
+    io.gpu.mockReturnValue({ allocatedBytes: 1000, releaseScene: vi.fn(), dispose: vi.fn() });
+    const input = allocationInput();
+    input.publication.previousFrontKind = 'gpu-surface';
+    input.publication.previousProviderBytes = previousProviderBytes;
+    const replaceLimits = vi.fn();
+    const renderer = createReviewPreviewRenderer({
+      resources,
+      readAsset: async () => new Blob(['image']),
+      allocation: { describe: () => input, replaceLimits },
+    });
+    const snapshot = scene();
+    snapshot.background = {
+      enabled: true,
+      type: 'image',
+      assetId: 'asset:background',
+      imageFit: 'contain',
+      layout: { padding: 0, cornerRadius: 0 },
+    };
+    const prepared = await renderer.prepare(snapshot, dimensions, new AbortController().signal);
+    expect(replaceLimits.mock.calls[0]![0]).toMatchObject({
+      maximumManagedBytes: expectedRetainedBytes,
+    });
+    expect(replaceLimits.mock.calls[1]![0]).toMatchObject({
+      maximumManagedBytes: expectedRetainedBytes + 20_000,
+    });
+    prepared.release();
+    renderer.dispose();
+  }
+);
+
+it.each([undefined, 2] as const)(
+  'derives annotated frame admission from initialized executor capability %s',
+  async (maximumGpuFramesInFlight) => {
+    const f = await annotationsFixture();
+    const { resources } = setup();
+    vi.stubGlobal('navigator', { gpu: {} });
+    const executor = {
+      ...f.executor,
+      ...(maximumGpuFramesInFlight ? { maximumGpuFramesInFlight } : {}),
+      prepareGpuFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => f.success(request)),
+    };
+    let gate: Promise<void> | undefined;
+    const gpu = {
+      allocatedBytes: 0,
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+      render: vi.fn(
+        async (input: {
+          annotations: Awaited<
+            ReturnType<typeof import('./annotation-renderer').createReviewAnnotationRenderer>
+          >;
+          signal: AbortSignal;
+        }) => {
+          const density = { content: { width: 1, height: 1 }, viewport: { width: 1, height: 1 } };
+          const batch = await input.annotations.prepareGpu(2, density, 30, input.signal);
+          const borrow = batch.retain();
+          batch.release();
+          try {
+            await gate;
+            return true;
+          } finally {
+            borrow.release();
+          }
+        }
+      ),
+    };
+    io.gpu.mockReturnValue(gpu);
+    const renderer = createReviewPreviewRenderer({
+      resources,
+      maximumInFlight: 2,
+      annotationExecutor: () => executor,
+    });
+    const signal = new AbortController().signal;
+    const prepared = await renderer.prepare(f.input, dimensions, signal);
+    expect(renderer.maximumInFlight(f.input)).toBe(1);
+    const input = {
+      ...frame(),
+      source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+    };
+    (await renderer.render(prepared, input, signal)).release();
+    expect(renderer.maximumInFlight(f.input)).toBe(maximumGpuFramesInFlight ?? 1);
+    expect(renderer.maximumInFlight(structuredClone(f.input))).toBe(1);
+    const fence = Promise.withResolvers<void>();
+    gate = fence.promise;
+    const a = renderer.render(prepared, input, signal);
+    // Admission is synchronous before the first asynchronous GPU preparation.
+    if (maximumGpuFramesInFlight === 2) {
+      const b = renderer.render(prepared, input, signal);
+      await expect(renderer.render(prepared, input, signal)).rejects.toThrow('already admitted');
+      fence.resolve();
+      (await b).release();
+    } else {
+      await expect(renderer.render(prepared, input, signal)).rejects.toThrow('already admitted');
+      fence.resolve();
+    }
+    (await a).release();
+    renderer.dispose();
+    expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
+  }
+);
+
+it.each(['gpu', 'legacy', 'disabled'] as const)(
+  'keeps a bounded advisory packet allowance separate from foreground admission (%s)',
+  async (mode) => {
+    const observed: { preparation: number; rendering: number }[] = [];
+    for (const explicitWarm of [false, true]) {
+      const f = await annotationsFixture(),
+        { resources } = setup(),
+        replaceLimits = vi.fn();
+      if (mode === 'disabled')
+        for (const instance of f.input.annotationEffects!.lane.instances) instance.enabled = false;
+      vi.stubGlobal('navigator', { gpu: {} });
+      io.gpu.mockReturnValue({
+        allocatedBytes: 0,
+        render: vi.fn(async () => true),
+        releaseScene: vi.fn(),
+        dispose: vi.fn(),
+      });
+      const renderer = createReviewPreviewRenderer({
+        resources,
+        renderer: mode === 'legacy' ? 'legacy' : 'gpu',
+        annotationExecutor: () => f.executor,
+        ...(explicitWarm ? { annotationWarmExecutor: () => f.executor } : {}),
+        allocation: { describe: allocationInput, replaceLimits },
+      });
+      const prepared = await renderer.prepare(f.input, dimensions, new AbortController().signal);
+      const preparation = replaceLimits.mock.calls.at(-1)![0].maximumManagedBytes;
+      const output = await renderer.render(prepared, frame());
+      observed.push({
+        preparation,
+        rendering: replaceLimits.mock.calls.at(-1)![0].maximumManagedBytes,
+      });
+      output.release();
+      prepared.release();
+      renderer.dispose();
+    }
+    const extra = mode === 'gpu' ? 128 * 1024 * 1024 + 4 : 0;
+    expect(observed[1]!.preparation - observed[0]!.preparation).toBe(extra);
+    expect(observed[1]!.rendering - observed[0]!.rendering).toBe(extra);
+  }
+);
+
+async function cutExecutionFixture() {
+  const { resources, leases } = setup();
+  const gates = Array.from({ length: 6 }, () => Promise.withResolvers<boolean>());
+  const started = gates.map(() => Promise.withResolvers<void>());
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn((_input: unknown) => {
+      const index = gpu.render.mock.calls.length - 1;
+      started[index]!.resolve();
+      return gates[index]!.promise;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const renderer = createReviewPreviewRenderer({ resources, maximumInFlight: 2 });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const input = () => ({
+    ...frame(),
+    source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+  });
+  const transition = () => {
+    const value = input();
+    const blend = reviewCutTransitionAt(2, [
+      {
+        id: 'cut',
+        type: 'dissolve',
+        seam: 2,
+        before: 0.5,
+        after: 0.5,
+        left: { start: 0, end: 1 },
+        right: { start: 3, end: 5 },
+      },
+    ])!;
+    const endpoint = { timestamp: 0.99, draw: vi.fn(), close: vi.fn() };
+    return {
+      ...value,
+      transition: { blend, frames: { left: endpoint, right: { ...endpoint, timestamp: 3 } } },
+    };
+  };
+  const requests: Promise<
+    { ok: true; value: Awaited<ReturnType<typeof renderer.render>> } | { ok: false; error: unknown }
+  >[] = [];
+  const render = (value: ReturnType<typeof input>, control?: AbortSignal) => {
+    let settled = false;
+    const result = renderer.render(prepared, value, control ?? signal).then(
+      (value) => {
+        settled = true;
+        return { ok: true as const, value };
+      },
+      (error) => {
+        settled = true;
+        return { ok: false as const, error };
+      }
+    );
+    requests.push(result);
+    return {
+      result,
+      get settled() {
+        return settled;
+      },
+    };
+  };
+  return {
+    renderer,
+    prepared,
+    gpu,
+    gates,
+    started,
+    input,
+    transition,
+    render,
+    leases,
+    async close() {
+      for (const gate of gates) gate.resolve(true);
+      for (const result of await Promise.all(requests)) if (result.ok) result.value.release();
+      prepared.release();
+      renderer.dispose();
+    },
+  };
+}
+
+// Drain the finite promise-only renderer path without a timer or a GPU completion.
+async function flushCutExecution() {
+  for (let step = 0; step < 24; step++) await Promise.resolve();
+}
+
+it.each(['normal-to-transition', 'transition-to-normal'] as const)(
+  'waits for the held actual frame at the %s execution boundary',
+  async (direction) => {
+    const f = await cutExecutionFixture();
+    try {
+      const first = f.render(direction === 'normal-to-transition' ? f.input() : f.transition());
+      await f.started[0]!.promise;
+      const second = f.render(direction === 'normal-to-transition' ? f.transition() : f.input());
+      await flushCutExecution();
+      expect(second.settled).toBe(false);
+      expect(f.gpu.render).toHaveBeenCalledTimes(1);
+      f.gates[0]!.resolve(true);
+      expect((await first.result).ok).toBe(true);
+      await f.started[1]!.promise;
+      f.gates[1]!.resolve(true);
+      expect((await second.result).ok).toBe(true);
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it('resumes two independent normal GPU frames after the exclusive transition drains', async () => {
+  const f = await cutExecutionFixture();
+  try {
+    const transition = f.render(f.transition());
+    await f.started[0]!.promise;
+    f.gates[0]!.resolve(true);
+    expect((await transition.result).ok).toBe(true);
+    const first = f.render(f.input());
+    const second = f.render({ ...f.input(), sourceTime: 3 });
+    await Promise.all([f.started[1]!.promise, f.started[2]!.promise]);
+    expect(f.gpu.render).toHaveBeenCalledTimes(3);
+    expect(first.settled).toBe(false);
+    expect(second.settled).toBe(false);
+    const third = await f.render(f.input()).result;
+    expect(third.ok).toBe(false);
+    if (!third.ok)
+      expect(third.error).toEqual(
+        expect.objectContaining({ message: 'Preview frame is already admitted.' })
+      );
+    f.gates[1]!.resolve(true);
+    f.gates[2]!.resolve(true);
+    expect((await first.result).ok).toBe(true);
+    expect((await second.result).ok).toBe(true);
+  } finally {
+    await f.close();
+  }
+});
+
+it('removes an aborted queued frame without letting its replacement bypass the held transition', async () => {
+  const f = await cutExecutionFixture();
+  const queuedController = new AbortController();
+  try {
+    const active = f.render(f.transition());
+    await f.started[0]!.promise;
+    const queued = f.render({ ...f.input(), sourceTime: 3 }, queuedController.signal);
+    queuedController.abort();
+    await flushCutExecution();
+    expect(queued.settled).toBe(true);
+    const refused = await queued.result;
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error).toMatchObject({ name: 'AbortError' });
+    const replacement = f.render({ ...f.input(), sourceTime: 4 });
+    await flushCutExecution();
+    expect(f.gpu.render).toHaveBeenCalledTimes(1);
+    expect(replacement.settled).toBe(false);
+    f.gates[0]!.resolve(true);
+    expect((await active.result).ok).toBe(true);
+    await f.started[1]!.promise;
+    f.gates[1]!.resolve(true);
+    const completed = await replacement.result;
+    expect(completed.ok).toBe(true);
+    if (completed.ok) expect(completed.value.sourceTime).toBe(4);
+  } finally {
+    await f.close();
+  }
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'holds an executing GPU lease through its fence on %s while a transition waits',
+  async (operation) => {
+    const f = await cutExecutionFixture();
+    const controller = new AbortController();
+    try {
+      const active = f.render(f.input(), controller.signal);
+      await f.started[0]!.promise;
+      const queued = f.render(f.transition());
+      if (operation === 'abort') controller.abort();
+      else f.renderer.dispose();
+      await flushCutExecution();
+      expect(active.settled).toBe(false);
+      expect(f.gpu.render).toHaveBeenCalledTimes(1);
+      expect(f.leases[0]!.release).not.toHaveBeenCalled();
+      if (operation === 'abort') expect(queued.settled).toBe(false);
+      f.gates[0]!.resolve(true);
+      const cancelled = await active.result;
+      expect(cancelled.ok).toBe(false);
+      if (operation === 'abort') {
+        if (!cancelled.ok) expect(cancelled.error).toMatchObject({ name: 'AbortError' });
+        await f.started[1]!.promise;
+        f.gates[1]!.resolve(true);
+        expect((await queued.result).ok).toBe(true);
+      } else {
+        expect((await queued.result).ok).toBe(false);
+        expect(f.gpu.render).toHaveBeenCalledTimes(1);
+        expect(f.gpu.dispose).toHaveBeenCalledOnce();
+      }
+    } finally {
+      await f.close();
+    }
+  }
+);
+
+it.each(['legacy', 'gpu'] as const)(
+  'awaits camera normalization before %s Canvas fallback',
+  async (backend) => {
+    const { resources } = setup();
+    const gpu = {
+      allocatedBytes: 0,
+      render: vi.fn(async () => false),
+      renderPresentation: vi.fn(),
+      releaseScene: vi.fn(),
+      dispose: vi.fn(),
+    };
+    io.gpu.mockReturnValue(gpu);
+    vi.stubGlobal('navigator', { gpu: {} });
+    const renderer = createReviewPreviewRenderer({ resources, renderer: backend });
+    const webcam = createQuickEditWebcam('camera', size, dimensions.canonical);
+    const signal = new AbortController().signal;
+    const prepared = await renderer.prepare({ ...scene(), webcam }, dimensions, signal);
+    const gate = Promise.withResolvers<void>();
+    const started = Promise.withResolvers<void>();
+    const drawable = {
+      prepare: vi.fn((_signal: AbortSignal) => {
+        started.resolve();
+        return gate.promise;
+      }),
+      draw: vi.fn(),
+    };
+    const input = {
+      ...frame(),
+      source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+      camera: {
+        representedMediaTime: 0.4,
+        generation: 1,
+        source: size,
+        placement: webcam.placement,
+        drawable,
+      },
+    };
+    const pending = renderer.render(prepared, input, signal);
+    await started.promise;
+    expect(io.webcam).not.toHaveBeenCalled();
+    gate.resolve();
+    const output = await pending;
+    expect(drawable.prepare).toHaveBeenCalledOnce();
+    expect(drawable.prepare.mock.calls[0]![0].aborted).toBe(false);
+    expect(io.webcam).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      webcam.placement,
+      size,
+      drawable,
+      undefined
+    );
+    expect(gpu.render).toHaveBeenCalledTimes(backend === 'gpu' ? 1 : 0);
+    output.release();
+    renderer.dispose();
+  }
+);
+
+it('renders draw-only RGB with unknown PTS and reports an unknown represented time', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const input = frame();
+  const { timestamp: _timestamp, ...rgb } = input.source;
+  const output = await renderer.render(prepared, { ...input, source: rgb }, signal);
+  expect(output.representedMediaTime).toBeNull();
+  expect(output.sourceTime).toBe(1);
+  expect(output.resultTime).toBe(2);
+  output.release();
+  renderer.dispose();
+});
+
+it('does not reuse a PTS-keyed window raster for unknown RGB snapshots', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(
+    { ...scene(), windowHeader: { ...DEFAULT_WINDOW_HEADER } },
+    dimensions,
+    signal
+  );
+  io.frame.mockImplementation((context, request) => {
+    if (!request.windowRaster) request.sample.draw(context, 0, 0, 10, 10);
+  });
+  (await renderer.render(prepared, frame(), signal)).release();
+  expect(io.frame.mock.lastCall![1].windowRaster).toBeDefined();
+  const first = vi.fn(),
+    second = vi.fn();
+  for (const draw of [first, second]) {
+    const source = { backing: dimensions.backing, draw };
+    (await renderer.render(prepared, { ...frame(), source }, signal)).release();
+    expect(io.frame.mock.lastCall![1].windowRaster).toBeUndefined();
+  }
+  expect(first).toHaveBeenCalledOnce();
+  expect(second).toHaveBeenCalledOnce();
+  renderer.dispose();
+});
+
+it.each([NaN, Infinity])('rejects a supplied invalid source PTS %s', async (timestamp) => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  await expect(
+    renderer.render(prepared, { ...frame(), source: { ...frame().source, timestamp } }, signal)
+  ).rejects.toThrow('Invalid preview frame time');
+  expect(io.frame).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('requires actual PTS for a native source accessor', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const source = {
+    backing: dimensions.backing,
+    draw: vi.fn(),
+    videoFrame: () => ({}) as VideoFrame,
+  };
+  await expect(renderer.render(prepared, { ...frame(), source }, signal)).rejects.toThrow(
+    'Invalid preview frame time'
+  );
+  renderer.dispose();
+});
+
+it('requires actual PTS only when a transition needs retained membership', async () => {
+  const { resources } = setup();
+  const renderer = createReviewPreviewRenderer({ resources, renderer: 'legacy' });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const blend = reviewCutTransitionAt(2, [
+    {
+      id: 'cut',
+      type: 'fade-black',
+      seam: 2,
+      before: 0.5,
+      after: 0.5,
+      left: { start: 0, end: 1 },
+      right: { start: 3, end: 5 },
+    },
+  ])!;
+  const endpoint = { timestamp: 0.99, draw: vi.fn(), close: vi.fn() };
+  const source = { backing: dimensions.backing, draw: vi.fn() };
+  await expect(
+    renderer.render(
+      prepared,
+      {
+        ...frame(),
+        source,
+        transition: { blend, frames: { left: endpoint, right: { ...endpoint, timestamp: 3 } } },
+      },
+      signal
+    )
+  ).rejects.toThrow('Transition source timestamp is unavailable');
+  expect(endpoint.draw).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('preserves enhancement preparation estimates but refuses an unknown source PTS', async () => {
+  const { resources } = setup();
+  const enhancer = {
+    mode: 'bicubic-sharpen' as const,
+    withEnhancedRegion: vi.fn(),
+    dispose: vi.fn(),
+  };
+  const renderer = createReviewPreviewRenderer({ resources, exportEnhancer: enhancer });
+  const signal = new AbortController().signal;
+  const prepared = await renderer.prepare(scene(), dimensions, signal);
+  const source = { backing: dimensions.backing, draw: vi.fn() };
+  await expect(renderer.render(prepared, { ...frame(), source }, signal)).rejects.toThrow(
+    'Export enhancement source timestamp is unavailable'
+  );
+  expect(enhancer.withEnhancedRegion).not.toHaveBeenCalled();
   renderer.dispose();
 });

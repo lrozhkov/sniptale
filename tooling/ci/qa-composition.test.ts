@@ -63,7 +63,7 @@ function gitOutput(root: string, ...args: string[]) {
 }
 
 it('assigns full product tests, coverage, and harness tests to Fast proof', async () => {
-  let productCoverageFinished = false;
+  let harnessFinished = false;
   const productProofCollector = vi.fn(async () => ({
     steps: [{ label: 'Oxlint', status: 'ok' as const }],
   }));
@@ -72,11 +72,11 @@ it('assigns full product tests, coverage, and harness tests to Fast proof', asyn
       steps: [{ label: 'Full product coverage', status: 'ok' as const }],
     }))
     .mockImplementationOnce(async () => {
-      productCoverageFinished = true;
+      expect(harnessFinished).toBe(true);
       return { steps: [{ label: 'Full product coverage', status: 'ok' as const }] };
     });
   const harnessTestCollector = vi.fn(async () => {
-    expect(productCoverageFinished).toBe(true);
+    harnessFinished = true;
     return { label: 'Harness unit tests', status: 'ok' as const };
   });
   const productionBuildCollector = vi.fn(() => ({
@@ -108,6 +108,67 @@ it('assigns full product tests, coverage, and harness tests to Fast proof', asyn
   expect(harnessTestCollector).toHaveBeenCalledWith(
     expect.objectContaining({ full: true, reason: 'candidate base unavailable' })
   );
+});
+
+it.each([
+  ['product', 'failed'],
+  ['product', 'blocked'],
+  ['harness', 'failed'],
+  ['harness', 'blocked'],
+  ['build', 'failed'],
+  ['build', 'blocked'],
+])('rejects a %s prerequisite with status %s before audit execution', async (owner, status) => {
+  const auditCollector = vi.fn();
+  const writeLog = vi.fn();
+  const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  const errorOutput = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  const step = (kind: string, label: string) => ({
+    label,
+    status: owner === kind ? status : 'ok',
+    detail: owner === kind ? 'prerequisite failure detail' : '',
+    stderr: owner === kind ? 'prerequisite failure detail' : '',
+  });
+  try {
+    await expect(
+      collectCiProofResults({
+        session: { writeLog },
+        scopeResolver: () => ({ targetFiles: [] }),
+        productProofCollector: async () => ({ steps: [step('product', 'Oxlint')] }),
+        harnessTestCollector: async () => step('harness', 'Harness unit tests'),
+        productionBuildCollector: () => step('build', 'Production build'),
+        auditCollector,
+      })
+    ).rejects.toThrow('CI prerequisites failed. Audit and full product coverage did not run.');
+    expect(auditCollector).not.toHaveBeenCalled();
+    expect(writeLog.mock.calls.flat().join('')).toContain('prerequisite failure detail');
+    const diagnostics = status === 'blocked' ? output : errorOutput;
+    expect(diagnostics.mock.calls.flat().join('')).toContain('prerequisite failure detail');
+  } finally {
+    output.mockRestore();
+    errorOutput.mockRestore();
+  }
+});
+
+it('waits for every successful prerequisite before starting audit', async () => {
+  let finishBuild!: (value: { label: string; status: string }) => void;
+  const build = new Promise<{ label: string; status: string }>((resolve) => {
+    finishBuild = resolve;
+  });
+  const auditCollector = vi.fn(async () => ({
+    steps: [{ label: 'Full product coverage', status: 'ok' }],
+  }));
+  const pending = collectCiProofResults({
+    scopeResolver: () => ({ targetFiles: [] }),
+    productProofCollector: async () => ({ steps: [{ label: 'Oxlint', status: 'ok' }] }),
+    harnessTestCollector: async () => ({ label: 'Harness unit tests', status: 'ok' }),
+    productionBuildCollector: () => build,
+    auditCollector,
+  });
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  expect(auditCollector).not.toHaveBeenCalled();
+  finishBuild({ label: 'Production build', status: 'ok' });
+  await pending;
+  expect(auditCollector).toHaveBeenCalledOnce();
 });
 
 it('uses affected harness closure for product-only candidates and full harness for control changes', () => {
@@ -440,13 +501,19 @@ it('runs a fresh production build exactly once when explicitly requested', () =>
 it.each(['sync', 'async'])(
   'waits for owned proof collectors after a %s failure and preserves their diagnostics',
   async (kind) => {
-    let finishAudit!: (value: {
-      steps: { label: string; status: string; stdout: string; stderr: string }[];
+    let finishHarness!: (value: {
+      label: string;
+      status: string;
+      stdout: string;
+      stderr: string;
     }) => void;
-    const audit = new Promise<{
-      steps: { label: string; status: string; stdout: string; stderr: string }[];
+    const harness = new Promise<{
+      label: string;
+      status: string;
+      stdout: string;
+      stderr: string;
     }>((resolve) => {
-      finishAudit = resolve;
+      finishHarness = resolve;
     });
     const writeLog = vi.fn();
     const writes: string[] = [];
@@ -459,6 +526,7 @@ it.each(['sync', 'async'])(
     try {
       const pending = collectCiProofResults({
         session: { writeLog },
+        auditCollector: vi.fn(),
         productProofCollector:
           kind === 'sync'
             ? () => {
@@ -467,32 +535,28 @@ it.each(['sync', 'async'])(
             : async () => {
                 throw failure;
               },
-        auditCollector: () => audit,
+        harnessTestCollector: () => harness,
         productionBuildCollector: () => ({ label: 'Production build', status: 'ok' }),
       }).catch((error) => {
         finalized = true;
         return error;
       });
       await new Promise<void>((resolve) => setImmediate(resolve));
-      const finalizedBeforeAudit = finalized;
-      finishAudit({
-        steps: [
-          {
-            label: 'Full product coverage',
-            status: 'failed',
-            stdout: 'retained product test failure',
-            stderr: 'retained coverage error',
-          },
-        ],
+      const finalizedBeforeHarness = finalized;
+      finishHarness({
+        label: 'Harness unit tests',
+        status: 'failed',
+        stdout: 'retained harness test failure',
+        stderr: 'retained harness error',
       });
       const error = await pending;
-      expect(finalizedBeforeAudit).toBe(false);
+      expect(finalizedBeforeHarness).toBe(false);
       expect(error).toBe(failure);
-      expect(writes.join('')).toContain('retained product test failure');
+      expect(writes.join('')).toContain('retained harness test failure');
       const log = writeLog.mock.calls.flat().join('');
       expect(log).toContain(failure.message);
-      expect(log).toContain('retained product test failure');
-      expect(log).toContain('retained coverage error');
+      expect(log).toContain('retained harness test failure');
+      expect(log).toContain('retained harness error');
     } finally {
       stdout.mockRestore();
     }
@@ -501,20 +565,21 @@ it.each(['sync', 'async'])(
 
 it('records an immediate exception before a later failure and retains both in the final error', async () => {
   const first = new Error('product collection failed');
-  const second = new Error('audit collection failed later');
-  let failAudit!: (error: Error) => void;
-  const audit = new Promise<never>((_resolve, reject) => {
-    failAudit = reject;
+  const second = new Error('harness collection failed later');
+  let failHarness!: (error: Error) => void;
+  const harness = new Promise<never>((_resolve, reject) => {
+    failHarness = reject;
   });
   const writeLog = vi.fn();
   const build = vi.fn(() => ({ label: 'Production build', status: 'ok' }));
   let finalized = false;
   const pending = collectCiProofResults({
     session: { writeLog },
+    auditCollector: vi.fn(),
     productProofCollector: () => {
       throw first;
     },
-    auditCollector: () => audit,
+    harnessTestCollector: () => harness,
     productionBuildCollector: build,
   }).catch((failure) => {
     finalized = true;
@@ -522,11 +587,11 @@ it('records an immediate exception before a later failure and retains both in th
   });
   await new Promise<void>((resolve) => setImmediate(resolve));
   const earlyLog = writeLog.mock.calls.flat().join('');
-  const finalizedBeforeAudit = finalized;
-  failAudit(second);
+  const finalizedBeforeHarness = finalized;
+  failHarness(second);
   const error = await pending;
   expect(build).toHaveBeenCalledOnce();
-  expect(finalizedBeforeAudit).toBe(false);
+  expect(finalizedBeforeHarness).toBe(false);
   expect(earlyLog).toContain(first.message);
   expect(earlyLog).toContain('Production build');
   expect(earlyLog).not.toContain(second.message);

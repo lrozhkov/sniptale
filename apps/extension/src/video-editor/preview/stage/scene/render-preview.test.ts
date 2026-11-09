@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { isVideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { createQuickEditWatermark } from '../../../../features/video/project/scene/watermark';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -8,7 +10,8 @@ import {
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { VideoProjectAssetType } from '../../../../features/video/project/types';
 import { drawPreviewVisualPasses } from './render-visual';
-import { renderPreviewScene } from './render-preview';
+import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
+import type { NativeGpuPreviewRenderer } from './types';
 const splitProof = vi.hoisted(() => ({
   resolve: vi.fn(() => null),
   paint: vi.fn(),
@@ -559,4 +562,487 @@ it('notifies thumbnail consumers only after a completed frame', async () => {
   Object.defineProperty(video, 'seeking', { value: true });
   await renderPreviewScene(job);
   expect(presented).toHaveBeenCalledOnce();
+});
+
+it('prepares images from the exact plan used for all motion-blur passes before painting', async () => {
+  const { job } = setup();
+  job.project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(job.project, 0),
+      scale: 2,
+      motionBlurAmount: 0.75,
+      zoomInDuration: 2,
+    },
+  ];
+  let ready!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    ready = resolve;
+  });
+  const prepareImages = vi.fn(
+    (
+      _frames: readonly import('../../../../features/video/composition/types').VideoCompositionFrame[]
+    ) => gate
+  );
+  const pending = renderPreviewScene({ ...job, prepareImages });
+  expect(prepareImages).toHaveBeenCalledOnce();
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  ready();
+  await pending;
+  const frames = prepareImages.mock.calls[0]![0];
+  const drawn = vi.mocked(drawPreviewVisualPasses).mock.lastCall![0];
+  expect(drawn.passes.length).toBeGreaterThan(1);
+  expect(frames[0]).toBe(drawn.overlayFrame);
+  expect(frames.slice(1)).toEqual(drawn.passes.map((pass) => pass.frame));
+});
+
+it('does not paint when image preparation rejects and permits a later retry', async () => {
+  const { job } = setup();
+  const prepareImages = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('image decode failed'))
+    .mockResolvedValueOnce(undefined);
+  await expect(renderPreviewScene({ ...job, prepareImages })).rejects.toThrow(
+    'image decode failed'
+  );
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  await renderPreviewScene({ ...job, prepareImages });
+  expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'seek'] as const)(
+  'discards a frame invalidated by %s during image preparation',
+  async (event) => {
+    const { job, video } = setup();
+    const controller = new AbortController();
+    let ready!: () => void;
+    const prepareImages = () =>
+      new Promise<void>((resolve) => {
+        ready = resolve;
+      });
+    const pending = renderPreviewScene({ ...job, prepareImages, signal: controller.signal });
+    const outcome = pending.catch((error: unknown) => error);
+    if (event === 'abort') controller.abort();
+    else video.dispatchEvent(new Event('seeking'));
+    ready();
+    expect(await outcome).toEqual(
+      event === 'abort' ? expect.objectContaining({ name: 'AbortError' }) : false
+    );
+    expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  ['empty', 1, false],
+  ['caption', 1, true],
+  ['watermark', 1, true],
+  ['fade', 0, true],
+  ['fade', 4.9, true],
+  ['fade', 1, false],
+  ['omitted-fade', 0, false],
+] as const)(
+  'admits final GPU artwork for %s at %s only when required',
+  async (kind, time, required) => {
+    const { job } = setup();
+    job.project.duration = 5;
+    job.project.sceneEdges = {
+      intro: { enabled: true, duration: 0.4 },
+      outro: { enabled: true, duration: 0.4 },
+    };
+    if (kind === 'watermark')
+      job.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+    const render = vi.fn<NativeGpuPreviewRenderer['render']>(async () => true);
+    await renderPreviewScene({
+      ...job,
+      currentTime: time,
+      ...(kind === 'omitted-fade' ? { sceneEdges: 'omit' } : {}),
+      captionRenderer: {
+        prepare: vi
+          .fn()
+          .mockResolvedValue({ plan: { cues: kind === 'caption' ? [{}] : [] }, draw: vi.fn() }),
+        clear: vi.fn(),
+      },
+      watermarkRenderer: {
+        prepare: vi.fn(async () => ({
+          bounds: { x: 0, y: 0, width: 20, height: 10 },
+          draw: vi.fn(),
+        })),
+        clear: vi.fn(),
+      },
+      gpuPreview: { render, dispose: vi.fn() },
+    });
+    expect(render).toHaveBeenCalledOnce();
+    expect(render.mock.calls[0]![5]).toBe(required);
+  }
+);
+
+it('admits the GPU transaction before Canvas normalization and skips legacy drawing after publication', async () => {
+  const { video, job } = setup();
+  Object.defineProperty(video, 'videoWidth', { value: 1904 });
+  const constructor = vi.fn();
+  vi.stubGlobal('VideoFrame', constructor);
+  const render = vi.fn(async () => true);
+  try {
+    expect(
+      await renderPreviewScene({ ...job, gpuPreview: { render, dispose: vi.fn() } })
+    ).toMatchObject({ time: 1, camera: expect.objectContaining({ scale: 1 }) });
+    expect(render).toHaveBeenCalledOnce();
+    expect(constructor).not.toHaveBeenCalled();
+    expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('honors the Standard preview choice without entering the available GPU transaction', async () => {
+  const { job } = setup();
+  const render = vi.fn<NativeGpuPreviewRenderer['render']>(async () => true);
+  await renderPreviewScene({
+    ...job,
+    previewRenderer: 'legacy',
+    gpuPreview: { render, dispose: vi.fn() },
+  });
+  expect(render).not.toHaveBeenCalled();
+  expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
+});
+
+it('packs padded native preview frames before composition and releases them after drawing', async () => {
+  const { video, job } = setup();
+  Object.defineProperty(video, 'videoWidth', { value: 1904 });
+  const raw = {
+    format: 'NV12',
+    visibleRect: { x: 0, y: 0, width: 1904, height: 984 },
+    codedWidth: 1904,
+    codedHeight: 992,
+    displayWidth: 1904,
+    displayHeight: 984,
+    colorSpace: {},
+    timestamp: 15_000_000,
+    duration: null,
+    allocationSize: () => 1904 * 984 * 1.5,
+    copyTo: vi.fn(async () => [
+      { offset: 0, stride: 1904 },
+      { offset: 1904 * 984, stride: 1904 },
+    ]),
+    close: vi.fn(),
+  };
+  const packed = { displayWidth: 1904, displayHeight: 984, close: vi.fn() };
+  let created = false;
+  vi.stubGlobal(
+    'VideoFrame',
+    vi.fn(function () {
+      if (!created) {
+        created = true;
+        return raw;
+      }
+      return packed;
+    })
+  );
+  const drawImage = vi.fn();
+  vi.mocked(drawPreviewVisualPasses).mockImplementationOnce(async ({ clipMediaElements }) => {
+    const source = clipMediaElements.values().next().value;
+    if (!source || !isVideoCompositionFrameSource(source))
+      throw new Error('Unnormalized native preview source');
+    source.draw({ drawImage } as unknown as CanvasRenderingContext2D, 0, 0, 1280, 720);
+    return null;
+  });
+  try {
+    await renderPreviewScene(job);
+    expect(raw.copyTo).toHaveBeenCalledOnce();
+    expect(drawImage).toHaveBeenCalledWith(packed, 0, 0, 1280, 720);
+    expect(raw.close).toHaveBeenCalledOnce();
+    expect(packed.close).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('returns the exact evaluated GPU camera override only after a completed frame', async () => {
+  const { job } = setup();
+  const { resolveVideoCompositionFrame } =
+    await import('../../../../features/video/composition/timeline/frame');
+  const camera = {
+    ...resolveVideoCompositionFrame(job.project, 1).camera,
+    viewportX: 123,
+    scale: 2.4,
+  };
+  const gpuPreview = {
+    dispose: vi.fn(),
+    render: vi.fn(async (_input, passes) => {
+      expect(passes.overlayFrame.camera).toBe(camera);
+      return true;
+    }),
+  };
+  await expect(renderPreviewScene({ ...job, cameraOverride: camera, gpuPreview })).resolves.toEqual(
+    { camera, time: 1, renderer: { backend: 'gpu' } }
+  );
+  gpuPreview.render.mockResolvedValueOnce(false);
+  await expect(renderPreviewScene({ ...job, cameraOverride: camera, gpuPreview })).resolves.toBe(
+    false
+  );
+});
+
+it('returns the camera evaluated from a bounded archive window without expanding inline samples', async () => {
+  const { createVideoProjectFromRecording } =
+    await import('../../../../features/video/project/factories/creation');
+  const { normalizeVideoProjectCursorSkin } =
+    await import('../../../../features/video/project/cursor');
+  const { prepareCursorTrajectoryProject } =
+    await import('../../../../features/video/project/cursor-trajectory/project-window');
+  const { resolveVideoCompositionFrame } =
+    await import('../../../../features/video/composition/timeline/frame');
+  const project = createVideoProjectFromRecording({
+    recordingId: 'archive-camera',
+    filename: 'capture.webm',
+    width: 100,
+    height: 100,
+    duration: 2,
+    mimeType: 'video/webm',
+    size: 10,
+  });
+  const clip = project.clips[0];
+  if (!clip || clip.type !== 'VIDEO') throw new Error('Missing video clip');
+  const descriptor: import('../../../../features/video/project/cursor-trajectory/types').CursorTrajectoryDescriptor =
+    {
+      format: 'cursor-trajectory-v1',
+      formatVersion: 1,
+      algorithm: 'sed-window-v1',
+      encoding: 'json-ascii-int-v1',
+      trajectoryId: 'a'.repeat(32),
+      state: 'complete',
+      finalized: true,
+      totalBlocks: 1,
+      totalRecords: 3,
+      totalSamples: 2,
+      totalBytes: 1000,
+      streamSha256: 'b'.repeat(64),
+    };
+  project.cursorTrack = {
+    captureMode: 'embedded-fallback',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'archive-camera',
+        sourceInstanceId: clip.sourceInstanceId!,
+        trajectory: descriptor,
+        samples: [],
+      },
+    ],
+  };
+  project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(project, 0),
+      duration: 2,
+      scale: 2,
+      focusMode: 'CURSOR',
+      zoomInDuration: 0,
+      zoomOutDuration: 0,
+    },
+  ];
+  const records: import('../../../../features/video/project/cursor-trajectory/types').CursorTrajectoryRecord[] =
+    [
+      {
+        kind: 'segment',
+        segmentId: 0,
+        activeTimeUs: 0,
+        width: 100,
+        height: 100,
+        reason: 'start',
+        clock: {
+          source: 'dom-event-time',
+          timestampQuantumUs: null,
+          resolutionBoundUs: null,
+          mappingUncertaintyUs: null,
+        },
+      },
+      ...[10, 90].map((x, i) => ({
+        kind: 'sample' as const,
+        segmentId: 0,
+        observationSeq: i,
+        activeTimeUs: i * 1_000_000,
+        xQ8: x * 256,
+        yQ8: 20 * 256,
+        observed: true,
+        visible: true,
+        event: 'move' as const,
+        button: 'none' as const,
+        relatedObservationSeq: null,
+        anchors: [],
+      })),
+    ];
+  const prepared = await prepareCursorTrajectoryProject(project, 0.75, async () => ({
+    fromTimeUs: 0,
+    toTimeUs: 2_000_000,
+    records,
+    initialSegment: null,
+  }));
+  const camera = resolveVideoCompositionFrame(prepared, 0.75).camera;
+  expect(camera.viewportX).not.toBe(resolveVideoCompositionFrame(project, 0.75).camera.viewportX);
+  const source = { sourceWidth: 100, sourceHeight: 100, draw() {} };
+  const gpuPreview = { dispose: vi.fn(), render: vi.fn(async () => true) };
+  const result = await renderPreviewScene({
+    canvas: document.createElement('canvas'),
+    stage: null,
+    project: prepared,
+    currentTime: 0.75,
+    imageBank: {},
+    videoRefs: { current: {} },
+    decodedVideoFrames: new Map([[clip.id, source]]),
+    gpuPreview,
+  });
+  expect(result).toEqual({ camera, time: 0.75, renderer: { backend: 'gpu' } });
+  expect(prepared.cursorTrack?.samples).toEqual([]);
+  expect(JSON.stringify(prepared)).toBe(JSON.stringify(project));
+});
+
+it('returns a direct GPU output with the exact completed camera and time without a Canvas publication', async () => {
+  const { job } = setup();
+  const { resolveVideoCompositionFrame } =
+    await import('../../../../features/video/composition/timeline/frame');
+  const camera = {
+    ...resolveVideoCompositionFrame(job.project, 1).camera,
+    viewportX: 17,
+    scale: 2,
+  };
+  const output = { canvas: document.createElement('canvas'), release: vi.fn() };
+  const gpuPreview = { dispose: vi.fn(), render: vi.fn(async () => output) };
+  const context = vi.spyOn(job.canvas, 'getContext');
+  const acquireGpuOutput = vi.fn();
+  const result = await renderPreviewScene({
+    ...job,
+    cameraOverride: camera,
+    gpuPreview,
+    acquireGpuOutput,
+  });
+  expect(result).toEqual({ camera, time: 1, output, renderer: { backend: 'gpu' } });
+  expect(context).not.toHaveBeenCalled();
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  expect(gpuPreview.render).toHaveBeenCalledWith(
+    expect.objectContaining({ acquireGpuOutput }),
+    expect.anything(),
+    expect.anything(),
+    expect.anything(),
+    expect.anything(),
+    expect.anything()
+  );
+  expect(output.release).not.toHaveBeenCalled();
+  output.release();
+});
+
+it.each(['abort', 'seek', 'unavailable'] as const)(
+  'releases a completed direct output rejected after %s',
+  async (operation) => {
+    const { job, video } = setup();
+    const output = { canvas: document.createElement('canvas'), release: vi.fn() };
+    const began = Promise.withResolvers<void>(),
+      finished = Promise.withResolvers<void>();
+    const gpuPreview = {
+      dispose: vi.fn(),
+      render: vi.fn(async () => {
+        began.resolve();
+        await finished.promise;
+        return output;
+      }),
+    };
+    const controller = new AbortController();
+    const pending = renderPreviewScene({ ...job, gpuPreview, signal: controller.signal });
+    await began.promise;
+    if (operation === 'abort') controller.abort();
+    else if (operation === 'seek') video.dispatchEvent(new Event('seeking'));
+    else Object.defineProperty(video, 'readyState', { configurable: true, value: 1 });
+    expect(output.release).not.toHaveBeenCalled();
+    finished.resolve();
+    expect(await pending).toBe(false);
+    expect(output.release).toHaveBeenCalledOnce();
+    expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  }
+);
+
+it.each([false, true])(
+  'defers the Canvas frame event until frontend publication (staged: %s)',
+  async (staged) => {
+    const { job } = setup();
+    const watermarkRenderer = {
+      prepare: vi.fn(async () => ({
+        bounds: { x: 0, y: 0, width: 20, height: 10 },
+        draw: vi.fn(),
+      })),
+      clear: vi.fn(),
+    };
+    if (staged) job.project.watermark = { ...createQuickEditWatermark('Mark'), mode: 'text' };
+    vi.mocked(drawPreviewVisualPasses).mockImplementation(async ({ canvas }) => {
+      canvas.width = 640;
+      canvas.height = 360;
+      return {
+        context: canvas.getContext('2d')!,
+        bounds: { width: 640, height: 360 },
+        dpr: 1,
+        viewport: { width: 640, height: 360, offsetX: 0, offsetY: 0, scale: 0.5 },
+      };
+    });
+    const notified = vi.fn();
+    job.canvas.addEventListener('sniptale-preview-frame', notified);
+    const result = await renderPreviewScene({ ...job, watermarkRenderer, deferFrameEvent: true });
+    expect(result).toMatchObject({ time: 1, renderer: { backend: 'legacy' } });
+    expect(notified).not.toHaveBeenCalled();
+    await renderPreviewScene({ ...job, watermarkRenderer });
+    expect(notified).toHaveBeenCalledOnce();
+  }
+);
+
+it('borrows the prepared geometry and effects without disposing their caller-owned lease', async () => {
+  const { job } = setup();
+  const { resolveVideoCompositionRenderPasses } =
+    await import('../../../../features/video/composition/timeline/render');
+  const { resolvePreviewEffectRuntimeRasterScale } = await import('./canvas');
+  const passes = resolveVideoCompositionRenderPasses(job.project, job.currentTime);
+  const dispose = vi.fn();
+  const effects = {
+    kind: 'gpu-scene' as const,
+    framesByTime: new Map(),
+    overlayFrames: new Map(),
+    dispose,
+  };
+  const cameraOverride = { ...passes.overlayFrame.camera, scale: 1.7 };
+  passes.overlayFrame.camera = cameraOverride;
+  for (const pass of passes.visualPasses) pass.frame.camera = cameraOverride;
+  const prepareImages = vi.fn(async () => undefined);
+  const render = vi.fn<NativeGpuPreviewRenderer['render']>(
+    async (_input, frame, _finish, _invalidated, supplied) => {
+      expect(frame).toBe(passes);
+      if (typeof supplied !== 'function') throw new Error('Expected effect resolver.');
+      const borrowed = await supplied(async () => {
+        throw new Error('Unexpected dependent input.');
+      });
+      expect(borrowed).toBe(effects);
+      return true;
+    }
+  );
+  const presentation = await renderPreviewScene({
+    ...job,
+    cameraOverride,
+    prepareImages,
+    gpuPreview: { render, dispose: vi.fn() },
+    preparedFrame: {
+      passes,
+      effects,
+      rasterScale: resolvePreviewEffectRuntimeRasterScale(job),
+      compositionTime: job.currentTime,
+      sourcePresentation: new Map(),
+    },
+  });
+  expect(presentation).toMatchObject({ camera: cameraOverride, time: job.currentTime });
+  expect(prepareImages).not.toHaveBeenCalled();
+  expect(dispose).not.toHaveBeenCalled();
+  effects.dispose();
+  expect(dispose).toHaveBeenCalledOnce();
+});
+
+it('defers Canvas fallback for an admitted GPU-only job before any legacy draw', async () => {
+  const { job } = setup();
+  const render = vi.fn<NativeGpuPreviewRenderer['render']>(async () => undefined);
+  await expect(
+    renderPreviewScene({ ...job, gpuOnly: true, gpuPreview: { render, dispose: vi.fn() } })
+  ).rejects.toBeInstanceOf(PreviewGpuSerialFallback);
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
 });

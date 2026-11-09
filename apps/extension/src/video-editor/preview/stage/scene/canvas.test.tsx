@@ -25,6 +25,7 @@ vi.mock('../../../../features/video/project/scene/background-audio', async (impo
 import {
   beginPreviewCameraPass,
   resolvePreparedPreviewSceneCanvas,
+  resolvePreviewSceneCanvasLayout,
   resolvePreviewEffectRuntimeRasterScale,
 } from './canvas';
 
@@ -183,3 +184,116 @@ it('sizes a detached drawing canvas from the presented viewport without resizing
   expect(viewportCanvas.width).toBe(320);
   expect(viewportCanvas.height).toBe(180);
 });
+
+function layoutFixture(width: number, height: number) {
+  const canvas = document.createElement('canvas');
+  Object.defineProperty(canvas, 'clientWidth', { configurable: true, get: () => width });
+  Object.defineProperty(canvas, 'clientHeight', { configurable: true, get: () => height });
+  const context = createContextMock();
+  const getContext = vi.fn(() => context);
+  Object.defineProperty(canvas, 'getContext', { value: getContext });
+  return { canvas, context, getContext };
+}
+
+it.each([undefined, { width: 1280, height: 720 }])(
+  'measures letterbox layout without binding2D or changing backing: %j',
+  (previewRasterSize) => {
+    const f = layoutFixture(200, 200);
+    const width = vi.spyOn(f.canvas, 'width', 'set');
+    const height = vi.spyOn(f.canvas, 'height', 'set');
+    vi.stubGlobal('window', { devicePixelRatio: 1.5 });
+    const args = {
+      canvas: f.canvas,
+      project: createEmptyVideoProject('Layout', 200, 100),
+      stage: null,
+      ...(previewRasterSize ? { previewRasterSize } : {}),
+    };
+    const layout = resolvePreviewSceneCanvasLayout(args);
+    expect(f.getContext).not.toHaveBeenCalled();
+    expect(width).not.toHaveBeenCalled();
+    expect(height).not.toHaveBeenCalled();
+    expect(layout).toEqual({
+      bounds: { width: 200, height: 200 },
+      viewport: { width: 200, height: 100, offsetX: 0, offsetY: 50, scale: 1 },
+      dpr: previewRasterSize ? 6.4 : 1.5,
+      backing: previewRasterSize ?? { width: 300, height: 300 },
+    });
+    const prepared = resolvePreparedPreviewSceneCanvas({
+      ...args,
+      imageBank: {},
+      shouldClearCanvas: false,
+    })!;
+    expect(prepared.bounds).toEqual(layout.bounds);
+    expect(prepared.viewport).toEqual(layout.viewport);
+    expect(prepared.dpr).toBe(layout.dpr);
+    expect({ width: f.canvas.width, height: f.canvas.height }).toEqual(layout.backing);
+  }
+);
+
+it('uses live CSS stage bounds and detached viewport dimensions through resize', () => {
+  const f = layoutFixture(0, 0),
+    viewport = layoutFixture(960, 540);
+  const stage = document.createElement('div');
+  const rect = vi
+    .spyOn(stage, 'getBoundingClientRect')
+    .mockReturnValue(new DOMRect(20, 30, 300, 200));
+  const args = {
+    canvas: f.canvas,
+    viewportCanvas: viewport.canvas,
+    project: createEmptyVideoProject('Stage', 400, 200),
+    stage,
+  };
+  const first = resolvePreviewSceneCanvasLayout(args);
+  expect(first.bounds).toEqual({ left: 20, top: 30, width: 300, height: 200 });
+  expect(first.viewport).toEqual({ width: 300, height: 150, offsetX: 0, offsetY: 25, scale: 0.75 });
+  expect(f.getContext).not.toHaveBeenCalled();
+  expect(viewport.getContext).not.toHaveBeenCalled();
+  rect.mockReturnValue(new DOMRect(20, 30, 600, 400));
+  const second = resolvePreviewSceneCanvasLayout(args);
+  const prepared = resolvePreparedPreviewSceneCanvas({
+    ...args,
+    imageBank: {},
+    shouldClearCanvas: false,
+  })!;
+  expect(second.viewport).toEqual({ width: 600, height: 300, offsetX: 0, offsetY: 50, scale: 1.5 });
+  expect(prepared.bounds).toEqual(second.bounds);
+  expect(prepared.viewport).toEqual(second.viewport);
+  expect({ width: f.canvas.width, height: f.canvas.height }).toEqual(second.backing);
+  expect(viewport.canvas.width).toBe(300);
+});
+
+it('preserves the global DPR choice even when canvas owner-window DPR differs', () => {
+  const f = layoutFixture(101, 51);
+  vi.stubGlobal('window', { devicePixelRatio: 2 });
+  const layout = resolvePreviewSceneCanvasLayout({
+    canvas: f.canvas,
+    project: createEmptyVideoProject('DPR', 202, 102),
+    stage: null,
+  });
+  expect(layout.dpr).toBe(2);
+  expect(layout.backing).toEqual({ width: 202, height: 102 });
+  expect(f.getContext).not.toHaveBeenCalled();
+});
+
+it.each([undefined, { width: 480, height: 270 }])(
+  'preserves zero-viewport preparation math without layout side effects: %j',
+  (previewRasterSize) => {
+    const f = layoutFixture(0, 0);
+    const args = {
+      canvas: f.canvas,
+      project: createEmptyVideoProject('Empty', 200, 100),
+      stage: null,
+      ...(previewRasterSize ? { previewRasterSize } : {}),
+    };
+    const layout = resolvePreviewSceneCanvasLayout(args);
+    expect(layout.bounds).toEqual({ width: 0, height: 0 });
+    expect(layout.viewport.width).toBe(0);
+    expect(layout.backing).toEqual(previewRasterSize ?? { width: 1, height: 1 });
+    expect(f.canvas.width).toBe(300);
+    expect(f.getContext).not.toHaveBeenCalled();
+    expect(
+      resolvePreparedPreviewSceneCanvas({ ...args, imageBank: {}, shouldClearCanvas: false })
+    ).toBeNull();
+    expect({ width: f.canvas.width, height: f.canvas.height }).toEqual(layout.backing);
+  }
+);

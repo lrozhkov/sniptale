@@ -14,16 +14,27 @@ export const primaryPanelButtonClassName = INSPECTOR_PRIMARY_BUTTON_CLASS_NAME;
 
 export const secondaryPanelButtonClassName = INSPECTOR_SECONDARY_BUTTON_CLASS_NAME;
 
-/** Keep scrub feedback local; only completed edits reach the document/history. */
-export function useInspectorNumericDraft(value: number, onChange: (value: number) => void) {
+/** Keep input feedback immediate and accept each completed preview once. */
+export function useInspectorNumericDraft(
+  value: number,
+  onChange: (value: number) => void,
+  onPreview?: ((value: number) => void) | undefined
+) {
   const [preview, setPreview] = React.useState(value);
+  const originRef = React.useRef<number | null>(null);
   React.useEffect(() => setPreview(value), [value]);
   return {
     value: preview,
-    onPreviewValue: setPreview,
-    onCommitValue: (next: number) => {
+    onPreviewValue: (next: number) => {
+      originRef.current ??= value;
       setPreview(next);
-      if (next !== value) onChange(next);
+      onPreview?.(next);
+    },
+    onCommitValue: (next: number) => {
+      const origin = originRef.current ?? value;
+      originRef.current = null;
+      setPreview(next);
+      if (next !== origin) onChange(next);
     },
   };
 }
@@ -33,11 +44,12 @@ export function EditorInspectorRangeField(props: {
   max: number;
   min?: number;
   onChange: (value: number) => void;
+  onPreview?: ((value: number) => void) | undefined;
   step?: number;
   unit: '' | '%' | 'deg' | 'px';
   value: number;
 }) {
-  const draft = useInspectorNumericDraft(props.value, props.onChange);
+  const draft = useInspectorNumericDraft(props.value, props.onChange, props.onPreview);
   const min = props.min ?? 0;
   const step = props.step ?? 1;
 

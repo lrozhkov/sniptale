@@ -1,3 +1,4 @@
+import type { EditorSimplifyCompute } from '../../drawing/simplify-runtime';
 import {
   createEditorDocumentCommandService,
   type EditorDocumentCommandService,
@@ -9,14 +10,17 @@ import { createEditorControllerEventHandlers, type EditorControllerEventHandlers
 
 export interface ImageEditorControllerServices {
   documentCommands?: EditorDocumentCommandService;
+  createSimplifyCompute?: () => EditorSimplifyCompute;
 }
 
 export class ImageEditorController extends ImageEditorControllerSceneActions {
   private readonly documentCommands: EditorDocumentCommandService;
+  readonly createSimplifyCompute?: () => EditorSimplifyCompute;
   readonly eventHandlers: EditorControllerEventHandlers;
 
   constructor(services: ImageEditorControllerServices = {}) {
     super();
+    if (services.createSimplifyCompute) this.createSimplifyCompute = services.createSimplifyCompute;
     this.documentCommands = services.documentCommands ?? createEditorDocumentCommandService();
     this.eventHandlers = createEditorControllerEventHandlers(
       createEditorControllerEventBindings(this)

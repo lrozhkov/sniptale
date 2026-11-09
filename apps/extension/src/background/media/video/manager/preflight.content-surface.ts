@@ -1,3 +1,4 @@
+import { browserRecordingHistoryBlockModes } from '../runtime/manager/controlled-cursor/messages';
 import type { Logger } from '@sniptale/platform/observability/logger/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../../../platform/i18n';
@@ -117,6 +118,7 @@ async function requestControlledCursorViewport(
     await deps.sendTabMessage(tabId, {
       type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
       recordingId,
+      ...browserRecordingHistoryBlockModes(),
     });
   return response.success ? response.viewport : undefined;
 }

@@ -275,3 +275,136 @@ async function createSvgAmplificationMessage(): Promise<EffectRuntimeRenderMessa
     snapshotId: `effect:${documentSha256}`,
   };
 }
+
+it('rejects scene preparation before worker or document work on an unnegotiated connection', async () => {
+  const workerFactory = vi.fn(() => new ReplyWorker());
+  const session = createEffectRuntimeBrokerSession({ workerFactory });
+  const result = await session.execute({ ...(await createMessage()), kind: 'prepareGpuFrame' });
+  expect(result).toMatchObject({ kind: 'error', code: 'inputRejected' });
+  expect(workerFactory).not.toHaveBeenCalled();
+});
+
+it.each([undefined, 'gpu-scene', 'gpu-scene-plan'] as const)(
+  'preloads a worker only for GPU scene sessions (%s)',
+  (compositionBackend) => {
+    const worker = new ReplyWorker(),
+      post = vi.spyOn(worker, 'postMessage');
+    const workerFactory = vi.fn(() => worker);
+    const session = createEffectRuntimeBrokerSession({
+      workerFactory,
+      ...(compositionBackend ? { compositionBackend } : {}),
+    });
+    expect(workerFactory).toHaveBeenCalledTimes(compositionBackend ? 1 : 0);
+    expect(post).not.toHaveBeenCalled();
+    expect(session.snapshot()).toEqual({
+      activeRequests: 0,
+      consecutiveFailures: 0,
+      circuitOpen: false,
+    });
+  }
+);
+
+it('does not charge an idle GPU worker failure to request or failure admission', () => {
+  const worker = new ReplyWorker();
+  const session = createEffectRuntimeBrokerSession({
+    compositionBackend: 'gpu-scene',
+    workerFactory: () => worker,
+  });
+  worker.onmessageerror?.(new MessageEvent('messageerror'));
+  expect(worker.terminate).toHaveBeenCalledOnce();
+  expect(session.snapshot()).toEqual({
+    activeRequests: 0,
+    consecutiveFailures: 0,
+    circuitOpen: false,
+  });
+});
+
+it('rejects bitmap commands on a plan-only connection before request admission', async () => {
+  const worker = new ReplyWorker();
+  const post = vi.spyOn(worker, 'postMessage');
+  const prepare = vi.fn().mockResolvedValue(createWorkerRequest());
+  const session = createEffectRuntimeBrokerSession({
+    compositionBackend: 'gpu-scene-plan',
+    prepare,
+    workerFactory: () => worker,
+  });
+  const bitmap = new FakeBitmap(10, 10);
+  const message = await createMessage();
+  message.inputFrames = { source: { bitmap, width: 10, height: 10 } };
+  await expect(session.execute(message)).resolves.toMatchObject({
+    kind: 'error',
+    code: 'inputRejected',
+  });
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(prepare).not.toHaveBeenCalled();
+  expect(post).not.toHaveBeenCalled();
+  expect(session.snapshot()).toEqual({
+    activeRequests: 0,
+    consecutiveFailures: 0,
+    circuitOpen: false,
+  });
+});
+
+it('routes an oversized plan-only preparation through refusal without materialization', async () => {
+  const bitmaps = Array.from({ length: 513 }, () => new FakeBitmap(1, 1));
+  class PlanWorker extends ReplyWorker {
+    override postMessage(): void {
+      const request = createWorkerRequest();
+      this.onmessage?.(
+        new MessageEvent('message', {
+          data: {
+            type: EFFECT_RUNTIME_WORKER_RESPONSE,
+            result: {
+              kind: 'gpu-plan',
+              effectInstanceId: request.effectInstanceId,
+              requestId: request.requestId,
+              sequenceId: request.sequenceId,
+              snapshotId: request.snapshotId,
+              acknowledged: {
+                documentId: request.documentRef.id,
+                assetSelectionId: request.assetSelectionRef.id,
+              },
+              width: 10,
+              height: 10,
+              logicalWidth: 10,
+              logicalHeight: 10,
+              rootPass: 0,
+              inputResources: {},
+              resources: bitmaps.map((bitmap, id) => ({
+                id,
+                bitmap,
+                kind: 'primitive',
+                width: 1,
+                height: 1,
+              })),
+              passes: [
+                {
+                  id: 0,
+                  width: 10,
+                  height: 10,
+                  logicalWidth: 10,
+                  logicalHeight: 10,
+                  operations: [],
+                },
+              ],
+            },
+          },
+        })
+      );
+    }
+  }
+  const render = vi.fn(async () => new FakeBitmap(10, 10));
+  const isAvailable = vi.fn(async () => true);
+  const session = createEffectRuntimeBrokerSession({
+    compositionBackend: 'gpu-scene-plan',
+    workerFactory: () => new PlanWorker(),
+    prepare: vi.fn().mockResolvedValue(createWorkerRequest()),
+    gpu: { isAvailable, render, dispose: vi.fn() },
+  });
+  await expect(
+    session.execute({ ...(await createMessage()), kind: 'prepareGpuFrame' })
+  ).resolves.toMatchObject({ kind: 'error', code: 'resourceLimit' });
+  expect(render).not.toHaveBeenCalled();
+  expect(isAvailable).not.toHaveBeenCalled();
+  for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+});

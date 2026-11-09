@@ -9,6 +9,23 @@ const solid = {
   layout: { padding: 40, cornerRadius: 0 },
 } as const;
 
+it('retains independent background motion across paint switches and disable/restore', () => {
+  const motion = { mode: 'waves' as const, speed: 25, intensity: 80 };
+  let background: QuickEditBackgroundSettings = { ...solid, motion };
+  for (const patch of [
+    { type: 'gradient' as const },
+    { enabled: false },
+    { type: 'image' as const, assetId: 'image' },
+    { type: 'solid' as const },
+  ]) {
+    background = updateQuickEditBackground(background, patch);
+    expect(background.motion).toEqual(motion);
+  }
+  expect(
+    updateQuickEditBackground(background, { motion: { ...motion, mode: 'none' } }).motion
+  ).toEqual({ ...motion, mode: 'none' });
+});
+
 const gradient = {
   type: 'linear',
   angle: 135,

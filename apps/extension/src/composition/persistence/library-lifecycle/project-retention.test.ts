@@ -24,7 +24,9 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({ runWithIndexedDbMutati
 
 import { repairTemporaryProjectLifecycles } from './project-retention';
 
-function createProjectStores(options: { failScenarioPut?: boolean; failReviewPut?: boolean } = {}) {
+function createProjectStores(
+  options: { failScenarioPut?: boolean; failReviewPut?: boolean; failVideoReadAt?: number } = {}
+) {
   const video = {
     ...createVideoProjectEntry({ id: 'video-1' }),
     lifecycle: createLibraryLifecycle('temporary', 10),
@@ -56,8 +58,15 @@ function createProjectStores(options: { failScenarioPut?: boolean; failReviewPut
     ['video_workspace_history', new Map<string, unknown>()],
   ]);
   const abort = vi.fn();
+  const reads = vi.fn();
   runWithIndexedDbMutation.mockImplementation(async (effect) => {
     const pending = new Map([...persisted].map(([name, entries]) => [name, new Map(entries)]));
+    let videoReads = 0;
+    const select = (name: string, query?: IDBKeyRange, count?: number) =>
+      [...(pending.get(name)?.entries() ?? [])]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .filter(([key]) => !query || typeof query.lower !== 'string' || key > query.lower)
+        .slice(0, count);
     const tx = {
       abort,
       get done() {
@@ -68,7 +77,14 @@ function createProjectStores(options: { failScenarioPut?: boolean; failReviewPut
       },
       objectStore: (name: string) => ({
         get: async (id: string) => pending.get(name)?.get(id),
-        getAll: async () => [...(pending.get(name)?.values() ?? [])],
+        getAll: async (query?: IDBKeyRange, count?: number) => {
+          reads(name, count);
+          if (name === 'video_projects' && ++videoReads === options.failVideoReadAt)
+            throw new DOMException('Page read failed', 'UnknownError');
+          return select(name, query, count).map(([, value]) => value);
+        },
+        getAllKeys: async (query?: IDBKeyRange, count?: number) =>
+          select(name, query, count).map(([key]) => key),
         index: () => ({
           getAll: async (id: string) =>
             [...(pending.get(name)?.values() ?? [])]
@@ -119,7 +135,7 @@ function createProjectStores(options: { failScenarioPut?: boolean; failReviewPut
     };
     return effect({ transaction: () => tx });
   });
-  return { abort, persisted, scenario, video };
+  return { abort, persisted, scenario, video, reads };
 }
 
 it('promotes both legacy project roots once without changing documents, revisions, or trash', async () => {
@@ -384,3 +400,34 @@ it.each(['image', 'review', 'review-missing', 'review-failure'] as const)(
     }
   }
 );
+
+it('rolls back earlier page promotions after a late read failure and retries the complete repair', async () => {
+  vi.stubGlobal('IDBKeyRange', {
+    lowerBound: (lower: IDBValidKey, lowerOpen: boolean) => ({ lower, lowerOpen }),
+  });
+  try {
+    const options: { failVideoReadAt?: number } = { failVideoReadAt: 2 };
+    const f = createProjectStores(options);
+    for (let index = 0; index < 512; index++) {
+      const id = `paged-${String(index).padStart(4, '0')}`;
+      f.persisted.get('video_projects')!.set(id, {
+        ...f.video,
+        id,
+        project: { ...f.video.project, id },
+      });
+    }
+    const before = structuredClone(f.persisted);
+    await expect(repairTemporaryProjectLifecycles(100)).rejects.toThrow('Page read failed');
+    expect(f.abort).toHaveBeenCalledOnce();
+    expect(f.persisted).toEqual(before);
+    delete options.failVideoReadAt;
+    f.abort.mockClear();
+    await expect(repairTemporaryProjectLifecycles(100)).resolves.toBe(514);
+    for (const raw of f.persisted.get('video_projects')!.values())
+      expect(raw).toMatchObject({ lifecycle: { storageClass: 'library', savedAt: 100 } });
+    for (const [name, count] of f.reads.mock.calls)
+      if (name === 'video_projects') expect(count).toBe(512);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

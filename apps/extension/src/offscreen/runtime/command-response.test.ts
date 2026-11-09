@@ -20,6 +20,43 @@ const pointTransform = {
   offsetY: 0,
 };
 
+it('preserves the compact finalized trajectory descriptor and refuses extra completion fields', () => {
+  const cursorTrajectory = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: 'a'.repeat(32),
+    state: 'unavailable',
+    finalized: true,
+    totalBlocks: 0,
+    totalRecords: 0,
+    totalSamples: 0,
+    totalBytes: 0,
+    streamSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  };
+  const completion = {
+    result: 'stopped',
+    recordingPointTransform: pointTransform,
+    cursorTrajectory,
+  };
+  expect(
+    buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_STOP_RECORDING, completion)
+  ).toEqual({ ...completion, result: 'accepted', success: true });
+  expect(() =>
+    buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_STOP_RECORDING, {
+      ...completion,
+      secret: 'private',
+    })
+  ).toThrow();
+  expect(() =>
+    buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_STOP_RECORDING, {
+      ...completion,
+      cursorTrajectory: { ...cursorTrajectory, totalSamples: -1 },
+    })
+  ).toThrow();
+});
+
 it.each([null, pointTransform])(
   'preserves admitted recording geometry in the stop response: %j',
   (recordingPointTransform) => {
@@ -233,5 +270,39 @@ it('validates quick-action header completion instead of acknowledging an arbitra
   ).toEqual({ success: true, dataUrl });
   expect(() =>
     buildOffscreenCommandResponse(MessageType.OFFSCREEN_QUICK_ACTION_HEADER, { dataUrl: 'unsafe' })
+  ).toThrow();
+});
+
+it('returns an independent event descriptor and refuses malformed or extra Stop facts', () => {
+  const recordingEvents = {
+    format: 'recording-events-v1',
+    formatVersion: 1,
+    algorithm: 'lossless-v1',
+    encoding: 'json-utf8-v1',
+    eventStreamId: 'd'.repeat(32),
+    state: 'unavailable',
+    finalized: true,
+    totalBlocks: 0,
+    totalRecords: 0,
+    totalBytes: 0,
+    streamSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  };
+  const result = { result: 'stopped', recordingEvents, recordingPointTransform: pointTransform };
+  expect(buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_STOP_RECORDING, result)).toEqual({
+    ...result,
+    result: 'accepted',
+    success: true,
+  });
+  expect(() =>
+    buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_STOP_RECORDING, {
+      ...result,
+      recordingEvents: { ...recordingEvents, totalRecords: -1 },
+    })
+  ).toThrow();
+  expect(() =>
+    buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_STOP_RECORDING, {
+      ...result,
+      sourceBlocks: [],
+    })
   ).toThrow();
 });

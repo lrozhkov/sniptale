@@ -48,7 +48,7 @@ it('centers the document title without a storage badge and keeps the library ico
     'items-center'
   );
   expect(getButton('editor.floating.document-bar.title').parentElement?.className).toContain(
-    'max-[1499px]:max-w-[6rem]'
+    'max-[1499px]:max-w-[min(6rem,var(--editor-title-available,6rem))]'
   );
   const promote = getButton('editor.floating.document-bar.promote-button');
   expect(promote.className).not.toContain('!bg-');
@@ -105,6 +105,7 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
     container?.querySelectorAll('[data-ui="editor.floating.document-bar"] button') ?? []
   ).map((button) => button.getAttribute('data-ui'));
   expect(actionIds).toEqual([
+    'editor.recent-images.trigger',
     'editor.floating.document-bar.title',
     'editor.floating.document-bar.promote-button',
     'editor.floating.document-bar.save-button',
@@ -673,4 +674,66 @@ it('keeps autosave control reachable after a failed save while the mode is off',
   expect(trigger.getAttribute('aria-label')).toContain(
     translate('editor.documentActions.saveErrorTitle')
   );
+});
+
+it('keeps a long caption before the cursor, preserves edit width and releases layout observers', async () => {
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+  const resizeCallbacks: Array<() => void> = [];
+  const disconnect = vi.fn();
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resizeCallbacks.push(callback);
+      }
+      observe() {}
+      disconnect = disconnect;
+    }
+  );
+  const tools = document.createElement('div');
+  tools.dataset['ui'] = 'editor.floating.tool-rail';
+  let toolLeft = 450;
+  tools.getBoundingClientRect = () => new DOMRect(toolLeft, 0, 500, 50);
+  document.body.append(tools);
+  renderDocumentBar(createProps());
+  await act(async () => Promise.resolve());
+  const bar = container!.querySelector<HTMLElement>('[data-ui="editor.floating.document-bar"]')!;
+  const title = getButton('editor.floating.document-bar.title').parentElement!;
+  bar.getBoundingClientRect = () => new DOMRect(12, 12, 400, 50);
+  title.getBoundingClientRect = () => new DOMRect(70, 12, 180, 50);
+  const flush = () => {
+    const pending = [...frames.values()];
+    frames.clear();
+    pending.forEach((callback) => callback(0));
+  };
+  flush();
+  expect(bar.style.getPropertyValue('--editor-title-available')).toBe('210px');
+  toolLeft = 200;
+  window.dispatchEvent(new Event('resize'));
+  window.dispatchEvent(new Event('resize'));
+  expect(frames.size).toBe(1);
+  flush();
+  expect(bar.style.getPropertyValue('--editor-title-available')).toBe('0px');
+  const input = document.createElement('input');
+  bar.append(input);
+  toolLeft = 600;
+  resizeCallbacks.forEach((callback) => callback());
+  flush();
+  expect(bar.style.getPropertyValue('--editor-title-available')).toBe('0px');
+  input.remove();
+  resizeCallbacks.forEach((callback) => callback());
+  flush();
+  expect(bar.style.getPropertyValue('--editor-title-available')).toBe('360px');
+  window.dispatchEvent(new Event('resize'));
+  expect(frames.size).toBe(1);
+  unmountDocumentBar();
+  expect(frames.size).toBe(0);
+  expect(disconnect).toHaveBeenCalled();
+  tools.remove();
 });

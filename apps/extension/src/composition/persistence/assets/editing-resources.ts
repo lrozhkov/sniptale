@@ -1,6 +1,7 @@
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from './contracts';
 import { parseAssetOwner, parseAssetRef } from './guards';
+import { parseRecordingEntry } from '../recordings/index.guards';
 import * as stores from '../infrastructure/indexed-db/core.stores';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { MediaLibraryEntry } from '../media-library/contracts';
@@ -152,12 +153,40 @@ class EditingResourceProjection {
       await this.optionalReview(id, ref);
       return media;
     }
-    const rows = await freezeMediaInTransaction(this.tx, id, { allowIndependentReview: true });
-    this.addRef(rows.ref);
-    this.mediaOriginals.set(id, rows.ref);
-    if ('screenshotRef' in rows) this.addRef(rows.screenshotRef);
-    await this.optionalReview(id, rows.ref);
+    const ref = await this.mediaOriginal(media);
+    this.mediaOriginals.set(id, ref);
+    await this.optionalReview(id, ref);
     return media;
+  }
+
+  private async mediaOriginal(media: MediaLibraryEntry): Promise<AssetRef> {
+    if (media.source.kind !== 'recording') {
+      const rows = await freezeMediaInTransaction(this.tx, media.id, {
+        allowIndependentReview: true,
+      });
+      this.addRef(rows.ref);
+      if ('screenshotRef' in rows) this.addRef(rows.screenshotRef);
+      return rows.ref;
+    }
+    // Local byte availability does not depend on the sync capture telemetry budget.
+    const recording = parseRecordingEntry(
+      await this.tx.objectStore(stores.STORE_NAME).get(media.source.recordingId)
+    );
+    requireResource(
+      recording &&
+        recording.id === media.source.recordingId &&
+        media.id === `recording:${recording.id}` &&
+        media.blob === undefined &&
+        media.workspaceRevision === 0 &&
+        media.imageContentState !== 'edited' &&
+        (media.kind === 'recording' || media.kind === 'video' || media.kind === 'audio') &&
+        recording.size === media.size &&
+        recording.mimeType === media.mimeType &&
+        JSON.stringify(recording.recordingGroup) === JSON.stringify(media.recordingGroup) &&
+        JSON.stringify(recording.recordingMetadata) === JSON.stringify(media.recordingMetadata)
+    );
+    await this.owner('recording', recording.id, 'body', recording.assetId);
+    return this.ref(recording.assetId, recording);
   }
 
   private async image(media: MediaLibraryEntry) {
@@ -286,11 +315,7 @@ class EditingResourceProjection {
       requireResource(source.asset.size === media.size && source.asset.mimeType === media.mimeType);
       ref = source.ref;
     } else {
-      const source = await freezeMediaInTransaction(this.tx, sourceId, {
-        allowIndependentReview: true,
-      });
-      ref = source.ref;
-      this.addRef(ref);
+      ref = await this.mediaOriginal(media);
     }
     // An archived Review borrows original bytes, not another Review on the same media.
     this.mediaIds.add(sourceId);
@@ -324,7 +349,9 @@ class EditingResourceProjection {
           break;
       }
       requireResource(
-        binding.size === asset.metadata.size && binding.mimeType === asset.metadata.mimeType
+        binding.size === asset.metadata.size &&
+          (binding.mimeType === asset.metadata.mimeType ||
+            sameReviewVideoContainer(asset.metadata.mimeType, binding.mimeType))
       );
     }
   }

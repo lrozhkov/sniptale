@@ -42,6 +42,14 @@
       "messageHash": "e65f923a68b7d7a94adcd0de39f1b44b843f51359d25743ef19ad4384b4ab6e2",
       "rule": "js/missing-await",
       "debtId": "noise.codeql.catalog-refresh-flight-identity"
+    },
+    {
+      "contentHash": "e65d1c1a7aa488d07068360b4cdc86b0507ec4765282d446566b4c68c80b781b",
+      "debtId": "noise.codeql.simplify-private-worker-message",
+      "file": "apps/extension/src/offscreen/simplify/worker.ts",
+      "line": 84,
+      "messageHash": "69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1",
+      "rule": "js/missing-origin-check"
     }
   ]
 }

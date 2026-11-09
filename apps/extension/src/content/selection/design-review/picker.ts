@@ -61,6 +61,7 @@ interface DesignReviewPickerArgs {
   ) => boolean | void;
   onHover?: (element: Element | null) => void;
   trackHover?: () => boolean;
+  isPageInteractionEnabled?: () => boolean;
   isFrameSuppressed?: () => boolean;
   replaceSelectionOnClick?: () => boolean;
 }
@@ -135,7 +136,12 @@ function refreshPickerFrame(
   args: DesignReviewPickerArgs
 ): void {
   const target = state.selectedElement ?? state.framedElement;
-  if (!state.editingText && !args.isFrameSuppressed?.() && target?.isConnected) {
+  if (
+    !state.editingText &&
+    args.isPageInteractionEnabled?.() !== false &&
+    !args.isFrameSuppressed?.() &&
+    target?.isConnected
+  ) {
     showDesignReviewFrame(target, target === state.selectedElement, false, state.framedElement);
   } else {
     hideDesignReviewFrame();
@@ -276,10 +282,30 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   };
   const measurements = createDesignReviewMeasurements();
   let cleanupCursor = mountDesignReviewCursor();
+  let pageInteractionEnabled = true;
+  let measurementsEnabled = false;
+  let measurementsExpanded = false;
+  const refreshInteraction = () => {
+    const enabled = !state.editingText && args.isPageInteractionEnabled?.() !== false;
+    if (enabled !== pageInteractionEnabled) {
+      pageInteractionEnabled = enabled;
+      cleanupCursor();
+      cleanupCursor = enabled ? mountDesignReviewCursor() : () => undefined;
+      measurements.setEnabled(enabled && measurementsEnabled);
+      measurements.setExpanded(enabled && measurementsExpanded);
+      measurements.hover(enabled ? state.selectedElement : null);
+      if (!enabled) {
+        state.framedElement = null;
+        state.inspectorPointerGestureStarted = false;
+        args.onHover?.(null);
+      }
+    }
+    refreshPickerFrame(state, args);
+  };
   const cleanupMove = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mousemove',
     (event, iframe) => {
-      if (state.editingText) return;
+      if (state.editingText || args.isPageInteractionEnabled?.() === false) return;
       handlePickerMouseMove(state, event, args, iframe);
       if (isTrustedMouseEvent(event) && !state.inspectorPointerGestureStarted)
         measurements.hover(state.selectedElement ?? resolveSelectablePageElement(event, iframe));
@@ -289,7 +315,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupLeave = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mouseleave',
     () => {
-      if (state.editingText) return;
+      if (state.editingText || args.isPageInteractionEnabled?.() === false) return;
       handlePickerMouseLeave(state, args);
       measurements.hover(state.selectedElement);
     },
@@ -298,7 +324,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupClick = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'click',
     (event, iframe) => {
-      if (state.editingText) return;
+      if (state.editingText || args.isPageInteractionEnabled?.() === false) return;
       handlePickerClick(state, args, event, iframe);
       if (isTrustedMouseEvent(event)) measurements.hover(state.selectedElement);
     },
@@ -307,7 +333,8 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupPointerDown = addEventListenerToAllWindowsDynamic<PointerEvent>(
     'pointerdown',
     (event) => {
-      if (!state.editingText) handlePickerPointerDown(state, event);
+      if (!state.editingText && args.isPageInteractionEnabled?.() !== false)
+        handlePickerPointerDown(state, event);
     },
     { capture: true }
   );
@@ -322,7 +349,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupKeydown = addWindowEventListenerToAllWindowsDynamic<KeyboardEvent>(
     'keydown',
     (event) => {
-      if (state.editingText) return;
+      if (state.editingText || args.isPageInteractionEnabled?.() === false) return;
       if (!isTrustedKeyboardEvent(event) || event.key !== 'Escape') {
         return;
       }
@@ -358,7 +385,7 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     { capture: true }
   );
   const cleanupInaccessibleIframes = addInaccessibleIframeSelectionListener((iframe) => {
-    if (state.editingText) return;
+    if (state.editingText || args.isPageInteractionEnabled?.() === false) return;
     handleInaccessibleIframeSelection(state, args, iframe);
     measurements.hover(state.selectedElement);
   });
@@ -369,17 +396,20 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
       state.editingText = editing;
       state.framedElement = state.selectedElement;
       state.inspectorPointerGestureStarted = false;
-      cleanupCursor();
-      cleanupCursor = editing ? () => undefined : mountDesignReviewCursor();
-      measurements.hover(editing ? null : state.selectedElement);
-      refreshPickerFrame(state, args);
+      refreshInteraction();
     },
     dismissSelection: () => {
       dismissPickerSelection(state);
       measurements.hover(null);
     },
-    setMeasurementsEnabled: measurements.setEnabled,
-    setMeasurementsExpanded: measurements.setExpanded,
+    setMeasurementsEnabled: (enabled) => {
+      measurementsEnabled = enabled;
+      measurements.setEnabled(enabled && pageInteractionEnabled);
+    },
+    setMeasurementsExpanded: (expanded) => {
+      measurementsExpanded = expanded;
+      measurements.setExpanded(expanded && pageInteractionEnabled);
+    },
     dispose: () => {
       measurements.dispose();
       cleanupMove();
@@ -393,10 +423,10 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
       cleanupCursor();
       removeDesignReviewFrame();
     },
-    refreshFrame: () => refreshPickerFrame(state, args),
+    refreshFrame: refreshInteraction,
     selectElement: (element, origin = 'tree') => {
       const selected = selectPickerElement(state, args, element, origin);
-      if (selected) measurements.hover(state.selectedElement);
+      if (selected) measurements.hover(pageInteractionEnabled ? state.selectedElement : null);
       return selected;
     },
   };

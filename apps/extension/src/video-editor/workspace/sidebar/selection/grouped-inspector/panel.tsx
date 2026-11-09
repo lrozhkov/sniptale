@@ -112,7 +112,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
   if (!defaultId) return null;
   if (groups.length === 1) {
     const group = groups[0]!;
-    const Icon = SECTION_ICONS[group.semantic];
+    const Icon = group.icon ?? SECTION_ICONS[group.semantic];
     return (
       <div ref={surface} data-ui="video-editor.inspector.sections" data-section={group.id}>
         <h3 data-ui="video-editor.inspector.section-heading" className="flex items-center gap-2">
@@ -133,7 +133,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
         className="video-editor-inspector-all-groups"
       >
         {groups.map((group) => {
-          const Icon = SECTION_ICONS[group.semantic];
+          const Icon = group.icon ?? SECTION_ICONS[group.semantic];
           return (
             <section
               key={group.id}
@@ -169,7 +169,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
         sections={groups.map((group) => ({
           id: group.id,
           label: group.label,
-          icon: SECTION_ICONS[group.semantic],
+          icon: group.icon ?? SECTION_ICONS[group.semantic],
         }))}
         renderSection={(id) => {
           const group = groups.find((candidate) => candidate.id === id);

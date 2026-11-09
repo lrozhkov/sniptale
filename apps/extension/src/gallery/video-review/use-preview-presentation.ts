@@ -56,6 +56,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const interacting = input.interacting || placement !== null || Object.keys(comments).length > 0;
   // A raw-source dissolve cannot represent two independently decorated camera poses.
   const manual =
+    (typeof navigator !== 'undefined' && !!navigator.gpu) ||
     isReviewPreviewManual(input.preferences, input.playing) ||
     !!(
       input.scene.webcam?.enabled &&
@@ -162,9 +163,19 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
     ...camera,
     onPreviewPlacement: onWebcamPreview,
   };
+  const presentationStatus: ReviewPreviewPresentationStatus = manual
+    ? status
+    : {
+        ...status,
+        // The DOM compositor owns Current mode when WebGPU is unavailable.
+        renderer: {
+          backend: 'legacy',
+          ...(input.preferences.renderer === 'gpu' ? { fallback: 'unavailable' } : {}),
+        },
+      };
   return {
     active: manual,
-    status,
+    status: presentationStatus,
     retry,
     onCommentPreview,
     onWebcamPreview,

@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+import { FabricImage, Gradient, Rect } from 'fabric';
 import { expect, it, vi } from 'vitest';
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
@@ -94,3 +96,61 @@ it('leaves blurred backgrounds for the async rebuild owner during relayout', () 
   expect(background.set).not.toHaveBeenCalled();
   expect(background.setCoords).not.toHaveBeenCalled();
 });
+
+it('keeps a raster gradient at its intrinsic size and scale during scene relayout', () => {
+  const raster = document.createElement('canvas');
+  raster.width = 2048;
+  raster.height = 1024;
+  const background = new FabricImage(raster, {
+    left: 0,
+    top: 0,
+    scaleX: 2,
+    scaleY: 2,
+    strokeWidth: 0,
+  });
+  background.sniptaleType = 'background';
+  background.sniptaleRole = 'background';
+  background.sniptaleBackgroundMode = 'gradient';
+  background.sniptaleBackgroundBlurAmount = 0;
+  const frame = createFrame({ backgroundMode: 'gradient', backgroundBlurAmount: 0 });
+  syncManagedBackgroundLayerLayout({
+    canvas: createFabricCanvasFixture(createCanvas([background])),
+    canvasSize: { width: 4096, height: 2048 },
+    frame,
+  });
+  expect({
+    width: background.width,
+    height: background.height,
+    scaleX: background.scaleX,
+    scaleY: background.scaleY,
+  }).toEqual({ width: 2048, height: 1024, scaleX: 2, scaleY: 2 });
+});
+
+it.each(['color', 'gradient'] as const)(
+  'keeps %s vector backgrounds covering the canvas during relayout',
+  (mode) => {
+    const background = new Rect({
+      left: 0,
+      top: 0,
+      width: 100,
+      height: 80,
+      scaleX: 2,
+      scaleY: 2,
+      strokeWidth: 0,
+      originX: 'left',
+      originY: 'top',
+    });
+    background.sniptaleType = 'background';
+    background.sniptaleRole = 'background';
+    background.sniptaleBackgroundMode = mode;
+    background.sniptaleBackgroundBlurAmount = 0;
+    syncManagedBackgroundLayerLayout({
+      canvas: createFabricCanvasFixture(createCanvas([background])),
+      canvasSize: { width: 320, height: 180 },
+      frame: createFrame({ backgroundMode: mode, backgroundBlurAmount: 0 }),
+    });
+    expect(background.getBoundingRect()).toEqual({ left: 0, top: 0, width: 320, height: 180 });
+    if (mode === 'color') expect(background.fill).toBe('#112233');
+    else expect(background.fill).toBeInstanceOf(Gradient);
+  }
+);

@@ -123,50 +123,6 @@ export function saveChromeAiEnabled(enabled: boolean): Promise<void> {
   );
 }
 
-export function enableAISecretPassphraseProtection(passphrase: string): Promise<void> {
-  return sendAiSettingsMutation({
-    operation: 'enable-secret-passphrase-protection',
-    passphrase,
-  }).then(() => undefined);
-}
-
-export function disableAISecretPassphraseProtection(passphrase?: string): Promise<void> {
-  return sendAiSettingsMutation({
-    operation: 'disable-secret-passphrase-protection',
-    ...(passphrase === undefined ? {} : { passphrase }),
-  }).then(() => undefined);
-}
-
-export function unlockAISecretPassphraseProtection(passphrase: string): Promise<void> {
-  return sendAiSettingsMutation({
-    operation: 'unlock-secret-passphrase-protection',
-    passphrase,
-  }).then(() => undefined);
-}
-
-export function changeAISecretPassphraseProtection(args: {
-  currentPassphrase: string;
-  nextPassphrase: string;
-}): Promise<void> {
-  return sendAiSettingsMutation({
-    currentPassphrase: args.currentPassphrase,
-    nextPassphrase: args.nextPassphrase,
-    operation: 'change-secret-passphrase-protection',
-  }).then(() => undefined);
-}
-
-export function lockAISecretPassphraseProtection(): Promise<void> {
-  return sendAiSettingsMutation({ operation: 'lock-secret-passphrase-protection' }).then(
-    () => undefined
-  );
-}
-
-export function resetAISecretPassphraseProtection(): Promise<void> {
-  return sendAiSettingsMutation({ operation: 'reset-secret-passphrase-protection' }).then(
-    () => undefined
-  );
-}
-
 /** Saves additional recognition instructions through the existing serialized background mutation. */
 export function saveAudioTranscriptionSystemPrompt(prompt: string): Promise<void> {
   return sendAiSettingsMutation({ operation: 'save-audio-transcription-prompt', prompt }).then(

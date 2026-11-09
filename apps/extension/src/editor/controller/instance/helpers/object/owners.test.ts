@@ -147,3 +147,16 @@ it('adapts selection and label commands through runtime action owners', () => {
   expect(mocks.getNextLabelIndexMock).toHaveBeenCalledWith(controller.canvas, 'text');
   expect(mocks.advanceStepMock).toHaveBeenCalledOnce();
 });
+
+it('preserves submitted Simplify work only for the window-blur route', () => {
+  const controller = createController();
+  mocks.cancelInteractionMock.mockReturnValue({ changed: false, drawSession: null });
+  cancelTransientInteractionForController(controller, 'window-blur');
+  expect(mocks.cancelInteractionMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ preserveActiveTool: true, preservePendingSimplify: true })
+  );
+  cancelTransientInteractionForController(controller);
+  expect(mocks.cancelInteractionMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ preservePendingSimplify: false })
+  );
+});

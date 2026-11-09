@@ -6,7 +6,12 @@ import { createEditorDocumentFixture } from '../document/page-session/document.t
 
 const mocks = vi.hoisted(() => ({
   beginDraft: vi.fn(),
+  requestExit: vi.fn(),
   openFile: vi.fn(),
+}));
+
+vi.mock('../../platform/runtime-messaging/sync-product-client', () => ({
+  createSyncProductClient: () => ({ requestCheckpointExit: mocks.requestExit }),
 }));
 
 vi.mock('../document/file-actions', async (importOriginal) => ({
@@ -23,7 +28,10 @@ import { openLocalImageAsEditorDraft } from './open-local-image-draft';
 beforeEach(() => vi.clearAllMocks());
 
 function createController(
-  autosaveService: Pick<EditorSessionAutosaveService, 'activate' | 'flushAutosave'> | null
+  autosaveService: Pick<
+    EditorSessionAutosaveService,
+    'activate' | 'flushAutosave' | 'prepareCheckpointExit'
+  > | null
 ) {
   return {
     autosaveService: autosaveService
@@ -187,4 +195,48 @@ it('uses the canonical controller as the file-open revision authority', async ()
     expect.any(Function),
     expect.objectContaining({ beforeOpen: expect.any(Function), onOpened: expect.any(Function) })
   );
+});
+
+it('preserves the current standalone draft when an edit arrives during exit intent', async () => {
+  let current = true;
+  const receipt = { rootKind: 'media' as const, rootId: 'old', revision: crypto.randomUUID() };
+  const request = Promise.withResolvers<void>();
+  const entered = Promise.withResolvers<void>();
+  mocks.requestExit.mockImplementation(() => {
+    entered.resolve();
+    return request.promise;
+  });
+  const controller = createController({
+    activate: vi.fn(),
+    flushAutosave: vi.fn(async () => undefined),
+    prepareCheckpointExit: vi.fn(async () => ({ receipt, isCurrent: () => current })),
+  });
+  mocks.openFile.mockImplementation(
+    async (
+      _controller: unknown,
+      _file: unknown,
+      _publish: unknown,
+      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => Promise<void> }
+    ) => {
+      await lifecycle.beforeOpen();
+      await controller.openImage();
+      await lifecycle.onOpened();
+    }
+  );
+  const replacing = openLocalImageAsEditorDraft(
+    controller,
+    new File(['bytes'], 'new.png', { type: 'image/png' }),
+    vi.fn()
+  );
+  await Promise.race([
+    entered.promise,
+    replacing.then(() => {
+      throw new Error('Replacement bypassed exit intent.');
+    }),
+  ]);
+  current = false;
+  request.resolve();
+  await expect(replacing).rejects.toThrow('changed');
+  expect(controller.openImage).not.toHaveBeenCalled();
+  expect(mocks.beginDraft).not.toHaveBeenCalled();
 });

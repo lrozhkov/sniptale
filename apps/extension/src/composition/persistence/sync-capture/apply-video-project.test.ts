@@ -1,3 +1,4 @@
+import { deferCheckpointInTransaction, consumeCheckpointInTransaction } from './checkpoints';
 import {
   createVideoProjectReplicaFixture,
   spaceId,
@@ -832,5 +833,67 @@ it('retains an existing export through a successor and refuses a changed owner a
       expectedBasis: [next.operationId],
     })
   ).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+});
+
+it('refuses a pending checkpoint before the first causal project state', async () => {
+  const f = setup();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'video-project', rootId: f.input.root.entry.id },
+    2
+  );
+  await tx.done;
+  expect(pending).not.toBeNull();
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(f.input)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedVideoProjectRevision(f.input)).resolves.toMatchObject({
+    status: 'applied',
+  });
+});
+
+it('refuses pending work with unchanged causal generation and native digest', async () => {
+  const f = setup();
+  const first = privateCopy(f.input);
+  await applyPreparedVideoProjectRevision(first);
+  const next = structuredClone(first);
+  next.operationId = 'pending-successor';
+  next.expectedLocalGeneration = 1;
+  next.expectedBasis = [first.operationId];
+  next.expectedWorkspaceRevision = 1;
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  const pending = await deferCheckpointInTransaction(
+    tx,
+    { rootKind: 'video-project', rootId: first.root.entry.id },
+    2
+  );
+  await tx.done;
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(next)).rejects.toThrow();
+  expect(f.rows).toEqual(before);
+  if (!pending) throw new Error('Missing pending checkpoint fixture');
+  const consume = f.database.transaction(['sync_capture'], 'readwrite');
+  expect(await consumeCheckpointInTransaction(consume, pending)).toBe(true);
+  await consume.done;
+  await expect(applyPreparedVideoProjectRevision(next)).resolves.toMatchObject({
+    status: 'applied',
+  });
+});
+
+it('refuses a dependency marked pending after project preparation without causal advancement', async () => {
+  const f = setup();
+  const tx = f.database.transaction(['sync_capture'], 'readwrite');
+  await deferCheckpointInTransaction(tx, { rootKind: 'media', rootId: sourceId }, 2);
+  await tx.done;
+  const before = structuredClone(f.rows);
+  await expect(applyPreparedVideoProjectRevision(f.input)).rejects.toMatchObject({
+    code: 'dependency-changed',
+  });
   expect(f.rows).toEqual(before);
 });

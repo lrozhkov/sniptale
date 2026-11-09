@@ -1,3 +1,6 @@
+import { projectRecordingEventAction } from '../../features/video/project/recording-events/project-facts';
+import type { RecordingEventRecord } from '../../features/video/project/recording-events/types';
+import { applyVideoProjectMutationPatch } from '../../features/video/project/mutation';
 import { describe, expect, it } from 'vitest';
 import { createVideoProjectMotionRegion } from '../../features/video/project/motion';
 import {
@@ -392,4 +395,100 @@ it('selects object tracks and preserves the track fallback for missing transitio
   expect(store.getState().selectedTrackId).toBe(track);
   store.actions.selectTransition('missing');
   expect(store.getState().selectedTrackId).toBe(track);
+});
+
+it('keeps one bound streamed action observation in selection and refuses stale or mismatched selection input', () => {
+  const { actions, getState } = createSelectionStore();
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    recordingSignals: [],
+    sourceNormalizedActionEvents: [],
+  });
+  const events = {
+    format: 'recording-events-v1' as const,
+    formatVersion: 1 as const,
+    algorithm: 'lossless-v1' as const,
+    encoding: 'json-utf8-v1' as const,
+    eventStreamId: 'a'.repeat(32),
+    state: 'incomplete' as const,
+    finalized: true,
+    totalBlocks: 1000,
+    totalRecords: 50000,
+    totalBytes: 5000000,
+    streamSha256: 'b'.repeat(64),
+  };
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+  });
+  const group = project.actionFeedback![0]!;
+  const record: Extract<RecordingEventRecord, { kind: 'action' }> = {
+    kind: 'action',
+    recordSeq: 1,
+    segmentId: 0,
+    activeTimeUs: 1000000,
+    action: {
+      id: 'key',
+      kind: 'KEY',
+      timeUs: 1000000,
+      durationUs: 0,
+      point: null,
+      label: 'Ctrl+S',
+      preset: 'NONE',
+      data: {
+        downTimeUs: null,
+        upTimeUs: 1000000,
+        pressDurationUs: null,
+        lastObservedTimeUs: 1000000,
+        repeatCount: 0,
+        completion: 'released',
+        keyboardAttackId: null,
+        keyboardOnsetTimeUs: null,
+        groupId: null,
+        continuationOf: null,
+        ctrlKey: true,
+        altKey: null,
+        shiftKey: false,
+        metaKey: null,
+      },
+    },
+  };
+  const event = projectRecordingEventAction(group, record);
+  getState().project = project;
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const observation = {
+    recordingId: group.recordingId,
+    sourceInstanceId: group.sourceInstanceId,
+    eventStreamId: events.eventStreamId,
+    streamSha256: events.streamSha256,
+    record,
+  };
+  actions.selectActionOccurrence(event.id, clip.id, observation);
+  expect(getState().selection).toMatchObject({
+    kind: 'action-occurrence',
+    eventId: event.id,
+    observedAction: { record },
+  });
+  const selected = getState().selection;
+  record.action.label = 'Changed after selection';
+  expect(
+    selected.kind === 'action-occurrence' && selected.observedAction?.record.action.label
+  ).toBe('Ctrl+S');
+  actions.selectActionOccurrence('another-event', clip.id, observation);
+  expect(getState().selection).toBe(selected);
+  actions.selectActionOccurrence(event.id, clip.id, {
+    ...observation,
+    streamSha256: 'c'.repeat(64),
+  });
+  expect(getState().selection).toBe(selected);
+  actions.selectActionOccurrence(event.id, 'missing-clip', observation);
+  expect(getState().selection).toBe(selected);
+  expect(getState().project).toBe(project);
+  expect(project.actionEvents).toEqual([]);
 });

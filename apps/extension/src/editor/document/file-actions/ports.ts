@@ -9,7 +9,7 @@ export interface CanvasReadyPort {
 export interface EditorDocumentOpenPort extends CanvasReadyPort {
   autosaveService?: Pick<
     EditorSessionAutosaveService,
-    'beginHydration' | 'flushAutosave' | 'persistSnapshot'
+    'beginHydration' | 'flushAutosave' | 'prepareCheckpointExit' | 'persistSnapshot'
   > | null;
   exportDocument?(): EditorDocument;
   loadDocument(document: EditorDocument): Promise<void>;

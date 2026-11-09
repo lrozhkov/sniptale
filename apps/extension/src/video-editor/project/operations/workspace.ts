@@ -87,7 +87,7 @@ async function buildRecordingSourceProject(
     viewport: telemetry?.viewport ?? null,
   };
 
-  const project = createVideoProjectFromRecording({
+  return createVideoProjectFromRecording({
     recordingId: sourceRecordingId,
     filename: entry.filename,
     width: metadata.width,
@@ -99,12 +99,14 @@ async function buildRecordingSourceProject(
     audioPeaks: metadata.audioPeaks,
     asset,
     sidecarVideos,
-    ...(telemetry ? { recordingSignals: telemetry.signals } : {}),
+    ...(telemetry
+      ? { recordingSignals: rawTelemetry?.recordingEvents ? [] : telemetry.signals }
+      : {}),
     ...(telemetry?.actionEvents === undefined
       ? {}
       : {
           sourceNormalizedActionEvents: normalizeRecordingActionEventsToProjectSpace(
-            telemetry.actionEvents,
+            rawTelemetry?.recordingEvents ? [] : telemetry.actionEvents,
             normalizedTelemetryParams
           ),
         }),
@@ -116,8 +118,9 @@ async function buildRecordingSourceProject(
             normalizedTelemetryParams
           ),
         }),
+    ...(rawTelemetry?.cursorTrajectory ? { cursorTrajectory: rawTelemetry.cursorTrajectory } : {}),
+    ...(rawTelemetry?.recordingEvents ? { recordingEvents: rawTelemetry.recordingEvents } : {}),
   });
-  return project;
 }
 
 async function buildRecordingProject(

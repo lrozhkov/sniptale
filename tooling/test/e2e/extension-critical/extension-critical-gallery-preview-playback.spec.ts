@@ -197,12 +197,21 @@ test('manual camera offset pixels follow cut speed and loop transport', async ({
     await ui.open(true);
     await ui.button('gallery.videoReview.advancedEditing').click();
     await ui.review
-      .getByRole('button', { name: translate('gallery.videoReview.webcam', 'en'), exact: true })
-      .and(ui.review.locator('[aria-label]'))
+      .locator('[data-review-header-track="webcam"] [data-review-track-select]')
       .click();
-    await expect(
-      ui.review.locator('[data-ui="gallery.videoReview.webcamOverlay"] canvas')
-    ).toBeVisible();
+    await ui.review
+      .getByRole('group', { name: translate('gallery.videoReview.inspector', 'en'), exact: true })
+      .getByRole('button', { name: translate('gallery.videoReview.webcam', 'en'), exact: true })
+      .click();
+    const webcamOverlay = ui.review.locator('[data-ui="gallery.videoReview.webcamOverlay"]');
+    await expect(webcamOverlay).toBeVisible();
+    if (await page.evaluate(() => !!navigator.gpu)) {
+      await expect(
+        ui.review.locator(
+          '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+        )
+      ).toBeVisible();
+    } else await expect(webcamOverlay.locator('canvas')).toBeVisible();
     await expect
       .poll(async () => {
         const camera = await readAcquiredPreviewCamera(page);
@@ -210,7 +219,8 @@ test('manual camera offset pixels follow cut speed and loop transport', async ({
       })
       .toBe(true);
     await seedWebcamComposition(page);
-    await page.reload();
+    // Reload restores the active review route; enter from the library explicitly instead.
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
     await ui.open(true);
     await ui.choose('gallery.videoReview.previewResolution', '360p');
     await ui.choose('gallery.videoReview.previewFrameRate', '≤ 30 FPS');

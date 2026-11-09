@@ -129,18 +129,33 @@ export const QA_WRAPPER_CLI_CONTRACTS = Object.freeze({
       'qa:e2e:critical',
       'qa:e2e:security',
       'qa:e2e:all',
+      'qa:e2e:preview-performance',
       'qa:e2e:headed',
       'qa:e2e:smoke:headed',
       'qa:e2e:critical:headed',
     ],
-    usage: 'npm run qa:e2e -- [--suite <smoke|critical|security|all>] [--headed]',
+    usage:
+      'npm run qa:e2e -- [--suite <smoke|critical|security|all|preview-performance>] ' +
+      '[--headed] [--case <name>] [--list]',
     description: 'Build the extension E2E artifact and run the selected Playwright suite.',
     options: [
       {
         name: '--suite',
         kind: 'value',
         key: 'suite',
-        description: 'Playwright suite: smoke, critical, security, or all.',
+        description: 'Playwright suite, including the optional preview-performance suite.',
+      },
+      {
+        name: '--case',
+        kind: 'value',
+        key: 'case',
+        description: 'Select one named performance test.',
+      },
+      {
+        name: '--list',
+        kind: 'flag',
+        key: 'list',
+        description: 'List performance tests without building or measuring.',
       },
       { name: '--headed', kind: 'flag', key: 'headed', description: 'Run with a visible browser.' },
     ],

@@ -291,6 +291,8 @@ beforeEach(() => {
     },
     onTime: (time: number) => time + 1,
     setPlaying: vi.fn(),
+    setPresentationActive: vi.fn(),
+    onPresentedTime: vi.fn(),
     onEnded: vi.fn(),
     onMediaError: vi.fn(),
     recovering: false,
@@ -443,6 +445,7 @@ it('restores annotation anchors on media readiness and restricts drawing to an i
 
 it('routes local preview preferences and inspector entry without changing editing or transport', async () => {
   const preferences = {
+    renderer: 'gpu',
     rasterPreset: '720p',
     frameRate: '30',
     pausedQuality: 'detailed',
@@ -465,6 +468,8 @@ it('routes local preview preferences and inspector entry without changing editin
   );
   expect(stage().preview?.preferences).toBe(preferences);
   expect(stage().preview?.playing).toBe(state.playing);
+  expect(stage().preview?.onPresentationActive).toBe(state.setPresentationActive);
+  expect(stage().preview?.onPresentedTime).toBe(state.onPresentedTime);
   expect(stage().preview?.sourceToResult(1)).toBe(state.timeline.timeMap.sourceToTimeline(1));
   stage().preview?.onRaster?.({ width: 1280, height: 720 });
   expect(raster).toHaveBeenCalledWith({ width: 1280, height: 720 });
@@ -623,3 +628,122 @@ it('forwards inspector draft interaction to the preview and clears it after canc
   expect(stage().preview?.interacting).toBe(false);
   expect(state.zoom.change).not.toHaveBeenCalled();
 });
+
+it('shows a retryable history failure while keeping the existing video transport available', async () => {
+  const retry = vi.fn();
+  state.history = {
+    telemetry: null,
+    pending: false,
+    initialLoading: false,
+    failed: true,
+    incomplete: false,
+    retry,
+  };
+  await render();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'gallery.videoReview.recordingHistoryFailed'
+  );
+  const button = [...host.querySelectorAll('button')].find((node) =>
+    node.textContent?.includes('gallery.videoReview.retry')
+  );
+  expect(button).toBeDefined();
+  await act(async () => button!.click());
+  expect(retry).toHaveBeenCalledOnce();
+  expect(frame().disabled).toBe(false);
+  state.history = { ...state.history, failed: false, pending: true, initialLoading: true };
+  await render();
+  expect(host.querySelector('[role="status"]')?.textContent).toContain(
+    'gallery.videoReview.recordingHistoryLoading'
+  );
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
+it('keeps background history refresh out of the stage layout', async () => {
+  state.history = {
+    telemetry: null,
+    pending: true,
+    initialLoading: false,
+    failed: false,
+    incomplete: false,
+    retry: vi.fn(),
+  };
+  await render();
+  expect(host.textContent).not.toContain('gallery.videoReview.recordingHistoryLoading');
+  expect(frame().disabled).toBe(false);
+});
+
+it(
+  'reports incomplete retained history after loading without blocking video or inventing ' +
+    'a retry failure',
+  async () => {
+    state.history = {
+      telemetry: null,
+      failed: false,
+      pending: false,
+      initialLoading: false,
+      incomplete: true,
+      retry: vi.fn(),
+    };
+    await render();
+    expect(host.querySelector('[role="status"]')?.textContent).toContain(
+      'gallery.videoReview.recordingHistoryIncomplete'
+    );
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(frame().disabled).toBe(false);
+  }
+);
+
+it.each([
+  { local: true, inherited: false, suspended: true },
+  { local: undefined, inherited: true, suspended: true },
+  { local: false, inherited: true, suspended: false },
+])(
+  'keeps accepted scene identity during follow drafts (local=$local inherited=$inherited)',
+  async ({ local, inherited, suspended }) => {
+    const accepted = { ...region, ...(local === undefined ? {} : { followCursor: local }) };
+    state.zoom.selected = () => accepted;
+    state.advanced.cursorFocusPath = {
+      version: 1,
+      mode: inherited ? 'follow' : 'fixed',
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      gapPolicy: 'hold',
+      segments: [],
+    };
+    let draft: ReturnType<typeof state.zoom.previewChanges.read> = null;
+    const listeners = new Set<() => void>();
+    state.zoom.previewChanges = {
+      read: () => draft,
+      subscribe: (listener) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+    };
+    state.zoom.previewRegion = (value, snapshot = draft) =>
+      snapshot
+        ? {
+            ...value,
+            transform: { ...value.transform, scale: snapshot.patch.scale ?? value.transform.scale },
+          }
+        : value;
+    await render(true, DEFAULT_QUICK_PREVIEW_PREFERENCES);
+    for (const scale of [1.1, 1.2, 1.3]) {
+      act(() => {
+        draft = { id: accepted.id, patch: { scale }, base: 'revision' };
+        listeners.forEach((listener) => listener());
+      });
+      expect(stage().preview?.interacting).toBe(true);
+      if (suspended) expect(stage().zoomOverlay?.region).toBe(accepted);
+      else expect(stage().zoomOverlay?.region.transform.scale).toBe(scale);
+    }
+    act(() => {
+      draft = null;
+      listeners.forEach((listener) => listener());
+    });
+    expect(stage().zoomOverlay?.region).toBe(accepted);
+    expect(stage().preview?.interacting).toBe(false);
+    expect(state.zoom.change).not.toHaveBeenCalled();
+  }
+);

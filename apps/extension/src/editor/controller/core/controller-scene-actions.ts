@@ -1,3 +1,4 @@
+import type { FrameSceneMutationOptions } from '../public-actions/scene/resize/types';
 import type {
   BrowserFrameState,
   EditorFrameSettings,
@@ -19,6 +20,7 @@ import {
   zoomToFitForController,
 } from '../instance/actions/scene';
 import { ImageEditorControllerSelectionActions } from './controller-selection-actions';
+import { reportEditorActionFailure } from '../../runtime/async-actions';
 
 export abstract class ImageEditorControllerSceneActions extends ImageEditorControllerSelectionActions {
   resizeCanvas(width: number, height: number) {
@@ -29,8 +31,21 @@ export abstract class ImageEditorControllerSceneActions extends ImageEditorContr
     resizeImageForController(this.getControllerInstance(), width, height);
   }
 
-  applyFrameSettings(frame: EditorFrameSettings) {
-    applyFrameSettingsForController(this.getControllerInstance(), frame);
+  /** Resolve true after application; cancellation or authoritative scene replacement resolves false. */
+  applyFrameSettings(
+    frame: EditorFrameSettings,
+    options?: FrameSceneMutationOptions
+  ): Promise<boolean> {
+    const mutation =
+      options === undefined
+        ? applyFrameSettingsForController(this.getControllerInstance(), frame)
+        : applyFrameSettingsForController(this.getControllerInstance(), frame, options);
+    if (options === undefined) {
+      void Promise.resolve(mutation).catch((error) =>
+        reportEditorActionFailure('scene-mutation', error)
+      );
+    }
+    return mutation;
   }
 
   async applyBrowserFrame(browserFrame: BrowserFrameState) {

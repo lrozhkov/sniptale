@@ -183,3 +183,39 @@ it.each(['empty', 'refused'] as const)(
     }
   }
 );
+
+it('binds original media and exposure clocks to source preparation before the FX wave', async () => {
+  const passes = createRenderPasses(true, true);
+  mocks.resolveRenderPasses.mockReturnValue(passes);
+  const args = createRenderArgs(createProject(true));
+  const signal = new AbortController().signal;
+  const prepared = { media: new Map(), renderDimensions: vi.fn(), release: vi.fn() };
+  const prepare = vi.fn(async () => prepared);
+  const sourceSampling = { prepare } as unknown as NonNullable<
+    RenderOffscreenProjectEffectFramesInput['sourceSampling']
+  >;
+  const runtime = createOffscreenProjectEffectRuntime();
+  await runtime.renderProjectFrames({
+    ...args,
+    sourceSampling,
+    signal,
+    sourceSamplingFallback: 'first',
+  });
+  const waveArgs = mocks.renderComposition.mock.lastCall![0];
+  expect(prepare).not.toHaveBeenCalled();
+  await expect(waveArgs.prepareSourcePass(passes.visualPasses[0]!.frame, 0.9)).resolves.toBe(
+    prepared
+  );
+  expect(prepare).toHaveBeenCalledWith({
+    project: args.project,
+    frame: passes.visualPasses[0]!.frame,
+    time: 0.9,
+    fallback: 'first',
+    sceneTime: 1,
+    lensFrame: passes.overlayFrame,
+    media: args.clipMediaElements,
+    images: args.loadedImages,
+    signal,
+  });
+  runtime.dispose();
+});

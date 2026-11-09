@@ -366,3 +366,134 @@ it('accepts a native PNG project export and rejects a contradictory source MIME'
   input.projectExport.mimeType = 'video/webm';
   expect(() => parsePortableMediaMetadata(input)).toThrow('association is invalid');
 });
+
+it('retains a bound cursor attachment and refuses a descriptor whose bytes are missing', () => {
+  const input = recordingMetadata();
+  const descriptor = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: 'a'.repeat(32),
+    state: 'complete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalSamples: 1,
+    totalBytes: 512,
+    streamSha256: 'b'.repeat(64),
+  };
+  const telemetry = {
+    recordingId: input.recording.entry.id,
+    createdAt: 1,
+    updatedAt: 1,
+    captureMode: null,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    cursorTrajectory: descriptor,
+  };
+  const cursorAttachment = {
+    recordingId: input.recording.entry.id,
+    sourceRecordingId: 'canonical-source',
+    width: 640,
+    height: 360,
+    descriptor,
+    objectId: 'cursor-object',
+  };
+  const metadata = { ...input, recording: { ...input.recording, telemetry, cursorAttachment } };
+  expect(parsePortableMediaMetadata(metadata).recording?.cursorAttachment).toEqual(
+    cursorAttachment
+  );
+  for (const recording of [
+    { ...input.recording, telemetry },
+    { ...metadata.recording, cursorAttachment: { ...cursorAttachment, recordingId: 'another' } },
+    {
+      ...metadata.recording,
+      cursorAttachment: {
+        ...cursorAttachment,
+        descriptor: { ...descriptor, streamSha256: 'c'.repeat(64) },
+      },
+    },
+    { ...input.recording, cursorAttachment },
+  ])
+    expect(() => parsePortableMediaMetadata({ ...input, recording })).toThrow(
+      'recording association'
+    );
+});
+
+it('refuses local event file references and nonempty event metadata without admitted portable bytes', () => {
+  const input = recordingMetadata();
+  const recordingEvents = {
+    format: 'recording-events-v1',
+    formatVersion: 1,
+    algorithm: 'lossless-v1',
+    encoding: 'json-utf8-v1',
+    eventStreamId: 'b'.repeat(32),
+    state: 'incomplete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalBytes: 512,
+    streamSha256: 'd'.repeat(64),
+  };
+  const telemetry = {
+    recordingId: input.recording.entry.id,
+    createdAt: 1,
+    updatedAt: 1,
+    captureMode: null,
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    recordingEvents,
+  };
+  const recordingEventsSnapshot = {
+    sourceRecordingId: 'canonical-source',
+    ref: {
+      assetId: 'local-events-file',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/local-events-file' },
+      mimeType: 'application/octet-stream',
+      size: 516,
+      sha256: recordingEvents.streamSha256,
+    },
+  };
+  const eventsAttachment = {
+    recordingId: input.recording.entry.id,
+    sourceRecordingId: 'canonical-source',
+    descriptor: recordingEvents,
+    objectId: 'events-object',
+  };
+  expect(
+    parsePortableMediaMetadata({
+      ...input,
+      recording: { ...input.recording, telemetry, eventsAttachment },
+    }).recording?.eventsAttachment
+  ).toEqual(eventsAttachment);
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...input,
+      recording: {
+        ...input.recording,
+        telemetry: { ...telemetry, recordingEventsSnapshot },
+        eventsAttachment,
+      },
+    })
+  ).toThrow('recording association');
+  expect(() =>
+    parsePortableMediaMetadata({
+      ...input,
+      recording: {
+        ...input.recording,
+        telemetry,
+        eventsAttachment: { ...eventsAttachment, recordingId: 'foreign' },
+      },
+    })
+  ).toThrow('recording association');
+  for (const facts of [telemetry, { ...telemetry, recordingEventsSnapshot }])
+    expect(() =>
+      parsePortableMediaMetadata({ ...input, recording: { ...input.recording, telemetry: facts } })
+    ).toThrow('recording association');
+});

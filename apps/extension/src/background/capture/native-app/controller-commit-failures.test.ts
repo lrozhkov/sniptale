@@ -18,6 +18,37 @@ const mocks = vi.hoisted(() => ({
   tombstoneFails: false,
 }));
 
+vi.mock('../../../composition/persistence/recordings/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/recordings/index')>()),
+  getRecording: async () => undefined,
+}));
+
+vi.mock(
+  '../../../composition/persistence/infrastructure/indexed-db/core',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/infrastructure/indexed-db/core')
+    >()),
+    initDB: async () => ({ get: async () => undefined }),
+  })
+);
+
+vi.mock(
+  '../../../composition/persistence/recordings/native-history/store',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../composition/persistence/recordings/native-history/store')
+    >()),
+    createNativeRecordingHistoryStore: () => ({
+      videoReceipt: async (id: string) => {
+        const parent = mocks.sessions.get(id);
+        if (parent?.kind !== 'recording-complete') throw new Error('not committed');
+        return { durable: true, sha256: parent.sha256, totalBytes: parent.totalBytes };
+      },
+    }),
+  })
+);
+
 vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/navigation/extension-pages')>()),
   openVideoEditorPage: mocks.openVideoEditorPageMock,
@@ -93,7 +124,7 @@ async function createRecordingStopped(bytes: Uint8Array): Promise<AppRecordingSt
     height: 720,
     mimeType: 'video/mp4',
     openEditor: true,
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     sha256: await sha256Hex(bytes),
     telemetry: { actionEvents: [], cursorTrack: null, signals: [], viewport: null },
@@ -111,7 +142,7 @@ async function createRecordingChunk(bytes: Uint8Array): Promise<AppRecordingChun
     chunkRawBytes: bytes.byteLength,
     chunkSha256: await sha256Hex(bytes),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     recordingId: 'recording-1',
     type: 'app.recording.chunk',
   };
@@ -173,7 +204,13 @@ it('acks recording commits when telemetry or editor opening fails after durable 
   mocks.editorFails = true;
 
   await expect(controller.handleRecordingChunk(await createRecordingChunk(bytes))).resolves.toEqual(
-    [expect.objectContaining({ recordingId: 'recording-1', type: 'extension.recording.ack' })]
+    [
+      expect.objectContaining({
+        recordingId: 'recording-1',
+        type: 'extension.recording.ack',
+        receipt: { durable: true, sha256: await sha256Hex(bytes), totalBytes: bytes.byteLength },
+      }),
+    ]
   );
   expect(mocks.recordingSaveMock).toHaveBeenCalled();
   expect(mocks.telemetrySaveMock).toHaveBeenCalled();

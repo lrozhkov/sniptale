@@ -1,3 +1,4 @@
+import { enhancementProof } from './export-enhancement';
 import { adaptiveExportProof, adaptiveReadbackProof } from './adaptive-video-export';
 import { harnessReady } from './browser-mocks/browser-mocks';
 import { recordingContext } from '../../../apps/extension/src/offscreen/recording/context';
@@ -72,6 +73,7 @@ type MostlyStaticLiveRecordingResult = {
 };
 
 type OffscreenHarnessBridge = {
+  enhancementProof: typeof enhancementProof;
   adaptiveExportProof: typeof adaptiveExportProof;
   adaptiveReadbackProof: typeof adaptiveReadbackProof;
   recordCanvasCadence: (
@@ -598,6 +600,7 @@ function setMediaRecorderState(state: HarnessMediaRecorderState) {
 }
 
 window.__sniptaleOffscreenHarness = {
+  enhancementProof,
   adaptiveExportProof,
   adaptiveReadbackProof,
   async reset() {

@@ -2,6 +2,17 @@ import { buildDrawingStrokeOutline } from './freehand';
 import { buildDrawingArrowOutline, buildDrawingFreehandArrowLines } from './arrow';
 import type { DrawingBounds, DrawingObject, DrawingPoint, DrawingShapeObject } from './model';
 
+/** Projects a drawing point through an affine canvas transform. */
+export function transformDrawingPoint(
+  point: DrawingPoint,
+  transform: Pick<DOMMatrixReadOnly, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'>
+): DrawingPoint {
+  return {
+    x: transform.a * point.x + transform.c * point.y + transform.e,
+    y: transform.b * point.x + transform.d * point.y + transform.f,
+  };
+}
+
 export type DrawingResizeHandle =
   | 'nw'
   | 'n'
@@ -348,7 +359,17 @@ export function translateDrawingObject(object: DrawingObject, delta: DrawingPoin
       end: move(object.end),
       ...(object.bendPoints ? { bendPoints: object.bendPoints.map(move) } : {}),
     };
-  return { ...object, bounds: { ...object.bounds, ...move(object.bounds) } };
+  const origin = move(object.bounds);
+  const translated = origin.x !== object.bounds.x || origin.y !== object.bounds.y;
+  const sourceDirty =
+    object.kind === 'simplify' &&
+    translated &&
+    (object.settings.automatic || object.settings.manualKind === 'text');
+  return {
+    ...object,
+    bounds: { ...object.bounds, ...origin },
+    ...(sourceDirty ? { sourceDirty: true } : {}),
+  };
 }
 
 /** Applies one rigid rotation without changing local dimensions or stroke geometry. */

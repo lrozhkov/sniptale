@@ -77,11 +77,13 @@ export function planReviewProjectMotion(
         easing: region.linkEasing === 'linear' ? 'LINEAR' : 'EASE_IN_OUT',
       };
   }
-  const minimumVersion = regions.some((region) => requiresExtendedBorderSchema(region.border))
-    ? 48
-    : regions.some((region) => region.spotlightTarget === 'source-scene')
-      ? 39
-      : 34;
+  const minimumVersion = regions.some((region) => region.cursorComposition !== undefined)
+    ? 51
+    : regions.some((region) => requiresExtendedBorderSchema(region.border))
+      ? 48
+      : regions.some((region) => region.spotlightTarget === 'source-scene')
+        ? 39
+        : 34;
   const utilityLanes = getVideoProjectUtilityLanes(project);
   return {
     ...project,
@@ -135,6 +137,9 @@ function mappedRegion(
         : {}),
     },
     ...(region.cameraFollow ? { cameraFollow: structuredClone(region.cameraFollow) } : {}),
+    ...(region.cursorComposition
+      ? { cursorComposition: structuredClone(region.cursorComposition) }
+      : {}),
     ...(region.perspective ? { perspective: structuredClone(region.perspective) } : {}),
     ...(region.depthOfField ? { depthOfField: structuredClone(region.depthOfField) } : {}),
     ...(region.motionBlur ? { motionBlur: structuredClone(region.motionBlur) } : {}),

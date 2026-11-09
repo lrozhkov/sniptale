@@ -1,9 +1,12 @@
 import { useState } from 'react';
+import { Trash2 } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import type { ReviewSessionEntry } from '../../../application/design-review-session/runtime';
 import { translate } from '../../../../platform/i18n';
 import type { BrowserDomAnnotationRecord } from '../../../parser/page-preparation/annotations';
 import { getDesignReviewActionOption, getDesignReviewActionTone } from '../action-catalog';
-import { getDesignReviewRecordAction } from '../records';
-import { FeedbackPreview } from './preview';
+import { getDesignReviewRecordAction, isDesignReviewRecordFromCurrentOrigin } from '../records';
+import { FeedbackEvidenceText, FeedbackPreview } from './preview';
 import type { FeedbackActionFilter } from './filter';
 
 function getElementLabel(record: BrowserDomAnnotationRecord): string {
@@ -11,15 +14,6 @@ function getElementLabel(record: BrowserDomAnnotationRecord): string {
   const tag = selectorTag.toUpperCase();
   const name = record.evidence.targetText.trim().replace(/\s+/gu, ' ').slice(0, 42);
   return name ? `${tag} · ${name}` : tag;
-}
-
-function getPageLabel(record: BrowserDomAnnotationRecord): string {
-  try {
-    const url = new URL(record.evidence.pageUrl);
-    return url.pathname === '/' ? url.hostname : url.pathname;
-  } catch {
-    return record.evidence.fileLabel;
-  }
 }
 
 function getRecordSummary(record: BrowserDomAnnotationRecord): string {
@@ -32,6 +26,7 @@ function getRecordSummary(record: BrowserDomAnnotationRecord): string {
 
 function matchesQuery(record: BrowserDomAnnotationRecord, query: string): boolean {
   if (!query) return true;
+  if (!isDesignReviewRecordFromCurrentOrigin(record)) return false;
   const action = getDesignReviewActionOption(getDesignReviewRecordAction(record));
   return [
     record.comment,
@@ -49,81 +44,118 @@ export function FeedbackList(props: {
   onOpenRecord: (annotationId: number) => boolean;
   query: string;
   records: BrowserDomAnnotationRecord[];
+  entries?: ReviewSessionEntry[];
+  onOpenEntry?: (id: string) => void;
+  onDeleteEntry?: (id: string) => void;
+  pending?: boolean;
 }) {
   const [hovered, setHovered] = useState<{
     record: BrowserDomAnnotationRecord;
+    entry: ReviewSessionEntry | undefined;
     anchor: HTMLElement;
   } | null>(null);
   const query = props.query.trim().toLocaleLowerCase();
-  const visibleRecords = props.records.filter(
+  const records = props.entries?.map((entry) => entry.record) ?? props.records;
+  const visibleRecords = records.filter(
     (record) =>
       (props.filter === 'all' || getDesignReviewRecordAction(record) === props.filter) &&
       matchesQuery(record, query)
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+    <div
+      data-ui="content.design-review.feedback-list"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2"
+    >
       {visibleRecords.length === 0 ? (
         <div className="px-3 py-8 text-center text-xs text-[var(--sniptale-color-text-dim)]">
-          {props.records.length === 0
+          {records.length === 0
             ? translate('content.designReview.panelEmpty')
             : translate('content.designReview.panelNoResults')}
         </div>
       ) : (
         visibleRecords.map((record) => {
+          const entry = props.entries?.find((entry) => entry.record === record);
           const action = getDesignReviewRecordAction(record);
           const option = getDesignReviewActionOption(action);
           const Icon = option.icon;
           return (
-            <button
-              key={record.annotationId}
-              type="button"
+            <div
+              key={entry?.id ?? record.annotationId}
               className={[
-                'block w-full rounded-[4px] border-l px-3 py-3 text-left',
+                'group/feedback-item flex h-14 w-full items-center rounded-[4px] border-l text-left',
                 'border-transparent hover:bg-[var(--sniptale-color-surface-input)]',
                 'focus-visible:border-[color:var(--sniptale-color-accent)] focus-visible:outline-none',
               ].join(' ')}
               data-annotation-id={record.annotationId}
               data-ui="content.design-review.feedback-item"
-              onClick={() => {
-                setHovered(null);
-                props.onOpenRecord(record.annotationId);
-              }}
-              onMouseEnter={(event) => setHovered({ record, anchor: event.currentTarget })}
+              onMouseEnter={(event) => setHovered({ record, entry, anchor: event.currentTarget })}
               onMouseLeave={() => setHovered(null)}
-              onFocus={(event) => setHovered({ record, anchor: event.currentTarget })}
+              onFocus={(event) => setHovered({ record, entry, anchor: event.currentTarget })}
               onBlur={() => setHovered(null)}
             >
-              <span className="flex items-center gap-2">
-                <Icon className={getDesignReviewActionTone(action)} size={17} />
-                <strong className={`text-xs ${getDesignReviewActionTone(action)}`}>
-                  {translate(option.labelKey)}
-                </strong>
-                <span className="ml-auto truncate text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
-                  {getElementLabel(record)}
-                </span>
-              </span>
-              <span
-                className="sniptale-design-review-authored-text mt-2 block overflow-hidden pl-6 text-xs leading-5"
-                data-ui="content.design-review.feedback-summary"
-                style={{
-                  WebkitBoxOrient: 'vertical',
-                  WebkitLineClamp: 3,
-                  display: '-webkit-box',
+              <button
+                type="button"
+                className={[
+                  'min-w-0 flex-1 rounded-[4px] px-2 py-2 text-left',
+                  'focus-visible:outline focus-visible:outline-1',
+                  'focus-visible:outline-[var(--sniptale-color-accent)]',
+                ].join(' ')}
+                disabled={props.pending}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setHovered(null);
+                  if (entry && props.onOpenEntry) props.onOpenEntry(entry.id);
+                  else props.onOpenRecord(record.annotationId);
                 }}
               >
-                {getRecordSummary(record)}
-              </span>
-              <span className="mt-1 block pl-6 text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
-                {translate('content.designReview.panelPage')} {getPageLabel(record)}
-              </span>
-            </button>
+                <span className="flex items-center gap-2">
+                  <Icon className={getDesignReviewActionTone(action)} size={17} />
+                  <strong className={`text-xs ${getDesignReviewActionTone(action)}`}>
+                    {record.markerNumber !== undefined ? `${record.markerNumber} · ` : ''}
+                    {translate(option.labelKey)}
+                  </strong>
+                </span>
+                <span
+                  className={[
+                    'sniptale-design-review-authored-text mt-1 block truncate pl-6 text-xs leading-4',
+                    'text-[var(--sniptale-color-text-secondary)]',
+                  ].join(' ')}
+                  data-ui="content.design-review.feedback-summary"
+                >
+                  <FeedbackEvidenceText record={record} text={getRecordSummary(record)} />
+                </span>
+              </button>
+              {entry && props.onDeleteEntry ? (
+                <ContentToolbarButton
+                  type="button"
+                  className={[
+                    'mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]',
+                    'invisible group-hover/feedback-item:visible group-focus-within/feedback-item:visible',
+                    'opacity-0 group-hover/feedback-item:opacity-100',
+                    'group-focus-within/feedback-item:opacity-100 focus-visible:opacity-100',
+                  ].join(' ')}
+                  aria-label={translate('content.designReview.panelDelete')}
+                  title={translate('content.designReview.panelDelete')}
+                  disabled={props.pending}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setHovered(null);
+                    props.onDeleteEntry?.(entry.id);
+                  }}
+                >
+                  <Trash2 size={16} />
+                </ContentToolbarButton>
+              ) : null}
+            </div>
           );
         })
       )}
       {hovered && visibleRecords.includes(hovered.record) ? (
         <FeedbackPreview
           record={hovered.record}
+          {...(hovered.entry?.preview ? { preview: hovered.entry.preview } : {})}
+          unavailable={hovered.entry?.unavailable ?? false}
           anchor={hovered.anchor}
           summary={getRecordSummary(hovered.record)}
           label={getElementLabel(hovered.record)}

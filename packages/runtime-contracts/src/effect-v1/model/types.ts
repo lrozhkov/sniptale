@@ -1,3 +1,4 @@
+import type { EffectV1ControlGroup } from './control-presentation.js';
 import type {
   ControlDefinition,
   EffectControlPreset,
@@ -72,6 +73,7 @@ export type EffectV1ObjectHandle = {
 export type { EffectControlPreset } from './base.js';
 
 export type EffectV1Document = {
+  controlGroups?: EffectV1ControlGroup[];
   editorRegion?: EffectV1EditorRegion;
   controlPresets?: EffectControlPreset[];
   defaultControlPresetId?: string;

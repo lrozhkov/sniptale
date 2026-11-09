@@ -1,4 +1,4 @@
-import type { Canvas, FabricImage, FabricObject } from 'fabric';
+import { FabricImage, type Canvas, type FabricObject } from 'fabric';
 
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import {
@@ -59,6 +59,9 @@ export function syncManagedBackgroundLayerLayout(options: {
   ) {
     return;
   }
+
+  // Raster gradients keep their intrinsic pixel size; canvas-size changes use the async rebuild owner.
+  if (frame.backgroundMode === 'gradient' && background instanceof FabricImage) return;
 
   if (frame.backgroundMode === 'image') {
     syncManagedBackgroundImageLayout(background, canvasSize, frame);

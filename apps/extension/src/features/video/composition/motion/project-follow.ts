@@ -1,17 +1,30 @@
+export type { ProjectCameraConflict } from './prepared-project-camera';
+import {
+  preparedProjectCamera,
+  projectCameraGeometryKey,
+  projectCameraOutputKey,
+  type PreparedProjectCamera,
+  type ProjectCameraConflict,
+} from './prepared-project-camera';
+import { projectCursorLinkSettings, smoothCursorCameraPreferences } from './cursor-orientation';
 import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../project/types/export';
 import type { VideoProjectRenderScope } from '../../project/export/render-scope';
-import { hasCameraPerspective, resolveCameraWindowWeight } from '../../project/motion/spatial';
 import { motionFocusAreaPoint } from '../../project/motion/focus-area';
 import { resolveManualMotionFocusPoint, resolveMotionTargetScale } from './focus-target';
 import { motionTransitionTypeForEasing } from '../../project/motion/timing';
 import { resolveProjectOutputTransform } from '../../project/export/output-dimensions';
 import {
   createWindowCameraLinkGeometry,
-  proveWindowCameraGap,
+  planWindowCameraGap,
+  type WindowCameraLinkFit,
   cropWindowCameraObservations,
 } from './window-camera-geometry';
 import { resolveMotionSourceWindow, motionWindowFocusToWindow } from './source-window';
-import { projectMotionSourcePhases } from '../../project/motion/source-binding';
+import {
+  projectMotionSourcePhases,
+  resolveMotionWindowCameraParts,
+  resolveMotionWindowCameraRegion,
+} from '../../project/motion/source-binding';
 import { resolveMotionSourcePlayback } from '../../project/motion/source-playback';
 import { isCameraMotionRegion } from '../../project/motion/normalization';
 import { cameraSourceGeometryBreaks } from './camera-source-geometry';
@@ -61,84 +74,13 @@ interface ProjectCameraPlanEntry {
   plan: WorkingZoneCameraPlan;
   geometry: WorkingZoneCameraGeometry;
   input: Parameters<typeof planWorkingZoneCamera>[0];
+  links?: Map<string, { conflict: ProjectCameraConflict | null; fit?: WindowCameraLinkFit }>;
 }
 const plans = new WeakMap<VideoProject, Map<string, ProjectCameraPlanEntry>>();
 
 /** Split animation parts share the existing camera-connection topology. */
 export function resolveProjectCameraEdges(project: VideoProject, region: VideoProjectMotionRegion) {
   return resolveMotionConnectionEdges(project, region);
-}
-
-function windowCameraParts(project: VideoProject, region: VideoProjectMotionRegion) {
-  const binding = region.sourceBinding;
-  if (
-    binding?.coordinateSpace !== 'source-window' ||
-    !binding.animationGroupId ||
-    !region.animation
-  )
-    return [region];
-  const clip = project.clips.find((item) => item.id === binding.clipId);
-  if (clip?.type !== 'VIDEO') return [region];
-  const controls = (item: VideoProjectMotionRegion) => {
-    const {
-      id: _id,
-      startTime: _start,
-      duration: _duration,
-      animation: _animation,
-      sourceBinding: _binding,
-      incomingConnection: _connection,
-      ...settings
-    } = item;
-    return JSON.stringify(settings);
-  };
-  const geometry = (id: string) => {
-    const item = project.clips.find((entry) => entry.id === id);
-    return item?.type === 'VIDEO'
-      ? JSON.stringify({
-          asset: item.assetId,
-          instance: item.sourceInstanceId,
-          track: item.trackId,
-          transform: item.transform,
-          crop: item.sourceCrop,
-          header: item.windowHeader,
-          fit: item.fitMode,
-          corner: item.windowCornerRadius,
-        })
-      : null;
-  };
-  const signature = controls(region),
-    plane = geometry(clip.id);
-  const origin = region.startTime - region.animation.start;
-  return (project.motionRegions ?? [])
-    .filter(
-      (item) =>
-        item.duration > 0 &&
-        item.sourceBinding?.coordinateSpace === 'source-window' &&
-        item.sourceBinding.animationGroupId === binding.animationGroupId &&
-        item.animation?.duration === region.animation!.duration &&
-        Math.abs(item.startTime - item.animation.start - origin) < 1e-9 &&
-        controls(item) === signature &&
-        geometry(item.sourceBinding.clipId) === plane
-    )
-    .toSorted((a, b) => a.startTime - b.startTime);
-}
-
-function windowCameraPlanRegion(project: VideoProject, region: VideoProjectMotionRegion) {
-  if (region.sourceBinding?.coordinateSpace !== 'source-window' || !region.animation) return region;
-  const parts = windowCameraParts(project, region);
-  const first = parts[0] ?? region;
-  for (let i = 1; i < parts.length; i++)
-    if (Math.abs(parts[i - 1]!.startTime + parts[i - 1]!.duration - parts[i]!.startTime) > 1e-9)
-      return region;
-  const clock = first.animation!;
-  const clockScale = first.duration / (clock.end - clock.start);
-  const startTime = first.startTime - clock.start * clockScale;
-  return {
-    ...first,
-    startTime,
-    duration: clock.duration * clockScale,
-    animation: { start: 0, end: clock.duration, duration: clock.duration },
-  };
 }
 
 type ProjectCameraPreference = { x: number; y: number; segmentId: string; sourceClipId?: string };
@@ -289,7 +231,7 @@ function collectProjectCameraFrames(
     if (time >= region.startTime && time <= end) times.add(time);
   const frames: FollowCursorFrame[] = [];
   const bindings = new Map<string, ProjectCameraSourceBinding>();
-  const parts = windowCameraParts(project, region);
+  const parts = resolveMotionWindowCameraParts(project, region);
   let continuity = 0;
   let previousClipId: string | undefined;
   let previousFocus: { x: number; y: number; segmentId: string; sourceClipId?: string } | undefined;
@@ -325,7 +267,9 @@ function collectProjectCameraFrames(
     region.sourceBinding?.coordinateSpace === 'source-window' && clip?.type === 'VIDEO'
       ? clip.sourceCrop
       : undefined;
-  return { frames: crop ? cropWindowCameraObservations(retained, crop) : retained, bindings, path };
+  const visibleFrames = crop ? cropWindowCameraObservations(retained, crop) : retained;
+  const preferred = smoothCursorCameraPreferences(visibleFrames, region.cursorComposition);
+  return { frames: preferred, bindings, path };
 }
 
 function resolveProvisionalPlanEntry(
@@ -333,7 +277,7 @@ function resolveProvisionalPlanEntry(
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
 ) {
-  region = windowCameraPlanRegion(project, region);
+  region = resolveMotionWindowCameraRegion(project, region);
   const viewport = output ?? { width: project.width, height: project.height };
   const key = `${region.id}:${viewport.width}:${viewport.height}:${output?.resolution ?? 'SOURCE'}`;
   const signature = JSON.stringify({
@@ -379,6 +323,7 @@ function resolveProvisionalPlanEntry(
     frames,
     geometry,
     policy,
+    ...(region.cursorComposition ? { tracking: 'continuous' as const } : {}),
     start: region.startTime,
     end: region.startTime + region.duration,
     targetScale: region.scale,
@@ -512,8 +457,8 @@ function resolvePlanEntry(
   project: VideoProject,
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
-) {
-  region = windowCameraPlanRegion(project, region);
+): ProjectCameraPlanEntry {
+  region = resolveMotionWindowCameraRegion(project, region);
   const provisional = resolveProvisionalPlanEntry(project, region, output);
   const boundaries: WorkingZoneCameraBoundaries = {};
   const neighbors = (project.motionRegions ?? [])
@@ -582,14 +527,16 @@ export function resolveProjectCursorCameraPlan(
   }
   project = projectMotionSourcePhases(project);
   region = project.motionRegions?.find((item) => item.id === region.id) ?? region;
+  const prepared = preparedProjectCamera(project);
+  if (prepared) {
+    const entry =
+      prepared.output === projectCameraOutputKey(project, output)
+        ? prepared.cameras.find((item) => item.key === projectCameraGeometryKey(project, region))
+        : undefined;
+    if (!entry) throw new Error('Prepared camera geometry is unavailable.');
+    return entry.plan;
+  }
   return resolvePlanEntry(project, region, output).plan;
-}
-
-interface ProjectCameraConflict {
-  regionId: string;
-  time: number;
-  interval: { start: number; end: number };
-  reason: Extract<WorkingZoneCameraPlan, { status: 'conflict' }>['reason'];
 }
 
 /** Preserve admission diagnostics locally; runtime responses retain the stable message code. */
@@ -647,19 +594,19 @@ export function resolveProjectWindowCameraEndpoint(
   };
 }
 
-function resolveProjectWindowLinkConflict(
+/** The same disposable link result owns validation and the rendered temporary fit. */
+export function resolveProjectWindowCameraLink(
   project: VideoProject,
   source: VideoProjectMotionRegion,
   destination: VideoProjectMotionRegion,
   output?: CameraOutputViewport
-): ProjectCameraConflict | null {
+): { conflict: ProjectCameraConflict | null; fit?: WindowCameraLinkFit } {
   const start = source.startTime + source.duration,
     end = destination.startTime;
   const interval = { start, end };
-  const failure = (
-    reason: ProjectCameraConflict['reason'],
-    time = start
-  ): ProjectCameraConflict => ({ regionId: source.id, interval, reason, time });
+  const failure = (reason: ProjectCameraConflict['reason'], time = start) => ({
+    conflict: { regionId: source.id, interval, reason, time },
+  });
   const from = resolveProjectWindowCameraEndpoint(project, source, start, output);
   const to = resolveProjectWindowCameraEndpoint(project, destination, end, output);
   if (!from || !to) return failure('unproven');
@@ -688,38 +635,46 @@ function resolveProjectWindowLinkConflict(
     ...(project.cameraFollowDefaults ? { defaults: project.cameraFollowDefaults } : {}),
     ...(context.cameraFollow ? { override: context.cameraFollow } : {}),
   });
+  const spatial = projectCursorLinkSettings(project, source, destination, start, end);
+  const entry = resolvePlanEntry(project, context, output);
+  const key = JSON.stringify([
+    entry.signature,
+    source,
+    destination,
+    from,
+    to,
+    size,
+    layout,
+    spatial,
+  ]);
+  const cached = (entry.links ??= new Map());
+  const previous = cached.get(key);
+  if (previous) return previous;
   const adapter = createWindowCameraLinkGeometry({
     output: size,
     window,
     ...createProjectWindowPlaneProjection(project, target, size),
     video: mapRect(layout.video),
     cornerRadius: (clip.windowCornerRadius ?? 0) * transform.scale,
-    windowWeight: resolveCameraWindowWeight(
-      project.sceneBackground?.zoomBehavior ?? 'window',
-      project.sceneBackground?.enabled !== false &&
-        project.sceneBackground?.zoomBehavior === 'follow-video' &&
-        !hasCameraPerspective(source.perspective) &&
-        !hasCameraPerspective(destination.perspective),
-      hasCameraPerspective(source.perspective) || hasCameraPerspective(destination.perspective)
-    ),
+    windowWeight: spatial.windowWeight,
     type: motionTransitionTypeForEasing(destination.incomingConnection?.easing ?? 'EASE_IN_OUT'),
     from: {
       end: start,
       scale: from.scale,
       pan: { x: from.pan.x * window.width, y: from.pan.y * window.height },
-      ...(source.perspective ? { perspective: source.perspective } : {}),
+      ...spatial.from,
     },
     to: {
       start: end,
       scale: to.scale,
       pan: { x: to.pan.x * window.width, y: to.pan.y * window.height },
-      ...(destination.perspective ? { perspective: destination.perspective } : {}),
+      ...spatial.to,
     },
     policy,
   });
   const gap = { ...context, startTime: start, duration: end - start };
   const observations = collectProjectCameraFrames(project, gap, { source, destination }).frames;
-  const proof = proveWindowCameraGap({
+  const proof = planWindowCameraGap({
     adapter,
     start,
     end,
@@ -728,7 +683,13 @@ function resolveProjectWindowLinkConflict(
     policy,
     observations,
   });
-  return proof.status === 'conflict' ? failure(proof.reason, proof.time) : null;
+  const result =
+    proof.status === 'conflict'
+      ? failure(proof.reason, proof.time)
+      : { conflict: null, ...(proof.fit ? { fit: proof.fit } : {}) };
+  cached.set(key, result);
+  if (cached.size > 4) cached.delete(cached.keys().next().value ?? '');
+  return result;
 }
 
 /** Refuse only exports that use an unresolved active follow camera. This check acquires no resources. */
@@ -737,6 +698,11 @@ export function resolveProjectCameraConflicts(
   output?: CameraOutputViewport,
   interval = { start: 0, end: project.duration }
 ): ProjectCameraConflict[] {
+  const prepared = preparedProjectCamera(project);
+  if (prepared?.output === projectCameraOutputKey(project, output))
+    return prepared.conflicts.filter(
+      (item) => item.interval.start < interval.end && item.interval.end > interval.start
+    );
   project = projectMotionSourcePhases(project[VIDEO_PROJECT_ATTACHMENT_GEOMETRY] ?? project);
   if (!isVideoProjectUtilityLaneVisible(project, 'camera')) return [];
   const conflicts = (project.motionRegions ?? []).filter(isCameraMotionRegion).flatMap((region) => {
@@ -768,7 +734,7 @@ export function resolveProjectCameraConflicts(
       destination.startTime <= interval.start
     )
       continue;
-    const conflict = resolveProjectWindowLinkConflict(project, source, destination, output);
+    const { conflict } = resolveProjectWindowCameraLink(project, source, destination, output);
     if (conflict) conflicts.push(conflict);
   }
   return conflicts;
@@ -795,7 +761,13 @@ export function resolveProjectFollowingCamera(
   }
   project = projectMotionSourcePhases(project);
   region = project.motionRegions?.find((item) => item.id === region.id) ?? region;
-  const { plan, geometry } = resolvePlanEntry(project, region, output);
+  const prepared = preparedProjectCamera(project);
+  const ready =
+    prepared?.output === projectCameraOutputKey(project, output)
+      ? prepared.cameras.find((item) => item.key === projectCameraGeometryKey(project, region))
+      : undefined;
+  if (prepared && !ready) throw new Error('Prepared camera geometry is unavailable.');
+  const { plan, geometry } = ready ?? resolvePlanEntry(project, region, output);
   const pan = evaluateWorkingZoneCamera(plan, time);
   const targetScale = plan.status === 'ready' ? plan.targetScale : region.scale;
   return {
@@ -806,6 +778,23 @@ export function resolveProjectFollowingCamera(
     focusPoint: {
       x: ((pan.x / geometry.window.width + 0.5) / targetScale) * project.width,
       y: ((pan.y / geometry.window.height + 0.5) / targetScale) * project.height,
+    },
+  };
+}
+
+/** Copies an admitted camera into plain values without retaining its proof geometry or inputs. */
+export function snapshotProjectCameraPlan(
+  project: VideoProject,
+  region: VideoProjectMotionRegion,
+  output?: CameraOutputViewport
+): PreparedProjectCamera['cameras'][number] {
+  const entry = resolvePlanEntry(project, region, output);
+  return {
+    key: projectCameraGeometryKey(project, region),
+    plan: entry.plan,
+    geometry: {
+      window: { ...entry.geometry.window },
+      viewport: { ...entry.geometry.viewport },
     },
   };
 }

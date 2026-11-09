@@ -265,3 +265,42 @@ it('detects HTML clones and binds every native markup extension to the populatio
   ).toEqual(expectedPaths);
   expect(closureResult.findings.every((finding) => finding.format === 'markup')).toBe(true);
 }, 30_000);
+
+it.each([
+  'checkout',
+  '.tmp/checkout',
+  '.tmp/check[out]',
+  ...(path.sep === '/' ? ['.tmp/check\\out'] : []),
+])(
+  'keeps the scan inside its own root when the checkout is %s',
+  (checkout) => {
+    const root = path.join(createTempRoot('verify-jscpd-rooted-ignore-'), checkout);
+    fs.mkdirSync(root, { recursive: true });
+    initializeFixtureRepository(root);
+    const configPath = path.join(root, '.jscpd.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    config.ignore.push('.tmp/**');
+    writeFile(root, '.jscpd.json', `${JSON.stringify(config)}\n`);
+    writeFile(root, '.tmp/ignored.ts', functionSource('ignoredTemporaryClone'));
+    const before = fs.readFileSync(configPath, 'utf8');
+    const result = runJscpdCheck({
+      baselinePath: null,
+      configPath,
+      root,
+      scanTargets: ['src-a', 'src-b', '.tmp'],
+    });
+    const report = JSON.parse(fs.readFileSync(result.reportPath, 'utf8'));
+    expect(report.statistics.total.sources).toBeGreaterThan(0);
+    const paths = result.findings.flatMap((finding) => [
+      finding.firstFile.path,
+      finding.secondFile.path,
+    ]);
+    expect(paths).toContain('src-a/cross-a.ts');
+    expect(paths).toContain('src-b/cross-b.ts');
+    expect(paths.some((file) => file.startsWith('.tmp/'))).toBe(false);
+    expect(paths).not.toContain('src-b/gitignored.ts');
+    expect(paths).not.toContain('src-b/config-ignored.ts');
+    expect(fs.readFileSync(configPath, 'utf8')).toBe(before);
+  },
+  30_000
+);

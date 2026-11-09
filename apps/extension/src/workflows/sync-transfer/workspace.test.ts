@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import {
   prepareSyncWorkspaceJoin,
+  discoverSyncWorkspaces,
   verifySyncWorkspaceIdentity,
   SyncWorkspaceError,
 } from './workspace';
@@ -441,4 +442,341 @@ it('preserves temporary lightweight marker refusal and normalizes unknown errors
   expect(JSON.stringify(error)).not.toContain('secret');
   expect(io.list).not.toHaveBeenCalled();
   expect(io.write).not.toHaveBeenCalled();
+});
+
+function discoveryFixture() {
+  const io = fixture();
+  io.data.delete(markerKey);
+  const pages = new Map<
+    string,
+    { objects: { key: string; size: number }[]; prefixes: string[]; nextCursor: string | null }
+  >();
+  pages.set('', { objects: [], prefixes: [], nextCursor: null });
+  const list = vi.fn(
+    async (selected: string, options: { signal: AbortSignal; cursor?: string }) => {
+      expect(selected).toBe('');
+      options.signal.throwIfAborted();
+      const page = pages.get(options.cursor ?? '');
+      if (!page) throw new SyncRemoteError('missing');
+      return page;
+    }
+  );
+  return { ...io, pages, list, remote: { ...io.remote, list } };
+}
+
+it('returns exact workspace discovery without list catalog or write effects', async () => {
+  const io = fixture();
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toEqual({
+    scope: 'exact',
+    complete: true,
+    candidates: [{ prefix: '', identity }],
+    issues: [],
+  });
+  expect(io.stat.mock.calls.map(([key]) => key)).toEqual([markerKey]);
+  expect(io.read.mock.calls.map(([key]) => key)).toEqual([markerKey]);
+  expect(io.list).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+});
+
+it('reports a complete empty parent while ignoring foreign folders and ZIP objects', async () => {
+  const io = discoveryFixture();
+  io.pages.set('', {
+    objects: [{ key: 'backup.zip', size: 100 }],
+    prefixes: ['Foreign/'],
+    nextCursor: null,
+  });
+  io.data.set('backup.zip', new Blob(['Not a sync workspace']));
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toEqual({
+    scope: 'children',
+    complete: true,
+    candidates: [],
+    issues: [],
+  });
+  expect(io.stat.mock.calls.map(([key]) => key)).toEqual([markerKey, `Foreign/${markerKey}`]);
+  expect(io.read).not.toHaveBeenCalled();
+  expect(io.list).toHaveBeenCalledOnce();
+  expect(io.write).not.toHaveBeenCalled();
+});
+
+it('returns multiple verified immediate workspace candidates without recursion', async () => {
+  const io = discoveryFixture();
+  const otherText = JSON.stringify({ ...marker, spaceId: bootstrapId, bootstrapId: spaceId });
+  const otherIdentity = {
+    spaceId: bootstrapId,
+    bootstrapId: spaceId,
+    fingerprint: hashSyncText(otherText),
+  };
+  io.pages.set('', { objects: [], prefixes: ['One/', 'Два %literal/'], nextCursor: null });
+  io.data.set(`One/${markerKey}`, new Blob([text]));
+  io.data.set(`Два %literal/${markerKey}`, new Blob([otherText]));
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toEqual({
+    scope: 'children',
+    complete: true,
+    candidates: [
+      { prefix: 'One/', identity },
+      { prefix: 'Два %literal/', identity: otherIdentity },
+    ],
+    issues: [],
+  });
+  expect(io.list).toHaveBeenCalledOnce();
+  expect(io.read.mock.calls.map(([key]) => key)).toEqual([
+    `One/${markerKey}`,
+    `Два %literal/${markerKey}`,
+  ]);
+});
+
+it.each(['authentication', 'access-denied', 'transport', 'temporary'] as const)(
+  'retains verified candidates with explicit partial discovery issues: %s',
+  async (code) => {
+    const io = discoveryFixture();
+    io.pages.set('', { objects: [], prefixes: ['Found/', 'Blocked/'], nextCursor: null });
+    io.data.set(`Found/${markerKey}`, new Blob([text]));
+    const stat = io.stat.getMockImplementation()!;
+    io.stat.mockImplementation(async (key) => {
+      if (key.startsWith('Blocked/')) throw new SyncRemoteError(code);
+      return stat(key);
+    });
+    expect(await discoverSyncWorkspaces(io.remote, signal())).toEqual({
+      scope: 'children',
+      complete: false,
+      candidates: [{ prefix: 'Found/', identity }],
+      issues: [{ prefix: 'Blocked/', code }],
+    });
+    expect(io.write).not.toHaveBeenCalled();
+  }
+);
+
+it('reports markerless metadata as incomplete bootstrap', async () => {
+  const io = discoveryFixture();
+  io.pages.set('', { objects: [], prefixes: ['.sniptale/'], nextCursor: null });
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toEqual({
+    scope: 'children',
+    complete: false,
+    candidates: [],
+    issues: [{ prefix: '', code: 'bootstrap-incomplete' }],
+  });
+  expect(io.stat.mock.calls.map(([key]) => key)).toEqual([markerKey]);
+  expect(io.list).toHaveBeenCalledOnce();
+});
+
+it.each([
+  { body: '{', code: 'invalid-marker' },
+  { body: JSON.stringify({ ...marker, version: 2 }), code: 'unsupported-format' },
+  { body: 'x'.repeat(4097), code: 'metadata-limit' },
+])(
+  'reports an exact invalid marker without searching or enabling an empty result: $code',
+  async ({ body, code }) => {
+    const io = fixture(new Blob([body]));
+    expect(await discoverSyncWorkspaces(io.remote, signal())).toEqual({
+      scope: 'exact',
+      complete: false,
+      candidates: [],
+      issues: [{ prefix: '', code }],
+    });
+    expect(io.list).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  '../',
+  '/escape/',
+  'a/b/',
+  './',
+  '%2e%2e/',
+  '%252f/',
+  'a\\b/',
+  'https:evil/',
+  'a?secret/',
+  'a#secret/',
+  'a\u0000/',
+])('refuses unsafe discovery prefixes before child IO: %j', async (unsafe) => {
+  const io = discoveryFixture();
+  io.pages.set('', { objects: [], prefixes: [unsafe], nextCursor: null });
+  const result = await discoverSyncWorkspaces(io.remote, signal());
+  expect(result).toMatchObject({
+    complete: false,
+    candidates: [],
+    issues: [{ prefix: '', code: 'invalid-response' }],
+  });
+  expect(io.stat.mock.calls.map(([key]) => key)).toEqual([markerKey]);
+  expect(io.read).not.toHaveBeenCalled();
+});
+
+it('bounds discovery pages children and immediate entries', async () => {
+  const children = discoveryFixture();
+  children.pages.set('', {
+    objects: [],
+    prefixes: Array.from({ length: 65 }, (_, n) => `Child${n}/`),
+    nextCursor: null,
+  });
+  expect(await discoverSyncWorkspaces(children.remote, signal())).toMatchObject({
+    complete: false,
+    issues: [{ prefix: '', code: 'metadata-limit' }],
+  });
+  expect(children.stat.mock.calls.length).toBeLessThanOrEqual(65);
+  const entries = discoveryFixture();
+  entries.pages.set('', {
+    objects: Array.from({ length: 257 }, (_, n) => ({ key: `File${n}`, size: 1 })),
+    prefixes: [],
+    nextCursor: null,
+  });
+  expect(await discoverSyncWorkspaces(entries.remote, signal())).toMatchObject({
+    complete: false,
+    issues: [{ prefix: '', code: 'metadata-limit' }],
+  });
+  expect(entries.read).not.toHaveBeenCalled();
+  const paged = discoveryFixture();
+  for (let n = 0; n < 17; n++)
+    paged.pages.set(n === 0 ? '' : `page${n}`, {
+      objects: [],
+      prefixes: [],
+      nextCursor: `page${n + 1}`,
+    });
+  expect(await discoverSyncWorkspaces(paged.remote, signal())).toMatchObject({
+    complete: false,
+    issues: [{ prefix: '', code: 'metadata-limit' }],
+  });
+  expect(paged.list).toHaveBeenCalledTimes(16);
+});
+
+it('detects discovery pagination cycles and cancellation', async () => {
+  const io = discoveryFixture();
+  io.pages.set('', { objects: [], prefixes: [], nextCursor: 'again' });
+  io.pages.set('again', { objects: [], prefixes: [], nextCursor: 'again' });
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toMatchObject({
+    complete: false,
+    issues: [{ prefix: '', code: 'pagination-cycle' }],
+  });
+  expect(io.list).toHaveBeenCalledTimes(2);
+  const cancelled = discoveryFixture();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(discoverSyncWorkspaces(cancelled.remote, controller.signal)).rejects.toMatchObject({
+    code: 'cancelled',
+  });
+  expect(cancelled.stat).not.toHaveBeenCalled();
+});
+
+it('does not reinterpret an exact marker read failure as parent discovery', async () => {
+  const io = fixture();
+  io.read.mockRejectedValueOnce(new SyncRemoteError('missing'));
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toMatchObject({
+    scope: 'exact',
+    complete: false,
+    issues: [{ prefix: '', code: 'workspace-changed' }],
+  });
+  expect(io.list).not.toHaveBeenCalled();
+});
+
+it.each([
+  { body: '{', code: 'invalid-marker' },
+  { body: JSON.stringify({ ...marker, version: 2 }), code: 'unsupported-format' },
+  { body: 'x'.repeat(4097), code: 'metadata-limit' },
+])('preserves explicit invalid child marker observations: $code', async ({ body, code }) => {
+  const io = discoveryFixture();
+  io.pages.set('', { objects: [], prefixes: ['Broken/'], nextCursor: null });
+  io.data.set(`Broken/${markerKey}`, new Blob([body]));
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toEqual({
+    scope: 'children',
+    complete: false,
+    candidates: [],
+    issues: [{ prefix: 'Broken/', code }],
+  });
+  if (code === 'metadata-limit') expect(io.read).not.toHaveBeenCalled();
+});
+
+it('retains a verified candidate when later parent pagination is unavailable', async () => {
+  const io = discoveryFixture();
+  io.pages.set('', { objects: [], prefixes: ['Found/'], nextCursor: 'later' });
+  io.data.set(`Found/${markerKey}`, new Blob([text]));
+  const listing = io.list.getMockImplementation()!;
+  io.list.mockImplementation(async (prefix, options) => {
+    if (options.cursor === 'later') throw new SyncRemoteError('access-denied', 403);
+    return listing(prefix, options);
+  });
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toEqual({
+    scope: 'children',
+    complete: false,
+    candidates: [{ prefix: 'Found/', identity }],
+    issues: [{ prefix: '', code: 'access-denied' }],
+  });
+  expect(io.write).not.toHaveBeenCalled();
+});
+
+it('completes parent pagination without reading unrelated object bodies', async () => {
+  const io = discoveryFixture();
+  io.pages.set('', {
+    objects: [{ key: 'backup.zip', size: 1 }],
+    prefixes: ['Foreign/'],
+    nextCursor: 'next',
+  });
+  io.pages.set('next', { objects: [], prefixes: ['Found/'], nextCursor: null });
+  io.data.set(`Found/${markerKey}`, new Blob([text]));
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toMatchObject({
+    complete: true,
+    candidates: [{ prefix: 'Found/', identity }],
+    issues: [],
+  });
+  expect(io.list.mock.calls.map(([, options]) => options.cursor)).toEqual([undefined, 'next']);
+  expect(io.read.mock.calls.map(([key]) => key)).toEqual([`Found/${markerKey}`]);
+});
+
+it('cancels a pending child marker stream and probes no later child', async () => {
+  const io = discoveryFixture();
+  io.pages.set('', { objects: [], prefixes: ['First/', 'Later/'], nextCursor: null });
+  io.data.set(`First/${markerKey}`, new Blob([text]));
+  io.data.set(`Later/${markerKey}`, new Blob([text]));
+  const controller = new AbortController();
+  let entered!: () => void;
+  const reading = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const cancel = vi.fn();
+  io.read.mockImplementationOnce(async () => {
+    entered();
+    return new ReadableStream<Uint8Array>({ cancel });
+  });
+  const discovery = discoverSyncWorkspaces(io.remote, controller.signal);
+  await reading;
+  controller.abort();
+  await expect(discovery).rejects.toMatchObject({ code: 'cancelled' });
+  expect(cancel).toHaveBeenCalledOnce();
+  expect(io.stat.mock.calls.map(([key]) => key)).toEqual([markerKey, `First/${markerKey}`]);
+});
+
+it.each(['authentication', 'access-denied', 'transport'] as const)(
+  'does not list after an exact marker authority failure: %s',
+  async (code) => {
+    const io = fixture();
+    io.stat.mockRejectedValueOnce(new SyncRemoteError(code));
+    expect(await discoverSyncWorkspaces(io.remote, signal())).toMatchObject({
+      scope: 'exact',
+      complete: false,
+      issues: [{ prefix: '', code }],
+    });
+    expect(io.list).not.toHaveBeenCalled();
+  }
+);
+
+it('normalizes provider messages and refuses duplicate or malformed parent entries', async () => {
+  const io = discoveryFixture();
+  io.list.mockRejectedValueOnce(new Error('secret provider endpoint'));
+  const result = await discoverSyncWorkspaces(io.remote, signal());
+  expect(result).toMatchObject({ complete: false, issues: [{ prefix: '', code: 'unavailable' }] });
+  expect(JSON.stringify(result)).not.toContain('secret');
+  io.pages.set('', {
+    objects: [{ key: '../private.zip', size: 1 }],
+    prefixes: [],
+    nextCursor: null,
+  });
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toMatchObject({
+    complete: false,
+    issues: [{ code: 'invalid-response' }],
+  });
+  io.pages.set('', { objects: [], prefixes: ['Same/', 'Same/'], nextCursor: null });
+  expect(await discoverSyncWorkspaces(io.remote, signal())).toMatchObject({
+    complete: false,
+    issues: [{ code: 'invalid-response' }],
+  });
+  expect(io.stat.mock.calls.map(([key]) => key)).not.toContain('../private.zip');
 });

@@ -1,3 +1,4 @@
+import { collectArchiveNativeMimeTypes } from './root-codecs/object-inventory';
 import { sha256 } from '@noble/hashes/sha2.js';
 import {
   assertAssetWriteAdmission,
@@ -20,8 +21,13 @@ export async function stageArchiveRootObjects(args: {
   signal?: AbortSignal;
   transitionPermit?: PersistenceMutationTransitionPermit;
 }): Promise<StagedArchiveObject[]> {
+  const envelope = structuredClone(args.envelope);
+  const nativeMimeTypes = await collectArchiveNativeMimeTypes(envelope);
   return stageRootObjects({
-    objects: args.envelope.objects,
+    objects: envelope.objects.map((object) => ({
+      ...object,
+      mimeType: nativeMimeTypes.get(object.objectId) ?? object.mimeType,
+    })),
     ...(args.onBytesRead ? { onBytesRead: args.onBytesRead } : {}),
     ...(args.signal ? { signal: args.signal } : {}),
     ...(args.transitionPermit ? { transitionPermit: args.transitionPermit } : {}),

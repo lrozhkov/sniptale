@@ -1,3 +1,4 @@
+import type { Translate } from '../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FolderOpen, Plus, Search } from 'lucide-react';
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
@@ -7,6 +8,18 @@ import type { EditorStartItem } from './use-items';
 import { EditorStartThumbnail } from './thumbnail';
 export { useEditorStartItems, sortEditorStartItems } from './use-items';
 export type { EditorStartItem, EditorStartSourceItem } from './use-items';
+
+/** Translates labels that are common to image and video start screens. */
+export function getEditorStartCommonLabels(translate: Translate) {
+  return {
+    emptyLabel: translate('shared.editorStart.empty'),
+    loadingLabel: translate('shared.editorStart.loading'),
+    errorLabel: translate('shared.editorStart.error'),
+    retryLabel: translate('shared.editorStart.retry'),
+    searchLabel: translate('shared.editorStart.search'),
+    unavailableLabel: translate('shared.editorStart.unavailable'),
+  };
+}
 
 export interface EditorStartProps {
   title: string;

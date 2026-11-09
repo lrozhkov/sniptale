@@ -4,7 +4,10 @@ import {
   loadSettings,
   removeRetiredSynchronizedSettings,
 } from '../../../../composition/persistence/settings';
-import { initializeAiStorageAccess } from '../../../../composition/persistence/ai-settings/init';
+import {
+  initializeAiStorageAccess,
+  readAiStorageReadiness,
+} from '../../../../composition/persistence/ai-settings/init';
 import { migrateHighlighterSystemPresetCatalog } from '../../../../composition/persistence/highlighter';
 import { migrateCalloutSystemPresetCatalog } from '../../../../composition/persistence/callout-presets';
 import { migrateStepBadgeSystemPresetCatalog } from '../../../../composition/persistence/step-badge-presets';
@@ -70,7 +73,14 @@ export function runStartupMaintenance(
     logger.warn('Capture job reconciliation failed (non-critical)', error);
   });
 
-  initializeAiStorageAccess().catch((error) => {
+  const aiPreparation = state.secretProtection
+    ? state.secretProtection.prepare().then(async () => {
+        if ((await readAiStorageReadiness()).requiresReset)
+          await state.secretProtection?.resetParticipant('ai');
+        await initializeAiStorageAccess();
+      })
+    : initializeAiStorageAccess();
+  aiPreparation.catch((error) => {
     logger.warn('AI storage initialization failed (non-critical)', error);
   });
 

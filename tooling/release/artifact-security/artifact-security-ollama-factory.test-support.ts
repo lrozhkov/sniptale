@@ -1,17 +1,52 @@
-// Bundled ollama-ai-provider-v2@4.0.1 factory; pinned by the release guard.
-export const bundledOllamaFactory = [
-  'function YG(e={}){let t=xw(e.baseURL)??`http://127.0.0.1:11434/api`,n=e.name',
-  '??`ollama`,r=()=>({"Ollama-Organization":e.organization,"Ollama-Project":e.p',
-  'roject,...e.headers}),i=(i,a={})=>new Qbe(i,a,{provider:`${n}.completion`,ur',
-  'l:({path:e})=>`${t}${e}`,headers:r,fetch:e.fetch}),a=(i,a={})=>new exe(i,a,{',
-  'provider:`${n}.embedding`,url:({path:e})=>`${t}${e}`,headers:r,fetch:e.fetch',
-  '});function o(e){if(new.target)throw Error(`The Ollama model function cannot',
-  ' be called with the new keyword.`);return s(e)}let s=i=>new uxe(i,{provider:',
-  '`${n}.responses`,url:({path:e})=>`${t}${e}`,headers:r,fetch:e.fetch}),c=func',
-  'tion(e){if(new.target)throw Error(`The Ollama model function cannot be calle',
-  'd with the new keyword.`);return o(e)};return c.specificationVersion=`v4`,c.',
-  'languageModel=o,c.chat=o,c.completion=i,c.embedding=a,c.textEmbedding=a,c.te',
-  'xtEmbeddingModel=a,c.embeddingModel=a,c.imageModel=e=>{throw new Bx({modelId',
-  ':e,modelType:`imageModel`,message:`Image generation is unsupported with Olla',
-  'ma`})},c}',
-].join('');
+import ts from 'typescript';
+import fixture from './fixtures/ollama-factory.json';
+
+export const bundledOllamaFactory = fixture.source;
+export const bundledOllamaBindings = fixture.bindings;
+
+/** Rename bindings while preserving wire properties, literals and lexical reference uses. */
+export function renameOllamaBindings(source: string, prefix = 'renamed_'): string {
+  const file = ts.createSourceFile(
+    'sdk.js',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS
+  );
+  const bindings = new Set<string>();
+  function declarations(node: ts.Node): void {
+    if (
+      (ts.isVariableDeclaration(node) ||
+        ts.isParameter(node) ||
+        ts.isFunctionDeclaration(node) ||
+        ts.isClassDeclaration(node) ||
+        ts.isBindingElement(node)) &&
+      node.name &&
+      ts.isIdentifier(node.name)
+    )
+      bindings.add(node.name.text);
+    ts.forEachChild(node, declarations);
+  }
+  declarations(file);
+  const edits: { start: number; end: number; value: string }[] = [];
+  function references(node: ts.Node): void {
+    if (ts.isIdentifier(node) && bindings.has(node.text)) {
+      const parent = node.parent;
+      const fixed =
+        (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+        (ts.isPropertyAssignment(parent) && parent.name === node) ||
+        (ts.isBindingElement(parent) && parent.propertyName === node) ||
+        ((ts.isMethodDeclaration(parent) || ts.isPropertyDeclaration(parent)) &&
+          parent.name === node) ||
+        ts.isShorthandPropertyAssignment(parent) ||
+        ts.isMetaProperty(parent);
+      if (!fixed)
+        edits.push({ start: node.getStart(file), end: node.end, value: prefix + node.text });
+    }
+    ts.forEachChild(node, references);
+  }
+  references(file);
+  return edits
+    .sort((a, b) => b.start - a.start)
+    .reduce((text, edit) => text.slice(0, edit.start) + edit.value + text.slice(edit.end), source);
+}

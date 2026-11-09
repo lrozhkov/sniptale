@@ -37,6 +37,7 @@ export const actionRouteHandlerBindings = {
   capture: routeTabAction,
   'content-action-capability-issuance': routeBackgroundOwnedAction,
   'content-runtime-wakeup': routeBackgroundOwnedAction,
+  simplify: routeBackgroundOwnedAction,
   'frame-annotation-raster': routeBackgroundOwnedAction,
   'internal-signal': routeInternalSignalAction,
   'llm-content-processing': routeBackgroundOwnedAction,

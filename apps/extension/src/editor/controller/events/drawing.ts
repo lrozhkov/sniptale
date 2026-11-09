@@ -13,6 +13,7 @@ import type { EditorControllerEventBindings, EditorControllerEventHandlers } fro
 import { handleStepMouseDown } from '../tools/step-drawing/pointer';
 import { isEditorDrawingSelection } from '../../drawing/object/metadata';
 import { createEditorDrawingFabricObject } from '../../drawing/object/vector';
+import { createEditorDrawingSimplifyObject } from '../../drawing/object/simplify';
 import { createEditorDrawingBlurObject } from '../../drawing/object/blur';
 import {
   beginEditorSelectionModifierGesture,
@@ -128,6 +129,18 @@ function startDrawing(
   clearSelection(canvas, bindings);
   if (tool === 'text') {
     startText(bindings, point, pointerId);
+    return true;
+  }
+  if (tool === 'simplify') {
+    const drawing = {
+      id: `drawing-${crypto.randomUUID()}`,
+      kind: 'simplify',
+      bounds: { x: point.x, y: point.y, width: 1, height: 1 },
+      settings: useEditorStore.getState().toolSettings.simplify,
+    } as const;
+    const object = createEditorDrawingSimplifyObject(drawing, bindings.nextLabelIndex('simplify'));
+    bindings.prepareObject(object);
+    bindings.startDrawSession('simplify', point, object, pointerId);
     return true;
   }
   if (tool === 'blur') {

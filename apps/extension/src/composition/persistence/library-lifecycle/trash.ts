@@ -180,7 +180,8 @@ async function mutateTrash(
                   ? { ...active, updatedAt: Math.max(now, trashedAt ?? 0, lifecycle.updatedAt + 1) }
                   : { ...lifecycle, trashedAt: Math.max(now, lifecycle.updatedAt + 1) },
               },
-              now
+              now,
+              { checkpoint: 'lifecycle' }
             );
             continue;
           }
@@ -218,19 +219,22 @@ async function mutateTrash(
             const media = parseMediaLibraryEntry(
               await tx.objectStore(MEDIA_LIBRARY_STORE).get(target.id)
             );
-            if (media) await captureMediaInTransaction(tx, target.id);
+            if (media) await captureMediaInTransaction(tx, target.id, { checkpoint: 'lifecycle' });
           }
         }
         for (const target of changed) {
           if (target.kind === 'video-project')
-            await captureVideoProjectInTransaction(tx, target.id);
+            await captureVideoProjectInTransaction(tx, target.id, { checkpoint: 'lifecycle' });
           if (target.kind === 'scenario-project')
-            await captureScenarioProjectInTransaction(tx, target.id);
+            await captureScenarioProjectInTransaction(tx, target.id, { checkpoint: 'lifecycle' });
           if (target.kind === 'scenario-export') {
             const child = parseScenarioExportEntry(
               await tx.objectStore(SCENARIO_EXPORTS_STORE).get(target.id)
             );
-            if (child) await captureScenarioProjectInTransaction(tx, child.projectId);
+            if (child)
+              await captureScenarioProjectInTransaction(tx, child.projectId, {
+                checkpoint: 'lifecycle',
+              });
           }
         }
         await tx.done;

@@ -312,7 +312,9 @@ it('keeps camera markers on the source axis and creates hide intervals through a
   act(render);
   const track = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.webcamTrack"]')!;
   expect(track.style.height).toBe('36px');
-  click('webcamSettings');
+  expect(field(label('webcamSettings'))).toBeNull();
+  pointer(track, 'pointerdown', 100);
+  pointer(track, 'pointerup', 100);
   expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam' });
   const markers = [
     track.querySelector<HTMLButtonElement>('[title="gallery.videoReview.webcamHidden"]')!,

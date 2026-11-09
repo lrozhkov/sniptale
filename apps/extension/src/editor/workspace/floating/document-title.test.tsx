@@ -72,6 +72,10 @@ it('selects the title, hides actions, commits once and restores keyboard focus',
   expect(mocks.rename).toHaveBeenCalledWith(mocks.controller, 'image-1', 'New.png');
   expect(container.querySelector('input')).toBeNull();
   expect(document.activeElement).toBe(container.querySelector('button'));
+  const restored = container.querySelector('button')!;
+  expect(restored.getAttribute('data-focus-restoration')).toBe('pointer');
+  restored.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+  expect(restored.hasAttribute('data-focus-restoration')).toBe(false);
   expect(container.querySelector('button')?.parentElement?.className).not.toBe('hidden');
 });
 

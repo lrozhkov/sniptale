@@ -16,6 +16,7 @@ import {
   beginAssetResidencyUnloadInTransaction,
   admitRemoteAssetResidencyInTransaction,
   retireAssetResidencyCopyInTransaction,
+  rebaseInlineImagePresentationInTransaction,
   finishAssetResidencyTransitionInTransaction,
   readAssetResidencyCopyInTransaction,
   readAssetResidencyCopiesPageInTransaction,
@@ -461,4 +462,179 @@ it('admits initially remote bytes without an unload transition and preserves exa
   expect(await f.transact((tx) => readAssetResidencyCopyInTransaction(tx, first.id))).toEqual(
     first
   );
+});
+
+function inlineDraft(): AssetResidencyUnloadDraft {
+  return {
+    ...draft(),
+    target: {
+      kind: 'inline-image',
+      mediaId: 'image-1',
+      createdAt: 1,
+      workspaceRevision: 4,
+      rootGeneration: 2,
+      nativeDigest: 'b'.repeat(64),
+      size: 100,
+      mimeType: 'image/png',
+      blobType: '',
+      duplicatePreview: { presentationRevision: 4, blobType: 'image/png' },
+    },
+  };
+}
+
+it.each(['unloading', 'unloaded', 'resident'] as const)(
+  'rebases only the exact inline recovery copy and rejects a stale command in phase %s',
+  async (phase) => {
+    const f = fixture();
+    const unloading = await begin(f, inlineDraft());
+    const copy = phase === 'unloading' ? unloading : await finish(f, unloading, phase);
+    const rebased = await f.transact((tx, permit) =>
+      rebaseInlineImagePresentationInTransaction(tx, copy, 'c'.repeat(64), permit)
+    );
+    if (copy.target.kind !== 'inline-image') throw new Error('Invalid inline fixture');
+    const { duplicatePreview: _duplicate, ...target } = copy.target;
+    expect(rebased).toEqual({
+      ...copy,
+      revision: copy.revision + 1,
+      target: { ...target, nativeDigest: 'c'.repeat(64) },
+    });
+    expect(rebased.phase).toBe(phase);
+    expect(rebased.operationId).toBe(copy.operationId);
+    expect(rebased.remote).toEqual(copy.remote);
+    expect(rebased.lastUsedAt).toBe(copy.lastUsedAt);
+    expect(rebased.target).not.toHaveProperty('duplicatePreview');
+    await expect(
+      f.transact((tx, permit) =>
+        rebaseInlineImagePresentationInTransaction(tx, copy, 'c'.repeat(64), permit)
+      )
+    ).rejects.toThrow('source is stale');
+    expect(await f.transact((tx) => readAssetResidencyCopyInTransaction(tx, copy.id))).toEqual(
+      rebased
+    );
+  }
+);
+
+it.each(['revision', 'phase', 'remote', 'operation', 'usage', 'source'] as const)(
+  'refuses a presentation rebase after a concurrent %s change',
+  async (change) => {
+    const f = fixture();
+    const copy = await finish(f, await begin(f, inlineDraft()), 'unloaded');
+    const current = structuredClone(copy);
+    if (change === 'revision') current.revision++;
+    if (change === 'phase') current.phase = 'resident';
+    if (change === 'remote') current.remote.key = 'objects/new/original.png';
+    if (change === 'operation') current.operationId = 'new-operation';
+    if (change === 'usage') current.lastUsedAt++;
+    if (change === 'source' && current.target.kind === 'inline-image') current.target.createdAt++;
+    f.rows.get('asset_residency')!.set(copy.id, current);
+    await expect(
+      f.transact((tx, permit) =>
+        rebaseInlineImagePresentationInTransaction(tx, copy, 'c'.repeat(64), permit)
+      )
+    ).rejects.toThrow('source is stale');
+    expect(await f.transact((tx) => readAssetResidencyCopyInTransaction(tx, copy.id))).toEqual(
+      current
+    );
+  }
+);
+
+it.each(['deleted', 'recreated'] as const)(
+  'refuses a delayed rebase after recovery identity is %s',
+  async (change) => {
+    const f = fixture();
+    const copy = await finish(f, await begin(f, inlineDraft()), 'unloaded');
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const delayed = gate.then(() =>
+      f.transact((tx, permit) =>
+        rebaseInlineImagePresentationInTransaction(tx, copy, 'c'.repeat(64), permit)
+      )
+    );
+    f.rows.get('asset_residency')!.delete(copy.id);
+    const recreated = { ...copy, operationId: 'recreated-operation', revision: 1 };
+    if (change === 'recreated') f.rows.get('asset_residency')!.set(copy.id, recreated);
+    release();
+    await expect(delayed).rejects.toThrow('source is stale');
+    expect(await f.transact((tx) => readAssetResidencyCopyInTransaction(tx, copy.id))).toEqual(
+      change === 'deleted' ? null : recreated
+    );
+  }
+);
+
+it('rolls back a presentation rebase with related native metadata and accepts a fresh retry', async () => {
+  const f = fixture();
+  const copy = await finish(f, await begin(f, inlineDraft()), 'unloaded');
+  const before = structuredClone(f.rows.get('asset_residency'));
+  await expect(
+    f.transact(async (tx, permit) => {
+      await rebaseInlineImagePresentationInTransaction(tx, copy, 'c'.repeat(64), permit);
+      await setAssetResidencyBudgetInTransaction(tx, 0, 0, permit);
+      throw new Error('presentation transaction refused');
+    })
+  ).rejects.toThrow('presentation transaction refused');
+  expect(f.rows.get('asset_residency')).toEqual(before);
+  await expect(
+    f.transact((tx, permit) =>
+      rebaseInlineImagePresentationInTransaction(tx, copy, 'c'.repeat(64), permit)
+    )
+  ).resolves.toMatchObject({ revision: copy.revision + 1 });
+});
+
+it('preserves the recovery copy after a rebase write failure', async () => {
+  const f = fixture();
+  const copy = await finish(f, await begin(f, inlineDraft()), 'unloaded');
+  f.failWrites();
+  await expect(
+    f.transact((tx, permit) =>
+      rebaseInlineImagePresentationInTransaction(tx, copy, 'c'.repeat(64), permit)
+    )
+  ).rejects.toThrow();
+  f.allowWrites();
+  expect(await f.transact((tx) => readAssetResidencyCopyInTransaction(tx, copy.id))).toEqual(copy);
+});
+
+it.each(['opfs', 'digest', 'extra', 'expired-permit'] as const)(
+  'rejects an invalid inline presentation rebase: %s',
+  async (change) => {
+    const f = fixture();
+    const copy = await begin(f, change === 'opfs' ? draft() : inlineDraft());
+    const expected = structuredClone(copy);
+    if (change === 'extra') Reflect.set(expected, 'unexpected', 'field');
+    const retained = await runWithPersistenceMutationPermit(async (permit) => permit);
+    await expect(
+      f.transact((tx, permit) =>
+        rebaseInlineImagePresentationInTransaction(
+          tx,
+          expected,
+          change === 'digest' ? 'invalid' : 'c'.repeat(64),
+          change === 'expired-permit' ? retained : permit
+        )
+      )
+    ).rejects.toThrow();
+    expect(await f.transact((tx) => readAssetResidencyCopyInTransaction(tx, copy.id))).toEqual(
+      copy
+    );
+  }
+);
+
+it('rejects a delayed parallel presentation rebase after the first writer commits', async () => {
+  const f = fixture();
+  const copy = await finish(f, await begin(f, inlineDraft()), 'unloaded');
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const delayed = gate.then(() =>
+    f.transact((tx, permit) =>
+      rebaseInlineImagePresentationInTransaction(tx, copy, 'd'.repeat(64), permit)
+    )
+  );
+  const first = await f.transact((tx, permit) =>
+    rebaseInlineImagePresentationInTransaction(tx, copy, 'c'.repeat(64), permit)
+  );
+  release();
+  await expect(delayed).rejects.toThrow('source is stale');
+  expect(await f.transact((tx) => readAssetResidencyCopyInTransaction(tx, copy.id))).toEqual(first);
 });

@@ -581,3 +581,120 @@ it('cancels a second decoder failure without reloading again', () => {
     vi.useRealTimers();
   }
 });
+
+it('keeps native playback exact while the current manual publication owns the display clock', () => {
+  const test = playbackHarness();
+  let frame: FrameRequestCallback | undefined;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frame = callback;
+    return 1;
+  });
+  const video = test.hook.video.current!;
+  Object.defineProperty(video, 'paused', { configurable: true, value: false });
+  try {
+    act(() => test.hook.setPlaying(true));
+    const active = test.hook.setPresentationActive;
+    const publish = test.hook.onPresentedTime;
+    act(() => active('first', true));
+    video.currentTime = 2.7;
+    act(() => frame!(0));
+    expect(video.currentTime).toBe(4);
+    expect(video.playbackRate).toBe(2);
+    expect(video.muted).toBe(true);
+    expect(test.hook.time).toBe(0);
+    act(() => publish('first', 3.9));
+    expect(test.hook.time).toBe(3.9);
+    expect(test.hook.setPresentationActive).toBe(active);
+    expect(test.hook.onPresentedTime).toBe(publish);
+    act(() => {
+      active('second', true);
+      active('first', false);
+      publish('first', 1);
+    });
+    video.currentTime = 6.5;
+    act(() => frame!(1));
+    expect(test.hook.time).toBe(3.9);
+    act(() => publish('second', 6.4));
+    expect(test.hook.time).toBe(6.4);
+    act(() => active('second', false));
+    act(() => frame!(2));
+    expect(test.hook.time).toBe(6.5);
+    act(() => active('second', true));
+    video.currentTime = 6.8;
+    Object.defineProperty(video, 'paused', { configurable: true, value: true });
+    act(() => video.dispatchEvent(new Event('pause')));
+    expect(test.hook.time).toBe(6.8);
+    act(() => publish('second', 6.4));
+    expect(test.hook.time).toBe(6.8);
+    act(() => test.hook.seek(7.1, false));
+    expect(test.hook.time).toBe(7.1);
+  } finally {
+    test.dispose();
+  }
+});
+
+it.each(['time', 'presented', 'ended', 'frame', 'pause'] as const)(
+  'publishes the project endpoint from browser-rounded EOF via %s without a corrective media seek',
+  (path) => {
+    const test = playbackHarness();
+    const duration = 26.283316666666664;
+    const browserTime = 26.283317;
+    try {
+      test.update({ duration, edits: [] });
+      const node = test.hook.video.current!;
+      const seek = vi.fn();
+      Object.defineProperty(node, 'currentTime', { get: () => browserTime, set: seek });
+      Object.defineProperty(node, 'paused', {
+        value: path !== 'presented' && path !== 'frame',
+        configurable: true,
+      });
+      let advance: FrameRequestCallback | undefined;
+      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+        advance = callback;
+        return 1;
+      });
+      act(() => test.hook.setPlaying(true));
+      if (path === 'presented') {
+        act(() => test.hook.setPresentationActive('source', true));
+        act(() => test.hook.onPresentedTime('source', browserTime));
+      } else if (path === 'frame') {
+        expect(advance).toBeDefined();
+        act(() => advance!(0));
+      } else if (path === 'pause') act(() => node.dispatchEvent(new Event('pause')));
+      else if (path === 'ended') act(() => test.hook.onEnded());
+      else act(() => test.hook.onTime(browserTime));
+      expect(test.hook.time).toBe(duration);
+      expect(node.currentTime).toBe(browserTime);
+      expect(seek).not.toHaveBeenCalled();
+      expect(node.playbackRate).toBe(1);
+      expect(node.volume).toBe(1);
+      if (path === 'ended') expect(test.hook.playing).toBe(false);
+    } finally {
+      test.dispose();
+    }
+  }
+);
+
+it('keeps presented-time callbacks stable and uses the current duration without publishing invalid numbers', () => {
+  const test = playbackHarness();
+  try {
+    test.update({ edits: [] });
+    const publish = test.hook.onPresentedTime;
+    Object.defineProperty(test.hook.video.current!, 'paused', { value: false });
+    act(() => test.hook.setPresentationActive('source', true));
+    act(() => publish('source', 7));
+    expect(test.hook.time).toBe(7);
+    test.update({ duration: 5 });
+    expect(test.hook.onPresentedTime).toBe(publish);
+    act(() => publish('source', 5.0000001));
+    expect(test.hook.time).toBe(5);
+    act(() => publish('source', NaN));
+    act(() => publish('source', Infinity));
+    act(() => publish('other-source', 1));
+    expect(test.hook.time).toBe(5);
+    act(() => publish('source', -0.000001));
+    expect(test.hook.time).toBe(0);
+  } finally {
+    test.dispose();
+  }
+});

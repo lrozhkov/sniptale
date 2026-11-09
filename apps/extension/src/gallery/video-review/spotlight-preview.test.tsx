@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import { ReviewBorderOverlay } from './border-overlay';
+import * as canvasModule from './zoom-preview-canvas';
+import * as blurModule from './motion-blur-preview';
+import type { ZoomPreviewGpuInput } from './zoom-preview-gpu';
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
@@ -82,7 +84,7 @@ afterEach(async () => {
 });
 const output = { width: 200, height: 100 };
 const rect = { x: 0, y: 0, ...output };
-it('reuses the paused source frame while the lens opening moves', () => {
+it('reuses the paused source frame while the lens opening moves', async () => {
   const initial = createQuickEditSpotlight();
   const region = {
     ...createQuickEditZoomRegion({ id: 'lens', at: 0 }),
@@ -91,7 +93,7 @@ it('reuses the paused source frame while the lens opening moves', () => {
   const frame = { image: document.createElement('canvas'), ...output };
   const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
   const renderLens = (area: typeof initial.area) =>
-    act(() =>
+    act(async () =>
       root.render(
         <ReviewSpotlightPreview
           region={{ ...region, spotlight: { ...region.spotlight, area } }}
@@ -107,9 +109,9 @@ it('reuses the paused source frame while the lens opening moves', () => {
         />
       )
     );
-  renderLens(initial.area);
+  await renderLens(initial.area);
   expect(paint).toHaveBeenCalledOnce();
-  renderLens({ ...initial.area, x: 0.3 });
+  await renderLens({ ...initial.area, x: 0.3 });
   expect(paint).toHaveBeenCalledOnce();
 });
 
@@ -643,10 +645,12 @@ it('shows a physical circle and preserves its aspect while resizing the Gallery 
 });
 
 it.each([
-  { direction: 'right', delta: 60, left: '62.5%', authoredX: 0.5 },
-  { direction: 'left', delta: -60, left: '12.5%', authoredX: 0 },
+  { direction: 'right interior', delta: 60, left: 67.5, authoredX: 0.6 },
+  { direction: 'left interior', delta: -60, left: 7.5, authoredX: 0 },
+  { direction: 'right boundary', delta: 100, left: 75, authoredX: 0.75 },
+  { direction: 'left boundary', delta: -100, left: 0, authoredX: 0 },
 ])(
-  'keeps the $direction edge circle preview and selection equal to its committed position',
+  'keeps the $direction circle preview and selection equal to its committed position',
   async ({ delta, left, authoredX }) => {
     let frame: FrameRequestCallback | undefined;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -663,13 +667,17 @@ it.each([
     await pointer(view.group, 'pointerdown', 100, 50);
     await pointer(view.plane, 'pointermove', 100 + delta, 50);
     act(() => frame?.(0));
-    expect(view.group.style.left).toBe(left);
+    expect(parseFloat(view.group.style.left)).toBeCloseTo(left, 10);
+    expect(view.group.style.width).toBe('25%');
+    expect(view.group.style.height).toBe('50%');
     const preview = view.onPreview.mock.lastCall?.[0].spotlight;
-    expect(preview.area.x).toBe(authoredX);
+    expect(preview.area.x).toBeCloseTo(authoredX, 10);
     await pointer(view.plane, 'pointerup', 100 + delta, 50);
     expect(view.onChange.mock.lastCall?.[0].spotlight).toEqual(preview);
     const accepted = render(false, preview);
-    expect(accepted.group.style.left).toBe(left);
+    expect(parseFloat(accepted.group.style.left)).toBeCloseTo(left, 10);
+    expect(accepted.group.style.width).toBe('25%');
+    expect(accepted.group.style.height).toBe('50%');
   }
 );
 
@@ -757,13 +765,13 @@ it.each([0.5, 0.01])(
 
 it.each(['border', 'spotlight'] as const)(
   'does not repaint a paused source for %s area-only drafts',
-  (kind) => {
+  async (kind) => {
     const appearance = kind === 'border' ? createQuickEditBorder() : createQuickEditSpotlight();
     const frame = { image: document.createElement('canvas'), ...output };
     const region = { ...createQuickEditZoomRegion({ id: 'focus', at: 0 }), [kind]: appearance };
     const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
     const renderFrame = (area: typeof appearance.area, source = frame, scale = 1) =>
-      act(() =>
+      act(async () =>
         root.render(
           <ReviewSpotlightPreview
             region={{ ...region, [kind]: { ...appearance, area } }}
@@ -779,38 +787,80 @@ it.each(['border', 'spotlight'] as const)(
           />
         )
       );
-    renderFrame(appearance.area);
+    await renderFrame(appearance.area);
     expect(paint).toHaveBeenCalledOnce();
-    renderFrame({ ...appearance.area, x: 0.3 });
+    await renderFrame({ ...appearance.area, x: 0.3 });
     expect(paint).toHaveBeenCalledOnce();
-    renderFrame(appearance.area, { ...frame, image: document.createElement('canvas') });
+    await renderFrame(appearance.area, { ...frame, image: document.createElement('canvas') });
     expect(paint).toHaveBeenCalledTimes(2);
-    renderFrame(appearance.area, frame, 2);
+    await renderFrame(appearance.area, frame, 2);
     expect(paint).toHaveBeenCalledTimes(3);
   }
 );
 
-it('paints identical border inputs once but repaints after geometry changes or remount', () => {
-  const frame = {
-    id: 'b',
-    path: 'M0 0H100V50Z',
-    perimeter: 300,
-    width: 2,
-    color: '#ffffff',
-    style: 'solid' as const,
-    start: 0,
-    end: 1,
-    opacity: 1,
+it('forwards live intent without retaining presented snapshots in the next paint job', async () => {
+  const queue = vi
+    .spyOn(canvasModule, 'useZoomPreviewCanvasPaint')
+    .mockReturnValue({ spatialFailure: false, gpuActive: false, retrySpatial: vi.fn() });
+  const blur = vi.spyOn(blurModule, 'ReviewMotionBlurPreview').mockImplementation(() => null);
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'live-mask', at: 0 }),
+    spotlight: createQuickEditSpotlight(),
   };
-  vi.mocked(drawSceneBorders).mockClear();
-  const renderBorder = (frames: (typeof frame)[]) =>
-    act(() => root.render(<ReviewBorderOverlay output={{ ...output }} frames={frames} />));
-  renderBorder([frame]);
-  renderBorder([{ ...frame }]);
-  expect(drawSceneBorders).toHaveBeenCalledOnce();
-  renderBorder([{ ...frame, width: 3 }]);
-  expect(drawSceneBorders).toHaveBeenCalledTimes(2);
-  renderBorder([]);
-  renderBorder([{ ...frame, width: 3 }]);
-  expect(drawSceneBorders).toHaveBeenCalledTimes(3);
+  const camera = { scale: 1, centerX: 0.5, centerY: 0.5 };
+  const layout = { contentRect: rect, windowRect: rect, videoRect: rect, videoTransform: rect };
+  const liveSource = { url: 'blob:frozen', time: 0.5, seekRevision: 2, segmentStart: 0 };
+  const auxiliary = {
+    scene: { source: output, background: { enabled: false as const } },
+    focus: { regions: [region], time: 1 },
+  };
+  const image = document.createElement('canvas');
+  image.width = 200;
+  image.height = 100;
+  const accepted: ZoomPreviewGpuInput = {
+    background: { enabled: false },
+    camera,
+    layout,
+    output,
+    frame: { image, ...output },
+    imageUrl: null,
+    currentTime: 1,
+    view: 'result',
+    cornerRadius: 4,
+    live: true,
+    liveSource,
+    auxiliary,
+  };
+  const video = document.createElement('video');
+  video.currentTime = 99;
+  await act(async () =>
+    root.render(
+      <ReviewSpotlightPreview
+        region={region}
+        frame={{ image: video, ...output }}
+        camera={{ ...camera, scale: 2 }}
+        layout={layout}
+        output={output}
+        view="result"
+        cornerRadius={4}
+        scale={1}
+        disabled
+        live
+        liveSource={liveSource}
+        auxiliary={auxiliary}
+        focus={{ regions: [region], time: 2 }}
+        presented={accepted}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  const input = queue.mock.lastCall![1];
+  expect(input.liveSource).toBe(liveSource);
+  expect(input.auxiliary).toBe(auxiliary);
+  expect(input).not.toHaveProperty('presented');
+  expect(blur.mock.lastCall![0].getFrame()).toBe(image);
+  expect(blur.mock.lastCall![0].camera).toBe(camera);
+  expect(blur.mock.lastCall![0].layout).toBe(layout);
+  expect(blur.mock.lastCall![0].focus?.time).toBe(1);
+  expect(video.currentTime).toBe(99);
 });

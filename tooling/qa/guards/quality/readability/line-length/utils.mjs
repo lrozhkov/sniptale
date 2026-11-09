@@ -2,14 +2,36 @@
  * Pure helpers for diff-aware changed-line readability checks.
  */
 
+import ts from 'typescript';
+
 import { QUALITY_LIMITS } from '../../../../policy/quality/quality.config.mjs';
 import { isDataCarrierFile } from '../../../../analysis/repository/shared-paths.mjs';
 
 const GENERATED_DATA_FIXTURE_PATTERN =
   /(?:(?:^|\/)(?:generated|fixtures?|snapshots?)(?:\/|\.)|\.(?:snap|snapshot|fixture|generated)\.[cm]?[jt]sx?$)/u;
 
+function hasStaticImportAttributes(line) {
+  if (
+    !line.includes('with') ||
+    !['import ', 'export ', '} from '].some((prefix) => line.startsWith(prefix))
+  )
+    return false;
+  const source = line.startsWith('} from ') ? `import { fixture ${line}` : line;
+  const parsed = ts.createSourceFile('readability-line.ts', source, ts.ScriptTarget.Latest);
+  if (parsed.parseDiagnostics.length > 0 || parsed.statements.length !== 1) return false;
+  const [statement] = parsed.statements;
+  return (
+    (ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)) &&
+    statement.moduleSpecifier !== undefined &&
+    ts.isStringLiteral(statement.moduleSpecifier) &&
+    statement.attributes?.token === ts.SyntaxKind.WithKeyword &&
+    statement.attributes.elements.every((attribute) => ts.isStringLiteral(attribute.value))
+  );
+}
+
 function isStaticModuleSpecifierLine(line) {
   const trimmed = line.trim();
+  if (hasStaticImportAttributes(trimmed)) return true;
   if (/\b(?:import|require)\s*\(\s*(['"])[^'"]+\1\s*\)/u.test(trimmed)) return true;
   const sourceMatch = trimmed.match(/(['"])[^'"]+\1;?$/u);
   if (!sourceMatch || sourceMatch.index === undefined) return false;

@@ -1,3 +1,5 @@
+import { createVideoProjectFromRecording } from '../../../../../../features/video/project/factories/creation';
+import { applyVideoProjectMutationPatch } from '../../../../../../features/video/project/mutation';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createEffectAudioBufferCache } from '../../../../../../features/video/composition/effect-runtime';
 
@@ -113,3 +115,76 @@ it('uses the selected export range duration when settings are provided', async (
   expect(collectRenderableAudioClipsMock).toHaveBeenCalledWith(project, settings);
   expect(createOfflineAudioMixContextMock).toHaveBeenCalledWith(3);
 });
+
+it.each([
+  { totalBlocks: 1, enabled: true, render: true },
+  { totalBlocks: 0, enabled: true, render: false },
+  { totalBlocks: 1, enabled: false, render: false },
+])(
+  'admits archived action audio without an inline clip: %j',
+  async ({ totalBlocks, enabled, render }) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'recording',
+      filename: 'source.webm',
+      width: 640,
+      height: 360,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: false,
+      recordingSignals: [],
+      sourceNormalizedActionEvents: [],
+    });
+    const archived = applyVideoProjectMutationPatch(project, {
+      actionFeedback: project.actionFeedback!.map((group) => ({
+        ...group,
+        events: {
+          format: 'recording-events-v1',
+          formatVersion: 1,
+          algorithm: 'lossless-v1',
+          encoding: 'json-utf8-v1',
+          eventStreamId: 'a'.repeat(32),
+          state: 'complete',
+          finalized: true,
+          totalBlocks,
+          totalRecords: totalBlocks * 10,
+          totalBytes: totalBlocks * 1000,
+          streamSha256: 'b'.repeat(64),
+        },
+        settings: [
+          {
+            ref: { kind: 'signal', id: 'typing' },
+            enabled,
+            presetId: 'typing-recorded-v2',
+            volume: 0.5,
+            offset: 0,
+          },
+        ],
+      })),
+    });
+    const contextBundle = {
+      decodeContext: { id: 'decode' },
+      decodedBuffers: createEffectAudioBufferCache<AudioBuffer>(),
+      offlineContext: { id: 'offline' },
+    };
+    const createContext = vi.fn(() => contextBundle);
+    const renderLoop = vi.fn().mockResolvedValue(null);
+    vi.doMock('../../../clip-audio/index', async (original) => ({
+      ...(await original<typeof import('../../../clip-audio/index')>()),
+      collectRenderableAudioClips: () => [],
+    }));
+    vi.doMock('./context', async (original) => ({
+      ...(await original<typeof import('./context')>()),
+      createOfflineAudioMixContext: createContext,
+    }));
+    vi.doMock('./render-loop', () => ({ renderOfflineAudioMixLoop: renderLoop }));
+    const { renderOfflineAudioMix } = await import('./index');
+    await expect(renderOfflineAudioMix(archived)).resolves.toBeNull();
+    expect(createContext).toHaveBeenCalledTimes(render ? 1 : 0);
+    expect(renderLoop).toHaveBeenCalledTimes(render ? 1 : 0);
+    if (render)
+      expect(renderLoop).toHaveBeenCalledWith(expect.objectContaining({ project: archived }));
+    expect(archived.actionEvents).toEqual([]);
+    expect(archived.actionFeedback![0]!.signals).toEqual([]);
+  }
+);

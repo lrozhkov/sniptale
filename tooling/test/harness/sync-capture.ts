@@ -1,3 +1,19 @@
+import { createWebdavOutgoingHarness } from './webdav-outgoing';
+import { readCheckpointInTransaction } from '../../../apps/extension/src/composition/persistence/sync-capture/checkpoints';
+import { prepareAssetReadyClaimIndex } from '../../../apps/extension/src/composition/persistence/assets/opfs-store';
+import {
+  readPhysicalDeleteAuthority,
+  completePhysicalDeleteOperations,
+} from '../../../apps/extension/src/composition/persistence/assets/operations';
+import {
+  parsePhysicalDeleteAssetOperation,
+  settleAssetWritingMarkers,
+} from '../../../apps/extension/src/composition/persistence/assets';
+import {
+  SyncRemoteError,
+  type SyncRemoteStore,
+} from '../../../apps/extension/src/workflows/sync-transfer/remote-store';
+import type { CaptureRootKind } from '../../../apps/extension/src/composition/persistence/sync-capture/contracts';
 import { imageHarness } from './sync-image';
 import { outgoingHarness } from './sync-outgoing';
 import { publishReadyJournalWithRetry } from '../../../apps/extension/src/composition/persistence/assets';
@@ -89,6 +105,91 @@ async function changes(rootId?: string): Promise<CapturedChange[]> {
     })
     .sort((a, b) => a.generation - b.generation);
 }
+const fixtureFiles = new Map<string, Blob>();
+const fixtureRemote: SyncRemoteStore = {
+  async list(prefix) {
+    return {
+      objects: [...fixtureFiles]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, body]) => ({ key, size: body.size })),
+      prefixes: [],
+      nextCursor: null,
+    };
+  },
+  async stat(key) {
+    const body = fixtureFiles.get(key);
+    if (!body) throw new SyncRemoteError('missing');
+    return { size: body.size };
+  },
+  async read(key) {
+    const body = fixtureFiles.get(key);
+    if (!body) throw new SyncRemoteError('missing');
+    return body.stream();
+  },
+  async write(key, body) {
+    fixtureFiles.set(key, body);
+  },
+};
+const fixturePublication = createWebdavOutgoingHarness(
+  () => fixtureRemote,
+  async (id) => {
+    const capture = (await changes(id)).at(-1);
+    check(capture, 'The selected immutable fixture capture is missing.');
+    return capture;
+  }
+);
+async function pendingRoot(rootKind: CaptureRootKind, rootId: string) {
+  const db = await initDB();
+  const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
+  const profile = parseSyncCaptureRecord(await tx.objectStore(SYNC_CAPTURE_STORE).get('profile'));
+  check(profile?.kind === 'profile', 'The fixture enrollment is missing.');
+  const pending = await readCheckpointInTransaction(
+    tx,
+    {
+      spaceId: profile.spaceId,
+      connectionGeneration: profile.connectionGeneration,
+      profileCreatedAt: profile.createdAt,
+    },
+    { rootKind, rootId }
+  );
+  await tx.done;
+  return pending;
+}
+async function freezeProject(rootId: string) {
+  const pending = await pendingRoot('video-project', rootId);
+  check(pending, 'The selected native project has no pending checkpoint.');
+  const result = await fixturePublication.checkpointRoot('video-project', rootId);
+  check(
+    result.outcome === 'captured' && result.pendingRevision === pending.revision,
+    'The explicit project checkpoint was refused.'
+  );
+  const capture = (await changes(rootId)).find((row) => row.operationId === result.operationId);
+  check(
+    capture?.change.kind === 'video-project',
+    'The exact native project checkpoint is missing.'
+  );
+  check(
+    (await pendingRoot('video-project', rootId)) === null,
+    'The checkpoint retained its consumed pending revision.'
+  );
+  return capture;
+}
+async function publishProjectPredecessor(rootId: string) {
+  return fixturePublication.sendHistory(rootId, false, 'video-project');
+}
+async function rootState(rootKind: CaptureRootKind, rootId: string) {
+  const db = await initDB();
+  const profile = parseSyncCaptureRecord(await db.get(SYNC_CAPTURE_STORE, 'profile'));
+  check(profile?.kind === 'profile', 'The fixture enrollment is missing.');
+  const state = parseSyncCaptureRecord(
+    await db.get(
+      SYNC_CAPTURE_STORE,
+      JSON.stringify(['root-state', captureRootKey(profile.spaceId, rootKind, rootId)])
+    )
+  );
+  check(state?.kind === 'root-state', 'The selected causal fixture state is missing.');
+  return state;
+}
 async function project(id: string): Promise<VideoProjectEntry> {
   const db = await initDB();
   const entry = parseVideoProjectEntry(await db.get(VIDEO_PROJECTS_STORE, id));
@@ -108,11 +209,12 @@ async function refused(operation: () => Promise<unknown>): Promise<void> {
 async function withCaptureWriteFailure<T>(
   kind: string,
   ordinal: number,
-  operation: () => Promise<T>
+  operation: () => Promise<T>,
+  method: 'add' | 'put' = 'add'
 ): Promise<T> {
-  const original = IDBObjectStore.prototype.add;
+  const original = IDBObjectStore.prototype[method];
   let seen = 0;
-  IDBObjectStore.prototype.add = function (value: unknown, key?: IDBValidKey) {
+  IDBObjectStore.prototype[method] = function (value: unknown, key?: IDBValidKey) {
     if (
       this.name === SYNC_CAPTURE_STORE &&
       typeof value === 'object' &&
@@ -126,7 +228,7 @@ async function withCaptureWriteFailure<T>(
   try {
     return await operation();
   } finally {
-    IDBObjectStore.prototype.add = original;
+    IDBObjectStore.prototype[method] = original;
   }
 }
 function png(): Blob {
@@ -200,16 +302,19 @@ async function preProfileDependenciesProof() {
     return next;
   };
   const failed = candidate('Rolled back dependency genesis');
-  await withCaptureWriteFailure('sync-operation', 2, () =>
-    refused(() =>
-      saveVideoProject(failed, { expectedWorkspaceRevision: null, expectedProject: null })
-    )
+  await withCaptureWriteFailure(
+    'pending-checkpoint',
+    1,
+    () =>
+      refused(() =>
+        saveVideoProject(failed, { expectedWorkspaceRevision: null, expectedProject: null })
+      ),
+    'put'
   );
   const db = await initDB();
-  check((await changes()).length === 0, 'Failure retained a partial dependency capture.');
   check(
-    (await db.get(VIDEO_PROJECTS_STORE, failed.id)) === undefined,
-    'Failure published the project.'
+    (await changes()).length === 0 && (await db.get(VIDEO_PROJECTS_STORE, failed.id)) === undefined,
+    'Failed native pending admission retained a project or immutable capture.'
   );
   check(
     JSON.stringify(await db.get('media_library', mediaId)) === JSON.stringify(mediaBefore),
@@ -220,6 +325,25 @@ async function preProfileDependenciesProof() {
     saveVideoProject(failed, { expectedWorkspaceRevision: null, expectedProject: null }),
     saveVideoProject(peer, { expectedWorkspaceRevision: null, expectedProject: null }),
   ]);
+  const failedPending = await pendingRoot('video-project', failed.id);
+  check(
+    failedPending &&
+      (await pendingRoot('video-project', peer.id)) &&
+      (await changes()).length === 0,
+    'Parallel native saves lost pending ownership or prematurely froze dependencies.'
+  );
+  await withCaptureWriteFailure('sync-operation', 2, () => refused(() => freezeProject(failed.id)));
+  check(
+    (await changes()).length === 0 &&
+      (await pendingRoot('video-project', failed.id))?.revision === failedPending.revision,
+    'Checkpoint failure retained a dependency or consumed pending work.'
+  );
+  check(
+    JSON.stringify((await project(failed.id)).project) === JSON.stringify(saved[0]!.project),
+    'Failed later checkpoint erased an acknowledged native project.'
+  );
+  await freezeProject(failed.id);
+  await freezeProject(peer.id);
   const captured = await changes();
   const media = captured.filter((row) => row.rootKind === 'media');
   const projects = captured.filter((row) => row.rootKind === 'video-project');
@@ -267,6 +391,8 @@ async function preProfileDependenciesProof() {
     retry: true,
     parallel: true,
     sharedHead: true,
+    checkpointAtomic: true,
+    pendingRevision: (await pendingRoot('video-project', first.id))?.revision ?? null,
   };
 }
 
@@ -323,21 +449,32 @@ async function saveProof() {
       expectedWorkspaceRevision: localOnly.workspaceRevision ?? 0,
     }
   );
-  const initial = await changes(first.id);
-  check(initial.length === 1, 'Enabled save must create one capture.');
-  await withCaptureWriteFailure('sync-operation', 1, () =>
-    refused(() =>
-      saveVideoProject(
-        { ...first.project, name: 'Must roll back' },
-        { expectedProject: first.project }
-      )
-    )
+  const initialPending = await pendingRoot('video-project', first.id);
+  check(
+    initialPending && (await changes(first.id)).length === 0,
+    'Enabled save must retain native work before an explicit checkpoint.'
+  );
+  await withCaptureWriteFailure(
+    'pending-checkpoint',
+    1,
+    () =>
+      refused(() =>
+        saveVideoProject(
+          { ...first.project, name: 'Must roll back' },
+          { expectedProject: first.project }
+        )
+      ),
+    'put'
   );
   check(
     (await project(first.id)).project.name === 'Enabled',
     'Capture failure did not roll back the domain save.'
   );
-  check((await changes(first.id)).length === 1, 'Capture failure advanced the journal.');
+  check(
+    (await changes(first.id)).length === 0 &&
+      (await pendingRoot('video-project', first.id))?.revision === initialPending.revision,
+    'Failed native save changed pending ownership.'
+  );
   const outcomes = await Promise.allSettled(
     ['A', 'B'].map((name) =>
       saveVideoProject(
@@ -350,14 +487,17 @@ async function saveProof() {
     outcomes.filter((outcome) => outcome.status === 'fulfilled').length === 1,
     'Parallel stale writers were both accepted.'
   );
-  const accepted = await changes(first.id);
+  const acceptedPending = await pendingRoot('video-project', first.id);
   check(
-    accepted.length === 2 && accepted[1]!.generation === 2,
-    'Parallel saves did not preserve one generation.'
+    acceptedPending &&
+      acceptedPending.revision !== initialPending.revision &&
+      (await changes(first.id)).length === 0,
+    'Parallel native CAS lost or prematurely froze its pending work.'
   );
+  const acceptedCapture = await freezeProject(first.id);
   check(
-    accepted[1]!.basis[0] === accepted[0]!.operationId,
-    'The accepted writer lost its causal predecessor.'
+    acceptedCapture.generation === 1 && acceptedCapture.basis.length === 0,
+    'The coalesced first checkpoint has an invalid causal identity.'
   );
   const current = await project(first.id);
   check(
@@ -378,7 +518,8 @@ async function saveProof() {
     expectedProject: temporary,
     expectedWorkspaceRevision: 0,
   });
-  const promotion = (await changes(temporary.id))[0];
+  check(await pendingRoot('video-project', temporary.id), 'Opening promotion lost pending work.');
+  const promotion = await freezeProject(temporary.id);
   check(
     promoted.lifecycle?.storageClass === 'library' &&
       promotion?.change.kind === 'video-project' &&
@@ -388,7 +529,7 @@ async function saveProof() {
   await deleteVideoProject(first.id);
   const deleted = await changes(first.id);
   check(
-    deleted.length === 3 && deleted[2]!.change.kind === 'tombstone',
+    deleted.length === 2 && deleted[1]!.change.kind === 'tombstone',
     'Delete did not capture its tombstone.'
   );
   await refused(() =>
@@ -397,18 +538,33 @@ async function saveProof() {
       { expectedProject: current.project }
     )
   );
-  check((await changes(first.id)).length === 3, 'A refused delayed writer appended an intent.');
+  check(
+    (await changes(first.id)).length === 2 &&
+      (await pendingRoot('video-project', first.id)) === null,
+    'A refused delayed writer appended an intent.'
+  );
   await saveVideoProject(
     { ...current.project, name: 'Recreated identity' },
     { expectedProject: null, expectedWorkspaceRevision: null }
   );
-  const recreated = await changes(first.id);
+  const recreated = await pendingRoot('video-project', first.id);
+  const deletedState = await rootState('video-project', first.id);
   check(
-    recreated.length === 4 && recreated[3]!.generation === 4,
-    'Recreation reset the capture generation.'
+    recreated &&
+      deletedState.generation === 2 &&
+      deletedState.deleted === true &&
+      ((await project(first.id)).workspaceRevision ?? 0) > (current.workspaceRevision ?? 0),
+    'Recreation reset native revision or lost its pending causal identity.'
+  );
+  await publishProjectPredecessor(first.id);
+  const recreatedCapture = await freezeProject(first.id);
+  check(
+    recreatedCapture.generation === 3 && recreatedCapture.basis[0] === deleted[1]!.operationId,
+    'Explicit recreation checkpoint lost its tombstone predecessor.'
   );
   return {
     localDefault: true,
+    pendingThenCheckpoint: true,
     rollback: true,
     parallel: true,
     delayedDelete: true,
@@ -419,6 +575,7 @@ async function saveProof() {
 
 async function exportProof() {
   const entry = await sourceProject('Export root');
+  await freezeProject(entry.id);
   const blob = new Blob(['Saved export byte-storage fixture'], { type: 'video/webm' });
   const prepared = await writeBlobToAsset(blob, { mimeType: blob.type });
   const journal = await createAssetPublicationJournal({
@@ -443,17 +600,24 @@ async function exportProof() {
   });
   await publishProjectExportJournal(journal);
   const after = await changes(entry.id);
-  check(after.length === 2, 'Saved export did not append its project capture.');
+  check(
+    after.length === 2,
+    'Publication-keyed saved export did not append its project checkpoint.'
+  );
   const frozen = JSON.stringify(after[1]);
   const current = await project(entry.id);
   await saveVideoProject(
     { ...current.project, name: 'Edit after export' },
     { expectedProject: current.project }
   );
+  const laterPending = await pendingRoot('video-project', entry.id);
+  check(laterPending, 'Later ordinary edit lost its pending revision.');
   await publishProjectExportJournal(journal);
   const replayed = await changes(entry.id);
   check(
-    replayed.length === 3 && JSON.stringify(replayed[1]) === frozen,
+    replayed.length === 2 &&
+      JSON.stringify(replayed[1]) === frozen &&
+      (await pendingRoot('video-project', entry.id))?.revision === laterPending.revision,
     'Publication replay replaced a frozen snapshot or duplicated an operation.'
   );
   await releaseAssetReadyProtection([prepared.ref.assetId]);
@@ -484,15 +648,20 @@ async function cascadeProof() {
     { ...initial.project, assets: [...initial.project.assets, borrowed] },
     { expectedProject: initial.project }
   );
+  const beforeCascade = await freezeProject(entry.id);
   const usage = [
     { id: entry.id, kind: 'video' as const, name: entry.project.name, primary: false },
   ];
   const before = (await changes()).length;
-  await withCaptureWriteFailure('sync-operation', 2, () =>
+  const pendingBefore = await pendingRoot('video-project', entry.id);
+  await withCaptureWriteFailure('sync-operation', 1, () =>
     refused(() => deleteMediaAssetWithProjectCascade(mediaId, usage))
   );
   check(
-    (await project(entry.id)).project.assets.length === 2 && (await changes()).length === before,
+    (await project(entry.id)).project.assets.length === 2 &&
+      (await changes()).length === before &&
+      JSON.stringify(await pendingRoot('video-project', entry.id)) ===
+        JSON.stringify(pendingBefore),
     'The second capture failure did not roll back the cascade.'
   );
   await deleteMediaAssetWithProjectCascade(mediaId, usage);
@@ -504,7 +673,9 @@ async function cascadeProof() {
   const sourceChanges = await changes(mediaId);
   const tombstones = sourceChanges.filter((capture) => capture.change.kind === 'tombstone');
   check(
-    projectChanges.length === 3 &&
+    projectChanges.length === 1 &&
+      projectChanges[0]!.operationId === beforeCascade.operationId &&
+      Boolean(await pendingRoot('video-project', entry.id)) &&
       sourceChanges.some((capture) => capture.change.kind === 'media') &&
       tombstones.length === 1,
     'Cascade did not capture both affected roots.'
@@ -513,8 +684,9 @@ async function cascadeProof() {
 }
 
 async function frozenProof() {
+  await prepareAssetReadyClaimIndex();
   const entry = await sourceProject('Frozen revision N');
-  const capture = (await changes(entry.id))[0]!;
+  const capture = await freezeProject(entry.id);
   check(capture.change.kind === 'video-project', 'Missing frozen project.');
   const before = await materialize(capture);
   const ref = capture.change.rows.refs[0]!;
@@ -539,6 +711,11 @@ async function frozenProof() {
     (await db.getAllFromIndex('asset_owners', 'assetId', ref.assetId)).length === 0,
     'Only-copy proof still has a native owner.'
   );
+  const retainedAuthority = await readPhysicalDeleteAuthority([ref.assetId]);
+  check(
+    retainedAuthority(ref.assetId) === 'publication',
+    'Frozen source survival was not justified by its immutable capture claim.'
+  );
   check(
     (await sha(await readAssetFile(ref, 'retained.png'))) === expectedHash,
     'Pending capture lost its source bytes.'
@@ -547,7 +724,7 @@ async function frozenProof() {
   await applyVideoProjectForCapturePrototype({
     operationId: crypto.randomUUID(),
     sourceDigest: await sha(new Blob([JSON.stringify(rows)])),
-    expectedLocalGeneration: 3,
+    expectedLocalGeneration: (await rootState('video-project', entry.id)).generation,
     root: {
       entry: {
         ...rows.project,
@@ -573,7 +750,7 @@ async function frozenProof() {
 
 async function provenanceProof() {
   const entry = await sourceProject('Before remote apply');
-  const capture = (await changes(entry.id))[0]!;
+  const capture = await freezeProject(entry.id);
   check(capture.change.kind === 'video-project', 'Expected native snapshot.');
   const rows = capture.change.rows;
   const remote = {
@@ -617,6 +794,11 @@ async function provenanceProof() {
     { ...current.project, name: 'Local edit after apply' },
     { expectedProject: current.project }
   );
+  check(
+    await pendingRoot('video-project', entry.id),
+    'Post-apply edit lost its pending native work.'
+  );
+  await freezeProject(entry.id);
   const outgoing = await changes(entry.id);
   check(
     outgoing.length === 2 && outgoing[1]!.generation === 3 && outgoing[1]!.basis[0] === operationId,
@@ -627,7 +809,7 @@ async function provenanceProof() {
 
 async function restoreProof() {
   const entry = await saveVideoProject(createEmptyVideoProject('Restore original'));
-  const capture = (await changes(entry.id))[0]!;
+  const capture = await freezeProject(entry.id);
   check(capture.change.kind === 'video-project', 'Expected restore source.');
   const roots = await buildVideoProjectRootInventory({
     db: createFrozenSnapshotDatabase(capture.change.rows),
@@ -711,16 +893,12 @@ async function restoreProof() {
     (fresh.workspaceRevision ?? 0) > (current.workspaceRevision ?? 0),
     'Fresh restore writer did not advance native admission.'
   );
-  const final = await changes(entry.id);
+  const finalPending = await pendingRoot('video-project', entry.id);
+  const finalState = await rootState('video-project', entry.id);
   check(
-    final.at(-1)?.basis[0] === repeatedChanges.at(-1)?.operationId,
-    'Fresh restore writer lost its causal predecessor.'
+    finalPending && finalState.basis[0] === repeatedChanges.at(-1)?.operationId,
+    'Fresh restore writer lost pending ownership or its causal predecessor.'
   );
-  if (oldWriterAccepted)
-    check(
-      final.at(-1)?.basis[0] === repeatedChanges.at(-1)?.operationId,
-      'An admitted old editor lost the restore predecessor.'
-    );
   return {
     checkpointAtomic: true,
     localCapture: true,
@@ -940,8 +1118,14 @@ async function applicationProof() {
 
 async function applicationAfterEditorProof(projectId: string, mediaId: string) {
   const edited = await project(projectId);
-  const captured = await changes(projectId);
-  check(captured.length > 0, 'The real editor did not capture a saved change.');
+  const editorPending = await pendingRoot('video-project', projectId);
+  check(editorPending, 'The real editor lost its pending native save.');
+  const captured = await freezeProject(projectId);
+  check(
+    captured.change.kind === 'video-project' &&
+      JSON.stringify(captured.change.rows.project) === JSON.stringify(edited),
+    'Explicit checkpoint differs from the acknowledged native editor state.'
+  );
   const usage = await listMediaAssetProjectUsage(mediaId);
   check(
     usage.some((item) => item.id === projectId),
@@ -996,6 +1180,8 @@ async function applicationAfterEditorProof(projectId: string, mediaId: string) {
   );
   return {
     captured: true,
+    pendingThenCheckpoint: true,
+    checkpointRevision: editorPending.revision,
     usage: true,
     cascade: true,
     delayedWriterRefused: true,
@@ -1066,6 +1252,7 @@ async function mediaCausalRevisionsProof(initialPayload: unknown, nextPayload: u
   );
   await applyPreparedMediaReplica(first.input);
   await releaseAssetReadyProtection([first.input.rows.ref.assetId]);
+  await settleAssetWritingMarkers([first.input.rows.ref.assetId]);
   const next = await prepareTransferredMediaReplica(nextPayload);
   check(
     next.input.rows.media.id === first.input.rows.media.id &&
@@ -1088,6 +1275,7 @@ async function mediaCausalRevisionsProof(initialPayload: unknown, nextPayload: u
     'Receipt replay changed a committed revision.'
   );
   await releaseAssetReadyProtection([next.input.rows.ref.assetId]);
+  await settleAssetWritingMarkers([next.input.rows.ref.assetId]);
   const persisted = await verifyMediaReplicaPersistence(first.input.rows.media.id);
   check(
     persisted.hash === next.hash && persisted.generation === 2,
@@ -1108,6 +1296,7 @@ async function mediaCausalRevisionsProof(initialPayload: unknown, nextPayload: u
 /** Verify source bytes and prepare a local binding in this disposable profile. */
 async function prepareTransferredMediaReplica(payload: unknown) {
   await harnessReady;
+  await prepareAssetReadyClaimIndex();
   check(
     isRecord(payload) &&
       Array.isArray(payload['bytes']) &&
@@ -1258,6 +1447,11 @@ async function mediaDeleteRestoreProof(mediaId: string) {
     (await db.get('media_library', mediaId)) === undefined,
     'Native deletion retained the logical root.'
   );
+  const deletes = (await db.getAll('asset_operations'))
+    .map(parsePhysicalDeleteAssetOperation)
+    .filter((operation) => operation !== null)
+    .filter((operation) => operation.assetIds.includes(ref.assetId));
+  await completePhysicalDeleteOperations(deletes);
   await refused(() => readAssetFile(ref, media.filename));
   const restoredFile = await writeBlobToAsset(new Blob([bytes], { type: ref.mimeType }), {
     mimeType: ref.mimeType,
@@ -1278,6 +1472,7 @@ async function mediaDeleteRestoreProof(mediaId: string) {
     expectedBasis: [deletion.operationId],
   });
   await releaseAssetReadyProtection([restoredFile.ref.assetId]);
+  await settleAssetWritingMarkers([restoredFile.ref.assetId]);
   check(
     (await applyCatalogDeletionNative(deletion)).status === 'duplicate',
     'Old delete replay was not a duplicate.'
@@ -1482,6 +1677,7 @@ async function recoverMediaReplicaProof(mediaId: string, journalId: string) {
 
 const syncCaptureHarness = {
   image: imageHarness,
+  pendingProject: (rootId: string) => pendingRoot('video-project', rootId),
   preProfileDependenciesProof,
   outgoing: outgoingHarness,
   stageMediaReplicaForRecovery,

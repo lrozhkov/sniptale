@@ -14,6 +14,7 @@ const exportMocks = vi.hoisted(() => ({
   getRecordingMock: vi.fn(),
   initDBMock: vi.fn(),
   txDeleteMock: vi.fn(),
+  selectedRecoveryMock: vi.fn(),
   txCountMock: vi.fn(),
   txDoneMock: vi.fn(),
   txPutMock: vi.fn(),
@@ -25,6 +26,11 @@ const exportMocks = vi.hoisted(() => ({
   discardPreparedAssetMock: vi.fn(),
   readAssetFileMock: vi.fn(),
   releaseAssetReadyProtectionMock: vi.fn(),
+}));
+
+vi.mock('../assets/recovery', async (importOriginal) => ({
+  ...(await importOriginal()),
+  recoverSelectedAssetPublications: exportMocks.selectedRecoveryMock,
 }));
 
 vi.mock('../assets', async (importOriginal) => ({
@@ -72,6 +78,7 @@ vi.mock('../recordings/index', async (importOriginal) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  exportMocks.selectedRecoveryMock.mockReset().mockResolvedValue(0);
   exportMocks.txDoneMock.mockResolvedValue(undefined);
   exportMocks.initDBMock.mockResolvedValue({
     get: exportMocks.dbGetMock,
@@ -255,9 +262,7 @@ it('preserves mirror evidence when the source export is already absent', async (
 
 it('does not delete an export while a committed ready journal cannot be drained', async () => {
   const { deleteProjectExport } = await import('./index');
-  exportMocks.recoverProjectMediaPublicationsMock.mockRejectedValueOnce(
-    new Error('ready journal replay failed')
-  );
+  exportMocks.selectedRecoveryMock.mockRejectedValueOnce(new Error('ready journal replay failed'));
 
   await expect(deleteProjectExport('export-1')).rejects.toThrow('ready journal replay failed');
 
@@ -279,3 +284,31 @@ exportMocks.createAssetPublicationJournalMock.mockResolvedValue({ journalId: 'jo
 exportMocks.publishReadyJournalWithRetryMock.mockResolvedValue(undefined);
 exportMocks.discardPreparedAssetMock.mockResolvedValue(undefined);
 exportMocks.txCountMock.mockResolvedValue(0);
+
+it('selects only the deleted export publication identity even when its source row is missing', async () => {
+  const { deleteProjectExport } = await import('./index');
+  exportMocks.dbGetMock.mockResolvedValueOnce(undefined);
+  await deleteProjectExport('selected-export');
+  expect(exportMocks.selectedRecoveryMock).toHaveBeenCalledWith(
+    [expect.objectContaining({ domain: 'project-exports' })],
+    {
+      id: 'export:selected-export',
+      source: { kind: 'project-export', exportId: 'selected-export' },
+    },
+    { transitionPermit: expect.any(Object), lifecyclePermit: expect.any(Object) }
+  );
+  expect(exportMocks.recoverProjectMediaPublicationsMock).not.toHaveBeenCalled();
+  expect(exportMocks.txDeleteMock).not.toHaveBeenCalled();
+});
+
+it.each([{ id: 'export-1' }, createProjectExportEntry({ id: 'wrong-export' })])(
+  'refuses malformed or mismatched export source bindings: %j',
+  async (raw) => {
+    const { deleteProjectExport } = await import('./index');
+    exportMocks.dbGetMock.mockResolvedValueOnce(raw);
+    await expect(deleteProjectExport('export-1')).rejects.toMatchObject({
+      reason: 'source-unavailable',
+    });
+    expect(exportMocks.txDeleteMock).not.toHaveBeenCalled();
+  }
+);

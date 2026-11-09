@@ -1,3 +1,4 @@
+import { createSyncProductClient } from '../../../platform/runtime-messaging/sync-product-client';
 import type { ScenarioProjectSnapshot } from '../../../composition/persistence/scenario/contracts';
 import {
   getTourImages,
@@ -100,10 +101,12 @@ export function useGuidePageState() {
   const busy = useRef(false);
   const [, publishMutationRelease] = useReducer((revision: number) => revision + 1, 0);
   const autosaving = useRef(false);
+  const autosaveOwner = useRef<ReturnType<typeof useGuideAutosave> | null>(null);
   const { project, reset, commit, publish, actionId, closedCaptures, ...editing } = useGuideHistory(
     {
       canEdit: () => (!busy.current || autosaving.current) && status !== 'loading',
       onEdit: () => {
+        autosaveOwner.current?.beginEdit();
         setActionError(null);
         setStatus((current) => (current === 'conflict' ? 'conflict' : 'dirty'));
       },
@@ -211,6 +214,22 @@ export function useGuidePageState() {
       publish(committed, source, historyAction);
     },
   });
+  autosaveOwner.current = autosave;
+  const prepareExit = async () => {
+    const turn = generation.current;
+    if (busy.current && !autosaving.current) return false;
+    if (!current.current.project) return true;
+    const exit = await autosave.prepareCheckpointExit();
+    if (!exit || turn !== generation.current || !exit.isCurrent()) return false;
+    if (exit.receipt) {
+      try {
+        await createSyncProductClient().requestCheckpointExit(exit.receipt);
+      } catch {
+        // The durable interval remains the recovery path for an undelivered exit intent.
+      }
+    }
+    return turn === generation.current && exit.isCurrent();
+  };
   const rejectAction = (action: Exclude<GuideActionError, 'structure'>) => {
     setStatus(status);
     setActionError(action);
@@ -310,8 +329,11 @@ export function useGuidePageState() {
     actionError,
     images: useGuideMedia(project),
     ...selection,
-    openExisting: (id: string) =>
-      openExistingScenarioProject(id, enterResourceSession, openProject),
+    prepareExit,
+    openExisting: async (id: string) => {
+      if (!(await prepareExit())) return;
+      await openExistingScenarioProject(id, enterResourceSession, openProject);
+    },
     ...editing,
     ...autosave,
     ...createGuideProjectCommands({
@@ -321,6 +343,7 @@ export function useGuidePageState() {
       openProject,
       setStatus,
       rejectAction,
+      prepareExit,
     }),
     reload: load,
   };
@@ -334,6 +357,7 @@ function createGuideProjectCommands({
   openProject,
   setStatus,
   rejectAction,
+  prepareExit,
 }: {
   project: GuideProject | null;
   status: GuidePageStatus;
@@ -341,15 +365,18 @@ function createGuideProjectCommands({
   openProject: (project: ScenarioProjectSnapshot | null) => Promise<void>;
   setStatus: (status: GuidePageStatus) => void;
   rejectAction: (action: Exclude<GuideActionError, 'structure'>) => void;
+  prepareExit: () => Promise<boolean>;
 }) {
-  const create = (name: string) =>
-    mutate(
+  const create = async (name: string) => {
+    if (!(await prepareExit())) return false;
+    return mutate(
       () => createScenarioProjectRecord(name),
       openProject,
       () => setStatus('failed')
     );
+  };
   const duplicate = async (name: string) => {
-    if (!project) return;
+    if (!project || (status !== 'conflict' && !(await prepareExit()))) return;
     await mutate(
       () => duplicateScenarioProjectRecord(project, name),
       openProject,
@@ -365,7 +392,7 @@ function createGuideProjectCommands({
     );
   };
   const remove = async () => {
-    if (!project) return;
+    if (!project || !(await prepareExit())) return;
     await mutate(
       () => deleteScenarioProjectRecord(project.id),
       () => openProject(null),

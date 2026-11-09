@@ -6,7 +6,7 @@ import { bindMotionRegionToClip } from '../../../../apps/extension/src/features/
 import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { drawProjectFrame } from '../../../../apps/extension/src/offscreen/project-export/renderer/frame';
 import { renderPreviewScene } from '../../../../apps/extension/src/video-editor/preview/stage/scene/render-preview';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../../../apps/extension/src/workflows/video-review/spatial-render-session';
 import { DEFAULT_CAMERA_PERSPECTIVE } from '../../../../apps/extension/src/features/video/project/motion/spatial';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { projectWindowHeaderImages } from '../../../../apps/extension/src/features/video/composition/draw/window-header';
@@ -295,7 +295,7 @@ export async function nativeSceneSpotlightRasterProof(bytes: number[]) {
           resolution: 'SOURCE' as const,
           downloadAfterExport: false,
         };
-        const renderer = mode === 'perspective' ? createReviewSpatialRenderer() : null;
+        const renderer = mode === 'perspective' ? createReviewSpatialSession() : null;
         try {
           const spatial = renderer ? { spatialRenderer: () => renderer } : {};
           const sources = new Map([[clip.id, video]]);

@@ -5,6 +5,7 @@ import { createPassContext } from '../interpreter/support.test-support';
 import { createSvgPartTransform } from './part-transform';
 import { clearSvgVectorCache, parseSvgAsset } from './vector-parser';
 import { drawSvgVectorAsset } from './vector-renderer';
+import * as primitiveBounds from './path-bounds';
 
 class FakePath2D {
   constructor(readonly source: string) {}
@@ -89,6 +90,32 @@ it('filters unmatched ids, groups, and callbacks without drawing parts', () => {
 
   expect(context.fill).not.toHaveBeenCalled();
   expect(context.stroke).not.toHaveBeenCalled();
+});
+
+it('derives SVG bounds only for the GPU paint hook without changing hydrated item fields', () => {
+  const asset = createAsset(),
+    context = createPassContext();
+  const spy = vi.spyOn(primitiveBounds, 'getSvgPartPrimitiveBounds');
+  try {
+    drawSvgVectorAsset(context, asset);
+    expect(spy).not.toHaveBeenCalled();
+    const part = parseSvgAsset(asset).parts[0]!,
+      keys = Object.keys(part);
+    const paint = vi.fn(
+      (
+        draw: () => void,
+        _bounds?: import('../canvas/primitive-bounds').PrimitiveGeometry,
+        _stroke?: boolean
+      ) => draw()
+    );
+    drawSvgVectorAsset(context, asset, { paint, primitive: (draw) => draw(context) });
+    expect(paint).toHaveBeenCalledTimes(4);
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(Object.keys(part)).toEqual(keys);
+    expect(paint.mock.calls[0]![1]).toEqual({ x: 0, y: 0, width: 10, height: 10 });
+  } finally {
+    spy.mockRestore();
+  }
 });
 
 it('supports every deterministic preset ordering and scatter mode', () => {

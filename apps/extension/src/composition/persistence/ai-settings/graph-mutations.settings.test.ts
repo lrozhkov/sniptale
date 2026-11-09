@@ -1,3 +1,25 @@
+vi.mock('../secret-protection/service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secret-protection/service')>();
+  const { SecretProtectionAdmissionPermit, SecretProtectionLockedError } =
+    await import('../secret-protection/model');
+  const { readPreparedSecretProtectionControl } =
+    await import('../secret-protection/transition.store');
+  const withSecretProtectionWriter: typeof actual.withSecretProtectionWriter = async (
+    operation,
+    permit
+  ) => {
+    const control = await readPreparedSecretProtectionControl();
+    if (control?.phase === 'transitioning') throw new SecretProtectionLockedError();
+    if (permit) {
+      if (!SecretProtectionAdmissionPermit.isActive(permit))
+        throw new SecretProtectionLockedError();
+      return operation(permit);
+    }
+    return SecretProtectionAdmissionPermit.run(operation);
+  };
+  return { ...actual, withSecretProtectionWriter };
+});
+
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const coreMocks = vi.hoisted(() => ({
@@ -49,58 +71,46 @@ beforeEach(() => {
   });
 });
 
-it('dispatches value and secret-protection commands inside the same authority', async () => {
+it('dispatches ordinary settings inside the AI authority', async () => {
   await mutateStoredAISettings({ operation: 'save-global-prompt', prompt: 'global' });
   await mutateStoredAISettings({ operation: 'save-scenario-editor-prompt', prompt: 'scenario' });
   await mutateStoredAISettings({ operation: 'reset-global-prompt' });
   await mutateStoredAISettings({ operation: 'reset-scenario-editor-prompt' });
   await mutateStoredAISettings({ enabled: true, operation: 'save-chrome-ai-enabled' });
-  await mutateStoredAISettings({
-    operation: 'change-secret-passphrase-protection',
-    currentPassphrase: 'current',
-    nextPassphrase: 'next',
-  });
-  await mutateStoredAISettings({ operation: 'lock-secret-passphrase-protection' });
-
   expect(coreMocks.saveGlobalSystemPrompt).toHaveBeenCalledWith('global');
   expect(coreMocks.saveScenarioEditorSystemPrompt).toHaveBeenCalledWith('scenario');
   expect(coreMocks.resetGlobalSystemPrompt).toHaveBeenCalledOnce();
   expect(coreMocks.resetScenarioEditorSystemPrompt).toHaveBeenCalledOnce();
   expect(coreMocks.saveChromeAiEnabled).toHaveBeenCalledWith(true);
-  expect(coreMocks.changeAISecretPassphraseProtection).toHaveBeenCalledWith({
-    currentPassphrase: 'current',
-    nextPassphrase: 'next',
-  });
-  expect(coreMocks.lockAISecretProtection).toHaveBeenCalledOnce();
-  expect(invariantMock).toHaveBeenCalledTimes(14);
+  expect(invariantMock).toHaveBeenCalledTimes(10);
 });
 
-it('dispatches remaining secret-protection commands and returns serialized status', async () => {
-  await mutateStoredAISettings({
-    operation: 'enable-secret-passphrase-protection',
-    passphrase: 'enable-passphrase',
-  });
-  await mutateStoredAISettings({
-    operation: 'disable-secret-passphrase-protection',
-    passphrase: 'disable-passphrase',
-  });
-  await mutateStoredAISettings({
-    operation: 'unlock-secret-passphrase-protection',
-    passphrase: 'unlock-passphrase',
-  });
-  await mutateStoredAISettings({ operation: 'reset-secret-passphrase-protection' });
+it('refuses protection commands outside the common background authority and preserves serialized status', async () => {
+  for (const command of [
+    { operation: 'enable-secret-passphrase-protection', passphrase: 'enable' },
+    { operation: 'disable-secret-passphrase-protection', passphrase: 'disable' },
+    { operation: 'unlock-secret-passphrase-protection', passphrase: 'unlock' },
+    {
+      operation: 'change-secret-passphrase-protection',
+      currentPassphrase: 'old',
+      nextPassphrase: 'next',
+    },
+    { operation: 'lock-secret-passphrase-protection' },
+    { operation: 'reset-secret-passphrase-protection' },
+  ] as const) {
+    await expect(mutateStoredAISettings(command)).rejects.toThrow('common background authority');
+  }
+  expect(coreMocks.enableAISecretPassphraseProtection).not.toHaveBeenCalled();
+  expect(coreMocks.disableAISecretPassphraseProtection).not.toHaveBeenCalled();
+  expect(coreMocks.unlockAISecretProtection).not.toHaveBeenCalled();
+  expect(coreMocks.changeAISecretPassphraseProtection).not.toHaveBeenCalled();
+  expect(coreMocks.lockAISecretProtection).not.toHaveBeenCalled();
+  expect(coreMocks.resetAISecretPassphraseProtection).not.toHaveBeenCalled();
   await expect(loadSerializedAISecretProtectionStatus()).resolves.toEqual({
     isEnabled: true,
     isUnlocked: true,
     mode: 'passphrase',
   });
-
-  expect(coreMocks.enableAISecretPassphraseProtection).toHaveBeenCalledWith('enable-passphrase');
-  expect(coreMocks.disableAISecretPassphraseProtection).toHaveBeenCalledWith('disable-passphrase');
-  expect(coreMocks.unlockAISecretProtection).toHaveBeenCalledWith('unlock-passphrase');
-  expect(coreMocks.resetAISecretPassphraseProtection).toHaveBeenCalledOnce();
-  expect(coreMocks.loadAISecretProtectionStatus).toHaveBeenCalledOnce();
-  expect(invariantMock).toHaveBeenCalledTimes(9);
 });
 
 it('keeps recognition prompt save/reset ordered with other AI settings mutations after failure', async () => {

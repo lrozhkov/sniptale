@@ -1,3 +1,4 @@
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import type { useReviewWorkspaceColor } from './workspace-color';
 import {
@@ -22,6 +23,7 @@ type ReviewPreviewInspectorBinding = {
   onProjectRetry?: () => void;
   preferences: QuickPreviewPreferences;
   status: ReturnType<typeof useReviewPreviewPreferences>['status'];
+  rendererStatus?: PreviewRendererStatus | null;
   actualRaster: { width: number; height: number } | null;
   disabled?: boolean | undefined;
   onChange(patch: Partial<QuickPreviewPreferences>): void;
@@ -40,6 +42,26 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
       className="min-w-0 sniptale-parameter-stack"
       title={translate('gallery.videoReview.previewOnly')}
     >
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('editor.scene.previewRenderer')}
+        disabled={props.disabled}
+        value={props.preferences.renderer}
+        options={[
+          { value: 'gpu', label: translate('editor.scene.previewRendererGpu') },
+          { value: 'legacy', label: translate('editor.scene.previewRendererLegacy') },
+        ]}
+        onChange={(renderer: QuickPreviewPreferences['renderer']) => props.onChange({ renderer })}
+      />
+      {props.preferences.renderer === 'gpu' && props.rendererStatus?.fallback ? (
+        <p role="status" className="m-0 text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate(
+            props.rendererStatus.fallback === 'device-failed'
+              ? 'editor.scene.previewRendererFailed'
+              : 'editor.scene.previewRendererUnavailable'
+          )}
+        </p>
+      ) : null}
       <InspectorParameterRow label={translate('gallery.videoReview.previewActualRaster')}>
         <output
           className="block w-full whitespace-nowrap px-2 text-right text-[13px] font-normal tabular-nums

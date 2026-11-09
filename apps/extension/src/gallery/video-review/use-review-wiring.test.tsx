@@ -22,7 +22,10 @@ const mocks = vi.hoisted(() => ({
   project: vi.fn(() => ({ markers: [], warnings: 2 })),
 }));
 
-vi.mock('../../features/video/review/telemetry', () => ({ projectReviewTelemetry: mocks.project }));
+vi.mock('../../features/video/review/telemetry', async (original) => ({
+  ...(await original<typeof import('../../features/video/review/telemetry')>()),
+  projectReviewTelemetry: mocks.project,
+}));
 vi.mock('./use-review-comments', () => ({ useReviewCommentActions: mocks.comments }));
 vi.mock('./use-canvas-comments', () => ({ useCanvasComments: mocks.canvas }));
 vi.mock('./use-review-audio', () => ({ useReviewAudio: mocks.audio }));

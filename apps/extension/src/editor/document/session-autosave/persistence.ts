@@ -10,9 +10,12 @@ import { useEditorStore } from '../../state/useEditorStore';
 import { scheduleImagePresentation } from './presentation';
 import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 import {
+  checkpointEditForAutosave,
+  settleAutosaveCheckpointEdit,
   cancelPendingAutosaveRequest,
   interruptImagePresentation,
   type ActiveEditorSessionContext,
+  type EditorCheckpointExit,
   type EditorSessionAutosaveState,
   type EditorAutosaveCapture,
 } from './state';
@@ -35,7 +38,15 @@ async function persistEditorSessionDocument(args: {
   hydrationGeneration: number;
   state: EditorSessionAutosaveState;
 }): Promise<void> {
+  const edit = checkpointEditForAutosave(args.state);
+  let writing = false;
   try {
+    if (edit) await edit.acquired;
+    if (!isCurrentCapture(args.state, args) || edit?.retired) return;
+    if (edit) {
+      edit.writes++;
+      writing = true;
+    }
     const result = await commitImageWorkspace({
       aggregateId: args.context.aggregateId,
       ...(args.context.capturedAt === undefined ? {} : { captureTime: args.context.capturedAt }),
@@ -47,6 +58,7 @@ async function persistEditorSessionDocument(args: {
       reusableAssetsByRuntimeUrl: args.state.documentAssetsByRuntimeUrl,
     });
 
+    if (edit) edit.committed = true;
     if (!isSameContext(args.state, args)) return;
     if (args.state.activeContext?.aggregateId === args.context.aggregateId) {
       args.state.activeContext.durableRevision = result.revision;
@@ -61,6 +73,9 @@ async function persistEditorSessionDocument(args: {
       args.state.activeContext?.aggregateId === args.context.aggregateId &&
       args.revision === args.state.autosaveRevision
     ) {
+      args.state.lastCheckpointReceipt = result.checkpointReceipt
+        ? { ...result.checkpointReceipt }
+        : null;
       args.state.hasUnsavedChanges = false;
       setEditorSaveErrorMessage(null);
       setEditorSaveState('saved');
@@ -80,6 +95,9 @@ async function persistEditorSessionDocument(args: {
     );
     setEditorSaveState('error');
     throw error;
+  } finally {
+    if (edit && writing) edit.writes--;
+    settleAutosaveCheckpointEdit(args.state, edit);
   }
 }
 
@@ -299,4 +317,36 @@ export async function saveEditorSessionSnapshot(
     if (!isCurrentCapture(state, captured) || (hydration && !hydration.isCurrent()))
       throw new Error('Editor document changed while waiting to save.');
   });
+}
+
+/** Join the existing local save barrier and guard the document across an awaited exit intent. */
+export async function prepareEditorCheckpointExit(
+  state: EditorSessionAutosaveState,
+  getDocument: () => EditorDocument
+): Promise<EditorCheckpointExit> {
+  const generation = {
+    contextGeneration: state.contextGeneration,
+    hydrationGeneration: state.hydrationGeneration,
+  };
+  await flushPendingAutosave(state, getDocument);
+  requireAutosaveGeneration(state, generation);
+  const aggregateId = state.activeContext?.aggregateId ?? null;
+  const durableRevision = state.activeContext?.durableRevision ?? null;
+  const autosaveRevision = state.autosaveRevision;
+  const isCurrent = () =>
+    aggregateId !== null &&
+    state.activeContext?.aggregateId === aggregateId &&
+    state.contextGeneration === generation.contextGeneration &&
+    state.hydrationGeneration === generation.hydrationGeneration &&
+    state.activeContext.durableRevision === durableRevision &&
+    state.autosaveRevision === autosaveRevision &&
+    !state.hydration &&
+    !state.hasUnsavedChanges &&
+    !state.pendingDocument &&
+    !state.interactionActive &&
+    !state.lastWriteError;
+  return {
+    receipt: isCurrent() && state.lastCheckpointReceipt ? { ...state.lastCheckpointReceipt } : null,
+    isCurrent,
+  };
 }

@@ -1,3 +1,4 @@
+import { closeEffectRuntimeGpuPlanResources } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import { collectEffectRuntimeResultBitmaps } from '../../contracts/effect-runtime/retry-inputs';
 import {
   createEffectRuntimeFailure,
@@ -9,7 +10,7 @@ import {
   EFFECT_RUNTIME_SANDBOX_CONNECT_MESSAGE,
   EFFECT_RUNTIME_SANDBOX_READY_MESSAGE,
   EFFECT_RUNTIME_SANDBOX_RENDER_MESSAGE,
-  type EffectRuntimeFrameResult,
+  type EffectRuntimeSceneResult,
 } from '../../contracts/effect-runtime/types';
 import type { EffectRuntimeBrokerSession } from './session';
 
@@ -100,10 +101,11 @@ function executeRequest(
   );
 }
 
-function postResult(port: MessagePort, result: EffectRuntimeFrameResult): void {
+function postResult(port: MessagePort, result: EffectRuntimeSceneResult): void {
   try {
     port.postMessage(result, collectEffectRuntimeResultBitmaps(result));
   } catch {
-    closeEffectRuntimeBitmaps(result);
+    if (result.kind === 'gpu-plan') closeEffectRuntimeGpuPlanResources(result);
+    else closeEffectRuntimeBitmaps(result);
   }
 }

@@ -608,22 +608,32 @@ it('uses the shared stage uploader with cancellation and separate import admissi
   Object.defineProperty(input, 'files', { value: [file], configurable: true });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
   expect(uploadStage).toHaveBeenCalledWith(file, expect.any(AbortSignal), undefined);
-  expect(
+  const uploadButton = () =>
     [...host.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent?.trim() === translate('settings.editor.backgrounds.upload')
-    )?.disabled
-  ).toBe(true);
+    )!;
+  expect(uploadButton().getAttribute('aria-disabled')).toBe('true');
+  expect(uploadButton().getAttribute('aria-busy')).toBe('true');
+  const inputClick = vi.spyOn(input, 'click');
+  await click(translate('settings.editor.backgrounds.upload'));
+  expect(inputClick).not.toHaveBeenCalled();
+  expect(uploadStage).toHaveBeenCalledTimes(1);
   await click('Cancel preparation');
   expect(uploadStage.mock.calls[0]?.[1].aborted).toBe(true);
   await act(async () => finish?.(false));
   expect(host.querySelector('[role="alert"]')).toBeNull();
+  expect(uploadButton().getAttribute('aria-disabled')).toBe('false');
+  expect(uploadButton().getAttribute('aria-busy')).toBe('false');
   importDisabled = true;
   draw();
-  expect(
-    [...host.querySelectorAll<HTMLButtonElement>('button')].find(
-      (button) => button.textContent?.trim() === translate('settings.editor.backgrounds.upload')
-    )?.disabled
-  ).toBe(true);
+  expect(uploadButton().getAttribute('aria-disabled')).toBe('true');
+  const pendingInputClick = vi.spyOn(
+    host.querySelector<HTMLInputElement>('input[type="file"]')!,
+    'click'
+  );
+  await click(translate('settings.editor.backgrounds.upload'));
+  expect(pendingInputClick).not.toHaveBeenCalled();
+  expect(uploadStage).toHaveBeenCalledTimes(1);
   expect(host.querySelector<HTMLButtonElement>('[aria-label="Stage background"]')?.disabled).toBe(
     false
   );

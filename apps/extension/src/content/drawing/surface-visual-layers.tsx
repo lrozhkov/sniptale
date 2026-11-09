@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
+import { DrawingSimplifyLayer } from './simplify-layer';
 import {
   getDrawingObjectBounds,
   getDrawingObjectRotation,
@@ -8,6 +9,7 @@ import {
 } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { drawDrawingFrame } from './frame';
+import { clipDrawingObjectToRoot } from './layout';
 import type { DrawingVisualLayer } from './frame-renderables';
 import {
   DrawingTextBackgrounds,
@@ -22,15 +24,39 @@ export function DrawingVisualLayers(props: {
   projection: DrawingPoint;
   root: NonNullable<ReturnType<ContentDrawingController['getScrollRoot']>>;
   getObjectOpacity?: (objectId: string) => number;
+  getObjectAnchor?: (object: DrawingObject) => Element | null;
 }) {
+  const clip = props.root.kind === 'element' ? props.root.element.getBoundingClientRect() : null;
   const pixelBudget = 16_777_216 / props.layers.filter((layer) => layer.kind === 'ink').length;
   return props.layers.map((layer, index) => {
     if (layer.kind === 'ink' && index === 0) return null;
+    const objectClip =
+      layer.kind === 'simplify' &&
+      clip &&
+      clipDrawingObjectToRoot(layer.object, props.root, props.getObjectAnchor?.(layer.object))
+        ? clip
+        : null;
     return (
       <div
         key={layer.kind === 'ink' ? layer.objects[0]!.id : layer.object.id}
         data-ui="content.drawing.visual-layer"
-        style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: index }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: index,
+          // Overflow preserves the page backdrop; a parent clip-path isolates it.
+          ...(objectClip
+            ? {
+                inset: undefined,
+                left: objectClip.left,
+                top: objectClip.top,
+                width: objectClip.width,
+                height: objectClip.height,
+                overflow: 'hidden',
+              }
+            : {}),
+        }}
       >
         {layer.kind === 'ink' ? (
           <DrawingInkLayer
@@ -39,6 +65,14 @@ export function DrawingVisualLayers(props: {
             projection={props.projection}
             pixelBudget={pixelBudget}
             {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}
+          />
+        ) : layer.kind === 'simplify' ? (
+          <DrawingSimplifyLayer
+            object={layer.object}
+            previewFill={layer.previewFill ?? false}
+            projection={props.projection}
+            viewportOrigin={{ x: objectClip?.left ?? 0, y: objectClip?.top ?? 0 }}
+            opacity={props.getObjectOpacity?.(layer.object.id) ?? 1}
           />
         ) : layer.kind === 'text' ? (
           <DrawingTextLayer {...props} objects={[layer.object]} />

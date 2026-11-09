@@ -15,11 +15,13 @@ import {
   resolveDrawingTextMeasuredNaturalWidth,
   resolveDrawingTextHeight,
   traceDrawingTextBackground,
+  transformDrawingPoint,
   resolveDrawingTextFontFamily,
   type DrawingObject,
   type DrawingPoint,
 } from '../../../features/drawing/public';
 import { createObjectLabel } from '../../document/model';
+import { createEditorDrawingSimplifyObject } from './simplify';
 import { stageEditorDrawingObject, writeEditorDrawingObject } from './metadata';
 
 type TextboxVisualAdapter = {
@@ -152,7 +154,10 @@ function createShapeObject(
   });
 }
 
-function createTextObject(drawing: Extract<DrawingObject, { kind: 'text' }>): FabricObject {
+function createTextObject(
+  drawing: Extract<DrawingObject, { kind: 'text' }>,
+  minimumWidth: number
+): FabricObject {
   const textbox = new Textbox(drawing.text, {
     fill: drawing.color,
     fontFamily: resolveDrawingTextFontFamily(drawing.fontFamily),
@@ -164,7 +169,7 @@ function createTextObject(drawing: Extract<DrawingObject, { kind: 'text' }>): Fa
     originY: 'top',
     top: drawing.bounds.y,
     textBackgroundColor: drawing.backgroundColor ?? '',
-    width: Math.max(40, drawing.bounds.width),
+    width: Math.max(minimumWidth, drawing.bounds.width),
   });
   applyEditorDrawingTextVisuals(textbox);
   return textbox;
@@ -216,10 +221,7 @@ function renderEditorDrawingTextStencil(
     { x: halfWidth, y: -halfHeight },
     { x: halfWidth, y: halfHeight },
     { x: -halfWidth, y: halfHeight },
-  ].map((point) => ({
-    x: transform.a * point.x + transform.c * point.y + transform.e,
-    y: transform.b * point.x + transform.d * point.y + transform.f,
-  }));
+  ].map((point) => transformDrawingPoint(point, transform));
   const left = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.x))));
   const top = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.y))));
   const right = Math.min(
@@ -353,21 +355,22 @@ export function synchronizeEditorDrawingTextLayout(textbox: Textbox): boolean {
 export function createEditorDrawingFabricObject(
   drawing: Exclude<DrawingObject, { kind: 'blur' }>,
   labelIndex: number,
-  options: { preview?: boolean } = {}
+  options: { preview?: boolean; preserveTextWidth?: boolean } = {}
 ): FabricObject {
+  if (drawing.kind === 'simplify') return createEditorDrawingSimplifyObject(drawing, labelIndex);
   const object =
     drawing.kind === 'pencil' || drawing.kind === 'marker'
       ? createFreehandObject(drawing, options.preview === true)
       : drawing.kind === 'arrow'
         ? createArrowObject(drawing)
         : drawing.kind === 'text'
-          ? createTextObject(drawing)
+          ? createTextObject(drawing, options.preserveTextWidth ? 1 : 40)
           : createShapeObject(drawing);
   const normalizedDrawing =
     drawing.kind === 'text'
       ? (() => {
           const height = Math.max(1, object.height);
-          const width = Math.max(40, object.width);
+          const width = Math.max(options.preserveTextWidth ? 1 : 40, object.width);
           const center = getDrawingBoundsCenter(drawing.bounds);
           return {
             ...drawing,

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { applyVideoProjectMutationPatch } from '../../../../../features/video/project/mutation';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -215,4 +216,60 @@ it('refuses missing project scope targets and retries a project reset without an
   expect(once.actionFeedback![1]).toEqual(project.actionFeedback![1]);
   act(() => reset.click());
   expect(execute(once)).toBe(once);
+});
+
+it('operates the existing global key control with empty streamed history and resets authored defaults', () => {
+  const { project: inline } = fixture();
+  const group = inline.actionFeedback![0]!;
+  const project = applyVideoProjectMutationPatch(
+    { ...inline, actionEvents: [] },
+    {
+      actionFeedback: [
+        {
+          ...group,
+          signals: [],
+          events: {
+            format: 'recording-events-v1',
+            formatVersion: 1,
+            algorithm: 'lossless-v1',
+            encoding: 'json-utf8-v1',
+            eventStreamId: 'a'.repeat(32),
+            state: 'complete',
+            finalized: true,
+            totalBlocks: 1000,
+            totalRecords: 50000,
+            totalBytes: 5000000,
+            streamSha256: 'b'.repeat(64),
+          },
+        },
+      ],
+    }
+  );
+  act(() =>
+    root.render(
+      <KeyFeedbackFields project={project} scope="project" part="display" disabled={false} />
+    )
+  );
+  expect(host.querySelector('[data-ui="controlled-key-fields"]')).not.toBeNull();
+  callbacks.at(-1)!({ enabled: false, style: { color: '#12345680' } });
+  const changed = execute(project);
+  expect(changed.actionFeedback![0]!.keyDefaults).toMatchObject({
+    enabled: false,
+    style: { color: '#12345680' },
+  });
+  expect(changed.actionFeedback![0]!.keyStyles?.[0]).toMatchObject({
+    enabled: false,
+    style: { color: '#12345680', fontSize: 32 },
+  });
+  act(() =>
+    root.render(
+      <KeyFeedbackFields project={changed} scope="project" part="display" disabled={false} />
+    )
+  );
+  act(() => host.querySelector<HTMLButtonElement>('[data-ui="video-editor.key.reset"]')!.click());
+  const reset = execute(changed);
+  expect(reset.actionFeedback![0]).not.toHaveProperty('keyDefaults');
+  expect(reset.actionFeedback![0]).not.toHaveProperty('keyStyles');
+  expect(reset.actionEvents).toEqual([]);
+  expect(reset.actionFeedback![0]!.signals).toEqual([]);
 });

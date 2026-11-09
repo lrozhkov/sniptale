@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
-  CaptureMode,
   VideoOutputCodec,
   VideoOutputContainer,
   VideoFrameRate,
@@ -196,8 +195,6 @@ describe('video guards roots', () => {
 describe('video guards valid settings', () => {
   registerFullVideoSettingsTests();
   registerPartialVideoSettingsTests();
-  registerCompleteNativeSettingsTests();
-  registerLegacyNativeSettingsTests();
 });
 
 function registerFullVideoSettingsTests() {
@@ -388,198 +385,8 @@ function registerPartialVideoSettingsTests() {
   });
 }
 
-function registerCompleteNativeSettingsTests() {
-  it('parses a complete native settings snapshot and rejects partial native payloads', () => {
-    const native = createCompleteNativeSettings();
-
-    expect(parseCurrentVideoSettings({ native }).value).toEqual({
-      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
-      native,
-    });
-    expect(parseCurrentVideoSettings({ native: { video: { enabled: true } } })).toEqual({
-      hasInvalidRoot: false,
-      invalidFieldCount: 1,
-      value: CURRENT_VIDEO_SETTINGS_CONTRACT,
-    });
-  });
-}
-
-function registerLegacyNativeSettingsTests() {
-  it('migrates legacy native settings without dropping existing video fields', () => {
-    const defaultTrayActions = DEFAULT_VIDEO_SETTINGS.native?.trayActions;
-    const legacyNative = {
-      screenshots: { includeCursor: false },
-      trayActions: {
-        captureScreenshot: { enabled: true, offlineCapable: false, shortcutLabel: 'PrintScreen' },
-        openGallery: { enabled: true, offlineCapable: false, shortcutLabel: 'Ctrl+G' },
-        openSettings: { enabled: true, offlineCapable: true, shortcutLabel: 'Ctrl+Alt+S' },
-        startRecording: { enabled: true, offlineCapable: false, shortcutLabel: 'Ctrl+Shift+R' },
-        stopRecording: { enabled: false, offlineCapable: false, shortcutLabel: 'Ctrl+Shift+S' },
-      },
-      video: {
-        ...DEFAULT_VIDEO_SETTINGS.native?.video,
-        enabled: true,
-      },
-    };
-
-    expect(parseCurrentVideoSettings({ native: legacyNative }).value).toEqual({
-      ...CURRENT_VIDEO_SETTINGS_CONTRACT,
-      native: {
-        screenshots: legacyNative.screenshots,
-        trayActions: {
-          ...defaultTrayActions,
-          captureScreenScreenshot: {
-            enabled: true,
-            offlineCapable: false,
-            shortcutLabel: 'PrintScreen',
-          },
-          openGallery: { enabled: true, offlineCapable: false, shortcutLabel: 'Ctrl+G' },
-          openSettings: { enabled: true, offlineCapable: true, shortcutLabel: 'Ctrl+Alt+S' },
-          startScreenRecording: {
-            enabled: true,
-            offlineCapable: false,
-            shortcutLabel: 'Ctrl+Shift+R',
-          },
-          stopRecording: { enabled: false, offlineCapable: false, shortcutLabel: 'Ctrl+Shift+S' },
-        },
-        video: legacyNative.video,
-      },
-    });
-  });
-}
-
-function createCompleteNativeSettings() {
-  return {
-    screenshots: { includeCursor: true },
-    trayActions: {
-      ...DEFAULT_VIDEO_SETTINGS.native?.trayActions,
-    },
-    video: {
-      advanced: {
-        audioBitrateKbps: 160,
-        audioSourceMode: 'mixed',
-        frameRate: 'auto',
-        includeCursorInVideo: true,
-        maxDurationMinutes: 120,
-        preferHardwareEncoder: true,
-        videoBitrateMbpsOverride: null,
-      },
-      codec: {
-        audioCodec: 'aac',
-        container: 'mp4',
-        hardwareAcceleration: 'prefer',
-        videoCodec: 'h264',
-      },
-      enabled: true,
-      telemetry: {
-        collectClicks: true,
-        collectCursor: true,
-        collectKeyEvents: true,
-        collectStaticSignals: true,
-        collectTypingSpans: true,
-      },
-    },
-  };
-}
-
-describe('video guards invalid settings', () => {
-  it('keeps valid settings fields and counts every invalid field', () => {
-    expect(
-      parseCurrentVideoSettings({
-        autoFadeDelay: '250',
-        countdownSeconds: 3,
-        interactionDiagnosticsEnabled: 'true',
-        microphoneDeviceId: 7,
-        microphoneEnabled: true,
-        outputProfile: { ...DEFAULT_VIDEO_SETTINGS.outputProfile, quality: 'BROKEN' },
-        systemAudioEnabled: null,
-        webcamDeviceId: false,
-        webcamEnabled: 'yes',
-      })
-    ).toEqual({
-      hasInvalidRoot: false,
-      invalidFieldCount: 7,
-      value: {
-        countdownSeconds: 3,
-        microphoneEnabled: true,
-        qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
-        qualityProfiles: DEFAULT_VIDEO_SETTINGS.qualityProfiles,
-      },
-    });
-  });
-
-  it('drops incompatible output settings and malformed profile collections independently', () => {
-    expect(
-      parseCurrentVideoSettings({
-        outputProfile: {
-          codec: VideoOutputCodec.AVC,
-          container: VideoOutputContainer.WEBM,
-          frameRate: VideoFrameRate.FPS30,
-          quality: VideoQuality.HIGH,
-          resolution: VideoResolutionPreset.P1080,
-        },
-        qualityProfiles: [
-          {
-            id: 'custom:broken',
-            name: '',
-            configuration: { ...DEFAULT_VIDEO_SETTINGS.outputProfile },
-          },
-        ],
-        systemAudioEnabled: false,
-      })
-    ).toEqual({
-      hasInvalidRoot: false,
-      invalidFieldCount: 2,
-      value: {
-        qualityProfileId: DEFAULT_VIDEO_SETTINGS.qualityProfileId,
-        systemAudioEnabled: false,
-      },
-    });
-  });
-});
-
-describe('video guards ui state', () => {
-  it('parses valid capture mode and nullable viewport preset ids', () => {
-    expect(
-      parseStoredVideoUiState({
-        captureMode: CaptureMode.TAB_CROP,
-        viewportPresetId: null,
-      })
-    ).toEqual({
-      hasInvalidRoot: false,
-      invalidFieldCount: 0,
-      value: {
-        captureMode: CaptureMode.TAB_CROP,
-        viewportPresetId: null,
-      },
-    });
-  });
-
-  it('drops invalid ui state fields while keeping valid ones', () => {
-    expect(
-      parseStoredVideoUiState({
-        captureMode: 'BROKEN_MODE',
-        viewportPresetId: 'preset-1',
-      })
-    ).toEqual({
-      hasInvalidRoot: false,
-      invalidFieldCount: 1,
-      value: {
-        viewportPresetId: 'preset-1',
-      },
-    });
-
-    expect(
-      parseStoredVideoUiState({
-        captureMode: CaptureMode.SCREEN,
-        viewportPresetId: 7,
-      })
-    ).toEqual({
-      hasInvalidRoot: false,
-      invalidFieldCount: 1,
-      value: {
-        captureMode: CaptureMode.SCREEN,
-      },
-    });
-  });
+it('drops obsolete Desktop settings while preserving browser recording preferences', () => {
+  const parsed = parseCurrentVideoSettings({ native: { video: { enabled: true } } });
+  expect(parsed.value).toEqual(CURRENT_VIDEO_SETTINGS_CONTRACT);
+  expect(parsed.value).not.toHaveProperty('native');
 });

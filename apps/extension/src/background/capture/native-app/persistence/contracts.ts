@@ -1,3 +1,5 @@
+import type { CursorTrajectoryDescriptor } from '../../../../features/video/project/cursor-trajectory/types';
+import type { RecordingEventsDescriptor } from '../../../../features/video/project/recording-events/types';
 import type {
   NativeRecordingTelemetrySnapshot,
   NativeRecordingTimebase,
@@ -23,6 +25,10 @@ export interface NativeTransferSessionEntry {
   updatedAt: number;
   expiresAt: number;
   metadata: {
+    /** Recordings persistence owns and validates this private history intent. */
+    history?: unknown;
+    cursorTrajectory?: CursorTrajectoryDescriptor;
+    recordingEvents?: RecordingEventsDescriptor;
     capturedAtEpochMs?: number;
     durationMs?: number;
     fps?: number;

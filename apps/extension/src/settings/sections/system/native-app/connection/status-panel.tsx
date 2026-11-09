@@ -31,17 +31,10 @@ function formatNativePlatform(platform: NativePlatform): string {
   return `${platformLabel} ${platform.version}`;
 }
 
-function formatHardwareAcceleration(
-  value: NonNullable<
-    NativeAppRuntimeStatus['effectiveSettings']
-  >['video']['codec']['hardwareAcceleration']
-): string {
-  return value === 'force-software'
-    ? translate('settings.nativeApp.hardwareAccelerationForceSoftware')
-    : translate('settings.nativeApp.hardwareAccelerationPrefer');
-}
-
-function NativeStatusActions(props: { onAction: (operation: NativeRuntimeOperation) => void }) {
+function NativeStatusActions(props: {
+  onAction: (operation: NativeRuntimeOperation) => void;
+  status: NativeAppRuntimeStatus | null;
+}) {
   return (
     <div className="flex flex-wrap gap-1">
       <ProductActionButton
@@ -53,22 +46,26 @@ function NativeStatusActions(props: { onAction: (operation: NativeRuntimeOperati
         <RefreshCw className="h-4 w-4" />
         {translate('settings.nativeApp.reconnect')}
       </ProductActionButton>
-      <ProductActionButton
-        type="button"
-        compact
-        tone="secondary"
-        onClick={() => props.onAction('sync-settings')}
-      >
-        {translate('settings.nativeApp.syncSettings')}
-      </ProductActionButton>
-      <ProductActionButton
-        type="button"
-        compact
-        tone="secondary"
-        onClick={() => props.onAction('take-controller')}
-      >
-        {translate('settings.nativeApp.takeController')}
-      </ProductActionButton>
+      {props.status?.connectionState === 'trust-required' ? (
+        <ProductActionButton
+          type="button"
+          compact
+          tone="primary"
+          onClick={() => props.onAction('trust-client')}
+        >
+          {translate('settings.nativeApp.trustClient')}
+        </ProductActionButton>
+      ) : null}
+      {props.status?.appIdentity && props.status.connectionState !== 'trust-required' ? (
+        <ProductActionButton
+          type="button"
+          compact
+          tone="secondary"
+          onClick={() => props.onAction('forget-client')}
+        >
+          {translate('settings.nativeApp.forgetClient')}
+        </ProductActionButton>
+      ) : null}
     </div>
   );
 }
@@ -130,14 +127,6 @@ function NativeStatusDetails({ status }: { status: NativeAppRuntimeStatus | null
         }
       />
       <StatusRow
-        label={translate('settings.nativeApp.effectiveEncoder')}
-        value={
-          status.effectiveSettings
-            ? formatHardwareAcceleration(status.effectiveSettings.video.codec.hardwareAcceleration)
-            : '-'
-        }
-      />
-      <StatusRow
         label={translate('settings.nativeApp.capabilityLimits')}
         value={limits ? `${limits.maxWidth}x${limits.maxHeight} · ${limits.maxFps} FPS` : '-'}
       />
@@ -168,7 +157,8 @@ export function NativeStatusPanel(props: {
               ? `${formatNativePlatform(status.install.platform)} · ${status.install.appVersion}`
               : translate('settings.nativeApp.statusMissing')}
           </p>
-          {status?.connectionState === 'controlled-by-other-profile' ? (
+          {status?.connectionState === 'controlled-by-other-profile' ||
+          status?.connectionState === 'selection-required' ? (
             <p className="text-[13px] leading-[18px] font-medium text-[var(--sniptale-color-warning)]">
               {translate('settings.nativeApp.controlledByOtherProfile')}
             </p>
@@ -179,8 +169,16 @@ export function NativeStatusPanel(props: {
             </p>
           ) : null}
         </div>
-        <NativeStatusActions onAction={props.onAction} />
+        <NativeStatusActions onAction={props.onAction} status={status} />
       </div>
+      {status?.connectionState === 'trust-required' && status.appIdentity ? (
+        <div className="space-y-1 text-[13px] leading-[18px]">
+          <p>{translate('settings.nativeApp.trustDescription')}</p>
+          <p className="break-all text-[var(--sniptale-color-text-secondary)]">
+            {status.appIdentity.clientId}
+          </p>
+        </div>
+      ) : null}
       <NativeStatusDetails status={status} />
       <NativeOperationError status={status} />
       <NativeStatusWarnings status={status} />

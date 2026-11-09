@@ -51,7 +51,13 @@ function verifiesAiSettingsMutationRouteShortCircuit() {
   parseBackgroundRuntimeMessageMock.mockReturnValue(message);
   routeAiSettingsMutationMessageMock.mockReturnValue(true);
   expectListenerResult(true, listener, message, sender, sendResponse);
-  expect(routeAiSettingsMutationMessageMock).toHaveBeenCalledWith(message, sender, sendResponse);
+  expect(routeAiSettingsMutationMessageMock).toHaveBeenCalledWith(
+    message,
+    sender,
+    sendResponse,
+    undefined,
+    undefined
+  );
 }
 
 function verifiesAISecretUnlockRouteShortCircuit() {
@@ -71,7 +77,9 @@ function verifiesAISecretUnlockRouteShortCircuit() {
     expect.objectContaining({
       authorityFamily: 'ai-secret-unlock-authority',
       preauthorization: { kind: 'ai-secret-unlock-route' },
-    })
+    }),
+    undefined,
+    undefined
   );
 }
 

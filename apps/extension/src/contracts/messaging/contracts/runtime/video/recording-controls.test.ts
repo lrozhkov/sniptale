@@ -378,3 +378,102 @@ it('requires an exact recording group when acknowledging a post-record result', 
     /ACKNOWLEDGE_POST_RECORD_RESULT/
   );
 });
+
+it('admits each bound camera source and refuses mixed source authority', () => {
+  const type = VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER;
+  const contract = runtimeVideoSessionMessageContracts[type];
+  const envelope = { type, capabilityToken: 'capability', peerId: 'peer', sdp: 'offer' };
+  const sources = [
+    { kind: 'surface', settings: recordingSettings },
+    { kind: 'countdown', recordingId: 'recording', generation: 0, streamInstanceId: 'stream' },
+    {
+      kind: 'recording-preview',
+      recordingId: 'recording',
+      generation: 0,
+      streamInstanceId: 'stream',
+      cameraOnly: false,
+    },
+  ];
+  for (const source of sources) {
+    expect(contract.parseRequest({ ...envelope, source })).toEqual({ ...envelope, source });
+    expect(() =>
+      contract.parseRequest({ ...envelope, source: { ...source, extra: true } })
+    ).toThrow();
+  }
+  for (const source of [
+    null,
+    { kind: 'unknown' },
+    {
+      kind: 'countdown',
+      recordingId: 'recording',
+      generation: -1,
+      streamInstanceId: 'stream',
+    },
+  ])
+    expect(() => contract.parseRequest({ ...envelope, source })).toThrow();
+});
+
+it('requires one observation payload and the same recording identity as its packet', () => {
+  const type = VideoMessageType.RECORDING_OBSERVATIONS;
+  const contract = runtimeVideoSessionMessageContracts[type];
+  const cursorPacket = {
+    version: 1,
+    recordingId: 'recording',
+    batchSequence: 0,
+    sourceClockId: 'document',
+    clockRevision: 1,
+    clock: {
+      source: 'dom-event-time',
+      timestampQuantumUs: null,
+      resolutionBoundUs: null,
+      mappingUncertaintyUs: null,
+    },
+    viewport: {
+      width: 640,
+      height: 360,
+      devicePixelRatio: 1,
+      visualViewportScale: 1,
+      visualViewportOffsetX: 0,
+      visualViewportOffsetY: 0,
+    },
+    records: [
+      {
+        kind: 'sample',
+        localSequence: 0,
+        activeTimeUs: 1000,
+        x: 10,
+        y: 20,
+        observed: true,
+        visible: true,
+        event: 'move',
+        button: 'none',
+        relatedLocalSequence: null,
+      },
+    ],
+  };
+  const request = { type, recordingId: 'recording', cursorPacket };
+  expect(contract.parseRequest(request)).toEqual(request);
+  expect(() => contract.parseRequest({ ...request, recordingId: 'other' })).toThrow();
+  expect(() => contract.parseRequest({ type, recordingId: 'recording' })).toThrow();
+  expect(() =>
+    contract.parseRequest({
+      ...request,
+      telemetry: {
+        captureMode: null,
+        viewport: null,
+        cursorTrack: null,
+        actionEvents: [],
+        signals: [],
+      },
+    })
+  ).toThrow();
+  expect(() =>
+    contract.parseRequest({
+      ...request,
+      cursorPacket: {
+        ...cursorPacket,
+        records: [{ ...cursorPacket.records[0], text: 'private' }],
+      },
+    })
+  ).toThrow();
+});

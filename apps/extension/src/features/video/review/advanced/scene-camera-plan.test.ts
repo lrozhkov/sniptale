@@ -1,13 +1,24 @@
+import type { CursorFocusPath } from '../../project/cursor-focus-path/types';
+import {
+  projectQuickEditPoint,
+  quickEditPlaneProjection,
+  multiplyQuickEditProjections,
+  type QuickEditHomography,
+} from '../../composition/motion/spatial-geometry';
 import { createQuickEditBorder } from '../../project/scene/focus-appearance';
 import { createReviewWorkingZoneCameraGeometry } from './camera-geometry';
 import { fitQuickEditSourceCrop } from './canvas';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import * as cameraGeometry from './camera-geometry';
 import {
   evaluateWorkingZoneCameraBoundary,
   planWorkingZoneCamera,
 } from '../../composition/motion/follow-cursor';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSpatialRasterLayout,
+  computeQuickEditSpatialWindow,
+  computeQuickEditWindowTransform,
   resolveReviewSceneCameraPlan,
   resolveReviewCameraGeometry,
   resolveReviewCameraConflicts,
@@ -20,73 +31,169 @@ import {
 import type { QuickEditZoomRegion } from './types';
 import { reviewCameraPlanObservations } from './cursor-focus-path';
 
-it('rejects a fragment inside a link gap when its captured pointer leaves the admitted output', () => {
-  const focus = {
-    version: 1 as const,
-    mode: 'follow' as const,
-    smoothing: 0,
-    sensitivity: 0.5,
-    gapPolicy: 'hold' as const,
-    segments: [
-      {
-        id: 'native',
-        start: 0,
-        end: 4,
-        binding: { kind: 'project' as const },
-        keys: [0, 1, 2, 3, 4].map((time) => ({
-          id: `point-${time}`,
-          time,
-          x: 0.5,
-          y: 0.5,
-          anchor: 'movement' as const,
-          interpolation: 'linear' as const,
-        })),
+it.each([0.5, 0.05])(
+  'reuses the linked camera proof across playback snapshots with observed pointer x=%s',
+  (gapX) => {
+    const scene = {
+      source: { width: 1000, height: 600 },
+      background: { enabled: false as const, zoomBehavior: 'window' as const },
+    };
+    const path = {
+      version: 1 as const,
+      mode: 'follow' as const,
+      smoothing: 0,
+      sensitivity: 0.5,
+      gapPolicy: 'hold' as const,
+      segments: [
+        {
+          id: 'native',
+          start: 0,
+          end: 4,
+          binding: { kind: 'project' as const },
+          keys: [0, 1, 2, 3, 4].map((time) => ({
+            id: `point-${time}`,
+            time,
+            x: time === 2 ? gapX : 0.5,
+            y: 0.5,
+            anchor: 'movement' as const,
+            interpolation: 'linear' as const,
+          })),
+        },
+      ],
+    };
+    const from: QuickEditZoomRegion = {
+      id: 'from',
+      start: 0,
+      end: 1,
+      linkTo: 'to',
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+      cursorFocus: {
+        path,
+        observed: path,
+        scene,
+        policy: resolveCameraFollowPolicy({
+          defaults: { ...createCameraFollowSettings('calm'), allowExpansion: false },
+        }),
       },
-    ],
-  };
-  const observed = {
-    ...focus,
-    segments: focus.segments.map((segment) => ({
-      ...segment,
-      keys: segment.keys.map((key) => ({ ...key, x: key.time === 2 ? 0.05 : 0.5 })),
-    })),
-  };
-  const scene = {
-    source: { width: 1000, height: 600 },
-    background: { enabled: false as const, zoomBehavior: 'window' as const },
-  };
-  const from = {
-    id: 'from',
-    start: 0,
-    end: 1,
-    linkTo: 'to',
-    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
-    enter: { type: 'none' as const, duration: 0 },
-    exit: { type: 'none' as const, duration: 0 },
-    cursorFocus: {
-      path: focus,
-      observed,
-      scene,
-      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') }),
-    },
-  };
-  const to = {
-    id: 'to',
-    start: 3,
-    end: 4,
-    transform: from.transform,
-    enter: from.enter,
-    exit: from.exit,
-  };
-  expect(resolveReviewCameraConflicts([from, to], scene, { start: 0, end: 0.5 })).toEqual([]);
-  expect(resolveReviewCameraConflicts([from, to], scene, { start: 1.9, end: 2.1 })).toContainEqual(
-    expect.objectContaining({
-      regionId: 'from',
-      interval: { start: 1, end: 3 },
-      reason: 'viewport',
-    })
-  );
-});
+    };
+    const to: QuickEditZoomRegion = {
+      id: 'to',
+      start: 3,
+      end: 4,
+      transform: from.transform,
+      enter: from.enter,
+      exit: from.exit,
+    };
+    const regions = [from, to];
+    const prove = vi.spyOn(cameraGeometry, 'proveReviewCameraGap');
+    try {
+      for (const time of [1.2, 1.5, 1.8]) {
+        // Stage and mini-preview supply wider objects than the scene contract.
+        const preview = { ...scene, focus: { regions, time }, camera: { ...from.transform } };
+        evaluateQuickEditCameraAtTime(regions, time, preview);
+      }
+      expect(prove).toHaveBeenCalledTimes(1);
+      const conflicts = resolveReviewCameraConflicts(regions, scene, { start: 1.5, end: 2.5 });
+      expect(conflicts.length).toBe(gapX === 0.5 ? 0 : 1);
+      expect(prove).toHaveBeenCalledTimes(1);
+      evaluateQuickEditCameraAtTime(regions, 1.5, {
+        ...scene,
+        output: { width: 1280, height: 720 },
+      });
+      expect(prove).toHaveBeenCalledTimes(2);
+    } finally {
+      prove.mockRestore();
+    }
+  }
+);
+
+it.each([false, true])(
+  'applies temporary expansion=%s across the complete captured link gap',
+  (allowExpansion) => {
+    const focus = {
+      version: 1 as const,
+      mode: 'follow' as const,
+      smoothing: 0,
+      sensitivity: 0.5,
+      gapPolicy: 'hold' as const,
+      segments: [
+        {
+          id: 'native',
+          start: 0,
+          end: 4,
+          binding: { kind: 'project' as const },
+          keys: [0, 1, 2, 3, 4].map((time) => ({
+            id: `point-${time}`,
+            time,
+            x: 0.5,
+            y: 0.5,
+            anchor: 'movement' as const,
+            interpolation: 'linear' as const,
+          })),
+        },
+      ],
+    };
+    const observed = {
+      ...focus,
+      segments: focus.segments.map((segment) => ({
+        ...segment,
+        keys: segment.keys.map((key) => ({ ...key, x: key.time === 2 ? 0.05 : 0.5 })),
+      })),
+    };
+    const scene = {
+      source: { width: 1000, height: 600 },
+      background: { enabled: false as const, zoomBehavior: 'window' as const },
+    };
+    const from = {
+      id: 'from',
+      start: 0,
+      end: 1,
+      linkTo: 'to',
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none' as const, duration: 0 },
+      exit: { type: 'none' as const, duration: 0 },
+      cursorFocus: {
+        path: focus,
+        observed,
+        scene,
+        policy: resolveCameraFollowPolicy({
+          defaults: { ...createCameraFollowSettings('calm'), allowExpansion },
+        }),
+      },
+    };
+    const to = {
+      id: 'to',
+      start: 3,
+      end: 4,
+      transform: from.transform,
+      enter: from.enter,
+      exit: from.exit,
+    };
+    expect(resolveReviewCameraConflicts([from, to], scene, { start: 0, end: 0.5 })).toEqual([]);
+    if (!allowExpansion)
+      expect(
+        resolveReviewCameraConflicts([from, to], scene, { start: 1.9, end: 2.1 })
+      ).toContainEqual(
+        expect.objectContaining({
+          regionId: 'from',
+          interval: { start: 1, end: 3 },
+          reason: 'viewport',
+        })
+      );
+    else {
+      expect(resolveReviewCameraConflicts([from, to], scene)).toEqual([]);
+      for (let time = 1; time <= 3; time += 1 / 60) {
+        const camera = evaluateQuickEditCameraAtTime([from, to], time, scene);
+        const actualX = time <= 2 ? 0.5 - 0.45 * (time - 1) : 0.05 + 0.45 * (time - 2);
+        expect(0.5 + (actualX - camera.centerX) * camera.scale).toBeGreaterThanOrEqual(-0.002);
+      }
+      expect(evaluateQuickEditCameraAtTime([from, to], 1, scene).scale).toBe(2);
+      expect(evaluateQuickEditCameraAtTime([from, to], 3, scene).scale).toBe(2);
+    }
+  }
+);
 
 it.each([
   ['manual', 'none'],
@@ -421,4 +528,157 @@ it('restores the linked camera exit after a neighboring Border becomes Zoom with
   expect(independent.breaks).toContain(2.4);
   const linked = resolveReviewCameraGeometry([from, target], from, scene)!;
   expect(linked.breaks).not.toContain(2.4);
+});
+
+it('keeps full camera projection at a same-time capture boundary within one backing pixel', () => {
+  const source = { width: 2560, height: 1440 };
+  const backing = { width: 840, height: 472 };
+  const cut = 2.01;
+  const path: CursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    smoothing: 0,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'before',
+        binding: {
+          kind: 'project',
+        },
+        start: 0,
+        end: 2.01,
+        keys: [
+          {
+            time: 0,
+            x: 0.26,
+            y: 0.42,
+            id: 'before0',
+            anchor: 'boundary',
+            interpolation: 'linear',
+          },
+          {
+            time: 2.01,
+            x: 0.26,
+            y: 0.42,
+            id: 'before1',
+            anchor: 'movement',
+            interpolation: 'linear',
+          },
+        ],
+      },
+      {
+        id: 'after',
+        binding: {
+          kind: 'project',
+        },
+        start: 2.01,
+        end: 4,
+        keys: [
+          {
+            time: 2.01,
+            x: 0.260390625,
+            y: 0.41930555555555554,
+            id: 'after0',
+            anchor: 'boundary',
+            interpolation: 'linear',
+          },
+          {
+            time: 2.11,
+            x: 0.26,
+            y: 0.3,
+            id: 'after1',
+            anchor: 'movement',
+            interpolation: 'linear',
+          },
+          {
+            time: 2.31,
+            x: 0.26,
+            y: 0.18,
+            id: 'after2',
+            anchor: 'movement',
+            interpolation: 'linear',
+          },
+          {
+            time: 4,
+            x: 0.26,
+            y: 0.18,
+            id: 'after3',
+            anchor: 'movement',
+            interpolation: 'linear',
+          },
+        ],
+      },
+    ],
+  };
+  const scene = { source, output: source, background: { enabled: false as const } };
+  const region: QuickEditZoomRegion = {
+    id: 'camera',
+    start: 0,
+    end: 4,
+    transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    followCursor: true,
+    cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
+    cursorFocus: { path, observed: path, scene },
+  };
+  const plan = resolveReviewSceneCameraPlan([region], region, scene);
+  expect(plan?.status).toBe('ready');
+  const project = (time: number) => {
+    const camera = evaluateQuickEditCameraAtTime([region], time, scene);
+    expect(camera.scale).toBe(1.5);
+    const layout = computeQuickEditSceneLayout({ ...scene, camera });
+    const raster = layout.spatial
+      ? computeQuickEditSpatialRasterLayout(layout, scene.background)
+      : layout;
+    const window = computeQuickEditWindowTransform(raster),
+      base = layout.windowRect;
+    const scale = window.width / base.width;
+    const inner: QuickEditHomography = [
+      scale,
+      0,
+      window.x - base.x * scale,
+      0,
+      scale,
+      window.y - base.y * scale,
+      0,
+      0,
+      1,
+    ];
+    const outer: QuickEditHomography = layout.spatial
+      ? quickEditPlaneProjection(
+          base,
+          computeQuickEditSpatialWindow(layout, scene.background),
+          layout.spatial
+        )
+      : [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    const projection = multiplyQuickEditProjections(outer, inner);
+    return [
+      [0, 0],
+      [source.width, 0],
+      [source.width, source.height],
+      [0, source.height],
+      [source.width / 2, source.height / 2],
+    ].map(([x, y]) => {
+      const projected = projectQuickEditPoint(projection, { x: x!, y: y! });
+      if (!projected) throw new Error('Expected finite camera projection');
+      return projected;
+    });
+  };
+  // The endpoint moves by one source pixel per axis. Allow one 840-wide backing pixel,
+  // including the preserved input discontinuity and its orbit projection.
+  for (const time of [cut, Math.ceil(cut * 30) / 30]) {
+    const left = project(time - 1e-9),
+      right = project(time + 1e-9);
+    expect(
+      Math.max(...left.map((point, i) => Math.hypot(point.x - right[i]!.x, point.y - right[i]!.y)))
+    ).toBeLessThanOrEqual(source.width / backing.width);
+  }
+  if (plan?.status !== 'ready') throw new Error('Expected admitted camera plan');
+  expect(
+    plan.discontinuities
+      .filter((boundary) => boundary.reason === 'source')
+      .map((boundary) => boundary.time)
+  ).toEqual([cut]);
 });

@@ -349,3 +349,39 @@ it('preserves a real reversal along a straight line while removing velocity-only
     'turn:6',
   ]);
 });
+
+it('bounds repeated preference lookup work for a dense native segment and preserves reference weights', () => {
+  let reads = 0;
+  const keys = Array.from({ length: 8192 }, (_, index) => ({
+    id: `key-${index}`,
+    get time() {
+      reads++;
+      return index;
+    },
+    x: 0.5,
+    y: 0.5,
+    anchor: index % 257 === 0 ? ('manual' as const) : ('movement' as const),
+    interpolation: 'linear' as const,
+  }));
+  const segment = { id: 'dense', start: 0, end: 8191, binding: { kind: 'project' as const }, keys };
+  const plain = structuredClone(keys);
+  const times = [
+    -1,
+    ...Array.from({ length: 128 }, (_, index) => (index * 8191) / 127 + 0.25),
+    9000,
+  ];
+  const expected = times.map((time) => {
+    const left = plain.findLast((key) => key.time <= time) ?? plain[0]!;
+    const right = plain.find((key) => key.time > time);
+    const weight = (key: typeof left) => (key.anchor === 'manual' ? 4 : 1);
+    return !right || time <= left.time
+      ? weight(left)
+      : weight(left) +
+          ((weight(right) - weight(left)) * (time - left.time)) / (right.time - left.time);
+  });
+  cursorFocusPreferenceWeight(segment, 0);
+  reads = 0;
+  const actual = times.map((time) => cursorFocusPreferenceWeight(segment, time));
+  actual.forEach((value, index) => expect(value).toBeCloseTo(expected[index]!, 12));
+  expect(reads).toBeLessThan(times.length * 50);
+});

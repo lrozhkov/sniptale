@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ReviewTrackHeightButton } from './track-row';
 import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
@@ -56,6 +57,7 @@ export type ReviewAnnotationTool = {
 type ToolbarProps = {
   selectedTrack?: QuickEditTrack | null;
   trackHasActions?: boolean;
+  trackTools?: ReactNode;
   beforeAction?: ReviewBeforeAction | undefined;
   annotationTool?: ReviewAnnotationTool;
   focusTool?: {
@@ -184,18 +186,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
           />
         ) : (
-          <span
-            data-ui="gallery.videoReview.trackToolHint"
-            className="px-1 text-xs text-[var(--sniptale-color-text-secondary)]"
-          >
-            {translate(
-              track === null
-                ? 'gallery.videoReview.noTrackSelected'
-                : props.trackHasActions === false
-                  ? 'gallery.videoReview.noTrackActions'
-                  : 'gallery.videoReview.trackActionsHint'
-            )}
-          </span>
+          (props.trackTools ?? reviewTrackToolHint(track, props.trackHasActions))
         )}
         {track === 'annotationEffects' &&
         features.annotationEffectsTrackVisible &&
@@ -526,4 +517,21 @@ function annotationTypeHint(tool: ReviewAnnotationTool): string {
     return translate('gallery.videoReview.annotationEffectsCatalogFailed');
   if (!tool.options.length) return translate('gallery.videoReview.annotationEffectsCatalogEmpty');
   return translate('gallery.videoReview.annotationEffectsChoose');
+}
+
+function reviewTrackToolHint(track: QuickEditTrack | null, available: boolean | undefined) {
+  return (
+    <span
+      data-ui="gallery.videoReview.trackToolHint"
+      className="px-1 text-xs text-[var(--sniptale-color-text-secondary)]"
+    >
+      {translate(
+        track === null
+          ? 'gallery.videoReview.noTrackSelected'
+          : available === false
+            ? 'gallery.videoReview.noTrackActions'
+            : 'gallery.videoReview.trackActionsHint'
+      )}
+    </span>
+  );
 }

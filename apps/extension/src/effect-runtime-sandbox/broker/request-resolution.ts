@@ -101,6 +101,7 @@ function createAcceptedRequest(args: {
   identity: ResolveEffectRuntimeRequestPayloadParams['identity'];
   inputFrames: EffectRuntimeFrameInputs;
   renderDimensions: { height: number; width: number };
+  kind: EffectRuntimeRenderRequest['kind'];
   timing: Pick<EffectRuntimeRenderRequest, 'duration' | 'fps' | 'frameIndex' | 'progress' | 'time'>;
 }): EffectRuntimeRequestParseResult {
   return {
@@ -116,7 +117,7 @@ function createAcceptedRequest(args: {
       documentPayloadIncluded: args.documentPayloadIncluded,
       height: args.dimensions.height,
       inputFrames: args.inputFrames,
-      kind: 'renderFrame',
+      kind: args.kind,
       protocolVersion: EFFECT_RUNTIME_PROTOCOL_VERSION,
       renderHeight: args.renderDimensions.height,
       renderWidth: args.renderDimensions.width,
@@ -159,6 +160,7 @@ export async function resolveEffectRuntimeRequestPayload(
   const fields = parseResolvedRequestFields(params.value, resolved.document);
   if (!fields) return reject(params.identity);
   return createAcceptedRequest({
+    kind: params.value['kind'] === 'prepareGpuFrame' ? 'prepareGpuFrame' : 'renderFrame',
     assetSelectionId: params.assetSelectionRef.id,
     assetSelectionPayloadIncluded: selection.payloadIncluded,
     assets: selection.assets,

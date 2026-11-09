@@ -1,3 +1,5 @@
+import { isCursorTrajectoryDescriptor } from '../../features/video/project/cursor-trajectory/records';
+import { isRecordingEventsDescriptor } from '../../features/video/project/recording-events/records';
 // policyStateIds: [] - native media parsers use static enum tables only.
 import {
   NATIVE_CHUNK_MAX_BASE64_CHARS,
@@ -84,6 +86,15 @@ export function isScreenshotCommit(value: Record<string, unknown>): boolean {
   return hasProtocolVersion(value) && hasLease(value) && isAsciiId(value['captureId']);
 }
 
+function isDesktopCoordinate(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= -2147483648 &&
+    value <= 2147483647
+  );
+}
+
 function isRecordingSource(value: unknown): value is NativeRecordingSource {
   const region = isRecord(value) ? value['region'] : null;
   return (
@@ -96,8 +107,8 @@ function isRecordingSource(value: unknown): value is NativeRecordingSource {
       isAsciiId(value['microphoneDeviceId'])) &&
     (region === undefined ||
       (isRecord(region) &&
-        isNonNegativeInteger(region['x']) &&
-        isNonNegativeInteger(region['y']) &&
+        isDesktopCoordinate(region['x']) &&
+        isDesktopCoordinate(region['y']) &&
         isPositiveInteger(region['width']) &&
         isPositiveInteger(region['height'])))
   );
@@ -156,6 +167,10 @@ export function isRecordingStopped(value: Record<string, unknown>): boolean {
     isPositiveInteger(value['chunkCount']) &&
     isSha256(value['sha256']) &&
     isNativeTelemetrySnapshot(value['telemetry']) &&
+    (value['cursorTrajectory'] === undefined ||
+      isCursorTrajectoryDescriptor(value['cursorTrajectory'])) &&
+    (value['recordingEvents'] === undefined ||
+      isRecordingEventsDescriptor(value['recordingEvents'])) &&
     isBoolean(value['openEditor'])
   );
 }

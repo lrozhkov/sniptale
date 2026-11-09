@@ -17,29 +17,31 @@
       "id": "curve",
       "kind": "number",
       "label": {
-        "ru": "Плавность (%)",
-        "en": "Easing (%)"
+        "ru": "Плавность",
+        "en": "Easing"
       },
       "defaultValue": 85,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "animation",
-      "order": 0
+      "order": 0,
+      "unit": "percent"
     },
     {
       "id": "strength",
       "kind": "number",
       "label": {
-        "ru": "Интенсивность (%)",
-        "en": "Intensity (%)"
+        "ru": "Интенсивность",
+        "en": "Intensity"
       },
       "defaultValue": 65,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "processing",
-      "order": 1
+      "order": 1,
+      "unit": "percent"
     },
     {
       "id": "tint",

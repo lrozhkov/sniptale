@@ -1,3 +1,4 @@
+import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
 import {
@@ -7,6 +8,13 @@ import {
 } from '../projects/index.test-support';
 import { updateMediaLibraryEntry, addMediaLibraryEntryTags } from '../media-library/index.library';
 import { parseSyncCaptureRecord } from '../sync-capture/guards';
+import {
+  captureRootKey,
+  pendingCheckpointKey,
+  type CaptureRootKind,
+} from '../sync-capture/contracts';
+import { createGuideProject } from '../../../features/scenario/project/factories';
+import { createScenarioProjectEntry } from '../scenario/projects/entry';
 import type { CapturedChange } from '../sync-capture/contracts';
 import { moveStoredItemsToTrash, restoreStoredItemsFromTrash } from './trash';
 
@@ -313,4 +321,112 @@ it('captures recording Trash and restore once and retains native child and origi
   expect(data.table('recordings').get(recording.id)).toEqual(recording);
   expect(data.table('asset_refs')).toEqual(refs);
   expect(data.table('asset_owners')).toEqual(owners);
+});
+
+function enableIntervalAndPending(
+  data: ReturnType<typeof setup>,
+  roots: { rootKind: CaptureRootKind; rootId: string }[]
+) {
+  const profile = data.table('sync_capture').get('profile');
+  if (!profile || typeof profile !== 'object') throw new Error('Missing lifecycle profile');
+  data.table('sync_capture').set('profile', { ...profile, checkpointIntervalMs: 300000 });
+  for (const root of roots) {
+    const rootKey = captureRootKey('lifecycle-space', root.rootKind, root.rootId);
+    const key = pendingCheckpointKey(rootKey);
+    data.table('sync_capture').set(key, {
+      version: 1,
+      kind: 'pending-checkpoint',
+      key,
+      rootKey,
+      ...root,
+      createdAt: 1,
+      spaceId: 'lifecycle-space',
+      profileCreatedAt: 1,
+      connectionGeneration: 1,
+      revision: crypto.randomUUID(),
+      dueAt: Date.now() + 300000,
+    });
+  }
+}
+
+it(
+  'publishes interval-enabled Image Montage and Scenario lifecycle changes ' +
+    'immediately and consumes pending work',
+  async () => {
+    const data = setup();
+    for (const store of SCENARIO_CAPTURE_STORES)
+      if (!data.rows.has(store)) data.rows.set(store, new Map());
+    const scenario = createScenarioProjectEntry({
+      project: createGuideProject('Pending guide', 'guide', 1),
+      existing: undefined,
+      updatedAt: 1,
+    });
+    data
+      .table('scenario_projects')
+      .set(scenario.id, { ...scenario, lifecycle: data.image.lifecycle });
+    const targets = [
+      data.targets[0]!,
+      data.targets[2]!,
+      { kind: 'scenario-project' as const, id: scenario.id },
+    ];
+    const roots = [
+      { rootKind: 'media' as const, rootId: data.image.id },
+      { rootKind: 'video-project' as const, rootId: data.project.id },
+      { rootKind: 'scenario-project' as const, rootId: scenario.id },
+    ];
+    const bytes = structuredClone(data.table('asset_refs'));
+    enableIntervalAndPending(data, roots);
+    await moveStoredItemsToTrash(targets, 10);
+    expect(data.captures()).toHaveLength(3);
+    for (const capture of data.captures()) {
+      expect(capture.generation).toBe(1);
+      expect(data.table('sync_capture').has(pendingCheckpointKey(capture.rootKey))).toBe(false);
+      if (capture.change.kind === 'image')
+        expect(capture.change.rows.media.lifecycle?.trashedAt).toBe(10);
+      else if (capture.change.kind === 'video-project')
+        expect(capture.change.rows.project.lifecycle?.trashedAt).toBe(10);
+      else if (capture.change.kind === 'scenario-project')
+        expect(capture.change.rows.entry.lifecycle?.trashedAt).toBe(10);
+      else throw new Error('Expected authored lifecycle capture');
+    }
+    enableIntervalAndPending(data, roots);
+    await restoreStoredItemsFromTrash(targets, 30);
+    expect(data.captures()).toHaveLength(6);
+    for (const capture of data.captures().filter((row) => row.generation === 2)) {
+      expect(data.table('sync_capture').has(pendingCheckpointKey(capture.rootKey))).toBe(false);
+      const root =
+        capture.change.kind === 'image'
+          ? capture.change.rows.media
+          : capture.change.kind === 'video-project'
+            ? capture.change.rows.project
+            : capture.change.kind === 'scenario-project'
+              ? capture.change.rows.entry
+              : null;
+      if (!root) throw new Error('Missing restored after-image');
+      expect(root.lifecycle?.updatedAt).toBe(30);
+      expect(root.lifecycle).not.toHaveProperty('trashedAt');
+    }
+    expect(data.table('asset_refs')).toEqual(bytes);
+  }
+);
+
+it('rolls back interval-enabled lifecycle changes and pending consumption on capture failure', async () => {
+  const data = setup();
+  enableIntervalAndPending(data, [
+    { rootKind: 'media', rootId: data.image.id },
+    { rootKind: 'video-project', rootId: data.project.id },
+  ]);
+  const before = structuredClone(data.rows);
+  data.failSecondCapture();
+  await expect(moveStoredItemsToTrash([data.targets[0]!, data.targets[2]!], 10)).rejects.toThrow(
+    'No space'
+  );
+  expect(data.rows).toEqual(before);
+  await moveStoredItemsToTrash([data.targets[0]!, data.targets[2]!], 10);
+  expect(data.captures()).toHaveLength(2);
+  expect(
+    [...data.table('sync_capture').values()]
+      .map(parseSyncCaptureRecord)
+      .filter((row) => row?.kind === 'pending-checkpoint')
+  ).toHaveLength(0);
 });

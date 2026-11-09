@@ -98,7 +98,7 @@ function createScreenshotStart(bytes: Uint8Array): Promise<AppScreenshotStartMes
     mimeType: 'image/png',
     mode: 'screen',
     openEditor: true,
-    protocolVersion: 1,
+    protocolVersion: 2,
     sha256,
     totalBytes: bytes.byteLength,
     type: 'app.screenshot.start',
@@ -115,7 +115,7 @@ async function createScreenshotChunk(bytes: Uint8Array): Promise<AppScreenshotCh
     chunkRawBytes: bytes.byteLength,
     chunkSha256: await sha256Hex(bytes),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.chunk',
   };
 }
@@ -124,7 +124,7 @@ function createScreenshotCommit(): AppScreenshotCommitMessage {
   return {
     captureId: 'capture-1',
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.commit',
   };
 }

@@ -199,7 +199,7 @@ it('accepts policy-bound privileged capability stores with declared policy ids',
   ).toEqual([]);
 });
 
-it('distinguishes immutable queue dictionaries from mutable or spoofed authority state', async () => {
+it('accepts immutable queue arrays and rejects runtime factory calls', async () => {
   const root = createTempRoot('architecture-guardrails-immutable-queue-');
   writeRuntimeTopology(root);
   writePolicyStateRegistry(root);
@@ -210,19 +210,10 @@ it('distinguishes immutable queue dictionaries from mutable or spoofed authority
       false,
     ],
     [
-      'platform/i18n/messages/settings/sync-queue.ts',
+      'platform/i18n/catalog-metadata.ts',
       [
-        "import { defineMessageSource } from '../source';",
-        "export const queueMessages = defineMessageSource({ title: { en: 'Queue', ru: 'Очередь' } });",
-      ].join(' '),
-      false,
-    ],
-    [
-      'platform/i18n/messages/settings/spoofed-owner.ts',
-      [
-        "import { defineMessageSource } from '../../../../../../../fake/" +
-          "apps/extension/src/platform/i18n/messages/source';",
-        "const queueMessages = defineMessageSource({ en: 'Queue' });",
+        "import { defineCatalogMetadata } from './catalog-contract';",
+        "export const queueMessages = defineCatalogMetadata({ en: 'Queue', ru: 'Очередь' });",
       ].join(' '),
       true,
     ],
@@ -233,18 +224,10 @@ it('distinguishes immutable queue dictionaries from mutable or spoofed authority
       true,
     ],
     [
-      'platform/i18n/messages/settings/spoof.ts',
+      'platform/i18n/dynamic-metadata.ts',
       [
-        "import { defineMessageSource } from './spoof-source';",
-        "const queueMessages = defineMessageSource({ en: 'Queue' });",
-      ].join(' '),
-      true,
-    ],
-    [
-      'platform/i18n/messages/settings/dynamic.ts',
-      [
-        "import { defineMessageSource } from '../source';",
-        'const queueMessages = defineMessageSource({ en: runtimeLabel });',
+        "import { defineCatalogMetadata } from './catalog-contract';",
+        'const queueMessages = defineCatalogMetadata({ en: runtimeLabel });',
       ].join(' '),
       true,
     ],
@@ -269,4 +252,43 @@ it('distinguishes immutable queue dictionaries from mutable or spoofed authority
       .flatMap(([relative, , blocked]) => (blocked ? [`apps/extension/src/${relative}`] : []))
       .sort()
   );
+});
+
+it('limits the GPU probe noise record to the exact finding', async () => {
+  const root = createTempRoot('architecture-guardrails-gpu-probe-noise-');
+  writeRuntimeTopology(root);
+  writePolicyStateRegistry(root);
+  const directory =
+    'apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/';
+  const probe = `${directory}runtimeCapabilities.js`;
+  const neighbor = `${directory}runtimeCapabilitiesPeer.js`;
+  for (const file of [probe, neighbor]) {
+    writeFile(root, file, 'export const available = true;\n');
+  }
+  const module = await loadModule(root);
+  const collect = () =>
+    module.collectPolicyStateDescriptorViolations([probe, neighbor], { root, enforceAll: true });
+
+  expect(collect()).toEqual([
+    expect.objectContaining({ file: neighbor, rule: 'policy-state-descriptor-required' }),
+  ]);
+
+  const changedRoot = createTempRoot('architecture-guardrails-gpu-probe-authority-');
+  writeRuntimeTopology(changedRoot);
+  writePolicyStateRegistry(changedRoot);
+  writeFile(changedRoot, probe, 'export const sessions = new Map();\n');
+  writeFile(changedRoot, neighbor, 'export const available = true;\n');
+  expect(
+    module.collectPolicyStateDescriptorViolations([probe, neighbor], {
+      root: changedRoot,
+      enforceAll: true,
+    })
+  ).toEqual([
+    expect.objectContaining({
+      file: probe,
+      message: expect.stringContaining('top-level-map-or-set'),
+      rule: 'policy-state-descriptor-required',
+    }),
+    expect.objectContaining({ file: neighbor, rule: 'policy-state-descriptor-required' }),
+  ]);
 });

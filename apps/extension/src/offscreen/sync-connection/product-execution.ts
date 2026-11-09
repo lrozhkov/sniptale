@@ -1,24 +1,37 @@
-import { readCurrentExecutionConnection } from './connection-admission';
+import { prepareLibraryBackupInRuntime } from '../../workflows/sync-transfer/retained-library';
+import {
+  parseSyncStoragePolicy,
+  sameSyncConnectionIdentity,
+} from '../../composition/persistence/remote-connection/model';
+import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
+import type { createPublishedOutgoingRetirement } from '../../workflows/sync-transfer/outgoing-retirement';
+import {
+  readCurrentExecutionConnection,
+  createExecutionRemoteStore,
+  type SyncExecutionCredentials,
+} from './connection-admission';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { releaseNativeEditingRoot } from '../../workflows/sync-transfer/native-cache';
 import { trimNativeCache } from '../../workflows/sync-transfer/native-cache-policy';
 import { indexCatalogCopies } from '../../workflows/sync-transfer/residency-copy';
 import {
   prepareNativeEditingRoot,
+  prepareNativeScenarioExport,
+  createSyncDownloadAllowance,
   isNativeEditingRootReady,
 } from '../../workflows/sync-transfer/native-residency';
 import type { createAutomaticCatalogSync } from '../../workflows/sync-transfer/automatic';
 import { resolveCatalogConflict } from '../../workflows/sync-transfer/conflict-resolution';
 import { readSyncProductThumbnail } from './product-thumbnail';
-import { loadSyncConnectionAuthentication } from '../../composition/persistence/remote-connection/store';
 import type {
   SyncExecutorBinding,
+  SyncCredentialLease,
   SyncProductCompletion,
   SyncProductFailureCode,
   SyncProductWork,
 } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { createSyncConnectionRequests } from '../../workflows/sync-transfer/connection-requests';
-import { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
+import type { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
 import { verifySyncWorkspaceIdentity } from '../../workflows/sync-transfer/workspace';
 import { readCheckedPersistedSyncCatalog } from '../../workflows/sync-transfer/catalog-view';
 import type { scanSyncCatalog } from '../../workflows/sync-transfer/catalog';
@@ -37,6 +50,7 @@ let thumbnailCatalog: {
 } | null = null;
 
 export interface SyncProductExecutionInput extends SyncExecutorBinding {
+  credentialLease?: SyncCredentialLease;
   work: SyncProductWork;
   signal: AbortSignal;
 }
@@ -47,9 +61,14 @@ export interface SyncProductExecutionResult {
   containment: 'contained' | 'unsafe';
 }
 function failure(error: unknown, signal: AbortSignal): SyncProductFailureCode {
-  if (signal.aborted) return 'interrupted';
+  if (signal.aborted)
+    return signal.reason instanceof SyncRemoteError && signal.reason.code === 'secrets-locked'
+      ? 'secrets-locked'
+      : 'interrupted';
   if (error instanceof Error && 'code' in error) {
     switch (error.code) {
+      case 'secrets-locked':
+        return 'secrets-locked';
       case 'authentication':
         return 'authentication';
       case 'access-denied':
@@ -111,7 +130,9 @@ function checkedSelectedCatalogOperation(
         | 'native-prepare'
         | 'native-release'
         | 'cache-trim'
-        | 'backup-prepare';
+        | 'backup-prepare'
+        | 'library-backup-prepare'
+        | 'scenario-export-prepare';
     }
   >
 ) {
@@ -140,10 +161,20 @@ export function createSyncProductExecution(
   hasOriginPermission: (origin: string) => Promise<boolean>,
   onLibraryChanged: () => void = () => undefined,
   onQueueAvailable: (operationId: string) => void = () => undefined,
-  automatic?: ReturnType<typeof createAutomaticCatalogSync>
+  automatic?: ReturnType<typeof createAutomaticCatalogSync>,
+  retirement?: ReturnType<typeof createPublishedOutgoingRetirement>,
+  credentials?: SyncExecutionCredentials
 ) {
   const selection = structuredClone({ scope: input.scope, authorization: input.authorization });
   const work = structuredClone(input.work);
+  const downloadAllowance =
+    work.kind === 'native-prepare' ||
+    work.kind === 'backup-prepare' ||
+    work.kind === 'library-backup-prepare' ||
+    work.kind === 'scenario-export-prepare' ||
+    work.kind === 'replica-prepare'
+      ? createSyncDownloadAllowance()
+      : undefined;
   const { signal } = input;
   function event(
     state: 'started' | 'ready' | 'failed' | 'interrupted',
@@ -170,22 +201,69 @@ export function createSyncProductExecution(
   const requests = createSyncConnectionRequests({
     identity: selection.authorization,
     hasOriginPermission,
+    ...(credentials ? { checkProtection: credentials.checkProtection } : {}),
   });
   async function current() {
     const connection = await readCurrentExecutionConnection(selection, signal);
     if (!connection) throw new Error('Sync product authorization refused');
+    if (
+      work.kind === 'library-backup-prepare' &&
+      !sameSyncConnectionIdentity(connection.identity, work.expected)
+    )
+      throw Object.assign(new Error('Library backup connection changed.'), {
+        code: 'selection-changed',
+      });
     return connection;
   }
   async function executeWork(
     remote: Awaited<ReturnType<typeof createWebdavRemoteStore>>,
     catalog: Awaited<ReturnType<typeof scanSyncCatalog>> | null
   ): Promise<SyncProductCompletion> {
+    if (work.kind === 'library-backup-prepare') {
+      if (!catalog || !downloadAllowance)
+        throw new Error('Library backup admission is unavailable.');
+      const connection = await current();
+      try {
+        await prepareLibraryBackupInRuntime({
+          catalog,
+          binding: connection.binding,
+          authorization: selection.authorization,
+          expected: work.expected,
+          options: work.options,
+          remote,
+          signal,
+          downloadAllowance,
+        });
+        await current();
+      } finally {
+        notifyLibraryChanged();
+      }
+      return { kind: 'library-backup', expected: work.expected, options: work.options };
+    }
+    if (work.kind === 'scenario-export-prepare') {
+      const connection = await current();
+      try {
+        await prepareNativeScenarioExport({
+          projectId: work.projectId,
+          exportId: work.exportId,
+          binding: connection.binding,
+          authorization: selection.authorization,
+          remote,
+          signal,
+          ...(downloadAllowance ? { downloadAllowance } : {}),
+        });
+      } finally {
+        notifyLibraryChanged();
+      }
+      return { kind: 'scenario-export', projectId: work.projectId, exportId: work.exportId };
+    }
     if (work.kind === 'native-prepare' || work.kind === 'backup-prepare') {
       const connection = await current();
       try {
         await prepareNativeEditingRoot({
           root: work.root,
           purpose: work.kind === 'backup-prepare' ? 'backup' : 'editing',
+          ...(downloadAllowance ? { downloadAllowance } : {}),
           remote,
           binding: connection.binding,
           authorization: selection.authorization,
@@ -220,7 +298,20 @@ export function createSyncProductExecution(
     }
     if (work.kind === 'automatic-sync') {
       if (!automatic) throw new Error('Automatic sync execution unavailable.');
-      const result = await automatic.run({ ...selection, remote, catalog, signal });
+      const connection = await current();
+      const policy = parseSyncStoragePolicy(
+        connection.storagePolicy === undefined
+          ? { version: 1, mode: 'on-demand' }
+          : connection.storagePolicy
+      );
+      if (!policy) throw new Error('Automatic sync storage policy is unavailable.');
+      const result = await automatic.run({
+        ...selection,
+        remote,
+        catalog,
+        signal,
+        binaryAdmission: 'resident',
+      });
       if (result.applied > 0) notifyLibraryChanged();
       return { kind: 'automatic', ...result };
     }
@@ -250,6 +341,7 @@ export function createSyncProductExecution(
         selection: selected,
         signal,
         ...(work.preserveNative ? { preserveNative: true as const } : {}),
+        ...(downloadAllowance ? { downloadAllowance } : {}),
       });
       const root = { rootKind: committed.rootKind, rootId: committed.rootId };
       try {
@@ -257,6 +349,7 @@ export function createSyncProductExecution(
         await prepareNativeEditingRoot({
           root,
           remote,
+          ...(downloadAllowance ? { downloadAllowance } : {}),
           binding: connection.binding,
           authorization: selection.authorization,
           signal,
@@ -285,19 +378,23 @@ export function createSyncProductExecution(
         signal.throwIfAborted();
         await offscreenDataReadiness.ensureAssets();
         const connection = await current();
-        const remote = await createWebdavRemoteStore(
-          {
-            rootUrl: connection.binding.rootUrl,
-            authentication: () => loadSyncConnectionAuthentication(selection.authorization),
-            request: requests.request,
-          },
+        const remote = await createExecutionRemoteStore(
+          connection,
+          requests.request,
+          credentials,
           signal
         );
         if (connection.workspace)
           await verifySyncWorkspaceIdentity(remote, connection.workspace, signal);
         await current();
+        if (work.kind === 'automatic-sync' && retirement) {
+          await retirement.run({ ...selection, remote, signal });
+          await current();
+        }
         const catalog =
-          work.kind === 'native-prepare' || work.kind === 'backup-prepare'
+          work.kind === 'native-prepare' ||
+          work.kind === 'backup-prepare' ||
+          work.kind === 'scenario-export-prepare'
             ? null
             : await loadProductCatalog(remote, selection, work, signal);
         if (catalog && work.kind !== 'thumbnail-read') notifyLibraryChanged();

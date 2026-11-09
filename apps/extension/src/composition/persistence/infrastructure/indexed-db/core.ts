@@ -1,3 +1,4 @@
+import { withIndexedRowProjections } from './indexed-row-projections';
 import { runStorageStartupPhase } from '../startup-diagnostics';
 import { openDB, type IDBPDatabase, type IDBPTransaction } from 'idb';
 import { createLazyDefaultOwner } from '@sniptale/foundation/default-owner';
@@ -251,7 +252,7 @@ async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
     throw error;
   }
 
-  return db;
+  return withIndexedRowProjections(db);
 }
 
 export { requestPersistentStorageGrant as ensurePersistentStorage };
@@ -427,4 +428,9 @@ export function subscribeToDbTermination(listener: DbTerminationListener): () =>
   return () => {
     state.dbTerminationListeners.delete(listener);
   };
+}
+
+/** Uses the database key order for bounded compound-index pagination. */
+export function compareIndexedDbKeys(first: IDBValidKey, second: IDBValidKey): number {
+  return indexedDB.cmp(first, second);
 }

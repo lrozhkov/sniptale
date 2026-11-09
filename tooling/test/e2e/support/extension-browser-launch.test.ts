@@ -122,3 +122,39 @@ it('applies an explicit laboratory TLS override to offscreen requests without ch
   expect(browserIo.launch.mock.calls[1]?.[1]?.args).not.toContain('--ignore-certificate-errors');
   expect(browserIo.launch.mock.calls[1]?.[1]?.ignoreHTTPSErrors).not.toBe(true);
 });
+
+it(
+  'configures a native headless screen only for the requested profile ' +
+    'without changing CSS viewport or DPR',
+  async () => {
+    vi.stubEnv('SNIPTALE_E2E_VIEWPORT', '1920x900');
+    preparePersistentBrowser();
+    await launchExtensionBrowser({
+      userDataDir: '/tmp/native-popup-profile',
+      headlessScreen: { width: 1920, height: 1080 },
+    });
+    expect(browserIo.launch.mock.calls[0]?.[1]?.args).toContain('--screen-info={1920x1080}');
+    expect(browserIo.launch.mock.calls[0]?.[1]?.viewport).toEqual({ width: 1920, height: 900 });
+    expect(browserIo.launch.mock.calls[0]?.[1]?.deviceScaleFactor).toBe(1);
+    await launchExtensionBrowser({ userDataDir: '/tmp/default-native-screen' });
+    expect(
+      browserIo.launch.mock.calls[1]?.[1]?.args.some((arg: string) =>
+        arg.startsWith('--screen-info=')
+      )
+    ).toBe(false);
+  }
+);
+
+it('enables Back/Forward Cache only for an explicitly selected browser profile', async () => {
+  preparePersistentBrowser();
+  await launchExtensionBrowser({
+    userDataDir: '/tmp/bfcache-profile',
+    enableBackForwardCache: true,
+  });
+  expect(browserIo.launch.mock.calls[0]?.[1]?.ignoreDefaultArgs).toEqual([
+    '--disable-extensions',
+    '--disable-back-forward-cache',
+  ]);
+  await launchExtensionBrowser({ userDataDir: '/tmp/ordinary-profile' });
+  expect(browserIo.launch.mock.calls[1]?.[1]?.ignoreDefaultArgs).toEqual(['--disable-extensions']);
+});

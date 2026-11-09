@@ -112,7 +112,10 @@ describe('workspace-sidebar/selection/inspect-motion', () => {
     renderPanel(createMotionPanelProps());
 
     expect(container?.textContent).toContain('videoEditor.sidebar.motionScaleLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.motionFocusLabel');
+    expect(container?.textContent).toContain('editor.scene.cameraFollowTarget');
+    expect(container?.textContent?.indexOf('editor.scene.cameraFollowTarget')).toBeLessThan(
+      container?.textContent?.indexOf('videoEditor.sidebar.motionScaleLabel') ?? -1
+    );
     expect(container?.textContent).toContain('videoEditor.sidebar.selectPointOnStage');
     expect(container?.textContent).not.toContain('videoEditor.sidebar.motionDurationLabel');
     expect(container?.querySelector('input[type="range"]')).not.toBeNull();
@@ -553,4 +556,11 @@ it('shows and edits link curves through compact choices', () => {
   expect(props.onUpdateMotionRegion).toHaveBeenCalledExactlyOnceWith(second.id, {
     incomingConnection: { fromRegionId: first.id, easing: VideoTemporalEasing.LINEAR },
   });
+});
+
+it('uses distinct icons for simultaneous inspector categories', () => {
+  renderPanel(createMotionPanelProps());
+  const icons = [...container!.querySelectorAll('nav button svg')].map((icon) => icon.innerHTML);
+  expect(icons.length).toBeGreaterThan(1);
+  expect(new Set(icons).size).toBe(icons.length);
 });

@@ -112,16 +112,13 @@ it('routes selected image and step changes through selection history', async () 
   image.result.selectionActions.applyTextStyle('bold');
   await image.result.editorActions.syncBrowserFrame({ enabled: true });
   await image.result.editorActions.insertOrUpdateBrowserFrame();
-  image.result.editorActions.onApplyFrame();
+  await image.result.editorActions.onApplyFrame();
   await image.result.editorActions.onCopyRenderedImage();
 
   expect(imageArgs.updateSelectionImageSettings).toHaveBeenCalledTimes(2);
   expect(mocks.controller.applyActiveSettingsToSelection).toHaveBeenCalledTimes(2);
   expect(mocks.controller.commitHistory).toHaveBeenCalledOnce();
-  expect(imageArgs.setBrowserFrame).toHaveBeenCalledWith({
-    enabled: false,
-    style: 'browser',
-  });
+  expect(imageArgs.setBrowserFrame).not.toHaveBeenCalled();
   expect(mocks.controller.applyBrowserFrame).toHaveBeenCalled();
   expect(mocks.controller.applyFrameSettings).toHaveBeenCalledWith(imageArgs.frameDraft);
   expect(mocks.controller.copyRenderedImage).toHaveBeenCalled();

@@ -170,3 +170,30 @@ it('does not estimate adaptive output from constant-rate samples', async () => {
   ).rejects.toThrow('Adaptive');
   expect(mocks.measure).not.toHaveBeenCalled();
 });
+
+it.each(['bicubic-sharpen', 'clark-x2'] as const)(
+  'reports %s size unavailable before allocating preview resources',
+  async (detailEnhancement) => {
+    const project = { ...createEmptyVideoProject(), duration: 1 };
+    await expect(
+      estimateProjectExportSize({
+        project,
+        assetUrls: {},
+        signal: new AbortController().signal,
+        settings: {
+          downloadAfterExport: false,
+          format: 'WEBM',
+          webmVideoCodec: 'VP9',
+          width: 1920,
+          height: 1080,
+          fps: 30,
+          quality: 'HIGH',
+          resolution: 'SOURCE',
+          detailEnhancement,
+        },
+      })
+    ).rejects.toThrow('Enhanced export size estimate is unavailable.');
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.measure).not.toHaveBeenCalled();
+  }
+);

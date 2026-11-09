@@ -531,3 +531,44 @@ it('encodes only admitted source master gain while retaining compound content ed
     applyReviewOperation(document, { ...operation, after: operation.before }, source)
   ).toThrow(new ReviewHistoryError('no-change'));
 });
+
+it('keeps unrelated text on the voiceover source positions after a video Cut', async () => {
+  const { parseReviewOperation } = await import('./validation');
+  const { projectReviewTextFragment } = await import('./text-projection');
+  const baseline = createQuickEditAdvancedContent();
+  baseline.text = {
+    version: 1,
+    fragments: [
+      {
+        id: 'text-after-cut',
+        start: 8,
+        end: 10,
+        text: 'Later phrase',
+        originalText: '',
+        revision: 0,
+        timingRevision: 0,
+        timeDomain: 'result',
+        alignment: 'manual',
+        showInVideo: true,
+      },
+    ],
+  };
+  const operation = parseReviewOperation(
+    {
+      id: 'cut-before-text',
+      at: 1,
+      target: 'edit',
+      before: null,
+      after: { id: 'cut', kind: 'cut', start: 1, end: 3, requestedStart: 1, requestedEnd: 3 },
+      preserveVoiceoverAnchors: true,
+      preserveTextAnchors: true,
+    },
+    source.duration
+  );
+  expect(operation).not.toBeNull();
+  const result = replayReviewHistory([operation!], 1, source, baseline);
+  const fragment = result.advancedContent.text!.fragments[0]!;
+  expect(
+    projectReviewTextFragment(fragment, buildReviewTimeMap(source.duration, result.edits)).ranges
+  ).toEqual([{ start: 6, end: 8 }]);
+});

@@ -1,3 +1,4 @@
+import { readPreparedSecretProtectionControl } from '../secret-protection/transition.store';
 import { browserStorage } from '../infrastructure/browser-storage';
 import {
   createAesGcmKeyMaterial,
@@ -5,11 +6,8 @@ import {
 } from '@sniptale/platform/security/local-secret-crypto';
 import { AI_LOCAL_SECRET_KEY_STORAGE_KEY } from './constants';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
-import {
-  AISecretPassphraseLockedError,
-  readStoredAISecretProtection,
-  readUnlockedAISecretPassphraseKey,
-} from './secret-protection.store.ts';
+import { SecretProtectionLockedError } from '../secret-protection/model';
+import { AI_SECRET_PROTECTION_KEY, AI_SECRET_PROTECTION_TRANSITION_KEY } from './constants';
 
 export async function readStoredSecretKeyMaterial(): Promise<string | null> {
   const result = await browserStorage.local.get([AI_LOCAL_SECRET_KEY_STORAGE_KEY]);
@@ -45,20 +43,13 @@ export async function resolveSecretKey(
   };
 }
 
-export async function resolveProviderSecretKeyForWrite(): Promise<{
+/** An explicit key belongs to one already-admitted common protection operation. */
+export async function resolveProviderSecretKeyForWrite(operationKey?: CryptoKey | null): Promise<{
   key: CryptoKey;
   nextKeyMaterial?: string | undefined;
 }> {
-  const protection = await readStoredAISecretProtection();
-  if (protection) {
-    const key = await readUnlockedAISecretPassphraseKey();
-    if (!key) {
-      throw new AISecretPassphraseLockedError();
-    }
-
-    return { key };
-  }
-
+  if (operationKey) return { key: operationKey };
+  if (operationKey === undefined) await assertUnprotectedLegacyAccess();
   const resolvedKey = await resolveSecretKey();
   return {
     key: resolvedKey.key,
@@ -66,11 +57,26 @@ export async function resolveProviderSecretKeyForWrite(): Promise<{
   };
 }
 
+/** Compatibility callers have no unlocked session authority. Refuse protected or unresolved data. */
+export async function assertUnprotectedLegacyAccess(): Promise<void> {
+  const [state, control] = await Promise.all([
+    browserStorage.local.get([AI_SECRET_PROTECTION_KEY, AI_SECRET_PROTECTION_TRANSITION_KEY]),
+    readPreparedSecretProtectionControl(),
+  ]);
+  if (
+    state[AI_SECRET_PROTECTION_KEY] != null ||
+    state[AI_SECRET_PROTECTION_TRANSITION_KEY] != null ||
+    control?.phase === 'transitioning' ||
+    control?.participants.ai
+  )
+    throw new SecretProtectionLockedError();
+}
+
 export async function removeTransparentKeyIfUnused(
   secretCount: number,
   permit?: PersistenceMutationPermit
 ): Promise<void> {
-  if (secretCount > 0 || (await readStoredAISecretProtection())) {
+  if (secretCount > 0) {
     return;
   }
 

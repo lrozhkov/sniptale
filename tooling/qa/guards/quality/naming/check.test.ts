@@ -103,6 +103,21 @@ function verifiesUsePrefixIsNotAHookAllowance() {
   ]);
 }
 
+function verifiesPinnedJavaScriptDeclarationName() {
+  const root = createTempRoot();
+  const pinned =
+    'apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.d.ts';
+  const neighbor = pinned.replace('realtimeVideoUpscaler', 'authoredHelper');
+  const authored = 'apps/extension/src/features/example/realtimeVideoUpscaler.d.ts';
+  const paths = [pinned, neighbor, authored].map((file) => writeFile(root, file));
+
+  expect(collectNamingViolations([paths[0]!])).toEqual([]);
+  expect(collectNamingViolations(paths.slice(1))).toEqual([
+    expect.objectContaining({ file: neighbor, rule: 'filename-naming' }),
+    expect.objectContaining({ file: authored, rule: 'filename-naming' }),
+  ]);
+}
+
 function verifiesRepeatedPrefixViolationForChangedFiles() {
   const root = createTempRoot();
   const file = writeFile(root, 'apps/extension/src/editor/inspector/inspector-content.tsx');
@@ -338,6 +353,10 @@ describe('collectNamingViolations', () => {
   it('ignores test-only scopes', verifiesTestScopeExclusion);
   it('rejects malformed lowercase filename stems', verifiesMalformedLowercaseStems);
   it('does not treat every use-prefixed word as a hook', verifiesUsePrefixIsNotAHookAllowance);
+  it(
+    'allows only the declaration paired with the pinned JavaScript module',
+    verifiesPinnedJavaScriptDeclarationName
+  );
   it(
     'flags repeated-prefix implementation names for changed files',
     verifiesRepeatedPrefixViolationForChangedFiles

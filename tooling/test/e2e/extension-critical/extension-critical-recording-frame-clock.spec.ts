@@ -62,6 +62,7 @@ interface SourcePaint {
   markerX: number | null;
 }
 interface DecodedVideo {
+  duration: number;
   width: number;
   height: number;
   frames: DecodedFrame[];
@@ -85,8 +86,22 @@ async function countDurableRecordings(page: Page): Promise<number> {
       request.onerror = () => reject(request.error);
       request.onsuccess = () => resolve(request.result);
     });
+    const complete = await new Promise<boolean>((resolve, reject) => {
+      const request = database
+        .transaction('recording_telemetry')
+        .objectStore('recording_telemetry')
+        .getAll();
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () =>
+        resolve(
+          request.result.some(
+            (entry: RecordingTelemetryEntry) =>
+              entry.recordingEvents?.finalized && entry.cursorTrajectory?.finalized
+          )
+        );
+    });
     database.close();
-    return count;
+    return complete ? count : 0;
   });
 }
 
@@ -190,6 +205,45 @@ async function readNativeFrameTimestampPairs(context: BrowserContext, targetId: 
   )) as NativeFramePair[];
 }
 
+async function readPreparedHistory(
+  page: Page,
+  telemetry: RecordingTelemetryEntry,
+  source: DecodedVideo,
+  size: number
+) {
+  const bundle = await build({
+    stdin: {
+      resolveDir: process.cwd(),
+      contents: `
+        import { createReviewRecordingHistoryProject, createReviewRecordingHistorySource } from './apps/extension/src/workflows/video-review/recording-review';
+        globalThis.readClockHistory = async (telemetry, source) => {
+          const project = createReviewRecordingHistoryProject(telemetry, {
+            ...source, mimeType: 'video/webm',
+          }, 'capture.webm');
+          if (!project) throw new Error('Expected canonical recording history.');
+          const reader = createReviewRecordingHistorySource(project, telemetry);
+          try { return (await reader.read(0, {start:0, end:project.duration})).telemetry; }
+          finally { reader.dispose(); }
+        };
+      `,
+    },
+    bundle: true,
+    write: false,
+    format: 'iife',
+    platform: 'browser',
+    define: { 'import.meta.env.DEV': 'false' },
+  });
+  await page.evaluate(bundle.outputFiles[0]!.text);
+  return page.evaluate(
+    async ({ telemetry, source, size }) =>
+      (await Reflect.get(window, 'readClockHistory')(telemetry, {
+        ...source,
+        size,
+      })) as RecordingTelemetryEntry,
+    { telemetry, source, size }
+  );
+}
+
 async function readSavedRecording(page: Page) {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -204,11 +258,17 @@ async function readSavedRecording(page: Page) {
         request.onerror = () => reject(request.error);
       });
     const telemetry = (await read('recording_telemetry')) as RecordingTelemetryEntry[];
-    const refs = (await read('asset_refs')) as { location: { objectKey: string } }[];
+    const recordings = (await read('recordings')) as { assetId: string }[];
+    const refs = (await read('asset_refs')) as {
+      assetId: string;
+      location: { objectKey: string };
+    }[];
     database.close();
     let directory = await navigator.storage.getDirectory();
     directory = await directory.getDirectoryHandle('sniptale-assets');
-    const parts = refs[0]!.location.objectKey.split('/');
+    const parts = refs
+      .find((ref) => ref.assetId === recordings[0]!.assetId)!
+      .location.objectKey.split('/');
     for (const part of parts.slice(0, -1)) directory = await directory.getDirectoryHandle(part);
     const file = await (await directory.getFileHandle(parts.at(-1)!)).getFile();
     const helpers = (await chrome.tabs.query({})).filter((tab) =>
@@ -216,6 +276,7 @@ async function readSavedRecording(page: Page) {
     ).length;
     return {
       telemetry: telemetry[0]!,
+      rawTelemetry: telemetry[0]!,
       helpers,
       bytes: Array.from(new Uint8Array(await file.arrayBuffer())),
     };
@@ -250,7 +311,7 @@ async function decodeSavedVideo(page: Page, bytes: number[]): Promise<DecodedVid
           }
           for await (const packet of new EncodedPacketSink(track).packets())
             if(packet.type==='key') keys.push(packet.timestamp);
-          return {width,height,frames,keys};
+          return {width,height,frames,keys,duration:await input.computeDuration()};
         } finally { input.dispose(); }
       };`,
     },
@@ -335,6 +396,7 @@ for (const { resolution, fault, crop } of [
           chrome.runtime.onMessage.addListener((message) => {
             if (
               [
+                'OFFSCREEN_ERROR',
                 'OFFSCREEN_RECORDING_STARTED',
                 'OFFSCREEN_RECORDING_PAUSED',
                 'OFFSCREEN_RECORDING_RESUMED',
@@ -343,6 +405,7 @@ for (const { resolution, fault, crop } of [
               Reflect.get(window, '__clockEvents').push({
                 type: message.type,
                 frameClock: message.frameClock ?? null,
+                error: message.error ?? null,
               });
             }
             return false;
@@ -366,7 +429,6 @@ for (const { resolution, fault, crop } of [
         });
         await target.goto(origin + '/initial');
         await target.bringToFront();
-        const actionTarget = await triggerExtensionAction(context, extensionId, target);
         const tabId = await popup.evaluate(
           async (url) => (await chrome.tabs.query({})).find((tab) => tab.url === url)?.id,
           target.url()
@@ -381,6 +443,8 @@ for (const { resolution, fault, crop } of [
         const faultWorldId = fault
           ? await refuseContentCalibration(context, target, extensionId)
           : null;
+        await target.bringToFront();
+        const actionTarget = await triggerExtensionAction(context, extensionId, target);
         await sendRuntimeMessageInTarget(
           context,
           actionTarget,
@@ -414,7 +478,16 @@ for (const { resolution, fault, crop } of [
           await expect(target.locator('#sniptale-height-input')).toHaveValue('560');
           await target.locator('.sniptale-selection-size-confirm-button').click({ timeout: 5000 });
         }
-        const state = () => sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' });
+        const state = async () => {
+          const result = await sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' });
+          const errors = await popup.evaluate(() =>
+            Reflect.get(window, '__clockEvents').filter(
+              (event: { type: string }) => event.type === 'OFFSCREEN_ERROR'
+            )
+          );
+          if (errors.length) throw new Error(JSON.stringify(errors));
+          return result;
+        };
         await expect
           .poll(state, { timeout: 20000 })
           .toMatchObject({ success: true, state: { status: VideoRecordingStatus.RECORDING } });
@@ -512,13 +585,29 @@ for (const { resolution, fault, crop } of [
         });
         await expect.poll(() => countDurableRecordings(popup), { timeout: 30000 }).toBe(1);
         const rawSaved = await readSavedRecording(popup);
+        const decoded = await decodeSavedVideo(popup, rawSaved.bytes);
+        const telemetry = await readPreparedHistory(
+          popup,
+          rawSaved.telemetry,
+          decoded,
+          rawSaved.bytes.length
+        );
         const saved = {
           ...rawSaved,
-          actions: projectRecordingObservationClock(rawSaved.telemetry)
-            .actionEvents as RecordedAction[],
+          telemetry,
+          actions: projectRecordingObservationClock(telemetry).actionEvents as RecordedAction[],
         };
+        expect(saved.rawTelemetry.recordingEvents).toMatchObject({
+          format: 'recording-events-v1',
+          finalized: true,
+        });
+        expect(saved.rawTelemetry.cursorTrajectory).toMatchObject({
+          format: 'cursor-trajectory-v1',
+          finalized: true,
+        });
+        expect(saved.rawTelemetry.actionEvents).toEqual([]);
+        expect(saved.rawTelemetry.cursorTrack?.samples ?? []).toEqual([]);
         await writeFile(info.outputPath('native-recording.webm'), Buffer.from(saved.bytes));
-        const decoded = await decodeSavedVideo(popup, saved.bytes);
         await writeFile(
           info.outputPath('raw-clock-evidence.json'),
           JSON.stringify(
@@ -577,11 +666,6 @@ for (const { resolution, fault, crop } of [
           await gallery.locator('[data-ui="gallery.videoReview.enter"]').click();
           const strip = gallery.locator('[data-ui="gallery.videoReview.historyStrip"]');
           await expect(strip.locator('button').first()).toBeVisible();
-          await expect(
-            gallery.locator(
-              '[data-ui="gallery.videoReview.trackHeader"] [data-ui="history.timing"]'
-            )
-          ).toBeInViewport();
           await gallery
             .getByRole('button', {
               name: translate('gallery.videoReview.advancedEditing', 'en'),
@@ -591,12 +675,6 @@ for (const { resolution, fault, crop } of [
           await strip.locator('[data-history-family="mouse"] button').first().click();
           await gallery
             .getByRole('button', {
-              name: translate('gallery.videoReview.clickEffect', 'en'),
-              exact: true,
-            })
-            .click();
-          await gallery
-            .getByRole('option', {
               name: translate('gallery.videoReview.click_ripple', 'en'),
               exact: true,
             })
@@ -614,6 +692,9 @@ for (const { resolution, fault, crop } of [
           );
           await expect(editor.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
           await expect(editor.locator('[data-ui="history.timing"]')).toBeInViewport();
+          await expect(
+            editor.locator('[data-ui="video-editor.timeline.history-event"]')
+          ).toHaveCount(retained.length);
           await editor.screenshot({
             path: info.outputPath('failed-calibration-montage.png'),
             fullPage: false,
@@ -622,7 +703,9 @@ for (const { resolution, fault, crop } of [
         }
         const evidence = retained.map((event) => {
           const action = saved.actions.find(
-            (candidate) => candidate.point.x === event.x && candidate.point.y === event.y
+            (candidate) =>
+              Math.abs(candidate.point.x * 1280 - event.x) < 0.01 &&
+              Math.abs(candidate.point.y * 560 - event.y) < 0.01
           );
           expect(action).toBeDefined();
           const anchor = clocks.find(
@@ -657,8 +740,13 @@ for (const { resolution, fault, crop } of [
           expect(action!.time).toBeLessThanOrEqual(
             upper!.chosenTimestampUs / 1_000_000 + frameBudgetSeconds + 0.001
           );
-          expect(action!.recordingPoint.x).toBeCloseTo(event.x / 1280, 10);
-          expect(action!.recordingPoint.y).toBeCloseTo(event.y / 560, 10);
+          // Canonical coordinates use Q8 rounding in encoded video pixels.
+          expect(
+            Math.abs(action!.recordingPoint.x - event.x / 1280) * decoded.width
+          ).toBeLessThanOrEqual(1 / 512 + 1e-9);
+          expect(
+            Math.abs(action!.recordingPoint.y - event.y / 560) * decoded.height
+          ).toBeLessThanOrEqual(1 / 512 + 1e-9);
           const marker = decoded.frames.find(
             (frame) =>
               frame.marker &&

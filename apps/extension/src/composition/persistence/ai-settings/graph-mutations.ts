@@ -1,4 +1,7 @@
+import { withSecretProtectionWriter } from '../secret-protection/service';
+import type { SecretProtectionAdmissionPermit } from '../secret-protection/model';
 import { setStoredAIProviderEnabled } from './provider-secrets.store';
+import type { SecretProtectionService } from '../secret-protection/model';
 import { browserStorage } from '../infrastructure/browser-storage';
 import {
   AI_STORAGE_VERSION,
@@ -16,30 +19,25 @@ import {
   runWithAtomicPersistenceMutationPermit,
   acquirePersistenceMutationTransition,
   type PersistenceMutationPermit,
+  type PersistenceMutationTransitionLease,
 } from '../infrastructure/mutation-barrier';
 import type { AIProviderUpsertInput } from './core';
 import {
-  changeAISecretPassphraseProtection,
   clearAIProviderSecret,
   deleteAIProviderGraphRecord,
-  disableAISecretPassphraseProtection,
-  enableAISecretPassphraseProtection,
   loadAISecretProtectionStatus as loadUnserializedAISecretProtectionStatus,
   loadAIModels,
   loadAIProviders,
-  lockAISecretProtection,
   resetAudioTranscriptionSystemPrompt,
   saveAudioTranscriptionSystemPrompt,
   saveVoiceInputCorrectionSystemPrompt,
   resetVoiceInputCorrectionSystemPrompt,
   resetGlobalSystemPrompt,
-  resetAISecretPassphraseProtection,
   resetScenarioEditorSystemPrompt,
   saveAIModels,
   saveChromeAiEnabled,
   saveGlobalSystemPrompt,
   saveScenarioEditorSystemPrompt,
-  unlockAISecretProtection,
   upsertAIProviderRecord,
   type AISecretProtectionStatus,
 } from './core';
@@ -96,35 +94,40 @@ async function assertModelProviderExists(
 
 async function addProvider(
   command: { provider: AIProviderUpsertInput },
-  permit: PersistenceMutationPermit
+  permit: PersistenceMutationPermit,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<void> {
   const providers = await loadAIProviders();
   if (providers.some((provider) => provider.id === command.provider.id)) {
     throw new Error(`Provider ${command.provider.id} already exists`);
   }
-  await upsertAIProviderRecord(command.provider, permit);
+  await upsertAIProviderRecord(command.provider, permit, operationKey, admissionPermit);
 }
 
 async function updateProvider(
   command: { provider: AIProviderUpsertInput },
-  permit: PersistenceMutationPermit
+  permit: PersistenceMutationPermit,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<void> {
   const providers = await loadAIProviders();
   if (!providers.some((provider) => provider.id === command.provider.id)) {
     throw new Error(`Provider ${command.provider.id} not found`);
   }
-  await upsertAIProviderRecord(command.provider, permit);
+  await upsertAIProviderRecord(command.provider, permit, operationKey, admissionPermit);
 }
 
 async function clearProviderSecret(
   providerId: string,
-  permit: PersistenceMutationPermit
+  permit: PersistenceMutationPermit,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<void> {
   const providers = await loadAIProviders();
   if (!providers.some((provider) => provider.id === providerId)) {
     throw new Error(`Provider ${providerId} not found`);
   }
-  await clearAIProviderSecret(providerId, permit);
+  await clearAIProviderSecret(providerId, permit, admissionPermit);
 }
 
 async function resolveModelProperties(
@@ -284,15 +287,17 @@ function isGraphCommand(command: AISettingsMutationCommand): command is GraphCom
 }
 async function applyGraphMutation(
   command: GraphCommand,
-  permit: PersistenceMutationPermit
+  permit: PersistenceMutationPermit,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<void> {
   switch (command.operation) {
     case 'add-provider':
-      return addProvider(command, permit);
+      return addProvider(command, permit, operationKey, admissionPermit);
     case 'update-provider':
-      return updateProvider(command, permit);
+      return updateProvider(command, permit, operationKey, admissionPermit);
     case 'clear-provider-secret':
-      return clearProviderSecret(command.providerId, permit);
+      return clearProviderSecret(command.providerId, permit, admissionPermit);
     case 'delete-provider':
       return deleteAIProviderGraphRecord(command.providerId, permit);
     case 'add-model':
@@ -305,7 +310,11 @@ async function applyGraphMutation(
       return moveModel(command.modelId, command.beforeModelId, permit);
   }
 }
-async function mutateGraph(command: GraphCommand): Promise<void> {
+async function mutateGraph(
+  command: GraphCommand,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<void> {
   await runWithAtomicPersistenceMutationPermit(async (permit) => {
     const state = await browserStorage.local.get([
       AI_STORAGE_VERSION_KEY,
@@ -316,9 +325,9 @@ async function mutateGraph(command: GraphCommand): Promise<void> {
       state[AI_STORAGE_RESET_PHASE_KEY] !== undefined
     )
       throw new Error('AI settings are not ready for graph publication');
-    await assertAISettingsGraphInvariants();
-    await applyGraphMutation(command, permit);
-    await assertAISettingsGraphInvariants();
+    await assertAISettingsGraphInvariants(admissionPermit);
+    await applyGraphMutation(command, permit, operationKey, admissionPermit);
+    await assertAISettingsGraphInvariants(admissionPermit);
   });
 }
 
@@ -353,43 +362,33 @@ async function applyAISettingsMutation(
     case 'save-chrome-ai-enabled':
       return saveChromeAiEnabled(command.enabled);
     case 'enable-secret-passphrase-protection':
-      return enableAISecretPassphraseProtection(command.passphrase);
     case 'disable-secret-passphrase-protection':
-      return disableAISecretPassphraseProtection(command.passphrase);
     case 'unlock-secret-passphrase-protection':
-      return unlockAISecretProtection(command.passphrase);
     case 'change-secret-passphrase-protection':
-      return changeAISecretPassphraseProtection({
-        currentPassphrase: command.currentPassphrase,
-        nextPassphrase: command.nextPassphrase,
-      });
     case 'lock-secret-passphrase-protection':
-      return lockAISecretProtection();
     case 'reset-secret-passphrase-protection':
-      return resetAISecretPassphraseProtection();
+      throw new Error('Secret protection commands require the common background authority');
   }
 }
 
 /** Serializes every durable AI settings mutation through the persistence owner. */
-export function mutateStoredAISettings(command: AISettingsMutationCommand): Promise<void> {
-  const transition =
-    command.operation === 'save-voice-input-correction-prompt' ||
-    command.operation === 'reset-voice-input-correction-prompt'
-      ? acquirePersistenceMutationTransition()
-      : null;
-  // Admission starts before queueing; observe failure even while an earlier command is pending.
-  void transition?.catch(() => undefined);
+function performStoredAISettings(
+  command: AISettingsMutationCommand,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit,
+  transition: Promise<PersistenceMutationTransitionLease> | null = null
+): Promise<void> {
   return queueAISettingsMutation(async () => {
     const lease = await transition;
     try {
       await initializeAiStorageAccess();
       if (isGraphCommand(command)) {
-        await mutateGraph(command);
+        await mutateGraph(command, operationKey, admissionPermit);
         return;
       }
-      await assertAISettingsGraphInvariants();
+      await assertAISettingsGraphInvariants(admissionPermit);
       await applyAISettingsMutation(command);
-      await assertAISettingsGraphInvariants();
+      await assertAISettingsGraphInvariants(admissionPermit);
     } finally {
       await lease?.release();
     }
@@ -397,11 +396,13 @@ export function mutateStoredAISettings(command: AISettingsMutationCommand): Prom
 }
 
 /** Reads secret-protection state after all previously queued settings mutations settle. */
-export function loadSerializedAISecretProtectionStatus(): Promise<AISecretProtectionStatus> {
+export function loadSerializedAISecretProtectionStatus(
+  service?: SecretProtectionService
+): Promise<AISecretProtectionStatus> {
   return queueAISettingsMutation(async () => {
     await initializeAiStorageAccess();
     await assertAISettingsGraphInvariants();
-    return loadUnserializedAISecretProtectionStatus();
+    return loadUnserializedAISecretProtectionStatus(service);
   });
 }
 
@@ -410,7 +411,7 @@ export function resetAISettingsMutationQueueForTests(): void {
 }
 
 /** Admit metadata fetch through the same queue as user settings mutations; fetch runs outside it. */
-export function admitStoredAICatalogRefresh(
+function performAdmitStoredAICatalogRefresh(
   providerId: string,
   explicit: boolean,
   now = Date.now()
@@ -424,7 +425,7 @@ export function admitStoredAICatalogRefresh(
 }
 
 /** Commit one admitted metadata result without replaying a failed network request. */
-export function commitStoredAICatalogRefresh(
+function performCommitStoredAICatalogRefresh(
   token: AICatalogRefreshToken,
   outcome: AICatalogRefreshOutcome,
   now = Date.now()
@@ -437,7 +438,7 @@ export function commitStoredAICatalogRefresh(
 }
 
 /** Admit advisory request metadata without initialization, secret activation or graph repair. */
-export function admitStoredAIOperation(binding: AIOperationObservationBinding) {
+function performAdmitStoredAIOperation(binding: AIOperationObservationBinding) {
   return queueAISettingsMutation(() =>
     runWithExclusivePersistenceMutationPermit((permit) =>
       admitOperationObservation(binding, permit)
@@ -446,7 +447,7 @@ export function admitStoredAIOperation(binding: AIOperationObservationBinding) {
 }
 
 /** Publish a bounded operation outcome after earlier graph mutations settle. */
-export function commitStoredAIOperation(
+function performCommitStoredAIOperation(
   token: AIOperationObservationToken,
   outcome: AIOperationObservationOutcome,
   now = Date.now()
@@ -456,4 +457,50 @@ export function commitStoredAIOperation(
       commitOperationObservation(token, outcome, now, permit)
     )
   );
+}
+
+export function mutateStoredAISettings(
+  command: AISettingsMutationCommand,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<void> {
+  // Preserve the existing FIFO privacy reservation before any asynchronous writer admission.
+  // Writer admission is nonblocking, so a reserved prompt cannot wait behind erasure containment.
+  const transition =
+    command.operation === 'save-voice-input-correction-prompt' ||
+    command.operation === 'reset-voice-input-correction-prompt'
+      ? acquirePersistenceMutationTransition()
+      : null;
+  void transition?.catch(() => undefined);
+  return withSecretProtectionWriter(
+    (checked) => performStoredAISettings(command, operationKey, checked, transition),
+    admissionPermit
+  ).catch(async (error) => {
+    await (await transition)?.release();
+    throw error;
+  });
+}
+
+export function admitStoredAICatalogRefresh(
+  ...args: Parameters<typeof performAdmitStoredAICatalogRefresh>
+): ReturnType<typeof performAdmitStoredAICatalogRefresh> {
+  return withSecretProtectionWriter(() => performAdmitStoredAICatalogRefresh(...args));
+}
+
+export function commitStoredAICatalogRefresh(
+  ...args: Parameters<typeof performCommitStoredAICatalogRefresh>
+): ReturnType<typeof performCommitStoredAICatalogRefresh> {
+  return withSecretProtectionWriter(() => performCommitStoredAICatalogRefresh(...args));
+}
+
+export function admitStoredAIOperation(
+  ...args: Parameters<typeof performAdmitStoredAIOperation>
+): ReturnType<typeof performAdmitStoredAIOperation> {
+  return withSecretProtectionWriter(() => performAdmitStoredAIOperation(...args));
+}
+
+export function commitStoredAIOperation(
+  ...args: Parameters<typeof performCommitStoredAIOperation>
+): ReturnType<typeof performCommitStoredAIOperation> {
+  return withSecretProtectionWriter(() => performCommitStoredAIOperation(...args));
 }

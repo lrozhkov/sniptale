@@ -104,3 +104,26 @@ it('still emits failure lifecycle when terminal storage update fails', async () 
     })
   );
 });
+
+it.each([
+  ['unavailable', 'detailEnhancementUnavailable'],
+  ['initialization-failed', 'detailEnhancementInitFailed'],
+  ['device-lost', 'detailEnhancementDeviceLost'],
+  ['invalid-output', 'detailEnhancementFailed'],
+] as const)(
+  'localizes typed enhancement %s through the existing failure notification',
+  async (code, label) => {
+    const { ExportEnhancementError } =
+      await import('../../../features/video/composition/export-enhancement/enhancer');
+    const { translate } = await import('../../../platform/i18n');
+    const { sendProjectExportFailed } = await import('./notifications');
+    const message = translate(`videoEditor.exportDialog.${label}`);
+    await sendProjectExportFailed('detail-job', new ExportEnhancementError('clark-x2', code));
+    expect(markTerminalMock).toHaveBeenCalledWith('detail-job', 'failed', message);
+    expect(sendRuntimeMessageBestEffortMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: { type: 'PROJECT_EXPORT_FAILED', jobId: 'detail-job', error: message },
+      })
+    );
+  }
+);

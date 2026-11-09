@@ -45,7 +45,29 @@ async function prepareRuntimeAttempt(
     if (latest.prepareSourceVoiceover !== authority.latestStateRef.current.prepareSourceVoiceover)
       return 'retry';
   }
-  await preparePreviewStagePlayback(latest, request.time);
+  const sourceController = new AbortController();
+  authority.activePreparationRef.current = sourceController;
+  let sourcePreparation: 'ready' | 'retry';
+  try {
+    sourcePreparation = await preparePreviewStagePlayback(
+      latest,
+      request.time,
+      AbortSignal.any([request.signal, sourceController.signal])
+    );
+  } catch (error) {
+    const stale = resolvePreviewAttemptFreshness(authority, request, revision);
+    if (stale) return stale;
+    if (latest.sourceRuntime !== authority.latestStateRef.current.sourceRuntime) return 'retry';
+    throw error;
+  } finally {
+    if (authority.activePreparationRef.current === sourceController)
+      authority.activePreparationRef.current = null;
+  }
+  if (
+    sourcePreparation === 'retry' ||
+    latest.sourceRuntime !== authority.latestStateRef.current.sourceRuntime
+  )
+    return 'retry';
   const stale = resolvePreviewAttemptFreshness(authority, request, revision);
   if (stale) return stale;
   if (latest.previewMode === VideoEditorPreviewMode.CACHE) {
@@ -155,9 +177,9 @@ function usePreviewRuntimeConfigurationReset(
     // Live gestures need conservative invalidation without serializing recorded telemetry.
     () =>
       params.previewMode === VideoEditorPreviewMode.CACHE
-        ? createVideoPreviewRenderIdentity(params.project)
+        ? createVideoPreviewRenderIdentity(params.project, params.previewRenderer)
         : params.project,
-    [params.project, params.previewMode]
+    [params.project, params.previewMode, params.previewRenderer]
   );
   useLayoutEffect(() => {
     authority.completedCacheRef.current = null;
@@ -176,6 +198,7 @@ function usePreviewRuntimeConfigurationReset(
     params.playbackRange?.end,
     params.playbackRange?.start,
     params.previewMode,
+    params.previewRenderer,
     params.previewRasterSize.height,
     params.previewRasterSize.width,
     projectRenderIdentity,

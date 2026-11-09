@@ -50,6 +50,7 @@ type AudioPart = {
 function hasClips(part: AudioPart): boolean {
   const plan = part.exportAudio;
   if (!plan) return false;
+  if (plan.recordingAction) return true;
   const audible = (entry: ReviewExportClipPlan['entries'][number]) =>
     entry.volume > 0 &&
     entry.timelineStart < part.segment.resultEnd &&

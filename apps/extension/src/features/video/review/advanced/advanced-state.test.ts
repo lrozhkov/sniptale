@@ -2,6 +2,23 @@ import { replayReviewHistory } from '../document';
 import { describe, expect, it } from 'vitest';
 import type { Gradient } from '@sniptale/foundation/paint';
 import { createQuickEditAdvancedContent, createQuickEditAdvancedState } from './defaults';
+
+it('admits background motion in saved state and refuses malformed controls', () => {
+  const state = createQuickEditAdvancedState();
+  state.background = { ...state.background, motion: { mode: 'drift', speed: 70, intensity: 90 } };
+  expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))?.background.motion).toEqual(
+    state.background.motion
+  );
+  for (const motion of [
+    { mode: 'aurora', speed: 50, intensity: 50 },
+    { mode: 'drift', speed: 50, intensity: 101 },
+    { mode: 'waves', speed: '25', intensity: 50 },
+  ]) {
+    expect(
+      loadQuickEditAdvancedState({ ...state, background: { ...state.background, motion } })
+    ).toBeNull();
+  }
+});
 import { loadQuickEditAdvancedContentState, loadQuickEditAdvancedState } from './validation';
 import { buildReviewTimeMap } from '../timeline';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION, type QuickEditAdvancedState } from './types';

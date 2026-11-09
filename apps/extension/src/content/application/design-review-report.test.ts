@@ -186,3 +186,71 @@ it.each([
     expect(annotations.captureSnapshot().domRecords[0]?.comment).toBe('Keep this feedback');
   }
 );
+
+it('exports all session pages and saved previews without visiting missing targets or recapturing', async () => {
+  const snapshot = annotations.captureSnapshot();
+  const first = snapshot.domRecords[0]!;
+  snapshot.domRecords.push({
+    ...structuredClone(first),
+    annotationId: 2,
+    creationOrder: 2,
+    comment: 'Feedback from another page',
+    evidence: {
+      ...first.evidence,
+      pageUrl: 'https://other.test/previous',
+      fileLabel: 'Previous page',
+    },
+  });
+  const previews = new Map([
+    [2, { dataUrl: 'data:image/png;base64,aGVsbG8=', width: 120, height: 40 }],
+  ]);
+  target.remove();
+  const lookup = vi.spyOn(annotations, 'getLiveTarget');
+  const send = vi.spyOn(services.messaging, 'sendRuntimeMessage');
+  const print = vi.fn<typeof printReviewReport>(async () => undefined);
+  await createDesignReviewReportExporter({
+    annotations,
+    services: () => services,
+    print,
+    captureSnapshot: () => ({ snapshot, previews }),
+  })('Full review', source);
+  expect(print.mock.calls[0]?.[1]?.domRecords.map((record) => record.comment)).toEqual([
+    'Keep this feedback',
+    'Feedback from another page',
+  ]);
+  expect(print.mock.calls[0]?.[2]?.previews?.get(2)?.dataUrl).toBe(
+    'data:image/png;base64,aGVsbG8='
+  );
+  expect(lookup).not.toHaveBeenCalled();
+  expect(send).not.toHaveBeenCalled();
+});
+
+it('keeps the aggregate export immutable while later comments and saved previews change', async () => {
+  const snapshot = annotations.captureSnapshot();
+  const preview = { dataUrl: 'data:image/png;base64,aGVsbG8=', width: 120, height: 40 };
+  const previews = new Map([[1, preview]]);
+  let finish!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const print = vi.fn<typeof printReviewReport>(async () => {
+    await gate;
+  });
+  const exportReport = createDesignReviewReportExporter({
+    annotations,
+    services: () => services,
+    print,
+    captureSnapshot: () => ({ snapshot, previews }),
+  });
+  const pending = exportReport('Full review', source);
+  snapshot.domRecords[0]!.comment = 'Later mutation';
+  preview.dataUrl = 'data:image/png;base64,bGF0ZXI=';
+  previews.clear();
+  await expect(exportReport('Duplicate', source)).rejects.toThrow('already being prepared');
+  finish();
+  await pending;
+  expect(print.mock.calls[0]?.[1]?.domRecords[0]?.comment).toBe('Keep this feedback');
+  expect(print.mock.calls[0]?.[2]?.previews?.get(1)?.dataUrl).toBe(
+    'data:image/png;base64,aGVsbG8='
+  );
+});

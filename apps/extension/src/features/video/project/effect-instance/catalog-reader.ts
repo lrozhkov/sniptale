@@ -65,7 +65,7 @@ async function readCatalogDocuments(catalog: EffectBundleCatalogEntry): Promise<
     retainedByteLength += sourceBytes.byteLength;
     if ((await sha256EffectV1Bytes(sourceBytes)) !== entry.sha256) failCatalogIntegrity();
     const input = parseCatalogDocument(sourceBytes);
-    const validation = validateEffectV1Document(input);
+    const validation = validateEffectV1Document(input, { presentationPolicy: 'retained' });
     if (!validation.ok || !validation.document || validation.document.id !== entry.id) {
       failCatalogIntegrity();
     }

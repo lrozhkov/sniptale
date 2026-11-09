@@ -1,3 +1,4 @@
+import type { VideoEditorPlaybackTimeSource } from '../../../contracts/controller-store';
 import { createContext } from 'react';
 import type { VideoEditorLibrariesState } from '../../app-model/types';
 import type { VideoEditorCommandHandlers } from '../../commands';
@@ -49,15 +50,18 @@ export const VideoEditorLibrariesContext = createContext<VideoEditorLibrariesSta
 export const VideoEditorSelectionsContext = createContext<VideoEditorSelections | null>(null);
 export const VideoEditorBlockingOverlayContext = createContext<boolean | null>(null);
 
-export const RuntimePlaybackContext = createContext<Pick<
-  VideoEditorRuntimeController,
-  | 'isPreparingPlayback'
-  | 'pausePlayback'
-  | 'seekTo'
-  | 'setPlaybackPlaying'
-  | 'stepByFrames'
-  | 'togglePlayback'
-> | null>(null);
+export const RuntimePlaybackContext = createContext<
+  | (Pick<
+      VideoEditorRuntimeController,
+      | 'isPreparingPlayback'
+      | 'pausePlayback'
+      | 'seekTo'
+      | 'setPlaybackPlaying'
+      | 'stepByFrames'
+      | 'togglePlayback'
+    > & { playbackTimeSource?: VideoEditorPlaybackTimeSource })
+  | null
+>(null);
 export const RuntimePreviewContext = createContext<Pick<
   VideoEditorRuntimeController,
   | 'assetUrls'

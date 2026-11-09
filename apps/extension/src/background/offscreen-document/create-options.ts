@@ -2,6 +2,7 @@ const OFFSCREEN_DOCUMENT_CONTEXT_TYPE =
   'OFFSCREEN_DOCUMENT' satisfies `${chrome.runtime.ContextType}`;
 const OFFSCREEN_DOCUMENT_REASON = 'USER_MEDIA' satisfies `${chrome.offscreen.Reason}`;
 const OFFSCREEN_DISPLAY_REASON = 'DISPLAY_MEDIA' satisfies `${chrome.offscreen.Reason}`;
+const OFFSCREEN_WORKER_REASON = 'WORKERS' satisfies `${chrome.offscreen.Reason}`;
 const OFFSCREEN_BLOB_REASON = 'BLOBS' satisfies `${chrome.offscreen.Reason}`;
 const OFFSCREEN_CLIPBOARD_REASON = 'CLIPBOARD' satisfies `${chrome.offscreen.Reason}`;
 const PRIVACY_ERASURE_OFFSCREEN_DOCUMENT_REASON =
@@ -16,6 +17,7 @@ type OffscreenCreateDocumentOptions = Omit<chrome.offscreen.CreateParameters, 'r
     typeof OFFSCREEN_CLIPBOARD_REASON,
     typeof OFFSCREEN_DISPLAY_REASON,
     typeof OFFSCREEN_BLOB_REASON,
+    typeof OFFSCREEN_WORKER_REASON,
   ];
 };
 type PrivacyErasureOffscreenCreateDocumentOptions = Omit<
@@ -42,6 +44,7 @@ export function createUserMediaOffscreenDocumentOptions(
       OFFSCREEN_CLIPBOARD_REASON,
       OFFSCREEN_DISPLAY_REASON,
       OFFSCREEN_BLOB_REASON,
+      OFFSCREEN_WORKER_REASON,
     ],
     justification,
   } as OffscreenCreateDocumentOptions as chrome.offscreen.CreateParameters;

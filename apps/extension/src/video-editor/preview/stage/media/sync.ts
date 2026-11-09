@@ -76,7 +76,7 @@ export function shouldRefreshPreviewMediaTime(params: {
     (!params.state.wasPlaying && params.mediaPaused) ||
     isTimelineJump(params.state, params.currentTime)
   ) {
-    return true;
+    return shouldRefreshPausedPreviewMediaTime(params.mediaCurrentTime, params.nextTime);
   }
 
   return (

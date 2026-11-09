@@ -4,9 +4,7 @@ import type {
   NativeAppRuntimeResponse,
 } from '../../../contracts/native-app/runtime';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
-import { loadVideoSettings } from '../../../composition/persistence/capture-settings';
 import { getNativeAppRuntimeService } from './service-singleton';
-import { normalizeNativeCaptureSettings } from './settings-snapshot';
 import { hasNativeMessagingPermission } from './permission-lifecycle';
 
 function isNativeQueryMessage(
@@ -31,9 +29,7 @@ function isNativeMutationMessage(message: unknown): message is NativeAppMutation
 }
 
 async function buildResponse(): Promise<NativeAppRuntimeResponse> {
-  const settings = await loadVideoSettings();
   return {
-    settings: normalizeNativeCaptureSettings(settings.native, settings.outputProfile.quality),
     status: await getNativeAppRuntimeService().getStatus(),
     success: true,
   };
@@ -63,11 +59,13 @@ async function runNativeMutation(
 
   const service = getNativeAppRuntimeService();
   if (message.operation === 'reconnect') {
-    service.reconnect();
-  } else if (message.operation === 'take-controller') {
-    service.takeController();
+    await service.reconnect();
+  } else if (message.operation === 'trust-client' && message.clientId) {
+    await service.trustClient(message.clientId);
+  } else if (message.operation === 'forget-client') {
+    await service.forgetClient();
   } else {
-    await service.syncSettings();
+    return { success: false, error: 'Unsupported Desktop connection operation' };
   }
   return buildResponse();
 }

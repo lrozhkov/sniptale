@@ -18,6 +18,7 @@ export const popupRuntimeTypes = new Set<RuntimeMessageType>([
 ]);
 
 export const offscreenRuntimeTypes = new Set<RuntimeMessageType>([
+  MessageType.OFFSCREEN_SIMPLIFY_COMMAND,
   MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
   MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND,
   MessageType.OFFSCREEN_SYNC_START,
@@ -43,6 +44,7 @@ export const offscreenRuntimeTypes = new Set<RuntimeMessageType>([
   VideoMessageType.OFFSCREEN_READINESS_PROBE,
   VideoMessageType.OFFSCREEN_BEGIN_RECORDING,
   VideoMessageType.OFFSCREEN_STOP_RECORDING,
+  VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS,
   VideoMessageType.OFFSCREEN_GET_RECORDING_CLOCK_TIMING,
   VideoMessageType.OFFSCREEN_PAUSE_RECORDING,
   VideoMessageType.OFFSCREEN_RESUME_RECORDING,

@@ -106,8 +106,32 @@ function validateJscpdScanTargets(scanTargets, root) {
   }
 }
 
+function createNativeScanConfig(configPath, reportPath, root) {
+  const config = readJscpdConfig(configPath, root);
+  if (!Array.isArray(config.ignore) || !config.ignore.includes('.tmp/**')) return configPath;
+  // Native globs match absolute paths. The repository's artifact directory must
+  // not match a parent .tmp directory that contains the checkout itself.
+  const rootPattern = path
+    .resolve(root)
+    .split(path.sep)
+    .map((segment) => segment.replace(/[\\*?[\]{}]/gu, '\\$&'))
+    .join('/');
+  const effectivePath = path.join(path.dirname(reportPath), 'native-scan-config.json');
+  fs.writeFileSync(
+    effectivePath,
+    JSON.stringify({
+      ...config,
+      ignore: config.ignore.map((pattern) =>
+        pattern === '.tmp/**' ? `${rootPattern}/.tmp/**` : pattern
+      ),
+    })
+  );
+  return effectivePath;
+}
+
 function runJscpdScan({
   configPath,
+  reportPath,
   executable,
   killSignal,
   root,
@@ -120,7 +144,7 @@ function runJscpdScan({
     executable,
     [
       '--config',
-      configPath,
+      createNativeScanConfig(configPath, reportPath, root),
       '--workers',
       String(JSCPD_WORKERS),
       '--no-colors',
@@ -241,6 +265,7 @@ export function runJscpdCheck({
   prepareJscpdReportPath(absoluteReportPath);
   const commandResult = runJscpdScan({
     configPath,
+    reportPath: absoluteReportPath,
     executable: resolvedExecutable,
     killSignal,
     root,

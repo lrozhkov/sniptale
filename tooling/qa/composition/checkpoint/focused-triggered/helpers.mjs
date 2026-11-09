@@ -87,17 +87,16 @@ export function shouldRunDependencyAdmission(targetFiles) {
   return targetFiles.some(isDependencyAdmissionInputPath);
 }
 
-export function collectFocusedI18nFiles(targetFiles) {
+export function collectFocusedI18nFiles(
+  targetFiles,
+  { collectAllI18nFiles = collectLiveProductI18nFiles } = {}
+) {
   const changedScopedFiles = targetFiles.filter((file) => isLiveProductI18nFile(file));
-  if (changedScopedFiles.length > 0) {
-    return changedScopedFiles;
-  }
-
   if (targetFiles.some((file) => isFullI18nScanTrigger(file))) {
-    return collectLiveProductI18nFiles();
+    return [...new Set([...collectAllI18nFiles(), ...targetFiles.filter(isFullI18nScanTrigger)])];
   }
 
-  return [];
+  return changedScopedFiles;
 }
 
 export function shouldRunDesignSystem(targetFiles) {
@@ -112,5 +111,9 @@ export function shouldRunDependencyGraph(targetFiles) {
 }
 
 export function shouldRunFocusedTypecheck(jsLikeFiles) {
-  return jsLikeFiles.some((file) => /\.(?:ts|tsx|cts|mts)$/u.test(file));
+  return jsLikeFiles.some(
+    (file) =>
+      /\.(?:ts|tsx|cts|mts)$/u.test(file) ||
+      file === 'apps/extension/src/platform/i18n/catalogs/en.json'
+  );
 }

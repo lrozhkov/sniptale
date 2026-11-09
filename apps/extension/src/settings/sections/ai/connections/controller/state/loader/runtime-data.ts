@@ -4,7 +4,6 @@ import {
   isChromeAiProviderId,
 } from '../../../../../../../features/ai/chrome/constants';
 import type { AIModel, AIProvider } from '../../../../../../../contracts/settings';
-import type { AISecretProtectionStatusPayload } from '../../../../../../../contracts/messaging/ai-settings-runtime';
 import { requestAISettingsPageRuntimeData } from '../../../../../../../workflows/ai-settings/query';
 
 export type LoadedAiProvidersRuntimeData = [
@@ -15,12 +14,11 @@ export type LoadedAiProvidersRuntimeData = [
   string,
   string,
   boolean,
-  AISecretProtectionStatusPayload,
 ];
 
 export async function loadAiProvidersRuntimeData() {
   const runtimeData = await requestAISettingsPageRuntimeData();
-  const { secretProtectionStatus, selectionBootstrap } = runtimeData;
+  const { selectionBootstrap } = runtimeData;
 
   return [
     filterChromeAiSelectorEntries(selectionBootstrap.providers, (provider) =>
@@ -35,6 +33,5 @@ export async function loadAiProvidersRuntimeData() {
     selectionBootstrap.globalSystemPrompt,
     runtimeData.scenarioEditorSystemPrompt,
     selectionBootstrap.chromeAiEnabled,
-    secretProtectionStatus,
   ] as LoadedAiProvidersRuntimeData;
 }

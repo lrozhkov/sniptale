@@ -1,3 +1,5 @@
+import { prepareScenarioProjectPublication } from './scenario-project-publication';
+import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createGuideProject,
@@ -699,4 +701,108 @@ it('restores a frozen canonical scenario representation without borrowing replac
     entry: { assetId: 'physical-image', galleryAssetId: 'replaced-root' },
   });
   expect(io.put.mock.calls[0]?.[0].root.assets[0].entry).not.toHaveProperty('borrowedMediaId');
+});
+
+it('omits only disposable Scenario sidecars for sync while retaining saved history and document refs', async () => {
+  const { args, history } = input();
+  const metadata = parsePortableScenarioProjectMetadata(args.envelope.metadata);
+  metadata.thumbnail = {
+    objectId: 'unloaded-thumbnail',
+    createdAt: 1,
+    updatedAt: 1,
+    width: 10,
+    height: 10,
+  };
+  const result = await prepareScenarioProjectPublication({
+    metadata,
+    rootId: 'guide',
+    sourceExists: true,
+    session: { strategy: 'replace', rootIdMap: {} },
+    staged: args.staged,
+    omitPresentation: true,
+  });
+  expect(result.root.entry.history).toHaveLength(history?.length ?? 0);
+  expect(result.root.assets).toHaveLength(1);
+  expect(result.root.stepDocuments).toHaveLength(1);
+  expect(result.root.thumbnail).toBeUndefined();
+  expect(result.root.exportThumbnails).toEqual([]);
+  expect(io.read.mock.calls.every(([ref]) => ref.assetId === 'physical-history')).toBe(true);
+});
+
+it('requires real saved HTML objects for ordinary archive preparation', async () => {
+  const { args } = input();
+  const metadata = parsePortableScenarioProjectMetadata({
+    ...parsePortableScenarioProjectMetadata(args.envelope.metadata),
+    exports: [
+      {
+        id: 'saved',
+        projectId: 'guide',
+        filename: 'saved.html',
+        format: 'html',
+        createdAt: 1,
+        size: 4,
+        html: { mode: 'guide', objectId: 'saved-body' },
+      },
+    ],
+  });
+  await expect(
+    prepareScenarioProjectPublication({
+      metadata,
+      rootId: 'guide',
+      sourceExists: true,
+      session: { strategy: 'replace', rootIdMap: {} },
+      staged: args.staged,
+    })
+  ).rejects.toThrow('object is missing');
+});
+
+it('accepts explicit deferred saved HTML descriptors without treating them as staged archive objects', async () => {
+  const { args } = input();
+  const metadata = parsePortableScenarioProjectMetadata({
+    ...parsePortableScenarioProjectMetadata(args.envelope.metadata),
+    exports: [
+      {
+        id: 'saved',
+        projectId: 'guide',
+        filename: 'saved.html',
+        format: 'html',
+        createdAt: 1,
+        size: 4,
+        html: { mode: 'guide', objectId: 'saved-body' },
+      },
+    ],
+  });
+  const ref: AssetRef = {
+    assetId: 'deferred-html',
+    createdAt: 1,
+    mimeType: 'text/html',
+    size: 4,
+    sha256: 'a'.repeat(64),
+    location: { kind: 'opfs', objectKey: 'objects/deferred-html' },
+  };
+  const deferred = {
+    entry: {
+      id: 'saved',
+      projectId: 'guide',
+      filename: 'saved.html',
+      format: 'html' as const,
+      createdAt: 1,
+      size: 4,
+      html: { mode: 'guide' as const, assetId: ref.assetId },
+    },
+    ref,
+    remote: { key: 'Files/saved.html', sha256: 'a'.repeat(64) },
+  };
+  const result = await prepareScenarioProjectPublication({
+    metadata,
+    rootId: 'guide',
+    sourceExists: true,
+    session: { strategy: 'replace', rootIdMap: {} },
+    staged: args.staged,
+    deferredExports: new Map([['saved', deferred]]),
+  });
+  expect(result.root.exports).toEqual([deferred.entry]);
+  expect(result.root.exportRefs).toEqual([ref]);
+  expect(result.root.deferredExports).toEqual([deferred]);
+  expect(io.read.mock.calls.every(([ref]) => ref.assetId === 'physical-history')).toBe(true);
 });

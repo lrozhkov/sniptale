@@ -1,45 +1,33 @@
+import { useContext } from 'react';
+import { ReviewPreviewRendererContext } from './use-preview-preferences';
+import { createZoomPreviewPaintOwner } from './zoom-preview-paint-owner';
+import { zoomPreviewGpuPointerProjection, type ZoomPreviewGpuInput } from './zoom-preview-gpu';
+import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
 import { ReviewButton } from './controls';
-import { quickEditPlaneProjection } from '../../features/video/composition/motion/spatial-geometry';
-import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { ReviewBackgroundBlurPreview } from './background-blur-preview';
+import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
+import { createReviewSpatialSession } from '../../workflows/video-review/spatial-render-session';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ReviewFocusFrame, useFocusFrameHover } from './focus-area-frame';
 import { useReviewCameraGesture } from './camera-gesture';
 import { translate } from '../../platform/i18n';
-import type {
-  QuickEditBackgroundSettings,
-  QuickEditZoomRegion,
-} from '../../features/video/review/advanced/types';
+import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneCamera,
-  computeQuickEditSpatialWindow,
   computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import {
   computeZoomPreviewArea,
   paintZoomPreview,
   previewBackgroundPaint,
-  type ZoomPreviewLayout,
 } from './zoom-preview-paint';
-import type { ZoomPreviewFrame } from './use-zoom-preview-source';
-import {
-  drawSceneSpotlights,
-  type SceneSpotlightLayer,
-} from '../../features/video/composition/draw/spotlight';
+import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 
-type ZoomCanvasProps = {
-  background: QuickEditBackgroundSettings;
-  imageUrl: string | null | undefined;
-  headerImage?: CanvasImageSource | null | undefined;
-  camera: QuickEditZoomRegion['transform'];
+type ZoomCanvasProps = ZoomPreviewGpuInput & {
   disabled?: boolean | undefined;
-  frame: ZoomPreviewFrame | null;
-  lensFrames?: readonly SceneSpotlightLayer[] | undefined;
-  live?: boolean | undefined;
-  layout: ZoomPreviewLayout;
-  output: { width: number; height: number };
-  view: 'area' | 'result';
-  cornerRadius: number;
-  previewScale?: number;
+  onBackend?: ((gpu: boolean) => void) | undefined;
+  onPaintReady?: ((ready: boolean) => void) | undefined;
+  onPresented?: ((input: ZoomPreviewGpuInput) => void) | undefined;
   onPreview?:
     | ((center: { centerX: number; centerY: number; scale?: number } | null) => void)
     | undefined;
@@ -62,17 +50,22 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
     offsetY,
     spatialFailure,
     retrySpatial,
+    gpuActive,
   } = useZoomCanvasModel(props);
   return (
     <>
-      <ZoomPreviewBackground
-        background={props.background}
-        imageUrl={props.imageUrl}
-        view={view}
-        offsetX={offsetX}
-        offsetY={offsetY}
-        scale={motion.backgroundScale}
-      />
+      {!gpuActive ? (
+        <ZoomPreviewBackground
+          background={props.background}
+          imageUrl={props.imageUrl}
+          view={view}
+          offsetX={offsetX}
+          offsetY={offsetY}
+          scale={motion.backgroundScale}
+          currentTime={props.currentTime}
+          output={props.output}
+        />
+      ) : null}
       {spatialFailure ? (
         <div role="alert" className="relative z-20 p-2 text-xs">
           {translate('gallery.videoReview.spatialUnavailable')}
@@ -152,6 +145,8 @@ function ZoomPreviewBackground({
   offsetX,
   offsetY,
   scale,
+  currentTime,
+  output,
 }: {
   background: QuickEditBackgroundSettings;
   imageUrl: string | null | undefined;
@@ -160,6 +155,8 @@ function ZoomPreviewBackground({
   offsetX: number;
   offsetY: number;
   scale: number;
+  currentTime?: number | undefined;
+  output: { width: number; height: number };
 }) {
   return (
     <div
@@ -171,7 +168,17 @@ function ZoomPreviewBackground({
           view === 'result' ? `translate(${offsetX}%, ${offsetY}%) scale(${scale})` : undefined,
       }}
     >
-      {imageUrl && background.enabled && background.type === 'image' ? (
+      {background.enabled &&
+      background.type !== 'solid' &&
+      hasSceneBackgroundMotion(background.motion) ? (
+        <ReviewBackgroundBlurPreview
+          background={background}
+          imageUrl={imageUrl ?? undefined}
+          width={output.width}
+          height={output.height}
+          currentTime={currentTime}
+        />
+      ) : imageUrl && background.enabled && background.type === 'image' ? (
         <img
           src={imageUrl}
           alt=""
@@ -183,8 +190,38 @@ function ZoomPreviewBackground({
   );
 }
 
+function sameZoomFrameSource(accepted: ZoomPreviewGpuInput, current: ZoomPreviewGpuInput) {
+  if (accepted.liveSource || current.liveSource)
+    return (
+      !!accepted.live &&
+      !!current.live &&
+      accepted.liveSource?.url === current.liveSource?.url &&
+      accepted.liveSource?.seekRevision === current.liveSource?.seekRevision &&
+      accepted.liveSource?.segmentStart === current.liveSource?.segmentStart &&
+      accepted.authoringRevision === current.authoringRevision
+    );
+  return accepted.frame?.image === current.frame?.image;
+}
+
 /** Camera projection and hover belong to this local model; source loading stays in the parent. */
 function useZoomCanvasModel(props: ZoomCanvasProps) {
+  const [accepted, setAccepted] = useState<ZoomPreviewGpuInput | null>(null);
+  const receivePresented = props.onPresented;
+  const onPresented = useCallback(
+    (input: ZoomPreviewGpuInput) => {
+      setAccepted(input);
+      receivePresented?.(input);
+    },
+    [receivePresented]
+  );
+  const basis =
+    props.view === 'result' &&
+    accepted?.view === props.view &&
+    sameZoomFrameSource(accepted, props) &&
+    accepted.output.width === props.output.width &&
+    accepted.output.height === props.output.height
+      ? accepted
+      : props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const {
     frame: areaRef,
@@ -192,8 +229,8 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
     pointerInteraction,
     keyboardInteraction,
   } = useFocusFrameHover();
-  const windowRect = props.layout.windowRect;
-  const follows = props.background.enabled && props.background.zoomBehavior === 'follow-video';
+  const windowRect = basis.layout.windowRect;
+  const follows = basis.background.enabled && basis.background.zoomBehavior === 'follow-video';
   const viewport = follows
     ? {
         x: -windowRect.x / windowRect.width,
@@ -202,56 +239,77 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
         height: props.output.height / windowRect.height,
       }
     : { x: 0, y: 0, width: 1, height: 1 };
-  const projectedWindow = computeQuickEditSpatialWindow(props.layout, props.background);
-  const projection =
-    props.camera.spatial && props.view === 'result'
-      ? quickEditPlaneProjection(projectedWindow, projectedWindow, props.camera.spatial)
-      : undefined;
-  const { camera, handlers } = useReviewCameraGesture({
+  const projection = zoomPreviewGpuPointerProjection(basis);
+  const {
+    camera: gestureCamera,
+    captured,
+    handlers,
+  } = useReviewCameraGesture({
     pointerProjection: projection ? { matrix: projection, output: props.output } : undefined,
     ...props,
+    camera: basis.camera,
+    keyboardCamera: props.camera,
     interactionElement: canvasRef,
     viewport,
-    videoRect: props.layout.windowRect,
-    visibleArea: computeZoomPreviewArea(props.layout, props.background, props.output),
+    videoRect: basis.layout.windowRect,
+    visibleArea: computeZoomPreviewArea(basis.layout, basis.background, props.output),
     onCommit: props.onCenter,
   });
-  const layout = useMemo(
-    () => ({
+  const camera = captured ? gestureCamera : props.camera;
+  const layout = useMemo(() => {
+    const layout = {
       ...props.layout,
       videoTransform: computeQuickEditVideoTransform({
         videoRect: props.layout.videoRect,
         windowRect: props.layout.windowRect,
         camera,
       }),
-    }),
-    [props.layout, camera]
-  );
-  const { spatialFailure, retrySpatial } = useZoomCanvasPaint(canvasRef, {
+    };
+    if (camera.spatial) layout.spatial = camera.spatial;
+    else delete layout.spatial;
+    return layout;
+  }, [props.layout, camera]);
+  const { spatialFailure, retrySpatial, gpuActive } = useZoomPreviewCanvasPaint(canvasRef, {
     ...props,
     camera,
     layout,
+    onPresented,
   });
 
-  const visible = computeZoomPreviewArea(layout, props.background, props.output);
+  const displayedLayout = props.live ? basis.layout : layout;
+  const displayedBackground = props.live ? basis.background : props.background;
+  const visible = computeZoomPreviewArea(displayedLayout, displayedBackground, props.output);
   const opening = {
     x: windowRect.x + visible.x * windowRect.width,
     y: windowRect.y + visible.y * windowRect.height,
     width: visible.width * windowRect.width,
     height: visible.height * windowRect.height,
   };
-  const motion = computeQuickEditSceneCamera(layout, props.background);
+  const motion = computeQuickEditSceneCamera(displayedLayout, displayedBackground);
   const offsetX = (motion.x / props.output.width) * 100;
   const offsetY = (motion.y / props.output.height) * 100;
   return {
     spatialFailure,
     retrySpatial,
+    gpuActive,
     canvasRef,
     areaRef,
     trackPointer,
     pointerInteraction,
     keyboardInteraction,
-    handlers,
+    handlers: {
+      ...handlers,
+      onPointerDown(event: Parameters<typeof handlers.onPointerDown>[0]) {
+        if (
+          !captured &&
+          props.view === 'result' &&
+          basis !== props &&
+          basis.authoringRevision !== props.authoringRevision
+        )
+          return;
+        handlers.onPointerDown(event);
+      },
+    },
     opening,
     motion,
     offsetX,
@@ -283,6 +341,7 @@ function areaRasterKey(
 type ZoomPaintCache = {
   painted: {
     key: string;
+    lens: boolean;
     frame: ZoomCanvasProps['frame'];
     header: ZoomCanvasProps['headerImage'];
   } | null;
@@ -294,7 +353,7 @@ function releaseZoomLensBase(cache: ZoomPaintCache) {
   cache.lensBase = null;
 }
 
-function zoomPaintKey(props: ZoomCanvasProps, canvas: HTMLCanvasElement, retry: number) {
+function zoomPaintKey(props: ZoomPreviewGpuInput, canvas: HTMLCanvasElement, retry: number) {
   if (props.live) return null;
   if (props.view === 'area')
     return areaRasterKey(
@@ -307,7 +366,6 @@ function zoomPaintKey(props: ZoomCanvasProps, canvas: HTMLCanvasElement, retry: 
       canvas,
       retry
     );
-  if (!props.lensFrames?.length) return null;
   return JSON.stringify([
     props.background,
     props.layout,
@@ -325,7 +383,7 @@ function restoreZoomPaint(
   canvas: HTMLCanvasElement,
   cache: ZoomPaintCache,
   key: string | null,
-  props: ZoomCanvasProps
+  props: ZoomPreviewGpuInput
 ) {
   if (
     key === null ||
@@ -335,7 +393,8 @@ function restoreZoomPaint(
   )
     return false;
   if (props.view === 'area') return true;
-  if (!cache.lensBase || !props.lensFrames?.length) return false;
+  if (!props.lensFrames?.length) return !cache.painted.lens;
+  if (!cache.lensBase) return false;
   context.drawImage(cache.lensBase, 0, 0);
   drawSceneSpotlights(context, canvas, null, props.lensFrames);
   return true;
@@ -349,98 +408,154 @@ function captureZoomLensBase(canvas: HTMLCanvasElement, cache: ZoomPaintCache) {
   cache.lensBase = base;
 }
 
-/** Imperative painting has one canvas resource and follows actual frame/camera updates. */
-function useZoomCanvasPaint(
+/** One source/camera request owner serializes both GPU completion and the supported fallback. */
+export function useZoomPreviewCanvasPaint(
   canvasRef: RefObject<HTMLCanvasElement | null>,
-  props: ZoomCanvasProps
+  props: ZoomPreviewGpuInput & {
+    onBackend?: ((gpu: boolean) => void) | undefined;
+    onPaintReady?: ((ready: boolean) => void) | undefined;
+    onPresented?: ((input: ZoomPreviewGpuInput) => void) | undefined;
+  }
 ) {
-  const renderer = useRef<ReturnType<typeof createReviewSpatialRenderer> | null>(null);
+  const renderer = useRef<ReturnType<typeof createReviewSpatialSession> | null>(null);
+  const latest = useRef(props);
+  latest.current = props;
   const cache = useRef<ZoomPaintCache>({ painted: null, lensBase: null });
   const [spatialFailure, setFailure] = useState(false);
+  const backend = useContext(ReviewPreviewRendererContext);
+  const [gpuActive, setGpuActive] = useState(
+    () => backend === 'gpu' && typeof navigator !== 'undefined' && !!navigator.gpu
+  );
+  const [painted, setPainted] = useState<ZoomPreviewGpuInput | null>(null);
+  const paintReady =
+    !spatialFailure &&
+    !!painted &&
+    sameZoomFrameSource(painted, props) &&
+    painted?.view === props.view &&
+    painted.output.width === props.output.width &&
+    painted.output.height === props.output.height;
   const [retry, setRetry] = useState(0);
-  const spatial = props.view === 'result' && !!props.camera.spatial;
+  const owner = useMemo(
+    () =>
+      createZoomPreviewPaintOwner({
+        backend,
+        publish(bitmap) {
+          const canvas = canvasRef.current;
+          const context = canvas?.getContext('2d');
+          if (!canvas || !context) throw new Error('Inspector canvas is unavailable.');
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(bitmap, 0, 0);
+        },
+        async fallback(input, signal) {
+          const canvas = canvasRef.current;
+          const context = canvas?.getContext('2d');
+          if (!canvas || !context) throw new Error('Inspector canvas is unavailable.');
+          const spatial = input.view === 'result' && !!input.camera.spatial;
+          if (spatial && !renderer.current)
+            renderer.current = createReviewSpatialSession(() => setFailure(true));
+          if (!spatial) {
+            renderer.current?.dispose();
+            renderer.current = null;
+          }
+          const paint = (frame = input.frame) => {
+            const cacheLensBase =
+              input.view === 'result' && !input.live && !!input.lensFrames?.length;
+            if (!cacheLensBase) releaseZoomLensBase(cache.current);
+            const key = zoomPaintKey(input, canvas, retry);
+            if (restoreZoomPaint(context, canvas, cache.current, key, input)) return;
+            cache.current.painted = null;
+            paintZoomPreview(context, {
+              spatialRenderer: renderer.current ?? undefined,
+              background: input.background,
+              accent: '#4f7cff',
+              camera: input.camera,
+              cornerRadius: input.cornerRadius,
+              previewScale: input.previewScale ?? 1,
+              frame,
+              headerImage: input.headerImage,
+              height: canvas.height,
+              layout: input.layout,
+              view: input.view,
+              showControls: false,
+              width: canvas.width,
+            });
+            if (cacheLensBase) captureZoomLensBase(canvas, cache.current);
+            if (input.lensFrames?.length)
+              drawSceneSpotlights(context, canvas, null, input.lensFrames);
+            if (key !== null)
+              cache.current.painted = {
+                key,
+                lens: !!input.lensFrames?.length,
+                frame: input.frame,
+                header: input.headerImage,
+              };
+          };
+          if (input.frame?.image instanceof HTMLVideoElement) {
+            if (typeof VideoFrame === 'undefined') {
+              signal.throwIfAborted();
+              const rgb = canvas.ownerDocument.createElement('canvas');
+              rgb.width = input.frame.width;
+              rgb.height = input.frame.height;
+              try {
+                const sourceContext = rgb.getContext('2d');
+                if (!sourceContext) throw new Error('Inspector source canvas is unavailable.');
+                sourceContext.drawImage(input.frame.image, 0, 0, rgb.width, rgb.height);
+                signal.throwIfAborted();
+                paint({ ...input.frame, image: rgb });
+              } finally {
+                rgb.width = rgb.height = 0;
+              }
+              return;
+            }
+            const captured = await prepareDecodedVideoFrame(
+              new VideoFrame(input.frame.image),
+              signal
+            );
+            try {
+              signal.throwIfAborted();
+              paint({ ...input.frame, image: captured });
+            } finally {
+              captured.close();
+            }
+          } else {
+            signal.throwIfAborted();
+            paint();
+          }
+        },
+        onBackend(gpu) {
+          setGpuActive(gpu);
+          setFailure(false);
+        },
+        onPresented(input) {
+          setPainted(input);
+          latest.current.onPresented?.(input);
+        },
+        onError() {
+          setFailure(true);
+        },
+      }),
+    [canvasRef, retry, backend]
+  );
   useEffect(
     () => () => {
-      releaseZoomLensBase(cache.current);
-    },
-    []
-  );
-  useEffect(() => {
-    if (!spatial) {
-      setFailure(false);
-      return;
-    }
-    try {
-      renderer.current = createReviewSpatialRenderer(() => setFailure(true));
-      setFailure(false);
-    } catch {
-      setFailure(true);
-    }
-    return () => {
+      owner.dispose();
       renderer.current?.dispose();
       renderer.current = null;
-    };
-  }, [spatial, retry]);
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
-    if (!canvas || !context) return;
-    const paint = () => {
-      const cacheLensBase = props.view === 'result' && !props.live && !!props.lensFrames?.length;
-      if (!cacheLensBase) releaseZoomLensBase(cache.current);
-      const key = zoomPaintKey(props, canvas, retry);
-      if (restoreZoomPaint(context, canvas, cache.current, key, props)) return;
+      releaseZoomLensBase(cache.current);
       cache.current.painted = null;
-      try {
-        paintZoomPreview(context, {
-          spatialRenderer: renderer.current ?? undefined,
-          background: props.background,
-          accent:
-            getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() ||
-            '#4f7cff',
-          camera: props.camera,
-          cornerRadius: props.cornerRadius,
-          previewScale: props.previewScale ?? 1,
-          frame: props.frame,
-          headerImage: props.headerImage,
-          height: canvas.height,
-          layout: props.layout,
-          view: props.view,
-          showControls: false,
-          width: canvas.width,
-        });
-        if (cacheLensBase) captureZoomLensBase(canvas, cache.current);
-        if (props.lensFrames?.length) drawSceneSpotlights(context, canvas, null, props.lensFrames);
-        if (key !== null)
-          cache.current.painted = { key, frame: props.frame, header: props.headerImage };
-      } catch {
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        setFailure(true);
-      }
-    };
-    paint();
-    if (!props.live) return;
-    let request: number;
-    const tick = () => {
-      paint();
-      request = requestAnimationFrame(tick);
-    };
-    request = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(request);
-  }, [
-    canvasRef,
-    props,
-    props.layout,
-    props.frame,
-    props.headerImage,
-    props.view,
-    props.camera,
-    props.cornerRadius,
-    props.previewScale,
-    props.background,
-    props.live,
-    props.lensFrames,
-    retry,
-  ]);
-  return { spatialFailure, retrySpatial: () => setRetry((v) => v + 1) };
+    },
+    [owner]
+  );
+  useEffect(() => {
+    owner.update(props);
+  }, [owner, props]);
+  const onBackend = props.onBackend;
+  const onPaintReady = props.onPaintReady;
+  useEffect(() => {
+    onBackend?.(gpuActive);
+  }, [onBackend, gpuActive]);
+  useEffect(() => {
+    onPaintReady?.(paintReady);
+  }, [onPaintReady, paintReady]);
+  return { spatialFailure, gpuActive, retrySpatial: () => setRetry((value) => value + 1) };
 }

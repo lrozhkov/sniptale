@@ -1,3 +1,4 @@
+import { createInlineWorkerBundlePlugin } from '../support/inline-worker-bundle';
 import { build } from 'esbuild';
 import { encodeRecordingKeyboardRhythm } from '../../../../apps/extension/src/features/video/project/keyboard-rhythm';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -377,7 +378,8 @@ for (const format of ['WEBM', 'MP4'] as const) {
         format: 'esm',
         platform: 'browser',
         write: false,
-        loader: { '.woff2': 'dataurl' },
+        loader: { '.woff2': 'dataurl', '.bin': 'dataurl' },
+        plugins: [createInlineWorkerBundlePlugin()],
         define: { 'process.env.NODE_ENV': '"production"', 'import.meta.env': '{}' },
       });
       await applyHarnessBootstrap(page, { preserveMediaLibrary: true });

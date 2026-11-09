@@ -19,6 +19,34 @@ class FakeBitmap implements ImageBitmap {
   close(): void {}
 }
 
+it('keeps the default native paint dispatch for zero rectangles and move-only paths', async () => {
+  const operations: string[] = [];
+  const canvas = createCanvas(128, 96, operations);
+  await createEffectV1GraphRenderer(
+    createDocument([
+      { op: 'fillRect', x: 0, y: 0, width: 0, height: 10, fill: '#fff' },
+      { op: 'path', segments: [{ kind: 'moveTo', x: 0, y: 0 }], fill: '#fff' },
+    ]),
+    createRuntime()
+  ).renderFrame({
+    assets: {},
+    controls: {},
+    createCanvas: () => canvas,
+    duration: 2,
+    frameIndex: 0,
+    height: 96,
+    inputFrames: {},
+    progress: 0,
+    resolveLayer: () => null,
+    time: 0,
+    track: vi.fn(),
+    width: 128,
+  });
+  expect(operations.filter((op) => op === 'fillRect')).toHaveLength(1);
+  expect(operations.filter((op) => op === 'fill')).toHaveLength(1);
+  expect(operations).not.toContain('drawImage');
+});
+
 it('evaluates the complete bounded expression operation table', () => {
   const cases: Array<[EffectV1ExpressionOp, unknown[], unknown]> = [
     ['add', [1, 2], 3],

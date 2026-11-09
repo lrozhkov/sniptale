@@ -1,3 +1,4 @@
+import type { ProjectExportSourceSampling } from '../../renderer/source-sampling';
 import type { VideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
 import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
 import type { ExportTimeEstimator } from '../../../../features/video/project/export/time-estimate';
@@ -14,6 +15,7 @@ export type RenderLoopJobState = Pick<
   captionRenderer?: VideoProjectCaptionRenderer;
   watermarkRenderer?: VideoProjectWatermarkRenderer;
   cameraSpatialRenderer?: ReviewSpatialRenderer;
+  sourceSampling?: ProjectExportSourceSampling;
   cancelled: boolean;
   timeEstimator?: ExportTimeEstimator;
   renderProgressRange?: { start: number; end: number };

@@ -1,5 +1,5 @@
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import {
@@ -16,6 +16,19 @@ import {
   seedReviewVideo,
 } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+
+async function trackSurfaceColor(owner: Locator, token: 'input' | 'hover') {
+  return owner.evaluate((node, token) => {
+    const reference = document.createElement('span');
+    reference.style.backgroundColor = `var(--sniptale-color-surface-${token})`;
+    node.append(reference);
+    try {
+      return getComputedStyle(reference).backgroundColor;
+    } finally {
+      reference.remove();
+    }
+  }, token);
+}
 
 for (const variant of [
   { locale: 'ru' as const, theme: 'light' as const },
@@ -82,7 +95,13 @@ for (const variant of [
       await expect(focusRow).toHaveAttribute('data-review-track-muted', 'true');
       await expect(focusLane).toHaveCSS(
         'background-color',
-        await focusHeader.evaluate((node) => getComputedStyle(node).backgroundColor)
+        await trackSurfaceColor(focusLane, 'input')
+      );
+      await expect(focusHeader).toHaveAttribute('data-review-header-selected', 'true');
+      await expect(focusHeader).toHaveAttribute('data-review-header-muted', 'true');
+      await expect(focusHeader).toHaveCSS(
+        'background-color',
+        await trackSurfaceColor(focusHeader, 'hover')
       );
       await expect(button('gallery.videoReview.zoomEnabled')).toBeEnabled();
       await focusLane.getByRole('button').first().click();
@@ -93,7 +112,17 @@ for (const variant of [
       await expect(originalRow).toHaveAttribute('data-review-track-muted', 'true');
       await expect(original).toHaveCSS(
         'background-color',
-        await originalHeader.evaluate((node) => getComputedStyle(node).backgroundColor)
+        await trackSurfaceColor(original, 'input')
+      );
+      await expect(originalHeader).toHaveAttribute('data-review-header-muted', 'true');
+      await expect(originalHeader).toHaveCSS(
+        'background-color',
+        await trackSurfaceColor(
+          originalHeader,
+          (await originalHeader.getAttribute('data-review-header-selected')) === 'true'
+            ? 'hover'
+            : 'input'
+        )
       );
       expect(
         await originalRow

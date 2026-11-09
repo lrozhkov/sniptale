@@ -167,7 +167,9 @@ it('erases page recovery records and identity claims while preferences are prese
     preservePreferences: true,
   });
   expect(plan.local).toContain('sniptale_page_recovery');
+  expect(plan.local).toContain('sniptale_design_review_sessions');
   expect(plan.session).toContain('sniptale_page_recovery_claims');
+  expect(plan.session).toContain('sniptale_design_review_bindings');
   expect(plan.local).not.toContain('sniptale_drawing_palette');
 });
 
@@ -178,8 +180,14 @@ it.each([true, false])(
       includeAiProviderSecrets: false,
       preservePreferences,
     });
+    expect(plan.local).toContain('sniptale.nativeApp.trustedClient');
+    expect(plan.session).toContain('sniptale.nativeApp.autoConnectPaused');
     expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('sync_connection');
     if (preservePreferences) expect(plan.local).not.toContain('sniptale-theme-preference');
     else expect(plan.local).toContain('sniptale-theme-preference');
   }
 );
+
+it('includes the common journal and recovery key store in verified local-data erasure', () => {
+  expect(getIndexedDbStoresForLocalExtensionDataErasure()).toContain('secret_protection');
+});

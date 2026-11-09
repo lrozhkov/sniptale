@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { FabricImage } from 'fabric';
+import { Canvas, FabricImage } from 'fabric';
 import {
   DEFAULT_EDITOR_FRAME_SETTINGS,
   DEFAULT_EDITOR_IMAGE_SETTINGS,
@@ -343,5 +343,39 @@ it('loads a captured scenario document through the actual Fabric receiver and pr
     expect(JSON.stringify(document)).toBe(original);
   } finally {
     canvas.destroy();
+  }
+});
+
+it('restores exact source dimensions instead of rounded Fabric serialization scales', async () => {
+  const canvas = new Canvas(document.createElement('canvas'), { renderOnAddRemove: false });
+  const image = new FabricImage(document.createElement('canvas'), {
+    width: 1920,
+    height: 480,
+    left: 33,
+    top: 16.4622,
+    scaleX: 0.9656,
+    scaleY: 0.9646,
+  });
+  image.sniptaleType = 'source-image';
+  canvas.add(image);
+  vi.spyOn(canvas, 'loadFromJSON').mockResolvedValue(canvas);
+  const prepared = createTypedTestFixture<LoadPreparedDocumentOptions['prepared']>({
+    ...createPreparedDocument(),
+    normalizedDocument: { ...createPreparedDocument().normalizedDocument, richShapes: [] },
+    source: { displayWidth: 1854, displayHeight: 463, left: 33, top: 16.462222222222223 },
+  });
+  try {
+    await loadPreparedDocumentOnCanvas({
+      canvas,
+      prepared,
+      prepareObject() {},
+      rebuildFrameDecorations: async () => undefined,
+      zoomLevel: 1,
+    });
+    expect(image.getScaledWidth()).toBeCloseTo(1854, 6);
+    expect(image.getScaledHeight()).toBeCloseTo(463, 6);
+    expect(image.top).toBe(prepared.source.top);
+  } finally {
+    await canvas.dispose();
   }
 });

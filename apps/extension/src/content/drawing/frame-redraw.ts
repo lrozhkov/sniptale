@@ -15,6 +15,7 @@ export function useDrawingFrameRedraw(args: {
   draftRef: RefObject<PointerDraft | null>;
   draftRevision: number;
   hoverBendRef: RefObject<DrawingArrowHover | null>;
+  hoverPointRef: RefObject<{ clientX: number; clientY: number } | null>;
   objects: readonly DrawingObject[];
   selectedIds: readonly string[];
   showSelectionChrome: boolean;
@@ -74,6 +75,11 @@ export function useDrawingFrameRedraw(args: {
         bendOnly: !showSelectionChrome,
         renderObjects: false,
         hoverBend: args.hoverBendRef.current,
+        hoverPoint:
+          controller.session.getSnapshot().activeTool === 'select'
+            ? args.hoverPointRef.current
+            : null,
+        ...(controller.getObjectAnchor ? { getObjectAnchor: controller.getObjectAnchor } : {}),
       });
   }, [
     active,
@@ -87,6 +93,7 @@ export function useDrawingFrameRedraw(args: {
     showSelectionChrome,
     args.getObjectOpacity,
     args.hoverBendRef,
+    args.hoverPointRef,
   ]);
 
   const latestRedraw = useRef(redraw);

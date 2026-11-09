@@ -63,20 +63,19 @@ export function reconcileVideoProjectInteractionSources(
     !(before.recordingIds.has(binding.recordingId) && !after.recordingIds.has(binding.recordingId));
   const groups = project.cursorTrack?.sourceObservations;
   const retainedGroups = groups?.filter(retained);
+  let cursorTrack = project.cursorTrack;
+  if (groups?.length && retainedGroups && cursorTrack) {
+    const samples = cursorTrack.samples.filter(
+      (sample) =>
+        !sample.sourceAnchor ||
+        project.clips.some((clip) => clip.id === sample.sourceAnchor?.sourceClipId)
+    );
+    if (retainedGroups.length !== groups.length || samples.length !== cursorTrack.samples.length) {
+      cursorTrack = { ...cursorTrack, sourceObservations: retainedGroups, samples };
+    }
+  }
   return {
-    ...(groups?.length && retainedGroups && project.cursorTrack
-      ? {
-          cursorTrack: {
-            ...project.cursorTrack,
-            sourceObservations: retainedGroups,
-            samples: project.cursorTrack.samples.filter(
-              (sample) =>
-                !sample.sourceAnchor ||
-                project.clips.some((clip) => clip.id === sample.sourceAnchor?.sourceClipId)
-            ),
-          },
-        }
-      : {}),
+    ...(groups?.length && retainedGroups && cursorTrack ? { cursorTrack } : {}),
     ...(project.actionFeedback ? { actionFeedback: project.actionFeedback.filter(retained) } : {}),
     ...(project.cursorFocusPath
       ? {

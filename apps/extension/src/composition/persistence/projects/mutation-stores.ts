@@ -6,6 +6,7 @@ import {
   RECORDING_TELEMETRY_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   SYNC_CAPTURE_STORE,
+  SYNC_CONNECTION_STORE,
   VIDEO_WORKSPACES_STORE,
   VIDEO_WORKSPACE_HISTORY_STORE,
   VIDEO_WORKSPACE_DRAFTS_STORE,
@@ -19,6 +20,7 @@ import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
+  PROJECT_EXPORT_INPUTS_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
   SCENARIO_PROJECTS_STORE,
@@ -31,10 +33,14 @@ import {
 
 type ProjectMutationDatabase = Awaited<ReturnType<typeof initDB>>;
 
-export function createProjectMutationStores(db: ProjectMutationDatabase) {
+export function createProjectMutationStores(
+  db: ProjectMutationDatabase,
+  options: { checkpointAdmission?: true } = {}
+) {
   const tx = db.transaction(
     [
       ...SCENARIO_CAPTURE_STORES,
+      ...(options.checkpointAdmission ? [SYNC_CONNECTION_STORE] : []),
       VIDEO_PROJECT_REVISIONS_STORE,
       SYNC_CAPTURE_STORE,
       VIDEO_PROJECTS_STORE,
@@ -48,6 +54,7 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
       SCENARIO_PROJECTS_STORE,
       SCENARIO_PROJECT_HISTORY_STORE,
       SCENARIO_PROJECT_UNITS_STORE,
+      PROJECT_EXPORT_INPUTS_STORE,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_WORKSPACES_STORE,
@@ -77,6 +84,7 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
       IMAGE_WORKSPACES_STORE,
       THUMBNAILS_STORE,
       SCENARIO_ASSETS_STORE,
+      PROJECT_EXPORT_INPUTS_STORE,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_WORKSPACES_STORE,

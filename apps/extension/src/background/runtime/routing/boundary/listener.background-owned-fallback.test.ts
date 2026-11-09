@@ -47,7 +47,7 @@ it('fails closed without unknown fallback when a background-owned route has no o
   expect(loggerWarnMock).toHaveBeenCalledWith('Background-owned route declined message', {
     routeName: `background-owned:${MessageType.REQUEST_LLM_SESSION}`,
   });
-  expect(routeLlmSessionMessageMock).toHaveBeenCalledWith(message, sender, sendResponse);
+  expect(routeLlmSessionMessageMock).toHaveBeenCalledWith(message, sender, sendResponse, undefined);
   expect(routeLlmSessionMessageMock).toHaveBeenCalledTimes(1);
 });
 

@@ -11,6 +11,37 @@ import {
 
 afterEach(() => vi.unstubAllGlobals());
 
+it('retains an original logical joined-window region at independent physical density', () => {
+  const header = document.createElement('canvas');
+  header.width = 100;
+  header.height = 10;
+  const h = header.getContext('2d')!;
+  h.fillStyle = '#0000ff';
+  h.fillRect(0, 0, 100, 10);
+  const region = { x: 20, y: 8, width: 40, height: 30 };
+  const raster = createReviewWindowRaster({
+    header,
+    windowRect: { x: 0, y: 0, width: 100, height: 60 },
+    videoRect: { x: 0, y: 10, width: 100, height: 50 },
+    region,
+    backing: { width: 80, height: 60 },
+    draw: (context, x, y, width, height) => {
+      context.fillStyle = '#ff0000';
+      context.fillRect(x, y, width, height);
+    },
+  });
+  try {
+    expect(raster.rect).toEqual(region);
+    expect(raster.width).toBe(80);
+    expect(raster.height).toBe(60);
+    const context = raster.image.getContext('2d')!;
+    expect([...context.getImageData(40, 3, 1, 1).data]).toEqual([0, 0, 255, 255]);
+    expect([...context.getImageData(40, 4, 1, 1).data]).toEqual([255, 0, 0, 255]);
+  } finally {
+    raster.release();
+  }
+});
+
 it('keeps native density only for an enlarging lens and never reduces a larger display raster', () => {
   const windowRect = { x: 0, y: 0, width: 640.2, height: 378.1 };
   expect(reviewWindowRasterBacking({ windowRect, sourceWidth: 1920, magnify: false })).toEqual({

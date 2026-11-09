@@ -13,9 +13,11 @@ export function clearNativeAuthorityStatus(
 ): NativeAppRuntimeStatus {
   return {
     ...status,
+    appIdentity: null,
     appStatus: null,
     capabilities: null,
     connectionState,
+    error: null,
     controllerLease: null,
     effectiveSettings: null,
     lastHeartbeatAt: null,
@@ -50,6 +52,8 @@ export function applyNativeHelloStatus(
     shouldAcquireController: failureState === null,
     status: {
       ...status,
+      appIdentity: message.appIdentity,
+      error: null,
       capabilities: message.capabilities,
       connectionState: failureState ?? 'connected',
       install: message.install,
@@ -65,7 +69,11 @@ export function applyNativeLeaseStatus(
   return {
     ...status,
     connectionState:
-      message.status === 'owned-by-other-profile' ? 'controlled-by-other-profile' : 'connected',
+      message.selectionStatus === 'selection-required'
+        ? 'selection-required'
+        : message.status === 'granted' && message.selectionStatus === 'selected'
+          ? 'connected'
+          : 'controlled-by-other-profile',
     controllerLease: message,
   };
 }

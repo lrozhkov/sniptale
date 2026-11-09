@@ -86,3 +86,55 @@ it('retains recording authority only for an unacknowledged cleanup and preserves
   expect(failure.cleanupError).toBe(cleanup);
   expect(requiresRecordingAuthorityRetention(primary)).toBe(false);
 });
+
+it.each([false, true])(
+  'publishes the independent cursor descriptor only for a saved bound stop; discard=%s',
+  async (discard) => {
+    const cursorTrajectory = {
+      format: 'cursor-trajectory-v1',
+      formatVersion: 1,
+      algorithm: 'sed-window-v1',
+      encoding: 'json-ascii-int-v1',
+      trajectoryId: 'a'.repeat(32),
+      state: 'unavailable',
+      finalized: true,
+      totalBlocks: 0,
+      totalRecords: 0,
+      totalSamples: 0,
+      totalBytes: 0,
+      streamSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    };
+    const response = { success: true, result: 'stopped', cursorTrajectory };
+    const outcome = await requestBoundOffscreenRecordingStop(binding, discard, {
+      sendRuntimeMessage: vi.fn().mockResolvedValue(response),
+    });
+    expect(outcome.cursorTrajectory).toEqual(discard ? undefined : cursorTrajectory);
+  }
+);
+
+it.each([false, true])(
+  'keeps event receipt facts independent of video and cursor, discard=%s',
+  async (discard) => {
+    const recordingEvents = {
+      format: 'recording-events-v1',
+      formatVersion: 1,
+      algorithm: 'lossless-v1',
+      encoding: 'json-utf8-v1',
+      eventStreamId: 'd'.repeat(32),
+      state: 'incomplete',
+      finalized: true,
+      totalBlocks: 1,
+      totalRecords: 2,
+      totalBytes: 100,
+      streamSha256: 'a'.repeat(64),
+    };
+    const outcome = await requestBoundOffscreenRecordingStop(binding, discard, {
+      sendRuntimeMessage: vi
+        .fn()
+        .mockResolvedValue({ success: true, result: 'accepted', recordingEvents }),
+    });
+    expect(outcome.recordingEvents).toEqual(discard ? undefined : recordingEvents);
+    expect(outcome).not.toHaveProperty('cursorTrajectory');
+    expect(outcome.terminalError).toBeNull();
+  }
+);

@@ -32,7 +32,6 @@ it('keeps admitted alpha speech metadata without an additional playback lane', a
       ],
     },
   };
-  const onOpenSpeech = vi.fn();
   const render = () =>
     act(() =>
       root.render(
@@ -53,8 +52,6 @@ it('keeps admitted alpha speech metadata without an additional playback lane', a
           onTrimClip={vi.fn()}
           onOriginal={vi.fn()}
           onImportFile={vi.fn()}
-          onRecordVoiceover={vi.fn()}
-          onOpenSpeech={onOpenSpeech}
         />
       )
     );
@@ -62,7 +59,6 @@ it('keeps admitted alpha speech metadata without an additional playback lane', a
     const before = structuredClone(speech);
     render();
     expect(host.querySelector('[data-ui="gallery.videoReview.revoiceTrack"]')).toBeNull();
-    expect(onOpenSpeech).not.toHaveBeenCalled();
     expect(speech).toEqual(before);
     expect(speech.transcript.replacements).toHaveLength(1);
   } finally {

@@ -1,13 +1,11 @@
 import type { AiProvidersDataState } from '../data-state';
-import type { AiSecretProtectionDataState } from '../secret-protection-state';
 import type { LoadedAiProvidersRuntimeData } from './runtime-data';
 
 export function applyLoadedAiProvidersRuntimeData(
   props: Pick<
     AiProvidersDataState,
     'setChromeAiEnabled' | 'setModels' | 'setProviders' | 'setSelectionState'
-  > &
-    Pick<AiSecretProtectionDataState, 'setSecretProtectionStatus'>,
+  >,
   loaded: LoadedAiProvidersRuntimeData
 ) {
   const [
@@ -18,7 +16,6 @@ export function applyLoadedAiProvidersRuntimeData(
     _loadedPrompt,
     _loadedScenarioEditorPrompt,
     loadedChromeAiEnabled,
-    loadedSecretProtectionStatus,
   ] = loaded;
 
   props.setProviders(loadedProviders);
@@ -28,7 +25,6 @@ export function applyLoadedAiProvidersRuntimeData(
     providers: loadedSelectorProviders,
   });
   props.setChromeAiEnabled(loadedChromeAiEnabled);
-  props.setSecretProtectionStatus(loadedSecretProtectionStatus);
 
   return { loadedModels: loadedSelectorModels };
 }

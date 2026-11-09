@@ -1,3 +1,9 @@
+import { setUIHidden } from '../../../selection/locker';
+import {
+  createContentSimplifyDependencies,
+  type ContentSimplifyDependencies,
+} from '../../../drawing/simplify';
+import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import {
   createDrawingSession,
   findDrawingObjectsIntersectingPath,
@@ -41,6 +47,7 @@ export interface RecordingDrawingOwner {
  */
 export function createRecordingDrawingOwner(options?: {
   clock?: RecordingDrawingClockPort;
+  simplifyDependencies?: ContentSimplifyDependencies;
   initialAutoHideDelay?: RecordingDrawingAutoHideDelay;
 }): RecordingDrawingOwner {
   const clock = options?.clock ?? createRecordingDrawingClockDriver();
@@ -105,7 +112,8 @@ export function createRecordingDrawingOwner(options?: {
   };
 
   controller = createContentDrawingController(
-    createDrawingSession({ autoSelectCreatedObjects: false, onDocumentCommit: acceptCommit })
+    createDrawingSession({ autoSelectCreatedObjects: false, onDocumentCommit: acceptCommit }),
+    options?.simplifyDependencies
   );
 
   return {
@@ -159,8 +167,20 @@ export function createRecordingDrawingOwner(options?: {
       if (disposed) return;
       disposed = true;
       for (const objectId of [...expiries.keys()]) cancelExpiry(objectId);
+      controller.simplify?.dispose();
       controller.session.dispose();
       visualListeners.clear();
     },
   };
+}
+
+/** Creates the visible recording drawing surface with its runtime-owned source capture adapter. */
+export function createRecordingSurfaceDrawingOwner(): RecordingDrawingOwner {
+  return createRecordingDrawingOwner({
+    simplifyDependencies: createContentSimplifyDependencies({
+      setUIHidden,
+      services: getContentRuntimeServices(),
+      getBounds: () => ({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }),
+    }),
+  });
 }

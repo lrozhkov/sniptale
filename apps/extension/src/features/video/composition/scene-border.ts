@@ -15,6 +15,10 @@ export interface SceneBorderFrame {
   id: string;
   path: string;
   perimeter: number;
+  /** Bounds of the complete path, before stroke expansion; absent custom paths stay isolated. */
+  bounds?: SceneRect;
+  /** Outward tangents at partial dash caps; absent corner samples retain raster isolation. */
+  revealCaps?: readonly { x: number; y: number; dx: number; dy: number }[];
   width: number;
   color: string;
   style: QuickEditBorder['style'];
@@ -25,7 +29,7 @@ export interface SceneBorderFrame {
   dashOffset?: number;
 }
 
-function patternedBorderPath(rect: SceneRect, radius: number) {
+function patternedBorderPoints(rect: SceneRect, radius: number) {
   const { x, y, width, height } = rect;
   const points = [{ x: x + width / 2, y }];
   // Canvas measures curve lengths coarsely when dashing. Explicit chords keep
@@ -47,6 +51,11 @@ function patternedBorderPath(rect: SceneRect, radius: number) {
     }
   }
   points.push(points[0]!);
+  return points;
+}
+
+function patternedBorderPath(rect: SceneRect, radius: number) {
+  const points = patternedBorderPoints(rect, radius);
   let perimeter = 0;
   for (let i = 1; i < points.length; i++)
     perimeter += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y);
@@ -54,6 +63,51 @@ function patternedBorderPath(rect: SceneRect, radius: number) {
     path: points.map((point, i) => `${i ? 'L' : 'M'}${point.x} ${point.y}`).join('') + 'Z',
     perimeter,
   };
+}
+
+/** Straight cap neighborhoods can use native clip coverage, including the original double AA. */
+function borderRevealCaps(
+  rect: SceneRect,
+  radius: number,
+  perimeter: number,
+  start: number,
+  end: number,
+  strokeWidth: number
+) {
+  if (end - start >= 1 - 1e-9 || (end - start) * perimeter < 8 || (1 - end + start) * perimeter < 8)
+    return undefined;
+  const points = patternedBorderPoints(rect, radius);
+  const caps = [];
+  const endpoints = [
+    [start, -1],
+    [end, 1],
+  ] as const;
+  for (const [phase, direction] of endpoints) {
+    let remaining = (((phase % 1) + 1) % 1) * perimeter;
+    let cap;
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1]!,
+        b = points[i]!;
+      const length = Math.hypot(b.x - a.x, b.y - a.y);
+      if (remaining > length || length === 0) {
+        remaining -= length;
+        continue;
+      }
+      if (remaining < strokeWidth + 4 || length - remaining < strokeWidth + 4) return undefined;
+      const dx = (b.x - a.x) / length,
+        dy = (b.y - a.y) / length;
+      cap = {
+        x: a.x + dx * remaining,
+        y: a.y + dy * remaining,
+        dx: dx * direction,
+        dy: dy * direction,
+      };
+      break;
+    }
+    if (!cap) return undefined;
+    caps.push(cap);
+  }
+  return caps;
 }
 
 /** Clockwise rounded path from top-center; patterned chords keep Canvas dash measurement exact. */
@@ -203,9 +257,14 @@ export function sampleSceneBorder(args: {
     perimeter: path.perimeter,
     origin: borderOrigin(rect, radius, border.style !== 'solid', border.origin, path.perimeter),
   });
+  const revealCaps =
+    border.style === 'dashed'
+      ? borderRevealCaps(rect, radius, path.perimeter, phase.start, phase.end, width)
+      : undefined;
   const primary: SceneBorderFrame = {
     id: args.id,
     ...path,
+    bounds: rect,
     width,
     color: border.color,
     style: border.style,
@@ -213,24 +272,23 @@ export function sampleSceneBorder(args: {
     end: phase.end,
     opacity: phase.opacity,
     dashOffset: 0 - phase.movement,
+    ...(revealCaps ? { revealCaps } : {}),
   };
   if (phase.rippleOpacity <= 0) return [primary];
   const spread = phase.ripple * Math.max(12 * args.scale, width * 4);
-  const outline = sceneBorderPath(
-    {
-      x: rect.x - spread,
-      y: rect.y - spread,
-      width: rect.width + 2 * spread,
-      height: rect.height + 2 * spread,
-    },
-    radius + spread,
-    border.style !== 'solid'
-  );
+  const bounds = {
+    x: rect.x - spread,
+    y: rect.y - spread,
+    width: rect.width + 2 * spread,
+    height: rect.height + 2 * spread,
+  };
+  const outline = sceneBorderPath(bounds, radius + spread, border.style !== 'solid');
   return [
     primary,
     {
       ...primary,
       ...outline,
+      bounds,
       id: `${args.id}:ripple`,
       start: 0,
       end: 1,

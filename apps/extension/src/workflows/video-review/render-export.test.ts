@@ -933,3 +933,60 @@ it('applies each dissolve side camera on the global clock during a fragment rend
   expect(left.close).not.toHaveBeenCalled();
   expect(right.close).not.toHaveBeenCalled();
 });
+
+it('admits a bounded leading source frame without shifting any plain export output tick', async () => {
+  state.firstTimestamp = 0.025;
+  state.packetRate = 30;
+  const args = argsFixture({ frameRate: 60 });
+  args.edits = [cutEdit(0.25, 2)];
+  const receipt = await writeReviewFrames(args);
+  expect(state.packetStats).toHaveBeenCalledExactlyOnceWith(256, { metadataOnly: true });
+  expect(state.sampleTimes.slice(0, 3)).toEqual([0.025, 0.025, 0.033]);
+  expect(state.encoded.map((sample) => sample.timestamp)).toEqual(
+    Array.from({ length: 15 }, (_, index) => index / 60)
+  );
+  expect(receipt.videoPackets).toBe(15);
+  for (const sample of state.drawn) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it.each(['oversized', 'outside-retained-interval'] as const)(
+  'rejects a %s leading source gap in plain export',
+  async (reason) => {
+    state.firstTimestamp = 0.025;
+    state.packetRate = reason === 'oversized' ? 60 : 30;
+    const args = argsFixture({ frameRate: 30 });
+    args.edits = [cutEdit(reason === 'oversized' ? 0.25 : 0.02, 2)];
+    await expect(writeReviewFrames(args)).rejects.toThrow('Source frame is unavailable.');
+    expect(state.encoded).toEqual([]);
+  }
+);
+
+it.each([0, NaN, Infinity])(
+  'does not admit plain export leading gap from invalid prefix rate %s',
+  async (rate) => {
+    state.firstTimestamp = 0.025;
+    state.packetRate = rate;
+    await expect(writeReviewFrames(argsFixture({ frameRate: 30 }))).rejects.toThrow(
+      'Source frame is unavailable.'
+    );
+    expect(state.encoded).toEqual([]);
+  }
+);
+
+it.each(['error', 'abort'] as const)(
+  'preserves plain export leading metadata %s',
+  async (failure) => {
+    state.firstTimestamp = 0.025;
+    const args = argsFixture();
+    const controller = new AbortController();
+    args.signal = controller.signal;
+    state.packetStats.mockImplementation(() => {
+      if (failure === 'error') throw new Error('leading-metadata-failed');
+      controller.abort();
+    });
+    const request = writeReviewFrames(args);
+    if (failure === 'error') await expect(request).rejects.toThrow('leading-metadata-failed');
+    else await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    expect(state.encoded).toEqual([]);
+  }
+);

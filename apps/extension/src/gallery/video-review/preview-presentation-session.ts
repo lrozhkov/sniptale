@@ -1,4 +1,6 @@
+import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
+import { createEffectRuntimeSandboxExecutor } from '../../workflows/video/effect-runtime-sandbox';
 import { createReviewPreviewRenderer } from '../../workflows/video-review/render-preview';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import {
@@ -6,10 +8,26 @@ import {
   quickEditWebcamScreenPlacementAt,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
-import { createReviewPreviewPresentation } from './preview-presentation';
+import {
+  createReviewPreviewPresentation,
+  createReviewPresentationPaintClock,
+} from './preview-presentation';
 import type { useReviewCutTransitionProvider } from './cut-transition-preview';
 import { createReviewWebcamPreviewSource } from './webcam-preview';
-import { captureReviewPreviewFrame } from './preview-presentation-frame';
+import {
+  attachReviewPreviewCamera,
+  captureReviewPreviewFrame,
+  captureDecodedReviewPreviewFrame,
+} from './preview-presentation-frame';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+  type PreviewSourceDemand,
+} from '../../workflows/video/preview-source';
+import {
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+} from '../../workflows/video/preview-html-source';
 import { createPresentationAdmission } from './preview-presentation-admission';
 import {
   createReviewExportDiagnostics,
@@ -20,6 +38,7 @@ import type {
   PresentationCameraState,
   Description,
   Renderer,
+  PresentedFrame,
   Prepared,
   RenderFrame,
   ReviewPreviewPresentationStatus,
@@ -31,9 +50,13 @@ type PresentationSnapshot = {
   placement: QuickEditWebcamPlacement | null;
 };
 type CameraSource = ReturnType<typeof createReviewWebcamPreviewSource>;
-class PendingPresentation extends Error {}
+class PendingPresentation extends Error {
+  constructor(readonly retryAfterCapture = false) {
+    super();
+  }
+}
 type Publication = {
-  completed: Awaited<ReturnType<Renderer['render']>>;
+  completed: PresentedFrame;
   prepared: Prepared;
   retain(): void;
 };
@@ -58,15 +81,25 @@ class ManualPresentationSession {
   private current: Description | null = null;
   private cameraDescription: Description | null = null;
   private resultTime = 0;
-  private front: Awaited<ReturnType<Renderer['render']>> | null = null;
+  private front: PresentedFrame | null = null;
   private cameraSource: CameraSource | null = null;
+  private cameraEvidence = 0;
   private cameraState: PresentationCameraState = { phase: 'loading', duration: 0, ready: false };
   private readonly publications: number[] = [];
   private readonly video: HTMLVideoElement | null;
+  private readonly sourceIdentity: string;
+  private clockActive = false;
   private readonly admission: ReturnType<typeof createPresentationAdmission>;
   private contextLost = false;
+  private sourceProvider: PreviewSourceProvider | null = null;
+  private htmlSourceProvider: ReturnType<typeof createPreviewHtmlSourceProvider> | null = null;
+  private sourceReady = false;
+  private sourceUnsupported = false;
+  private sourceDiscontinuity = true;
+  private clockSample: { sourceTime: number; resultTime: number } | null = null;
   private sourceFrameCallback: number | null = null;
   private renderer: Renderer;
+  private rendererPreference: VideoPreviewRenderer;
   private readonly scheduler: ReturnType<
     typeof createReviewPreviewPresentation<Description, Prepared, RenderFrame, Publication>
   >;
@@ -78,16 +111,21 @@ class ManualPresentationSession {
     private readonly reportCamera: (state: PresentationCameraState) => void
   ) {
     this.video = latest().input.video.current;
+    this.sourceIdentity = latest().input.sourceIdentity;
     this.admission = createPresentationAdmission(
       () => ({ playing: this.latest().input.playing, video: this.latest().input.video.current }),
       () => this.current,
       () => this.resultTime,
-      () => this.front
+      () => this.front,
+      (scene) => this.renderer?.maximumInFlight(scene) ?? 1
     );
+    this.rendererPreference = this.latest().input.preferences.renderer ?? 'gpu';
     this.renderer = this.createRenderer();
     this.scheduler = createReviewPreviewPresentation({
-      requestTick: (callback) => requestAnimationFrame(callback),
-      cancelTick: (id) => cancelAnimationFrame(id),
+      ...createReviewPresentationPaintClock(),
+      allowPreparedPlayingFrames: true,
+      maximumInFlight: (description) =>
+        description.renderer === 'legacy' ? 1 : this.renderer.maximumInFlight(description.scene),
       now: () => performance.now(),
       sampleTime: this.sampleTime,
       prepare: this.prepare,
@@ -99,10 +137,17 @@ class ManualPresentationSession {
     this.connectSources();
   }
 
+  private reportClock(active: boolean) {
+    if (this.clockActive === active) return;
+    this.clockActive = active;
+    this.latest().input.onPresentationActive?.(this.sourceIdentity, active);
+  }
+
   private clearFront() {
     this.front?.canvas.parentElement?.replaceChildren();
     this.front?.release();
     this.front = null;
+    this.latest().input.onGeometry?.(null, undefined, this.sourceIdentity);
   }
 
   private status(phase: ReviewPreviewPresentationStatus['phase']) {
@@ -111,6 +156,7 @@ class ManualPresentationSession {
       first = this.publications[0];
     this.report({
       phase,
+      ...(this.front?.renderer ? { renderer: this.front.renderer } : {}),
       captionConflicts: this.front?.captionConflicts ?? [],
       nativeVideoFPS: null,
       actualRaster: this.front
@@ -128,11 +174,26 @@ class ManualPresentationSession {
     const readAsset = this.latest().input.readAsset;
     return createReviewPreviewRenderer({
       resources,
+      renderer: this.rendererPreference,
+      maximumInFlight: this.rendererPreference === 'gpu' ? 2 : 1,
+      annotationExecutor: () =>
+        createEffectRuntimeSandboxExecutor(
+          this.rendererPreference === 'gpu' ? { compositionBackend: 'gpu-scene' } : {}
+        ),
+      ...(this.rendererPreference === 'gpu'
+        ? {
+            annotationWarmExecutor: () =>
+              this.playing
+                ? createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene-plan' })
+                : undefined,
+          }
+        : {}),
       ...(readAsset ? { readAsset } : {}),
       allocation: { describe: graph, replaceLimits: (limits) => resources.replaceLimits(limits) },
       onContextLost: () => {
         if (!this.disposed) {
           this.contextLost = true;
+          this.reportClock(false);
           this.scheduler.invalidate();
           this.status('failed');
         }
@@ -142,14 +203,25 @@ class ManualPresentationSession {
 
   private sampleTime = () => {
     const node = this.latest().input.video.current;
-    const time = node && this.latest().input.sourceToResult(node.currentTime);
-    if (time === null || time === undefined) throw new PendingPresentation();
+    const sourceTime = node?.currentTime;
+    const time = sourceTime === undefined ? null : this.latest().input.sourceToResult(sourceTime);
+    if (time === null || sourceTime === undefined) throw new PendingPresentation();
+    this.clockSample = { sourceTime, resultTime: time };
     return time;
   };
 
   private prepare = async (request: { scene: Description; time: number }, signal: AbortSignal) => {
     if (this.contextLost) throw new Error('Preview context lost');
     if (this.latest().input.backgroundPending) throw new PendingPresentation();
+    const rendererPreference = request.scene.renderer ?? 'gpu';
+    if (this.rendererPreference !== rendererPreference) {
+      // The presentation scheduler drains the previous render before preparing this scene.
+      this.renderer.dispose();
+      this.resetSource();
+      this.rendererPreference = rendererPreference;
+      this.renderer = this.createRenderer();
+      this.admission.resetAssets();
+    }
     if (this.cameraDescription !== request.scene) {
       prepareReviewCameraPlans(request.scene.scene.zoomRegions, {
         ...request.scene.scene,
@@ -164,6 +236,12 @@ class ManualPresentationSession {
         : request.time;
     if (!this.video || this.video.seeking || this.video.readyState < 2)
       throw new PendingPresentation();
+    if (this.canDecodeSource() && !this.sourceReady)
+      await this.prepareSource(
+        this.latest().input.playing ? this.video.currentTime : request.scene.sourceTime,
+        signal
+      );
+    signal.throwIfAborted();
     const transition = this.latest().cut.read(this.resultTime);
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
@@ -186,7 +264,7 @@ class ManualPresentationSession {
     return { value: prepared, release: () => prepared.release() };
   };
 
-  private capture = (prepared: Prepared, time: number) => {
+  private capture = (prepared: Prepared, time: number, signal: AbortSignal) => {
     const video = this.video;
     if (!this.current || !video || video.seeking || video.readyState < 2)
       throw new PendingPresentation();
@@ -195,25 +273,28 @@ class ManualPresentationSession {
     if (transition?.failed) throw new Error('Transition preview unavailable');
     if (transition && (!transition.frames || !transition.lease?.active))
       throw new PendingPresentation();
-    const captured = captureReviewPreviewFrame({
+    const sourceTime = this.latest().input.playing
+      ? this.clockSample?.resultTime === time
+        ? this.clockSample.sourceTime
+        : video.currentTime
+      : this.current.sourceTime;
+    const snapshot = this.latest();
+    const cameraSource = this.cameraSource;
+    const cameraState = this.cameraState;
+    const args = {
       video,
       description: this.current,
       sequence: this.sequence,
       time,
       transition,
-      sourceTime: () =>
-        this.latest().input.playing ? video.currentTime : this.current!.sourceTime,
-      reserveSource: (bytes) => this.admission.reserveSource(bytes, prepared.allocationAssets),
-      captureCamera: () =>
-        capturePresentationCamera(
-          this.latest(),
-          video,
-          this.cameraState,
-          this.cameraSource,
-          this.admission.cameraResources
-        ),
-    });
-    if (!captured) {
+      sourceTime: () => sourceTime,
+      reserveSource: (bytes: number) =>
+        this.admission.reserveSource(bytes, prepared.allocationAssets),
+      captureCamera: () => undefined,
+    };
+    // Compatibility pixels freeze before camera acquisition can yield to another HTML tick.
+    const primary = this.canDecodeSource() ? undefined : captureReviewPreviewFrame(args);
+    if (primary === null) {
       if (
         this.sourceFrameCallback === null &&
         typeof video.requestVideoFrameCallback === 'function'
@@ -224,9 +305,141 @@ class ManualPresentationSession {
         });
       throw new PendingPresentation();
     }
-    this.cancelSourceFrameCallback();
-    return captured;
+    if (!snapshot.input.webcam) {
+      this.cancelSourceFrameCallback();
+      return primary ?? this.captureDecoded(args, sourceTime, signal);
+    }
+    return (async () => {
+      let captured = primary;
+      let camera: Awaited<ReturnType<typeof capturePresentationCamera>>;
+      const evidence = this.cameraEvidence;
+      try {
+        camera = await capturePresentationCamera(
+          snapshot,
+          sourceTime,
+          cameraState,
+          cameraSource,
+          this.admission.cameraResources,
+          signal
+        );
+        signal.throwIfAborted();
+        if (this.disposed || this.cameraSource !== cameraSource) throw new PendingPresentation();
+        captured ??= await this.captureDecoded(args, sourceTime, signal);
+        signal.throwIfAborted();
+        const primaryFrame = captured;
+        const cameraFrame = camera;
+        captured = undefined;
+        camera = undefined;
+        const result = attachReviewPreviewCamera(primaryFrame, cameraFrame);
+        this.cancelSourceFrameCallback();
+        return result;
+      } catch (error) {
+        if (
+          error instanceof PendingPresentation &&
+          !this.disposed &&
+          this.cameraSource === cameraSource &&
+          evidence !== this.cameraEvidence
+        )
+          throw new PendingPresentation(true);
+        throw error;
+      } finally {
+        camera?.release();
+        captured?.release();
+      }
+    })();
   };
+
+  private canDecodeSource() {
+    return typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
+  }
+
+  private resetSource() {
+    this.sourceProvider?.dispose();
+    this.sourceProvider = null;
+    this.htmlSourceProvider?.dispose();
+    this.htmlSourceProvider = null;
+    this.sourceReady = this.sourceUnsupported = false;
+    this.sourceDiscontinuity = true;
+    this.clockSample = null;
+  }
+
+  private sourceDemand(time: number): PreviewSourceDemand {
+    const duration = this.video?.duration;
+    return {
+      id: 'source',
+      url: this.sourceIdentity,
+      time,
+      rangeStart: 0,
+      ...(duration !== undefined && Number.isFinite(duration) && duration > 0
+        ? { rangeEnd: duration, holdEnd: true }
+        : {}),
+    };
+  }
+
+  private async prepareSource(time: number, signal: AbortSignal) {
+    const provider = (this.sourceProvider ??= createPreviewSourceProvider());
+    let lease: PreparedPreviewSourceLease | null = null;
+    const demand = this.sourceDemand(time);
+    try {
+      if (!this.sourceUnsupported)
+        lease = await provider.acquire([demand], signal, { discontinuity: true });
+      signal.throwIfAborted();
+      if (this.disposed || this.sourceProvider !== provider) throw new PendingPresentation();
+      if (!lease) {
+        this.sourceUnsupported = true;
+        const html = (this.htmlSourceProvider ??= createPreviewHtmlSourceProvider());
+        lease = await html.acquire([demand], signal);
+        signal.throwIfAborted();
+        if (this.disposed || this.sourceProvider !== provider || this.htmlSourceProvider !== html)
+          throw new PendingPresentation();
+      }
+      this.sourceReady = true;
+    } finally {
+      lease?.release();
+    }
+  }
+
+  private async captureDecoded(
+    args: Parameters<typeof captureReviewPreviewFrame>[0],
+    sourceTime: number,
+    signal: AbortSignal
+  ) {
+    const provider = this.sourceProvider;
+    if (!provider) throw new PendingPresentation();
+    signal.throwIfAborted();
+    let lease: PreparedPreviewSourceLease | null = null;
+    const html = this.htmlSourceProvider;
+    const discontinuity = this.sourceDiscontinuity || !this.latest().input.playing;
+    this.sourceDiscontinuity = false;
+    try {
+      if (this.sourceUnsupported) {
+        if (!html) throw new PendingPresentation();
+        lease = await html.acquire([this.sourceDemand(sourceTime)], signal);
+      } else
+        lease = await provider.acquire([this.sourceDemand(sourceTime)], signal, { discontinuity });
+      signal.throwIfAborted();
+      if (
+        this.disposed ||
+        this.sourceProvider !== provider ||
+        (this.sourceUnsupported && this.htmlSourceProvider !== html)
+      )
+        throw new PendingPresentation();
+      const binding = lease?.bindings.get('source');
+      if (!binding || !lease) throw new Error('Preview source frame is unavailable.');
+      const ownedSource = lease;
+      lease = null;
+      const captured = captureDecodedReviewPreviewFrame({
+        ...args,
+        binding,
+        releaseSource: () => ownedSource.release(),
+        captureCamera: () => undefined,
+      });
+      this.cancelSourceFrameCallback();
+      return captured;
+    } finally {
+      lease?.release();
+    }
+  }
 
   private cancelSourceFrameCallback() {
     if (this.sourceFrameCallback === null) return;
@@ -241,7 +454,20 @@ class ManualPresentationSession {
     signal: AbortSignal
   ) => {
     const completed = await reviewExportPhase(signal, 'compose', () =>
-      this.renderer.render(prepared, frame, signal)
+      this.renderer.renderPresentation(prepared, frame, signal, (size, backend) => {
+        const host = this.latest().input.host.current;
+        if (!host || this.disposed) throw new PendingPresentation();
+        const output = this.admission.resources.presentationCanvas(size, backend);
+        try {
+          if (output.canvas.parentElement !== host) {
+            this.attachCanvas(host, output.canvas);
+          }
+          return output;
+        } catch (error) {
+          output.release();
+          throw error;
+        }
+      })
     );
     let transferred = false;
     return {
@@ -258,25 +484,37 @@ class ManualPresentationSession {
     };
   };
 
+  private attachCanvas(host: HTMLDivElement, canvas: HTMLCanvasElement) {
+    canvas.className = 'pointer-events-none absolute inset-0 h-full w-full';
+    canvas.setAttribute('aria-hidden', 'true');
+    canvas.style.opacity = '0';
+    canvas.style.willChange = 'opacity';
+    canvas.style.backgroundColor = '#000';
+    host.appendChild(canvas);
+  }
+
   private publishCanvas(host: HTMLDivElement, value: Publication) {
     const canvas = value.completed.canvas;
     const previous = this.front;
-    if (canvas.parentElement !== host) {
-      canvas.className = 'pointer-events-none absolute inset-0 h-full w-full';
-      canvas.setAttribute('aria-hidden', 'true');
-      canvas.style.opacity = '0';
-      canvas.style.willChange = 'opacity';
-      host.appendChild(canvas);
-    }
+    if (canvas.parentElement !== host) this.attachCanvas(host, canvas);
     canvas.style.opacity = '1';
     canvas.dataset['previewFront'] = 'true';
     if (previous && previous.canvas !== canvas) {
       previous.canvas.style.opacity = '0';
       previous.canvas.dataset['previewFront'] = 'false';
     }
-    // Keep one idle publication buffer attached for pool reuse, without DOM replacement per frame.
+    // Two GPU requests and the retained front rotate through three publication buffers.
+    const maximumHidden = this.rendererPreference === 'gpu' ? 2 : 1;
+    let hidden = 0;
     for (const child of [...host.children])
-      if (child !== canvas && child !== previous?.canvas) child.remove();
+      if (
+        child !== canvas &&
+        (!(child instanceof HTMLCanvasElement) ||
+          child.width !== canvas.width ||
+          child.height !== canvas.height ||
+          hidden++ >= maximumHidden)
+      )
+        child.remove();
     this.front = value.completed;
     value.retain();
     previous?.release();
@@ -297,29 +535,41 @@ class ManualPresentationSession {
     if (!cadenceRequested) this.publications.length = 0;
     while (this.publications.length > 2 && this.publications[0]! < performance.now() - 1000)
       this.publications.shift();
+    this.reportClock(this.playing && value.completed.geometry != null);
+    this.latest().input.onGeometry?.(
+      value.completed.geometry ?? null,
+      value.completed.sourceTime,
+      this.sourceIdentity
+    );
     this.reportBounds(value.prepared.watermarkBounds);
     this.status('ready');
   };
 
   private onError = (error: unknown) => {
     this.waiting = error instanceof PendingPresentation;
+    this.reportClock(false);
     if (!this.waiting) {
       this.diagnostics.reportFailure(error);
       this.diagnosed = true;
     }
     this.status(this.waiting ? 'pending' : 'failed');
+    if (error instanceof PendingPresentation && error.retryAfterCapture) this.ready();
   };
 
   readonly ready = () => {
     if (!this.disposed && this.waiting) {
       this.waiting = false;
+      this.reportClock(this.playing && !this.contextLost);
       this.scheduler.invalidate();
     }
   };
 
   private seeking = () => {
+    this.sourceDiscontinuity = true;
+    this.renderer.cancelWarmAnnotations?.();
     this.publications.length = 0;
     this.waiting = true;
+    this.reportClock(false);
     this.scheduler.invalidate();
     this.status('pending');
   };
@@ -339,6 +589,11 @@ class ManualPresentationSession {
       webcam.settings.assetId,
       () => this.latest().input.webcam!.settings,
       {
+        evidenceChanged: () => {
+          if (this.disposed) return;
+          this.cameraEvidence++;
+          this.ready();
+        },
         ready: (visible) => {
           if (this.disposed) return;
           this.cameraState = { ...this.cameraState, ready: visible };
@@ -368,15 +623,24 @@ class ManualPresentationSession {
   }
 
   update(description: Description, generation: number, interacting: boolean, active = true) {
+    if (
+      this.current !== description ||
+      this.sequence !== generation ||
+      !active ||
+      !this.latest().input.playing
+    )
+      this.renderer.cancelWarmAnnotations?.();
     this.current = description;
     this.sequence = generation;
     const input = this.latest().input;
+    const deferFrames = !input.playing && !!input.deferFrames;
     if (this.playing !== input.playing || !active) this.publications.length = 0;
     this.playing = active && input.playing;
+    this.reportClock(this.playing && !this.waiting && !this.diagnosed && !this.contextLost);
     this.scheduler.update({
       scene: description,
       generation: String(generation),
-      visible: active,
+      visible: active && !deferFrames,
       playing: input.playing,
       interacting,
       frameRate:
@@ -393,7 +657,7 @@ class ManualPresentationSession {
     } else if (!this.cameraSource) {
       this.connectCamera();
     }
-    this.status(active ? 'pending' : 'inactive');
+    this.status(active ? (deferFrames && this.front ? 'ready' : 'pending') : 'inactive');
   }
 
   retry() {
@@ -403,17 +667,21 @@ class ManualPresentationSession {
     this.waiting = false;
     this.scheduler.invalidate();
     this.renderer.dispose();
+    this.resetSource();
     this.renderer = this.createRenderer();
     this.admission.resetAssets();
     this.contextLost = false;
+    this.reportClock(this.playing);
     this.status('pending');
   }
 
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.reportClock(false);
     this.cancelSourceFrameCallback();
     this.scheduler.dispose();
+    this.resetSource();
     for (const event of ['loadeddata', 'seeked', 'timeupdate'])
       this.video?.removeEventListener(event, this.ready);
     this.video?.removeEventListener('seeking', this.seeking);
@@ -425,32 +693,37 @@ class ManualPresentationSession {
 }
 
 /** Camera readiness is independent of the atomic source-frame lease and native transport. */
-function capturePresentationCamera(
+async function capturePresentationCamera(
   snapshot: PresentationSnapshot,
-  video: HTMLVideoElement,
+  sourceTime: number,
   state: PresentationCameraState,
   source: CameraSource | null,
-  resources: RenderResources
+  resources: RenderResources,
+  signal: AbortSignal
 ) {
   const binding = snapshot.input.webcam;
   if (!binding) return undefined;
   if (state.phase === 'failed') throw new Error('Camera preview unavailable');
   if (state.phase !== 'ready' || !source) throw new PendingPresentation();
-  const mapped = quickEditWebcamFrameAt(binding.settings, video.currentTime, state.duration);
+  const mapped = quickEditWebcamFrameAt(binding.settings, sourceTime, state.duration);
   if (!mapped) return undefined;
-  const screen = quickEditWebcamScreenPlacementAt(binding.settings, video.currentTime);
+  const screen = quickEditWebcamScreenPlacementAt(binding.settings, sourceTime);
   const split = screen.width < 1 || screen.height < 1 || !!screen.clip || !!screen.cameraOverlay;
   const selected =
     !binding.disabled && ['webcam', 'webcam-position'].includes(binding.editor.selection.kind);
-  const result = source.captureAccepted(
+  const result = await source.captureFrame(
     {
+      sourceTime,
+      settings: binding.settings,
       placement: split
         ? undefined
         : (snapshot.placement ?? (selected ? binding.editor.placement : undefined)),
       crop: selected ? binding.editor.crop : undefined,
     },
-    resources
+    resources,
+    signal
   );
+  if (result.status === 'hidden') return undefined;
   if (result.status === 'failed') throw new Error('Camera preview unavailable');
   if (result.status !== 'ready') throw new PendingPresentation();
   return result.frame;

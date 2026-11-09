@@ -35,6 +35,7 @@ export interface WorkerRequestEnvelope {
 }
 
 export interface WorkerRequestFields {
+  renderTarget?: 'gpu-plan';
   controls: Record<string, number | string>;
   dimensions: { height: number; width: number };
   inputs: EffectRuntimeFrameInputs;
@@ -52,7 +53,9 @@ function parseDocumentRef(value: unknown): WorkerRequestEnvelope['documentRef'] 
     return null;
   }
   if (!('document' in value)) return { id: value['id'] };
-  const validation = validateEffectV1Document(value['document']);
+  const validation = validateEffectV1Document(value['document'], {
+    presentationPolicy: 'retained',
+  });
   return validation.ok && validation.document
     ? { document: validation.document, id: value['id'] }
     : null;
@@ -70,7 +73,13 @@ function parseAssetSelectionRef(value: unknown): WorkerRequestEnvelope['assetSel
 }
 
 export function parseWorkerRequestEnvelope(value: unknown): WorkerRequestEnvelope | null {
-  if (!isRecord(value) || !hasExactKeys(value, EFFECT_RUNTIME_WORKER_REQUEST_KEYS)) return null;
+  if (
+    !isRecord(value) ||
+    (!hasExactKeys(value, EFFECT_RUNTIME_WORKER_REQUEST_KEYS) &&
+      !hasExactKeys(value, [...EFFECT_RUNTIME_WORKER_REQUEST_KEYS, 'renderTarget']))
+  )
+    return null;
+  if ('renderTarget' in value && value['renderTarget'] !== 'gpu-plan') return null;
   const identity = parseEffectRuntimeIdentity(value);
   const documentRef = parseDocumentRef(value['documentRef']);
   const assetSelectionRef = parseAssetSelectionRef(value['assetSelectionRef']);
@@ -216,6 +225,7 @@ export function parseWorkerRequestFields(
     return null;
   }
   return {
+    ...(value['renderTarget'] === 'gpu-plan' ? { renderTarget: 'gpu-plan' as const } : {}),
     controls,
     dimensions,
     inputs,

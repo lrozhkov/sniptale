@@ -1,3 +1,4 @@
+import { compileCursorPanTracking } from './cursor-pan-tracking';
 import type { CursorFocusPoint } from '../../project/cursor-focus-path/types';
 import type { ResolvedCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import { createCameraTrajectory, evaluateCameraTrajectoryDerivative } from './camera-trajectory';
@@ -106,6 +107,8 @@ export function evaluateWorkingZoneCameraBoundary(
 }
 
 interface WorkingZoneCameraInput extends WorkingZoneCameraBoundaries {
+  /** New cursor composition follows continuously; omitted legacy policies retain activity holds. */
+  tracking?: 'continuous';
   frames: readonly FollowCursorFrame[];
   start: number;
   end: number;
@@ -113,6 +116,14 @@ interface WorkingZoneCameraInput extends WorkingZoneCameraBoundaries {
   policy: ResolvedCameraFollowPolicy;
   geometry: WorkingZoneCameraGeometry;
   fallback?: CameraPanPoint;
+}
+
+/** The same bounded expansion candidates apply to regions and their connecting gaps. */
+export function cameraExpansionScales(targetScale: number, policy: ResolvedCameraFollowPolicy) {
+  const minimum = Math.max(1, Math.min(targetScale, policy.settings.minimumScale));
+  return !policy.settings.allowExpansion || minimum === targetScale
+    ? []
+    : [0.75, 0.5, 0.25, 0].map((fraction) => minimum + (targetScale - minimum) * fraction);
 }
 
 export function planWorkingZoneCamera(input: WorkingZoneCameraInput): WorkingZoneCameraPlan {
@@ -126,12 +137,10 @@ export function planWorkingZoneCamera(input: WorkingZoneCameraInput): WorkingZon
     input.outgoing
   )
     return nominal;
-  const minimum = Math.max(1, Math.min(input.targetScale, input.policy.settings.minimumScale));
-  if (minimum === input.targetScale) return nominal;
-  for (const fraction of [0.75, 0.5, 0.25, 0]) {
+  for (const targetScale of cameraExpansionScales(input.targetScale, input.policy)) {
     const expanded = planWorkingZoneCameraAtScale({
       ...input,
-      targetScale: minimum + (input.targetScale - minimum) * fraction,
+      targetScale,
     });
     if (expanded.status === 'ready') return expanded;
   }
@@ -685,6 +694,24 @@ function planWorkingZoneCameraAtScale(input: WorkingZoneCameraInput): WorkingZon
     segmentId: frame.segmentId,
     ...(frame.preferenceWeight !== undefined ? { preferenceWeight: frame.preferenceWeight } : {}),
   }));
+  if (input.tracking === 'continuous' && preferences.length) {
+    let result: WorkingZoneCameraPlan | undefined;
+    for (const factor of [1, 1.5, 2, 3]) {
+      const spans = compileCursorPanTracking({
+        preferences,
+        start: input.start,
+        end: input.end,
+        step:
+          input.policy.settings.transitionDuration *
+          (0.5 + input.policy.settings.zoneSize) *
+          factor,
+        domain,
+      });
+      result = admitCameraBoundaries(input, spans, discontinuities, fallback);
+      if (result.status === 'ready') return result;
+    }
+    if (result) return result;
+  }
   const zones = fitWorkingCameraZones(input, preferences, fallback);
   if (!Array.isArray(zones)) return zones;
   if (!zones.length)

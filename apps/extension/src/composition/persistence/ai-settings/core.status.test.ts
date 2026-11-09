@@ -1,3 +1,25 @@
+vi.mock('../secret-protection/service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secret-protection/service')>();
+  const { SecretProtectionAdmissionPermit, SecretProtectionLockedError } =
+    await import('../secret-protection/model');
+  const { readPreparedSecretProtectionControl } =
+    await import('../secret-protection/transition.store');
+  const withSecretProtectionWriter: typeof actual.withSecretProtectionWriter = async (
+    operation,
+    permit
+  ) => {
+    const control = await readPreparedSecretProtectionControl();
+    if (control?.phase === 'transitioning') throw new SecretProtectionLockedError();
+    if (permit) {
+      if (!SecretProtectionAdmissionPermit.isActive(permit))
+        throw new SecretProtectionLockedError();
+      return operation(permit);
+    }
+    return SecretProtectionAdmissionPermit.run(operation);
+  };
+  return { ...actual, withSecretProtectionWriter };
+});
+
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import {
@@ -79,12 +101,12 @@ it('reads AI secret protection status through the initialized core facade', asyn
   });
 });
 
-it('recovers interrupted passphrase transitions before reading protection status', async () => {
-  const { createAISecretPassphraseProtection } = await import('./secret-protection.store.ts');
-  const protection = await createAISecretPassphraseProtection('passphrase');
+it('reads locked status without consuming the common recovery marker', async () => {
+  const { createSecretProtectionProfile } = await import('../secret-protection/profile.store.ts');
+  const protection = await createSecretProtectionProfile('passphrase');
   installStorageState({
     [AI_LOCAL_SECRET_KEY_STORAGE_KEY]: null,
-    [AI_SECRET_PROTECTION_KEY]: protection.protection,
+    [AI_SECRET_PROTECTION_KEY]: protection.profile,
     [AI_SECRET_PROTECTION_TRANSITION_KEY]: createTransition('pending-enable'),
     [AI_STORAGE_MIGRATION_PHASE_KEY]: AI_PROVIDER_STORAGE_MIGRATION_PHASE,
     [AI_STORAGE_VERSION_KEY]: AI_STORAGE_VERSION,
@@ -97,7 +119,9 @@ it('recovers interrupted passphrase transitions before reading protection status
     isUnlocked: false,
     mode: 'passphrase',
   });
-  expect(localState[AI_SECRET_PROTECTION_KEY]).toEqual(protection.protection);
-  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeUndefined();
-  expect(localState[AI_SECRET_PROTECTION_TRANSITION_KEY]).toBeUndefined();
+  expect(localState[AI_SECRET_PROTECTION_KEY]).toEqual(protection.profile);
+  expect(localState[AI_LOCAL_SECRET_KEY_STORAGE_KEY]).toBeNull();
+  expect(localState[AI_SECRET_PROTECTION_TRANSITION_KEY]).toEqual(
+    createTransition('pending-enable')
+  );
 });

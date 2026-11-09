@@ -47,26 +47,5 @@ export function createMockAiProvidersSectionState(): AiProvidersSectionState {
 }
 
 export function createMockSecretProtectionState(): AiProvidersSectionState['secretProtection'] {
-  return {
-    dialog: null,
-    ensureUnlocked: vi.fn().mockResolvedValue(undefined),
-    handleChangeSubmit: vi.fn().mockResolvedValue(undefined),
-    handleCloseDialog: vi.fn(),
-    handleDisableSubmit: vi.fn().mockResolvedValue(undefined),
-    handleEnableSubmit: vi.fn().mockResolvedValue(undefined),
-    handleLockNow: vi.fn().mockResolvedValue(undefined),
-    handleOpenChangeDialog: vi.fn(),
-    handleOpenDisableDialog: vi.fn(),
-    handleOpenEnableDialog: vi.fn(),
-    handleOpenResetDialog: vi.fn(),
-    handleOpenUnlockDialog: vi.fn(),
-    handleResetConfirm: vi.fn().mockResolvedValue(undefined),
-    handleUnlockSubmit: vi.fn().mockResolvedValue(undefined),
-    isBusy: false,
-    status: {
-      isEnabled: false,
-      isUnlocked: true,
-      mode: 'transparent',
-    },
-  };
+  return { ensureUnlocked: vi.fn().mockResolvedValue(undefined) };
 }

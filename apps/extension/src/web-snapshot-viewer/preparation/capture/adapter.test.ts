@@ -79,3 +79,21 @@ it('surfaces a clear capture error when the viewer iframe is not ready', async (
     'Web snapshot viewer frame is not ready'
   );
 });
+
+it('maps the visible local raster through the iframe offset and CSS scale', () => {
+  const iframe = createReadyIframe();
+  iframe.getBoundingClientRect = () => ({
+    x: 40,
+    y: 60,
+    left: 40,
+    top: 60,
+    width: 600,
+    height: 400,
+    right: 640,
+    bottom: 460,
+    toJSON() {},
+  });
+  const adapter = createViewerScreenshotCaptureAdapter({ iframe });
+  expect(adapter.getViewportBounds?.()).toEqual({ x: 40, y: 60, width: 600, height: 400 });
+  iframe.remove();
+});

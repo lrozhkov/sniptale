@@ -12,8 +12,8 @@ const mocks = vi.hoisted(() => ({
   loadVideoSettings: vi.fn(),
   hasNativeMessagingPermission: vi.fn(),
   reconnect: vi.fn(),
-  syncSettings: vi.fn(),
-  takeController: vi.fn(),
+  forgetClient: vi.fn(),
+  trustClient: vi.fn(),
 }));
 
 vi.mock('./permission-lifecycle', async (importOriginal) => ({
@@ -38,8 +38,8 @@ vi.mock('./service-singleton', () => ({
   getNativeAppRuntimeService: () => ({
     getStatus: mocks.getStatus,
     reconnect: mocks.reconnect,
-    syncSettings: mocks.syncSettings,
-    takeController: mocks.takeController,
+    forgetClient: mocks.forgetClient,
+    trustClient: mocks.trustClient,
   }),
 }));
 
@@ -57,6 +57,7 @@ beforeEach(() => {
 
 function createStatus(patch: Partial<NativeAppRuntimeStatus> = {}): NativeAppRuntimeStatus {
   return {
+    appIdentity: null,
     appStatus: null,
     capabilities: null,
     connectionState: 'connected',
@@ -112,7 +113,7 @@ it('maps native startup, disconnect, and command ids', async () => {
   expect(createNativeCommandId('ping')).toMatch(/^ping-10-/);
 });
 
-it('routes native settings queries and mutations through the runtime service', async () => {
+it('routes native connection queries and mutations through the runtime service', async () => {
   const sendResponse = vi.fn();
   const { routeNativeAppRuntimeMessage } = await import('./route');
 
@@ -139,18 +140,18 @@ it('routes native settings queries and mutations through the runtime service', a
   expect(mocks.reconnect).toHaveBeenCalledTimes(1);
 
   routeNativeAppRuntimeMessage(
-    { operation: 'take-controller', type: MessageType.NATIVE_APP_MUTATION },
+    { operation: 'trust-client', clientId: 'a'.repeat(64), type: MessageType.NATIVE_APP_MUTATION },
     {},
     sendResponse
   );
   routeNativeAppRuntimeMessage(
-    { operation: 'sync-settings', type: MessageType.NATIVE_APP_MUTATION },
+    { operation: 'forget-client', type: MessageType.NATIVE_APP_MUTATION },
     {},
     sendResponse
   );
   await flushAsync();
-  expect(mocks.takeController).toHaveBeenCalledTimes(1);
-  expect(mocks.syncSettings).toHaveBeenCalledTimes(1);
+  expect(mocks.trustClient).toHaveBeenCalledTimes(1);
+  expect(mocks.forgetClient).toHaveBeenCalledTimes(1);
   expect(routeNativeAppRuntimeMessage({ type: 'other' }, {}, sendResponse)).toBe(false);
 });
 
@@ -248,7 +249,7 @@ function createPolicyDeniedMessage(): Extract<
     occurredAtEpochMs: 1,
     operation: 'screenshot',
     phase: 'capture',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.operation.failed',
   };
 }

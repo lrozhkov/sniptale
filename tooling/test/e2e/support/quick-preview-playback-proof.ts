@@ -163,12 +163,26 @@ export function previewPlaybackControls(page: Page) {
     },
     async pixel(x: number, y: number) {
       return canvas.evaluate(
-        (node: HTMLCanvasElement, point) => [
-          ...node
-            .getContext('2d')!
-            .getImageData(Math.floor(node.width * point.x), Math.floor(node.height * point.y), 1, 1)
-            .data,
-        ],
+        (node: HTMLCanvasElement, point) => {
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          try {
+            const context = readback.getContext('2d');
+            if (!context) throw new Error('Preview pixel readback is unavailable.');
+            context.drawImage(node, 0, 0);
+            return [
+              ...context.getImageData(
+                Math.floor(node.width * point.x),
+                Math.floor(node.height * point.y),
+                1,
+                1
+              ).data,
+            ];
+          } finally {
+            readback.width = readback.height = 0;
+          }
+        },
         { x, y }
       );
     },

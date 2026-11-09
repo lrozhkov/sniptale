@@ -156,3 +156,11 @@ it('edits retained cut settings as source metadata without inventing a seek posi
   click('gallery.videoReview.transitionNone');
   expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual([join]);
 });
+
+it('keeps per-boundary disclosures free of repeated section glyphs', () => {
+  render();
+  const boundary = host.querySelector('details details > summary')!;
+  expect(boundary).not.toBeNull();
+  expect(boundary.querySelectorAll('svg')).toHaveLength(1);
+  expect(boundary.querySelector('svg')!.classList.contains('lucide-chevron-down')).toBe(true);
+});

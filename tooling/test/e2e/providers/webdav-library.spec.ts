@@ -1,8 +1,9 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import JSZip from 'jszip';
 import { createHash } from 'node:crypto';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type TestInfo } from '@playwright/test';
 import { test, openProvider, saveProof } from './webdav-fixtures';
+import { DB_NAME } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores';
 import { parseSyncProductResponse } from '../../../../apps/extension/src/contracts/messaging/contracts/runtime/sync-product';
 import {
   EFFECT_BUNDLE_CORPUS,
@@ -46,11 +47,50 @@ async function fillConnectionDraft(
     })
     .click();
   await page
-    .getByLabel(input.mode === 'create' ? 'Parent folder URL' : 'Workspace URL', { exact: true })
+    .getByLabel(input.mode === 'create' ? 'Parent folder URL' : 'Search folder URL', {
+      exact: true,
+    })
     .fill(input.url);
   await page.getByLabel('Account', { exact: true }).fill(input.username);
   await page.getByLabel('Username', { exact: true }).fill(input.username);
   await page.getByLabel('Password', { exact: true }).fill(input.password);
+}
+
+async function setupPolicyProof(page: Page) {
+  return page.evaluate(async (name) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name);
+      request.onupgradeneeded = () => {
+        request.transaction?.abort();
+        reject(new Error('Setup database was not prepared'));
+      };
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      const tx = database.transaction(['sync_connection', 'sync_capture'], 'readonly');
+      const read = (store: string, key: string) =>
+        new Promise<unknown>((resolve, reject) => {
+          const request = tx.objectStore(store).get(key);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      const [connection, profile] = await Promise.all([
+        read('sync_connection', 'connection'),
+        read('sync_capture', 'profile'),
+      ]);
+      return {
+        hasConnection: connection !== undefined,
+        hasProfile: profile !== undefined,
+        policy:
+          typeof connection === 'object' && connection !== null && 'storagePolicy' in connection
+            ? connection.storagePolicy
+            : null,
+      };
+    } finally {
+      database.close();
+    }
+  }, DB_NAME);
 }
 
 async function connectWorkspace(
@@ -60,14 +100,69 @@ async function connectWorkspace(
     url: string;
     username: string;
     password: string;
-  }
+  },
+  screenshots?: Pick<TestInfo, 'outputPath'>
 ) {
   await fillConnectionDraft(page, input);
-  await page.getByRole('button', { name: 'Connect workspace', exact: true }).click();
+  if (input.mode === 'join') {
+    await page.getByRole('button', { name: 'Find workspaces', exact: true }).click();
+    const discovery = page.locator('[data-ui="settings.sync-discovery"]');
+    await expect(discovery.getByRole('radio')).toHaveCount(1, { timeout: 30_000 });
+    await discovery.getByRole('radio').check();
+    if (screenshots) {
+      await page
+        .getByRole('button', { name: 'Select workspace', exact: true })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: screenshots.outputPath('setup-workspace-selection.png'),
+        fullPage: false,
+      });
+    }
+    await page.getByRole('button', { name: 'Select workspace', exact: true }).click();
+  } else {
+    await page.getByRole('button', { name: 'Create in selected folder', exact: true }).click();
+  }
+  const policy = page.getByRole('checkbox', {
+    name: 'I confirm on-demand file storage on this device',
+    exact: true,
+  });
+  await expect(policy).toBeVisible({ timeout: 30_000 });
   const finish = page.getByRole('button', { name: 'Finish connection', exact: true });
+  await expect(finish).toBeDisabled();
+  expect(await setupPolicyProof(page)).toEqual({
+    hasConnection: false,
+    hasProfile: false,
+    policy: null,
+  });
+  await policy.check();
+  expect(await setupPolicyProof(page)).toEqual({
+    hasConnection: false,
+    hasProfile: false,
+    policy: null,
+  });
   await expect(finish).toBeEnabled({ timeout: 30_000 });
+  if (screenshots) {
+    const local = page.locator('[data-ui="settings.sync-local-presence"]');
+    await expect(local).toContainText('This device has local projects or files.');
+    const review = page.locator('[data-ui="settings.sync-storage-policy"]');
+    await expect(review).toContainText('Existing projects and files stay on this device.');
+    await expect(review).toContainText(
+      'synchronization adds them to the selected workspace catalog.'
+    );
+    await finish.scrollIntoViewIfNeeded();
+    await expect(finish).toBeInViewport();
+    await page.screenshot({
+      path: screenshots.outputPath('setup-storage-policy.png'),
+      fullPage: false,
+    });
+  }
   await finish.click();
   await expect(page.getByText('Storage connected', { exact: true })).toBeVisible();
+  expect(await setupPolicyProof(page)).toEqual({
+    hasConnection: true,
+    hasProfile: true,
+    policy: { version: 1, mode: 'on-demand' },
+  });
   await expect(page.getByText('Catalog refreshed', { exact: true })).toBeVisible({
     timeout: 30_000,
   });
@@ -861,7 +956,9 @@ test('Settings abandons an uncertain setup locally and creates a different owned
       ...lab.credentials,
     });
     lab.proxy.armFault({ method: 'MKCOL', key: '*', kind: 'lost-response' });
-    await browser.page.getByRole('button', { name: 'Connect workspace', exact: true }).click();
+    await browser.page
+      .getByRole('button', { name: 'Create in selected folder', exact: true })
+      .click();
     await lab.proxy.waitForFault();
     await expect(browser.page.getByRole('alert')).toBeVisible({ timeout: 30_000 });
     const probe = await harnessPage(browser);
@@ -927,7 +1024,9 @@ test('Settings retries a checked MKCOL 423 and completes the same workspace in o
       ...lab.credentials,
     });
     lab.proxy.armFault({ method: 'MKCOL', key: '*', kind: 'status', status: 423 });
-    await browser.page.getByRole('button', { name: 'Connect workspace', exact: true }).click();
+    await browser.page
+      .getByRole('button', { name: 'Create in selected folder', exact: true })
+      .click();
     await lab.proxy.waitForFault();
     await expect(browser.page.getByRole('alert')).toBeVisible({ timeout: 30_000 });
     const probe = await harnessPage(browser);
@@ -1643,6 +1742,209 @@ for (const viewport of [
       }
       await source.context.close();
       await target?.context.close();
+    }
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`Settings discovery joins a populated workspace with existing local files ${viewport.width}`, async ({
+    lab,
+  }, info) => {
+    test.setTimeout(180_000);
+    const source = await openProvider(lab, info, 'setup-bidirectional-source', false, build, {
+      viewport,
+    });
+    const target = await openProvider(lab, info, 'setup-bidirectional-target', false, build, {
+      viewport,
+    });
+    try {
+      await connectionPage(source, viewport);
+      const rootUrl = await connectWorkspace(source.page, {
+        mode: 'create',
+        url: lab.credentials.rootUrl,
+        ...lab.credentials,
+      });
+      const sourceProbe = await harnessPage(source);
+      const remote = await sourceProbe.evaluate(async () => {
+        await window.webdavTransferHarness.connection.restore();
+        const fixture = await window.webdavTransferHarness.portable.source(undefined, {
+          useExistingProfile: true,
+          name: 'Remote before connection',
+        });
+        const sent = [];
+        for (const [id, project] of [
+          [fixture.mediaId, false],
+          [fixture.projectId, true],
+        ] as const)
+          sent.push(
+            ...(await window.webdavTransferHarness.portable.outgoing.sendHistory(id, project))
+          );
+        return {
+          projectId: fixture.projectId,
+          files: sent.flatMap((operation) => operation.files),
+        };
+      });
+      await openLibrary(target, viewport);
+      const base64 = await target.page.evaluate(() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 96;
+        canvas.height = 48;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('PNG fixture unavailable');
+        context.fillStyle = '#336699';
+        context.fillRect(0, 0, 96, 48);
+        return canvas.toDataURL('image/png').split(',')[1];
+      });
+      if (!base64) throw new Error('PNG fixture bytes unavailable');
+      const original = Buffer.from(base64, 'base64');
+      const expectedHash = createHash('sha256').update(original).digest('hex');
+      await target.page.locator('input[type="file"][multiple]').setInputFiles({
+        name: 'Local before connection.png',
+        mimeType: 'image/png',
+        buffer: original,
+      });
+      await expect(
+        target.page.getByRole('group', { name: 'Local before connection.png', exact: true })
+      ).toBeVisible();
+      const localProof = () =>
+        target.page.evaluate(
+          async ({ name, size }) => {
+            const database = await new Promise<IDBDatabase>((resolve, reject) => {
+              const request = indexedDB.open(name);
+              request.onsuccess = () => resolve(request.result);
+              request.onerror = () => reject(request.error);
+            });
+            let entries: unknown[];
+            let refs: unknown[];
+            try {
+              const tx = database.transaction(['media_library', 'asset_refs'], 'readonly');
+              const all = (store: string) =>
+                new Promise<unknown[]>((resolve, reject) => {
+                  const request = tx.objectStore(store).getAll();
+                  request.onsuccess = () => resolve(request.result);
+                  request.onerror = () => reject(request.error);
+                });
+              [entries, refs] = await Promise.all([all('media_library'), all('asset_refs')]);
+            } finally {
+              database.close();
+            }
+            const entry = entries.find(
+              (row) =>
+                typeof row === 'object' &&
+                row !== null &&
+                'filename' in row &&
+                row.filename === 'Local before connection.png'
+            );
+            if (
+              typeof entry !== 'object' ||
+              entry === null ||
+              !('id' in entry) ||
+              typeof entry.id !== 'string' ||
+              !('source' in entry)
+            )
+              throw new Error('Local native entry missing');
+            const ref = refs.find(
+              (row) =>
+                typeof row === 'object' &&
+                row !== null &&
+                'size' in row &&
+                row.size === size &&
+                'location' in row
+            );
+            if (
+              typeof ref !== 'object' ||
+              ref === null ||
+              !('location' in ref) ||
+              typeof ref.location !== 'object' ||
+              ref.location === null ||
+              !('objectKey' in ref.location) ||
+              typeof ref.location.objectKey !== 'string'
+            )
+              throw new Error('Local original reference missing');
+            const parts = ref.location.objectKey.split('/');
+            const filename = parts.pop();
+            if (!filename) throw new Error('Local object key missing');
+            let directory = await (
+              await navigator.storage.getDirectory()
+            ).getDirectoryHandle('sniptale-assets');
+            for (const part of parts) directory = await directory.getDirectoryHandle(part);
+            const file = await (await directory.getFileHandle(filename)).getFile();
+            const hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+            return {
+              id: entry.id,
+              source: entry.source,
+              size: file.size,
+              sha256: Array.from(new Uint8Array(hash), (value) =>
+                value.toString(16).padStart(2, '0')
+              ).join(''),
+            };
+          },
+          { name: DB_NAME, size: original.length }
+        );
+      const before = await localProof();
+      expect(before.sha256).toBe(expectedHash);
+      expect(await setupPolicyProof(target.page)).toEqual({
+        hasConnection: false,
+        hasProfile: false,
+        policy: null,
+      });
+      const getIndex = lab.proxy.counts.getKeys.length;
+      const rootKey = new URL(rootUrl).pathname.slice(
+        new URL(lab.credentials.rootUrl).pathname.length
+      );
+      const binaryKeys = new Set(remote.files.map((file) => rootKey + file.key));
+      await connectionPage(target, viewport);
+      await connectWorkspace(target.page, { mode: 'join', url: rootUrl, ...lab.credentials }, info);
+      expect(await localProof()).toEqual(before);
+      const probe = await harnessPage(target);
+      await expect
+        .poll(
+          async () => {
+            const queue = await probe.evaluate(() =>
+              window.webdavTransferHarness.portable.outgoing.queueState()
+            );
+            return queue.operations.some((operation) => {
+              const key: unknown = JSON.parse(operation.rootKey);
+              return (
+                Array.isArray(key) &&
+                key[1] === 'media' &&
+                key[2] === before.id &&
+                operation.status === 'published'
+              );
+            });
+          },
+          { timeout: 30_000 }
+        )
+        .toBe(true);
+      expect(lab.proxy.counts.getKeys.slice(getIndex).filter((key) => binaryKeys.has(key))).toEqual(
+        []
+      );
+      await target.page.screenshot({
+        path: info.outputPath('setup-bidirectional-connected.png'),
+        fullPage: false,
+      });
+      await openLibrary(target, viewport);
+      await expect(
+        target.page.getByRole('group', { name: 'Remote before connection', exact: true })
+      ).toBeVisible();
+      await expect(
+        target.page.getByRole('group', { name: 'Local before connection.png', exact: true })
+      ).toBeVisible();
+      await saveProof(info, {
+        actualSearchAndSelection: true,
+        explicitPolicyBeforeEnrollment: true,
+        existingLocalSha256: before.sha256,
+        localPublished: true,
+        remoteProjectId: remote.projectId,
+        unsolicitedRemoteBinaryGets: 0,
+        viewport,
+      });
+    } finally {
+      await source.context.close();
+      await target.context.close();
     }
   });
 }

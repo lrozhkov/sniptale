@@ -10,6 +10,11 @@
 
     /* Bundler mode */
     "moduleResolution": "bundler",
+    "paths": {
+      "sniptale:i18n/popup": ["./apps/extension/src/platform/i18n/catalog-projections.d.ts"],
+      "sniptale:i18n/popup-shell": ["./apps/extension/src/platform/i18n/catalog-projections.d.ts"],
+      "sniptale:i18n/content-shim": ["./apps/extension/src/platform/i18n/catalog-projections.d.ts"]
+    },
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,

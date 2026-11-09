@@ -111,3 +111,22 @@ it('supports image keyboard editing and retains metadata on decode failure', () 
   expect(p.onChange).not.toHaveBeenCalled();
   expect(container.querySelectorAll('button')).toHaveLength(2);
 });
+it('discards an unfinished crop gesture when preview media is removed and reopened', () => {
+  const p = props();
+  act(() => root.render(<MediaCropPreview {...p} />));
+  const first = container.querySelector('video')!;
+  act(() => first.dispatchEvent(new Event('loadeddata')));
+  pointer('pointerdown', 50, 20);
+  pointer('pointermove', 70, 30);
+  act(() => root.render(null));
+  expect(first.isConnected).toBe(false);
+  expect(p.onChange).not.toHaveBeenCalled();
+  act(() => root.render(<MediaCropPreview {...p} sourceTime={3} />));
+  const reopened = container.querySelector('video')!;
+  expect(reopened).not.toBe(first);
+  act(() => reopened.dispatchEvent(new Event('loadedmetadata')));
+  expect(reopened.currentTime).toBe(3);
+  act(() => reopened.dispatchEvent(new Event('loadeddata')));
+  pointer('pointerup', 70, 30);
+  expect(p.onChange).not.toHaveBeenCalled();
+});

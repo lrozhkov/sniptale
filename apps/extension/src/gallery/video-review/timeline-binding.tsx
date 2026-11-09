@@ -1,3 +1,5 @@
+import { useReviewTrackCreation } from './track-creation-tools';
+import { useReviewTrackSelection } from './timeline-track-selection';
 import { cancelReviewTimelineGestures } from './timeline-drag';
 import { useReviewTrackOrder } from './track-order';
 import { ReviewTrackControlsProvider } from './track-row';
@@ -58,6 +60,8 @@ type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
 type TimelineBindingProps = {
+  onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
+  cursorArchiveAvailable?: boolean | undefined;
   navigationRevision?: number | undefined;
   annotationEffects?: ReturnType<typeof useReviewAnnotationEffects>;
   effectSnapshots?: readonly ReviewAnnotationEffectSnapshot[];
@@ -69,6 +73,7 @@ type TimelineBindingProps = {
   text?: ReturnType<typeof useReviewText>;
   selectedTextId?: string | undefined;
   onOpenText?(): void;
+  onToggleCaptions?(): void;
   onSelectText?(id: string): void;
   webcam?: ReturnType<typeof useReviewWebcamEditor>;
   fillHeight?: boolean;
@@ -134,6 +139,7 @@ function ReviewTimelineToolsBinding(
     focusTool: { active: boolean; available: boolean; hint?: string | undefined; onToggle(): void };
     selectedTrack: QuickEditTrack | null;
     trackHasActions: boolean;
+    trackTools: ReactNode;
     clearFocusTool(): void;
     annotationTool?: ReviewAnnotationTool;
     clearAnnotationTool(): void;
@@ -152,6 +158,7 @@ function ReviewTimelineToolsBinding(
       <ReviewTimelineToolbar
         selectedTrack={props.selectedTrack}
         trackHasActions={props.trackHasActions}
+        trackTools={props.trackTools}
         beforeAction={props.beforeAction}
         originalAudioEditor={props.audio}
         rulerRange={props.playbackRange ? range : undefined}
@@ -216,69 +223,51 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   useOriginalAudioPlacement(props);
   const focus = useFocusPlacement(props, projection);
   const annotation = useAnnotationPlacement(props);
-  const [trackSelection, setTrackSelection] = useState({
-    sourceId: props.annotationSourceId,
-    mode: features.mode,
-    track: 'source' as QuickEditTrack,
-  });
-  const selectable = reviewSelectableTracks(props, features);
-  const resetTrack =
-    trackSelection.sourceId !== props.annotationSourceId ||
-    trackSelection.mode !== features.mode ||
-    !selectable[trackSelection.track];
-  const selectedTrack = resetTrack || props.editing.mode ? 'source' : trackSelection.track;
+  const selectable = reviewSelectableTracks(props, features, configuring);
   const clearTools = () => {
     cancelReviewTimelineGestures();
     annotation.clear();
     focus.clear();
     props.audio.setOriginalTool(false);
     props.editing.setCutting(false);
+    creation.clear();
   };
-  const latestSelection = useRef({ clearTools, props, selectable });
-  latestSelection.current = { clearTools, props, selectable };
-  useEffect(() => {
-    if (
-      selectedTrack === trackSelection.track &&
-      trackSelection.sourceId === props.annotationSourceId &&
-      trackSelection.mode === features.mode
-    )
-      return;
-    if (resetTrack) latestSelection.current.clearTools();
-    setTrackSelection({
-      sourceId: props.annotationSourceId,
-      mode: features.mode,
-      track: selectedTrack,
-    });
-  }, [selectedTrack, trackSelection, props.annotationSourceId, features.mode, resetTrack]);
-  const selectTrack = (track: QuickEditTrack) => {
-    if (
-      track === selectedTrack ||
-      !selectable[track] ||
-      props.busy ||
-      props.composerBusy ||
-      props.editing.exporter.phase !== 'idle'
-    )
-      return;
-    (props.beforeAction ?? ((action) => action()))(() => {
-      const latest = latestSelection.current;
-      if (
-        latest.props.annotationSourceId !== props.annotationSourceId ||
-        latest.props.advanced.ui.mode !== features.mode ||
-        !latest.selectable[track] ||
-        latest.props.busy ||
-        latest.props.composerBusy ||
-        latest.props.editing.exporter.phase !== 'idle'
-      )
-        return;
-      latest.clearTools();
-      setTrackSelection({ sourceId: props.annotationSourceId, mode: features.mode, track });
-    });
-  };
+  const { track: selectedTrack, select: selectTrack } = useReviewTrackSelection({
+    sourceId: props.annotationSourceId,
+    mode: features.mode,
+    editing: !!props.editing.mode,
+    selectable,
+    blocked: props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle',
+    beforeAction: props.beforeAction,
+    clearTools,
+    activate: (track) => {
+      if (track === 'text') props.onOpenText?.();
+      else if (track === 'originalAudio') props.onOpenSpeech?.();
+      else if (track === 'actions') props.onOpenHistory?.();
+      else if (track === 'webcam') props.webcam?.select({ kind: 'webcam' });
+    },
+  });
+  const creation = useReviewTrackCreation({
+    sourceId: props.annotationSourceId,
+    track: selectedTrack,
+    blocked: props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle',
+    beforeAction: props.beforeAction,
+    range: props.playbackRange
+      ? { kind: 'range', ...props.playbackRange }
+      : !props.selectedObject && props.selection.kind === 'range'
+        ? props.selection
+        : undefined,
+    text: props.text,
+    onRecordVoiceover: props.onRecordVoiceover,
+    onImportFile: props.onImportAudioFile,
+    onOpenAudio: props.onOpenMusic,
+  });
   return (
     <ReviewTrackControlsProvider
       value={{
         ui: props.advanced.ui,
         selectedTrack,
+        selectable,
         selectTrack,
         order: trackOrder,
         configuring: features.mode === 'advanced' && configuring,
@@ -299,6 +288,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       }}
     >
       <ReviewTimeline
+        onHistoryRange={props.onHistoryRange}
+        cursorArchiveAvailable={props.cursorArchiveAvailable}
         trackOrder={trackOrder.order}
         actionsTrackVisible={
           (features.mode === 'advanced' && configuring) || features.actionsTrackVisible
@@ -345,6 +336,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
             selectedId={props.selectedTextId}
             beforeAction={props.beforeAction}
             onOpen={props.onOpenText}
+            onToggleCaptions={props.onToggleCaptions}
             onSelect={props.onSelectText}
           />
         }
@@ -369,6 +361,9 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
             {...props}
             selectedTrack={selectedTrack}
             trackHasActions={selectable[selectedTrack]}
+            trackTools={
+              ['text', 'voiceover', 'music'].includes(selectedTrack) ? creation.tools : undefined
+            }
             focusTool={{
               ...focus.tool,
               onToggle: () => {
@@ -429,6 +424,11 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           ? { boundaries: props.editing.exporter.index.boundaries }
           : {})}
         {...reviewTimelineAudioTrack(props, features, projection, compact)}
+        onTextRangeCommit={creation.active ? creation.commitText : undefined}
+        onTrackRangeCommit={(range) => {
+          props.onPlaybackRange?.(range);
+          props.onSeek(range.start);
+        }}
         onRangeCommit={(range) => {
           if (props.editing.mode) void props.editing.commitRange(range);
         }}
@@ -462,7 +462,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
 /** Selection follows supported visible rows, excluding settings-only placeholders. */
 function reviewSelectableTracks(
   props: TimelineBindingProps,
-  features: ReturnType<typeof resolveQuickEditEffectiveFeatures>
+  features: ReturnType<typeof resolveQuickEditEffectiveFeatures>,
+  configuring: boolean
 ): Record<QuickEditTrack, boolean> {
   return {
     source: true,
@@ -473,9 +474,13 @@ function reviewSelectableTracks(
       features.originalAudioTrackVisible &&
       (props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec),
     annotationEffects: features.annotationEffectsTrackVisible && !!props.annotationEffects,
-    text: features.textTrackVisible && !!props.text && !!props.onOpenText && !!props.onSelectText,
-    voiceover: features.voiceoverTrackVisible,
-    music: features.musicTrackVisible,
+    text:
+      (features.textTrackVisible || configuring) &&
+      !!props.text &&
+      !!props.onOpenText &&
+      !!props.onSelectText,
+    voiceover: features.voiceoverTrackVisible || configuring,
+    music: features.musicTrackVisible || configuring,
     webcam: features.webcamTrackVisible && !!props.webcam?.camera,
   };
 }
@@ -888,6 +893,7 @@ function ReviewTextLane(props: {
   selectedId: string | undefined;
   beforeAction: ReviewBeforeAction | undefined;
   onOpen: (() => void) | undefined;
+  onToggleCaptions: (() => void) | undefined;
   onSelect: ((id: string) => void) | undefined;
 }) {
   if (props.mode !== 'advanced' || !props.editor || !props.onOpen || !props.onSelect) return null;
@@ -898,7 +904,7 @@ function ReviewTextLane(props: {
       busy={props.busy}
       selectedId={props.selectedId}
       beforeAction={props.beforeAction}
-      onOpenDocument={props.onOpen}
+      onToggleCaptions={props.onToggleCaptions}
       onSelect={props.onSelect}
     />
   );
@@ -944,9 +950,6 @@ function reviewTimelineAudioTrack(
               audio={props.audio}
               busy={props.busy}
               onImportFile={props.onImportAudioFile}
-              onRecordVoiceover={props.onRecordVoiceover}
-              onOpenMusic={props.onOpenMusic}
-              onOpenSpeech={props.onOpenSpeech}
             />,
           ])
         ),
@@ -956,7 +959,6 @@ function reviewTimelineAudioTrack(
 
 function reviewTimelineHistoryBinding(props: TimelineBindingProps) {
   return {
-    onOpenHistory: props.onOpenHistory,
     actionsEnabled: props.advanced.actionsEnabled !== false,
     onToggleActions: props.onToggleActions,
     keyAnimations: props.advanced.keyAnimations,

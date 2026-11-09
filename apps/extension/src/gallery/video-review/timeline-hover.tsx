@@ -11,7 +11,15 @@ import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { reviewTimeLabel } from './controls';
 import { planeTime, reviewPlaneLane } from './timeline-drag';
 
-type HoverLane = 'annotation' | 'source' | 'focus' | 'original' | 'seek' | 'ruler';
+type HoverLane =
+  | 'annotation'
+  | 'source'
+  | 'focus'
+  | 'original'
+  | 'seek'
+  | 'ruler'
+  | 'text'
+  | 'track';
 type Hover = {
   time: number;
   x: number;

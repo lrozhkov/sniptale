@@ -3,6 +3,83 @@ import { expect, test } from '../support/extension-fixture';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
+import {
+  evaluateInTarget,
+  sendRuntimeMessageInTarget,
+  triggerExtensionAction,
+} from '../support/recording-action';
+
+test('ordinary page drawing survives idle time before visible capture', async ({
+  hostOrigin,
+}, info) => {
+  test.setTimeout(90_000);
+  const viewport = { width: 1280, height: 560 };
+  const launched = await launchExtensionBrowser({ viewport });
+  try {
+    const { page, popup } = await openDesignReview(
+      launched.context,
+      launched.extensionId,
+      hostOrigin,
+      viewport
+    );
+    await popup.evaluate(async () => {
+      const current = (await chrome.storage.sync.get('sniptale_settings'))['sniptale_settings'];
+      await chrome.storage.sync.set({ sniptale_settings: { ...current, captureAction: 'edit' } });
+    });
+    await page.reload();
+    const tabId = await popup.evaluate(async (url) => {
+      const tab = (await chrome.tabs.query({})).find((candidate) => candidate.url === url);
+      if (tab?.id === undefined) throw new Error('Drawing tab missing');
+      return tab.id;
+    }, page.url());
+    const target = await triggerExtensionAction(launched.context, launched.extensionId, page);
+    try {
+      expect(
+        await sendRuntimeMessageInTarget(launched.context, target, {
+          type: 'ENABLE_SCREENSHOT_MODE',
+          tabId,
+          workingMode: 'drawing',
+        })
+      ).toMatchObject({ success: true });
+    } finally {
+      await evaluateInTarget(launched.context, target, 'window.close()').catch(() => undefined);
+    }
+    await page.bringToFront();
+    const pencil = page.locator('[data-ui="content.toolbar.drawing.pencil"]').first();
+    await expect(pencil).toBeVisible();
+    await pencil.click();
+    if (await page.locator('.sniptale-drawing-options-popover').isVisible()) await pencil.click();
+    await stroke(page, { x: 400, y: 200 }, { x: 700, y: 220 });
+    const before = await readMainDrawingPixels(page);
+    expect(before).toBeGreaterThan(100);
+    // Keep the page foreground without polling extension state across the worker idle deadline.
+    await new Promise((resolve) => setTimeout(resolve, 45_000));
+    const statusTarget = await triggerExtensionAction(launched.context, launched.extensionId, page);
+    try {
+      const status = await sendRuntimeMessageInTarget(launched.context, statusTarget, {
+        type: 'SCREENSHOT_MODE_STATUS',
+        tabId,
+      });
+      expect(status, JSON.stringify(status)).toMatchObject({ success: true, enabled: true });
+    } finally {
+      await evaluateInTarget(launched.context, statusTarget, 'window.close()').catch(
+        () => undefined
+      );
+    }
+    expect(await readMainDrawingPixels(page)).toBe(before);
+    await page.screenshot({
+      path: info.outputPath('ordinary-drawing-after-idle.png'),
+      fullPage: false,
+    });
+    const editorPromise = launched.context.waitForEvent('page');
+    await page.locator('[data-ui="content.toolbar.capture-visible-button"]').click();
+    const editor = await editorPromise;
+    await expect(editor).toHaveURL(/\/editor\/index\.html/u);
+    await expect.poll(async () => (await readCapturedPixels(editor)).ink).toBeGreaterThan(100);
+  } finally {
+    await closeExtensionBrowser(launched, { removeUserDataDir: true });
+  }
+});
 
 async function stroke(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
   await page.mouse.move(from.x, from.y);

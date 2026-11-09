@@ -30,6 +30,7 @@ const VITE_ENV = `${REPO_ROOT}/apps/extension/src/vite-env.d.ts`;
 const UI_STYLE_IMPORTS = `${REPO_ROOT}/packages/ui/src/styles/imports.d.ts`;
 const APP_AMBIENT_DECLARATION_FILES = [
   VITE_ENV,
+  `${REPO_ROOT}/apps/extension/src/platform/i18n/catalog-projections.d.ts`,
   UI_STYLE_IMPORTS,
   `${REPO_ROOT}/packages/runtime-contracts/src/messaging/message-types/literals.d.ts`,
   `${REPO_ROOT}/packages/runtime-contracts/src/video/messages/index.literals.d.ts`,

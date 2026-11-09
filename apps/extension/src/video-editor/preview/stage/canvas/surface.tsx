@@ -12,6 +12,7 @@ export function PreviewStageSurface(params: PreviewStageSurfaceProps) {
 
   return (
     <PreviewFrameRateProvider
+      rendererPreference={params.previewRenderer ?? 'gpu'}
       enabled={params.previewShowFrameRate ?? false}
       live={params.previewMode === 'live'}
       playing={params.isPlaying && !params.alternateView?.active}
@@ -30,6 +31,7 @@ export function PreviewStageSurface(params: PreviewStageSurfaceProps) {
           onCloseFullscreen={closeFullscreen}
           onOpenFullscreen={openFullscreen}
           onPreviewModeChange={params.onPreviewModeChange}
+          onPreviewRendererChange={params.onPreviewRendererChange}
           onPreviewPreferencesRetry={params.onPreviewPreferencesRetry}
           onPreviewRasterPresetChange={params.onPreviewRasterPresetChange}
           onPreviewZoomChange={params.onPreviewZoomChange}
@@ -37,6 +39,7 @@ export function PreviewStageSurface(params: PreviewStageSurfaceProps) {
           onSelectScene={params.onSelectScene}
           onTogglePlay={params.onTogglePlay}
           previewMode={params.previewMode}
+          previewRenderer={params.previewRenderer}
           previewPreferencesSaveFailed={params.previewPreferencesSaveFailed}
           previewFrameRate={params.previewFrameRate}
           onPreviewFrameRateChange={params.onPreviewFrameRateChange}

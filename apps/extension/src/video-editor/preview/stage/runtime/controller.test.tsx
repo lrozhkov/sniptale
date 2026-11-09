@@ -7,6 +7,8 @@ import {
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { usePreviewStageRuntime } from './controller';
+import * as recordingEvents from './recording-events';
+import { usePreviewStagePresentationTime } from './presentation';
 import { usePreviewStageCanvasRender } from '../scene/render';
 import type { PreviewSceneRenderJob } from '../scene/render-scheduler';
 import type { PreviewStageProps } from './view-types';
@@ -24,12 +26,20 @@ let latest: ReturnType<typeof usePreviewStageRuntime>;
 let root: Root;
 let container: HTMLDivElement;
 
-function Harness(props: PreviewStageProps) {
+function Harness(props: PreviewStageProps & { direct?: boolean }) {
   const runtime = usePreviewStageRuntime(props);
   latest = runtime;
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   usePreviewStageCanvasRender({
     canvasRef,
+    onCameraPresented: runtime.render.onCameraPresented,
+    canRenderCursorFrame: runtime.render.canRenderCursorFrame,
+    ...(props.direct
+      ? {
+          registerPlaybackRequest: runtime.render.registerPlaybackRequest,
+          renderGenerationRef: runtime.render.renderGenerationRef,
+        }
+      : {}),
     stageRef: runtime.surface.stageRef,
     activeClips: runtime.surface.activeClips,
     assetUrls: props.assetUrls,
@@ -40,6 +50,7 @@ function Harness(props: PreviewStageProps) {
     previewMode: props.previewMode,
     previewRasterSize: runtime.previewRasterSize,
     project: runtime.render.project,
+    effectPreparationProject: runtime.render.effectPreparationProject,
     resizeVersion: 0,
     videoFrameState,
     videoRefs: runtime.media.videoRefs,
@@ -47,6 +58,13 @@ function Harness(props: PreviewStageProps) {
   return (
     <div ref={runtime.surface.stageRef}>
       <canvas ref={canvasRef} />
+      <button
+        data-test="begin-gesture"
+        onPointerDown={(event) => {
+          const clip = runtime.surface.activeClips[0];
+          if (clip) runtime.surface.beginInteraction(event, clip, 'move');
+        }}
+      />
     </div>
   );
 }
@@ -107,6 +125,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -167,4 +186,348 @@ it('invalidates when an optional render property is removed', async () => {
   scheduler.enqueue.mockClear();
   await render(input);
   expect(scheduler.enqueue).toHaveBeenCalledOnce();
+});
+
+it('does not prepare the composition camera while rendering inspector project changes', async () => {
+  const composition = await import('../../../../features/video/composition/timeline/frame');
+  const spy = vi.spyOn(composition, 'resolveVideoCompositionFrame');
+  const input = props();
+  await render(input);
+  await render({ ...input, project: { ...input.project, backgroundColor: '#123456' } });
+  expect(spy).not.toHaveBeenCalled();
+  spy.mockRestore();
+});
+
+it('uses the accepted scene camera for overlays without enqueueing another frame', async () => {
+  await render(props());
+  const job = scheduler.enqueue.mock.lastCall![0];
+  const camera = {
+    viewportX: 30,
+    viewportY: 20,
+    viewportWidth: 100,
+    viewportHeight: 80,
+    focusPoint: { x: 80, y: 60 },
+    scale: 2,
+    regionId: 'accepted',
+    motionBlurAmount: 0,
+  };
+  scheduler.enqueue.mockClear();
+  act(() => job.onCameraPresented?.(camera, job.currentTime));
+  expect(latest.surface.camera).toBe(camera);
+  expect(scheduler.enqueue).not.toHaveBeenCalled();
+});
+
+it('blocks a paused seek gesture until the same project and destination time are presented', async () => {
+  const surface = await import('./surface-state');
+  const begin = vi.fn();
+  const factory = vi.spyOn(surface, 'createPreviewStageInteraction').mockReturnValue(begin);
+  const input = props();
+  try {
+    await render(input);
+    const first = scheduler.enqueue.mock.lastCall![0];
+    const camera = { ...latest.surface.camera, viewportX: 30 };
+    act(() => first.onCameraPresented?.(camera, first.currentTime));
+    await render({ ...input, currentTime: 2 });
+    const destination = scheduler.enqueue.mock.lastCall![0];
+    act(() =>
+      container
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+    expect(begin).not.toHaveBeenCalled();
+    act(() => first.onCameraPresented?.(camera, first.currentTime));
+    act(() =>
+      container
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+    expect(begin).not.toHaveBeenCalled();
+    act(() => destination.onCameraPresented?.(camera, destination.currentTime));
+    act(() =>
+      container
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+    expect(begin).toHaveBeenCalledOnce();
+  } finally {
+    factory.mockRestore();
+  }
+});
+
+it('loads destination clips while a paused camera receipt is pending', async () => {
+  const input = props();
+  input.project = createProject([
+    createVideoClip({ id: 'origin', startTime: 0, duration: 1, sourceDuration: 1 }),
+    createVideoClip({ id: 'destination', startTime: 2, duration: 2, sourceDuration: 2 }),
+  ]);
+  input.currentTime = 0.5;
+  await render(input);
+  const first = scheduler.enqueue.mock.lastCall![0];
+  act(() => first.onCameraPresented?.(latest.surface.camera, first.currentTime));
+  await render({ ...input, currentTime: 2.5 });
+  expect(latest.surface.cameraInteractionEnabled).toBe(false);
+  expect(latest.surface.activeClips.map((clip) => clip.id)).toEqual(['destination']);
+  expect(latest.media.videoBankClips.map((clip) => clip.id)).toContain('destination');
+  expect(scheduler.enqueue.mock.lastCall![0].currentTime).toBe(2.5);
+});
+
+it('keeps playback handoff and its active frozen gesture usable while rendering catches up', async () => {
+  const surface = await import('./surface-state');
+  const begin = vi.fn();
+  const factory = vi
+    .spyOn(surface, 'createPreviewStageInteraction')
+    .mockImplementation((options) => (event, clip, mode) => {
+      begin(event, clip, mode);
+      options.gestureHooks?.onActivate?.(clip.id);
+      options.gestureHooks?.onCacheBypassChange?.(true);
+      options.gestureHooks?.onPreviewTransform?.(clip.id, { ...clip.transform, x: 30 });
+    });
+  const input = props();
+  input.onPausePlayback = vi.fn(() => 2);
+  try {
+    await render(input);
+    const first = scheduler.enqueue.mock.lastCall![0];
+    act(() => first.onCameraPresented?.(latest.surface.camera, first.currentTime));
+    await render({ ...input, isPlaying: true, currentTime: 2 });
+    expect(latest.surface.cameraInteractionEnabled).toBe(true);
+    act(() =>
+      container
+        .querySelector('button')!
+        .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+    );
+    expect(begin).toHaveBeenCalledOnce();
+    expect(input.onPausePlayback).toHaveBeenCalledOnce();
+    await render({ ...input, isPlaying: false, currentTime: 2 });
+    expect(latest.cache.bypass).toBe(true);
+    expect(latest.surface.cameraInteractionEnabled).toBe(true);
+    const hooks = factory.mock.lastCall![0].gestureHooks!;
+    act(() => {
+      hooks.onRestore?.('video');
+      hooks.onSettle?.('cancel');
+      hooks.onCacheBypassChange?.(false);
+    });
+    expect(latest.cache.bypass).toBe(false);
+    expect(latest.surface.cameraInteractionEnabled).toBe(false);
+    const completed = scheduler.enqueue.mock.lastCall![0];
+    act(() => completed.onCameraPresented?.(latest.surface.camera, completed.currentTime));
+    expect(latest.surface.cameraInteractionEnabled).toBe(true);
+  } finally {
+    factory.mockRestore();
+  }
+});
+
+it('borrows playback requests without a React time commit and restores the unregistered clock path', async () => {
+  let presentation: ReturnType<typeof usePreviewStagePresentationTime>;
+  let renders = 0;
+  function PresentationHarness({ time = 0 }: { time?: number }) {
+    renders++;
+    presentation = usePreviewStagePresentationTime({
+      currentTime: time,
+      isPlaying: true,
+      projectId: 'p',
+    });
+    return null;
+  }
+  await act(async () => {
+    root.render(<PresentationHarness />);
+  });
+  const first = vi.fn();
+  const second = vi.fn();
+  const releaseFirst = presentation!.registerPlaybackRequest(first);
+  const before = renders;
+  act(() => presentation!.present(1));
+  expect(first).toHaveBeenCalledExactlyOnceWith(1);
+  expect(renders).toBe(before);
+  const releaseSecond = presentation!.registerPlaybackRequest(second);
+  releaseFirst();
+  act(() => presentation!.present(2));
+  expect(second).toHaveBeenCalledExactlyOnceWith(2);
+  await act(async () => {
+    root.render(<PresentationHarness time={2} />);
+  });
+  expect(presentation!.currentTime).toBe(2);
+  releaseSecond();
+  act(() => presentation!.present(3));
+  expect(presentation!.currentTime).toBe(3);
+});
+
+it('routes the actual playback runtime directly to the existing scene scheduler', async () => {
+  const input = { ...props(), project: createProject([]), isPlaying: true };
+  const holder: { runtime: Parameters<PreviewStageProps['registerPreviewRuntime']>[0] } = {
+    runtime: null,
+  };
+  input.registerPreviewRuntime = (runtime) => {
+    holder.runtime = runtime;
+  };
+  await act(async () => {
+    root.render(<Harness {...input} direct />);
+  });
+  expect(holder.runtime).not.toBeNull();
+  scheduler.enqueue.mockClear();
+  act(() => holder.runtime?.present(1.5));
+  expect(scheduler.enqueue).toHaveBeenCalledOnce();
+  expect(scheduler.enqueue.mock.lastCall![0].currentTime).toBe(1.5);
+  expect(latest.render.currentTime).toBe(input.currentTime);
+  await act(async () => {
+    root.render(<Harness {...input} currentTime={1.5} direct />);
+  });
+  expect(scheduler.enqueue).toHaveBeenCalledOnce();
+});
+
+it('compiles camera inputs before event-window adaptation and preserves the bundle through FPS clones', async () => {
+  const cursorOwner = await import('../../../../workflows/video-review/cursor-trajectory');
+  const eventsOwner = await import('../../../../workflows/video-review/recording-events');
+  const { attachRecordingEventGroups } =
+    await import('../../../../features/video/project/recording-events/project-facts');
+  const {
+    attachPreparedProjectCamera,
+    preparedProjectCamera,
+    projectCameraInputSignature,
+    projectCameraOutputKey,
+  } = await import('../../../../features/video/composition/motion/prepared-project-camera');
+  const { normalizeVideoProjectCursorSkin } =
+    await import('../../../../features/video/project/cursor');
+  const { createVideoProjectMotionRegion } =
+    await import('../../../../features/video/project/motion');
+  const input = props();
+  const clip = input.project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Missing source.');
+  clip.sourceInstanceId = 'instance';
+  input.project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin({ hidden: true }),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'source',
+        sourceInstanceId: 'instance',
+        samples: [],
+        trajectory: {
+          format: 'cursor-trajectory-v1',
+          formatVersion: 1,
+          algorithm: 'sed-window-v1',
+          encoding: 'json-ascii-int-v1',
+          trajectoryId: 'a'.repeat(32),
+          state: 'complete',
+          finalized: true,
+          totalBlocks: 1,
+          totalRecords: 0,
+          totalSamples: 0,
+          totalBytes: 0,
+          streamSha256: 'b'.repeat(64),
+        },
+      },
+    ],
+  };
+  input.project.motionRegions = [
+    {
+      ...createVideoProjectMotionRegion(input.project, 0),
+      startTime: 0,
+      duration: 5,
+      focusMode: 'CURSOR',
+    },
+  ];
+  const descriptor = {
+    format: 'recording-events-v1' as const,
+    formatVersion: 1 as const,
+    algorithm: 'lossless-v1' as const,
+    encoding: 'json-utf8-v1' as const,
+    eventStreamId: 'c'.repeat(32),
+    state: 'complete' as const,
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 0,
+    totalBytes: 0,
+    streamSha256: 'd'.repeat(64),
+  };
+  input.project.actionFeedback = [
+    {
+      recordingId: 'source',
+      sourceInstanceId: 'instance',
+      events: descriptor,
+      settings: [],
+      signals: [],
+    },
+  ];
+  const bundle = {
+    signature: projectCameraInputSignature(input.project),
+    output: projectCameraOutputKey(input.project),
+    cameras: [],
+    orientations: [],
+    conflicts: [],
+  };
+  const camera = vi.fn(async (source: VideoProject) => attachPreparedProjectCamera(source, bundle));
+  const cursorSpy = vi
+    .spyOn(cursorOwner, 'createRecordingCursorTrajectoryRenderer')
+    .mockReturnValue({
+      prepareCamera: camera,
+      prepare: vi.fn(async (source: VideoProject) => source),
+      clear: vi.fn(),
+    });
+  const events = vi.fn(async (source: VideoProject, range: { start: number; end: number }) =>
+    attachRecordingEventGroups(source, range, [
+      {
+        recordingId: 'source',
+        sourceInstanceId: 'instance',
+        eventStreamId: descriptor.eventStreamId,
+        descriptor,
+        writerGeneration: 'generation',
+        actions: [],
+        signals: [],
+        cadence: new Map(),
+      },
+    ])
+  );
+  const eventsSpy = vi
+    .spyOn(eventsOwner, 'createRecordingEventsRenderer')
+    .mockReturnValue({ prepare: events, clear: vi.fn() });
+  try {
+    await render(input);
+    expect(camera).toHaveBeenCalledOnce();
+    expect(camera).toHaveBeenCalledWith(input.project, undefined, expect.any(AbortSignal));
+    expect(preparedProjectCamera(latest.render.project)).toBe(bundle);
+    expect(events.mock.calls.some(([source]) => preparedProjectCamera(source) === bundle)).toBe(
+      true
+    );
+    await render({ ...input, currentTime: 2.25 });
+    expect(camera).toHaveBeenCalledOnce();
+    expect(preparedProjectCamera(latest.render.project)).toBe(bundle);
+    expect(latest.render.project.fps).toBe(30);
+  } finally {
+    cursorSpy.mockRestore();
+    eventsSpy.mockRestore();
+  }
+});
+
+it('forwards stable authored provenance with the latest hydrated project and effective preview cadence', async () => {
+  const base = props();
+  const input = { ...base, project: { ...base.project, fps: 60 }, previewFrameRate: '30' as const };
+  let revision = 0;
+  let source: VideoProject | undefined;
+  let hydrated: VideoProject;
+  let capturedRevision = -1;
+  vi.spyOn(recordingEvents, 'useRecordingEventsProject').mockImplementation((project) => {
+    if (source !== project || capturedRevision !== revision) {
+      source = project;
+      capturedRevision = revision;
+      hydrated = { ...project };
+    }
+    return hydrated;
+  });
+  await render(input);
+  const authored = latest.render.effectPreparationProject;
+  const first = latest.render.project;
+  expect(authored).toBe(input.project);
+  expect(scheduler.enqueue.mock.lastCall![0].effectPreparationProject).toBe(authored);
+  expect(first.fps).toBe(30);
+  revision++;
+  await render({ ...input });
+  expect(latest.render.project).not.toBe(first);
+  expect(latest.render.project.fps).toBe(30);
+  expect(latest.render.effectPreparationProject).toBe(authored);
+  expect(scheduler.enqueue.mock.lastCall![0].project).toBe(latest.render.project);
+  expect(scheduler.enqueue.mock.lastCall![0].effectPreparationProject).toBe(authored);
+  const edited = { ...input, project: { ...input.project, backgroundColor: '#123456' } };
+  await render(edited);
+  expect(latest.render.effectPreparationProject).toBe(edited.project);
 });

@@ -4,6 +4,16 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { Image as CanvasImage } from 'canvas';
+import type { ContentDrawingController } from '../../drawing/controller';
+import {
+  createContentRuntimeServices,
+  setContentRuntimeServicesForTests,
+  resetContentRuntimeServicesForTests,
+} from '../../application/runtime-services/services';
+import { createRuntimeMessagingTransport } from '../../../platform/runtime-messaging';
+import * as trustedEvents from '../../platform/trusted-events';
 import { PREPARATION_SURFACE_RESIZE } from '../../../workflows/page-preparation';
 import type { ContentAppModeState } from '../../../content/overlay/app/mode';
 import { createModeState } from './mode-state.test-support';
@@ -26,6 +36,7 @@ type RuntimeLayoutProps = {
     handleCancelCountdown: unknown;
   };
   toolbar: {
+    drawingController: ContentDrawingController;
     aiController: unknown;
     futureFrameStyle: unknown;
     handleTakeScreenshot: unknown;
@@ -64,6 +75,7 @@ const runtimeMocks = vi.hoisted(() => {
   const captureAdapter = {
     captureSelection: vi.fn(),
     captureViewport: vi.fn(),
+    getViewportBounds: vi.fn(() => ({ x: 40, y: 60, width: 100, height: 50 })),
   };
   return {
     ContentAppLayout: vi.fn((_props: RuntimeLayoutProps) => null),
@@ -411,4 +423,95 @@ it('passes only an accepted standalone source element to its DOM binding owner',
   addFreeFrame(point, accepted);
   expect(runtimeMocks.frameManager.addFreeFrame).toHaveBeenCalledOnce();
   expect(runtimeMocks.frameManager.addFreeFrame).toHaveBeenCalledWith(point, accepted);
+});
+
+it('uses the real injected local adapter bounds and raster for shared Simplify drawings', async () => {
+  const png = (width: number, height: number) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas.toDataURL('image/png');
+  };
+  const source = png(200, 100);
+  runtimeMocks.captureAdapter.captureViewport.mockResolvedValue(source);
+  const send = vi.fn(async (message: unknown) => {
+    if (!isPlainRecord(message) || message['type'] !== MessageType.SIMPLIFY_COMMAND)
+      throw new Error('Unexpected native capture fallback');
+    if (message['operation'] === 'prepare')
+      return {
+        success: true,
+        sessionId: 'local-proof',
+        width: 200,
+        height: 100,
+        version: 'simplify-v1',
+      };
+    if (message['operation'] === 'render') {
+      const region = message['region'];
+      if (
+        !isPlainRecord(region) ||
+        typeof region['width'] !== 'number' ||
+        typeof region['height'] !== 'number'
+      )
+        throw new Error('Invalid compute region');
+      return {
+        success: true,
+        sessionId: 'local-proof',
+        width: region['width'],
+        height: region['height'],
+        dataUrl: png(region['width'], region['height']),
+        version: 'simplify-v1',
+      };
+    }
+    return { success: true, result: 'disposed' };
+  });
+  setContentRuntimeServicesForTests(
+    createContentRuntimeServices({
+      messaging: createRuntimeMessagingTransport({
+        runtimeSendMessage: send,
+        tabSendMessage: async () => undefined,
+      }),
+    })
+  );
+  const trusted = vi.spyOn(trustedEvents, 'isTrustedPointerEvent').mockReturnValue(true);
+  const admission = vi.spyOn(pagePreparationHistory, 'commitEntry').mockReturnValue(true);
+  vi.stubGlobal('Image', CanvasImage);
+  try {
+    renderSurface();
+    const controller = runtimeMocks.ContentAppLayout.mock.lastCall?.[0].toolbar.drawingController;
+    if (!controller?.simplify) throw new Error('Missing Simplify runtime');
+    await act(async () => {
+      await controller.simplify!.submit(
+        {
+          id: 'local-simplify-proof',
+          kind: 'simplify',
+          bounds: { x: 50, y: 70, width: 30, height: 20 },
+          settings: controller.session.getSnapshot().defaults.simplify,
+        },
+        new Event('pointerup')
+      );
+    });
+    expect(runtimeMocks.captureAdapter.captureViewport).toHaveBeenCalledExactlyOnceWith('visible');
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'render',
+        region: { x: 20, y: 20, width: 60, height: 40 },
+      })
+    );
+    expect(controller.session.getSnapshot().document.objects).toContainEqual(
+      expect.objectContaining({
+        id: 'local-simplify-proof',
+        engineVersion: 'simplify-v1',
+        source: expect.objectContaining({ bounds: { x: 40, y: 60, width: 100, height: 50 } }),
+      })
+    );
+    renderSurface();
+    expect(runtimeMocks.ContentAppLayout.mock.lastCall?.[0].toolbar.drawingController).toBe(
+      controller
+    );
+  } finally {
+    act(() => pagePreparationHistory.clear());
+    trusted.mockRestore();
+    admission.mockRestore();
+    resetContentRuntimeServicesForTests();
+  }
 });

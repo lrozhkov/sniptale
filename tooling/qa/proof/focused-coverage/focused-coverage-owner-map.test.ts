@@ -15,6 +15,40 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it.each(['controller.ts', 'context.tsx', 'view.tsx', 'dialog.tsx'])(
+  'selects direct and participant composition proof for the common Settings protection %s owner',
+  async (owner) => {
+    const module = await importOwnerMap();
+    const root = 'apps/extension/src/settings/secret-protection';
+    expect(module.resolveMappedCoverageOwnerTests(`${root}/${owner}`)).toEqual(
+      expect.arrayContaining([
+        `${root}/controller.test.tsx`,
+        `${root}/context.test.tsx`,
+        `${root}/view.test.tsx`,
+        `${root}/dialog.test.tsx`,
+        `${root}/integration.test.tsx`,
+        'apps/extension/src/settings/sections/capture/saving/sync-connection.test.tsx',
+        'apps/extension/src/settings/sections/system/access-data/index.test.tsx',
+      ])
+    );
+  }
+);
+
+it('keeps the shared protection client and retained AI mutations on their real wire proof', async () => {
+  const module = await importOwnerMap();
+  const test = 'apps/extension/src/settings/runtime/secret-protection.test.ts';
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/settings/runtime/secret-protection.ts'
+    )
+  ).toEqual([test]);
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/settings/runtime/ai-settings/mutations.ts'
+    )
+  ).toEqual([test]);
+});
+
 it.each(['core.ts', 'settings.ts', 'graph-mutations.ts'])(
   'retains AI settings aggregation and queued command proof for %s',
   async (owner) => {
@@ -36,11 +70,13 @@ it.each(['parser', 'store'])(
     const module = await importOwnerMap();
     expect(
       module.resolveMappedCoverageOwnerTests(
-        `apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.${owner}.ts`
+        `apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.${owner}.ts`
       )
     ).toEqual([
+      'apps/extension/src/background/ai/settings/authorization/secret-unlock.test.ts',
+      'apps/extension/src/background/ai/settings/secret-unlock-route.lifecycle.test.ts',
       'apps/extension/src/background/ai/settings/secret-unlock-route.review-text.test.ts',
-      'apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.test.ts',
+      'apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.test.ts',
     ]);
   }
 );
@@ -528,3 +564,91 @@ it.each(['core.stores.ts', 'upgrade/core.ts'])(
     );
   }
 );
+
+it.each([
+  'apps/extension/src/composition/persistence/assets/retention-index.ts',
+  'apps/extension/src/composition/persistence/assets/operations.ts',
+])('selects both Review attachment adapter suites for %s', async (owner) => {
+  const module = await importOwnerMap();
+  expect(module.resolveMappedCoverageOwnerTests(owner)).toEqual([
+    'apps/extension/src/workflows/video-review/presentation-attachment.test.ts',
+    'apps/extension/src/workflows/video-review/watermark-image.test.ts',
+  ]);
+});
+
+it.each(['en', 'ru'])('selects exact product proof for the %s catalog data', async (locale) => {
+  const module = await importOwnerMap();
+  const files = module.resolveMappedCoverageOwnerTests(
+    `apps/extension/src/platform/i18n/catalogs/${locale}.json`
+  );
+  expect(files).toHaveLength(12);
+  expect(files).toContain('apps/extension/src/platform/i18n/catalog-reader.test.ts');
+  expect(files).toContain('apps/extension/src/content/runtime/shim/launcher.test.ts');
+  expect(files.every((file) => file.startsWith('apps/extension/src/'))).toBe(true);
+  expect(
+    module.resolveMappedCoverageOwnerTests('apps/extension/src/platform/i18n/catalogs/de.json')
+  ).toEqual([]);
+});
+
+it.each([
+  { paths: [], rule: 'focused-coverage-owner-mapping-data-files' },
+  { paths: ['data/en.json', 'data/en.json'], rule: 'focused-coverage-owner-mapping-data-files' },
+  { paths: ['data/missing.json'], rule: 'focused-coverage-owner-mapping-missing-data-file' },
+  { paths: ['data/*.json'], rule: 'focused-coverage-owner-mapping-data-path' },
+  { paths: ['data/en.ts'], rule: 'focused-coverage-owner-mapping-data-path' },
+  { paths: ['data/../en.json'], rule: 'focused-coverage-owner-mapping-data-path' },
+])('rejects invalid data proof targets: $paths', async ({ paths, rule }) => {
+  const root = createTempRoot('focused-data-target-');
+  writeFile(root, 'data/en.json', '{}');
+  writeFile(root, 'data/en.ts', 'export const value = 1;');
+  writeFile(root, 'data/owner.test.ts', 'export const test = 1;');
+  const violations = await withCwd(root, async () => {
+    const module = await importOwnerMap();
+    return module.collectFocusedCoverageOwnerMappingViolations({
+      mappings: [
+        {
+          owner: 'catalog-data',
+          productionDataFiles: paths,
+          allowMissingProductionTarget: true,
+          reason: 'Exact data proof does not bypass missing input validation.',
+          testFiles: ['data/owner.test.ts'],
+        },
+      ],
+    });
+  });
+  expect(violations).toContainEqual(expect.objectContaining({ rule }));
+});
+
+it('requires exactly one mapping target kind without treating JSON as covered code', async () => {
+  const root = createTempRoot('focused-data-target-kind-');
+  writeFile(root, 'data/en.json', '{}');
+  writeFile(root, 'data/owner.test.ts', 'export const test = 1;');
+  const results = await withCwd(root, async () => {
+    const module = await importOwnerMap();
+    const base = {
+      owner: 'catalog-data',
+      reason: 'Data proof stays distinct from code coverage eligibility.',
+      testFiles: ['data/owner.test.ts'],
+    };
+    return {
+      data: module.collectFocusedCoverageOwnerMappingViolations({
+        mappings: [{ ...base, productionDataFiles: ['data/en.json'] }],
+      }),
+      ambiguous: module.collectFocusedCoverageOwnerMappingViolations({
+        mappings: [
+          { ...base, productionDataFiles: ['data/en.json'], productionFile: 'data/en.json' },
+        ],
+      }),
+      code: module.collectFocusedCoverageOwnerMappingViolations({
+        mappings: [{ ...base, productionFile: 'data/en.json' }],
+      }),
+    };
+  });
+  expect(results.data).toEqual([]);
+  expect(results.ambiguous).toContainEqual(
+    expect.objectContaining({ rule: 'focused-coverage-owner-mapping-target' })
+  );
+  expect(results.code).toContainEqual(
+    expect.objectContaining({ rule: 'focused-coverage-owner-mapping-non-coverage-production-file' })
+  );
+});

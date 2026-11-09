@@ -23,7 +23,7 @@ interface HistoryDependencies {
 function validProfile(value: unknown): value is string {
   if (typeof value !== 'string' || value.length > 100) return false;
   const match =
-    /^(project|review)-(render|copy)-(mp4|webm)-(avc|hevc|vp8|vp9|av1)-p([1-9]\d{0,2})-f([1-9]\d{0,2})-q(LOW|MEDIUM|HIGH|ULTRA)-c([1-9]\d?)$/.exec(
+    /^(project|review)-(render|copy)-(mp4|webm)-(avc|hevc|vp8|vp9|av1)-p([1-9]\d{0,2})-f([1-9]\d{0,2})-q(LOW|MEDIUM|HIGH|ULTRA)-c([1-9]\d?)(?:-e(?:bicubic-sharpen|clark-x2))?$/.exec(
       value
     );
   return !!match && Number(match[5]) <= 256 && Number(match[6]) <= 240 && Number(match[8]) <= 16;

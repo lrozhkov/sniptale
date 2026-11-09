@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+const wakeCheckpoints = vi.hoisted(() => vi.fn());
+vi.mock('../../../platform/runtime-messaging/sync-product-client', () => ({
+  createSyncProductClient: () => ({ wakeCheckpoints }),
+}));
 import { EDITOR_AUTOSAVE_POLICY } from '../../../features/autosave/policy';
 
 import { act } from 'react';
@@ -7,8 +11,18 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject as createDomainProject } from '../../../features/video/project/factories/creation';
 import { requestVideoEditorSaveRetry } from './save-retry';
 import { useVideoEditorStore } from '../../state/store';
-import { observeVideoEditorSave, waitForVideoEditorSave } from './save-readiness';
+import {
+  observeVideoEditorSave,
+  waitForVideoEditorSave,
+  prepareVideoEditorCheckpointExit,
+} from './save-readiness';
 
+const checkpointReceiptForSave = vi.fn();
+const acquireCheckpoint = vi.fn();
+const releaseCheckpoint = vi.fn();
+vi.mock('../../../composition/persistence/sync-capture/checkpoint-publication', () => ({
+  acquireSyncCheckpointEdit: acquireCheckpoint,
+}));
 const saveVideoProject = vi.fn();
 const getVideoProject = vi.fn();
 const replaceVideoEditorUrl = vi.fn();
@@ -30,10 +44,15 @@ vi.mock('../../../composition/persistence/projects/index-mutations', async (impo
       expectedWorkspaceRevision: number | null;
       expectedProject: ReturnType<typeof createDomainProject> | null;
     }
-  ) => ({
-    project: await saveVideoProject(project, options),
-    workspaceRevision: (options.expectedWorkspaceRevision ?? 0) + 1,
-  }),
+  ) => {
+    const saved = await saveVideoProject(project, options);
+    const checkpointReceipt = checkpointReceiptForSave(project);
+    return {
+      project: saved,
+      workspaceRevision: (options.expectedWorkspaceRevision ?? 0) + 1,
+      ...(checkpointReceipt ? { checkpointReceipt } : {}),
+    };
+  },
 }));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
@@ -94,7 +113,11 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 beforeEach(() => {
+  wakeCheckpoints.mockReset().mockResolvedValue({ kind: 'checkpoint-woken' });
   vi.useFakeTimers();
+  checkpointReceiptForSave.mockReset();
+  acquireCheckpoint.mockReset().mockImplementation(async () => ({ release: releaseCheckpoint }));
+  releaseCheckpoint.mockReset().mockResolvedValue(undefined);
   saveVideoProject.mockReset();
   getVideoProject.mockReset();
   initialProjects.clear();
@@ -767,4 +790,421 @@ it('ignores a late conflict from a project that has been replaced', async () => 
     rejectSave(Object.assign(new Error('stale'), { name: 'StaleVideoProjectSaveError' }))
   );
   expect(setSaveState).toHaveBeenLastCalledWith('saved');
+});
+
+function checkpointDeferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+async function mountCheckpointProject() {
+  const project = createEmptyVideoProject('Checkpoint action');
+  const hook = await importAutoSaveHook();
+  useVideoEditorStore.getState().setProject(project, 'rec-1');
+  act(() =>
+    root?.render(
+      <StoreAutoSaveHarness
+        refreshProjects={vi.fn().mockResolvedValue(undefined)}
+        useVideoEditorAutoSave={hook}
+      />
+    )
+  );
+  return project;
+}
+function beginCheckpointGesture() {
+  let lease: symbol | null = null;
+  act(() => {
+    lease = useVideoEditorStore.getState().beginProjectHistoryTransaction();
+  });
+  if (!lease) throw new Error('Expected authored history transaction');
+  return lease;
+}
+
+it('holds the checkpoint edit lease through a long history gesture and its final native ACK', async () => {
+  await mountCheckpointProject();
+  const final = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+  saveVideoProject
+    .mockImplementationOnce(async (project) => project)
+    .mockImplementationOnce(() => final.promise);
+  const lease = beginCheckpointGesture();
+  expect(acquireCheckpoint).toHaveBeenCalledOnce();
+  act(() => useVideoEditorStore.getState().renameProject('Gesture intermediate'));
+  await flushAutoSaveTimers();
+  expect(wakeCheckpoints).not.toHaveBeenCalled();
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  await act(async () => {
+    vi.advanceTimersByTime(6000);
+  });
+  expect(releaseCheckpoint).not.toHaveBeenCalled();
+  act(() => useVideoEditorStore.getState().renameProject('Gesture completed'));
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
+  await act(async () => undefined);
+  expect(saveVideoProject).toHaveBeenCalledTimes(2);
+  expect(releaseCheckpoint).not.toHaveBeenCalled();
+  const latest = useVideoEditorStore.getState().project;
+  if (!latest) throw new Error('Expected latest project');
+  await act(async () => {
+    final.resolve(latest);
+  });
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+  expect(saveVideoProject).toHaveBeenLastCalledWith(
+    expect.objectContaining({ name: 'Gesture completed' }),
+    expect.anything()
+  );
+  expect(wakeCheckpoints).toHaveBeenCalledOnce();
+});
+
+it('waits for initial checkpoint grant before native persistence', async () => {
+  await mountCheckpointProject();
+  const grant = checkpointDeferred<{ release: typeof releaseCheckpoint }>();
+  acquireCheckpoint.mockImplementationOnce(() => grant.promise);
+  saveVideoProject.mockImplementation(async (project) => project);
+  const lease = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Responsive before lock'));
+  await flushAutoSaveTimers();
+  expect(useVideoEditorStore.getState().project?.name).toBe('Responsive before lock');
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  await act(async () => {
+    grant.resolve({ release: releaseCheckpoint });
+  });
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  expect(releaseCheckpoint).not.toHaveBeenCalled();
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
+  await act(async () => undefined);
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+});
+
+it('keeps a new gesture protected after the previous save ACK', async () => {
+  await mountCheckpointProject();
+  const old = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+  const latest = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+  saveVideoProject
+    .mockImplementationOnce(() => old.promise)
+    .mockImplementationOnce(() => latest.promise);
+  const first = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('First action'));
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(first));
+  await act(async () => undefined);
+  const savedFirst = useVideoEditorStore.getState().project!;
+  const second = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Second action'));
+  await act(async () => {
+    old.resolve(savedFirst);
+  });
+  expect(releaseCheckpoint).not.toHaveBeenCalled();
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(second));
+  await act(async () => undefined);
+  await act(async () => {
+    latest.resolve(useVideoEditorStore.getState().project!);
+  });
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+});
+
+it.each(['replace', 'dispose'] as const)(
+  'releases retired protection after context replacement and disposal: %s',
+  async (mode) => {
+    await mountCheckpointProject();
+    const saved = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+    saveVideoProject.mockImplementationOnce(() => saved.promise);
+    beginCheckpointGesture();
+    act(() => useVideoEditorStore.getState().renameProject('Pending old context'));
+    await flushAutoSaveTimers();
+    const old = useVideoEditorStore.getState().project!;
+    if (mode === 'replace')
+      act(() =>
+        useVideoEditorStore.getState().setProject(createEmptyVideoProject('Replacement'), null)
+      );
+    else {
+      act(() => root?.unmount());
+      root = null;
+    }
+    expect(releaseCheckpoint).not.toHaveBeenCalled();
+    await act(async () => {
+      saved.resolve(old);
+    });
+    expect(releaseCheckpoint).toHaveBeenCalledOnce();
+    if (mode === 'replace')
+      expect(useVideoEditorStore.getState().project?.name).toBe('Replacement');
+  }
+);
+
+it('retries a failed checkpoint acquisition through existing save retry', async () => {
+  await mountCheckpointProject();
+  acquireCheckpoint.mockRejectedValueOnce(new Error('Lock unavailable'));
+  saveVideoProject.mockImplementation(async (project) => project);
+  act(() => useVideoEditorStore.getState().renameProject('Retry protected save'));
+  await flushAutoSaveTimers();
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(useVideoEditorStore.getState().saveState).toBe('error');
+  act(() => requestVideoEditorSaveRetry());
+  await flushAutoSaveTimers();
+  expect(acquireCheckpoint).toHaveBeenCalledTimes(2);
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+});
+
+it.each(['replace', 'dispose'] as const)(
+  'releases an ungranted retired lease without entering native persistence: %s',
+  async (mode) => {
+    await mountCheckpointProject();
+    const grant = checkpointDeferred<{ release: typeof releaseCheckpoint }>();
+    acquireCheckpoint.mockImplementationOnce(() => grant.promise);
+    beginCheckpointGesture();
+    act(() => useVideoEditorStore.getState().renameProject('Waiting on browser lock'));
+    await flushAutoSaveTimers();
+    if (mode === 'replace')
+      act(() =>
+        useVideoEditorStore.getState().setProject(createEmptyVideoProject('Replacement'), null)
+      );
+    else {
+      act(() => root?.unmount());
+      root = null;
+    }
+    expect(releaseCheckpoint).not.toHaveBeenCalled();
+    await act(async () => {
+      grant.resolve({ release: releaseCheckpoint });
+    });
+    expect(saveVideoProject).not.toHaveBeenCalled();
+    expect(releaseCheckpoint).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps a successor gesture lease when an older release settles', async () => {
+  await mountCheckpointProject();
+  const released = checkpointDeferred<void>();
+  releaseCheckpoint.mockImplementationOnce(() => released.promise).mockResolvedValue(undefined);
+  const first = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(first));
+  await act(async () => undefined);
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+  const saved = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+  saveVideoProject.mockImplementationOnce(() => saved.promise);
+  const second = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Protected successor'));
+  await flushAutoSaveTimers();
+  await act(async () => {
+    released.resolve();
+  });
+  expect(acquireCheckpoint).toHaveBeenCalledTimes(2);
+  expect(wakeCheckpoints).not.toHaveBeenCalled();
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(second));
+  await act(async () => {
+    saved.resolve(useVideoEditorStore.getState().project!);
+  });
+  expect(releaseCheckpoint).toHaveBeenCalledTimes(2);
+  expect(wakeCheckpoints).toHaveBeenCalledOnce();
+});
+
+it('reports a gesture lock refusal before retrying the pending local save', async () => {
+  await mountCheckpointProject();
+  acquireCheckpoint.mockRejectedValueOnce(new Error('Lock refused'));
+  saveVideoProject.mockImplementation(async (project) => project);
+  const lease = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Retained after refusal'));
+  await act(async () => undefined);
+  expect(useVideoEditorStore.getState().saveState).toBe('error');
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  await flushAutoSaveTimers();
+  expect(acquireCheckpoint).toHaveBeenCalledTimes(2);
+  expect(saveVideoProject).toHaveBeenCalledOnce();
+  expect(releaseCheckpoint).not.toHaveBeenCalled();
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
+  await act(async () => undefined);
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+});
+
+it('retains completed-action protection after native refusal until retry ACK', async () => {
+  await mountCheckpointProject();
+  saveVideoProject
+    .mockRejectedValueOnce(new Error('Native save refused'))
+    .mockImplementation(async (project) => project);
+  const lease = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Retained completed action'));
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
+  await act(async () => undefined);
+  expect(useVideoEditorStore.getState().saveState).toBe('error');
+  expect(releaseCheckpoint).not.toHaveBeenCalled();
+  expect(wakeCheckpoints).not.toHaveBeenCalled();
+  act(() => requestVideoEditorSaveRetry());
+  await flushAutoSaveTimers();
+  expect(saveVideoProject).toHaveBeenCalledTimes(2);
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+  expect(useVideoEditorStore.getState().project?.name).toBe('Retained completed action');
+  expect(wakeCheckpoints).toHaveBeenCalledOnce();
+});
+
+it('wakes Montage only after its accepted protection release settles', async () => {
+  await mountCheckpointProject();
+  const released = checkpointDeferred<void>();
+  releaseCheckpoint.mockImplementationOnce(() => released.promise);
+  saveVideoProject.mockImplementation(async (project) => project);
+  const lease = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Accepted'));
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
+  await act(async () => undefined);
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+  expect(wakeCheckpoints).not.toHaveBeenCalled();
+  await act(async () => released.resolve());
+  expect(wakeCheckpoints).toHaveBeenCalledOnce();
+});
+
+it('does not wake Montage after a no-op history transaction', async () => {
+  await mountCheckpointProject();
+  const lease = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
+  await act(async () => undefined);
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(wakeCheckpoints).not.toHaveBeenCalled();
+});
+
+it('keeps Montage saved after advisory wake rejection', async () => {
+  await mountCheckpointProject();
+  wakeCheckpoints.mockRejectedValueOnce(new Error('Worker unavailable'));
+  saveVideoProject.mockImplementation(async (project) => project);
+  const lease = beginCheckpointGesture();
+  act(() => useVideoEditorStore.getState().renameProject('Accepted'));
+  act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease));
+  await act(async () => undefined);
+  expect(wakeCheckpoints).toHaveBeenCalledOnce();
+  expect(useVideoEditorStore.getState().saveState).toBe('saved');
+  expect(releaseCheckpoint).toHaveBeenCalledOnce();
+});
+
+it('retains native ACK receipts only in the matching Montage context', async () => {
+  const project = await mountCheckpointProject();
+  const receipt = {
+    rootKind: 'video-project' as const,
+    rootId: project.id,
+    revision: '11111111-1111-4111-8111-111111111111',
+  };
+  const ack = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+  checkpointReceiptForSave.mockReturnValueOnce(receipt);
+  saveVideoProject.mockImplementationOnce(() => ack.promise);
+  act(() => useVideoEditorStore.getState().renameProject('Receipted native save'));
+  await flushAutoSaveTimers();
+  let prepared = false;
+  const waiting = prepareVideoEditorCheckpointExit(project.id);
+  void waiting.then(() => {
+    prepared = true;
+  });
+  await act(async () => undefined);
+  expect(prepared).toBe(false);
+  await act(async () => {
+    ack.resolve(useVideoEditorStore.getState().project!);
+  });
+  const exit = await waiting;
+  expect(exit.receipt).toEqual(receipt);
+  expect(exit.isCurrent()).toBe(true);
+  expect(useVideoEditorStore.getState().project).not.toHaveProperty('checkpointReceipt');
+});
+
+it('invalidates Montage exit before React sees a new gesture or edit', async () => {
+  const project = await mountCheckpointProject();
+  const receipt = {
+    rootKind: 'video-project' as const,
+    rootId: project.id,
+    revision: '11111111-1111-4111-8111-111111111111',
+  };
+  checkpointReceiptForSave.mockReturnValue(receipt);
+  saveVideoProject.mockImplementation(async (candidate) => candidate);
+  act(() => useVideoEditorStore.getState().renameProject('Saved before exit'));
+  await flushAutoSaveTimers();
+  const exit = await prepareVideoEditorCheckpointExit(project.id);
+  let active = true;
+  act(() => {
+    const lease = useVideoEditorStore.getState().beginProjectHistoryTransaction();
+    if (!lease) throw new Error('Expected new gesture');
+    active = exit.isCurrent();
+    useVideoEditorStore.getState().endProjectHistoryTransaction(lease);
+  });
+  expect(active).toBe(false);
+  const afterGesture = await prepareVideoEditorCheckpointExit(project.id);
+  let unchanged = true;
+  act(() => {
+    useVideoEditorStore.getState().renameProject('New edit in extra intent gap');
+    unchanged = afterGesture.isCurrent();
+  });
+  expect(unchanged).toBe(false);
+});
+
+it('clears Montage receipt on ACK omission and rejects retired witnesses', async () => {
+  const project = await mountCheckpointProject();
+  const receipt = {
+    rootKind: 'video-project' as const,
+    rootId: project.id,
+    revision: '11111111-1111-4111-8111-111111111111',
+  };
+  checkpointReceiptForSave.mockReturnValueOnce(receipt);
+  saveVideoProject.mockImplementation(async (candidate) => candidate);
+  act(() => useVideoEditorStore.getState().renameProject('First ACK'));
+  await flushAutoSaveTimers();
+  const first = await prepareVideoEditorCheckpointExit(project.id);
+  expect(first.receipt).toEqual(receipt);
+  act(() => useVideoEditorStore.getState().renameProject('Legacy ACK without receipt'));
+  await flushAutoSaveTimers();
+  const second = await prepareVideoEditorCheckpointExit(project.id);
+  expect(second.receipt).toBeNull();
+  expect(second.isCurrent()).toBe(true);
+  expect(first.isCurrent()).toBe(false);
+  act(() =>
+    useVideoEditorStore.getState().setProject(createEmptyVideoProject('Replacement context'), null)
+  );
+  expect(second.isCurrent()).toBe(false);
+});
+
+it('rejects a Montage replacement synchronously before its context effect runs', async () => {
+  const project = await mountCheckpointProject();
+  const exit = await prepareVideoEditorCheckpointExit(project.id);
+  expect(exit.receipt).toBeNull();
+  expect(exit.isCurrent()).toBe(true);
+  let eligible = true;
+  act(() => {
+    useVideoEditorStore
+      .getState()
+      .setProject(createEmptyVideoProject('Replacement during exit intent'), null);
+    eligible = exit.isCurrent();
+  });
+  expect(eligible).toBe(false);
+});
+
+it('does not transfer a retired save receipt to a replacement Montage context', async () => {
+  const project = await mountCheckpointProject();
+  const receipt = {
+    rootKind: 'video-project' as const,
+    rootId: project.id,
+    revision: '11111111-1111-4111-8111-111111111111',
+  };
+  checkpointReceiptForSave.mockReturnValueOnce(receipt);
+  const ack = checkpointDeferred<ReturnType<typeof createEmptyVideoProject>>();
+  saveVideoProject.mockImplementationOnce(() => ack.promise);
+  act(() => useVideoEditorStore.getState().renameProject('Old native write'));
+  await flushAutoSaveTimers();
+  const old = useVideoEditorStore.getState().project!;
+  const replacement = createEmptyVideoProject('New clean context');
+  act(() => useVideoEditorStore.getState().setProject(replacement, null));
+  await act(async () => {
+    ack.resolve(old);
+  });
+  const exit = await prepareVideoEditorCheckpointExit(replacement.id);
+  expect(exit.receipt).toBeNull();
+  expect(exit.isCurrent()).toBe(true);
+});
+
+it('rejects a Montage source edit during the extra exit-intent gap', async () => {
+  const project = await mountCheckpointProject();
+  const exit = await prepareVideoEditorCheckpointExit(project.id);
+  let eligible = true;
+  act(() => {
+    useVideoEditorStore
+      .getState()
+      .updateProject((current) => ({ ...current, baseRecordingId: 'replacement-source' }));
+    eligible = exit.isCurrent();
+  });
+  expect(eligible).toBe(false);
 });

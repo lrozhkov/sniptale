@@ -1,6 +1,6 @@
 import { BlobReader, TextReader, ZipWriter } from '@zip.js/zip.js';
 import type {
-  ArchiveEntrySource,
+  ArchiveStreamSource,
   ArchiveResourceProfile,
   ArchiveWriter,
   ExportSink,
@@ -20,7 +20,7 @@ function assertNotAborted(signal: AbortSignal | undefined): void {
 }
 
 function createSourceTransfer(
-  source: ArchiveEntrySource,
+  source: ArchiveStreamSource,
   signal: AbortSignal | undefined
 ): {
   cleanup(): void;

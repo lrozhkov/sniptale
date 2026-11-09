@@ -7,11 +7,15 @@ const mocks = vi.hoisted(() => ({
   rasterize: vi.fn(() => ({ kind: 'blurred-background' })),
 }));
 
-vi.mock('./raster', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./raster')>()),
-  rasterizeBlurredBackground: mocks.rasterize,
-  resolveBackgroundRasterSize: (size: unknown) => size,
-}));
+vi.mock('./raster', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./raster')>();
+  return {
+    ...actual,
+    rasterizeBlurredBackground: mocks.rasterize,
+    createAdvancedBackgroundImage: vi.fn(actual.createAdvancedBackgroundImage),
+    resolveBackgroundRasterSize: vi.fn(actual.resolveBackgroundRasterSize),
+  };
+});
 
 vi.mock('fabric', () => ({
   FabricImage: {
@@ -36,6 +40,7 @@ vi.mock('fabric', () => ({
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import { createBackgroundLayer } from './objects';
+import { createAdvancedBackgroundImage, resolveBackgroundRasterSize } from './raster';
 
 function createFrame(patch: Partial<EditorFrameSettings>): EditorFrameSettings {
   return {
@@ -122,4 +127,59 @@ it('keeps the fast path at zero and rasterizes the full backing above zero', asy
     expect.objectContaining({ amount: 12, targetSize: { width: 320, height: 180 } })
   );
   expect(blurred).toEqual({ kind: 'blurred-background' });
+});
+
+it('threads transient quality through blurred and advanced gradient creation', async () => {
+  const frame = createFrame({ backgroundMode: 'gradient', backgroundBlurAmount: 12 });
+  await createBackgroundLayer({ width: 6000, height: 4000 }, frame, true);
+  expect(resolveBackgroundRasterSize).toHaveBeenCalledWith({ width: 6000, height: 4000 }, true);
+  expect(createAdvancedBackgroundImage).toHaveBeenCalledWith(
+    { width: 768, height: 512 },
+    frame,
+    true
+  );
+  expect(mocks.rasterize).toHaveBeenCalledWith(
+    expect.objectContaining({
+      rasterSize: { width: 768, height: 512 },
+      targetSize: { width: 6000, height: 4000 },
+    })
+  );
+});
+
+it('preserves the final tile frequency in smaller transient blur rasters', async () => {
+  class MockImage {
+    onload: (() => void) | null = null;
+    set src(_source: string) {
+      this.onload?.();
+    }
+  }
+  vi.stubGlobal('Image', MockImage);
+  try {
+    const frame = createFrame({
+      backgroundMode: 'image',
+      backgroundImageFit: 'tile',
+      backgroundBlurAmount: 12,
+    });
+    await createBackgroundLayer({ width: 6000, height: 4000 }, frame, true);
+    expect(mocks.rasterize).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        object: expect.objectContaining({
+          fill: expect.objectContaining({
+            patternTransform: [768 / 2048, 0, 0, 512 / 1365, 0, 0],
+          }),
+        }),
+      })
+    );
+    await createBackgroundLayer({ width: 6000, height: 4000 }, frame);
+    expect(mocks.rasterize).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        rasterSize: { width: 2048, height: 1365 },
+        object: expect.objectContaining({
+          fill: expect.not.objectContaining({ patternTransform: expect.anything() }),
+        }),
+      })
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

@@ -100,13 +100,13 @@ it('creates and installs a browser-frame layer before committing the mutation', 
 
   expect(mocks.createBrowserFrameLayerObject).toHaveBeenCalledWith(
     expect.objectContaining({
-      browserFrame: options.browserFrame,
+      browserFrame: expect.objectContaining(options.browserFrame),
       nextLabelIndex: 9,
       prepareObject: options.prepareObject,
     })
   );
   expect(options.relayoutScene).toHaveBeenCalledWith(
-    options.browserFrame,
+    expect.objectContaining(options.browserFrame),
     expect.objectContaining({ hasBrowserFrame: true })
   );
   expect(canvas.add).toHaveBeenCalledWith(nextLayer);
@@ -157,8 +157,6 @@ it.each(['resize', 'keep-size'] as const)(
     expect(canvas.getObjects()).toHaveLength(0);
     expect(options.relayoutScene).toHaveBeenCalledWith(expect.anything(), {
       hasBrowserFrame: false,
-      preserveCanvasSize: canvasMode === 'keep-size',
-      fitSourceToContent: false,
     });
     expect(effects.ensureBrowserFrameOnTop).toHaveBeenCalledOnce();
     expect(effects.commitHistory).toHaveBeenCalledOnce();
@@ -180,7 +178,7 @@ it('does not reinstall a header after its owner mutation token becomes stale', a
   });
   mocks.createBrowserFrameLayerObject.mockImplementation(async () => {
     current = false;
-    return { setCoords: vi.fn() };
+    return { setCoords: vi.fn(), dispose: vi.fn() };
   });
   await applyEditorBrowserFrameSettings(options);
   expect(canvas.add).not.toHaveBeenCalled();
@@ -232,3 +230,124 @@ it.each([false, true])(
     expect(effects.commitHistory).toHaveBeenCalledOnce();
   }
 );
+
+it('preserves completed settings and geometry when header rendering fails', async () => {
+  const canvas = createCanvas([]);
+  const { options, effects } = createOptions(canvas);
+  mocks.readCurrentBrowserFrameSourceState.mockReturnValueOnce({
+    displayHeight: 300,
+    displayWidth: 400,
+    left: 10,
+    top: 40,
+  });
+  mocks.createBrowserFrameLayerObject.mockRejectedValueOnce(new Error('render failed'));
+  await expect(applyEditorBrowserFrameSettings(options)).rejects.toThrow('render failed');
+  expect(options.store.setBrowserFrame).not.toHaveBeenCalled();
+  expect(options.relayoutScene).not.toHaveBeenCalled();
+  expect(effects.commitHistory).not.toHaveBeenCalled();
+  expect(canvas.getObjects()).toEqual([]);
+});
+
+it.each(['add', 'remove'] as const)(
+  'rebuilds canvas-sized backgrounds before header %s commits',
+  async (operation) => {
+    const header = { sniptaleType: 'browser-frame', getScaledWidth: () => 400 };
+    const canvas = createCanvas(operation === 'remove' ? [header] : []);
+    const { options, effects } = createOptions(canvas);
+    mocks.readCurrentBrowserFrameSourceState.mockReturnValue({
+      displayHeight: 300,
+      displayWidth: 400,
+      left: 10,
+      top: 40,
+    });
+    mocks.createBrowserFrameLayerObject.mockResolvedValue({ setCoords: vi.fn(), dispose: vi.fn() });
+    const prepared = { apply: vi.fn(() => true), dispose: vi.fn() };
+    const prepareBackground = vi.fn(async () => prepared);
+    if (operation === 'add')
+      await applyEditorBrowserFrameSettings({ ...options, prepareBackground });
+    else await removeEditorBrowserFrameSettings({ ...options, prepareBackground });
+    expect(prepareBackground).toHaveBeenCalledOnce();
+    expect(prepared.apply).toHaveBeenCalledOnce();
+    expect(prepared.apply.mock.invocationCallOrder[0]).toBeLessThan(
+      effects.commitHistory.mock.invocationCallOrder[0]!
+    );
+  }
+);
+it.each(['add', 'remove'] as const)(
+  'preserves the existing composition when background preparation fails during header %s',
+  async (operation) => {
+    const header = { sniptaleType: 'browser-frame', getScaledWidth: () => 400 };
+    const canvas = createCanvas(operation === 'remove' ? [header] : []);
+    const { options, effects } = createOptions(canvas);
+    mocks.readCurrentBrowserFrameSourceState.mockReturnValue({
+      displayHeight: 300,
+      displayWidth: 400,
+      left: 10,
+      top: 40,
+    });
+    const prepareBackground = async () => {
+      throw new Error('Background decode failed');
+    };
+    const action =
+      operation === 'add' ? applyEditorBrowserFrameSettings : removeEditorBrowserFrameSettings;
+    await expect(action({ ...options, prepareBackground })).rejects.toThrow(
+      'Background decode failed'
+    );
+    expect(options.relayoutScene).not.toHaveBeenCalled();
+    expect(canvas.remove).not.toHaveBeenCalled();
+    expect(effects.commitHistory).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['add', 'remove'] as const)(
+  'disposes a background prepared for a stale header %s intent',
+  async (operation) => {
+    const canvas = createCanvas(operation === 'remove' ? [{ sniptaleType: 'browser-frame' }] : []);
+    const { options, effects } = createOptions(canvas);
+    mocks.readCurrentBrowserFrameSourceState.mockReturnValue({
+      displayHeight: 300,
+      displayWidth: 400,
+      left: 10,
+      top: 40,
+    });
+    const prepared = { apply: vi.fn(() => true), dispose: vi.fn() };
+    let complete!: (value: typeof prepared) => void;
+    let current = true;
+    const pendingBackground = new Promise<typeof prepared>((resolve) => {
+      complete = resolve;
+    });
+    const action =
+      operation === 'add' ? applyEditorBrowserFrameSettings : removeEditorBrowserFrameSettings;
+    const pending = action({
+      ...options,
+      isMutationCurrent: () => current,
+      prepareBackground: () => pendingBackground,
+    });
+    current = false;
+    complete(prepared);
+    await pending;
+    expect(prepared.dispose).toHaveBeenCalledOnce();
+    expect(prepared.apply).not.toHaveBeenCalled();
+    expect(options.relayoutScene).not.toHaveBeenCalled();
+    expect(canvas.remove).not.toHaveBeenCalled();
+    expect(effects.commitHistory).not.toHaveBeenCalled();
+  }
+);
+it('disposes a prepared background when header rendering fails', async () => {
+  const { options, effects } = createOptions(createCanvas([]));
+  mocks.readCurrentBrowserFrameSourceState.mockReturnValue({
+    displayHeight: 300,
+    displayWidth: 400,
+    left: 10,
+    top: 40,
+  });
+  mocks.createBrowserFrameLayerObject.mockRejectedValueOnce(new Error('Header decode failed'));
+  const prepared = { apply: vi.fn(() => true), dispose: vi.fn() };
+  await expect(
+    applyEditorBrowserFrameSettings({ ...options, prepareBackground: async () => prepared })
+  ).rejects.toThrow('Header decode failed');
+  expect(prepared.dispose).toHaveBeenCalledOnce();
+  expect(prepared.apply).not.toHaveBeenCalled();
+  expect(options.relayoutScene).not.toHaveBeenCalled();
+  expect(effects.commitHistory).not.toHaveBeenCalled();
+});

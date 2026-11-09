@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
+import { createRecordingEventSource } from './event-source';
 import { createInitialState } from './state';
 import { createTelemetryListeners, recordTelemetryPauseBoundary } from './events';
 
@@ -144,6 +145,24 @@ it('does not manufacture release or dwell across a lost observation boundary', (
   expect(state.signals.filter((signal) => signal.kind === 'cursor-idle')).toEqual([]);
 });
 
+it.each(['blur', 'pause', 'outside'] as const)(
+  'retains the last real pointer observation when %s occurs after silence',
+  (boundary) => {
+    const state = createInitialState();
+    state.segmentStartedAtTimestamp = 0;
+    const listeners = createTelemetryListeners(state);
+    listeners.pointerDown(pointer('pointerdown', 1000, 100, 100));
+    listeners.pointerMove(pointer('pointermove', 2000, 150, 100));
+    vi.spyOn(performance, 'now').mockReturnValue(30000);
+    if (boundary === 'blur') listeners.blur();
+    else if (boundary === 'pause') recordTelemetryPauseBoundary(state);
+    else listeners.pointerLeave(pointer('pointerout', 30000, 150, 100));
+    expect(state.actionEvents[0]?.data).toMatchObject({ completion: 'lost', lastObservedTime: 2 });
+    expect(state.actionEvents[0]?.data).not.toHaveProperty('upTime');
+    expect(state.actionEvents[0]?.data).not.toHaveProperty('pressDuration');
+  }
+);
+
 it('keeps native semantic completion after pointercancel without inventing physical up', () => {
   const state = createInitialState();
   const listeners = createTelemetryListeners(state);
@@ -243,4 +262,197 @@ it('does not manufacture a zero-time click from an event before the admitted rec
   listeners.pointerDown(pointer('pointerdown', 1000, 20, 30));
   listeners.pointerUp(pointer('pointerup', 1100, 20, 30));
   expect(state.actionEvents).toHaveLength(0);
+});
+
+function streamedPointer() {
+  const state = createInitialState();
+  state.segmentStartedAtTimestamp = 0;
+  const packets: import('../../../contracts/video/event-observations').RecordingEventObservationPacket[] =
+    [];
+  state.eventSource = createRecordingEventSource({
+    recordingId: 'recording',
+    project: (moment) => ({
+      activeTimeUs: Math.round(moment.observationTimeSeconds * 1000000),
+      clockRevision: 0,
+      clock: {
+        source: 'dom-event-time',
+        timestampQuantumUs: null,
+        resolutionBoundUs: null,
+        mappingUncertaintyUs: null,
+      },
+    }),
+    send: async (packet) => {
+      packets.push(structuredClone(packet));
+    },
+  });
+  return {
+    state,
+    listeners: createTelemetryListeners(state),
+    all: () => packets.flatMap((packet) => packet.records),
+    flush: () => state.eventSource!.flush(),
+  };
+}
+
+it('streams 5000 completed DOM clicks without retaining lifetime action history or target text', async () => {
+  const { state, listeners, all, flush } = streamedPointer();
+  const button = document.createElement('button');
+  button.textContent = 'private target description';
+  document.body.append(button);
+  for (let i = 0; i < 5000; i++) {
+    const time = 1000 + i * 10;
+    listeners.pointerDown(pointer('pointerdown', time, 20, 30, 0, button));
+    listeners.pointerUp(pointer('pointerup', time + 1, 20, 30, 0, button));
+    listeners.click(pointer('click', time + 1, 20, 30, 0, button));
+    if (i % 32 === 31) await flush();
+    expect(state.actionEvents).toHaveLength(0);
+    expect(state.releasedGestures.size).toBe(0);
+  }
+  recordTelemetryPauseBoundary(state, 52000, 'stop');
+  expect(await flush()).toBe(true);
+  const clicks = all().filter(
+    (record) => record.kind === 'action' && record.action.kind === 'CLICK'
+  );
+  expect(clicks).toHaveLength(5000);
+  expect(clicks[0]).toMatchObject({
+    action: {
+      label: 'Click',
+      timeUs: 1000000,
+      data: {
+        downTimeUs: 1000000,
+        upTimeUs: 1001000,
+        pressDurationUs: 1000,
+        completion: 'released',
+      },
+    },
+  });
+  expect(JSON.stringify(all())).not.toContain('private target description');
+  expect(all().at(-1)).toMatchObject({ kind: 'boundary', reason: 'stop' });
+});
+
+it(
+  'flushes a released gesture through a separate public-boundary recorder and never ' +
+    'stretches missing up',
+  async () => {
+    const { state, listeners, all, flush } = streamedPointer();
+    listeners.pointerDown(pointer('pointerdown', 1000, 20, 30));
+    listeners.pointerUp(pointer('pointerup', 1100, 20, 30));
+    listeners.pointerDown(pointer('pointerdown', 2000, 20, 30));
+    listeners.pointerMove(pointer('pointermove', 2500, 40, 30));
+    recordTelemetryPauseBoundary(state, 9000, 'stop');
+    await flush();
+    const clicks = all().filter(
+      (record) => record.kind === 'action' && record.action.kind === 'CLICK'
+    );
+    expect(clicks).toHaveLength(2);
+    expect(clicks[0]).toMatchObject({
+      action: { data: { completion: 'released', upTimeUs: 1100000 } },
+    });
+    expect(clicks[1]).toMatchObject({
+      action: {
+        data: {
+          completion: 'lost',
+          upTimeUs: null,
+          pressDurationUs: null,
+          lastObservedTimeUs: 2500000,
+          gestureType: 'drag',
+        },
+      },
+    });
+    expect(state.releasedGestures.size).toBe(0);
+  }
+);
+
+it(
+  'retains semantic double-click count and anonymous keyboard activation without ' +
+    'inventing physical edges',
+  async () => {
+    const { listeners, all, flush } = streamedPointer();
+    listeners.pointerDown(pointer('pointerdown', 1000, 20, 30));
+    listeners.pointerUp(pointer('pointerup', 1100, 20, 30));
+    const double = new MouseEvent('click', { detail: 2, clientX: 20, clientY: 30 });
+    Object.defineProperty(double, 'timeStamp', { value: 1100 });
+    listeners.click(trusted(double));
+    const activation = new MouseEvent('click', { detail: 0 });
+    Object.defineProperty(activation, 'timeStamp', { value: 2000 });
+    listeners.click(trusted(activation));
+    await flush();
+    expect(all().filter((record) => record.kind === 'action')).toMatchObject([
+      { action: { data: { clickCount: 2, downTimeUs: 1000000, upTimeUs: 1100000 } } },
+      {
+        action: {
+          point: null,
+          data: {
+            completion: 'semantic',
+            downTimeUs: null,
+            upTimeUs: null,
+            pressDurationUs: null,
+            semanticEndTimeUs: 2000000,
+          },
+        },
+      },
+    ]);
+  }
+);
+
+it('retains actual wheel deltas and scroll offsets as separate source facts', async () => {
+  const { state, listeners, all, flush } = streamedPointer();
+  listeners.wheel(
+    trusted(
+      new WheelEvent('wheel', { deltaX: -3.5, deltaY: 120, deltaZ: 2, deltaMode: 1, ctrlKey: true })
+    )
+  );
+  listeners.scroll(trusted(new Event('scroll')));
+  await flush();
+  expect(all().filter((record) => record.kind === 'action')).toMatchObject([
+    {
+      action: {
+        kind: 'SCROLL',
+        data: {
+          eventType: 'wheel',
+          deltaX: -3.5,
+          deltaY: 120,
+          deltaZ: 2,
+          deltaMode: 1,
+          scrollX: null,
+          scrollY: null,
+          ctrlKey: true,
+        },
+      },
+    },
+    {
+      action: {
+        kind: 'SCROLL',
+        data: {
+          eventType: 'scroll',
+          deltaX: null,
+          deltaY: null,
+          deltaZ: null,
+          deltaMode: null,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+          ctrlKey: null,
+        },
+      },
+    },
+  ]);
+  expect(state.actionEvents).toHaveLength(0);
+});
+
+it('does not infer an up point when geometry changed during the gesture and later changed back', async () => {
+  const { state, listeners, all, flush } = streamedPointer();
+  const originalWidth = window.innerWidth;
+  listeners.pointerDown(pointer('pointerdown', 1000, 20, 30));
+  vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(originalWidth + 100);
+  listeners.pointerUp(pointer('pointerup', 1100, 40, 30));
+  vi.mocked(Object.getOwnPropertyDescriptor(window, 'innerWidth')!.get!).mockReturnValue(
+    originalWidth
+  );
+  recordTelemetryPauseBoundary(state, 2000, 'stop');
+  await flush();
+  expect(all().find((record) => record.kind === 'action')).toMatchObject({
+    action: {
+      point: { x: 20 / originalWidth, y: 30 / window.innerHeight },
+      data: { upTimeUs: 1100000, upPoint: null },
+    },
+  });
 });

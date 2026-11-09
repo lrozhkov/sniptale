@@ -21,7 +21,7 @@ export interface SaveScenarioProjectOptions {
   historyActionId?: string;
 }
 
-/** Publishes through the aggregate owner and returns its exact committed project/revision pair. */
+/** Returns the aggregate owner ACK, including an optional transient checkpoint receipt. */
 export async function saveScenarioProject(
   project: GuideProject,
   options: SaveScenarioProjectOptions = {}

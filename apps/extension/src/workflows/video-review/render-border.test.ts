@@ -49,7 +49,11 @@ function compositor() {
   vi.stubGlobal(
     'Path2D',
     class {
-      constructor(public path: string) {}
+      constructor(public path?: string) {}
+      rect() {}
+      moveTo() {}
+      lineTo() {}
+      closePath() {}
     }
   );
   return { destination, layer, mask, createElement };
@@ -322,4 +326,289 @@ it('rasterizes transformed border and reveal paths once in destination device pi
   expect(layer.context.setTransform).toHaveBeenCalledWith(transform);
   expect(mask.context.setTransform).toHaveBeenCalledWith(transform);
   expect(destination.context.setTransform).toHaveBeenCalledWith(1, 0, 0, 1, 0, 0);
+});
+
+it.each(['solid', 'dashed', 'dotted'] as const)(
+  'paints a complete %s contour without full-frame compositor surfaces',
+  (style) => {
+    const p = managedCompositor();
+    const context = {
+      ...p.destination.context,
+      filter: 'none',
+      canvas: output,
+      shadowColor: 'rgba(0, 0, 0, 0)',
+      rect: vi.fn(),
+      getTransform: () => ({ isIdentity: true }),
+    };
+    drawSceneBorders(target(context), output, [{ ...frame, style }], undefined, p.resources);
+    expect(p.canvas).not.toHaveBeenCalled();
+    expect(p.createElement).not.toHaveBeenCalled();
+    expect(context.stroke).toHaveBeenCalledOnce();
+    expect(context.drawImage).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  'filter',
+  'shadow',
+  'composite',
+  'explicit-transform',
+  'inherited-transform',
+  'smaller-output',
+  'shorter-output',
+  'reveal',
+] as const)('retains the isolated compositor for %s', (mode) => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    rect: vi.fn(),
+    getTransform: () => ({ isIdentity: mode !== 'inherited-transform' }),
+  };
+  if (mode === 'filter') context.filter = 'blur(2px)';
+  if (mode === 'shadow') context.shadowColor = '#000000';
+  if (mode === 'composite') context.globalCompositeOperation = 'xor';
+  if (mode === 'smaller-output') context.canvas = { width: 240, height: 160 };
+  if (mode === 'shorter-output') context.canvas = { width: 120, height: 160 };
+  drawSceneBorders(
+    target(context),
+    output,
+    [{ ...frame, style: 'dashed', end: mode === 'reveal' ? 0.5 : 1 }],
+    undefined,
+    p.resources,
+    mode === 'explicit-transform' ? {} : undefined
+  );
+  expect(p.canvas).toHaveBeenCalledTimes(2);
+  expect(p.layerRelease).toHaveBeenCalledOnce();
+  expect(p.maskRelease).toHaveBeenCalledOnce();
+});
+
+it('restores the destination when a direct stroke fails without acquiring resources', () => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    rect: vi.fn(),
+    getTransform: () => ({ isIdentity: true }),
+  };
+  context.stroke.mockImplementation(() => {
+    throw new Error('stroke refused');
+  });
+  expect(() => drawSceneBorders(target(context), output, [frame], undefined, p.resources)).toThrow(
+    'stroke refused'
+  );
+  expect(context.restore).toHaveBeenCalledOnce();
+  expect(p.canvas).not.toHaveBeenCalled();
+});
+
+it('clips visible direct strokes and applies caller opacity without painting invisible frames', () => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    getTransform: () => ({ isIdentity: true }),
+  };
+  context.globalAlpha = 0.25;
+  const alphas: number[] = [];
+  context.stroke.mockImplementation(() => {
+    alphas.push(context.globalAlpha);
+  });
+  drawSceneBorders(
+    target(context),
+    output,
+    [
+      { ...frame, opacity: 0 },
+      { ...frame, opacity: 0.4 },
+      { ...frame, opacity: 0.8 },
+    ],
+    { rect: { x: 20, y: 10, width: 80, height: 60 }, radius: 8 },
+    p.resources
+  );
+  expect(alphas).toEqual([0.1, 0.2]);
+  expect(context.roundRect).toHaveBeenCalledWith(20, 10, 80, 60, 8);
+  expect(context.clip).toHaveBeenCalledOnce();
+  expect(context.restore).toHaveBeenCalledOnce();
+  expect(p.canvas).not.toHaveBeenCalled();
+});
+
+it('bounds masked animated borders to their stroked areas instead of the full output', () => {
+  const p = managedCompositor();
+  const size = { width: 1920, height: 1080 };
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: size,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    getTransform: () => ({ isIdentity: true }),
+  };
+  const bounded = {
+    ...frame,
+    style: 'dotted' as const,
+    end: 0.35,
+    bounds: { x: 100, y: 100, width: 300, height: 200 },
+  };
+  drawSceneBorders(
+    target(context),
+    size,
+    [bounded, { ...bounded, id: 'next', bounds: { ...bounded.bounds, x: 800 } }],
+    undefined,
+    p.resources
+  );
+  for (const [, backing] of p.canvas.mock.calls) {
+    expect(backing.width).toBeLessThan(400);
+    expect(backing.height).toBeLessThan(300);
+  }
+  expect(p.layer.context.setTransform).toHaveBeenCalledWith(
+    expect.objectContaining({ e: -78, f: -78 })
+  );
+  expect(context.drawImage).toHaveBeenNthCalledWith(1, p.layer.canvas, 78, 78);
+  expect(context.drawImage).toHaveBeenNthCalledWith(2, p.layer.canvas, 778, 78);
+  expect(p.layerRelease).toHaveBeenCalledOnce();
+  expect(p.maskRelease).toHaveBeenCalledOnce();
+});
+
+it('paints solid draw transitions directly without a reveal mask or layer', () => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    getTransform: () => ({ isIdentity: true }),
+  };
+  drawSceneBorders(
+    target(context),
+    output,
+    [
+      { ...frame, start: 0.9, end: 1.15 },
+      { ...frame, start: 0.7, end: 0.2 },
+    ],
+    undefined,
+    p.resources
+  );
+  expect(p.canvas).not.toHaveBeenCalled();
+  expect(context.stroke).toHaveBeenCalledOnce();
+  expect(context.lineCap).toBe('round');
+  expect(context.lineDashOffset).toBe(-288);
+});
+
+it.each(['unknown', 'crossing', 'inside'] as const)(
+  'isolates a solid reveal unless its stroked bounds fit the rounded clip: %s',
+  (mode) => {
+    const isolated = mode !== 'inside';
+    const p = managedCompositor();
+    const size = { width: 1920, height: 1080 };
+    const context = {
+      ...p.destination.context,
+      filter: 'none',
+      canvas: size,
+      shadowColor: 'rgba(0, 0, 0, 0)',
+      getTransform: () => ({ isIdentity: true }),
+    };
+    drawSceneBorders(
+      target(context),
+      size,
+      [
+        {
+          ...frame,
+          start: 0.9,
+          end: 1.15,
+          ...(mode === 'unknown'
+            ? {}
+            : { bounds: { x: mode === 'crossing' ? 1 : 100, y: 100, width: 300, height: 200 } }),
+        },
+      ],
+      { rect: { x: 0, y: 0, ...size }, radius: 8 },
+      p.resources
+    );
+    expect(p.canvas).toHaveBeenCalledTimes(isolated ? 2 : 0);
+    expect(context.stroke).toHaveBeenCalledTimes(isolated ? 0 : 1);
+  }
+);
+
+it('paints an admitted moving dashed contour without bitmap surfaces', () => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    getTransform: () => ({ isIdentity: true }),
+  };
+  drawSceneBorders(
+    target(context),
+    output,
+    [
+      {
+        ...frame,
+        style: 'dashed',
+        start: 0.9,
+        end: 1.15,
+        dashOffset: -17,
+        revealCaps: [
+          { x: 30, y: 10, dx: -1, dy: 0 },
+          { x: 70, y: 70, dx: -1, dy: 0 },
+        ],
+        bounds: { x: 10, y: 10, width: 100, height: 60 },
+      },
+    ],
+    undefined,
+    p.resources
+  );
+  expect(p.canvas).not.toHaveBeenCalled();
+  expect(context.stroke).toHaveBeenCalledOnce();
+});
+
+it('preserves layer order and inherited opacity when direct and masked borders overlap', () => {
+  const p = managedCompositor();
+  const context = {
+    ...p.destination.context,
+    globalAlpha: 0.25,
+    filter: 'none',
+    canvas: output,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    getTransform: () => ({ isIdentity: true }),
+  };
+  const operations: { kind: string; alpha: number }[] = [];
+  context.stroke.mockImplementation(() => {
+    operations.push({ kind: 'direct', alpha: context.globalAlpha });
+  });
+  context.drawImage.mockImplementation(() => {
+    operations.push({ kind: 'masked', alpha: context.globalAlpha });
+  });
+  const bounds = { x: 10, y: 10, width: 100, height: 60 };
+  drawSceneBorders(
+    target(context),
+    output,
+    [
+      {
+        ...frame,
+        style: 'dashed',
+        bounds,
+        revealCaps: [
+          { x: 30, y: 10, dx: -1, dy: 0 },
+          { x: 70, y: 70, dx: -1, dy: 0 },
+        ],
+        end: 0.5,
+        opacity: 0.4,
+      },
+      { ...frame, style: 'dotted', bounds, end: 0.5, opacity: 0.8 },
+      { ...frame, bounds, opacity: 0.6 },
+    ],
+    undefined,
+    p.resources
+  );
+  expect(operations).toEqual([
+    { kind: 'direct', alpha: 0.1 },
+    { kind: 'masked', alpha: 0.2 },
+    { kind: 'direct', alpha: 0.15 },
+  ]);
+  expect(p.layerRelease).toHaveBeenCalledOnce();
+  expect(p.maskRelease).toHaveBeenCalledOnce();
 });

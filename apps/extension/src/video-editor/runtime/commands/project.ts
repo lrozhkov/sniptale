@@ -10,34 +10,61 @@ import {
 import { toErrorMessage } from './helpers';
 import type { ProjectHandlerPort, VideoEditorActionHandlers } from './types';
 import type { VideoEditorConfirmDialogState } from '../controller/workspace-state';
-import { waitForVideoEditorSave } from '../session/save-readiness';
+import {
+  prepareVideoEditorCheckpointExit,
+  type VideoEditorCheckpointExit,
+} from '../session/save-readiness';
+import { createSyncProductClient } from '../../../platform/runtime-messaging/sync-product-client';
 import { beginProjectTransition } from './project-transition';
 
 const logger = createLogger({ namespace: 'VideoEditorProjects' });
 
-export async function loadProjectWorkspace(
-  projectId: string,
-  port: ProjectHandlerPort
+async function prepareProjectExit(projectId: string): Promise<VideoEditorCheckpointExit> {
+  const witness = await prepareVideoEditorCheckpointExit(projectId);
+  if (witness.isCurrent() && witness.receipt) {
+    try {
+      await createSyncProductClient().requestCheckpointExit(witness.receipt);
+    } catch {
+      // The saved pending checkpoint retains its original durable deadline.
+    }
+  }
+  return witness;
+}
+
+async function withProjectTransition(
+  port: ProjectHandlerPort,
+  operation: (
+    isCurrent: () => boolean,
+    currentProject: ReturnType<ProjectHandlerPort['getCurrentProject']>
+  ) => Promise<void>
 ): Promise<void> {
   const transition = beginProjectTransition();
   try {
     const currentProject = port.getCurrentProject();
     if (currentProject && port.beforeLeave && !(await port.beforeLeave())) return;
     if (!transition.isCurrent()) return;
-    if (currentProject && currentProject.id !== projectId) {
-      await waitForVideoEditorSave(currentProject.id);
-      if (!transition.isCurrent()) return;
-    }
+    const exit = currentProject ? await prepareProjectExit(currentProject.id) : null;
+    const isCurrent = () => transition.isCurrent() && (!exit || exit.isCurrent());
+    if (!isCurrent()) return;
+    await operation(isCurrent, currentProject);
+  } finally {
+    transition.complete();
+  }
+}
+
+export async function loadProjectWorkspace(
+  projectId: string,
+  port: ProjectHandlerPort
+): Promise<void> {
+  return withProjectTransition(port, async (isCurrent) => {
     const project = await openPersistedProject(projectId);
-    if (!transition.isCurrent()) return;
+    if (!isCurrent()) return;
     port.applyLoadedProject(project, project.baseRecordingId);
     await Promise.all([
       port.libraries.refreshProjects(),
       port.libraries.refreshProjectExports(project.id),
     ]);
-  } finally {
-    transition.complete();
-  }
+  });
 }
 
 export async function createProjectWorkspace(
@@ -48,15 +75,7 @@ export async function createProjectWorkspace(
   const projectName = name?.trim();
   if (name !== undefined && !projectName)
     throw new Error(translate('videoEditor.app.projectNameRequired'));
-  const transition = beginProjectTransition();
-  try {
-    const currentProject = port.getCurrentProject();
-    if (currentProject && port.beforeLeave && !(await port.beforeLeave())) return;
-    if (!transition.isCurrent()) return;
-    if (currentProject) {
-      await waitForVideoEditorSave(currentProject.id);
-      if (!transition.isCurrent()) return;
-    }
+  return withProjectTransition(port, async (isCurrent, currentProject) => {
     const source = port.getCurrentProject();
     if (copyCurrent && (!source || source.id !== currentProject?.id)) {
       throw new Error(translate('common.errors.actionFailed'));
@@ -65,7 +84,7 @@ export async function createProjectWorkspace(
       copyCurrent && source
         ? await copyProject(source, projectName ?? source.name)
         : await createBlankProject(projectName);
-    if (!transition.isCurrent()) return;
+    if (!isCurrent()) return;
     port.applyLoadedProject(project, project.baseRecordingId);
     const refreshes = await Promise.allSettled([
       port.libraries.refreshProjects(),
@@ -75,9 +94,7 @@ export async function createProjectWorkspace(
       if (refresh.status === 'rejected')
         logger.warn('Project created, library refresh failed', refresh.reason);
     }
-  } finally {
-    transition.complete();
-  }
+  });
 }
 
 export async function deleteProjectWorkspace(

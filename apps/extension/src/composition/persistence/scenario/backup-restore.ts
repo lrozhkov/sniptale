@@ -1,8 +1,9 @@
+import { readScenarioVideoDependencyRows } from '../media-library/deletion-index';
 import type { IDBPTransaction } from 'idb';
 import { promoteScenarioSourceLifecycles } from './library-publication';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import { detachScenarioVideoAssets } from './video-asset-detachment';
-import { MEDIA_LIBRARY_STORE, VIDEO_PROJECTS_STORE } from '../infrastructure/indexed-db/core';
+import { MEDIA_LIBRARY_STORE } from '../infrastructure/indexed-db/core';
 import { parseVideoDependencyEnvelope } from '../media-library/dependencies';
 import { parseAssetOwner, parseAssetRef } from '../assets/guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -106,7 +107,12 @@ async function deleteExisting(args: {
     const oldChildren = new Map(
       assets.flatMap((asset) => (asset ? [[asset.id, asset] as const] : []))
     );
-    for (const raw of await args.tx.objectStore(VIDEO_PROJECTS_STORE).getAll()) {
+    for (const raw of await readScenarioVideoDependencyRows(
+      args.tx,
+      args.projectId,
+      new Set(oldChildren.keys()),
+      false
+    )) {
       const envelope = parseVideoDependencyEnvelope(raw);
       if (!envelope)
         throw new Error('Scenario replacement cannot check related video project dependencies.');

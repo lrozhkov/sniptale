@@ -1,4 +1,5 @@
 import { ActiveSelection, type Canvas, type FabricObject } from 'fabric';
+import { resolveUpdatedQuickObject } from '../../../../features/drawing/public';
 import type { EditorObjectType } from '../../../../features/editor/document/types';
 import type { EditorToolSettings } from '../../../../features/editor/document/tool-settings-types';
 import {
@@ -14,20 +15,14 @@ import { applyImageLayerSettings } from './image';
 
 function applyDrawingSettings(object: FabricObject, settings: EditorToolSettings): FabricObject {
   const drawing = readEditorDrawingObject(object);
-  if (!drawing || drawing.kind === 'blur') return object;
+  if (!drawing || drawing.kind === 'blur' || drawing.kind === 'simplify') return object;
   let nextDrawing: Exclude<typeof drawing, { kind: 'blur' }>;
   if (drawing.kind === 'pencil') {
     nextDrawing = { ...drawing, ...settings.pencil };
   } else if (drawing.kind === 'marker') {
     nextDrawing = { ...drawing, ...settings.marker };
   } else if (drawing.kind === 'arrow') {
-    nextDrawing = {
-      ...drawing,
-      color: settings.arrow.color,
-      design: settings.arrow.design,
-      dynamicWidth: settings.arrow.dynamicWidth,
-      width: settings.arrow.width,
-    };
+    nextDrawing = resolveUpdatedQuickObject(drawing, settings.arrow);
   } else if (drawing.kind === 'text') {
     nextDrawing = { ...drawing, ...settings.text };
   } else {
@@ -82,6 +77,8 @@ export function applySelectionToolSettingsToObjects(
   prepareObject: (object: FabricObject) => void = () => undefined
 ): void {
   switch (selectedType) {
+    case 'simplify':
+      return;
     case 'transparent-base':
     case 'browser-frame':
     case 'frame-annotation':

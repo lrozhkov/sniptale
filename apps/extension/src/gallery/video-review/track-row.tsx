@@ -20,6 +20,7 @@ type ReviewTrackControlsState = {
   ui: QuickEditUiState;
   configuring: boolean;
   selectedTrack?: QuickEditTrack | null;
+  selectable?: Partial<Record<QuickEditTrack, boolean>>;
   selectTrack?(track: QuickEditTrack): void;
   busy: boolean;
   unavailable: Partial<Record<QuickEditTrack, boolean>>;
@@ -92,7 +93,27 @@ export function ReviewTrackRow(props: TrackRowProps) {
       ].join(' ')}
     >
       {placement.header ? createPortal(header, placement.header) : header}
-      <div data-review-track-content className="relative min-w-0">
+      <div
+        data-review-track-content
+        className="relative min-w-0"
+        onPointerDownCapture={(event) => {
+          if (
+            !track ||
+            (!enabled && !controls?.selectable?.[track]) ||
+            controls?.busy ||
+            event.button !== 0
+          )
+            return;
+          if (
+            !(event.target instanceof Element) ||
+            event.target.closest(
+              'button,input,select,textarea,a,[role="button"],[data-audio-id],[data-text-id],[data-review-removal-key]'
+            )
+          )
+            return;
+          controls?.selectTrack?.(track);
+        }}
+      >
         {props.children}
       </div>
     </div>
@@ -151,7 +172,7 @@ function ReviewTrackHeader({
           type="button"
           data-review-track-select
           aria-pressed={controls.selectedTrack === track}
-          disabled={!enabled || controls.busy}
+          disabled={(!enabled && !controls.selectable?.[track]) || controls.busy}
           className="review-track-select flex min-w-0 flex-1 items-center gap-1 text-left"
           title={props.label}
           onClick={() => controls.selectTrack?.(track)}

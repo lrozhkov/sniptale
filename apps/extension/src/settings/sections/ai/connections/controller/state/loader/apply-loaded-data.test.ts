@@ -30,12 +30,6 @@ const MODELS: AIModel[] = [
   },
 ];
 
-const SECRET_PROTECTION_STATUS = {
-  isEnabled: true,
-  isUnlocked: false,
-  mode: 'passphrase' as const,
-};
-
 const LOADED_RUNTIME_DATA: LoadedAiProvidersRuntimeData = [
   [PROVIDER],
   MODELS,
@@ -44,7 +38,6 @@ const LOADED_RUNTIME_DATA: LoadedAiProvidersRuntimeData = [
   'Global',
   'Scenario',
   true,
-  SECRET_PROTECTION_STATUS,
 ];
 
 it('applies loaded runtime data to the ai providers state setters', () => {
@@ -52,7 +45,6 @@ it('applies loaded runtime data to the ai providers state setters', () => {
   const setModels = vi.fn();
   const setProviders = vi.fn();
   const setSelectionState = vi.fn();
-  const setSecretProtectionStatus = vi.fn();
 
   const result = applyLoadedAiProvidersRuntimeData(
     {
@@ -60,7 +52,6 @@ it('applies loaded runtime data to the ai providers state setters', () => {
       setModels,
       setProviders,
       setSelectionState,
-      setSecretProtectionStatus,
     },
     LOADED_RUNTIME_DATA
   );
@@ -75,5 +66,4 @@ it('applies loaded runtime data to the ai providers state setters', () => {
     providers: [PROVIDER],
   });
   expect(setChromeAiEnabled).toHaveBeenCalledWith(true);
-  expect(setSecretProtectionStatus).toHaveBeenCalledWith(SECRET_PROTECTION_STATUS);
 });

@@ -7,22 +7,31 @@ import {
 export const MEDIA_HUB_BACKUP_LAYOUT = 'library-folders-v1';
 export const MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT = 'library-folders-v2';
 export const MEDIA_HUB_BACKUP_SHARED_LAYOUT = 'library-folders-v3';
-export const MEDIA_HUB_BACKUP_PROJECT_LAYOUT = 'library-folders-v4';
+const MEDIA_HUB_BACKUP_PROJECT_LAYOUT = 'library-folders-v4';
+export const MEDIA_HUB_BACKUP_CURSOR_LAYOUT = 'library-folders-v5';
 export type MediaHubBackupLayout =
   | typeof MEDIA_HUB_BACKUP_LAYOUT
   | typeof MEDIA_HUB_BACKUP_PAYLOAD_LAYOUT
   | typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT
-  | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT;
+  | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT;
 
-/** Both admitted shared layouts use the same byte and alias resource profile. */
+/** Admitted shared layouts use the same byte and alias resource profile. */
 export function isSharedBackupLayout(
   value: unknown
-): value is typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT {
-  return value === MEDIA_HUB_BACKUP_SHARED_LAYOUT || value === MEDIA_HUB_BACKUP_PROJECT_LAYOUT;
+): value is
+  | typeof MEDIA_HUB_BACKUP_SHARED_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_PROJECT_LAYOUT
+  | typeof MEDIA_HUB_BACKUP_CURSOR_LAYOUT {
+  return (
+    value === MEDIA_HUB_BACKUP_SHARED_LAYOUT ||
+    value === MEDIA_HUB_BACKUP_PROJECT_LAYOUT ||
+    value === MEDIA_HUB_BACKUP_CURSOR_LAYOUT
+  );
 }
 
 /** Checks admitted JSON inventory, including reviews nested in montage resources. */
-export function hasReviewProjectMetadata(value: unknown): boolean {
+function hasReviewProjectMetadata(value: unknown): boolean {
   if (Array.isArray(value)) return value.some(hasReviewProjectMetadata);
   if (!isRecord(value)) return false;
   const review = value['videoReview'];
@@ -33,8 +42,39 @@ export function hasReviewProjectMetadata(value: unknown): boolean {
 
 /** Legacy layouts cannot carry the new authoritative project contract. */
 export function assertReviewProjectLayout(value: unknown, layout: MediaHubBackupLayout): void {
-  if (layout !== MEDIA_HUB_BACKUP_PROJECT_LAYOUT && hasReviewProjectMetadata(value))
+  if (
+    layout !== MEDIA_HUB_BACKUP_PROJECT_LAYOUT &&
+    layout !== MEDIA_HUB_BACKUP_CURSOR_LAYOUT &&
+    hasReviewProjectMetadata(value)
+  )
     throw new Error('Review project metadata requires library-folders-v4.');
+}
+
+/** Only root-owned attachment fields select the cursor layout. Authored JSON is not a capability marker. */
+export function hasCursorAttachmentMetadata(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (Object.hasOwn(value, 'cursorAttachments') ||
+      (isRecord(value['recording']) &&
+        (Object.hasOwn(value['recording'], 'cursorAttachment') ||
+          Object.hasOwn(value['recording'], 'eventsAttachment'))))
+  );
+}
+
+/** An older layout cannot silently discard root-owned capture history. */
+export function assertCursorAttachmentLayout(value: unknown, layout: MediaHubBackupLayout): void {
+  if (layout !== MEDIA_HUB_BACKUP_CURSOR_LAYOUT && hasCursorAttachmentMetadata(value))
+    throw new Error('Recording history attachments require library-folders-v5.');
+}
+
+/** Selects the required writer layout without downgrading an already selected newer contract. */
+export function resolveMediaHubBackupMetadataLayout(
+  layout: MediaHubBackupLayout,
+  value: unknown
+): MediaHubBackupLayout {
+  if (layout === MEDIA_HUB_BACKUP_CURSOR_LAYOUT || hasCursorAttachmentMetadata(value))
+    return MEDIA_HUB_BACKUP_CURSOR_LAYOUT;
+  return hasReviewProjectMetadata(value) ? MEDIA_HUB_BACKUP_PROJECT_LAYOUT : layout;
 }
 export const MANIFEST_PATH = '_sniptale/manifest.json';
 export const CATALOG_ROOT = '_sniptale/catalog';

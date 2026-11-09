@@ -1,20 +1,15 @@
 // @vitest-environment jsdom
-import { createGradientPaint } from '@sniptale/foundation/paint';
-import { createCanvasComment } from '../../features/video/review/comments';
+import { calculateSpatialRenderAllocations } from './spatial-render-allocation';
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
-import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { expect, it, vi } from 'vitest';
 import {
   calculatePreviewRenderAllocation,
   calculatePreviewPreparationAllocation,
-  resolvePreviewRenderAllocation,
-  type PreviewRuntimeAllocationInput,
   type PreviewPreparationAllocationInput,
   type PreviewRenderAllocationInput,
 } from './preview-render-allocation';
 import { createPreviewRenderResources } from './preview-render-resources';
+import { createSceneSpotlightMasks } from '../../features/video/composition/draw/spotlight';
 
 const size = { width: 10, height: 10 };
 function input(): PreviewRenderAllocationInput {
@@ -105,6 +100,74 @@ it('counts exactly front, staging and frozen source without an arbitrary reserve
   expect(plan.maximumCanvases).toBe(3);
 });
 
+it('charges direct GPU front and two staging canvases at eight bytes per pixel', () => {
+  const graph = input();
+  graph.publication.outputKind = 'gpu-surface';
+  graph.publication.maximumInFlight = 2;
+  const plan = calculatePreviewRenderAllocation(graph);
+  expect(
+    phase(plan, 'scene').allocations.filter((value) => value.role.startsWith('publication-'))
+  ).toEqual([
+    { role: 'publication-front', bytes: 800, canvases: 1 },
+    { role: 'publication-staging', bytes: 800, canvases: 1 },
+    { role: 'publication-staging', bytes: 800, canvases: 1 },
+  ]);
+  expect(plan.maximumManagedBytes).toBe(2800);
+  expect(plan.maximumCanvases).toBe(4);
+});
+
+it('keeps the actual old GPU front and adds retired provider storage exactly once', () => {
+  const graph = input();
+  graph.publication.previousFront = { width: 5, height: 5 };
+  graph.publication.previousFrontKind = 'gpu-surface';
+  graph.publication.previousProviderBytes = 1100;
+  graph.publication.maximumInFlight = 2;
+  const plan = calculatePreviewRenderAllocation(graph);
+  expect(phase(plan, 'scene').allocations.slice(0, 2)).toEqual([
+    { role: 'publication-front', bytes: 200, canvases: 1 },
+    { role: 'publication-retired-provider', bytes: 900, canvases: 0 },
+  ]);
+  expect(plan.maximumManagedBytes).toBe(2300);
+  expect(phase(plan, 'prepare-header').bytes).toBe(1100);
+  graph.publication.previousProviderBytes = 0;
+  expect(calculatePreviewRenderAllocation(graph).maximumManagedBytes).toBe(1400);
+});
+
+it('retains a 2D front at its own size while the next GPU output is prepared', () => {
+  const graph = input();
+  graph.publication.outputKind = 'gpu-surface';
+  graph.publication.maximumInFlight = 2;
+  graph.publication.previousFront = { width: 5, height: 5 };
+  expect(calculatePreviewRenderAllocation(graph).maximumManagedBytes).toBe(2100);
+});
+
+it.each([NaN, -1, Infinity, 0.5, 199])(
+  'rejects invalid retained GPU provider storage %s',
+  (count) => {
+    const graph = input();
+    graph.publication.previousFront = { width: 5, height: 5 };
+    graph.publication.previousFrontKind = 'gpu-surface';
+    graph.publication.previousProviderBytes = count;
+    expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  }
+);
+
+it('rejects orphan provider bytes, invalid GPU dimensions and overflowing totals', () => {
+  const graph = input();
+  graph.publication.previousProviderBytes = 800;
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  graph.publication.previousFront = size;
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  graph.publication.previousFrontKind = 'gpu-surface';
+  graph.publication.previousProviderBytes = Number.MAX_SAFE_INTEGER;
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  graph.publication.previousProviderBytes = 0;
+  graph.publication.previousFront = { width: 0, height: 10 };
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+  graph.publication.previousFront = { width: Number.MAX_SAFE_INTEGER, height: 1 };
+  expect(() => calculatePreviewRenderAllocation(graph)).toThrow('Invalid preview allocation');
+});
+
 it('charges immutable annotations during preparation and all planned outputs through every composition phase', () => {
   const graph = input();
   graph.assets.annotationSourceBytes = 123;
@@ -172,7 +235,7 @@ it.each([false, true])('uses actual odd spatial levels with half-float=%s', (hal
   expect(plan.maximumCanvases).toBe(6);
 });
 
-it('accounts minimum one-pixel spotlight tiles and their prefix array', () => {
+it('accounts minimum spotlight tiles, prefix, group indices and references', () => {
   const graph = input();
   graph.scene.spotlight = {
     backing: { width: 1, height: 1 },
@@ -181,7 +244,7 @@ it('accounts minimum one-pixel spotlight tiles and their prefix array', () => {
     fastPath: false,
   };
   const plan = calculatePreviewRenderAllocation(graph);
-  expect(phase(plan, 'spotlight-coverage').bytes).toBe(1200 + 8 + 4 + 22 * 4 + 11 * 8);
+  expect(phase(plan, 'spotlight-coverage').bytes).toBe(1200 + 8 + 4 + 22 * 4 + 31 * 8);
 });
 
 it('counts the full spotlight path surface while bounding only coverage readback tiles', () => {
@@ -302,6 +365,24 @@ function discovery(): PreviewPreparationAllocationInput {
   };
 }
 
+it('retains GPU front and retired provider during discovery without a second front charge', () => {
+  const preparing = discovery();
+  preparing.previousFront = { width: 5, height: 5 };
+  preparing.previousFrontKind = 'gpu-surface';
+  preparing.previousProviderBytes = 1100;
+  const plan = calculatePreviewPreparationAllocation(preparing);
+  expect(plan.maximumManagedBytes).toBe(1100);
+  expect(plan.maximumCanvases).toBe(1);
+  expect(plan.phases[0]?.allocations).toEqual([
+    { role: 'publication-front', bytes: 200, canvases: 1 },
+    { role: 'publication-retired-provider', bytes: 900, canvases: 0 },
+  ]);
+  preparing.previousProviderBytes = 199;
+  expect(() => calculatePreviewPreparationAllocation(preparing)).toThrow(
+    'Invalid preview allocation'
+  );
+});
+
 it('reports zero actual storage for empty discovery despite constructor control minimums', () => {
   const plan = calculatePreviewPreparationAllocation(discovery());
   expect(plan.maximumManagedBytes).toBe(1);
@@ -352,128 +433,6 @@ it('rejects unknown-sized or invalid decoded payloads before discovery admission
   expect(() => calculatePreviewPreparationAllocation(input)).toThrow('Invalid preview allocation');
 });
 
-function runtimeInput(): PreviewRuntimeAllocationInput {
-  return {
-    scene: {
-      source: { width: 1920, height: 1080 },
-      background: { enabled: false },
-      zoomRegions: [],
-      comments: [],
-      keys: [],
-      clicks: [],
-    },
-    dimensions: { canonical: { width: 1920, height: 1080 }, backing: { width: 640, height: 360 } },
-    sourceTime: 1,
-    resultTime: 1,
-    sourceAllocationBytes: null,
-    sourceBacking: { width: 640, height: 360 },
-    camera: { retainedBytes: null, activeBytes: null },
-    transitionBytes: null,
-    previousFront: null,
-    assets: {
-      backgroundBitmap: null,
-      headerBitmap: null,
-      watermark: null,
-      previousWatermarkCache: null,
-    },
-  };
-}
-
-it('reserves no spatial surfaces for neutral enabled poses and admits an actual rotation', () => {
-  const runtime = runtimeInput();
-  const region = {
-    ...createQuickEditZoomRegion({ id: 'neutral', at: 0 }),
-    perspective: { enabled: true, rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0.5 },
-  };
-  runtime.scene.zoomRegions = [region];
-  expect(resolvePreviewRenderAllocation(runtime).scene.spatial).toBeNull();
-  runtime.scene.zoomRegions = [{ ...region, perspective: { ...region.perspective, rotateZ: 5 } }];
-  expect(resolvePreviewRenderAllocation(runtime).scene.spatial).not.toBeNull();
-});
-
-it('resolves a plain runtime graph without inventing a pre-capture source allocation', () => {
-  const runtime = runtimeInput();
-  const graph = resolvePreviewRenderAllocation(runtime);
-  expect(graph.admission.source).toBeNull();
-  expect(graph.scene.spatial).toBeNull();
-  expect(graph.scene.motionPass).toBeNull();
-  expect(calculatePreviewRenderAllocation(graph).maximumManagedBytes).toBe(2 * 640 * 360 * 4);
-  runtime.sourceAllocationBytes = 123456;
-  expect(resolvePreviewRenderAllocation(runtime).admission.source).toEqual({
-    kind: 'video-frame',
-    allocationBytes: 123456,
-  });
-});
-
-it('maps real header geometry and separate transition source backing', () => {
-  const runtime = runtimeInput();
-  runtime.scene.windowHeader = DEFAULT_WINDOW_HEADER;
-  runtime.assets.headerBitmap = { width: 640, height: 40 };
-  runtime.transitionBytes = [100, 200];
-  runtime.sourceBacking = { width: 320, height: 180 };
-  const graph = resolvePreviewRenderAllocation(runtime);
-  expect(graph.scene.windowRaster?.width).toBeGreaterThan(0);
-  expect(graph.scene.windowRaster?.height).toBeGreaterThan(0);
-  expect(graph.scene.transitionRaster).toEqual({ width: 320, height: 180 });
-  expect(graph.admission.transition).toEqual([
-    { kind: 'video-frame', allocationBytes: 100 },
-    { kind: 'video-frame', allocationBytes: 200 },
-  ]);
-});
-
-it('maps source-density joined raster and explicit lens phase only while magnification is active', () => {
-  const runtime = runtimeInput();
-  runtime.scene.windowHeader = DEFAULT_WINDOW_HEADER;
-  runtime.assets.headerBitmap = { width: 1920, height: 106 };
-  runtime.scene.clicks = [
-    {
-      settings: { ...REVIEW_CLICK_DEFAULT, effect: 'magnify' },
-      point: { x: 0.5, y: 0.025 },
-      anchor: 1,
-      start: 0,
-      end: 2,
-    },
-  ];
-  const graph = resolvePreviewRenderAllocation(runtime);
-  expect(graph.scene.windowRaster?.width).toBe(1920);
-  expect(graph.scene.clickLens).toBe(true);
-  expect(phase(calculatePreviewRenderAllocation(graph), 'click-lens').allocations).toContainEqual({
-    role: 'decorated-window',
-    bytes: 1920 * graph.scene.windowRaster!.height * 4,
-    canvases: 1,
-  });
-  runtime.resultTime = 0;
-  const identity = resolvePreviewRenderAllocation(runtime);
-  expect(identity.scene.clickLens).toBe(false);
-  expect(identity.scene.windowRaster?.width).toBeLessThan(1920);
-  expect(
-    calculatePreviewRenderAllocation(identity).phases.some((value) => value.name === 'click-lens')
-  ).toBe(false);
-  runtime.assets.headerBitmap = null;
-  runtime.resultTime = 1;
-  expect(resolvePreviewRenderAllocation(runtime).scene.windowRaster).toBeNull();
-});
-
-it('keeps session spatial storage budget outside the current active region and reports unknown format bound', () => {
-  const runtime = runtimeInput();
-  runtime.scene.zoomRegions = [
-    {
-      ...createQuickEditZoomRegion({ id: 'spatial', at: 0, duration: 3, endMax: 3 }),
-      perspective: { enabled: true, rotateX: 10, rotateY: 20, rotateZ: 0, strength: 0.5 },
-    },
-  ];
-  runtime.resultTime = 10;
-  const pending = resolvePreviewRenderAllocation(runtime);
-  expect(pending.scene.spatial).toEqual({
-    output: runtime.dimensions.backing,
-    plane: { x: 0, y: 0, ...runtime.dimensions.backing },
-    halfFloat: true,
-  });
-  expect(pending.upperBounds.spatialFormatPending).toBe(true);
-  runtime.spatialHalfFloat = false;
-  expect(resolvePreviewRenderAllocation(runtime).scene.spatial?.halfFloat).toBe(false);
-});
-
 it('keeps retained transition endpoints admitted during discovery', () => {
   const input = discovery();
   input.retainedTransition = [
@@ -485,38 +444,186 @@ it('keeps retained transition endpoints admitted during discovery', () => {
   expect(plan.phases[0]?.canvases).toBe(0);
 });
 
-it('reports a canonical comment style bound rather than a full-output scratch guess', () => {
-  const runtime = runtimeInput();
-  const comment = createCanvasComment({ id: 'gradient', start: 0, end: 2 });
-  comment.attachment = 'viewport';
-  comment.style = {
-    ...comment.style,
-    width: 120,
-    fillPaint: createGradientPaint('#ff0000', () => 'stop'),
+it.each([2, 3, 10])(
+  'admits the real %s-mask compositor inside its planned coverage peak',
+  (frameCount) => {
+    vi.stubGlobal('Path2D', class {});
+    const graph = input();
+    graph.scene.spotlight = { backing: size, frameCount, blurRadius: 0, fastPath: false };
+    const plan = calculatePreviewRenderAllocation(graph);
+    const resources = createPreviewRenderResources({
+      ...plan,
+      createCanvas: () => {
+        const canvas = document.createElement('canvas');
+        vi.spyOn(canvas, 'getContext').mockReturnValue({
+          clearRect: vi.fn(),
+          save: vi.fn(),
+          restore: vi.fn(),
+          fill: vi.fn(),
+          getImageData: (_x: number, _y: number, width: number, height: number) => ({
+            data: new Uint8ClampedArray(width * height * 4),
+          }),
+          createImageData: (width: number, height: number) => ({
+            data: new Uint8ClampedArray(width * height * 4),
+          }),
+          putImageData: vi.fn(),
+        } as unknown as CanvasRenderingContext2D);
+        return canvas;
+      },
+    });
+    try {
+      const retained = ['front', 'staging', 'source'].map((role) => resources.canvas(role, size));
+      const masks = createSceneSpotlightMasks(
+        size,
+        Array.from({ length: frameCount }, (_, index) => ({
+          opening: { x: index, y: 0, width: 4, height: 4 },
+          radius: 1,
+          dim: 0.5,
+          blur: 0,
+        })),
+        resources
+      );
+      expect(resources.counters.peakManagedBytes).toBe(plan.maximumManagedBytes);
+      expect(() => resources.bytes('overflow', plan.maximumManagedBytes)).toThrow();
+      masks.dispose();
+      for (const lease of retained) lease.release();
+    } finally {
+      resources.dispose();
+      vi.unstubAllGlobals();
+    }
+    expect(resources.counters.managedBytes).toBe(0);
+  }
+);
+
+it.each([true, false])(
+  'shares exact odd spatial storage with the preview graph for half-float=%s',
+  (halfFloat) => {
+    const spatial = { plane: { width: 5, height: 3 }, output: { width: 7, height: 5 }, halfFloat };
+    const declarations = calculateSpatialRenderAllocations(spatial);
+    expect(declarations).toHaveLength(14);
+    const bytes = declarations.reduce((total, entry) => total + entry.bytes, 0);
+    expect(bytes).toBe(halfFloat ? 984 : 900);
+    expect(declarations.reduce((total, entry) => total + entry.canvases, 0)).toBe(3);
+    const graph = input();
+    graph.scene.spatial = spatial;
+    expect(phase(calculatePreviewRenderAllocation(graph), 'scene').bytes).toBe(1200 + bytes);
+  }
+);
+
+it('budgets physical plane/overlay and retained texture geometry per replaced role', () => {
+  const graph = input();
+  graph.scene.spatial = {
+    output: size,
+    plane: { width: 40, height: 20 },
+    overlay: { width: 30, height: 15 },
+    halfFloat: true,
+    retained: [
+      { role: 'spatial-plane', bytes: 4000, canvases: 1 },
+      { role: 'spatial-texture-0', bytes: 5000, canvases: 0 },
+    ],
   };
-  runtime.scene.comments = [{ ...comment, resolvedText: 'Visible label' }];
-  const graph = resolvePreviewRenderAllocation(runtime);
-  expect(graph.upperBounds.commentGradient?.width).toBe(40);
-  expect(graph.upperBounds.commentGradient?.height).toBeLessThanOrEqual(360);
-  expect(graph.scene.denseCommentGradient).toEqual(graph.upperBounds.commentGradient);
-  runtime.sourceTime = 3;
-  expect(resolvePreviewRenderAllocation(runtime).upperBounds.commentGradient).toBeNull();
+  const allocations = calculateSpatialRenderAllocations(graph.scene.spatial);
+  expect(allocations.find((x) => x.role === 'spatial-plane')!.bytes).toBe(4000);
+  expect(allocations.find((x) => x.role === 'spatial-overlay')!.bytes).toBe(1800);
+  expect(allocations.find((x) => x.role === 'spatial-texture-0')!.bytes).toBe(5000);
+  expect(allocations.filter((x) => x.role === 'spatial-plane')).toHaveLength(1);
+  const plan = calculatePreviewRenderAllocation(graph);
+  const resources = createPreviewRenderResources(plan);
+  const lease = resources.bytes('exact-phase', plan.maximumManagedBytes);
+  expect(() => resources.bytes('one-extra-byte', 1)).toThrow('resource allocation failed');
+  lease.release();
+  resources.dispose();
 });
 
-it('derives background cache clamp and scaled blur from actual chosen backing', () => {
-  const runtime = runtimeInput();
-  runtime.dimensions.backing = { width: 3840, height: 2160 };
-  runtime.scene.background = updateQuickEditBackground(
+it('accounts for a second outstanding publication without duplicating the retained front', () => {
+  const single = input();
+  const before = calculatePreviewRenderAllocation(single);
+  const after = calculatePreviewRenderAllocation({
+    ...single,
+    publication: { ...single.publication, maximumInFlight: 2 },
+  });
+  expect(after.maximumManagedBytes - before.maximumManagedBytes).toBe(size.width * size.height * 4);
+  expect(after.maximumCanvases - before.maximumCanvases).toBe(1);
+});
+
+it('admits two real drift painter caches and blur scratch while both destinations remain borrowed', async () => {
+  const { createReviewBackgroundPainter } = await import('./scene-background');
+  const { reviewGpuPreviewAllocation } = await import('./gpu-preview-geometry');
+  const background = updateQuickEditBackground(
     { enabled: false },
     {
       enabled: true,
-      type: 'gradient',
-      layout: { padding: 40, cornerRadius: 12, blur: 6 },
+      type: 'image',
+      assetId: 'background',
+      layout: { padding: 0, cornerRadius: 0, blur: 10 },
+      motion: { mode: 'drift', speed: 100, intensity: 100 },
     }
   );
-  const graph = resolvePreviewRenderAllocation(runtime);
-  expect(graph.background?.cache).toEqual({ width: 2048, height: 1152 });
-  expect(graph.background?.blurRadius).toBeCloseTo((6 * 2 * 2048) / 3840);
-  expect(graph.upperBounds.gradientFallback).toBe(true);
-  expect(graph.scene.denseBackgroundGradient).toBeNull();
+  if (!background.enabled || background.type !== 'image')
+    throw new Error('Expected image background');
+  const scene = {
+    source: { width: 640, height: 360 },
+    background,
+    zoomRegions: [],
+    comments: [],
+    keys: [],
+    clicks: [],
+  };
+  const dimensions = { canonical: scene.source, backing: { width: 320, height: 180 } };
+  const plan = reviewGpuPreviewAllocation(scene, dimensions, 2);
+  const resources = createPreviewRenderResources({
+    ...plan,
+    createCanvas: () => {
+      const canvas = document.createElement('canvas');
+      vi.spyOn(canvas, 'getContext').mockReturnValue({
+        canvas,
+        clearRect: vi.fn(),
+        setTransform: vi.fn(),
+        fillRect: vi.fn(),
+        drawImage: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
+        beginPath: vi.fn(),
+        rect: vi.fn(),
+        clip: vi.fn(),
+      } as unknown as CanvasRenderingContext2D);
+      return canvas;
+    },
+  });
+  const slots = [0, 1].map(() => ({
+    destination: resources.canvas('preview-gpu-background', dimensions.backing),
+    painter: createReviewBackgroundPainter(resources),
+  }));
+  try {
+    for (const [index, slot] of slots.entries()) {
+      slot.painter.draw(slot.destination.context, {
+        background: { ...background, layout: { ...background.layout, blur: 5 } },
+        image: null,
+        ...dimensions.backing,
+        currentTime: index,
+      });
+    }
+    expect(slots.map((slot) => slot.painter.retainedCacheSize)).toEqual([
+      dimensions.backing,
+      dimensions.backing,
+    ]);
+    expect(resources.counters.peakManagedBytes).toBeLessThanOrEqual(plan.maximumManagedBytes);
+    expect(resources.counters.peakCanvasCount).toBeLessThanOrEqual(plan.maximumCanvases);
+    // Updating one destination retains the other painter's independently owned cache.
+    slots[0]!.painter.dispose();
+    expect(slots[1]!.painter.retainedCacheSize).toEqual(dimensions.backing);
+    slots[1]!.painter.draw(slots[1]!.destination.context, {
+      background: { ...background, layout: { ...background.layout, blur: 5 } },
+      image: null,
+      ...dimensions.backing,
+      currentTime: 2,
+    });
+  } finally {
+    for (const slot of slots) {
+      slot.painter.dispose();
+      slot.destination.release();
+    }
+    resources.dispose();
+  }
+  expect(resources.counters.managedBytes).toBe(0);
 });

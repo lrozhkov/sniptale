@@ -1,4 +1,13 @@
 // @vitest-environment jsdom
+import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
+import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
+import { prepareRecordingEventsProject } from '../../../../features/video/project/recording-events/project-window';
+import { decodeRecordingEventsBlock } from '../../../../features/video/project/recording-events/blocks';
+import { isRecordingEventsDescriptor } from '../../../../features/video/project/recording-events/records';
+import fixtureData from '../../../../features/video/project/recording-events/fixtures.json';
+import { recordingEventProjectActions } from '../../../../features/video/project/recording-events/project-facts';
+import { resolveRecordingActionOccurrences } from '../../../project/operations/recording-events-selection';
+import { resolveTypingSpanSource } from '../../../project/state/clip-timeline/source-range';
 
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import {
@@ -6,7 +15,27 @@ import {
   createTrack,
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { act } from 'react';
+import { act, useRef } from 'react';
+import { useVideoEditorStore } from '../../../state/store';
+import { useTimelineNavigation } from '../interaction-state/navigation';
+import { resolveVideoProjectActionPresentations } from '../../../../features/video/project/action-presentation';
+import { getTimelineHistoryLayout, buildHistoryTargetGroups } from './history-layout';
+vi.mock('../../../../features/video/project/action-presentation', async (original) => {
+  const actual =
+    await original<typeof import('../../../../features/video/project/action-presentation')>();
+  return {
+    ...actual,
+    resolveVideoProjectActionPresentations: vi.fn(actual.resolveVideoProjectActionPresentations),
+  };
+});
+vi.mock('./history-layout', async (original) => {
+  const actual = await original<typeof import('./history-layout')>();
+  return {
+    ...actual,
+    getTimelineHistoryLayout: vi.fn(actual.getTimelineHistoryLayout),
+    buildHistoryTargetGroups: vi.fn(actual.buildHistoryTargetGroups),
+  };
+});
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
@@ -683,4 +712,165 @@ it('keeps every typing instance and held command accessible when their entire hi
   expect(chooser).not.toBeNull();
   act(() => chooser.click());
   expect(document.querySelectorAll('[role="option"]')).toHaveLength(3);
+});
+
+it('passes the canonical streamed action through actual marker selection and drag admission', async () => {
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [],
+    recordingSignals: [],
+  });
+  const events = fixtureData.descriptor;
+  const block = decodeRecordingEventsBlock(new TextEncoder().encode(fixtureData.blocks[0]!.utf8));
+  if (!isRecordingEventsDescriptor(events) || !block) throw new Error('Invalid test fixture.');
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+  });
+  const prepared = await prepareRecordingEventsProject(project, { start: 0, end: 1 }, async () => ({
+    writerGeneration: 'generation',
+    records: block.records.filter((record) => record.kind === 'action'),
+  }));
+  const event = recordingEventProjectActions(prepared)[0]!;
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const select = vi.fn();
+  const begin = vi.fn();
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={prepared}
+        recordingTelemetry={[]}
+        pixelsPerSecond={100}
+        onSeek={vi.fn()}
+        onSelectActionOccurrence={select}
+        onBeginEffectInteraction={begin}
+      />
+    )
+  );
+  const marker = container.querySelector<HTMLButtonElement>('[data-action-id]')!;
+  expect(marker).not.toBeNull();
+  act(() => marker.click());
+  expect(select).toHaveBeenCalledWith(
+    event.id,
+    clip.id,
+    expect.objectContaining({ streamSha256: events.streamSha256, record: { ...block.records[1] } })
+  );
+  const observed = select.mock.calls[0]![2];
+  expect(resolveRecordingActionOccurrences(project, observed)[0]?.event.id).toBe(event.id);
+  act(() => marker.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 })));
+  expect(begin).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ observedAction: observed })
+  );
+  expect(project.actionEvents).toEqual([]);
+});
+
+it('passes a streamed typing interval to the source-range owner without legacy telemetry', async () => {
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [],
+    recordingSignals: [],
+  });
+  const events = fixtureData.descriptor;
+  const block = decodeRecordingEventsBlock(new TextEncoder().encode(fixtureData.blocks[0]!.utf8));
+  if (!isRecordingEventsDescriptor(events) || !block) throw new Error('Invalid test fixture.');
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+  });
+  const prepared = await prepareRecordingEventsProject(project, { start: 0, end: 1 }, async () => ({
+    writerGeneration: 'generation',
+    records: block.records.flatMap((record) =>
+      record.kind === 'signal' && record.signal.kind === 'typing' ? [record] : []
+    ),
+  }));
+  const select = vi.fn();
+  act(() =>
+    root.render(
+      <ProjectTimelineTelemetryLane
+        project={prepared}
+        recordingTelemetry={[]}
+        pixelsPerSecond={1000}
+        onSeek={vi.fn()}
+        onSelectHistorySpan={select}
+      />
+    )
+  );
+  const marker = container.querySelector<HTMLButtonElement>('[data-history-span-kind="typing"]')!;
+  expect(marker).not.toBeNull();
+  act(() => marker.click());
+  expect(select).toHaveBeenCalledOnce();
+  expect(
+    resolveTypingSpanSource(project, [], select.mock.calls[0]![0])?.signal.data['eventCount']
+  ).toBe(3);
+  expect(project.actionFeedback![0]!.signals).toEqual([]);
+});
+
+it('retains telemetry on clock updates and invalidates authored and viewport edits', () => {
+  const project = createEmptyVideoProject('Static telemetry');
+  project.duration = 10;
+  project.actionEvents = [action('static', 2)];
+  const telemetry: RecordingTelemetryEntry[] = [];
+  const select = vi.fn();
+  const seek = vi.fn();
+  let renderedProject = project;
+  function Clock({ zoom = 100 }: { zoom?: number }) {
+    const time = useVideoEditorStore((state) => state.currentTime);
+    const timelineRef = useRef<HTMLDivElement | null>(null);
+    const navigation = useTimelineNavigation({
+      timelineRef,
+      extentSeconds: 20,
+      pixelsPerSecond: zoom,
+      viewportWidth: 800,
+    });
+    return (
+      <div ref={timelineRef} data-clock={time}>
+        <ProjectTimelineTelemetryLane
+          project={renderedProject}
+          recordingTelemetry={telemetry}
+          projection={navigation.projection}
+          pixelsPerSecond={zoom}
+          onSelectActionOccurrence={select}
+          onSeek={seek}
+        />
+      </div>
+    );
+  }
+  const prior = useVideoEditorStore.getState();
+  act(() => useVideoEditorStore.getState().setProject(project));
+  try {
+    act(() => root.render(<Clock />));
+    vi.mocked(resolveVideoProjectActionPresentations).mockClear();
+    vi.mocked(getTimelineHistoryLayout).mockClear();
+    vi.mocked(buildHistoryTargetGroups).mockClear();
+    for (const time of [0.1, 0.2, 0.3])
+      act(() => useVideoEditorStore.getState().setCurrentTime(time));
+    expect(container.firstElementChild?.getAttribute('data-clock')).toBe('0.3');
+    expect.soft(resolveVideoProjectActionPresentations).not.toHaveBeenCalled();
+    expect.soft(getTimelineHistoryLayout).not.toHaveBeenCalled();
+    expect(buildHistoryTargetGroups).not.toHaveBeenCalled();
+    act(() => container.querySelector<HTMLButtonElement>('[data-action-id="static"]')?.click());
+    expect(select).toHaveBeenCalledWith('static', null);
+    act(() => root.render(<Clock zoom={200} />));
+    expect(buildHistoryTargetGroups).toHaveBeenCalled();
+    renderedProject = { ...project, actionEvents: [action('replacement', 3)] };
+    act(() => root.render(<Clock zoom={200} />));
+    expect(resolveVideoProjectActionPresentations).toHaveBeenCalled();
+    expect(getTimelineHistoryLayout).toHaveBeenCalled();
+    expect(container.querySelector('[data-action-id="replacement"]')).not.toBeNull();
+  } finally {
+    act(() => useVideoEditorStore.setState(prior, true));
+  }
 });

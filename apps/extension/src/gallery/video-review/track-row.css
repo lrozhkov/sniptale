@@ -87,6 +87,15 @@
 }
 
 /* Track selection belongs to the whole header, independently from its mini actions. */
+[data-ui='gallery.videoReview.trackHeader']:not([data-review-header-selected='true']):has(
+    .review-track-select:enabled
+  ):hover {
+  background-color: color-mix(
+    in srgb,
+    var(--sniptale-color-surface-hover) 55%,
+    var(--sniptale-color-surface-panel)
+  );
+}
 [data-ui='gallery.videoReview.trackHeader'][data-review-header-selected='true'] {
   background-color: var(--sniptale-color-surface-hover);
 }
@@ -147,9 +156,6 @@
 .review-track-select:enabled:hover,
 .review-track-select[aria-pressed='true'] {
   color: var(--sniptale-color-text-primary);
-}
-.review-track-select:enabled:hover:not([aria-pressed='true']) {
-  background-color: var(--sniptale-color-surface-hover);
 }
 .review-track-select:focus-visible {
   outline: 1px solid var(--sniptale-color-border-strong);

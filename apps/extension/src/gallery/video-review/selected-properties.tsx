@@ -1,3 +1,10 @@
+import { createRecordingCursorAvailabilityReader } from '../../workflows/video-review/cursor-trajectory';
+import {
+  sameCursorAvailabilitySource,
+  type CursorAvailabilityInterval,
+} from '../../features/video/project/cursor-trajectory/availability';
+import { reviewFocusSourceRange } from '../../features/video/review/focus-edits';
+import { useReviewRecordingHistory } from './use-recording-history';
 import type { CompositionJoinSettings } from '../../features/video/project/scene/composition-join';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
 import { ReviewTextPhrase } from './speech-phrase';
@@ -111,16 +118,70 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
     : null;
   const previewLoader = useZoomPreviewSource(resource.file);
   const cameraSelected = selection.kind === 'zoom' || selection.kind === 'zoom-link';
+  const selectedRegion = cameraSelected
+    ? advanced.zoom.regions.find((region) => region.id === zoom.selection)
+    : undefined;
+  const middle = selectedRegion ? (selectedRegion.start + selectedRegion.end) / 2 : 0;
+  const miniTime = props.playback ? (props.focusTime ?? middle) : middle;
+  const miniSourceTime = selectedRegion ? props.toSourceTime(miniTime) : 0;
+  const miniNeedsCursor =
+    !!selectedRegion &&
+    (selectedRegion.followCursor ?? advanced.cursorFocusPath?.mode === 'follow');
+  const selectedHistory = useReviewRecordingHistory(
+    {
+      source: resource.source,
+      telemetry: resource.telemetry,
+      ...(miniNeedsCursor && resource.historyProject
+        ? { historyProject: resource.historyProject }
+        : {}),
+    },
+    miniSourceTime ?? 0,
+    selection
+  );
   const cursorPath = useMemo(
     () =>
       cameraSelected
         ? resolveReviewCursorFocusPath(
-            resource.telemetry,
+            selectedHistory.telemetry ?? null,
+            resource.source,
+            advanced.cursorFocusPath
+          )
+        : undefined,
+    [cameraSelected, selectedHistory.telemetry, resource.source, advanced.cursorFocusPath]
+  );
+  const edits = resource.session.getSnapshot().document.edits;
+  const regionId = selectedRegion?.id,
+    start = selectedRegion?.start,
+    end = selectedRegion?.end;
+  const anchorStart = selectedRegion?.sourceAnchor?.start,
+    anchorEnd = selectedRegion?.sourceAnchor?.end;
+  const sourceInterval = useMemo(() => {
+    if (!regionId || start === undefined || end === undefined) return null;
+    const range =
+      anchorStart !== undefined && anchorEnd !== undefined
+        ? { start: anchorStart, end: anchorEnd }
+        : reviewFocusSourceRange(
+            { start, end },
+            buildReviewTimeMap(resource.source.duration, edits)
+          );
+    return range ? { startTime: range.start, duration: range.end - range.start } : null;
+  }, [regionId, start, end, anchorStart, anchorEnd, resource.source.duration, edits]);
+  const inlineCursorPath = useMemo(
+    () =>
+      cameraSelected
+        ? resolveReviewCursorFocusPath(
+            resource.telemetry?.cursorTrajectory ? null : resource.telemetry,
             resource.source,
             advanced.cursorFocusPath
           )
         : undefined,
     [cameraSelected, resource.telemetry, resource.source, advanced.cursorFocusPath]
+  );
+  const cursor = useSelectedCursorAvailability(
+    resource.historyProject,
+    sourceInterval,
+    inlineCursorPath,
+    regionId
   );
   return (
     <>
@@ -199,12 +260,15 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
           <ReviewAdvancedPanels
             advanced={advanced}
             {...(cursorPath ? { cursorPath } : {})}
+            cursorAvailable={cursor.available}
+            cursorPending={cursor.pending}
             zoom={zoom}
-            zoomPreview={(region) => (
+            zoomPreview={(region, previewing = false) => (
               <ReviewZoomPreview
                 key={region.id}
-                disabled={busy || editing.exporter.phase !== 'idle'}
+                disabled={busy || editing.exporter.phase !== 'idle' || selectedHistory.pending}
                 region={zoom.previewRegion(region)}
+                previewing={previewing}
                 cursorFollowing={
                   !region.spotlight &&
                   !region.border &&
@@ -217,7 +281,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                   onCommit: (revision, patch) => zoom.changeAtRevision(region.id, revision, patch),
                 }}
                 focus={{
-                  regions: selectedReviewCameraRegions(props),
+                  regions: selectedReviewCameraRegions(props, selectedHistory.telemetry),
                   time: props.playback
                     ? (props.focusTime ?? (region.start + region.end) / 2)
                     : (region.start + region.end) / 2,
@@ -242,7 +306,10 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
 }
 
 /** The selected preview consumes the source/time-mapped camera policy shared with export. */
-function selectedReviewCameraRegions(props: SelectedPropertiesProps) {
+function selectedReviewCameraRegions(
+  props: SelectedPropertiesProps,
+  facts: LoadedReview['telemetry']
+) {
   const { advanced, resource, zoom } = props;
   return resolveQuickEditEffectiveState(
     {
@@ -259,7 +326,7 @@ function selectedReviewCameraRegions(props: SelectedPropertiesProps) {
         ),
       },
     },
-    { facts: resource.telemetry, source: resource.source }
+    { facts, source: resource.source }
   ).zoomRegions;
 }
 
@@ -614,4 +681,64 @@ export function ReviewSelectedTextProperties(props: {
       />
     </fieldset>
   );
+}
+
+/** The selected source interval owns admission; the playhead supplies only mini render facts. */
+function useSelectedCursorAvailability(
+  project: LoadedReview['historyProject'],
+  interval: CursorAvailabilityInterval | null,
+  path: ReturnType<typeof resolveReviewCursorFocusPath> | undefined,
+  selectionId: string | undefined
+) {
+  const retained = useRef({ project, interval, selectionId });
+  const previous = retained.current;
+  if (
+    !sameCursorAvailabilitySource(previous.project, project) ||
+    previous.selectionId !== selectionId ||
+    previous.interval?.startTime !== interval?.startTime ||
+    previous.interval?.duration !== interval?.duration ||
+    previous.interval?.sourceBinding?.clipId !== interval?.sourceBinding?.clipId
+  )
+    retained.current = { project, interval, selectionId };
+  const query = retained.current;
+  const reader = useMemo(() => createRecordingCursorAvailabilityReader(), []);
+  const [completed, setCompleted] = useState<{
+    project: LoadedReview['historyProject'];
+    interval: CursorAvailabilityInterval;
+    available: boolean;
+  } | null>(null);
+  useEffect(() => {
+    const { project, interval } = query;
+    if (!project || !interval) return;
+    const controller = new AbortController();
+    let active = true;
+    void reader
+      .available(project, interval, controller.signal)
+      .then((available) => {
+        if (active && !controller.signal.aborted) setCompleted({ project, interval, available });
+      })
+      .catch(() => {
+        if (active && !controller.signal.aborted)
+          setCompleted({ project, interval, available: false });
+      });
+    return () => {
+      active = false;
+      controller.abort();
+      reader.clear();
+    };
+  }, [query, reader]);
+  const inline =
+    !!interval &&
+    !!path?.segments.some(
+      (segment) =>
+        segment.keys.length > 0 &&
+        segment.end >= interval.startTime &&
+        segment.start <= interval.startTime + interval.duration
+    );
+  const ready =
+    !!completed && completed.project === query.project && completed.interval === query.interval;
+  return {
+    available: inline || (ready && completed.available),
+    pending: !inline && !!project && !!interval && !ready,
+  };
 }

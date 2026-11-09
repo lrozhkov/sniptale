@@ -27,7 +27,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
     'ai.prompts',
     'action/status',
   ],
-  'native-app': ['system.native', 'system.native.connection'],
+  'native-app': ['action/status'],
   'access-data': ['action/status'],
   'events-logs': ['action/status'],
   'settings-transfer': ['action/status'],
@@ -123,15 +123,8 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     ['ai.providers']
   ),
   excluded(
-    'ai/connections/controller/section/secret-protection.ts',
-    [
-      'changeAISecretPassphraseProtection',
-      'disableAISecretPassphraseProtection',
-      'enableAISecretPassphraseProtection',
-      'lockAISecretPassphraseProtection',
-      'resetAISecretPassphraseProtection',
-      'unlockAISecretPassphraseProtection',
-    ],
+    'apps/extension/src/settings/secret-protection/context.tsx',
+    ['createSecretProtectionClient', 'settingsRuntimeMessagingTransport'],
     'secret'
   ),
   transferable(
@@ -300,7 +293,6 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     ['requestLocalExtensionDataErasure'],
     'action/status'
   ),
-  transferable('system/native-app/controller.ts', ['mutateVideoSettings'], ['system.native']),
   excluded(
     'system/native-app/controller.ts',
     ['createNativeAppRuntimeClient', 'settingsRuntimeMessagingTransport'],

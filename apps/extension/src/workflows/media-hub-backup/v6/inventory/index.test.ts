@@ -39,7 +39,10 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 import { createVideoProjectEntry } from '../../../../composition/persistence/projects/index.test-support';
 import { createMediaHubBackupExportOptions } from '../options';
-import { buildMediaHubBackupExportPlanFromLibraryV6 } from './index';
+import {
+  buildMediaHubBackupExportPlanFromLibraryV6,
+  prepareMediaHubBackupRootsFromLibraryV6,
+} from './index';
 
 function options() {
   return createMediaHubBackupExportOptions({
@@ -175,6 +178,144 @@ it.each(['mediaAssetIds', 'scenarioProjectIds', 'videoProjectIds'] as const)(
       buildMediaHubBackupExportPlanFromLibraryV6(
         createMediaHubBackupExportOptions({ scope: 'selected', selected }),
         { requireSelected: true }
+      )
+    ).rejects.toThrow('selected backup item');
+  }
+);
+
+describe('frozen descriptor-only asset inventory', () => {
+  it('creates a canonical descriptor from the exact frozen ref without a body placeholder', async () => {
+    const { createObjectCollector } = await import('./helpers');
+    const { createArchivePathAllocator } = await import('../../../../composition/archive-transfer');
+    const ref = {
+      assetId: 'unloaded',
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: 'objects/unloaded' },
+      mimeType: 'image/png',
+      sha256: 'a'.repeat(64),
+      size: 4,
+    };
+    const onObject = vi.fn();
+    const collector = createObjectCollector('frozen', createArchivePathAllocator(), {
+      refs: new Map([[ref.assetId, ref]]),
+      onObject,
+    });
+    const db = { get: vi.fn(async () => ref) };
+    const objectId = await collector.addAsset(db, ref.assetId, 'original.png', 'image/png');
+    expect(collector.objects).toEqual([]);
+    expect(collector.references).toEqual([
+      {
+        ref: expect.objectContaining({
+          objectId,
+          size: 4,
+          filename: 'original.png',
+          mimeType: 'image/png',
+        }),
+      },
+    ]);
+    expect(onObject).toHaveBeenCalledExactlyOnceWith(ref.assetId, collector.references[0]!.ref);
+    expect(await collector.addAsset(db, ref.assetId, 'another-role.png', 'image/png')).toBe(
+      objectId
+    );
+    expect(collector.references).toHaveLength(1);
+    expect(onObject).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a changed frozen reference before allocating its descriptor', async () => {
+    const { createObjectCollector } = await import('./helpers');
+    const { createArchivePathAllocator } = await import('../../../../composition/archive-transfer');
+    const ref = {
+      assetId: 'unloaded',
+      createdAt: 1,
+      location: { kind: 'opfs' as const, objectKey: 'objects/unloaded' },
+      mimeType: 'image/png',
+      sha256: 'a'.repeat(64),
+      size: 4,
+    };
+    const onObject = vi.fn();
+    const collector = createObjectCollector('frozen', createArchivePathAllocator(), {
+      refs: new Map([[ref.assetId, ref]]),
+      onObject,
+    });
+    await expect(
+      collector.addAsset(
+        { get: async () => ({ ...ref, size: 5 }) },
+        ref.assetId,
+        'original.png',
+        'image/png'
+      )
+    ).rejects.toThrow();
+    expect(collector.references).toEqual([]);
+    expect(onObject).not.toHaveBeenCalled();
+  });
+});
+
+it.each(['all', 'selected'] as const)(
+  'prepares canonical native roots with runtime-only Chrome and no local configuration reads: %s',
+  async (scope) => {
+    vi.stubGlobal('chrome', { runtime: { id: 'offscreen-fixture' } });
+    try {
+      const { readEffectCatalogPreferences } = await vi.importActual<
+        typeof import('../../../../composition/persistence/effect-bundles/preferences')
+      >('../../../../composition/persistence/effect-bundles/preferences');
+      await expect(readEffectCatalogPreferences()).rejects.toThrow(
+        'chrome.storage.local is unavailable'
+      );
+      const { buildEffectBundleRootInventory } =
+        await vi.importActual<typeof import('./effect-bundles')>('./effect-bundles');
+      mocks.buildEffects.mockImplementation(buildEffectBundleRootInventory);
+      mocks.db.getAll.mockResolvedValue([]);
+      const prepareRoot = vi.fn();
+      mocks.buildScenarios.mockImplementation(async (args) => {
+        await args.prepareRoot({ rootKind: 'scenario-project', rootId: 'native-scenario' });
+        return [{ descriptor: { rootId: 'native-scenario' } }];
+      });
+      await expect(
+        prepareMediaHubBackupRootsFromLibraryV6(createMediaHubBackupExportOptions({ scope }), {
+          prepareRoot,
+        })
+      ).resolves.toBeUndefined();
+      expect(prepareRoot).toHaveBeenCalledExactlyOnceWith({
+        rootKind: 'scenario-project',
+        rootId: 'native-scenario',
+      });
+      expect(mocks.buildEffects).not.toHaveBeenCalled();
+      expect(mocks.listGalleryViews).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);
+it('full archive creation still refuses unavailable effect preferences instead of inventing an empty settings snapshot', async () => {
+  vi.stubGlobal('chrome', { runtime: { id: 'offscreen-fixture' } });
+  try {
+    mocks.db.getAll.mockResolvedValue([]);
+    const { buildEffectBundleRootInventory } =
+      await vi.importActual<typeof import('./effect-bundles')>('./effect-bundles');
+    mocks.buildEffects.mockImplementation(buildEffectBundleRootInventory);
+    await expect(
+      buildMediaHubBackupExportPlanFromLibraryV6(
+        createMediaHubBackupExportOptions({ scope: 'all' })
+      )
+    ).rejects.toThrow('chrome.storage.local is unavailable');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+it.each(['mediaAssetIds', 'scenarioProjectIds', 'videoProjectIds'] as const)(
+  'native preparation refuses an absent explicit %s target through canonical selection',
+  async (kind) => {
+    mocks.db.getAll.mockResolvedValue([]);
+    const selected = {
+      mediaAssetIds: [],
+      scenarioProjectIds: [],
+      videoProjectIds: [],
+      [kind]: ['missing'],
+    };
+    await expect(
+      prepareMediaHubBackupRootsFromLibraryV6(
+        createMediaHubBackupExportOptions({ scope: 'selected', selected }),
+        { prepareRoot: vi.fn(), requireSelected: true }
       )
     ).rejects.toThrow('selected backup item');
   }

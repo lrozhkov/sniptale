@@ -118,12 +118,16 @@ function updateCropDraft(
 function updateBlurPreview(
   canvas: Canvas,
   object: FabricObject,
-  drawing: Extract<DrawingObject, { kind: 'blur' }>,
+  drawing: Extract<DrawingObject, { kind: 'blur' | 'simplify' }>,
   start: { x: number; y: number },
   point: { x: number; y: number }
 ): void {
   const { bounds, properties } = createDraftBoundsUpdate(start, point);
-  object.set(properties);
+  object.set(
+    drawing.kind === 'simplify'
+      ? { ...properties, left: bounds.x + bounds.width / 2, top: bounds.y + bounds.height / 2 }
+      : properties
+  );
   writeEditorDrawingObject(object, { ...drawing, bounds });
   object.setCoords();
   canvas.requestRenderAll();
@@ -164,7 +168,7 @@ function applyDrawingPreview(
   start: { x: number; y: number },
   point: { x: number; y: number }
 ): void {
-  if (drawing.kind === 'blur') {
+  if (drawing.kind === 'blur' || drawing.kind === 'simplify') {
     updateBlurPreview(canvas, object, drawing, start, point);
     return;
   }

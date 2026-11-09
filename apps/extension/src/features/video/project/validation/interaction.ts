@@ -1,6 +1,8 @@
 import { isMotionFocusArea } from '../motion/focus-area';
+import { isCursorTrajectoryDescriptor } from '../cursor-trajectory/records';
 import { parseQuickEditBorder, parseQuickEditSpotlight } from '../scene/focus-appearance';
 import {
+  parseCursorCompositionSettings,
   parseCameraPerspective,
   parseCameraDepth,
   parseMotionSpatialReference,
@@ -102,11 +104,15 @@ function isCursorSourceObservations(value: unknown): boolean {
     if (
       !isRecord(group) ||
       Object.keys(group).some(
-        (key) => !['recordingId', 'sourceInstanceId', 'samples'].includes(key)
+        (key) => !['recordingId', 'sourceInstanceId', 'samples', 'trajectory'].includes(key)
       ) ||
       !isCursorSourceIdentity(group['recordingId']) ||
       !isCursorSourceIdentity(group['sourceInstanceId']) ||
-      !Array.isArray(group['samples'])
+      !Array.isArray(group['samples']) ||
+      (group['trajectory'] !== undefined &&
+        (!isCursorTrajectoryDescriptor(group['trajectory']) ||
+          !group['trajectory'].finalized ||
+          group['samples'].length !== 0))
     )
       return false;
     const identity = JSON.stringify([group['recordingId'], group['sourceInstanceId']]);
@@ -265,7 +271,9 @@ export function isVideoProjectActionPresentation(value: unknown): boolean {
   );
 }
 
-export function isVideoProjectActionPresentationOverride(value: unknown): boolean {
+export function isVideoProjectActionPresentationOverride(
+  value: unknown
+): value is import('../types/interaction').VideoProjectActionPresentationOverride {
   return (
     isRecord(value) &&
     (value['clickStyle'] === undefined || isActionClickStyle(value['clickStyle'])) &&
@@ -301,6 +309,7 @@ export function isMotionRegion(value: unknown): boolean {
             value['spotlightTarget'] === 'scene' ||
             value['spotlightTarget'] === 'source-scene') &&
             value['sourceBinding'] !== undefined))) &&
+    parseCursorCompositionSettings(value['cursorComposition']) !== null &&
     parseCameraPerspective(value['perspective']) !== null &&
     parseCameraDepth(value['depthOfField']) !== null &&
     parseMotionSpatialReference(value['spatialReference']) !== null &&

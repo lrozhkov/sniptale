@@ -1,3 +1,4 @@
+import type { SecretProtectionPort } from '../../../composition/persistence/secret-protection/model';
 import { AIProviderRequestError } from '../providers';
 import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import type {
@@ -119,9 +120,12 @@ function createScenarioEditorParseFailure(): ProcessScenarioEditorWithLLMRespons
   };
 }
 
-async function loadScenarioEditorRequestContext(modelId: string) {
+async function loadScenarioEditorRequestContext(
+  modelId: string,
+  protection?: SecretProtectionPort
+) {
   const [config, scenarioPrompt] = await Promise.all([
-    resolveModelConfig(modelId),
+    resolveModelConfig(modelId, undefined, protection),
     loadScenarioEditorSystemPrompt(),
   ]);
 
@@ -130,19 +134,20 @@ async function loadScenarioEditorRequestContext(modelId: string) {
 
 async function processScenarioEditorRequest(
   message: ProcessScenarioEditorWithLLMMessage,
-  canonicalPayload: ScenarioEditorCanonicalEgressPayload
+  canonicalPayload: ScenarioEditorCanonicalEgressPayload,
+  protection?: SecretProtectionPort
 ): Promise<ProcessScenarioEditorWithLLMResponse> {
   logScenarioEditorRequest(message, canonicalPayload);
 
   const modelId = await resolveRequiredLlmModelId(message.modelId);
-  const { config, scenarioPrompt } = await loadScenarioEditorRequestContext(modelId);
+  const { config, scenarioPrompt } = await loadScenarioEditorRequestContext(modelId, protection);
   const rawResponse = await requestMultimodalChatCompletion({
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
     modelCode: config.modelCode,
     connectionType: config.connectionType,
     observationBinding: config.observationBinding,
-    beforeSend: () => assertResolvedLlmModelConfigCurrent(config),
+    beforeSend: () => assertResolvedLlmModelConfigCurrent(config, protection),
     ...(config.maxOutputTokens ? { maxOutputTokens: config.maxOutputTokens } : {}),
     providerErrorLabel: config.providerId,
     systemPrompt: buildScenarioAiSystemPrompt(scenarioPrompt),
@@ -155,7 +160,8 @@ async function processScenarioEditorRequest(
 export function routeScenarioEditorLlmMessage(
   message: unknown,
   sendResponse: ResponseSender<ProcessScenarioEditorWithLLMResponse>,
-  _sender: chrome.runtime.MessageSender
+  _sender: chrome.runtime.MessageSender,
+  protection?: SecretProtectionPort
 ): boolean {
   if (!isProcessScenarioEditorWithLLMMessage(message)) {
     return false;
@@ -179,10 +185,12 @@ export function routeScenarioEditorLlmMessage(
   }
 
   respondAsyncLlmRoute({
-    work: processScenarioEditorRequest(message, canonicalPayload).catch((error: unknown) => {
-      if (!(error instanceof AIProviderRequestError)) throw error;
-      return { success: false, failureReason: error.reason };
-    }),
+    work: processScenarioEditorRequest(message, canonicalPayload, protection).catch(
+      (error: unknown) => {
+        if (!(error instanceof AIProviderRequestError)) throw error;
+        return { success: false, failureReason: error.reason };
+      }
+    ),
     sendResponse,
     logger,
     failureLogMessage: 'Scenario editor LLM request failed',

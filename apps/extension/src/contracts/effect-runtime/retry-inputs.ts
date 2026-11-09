@@ -5,7 +5,11 @@ import {
   hasExactKeys,
   isRecord,
 } from './identity';
-import type { EffectRuntimeFrameInputs, EffectRuntimeFrameResult } from './types';
+import type {
+  EffectRuntimeFrameInputs,
+  EffectRuntimeFrameResult,
+  EffectRuntimeSceneResult,
+} from './types';
 
 /** Only unconsumed, bounded raster inputs may travel back on a reference miss. */
 export function parseEffectRuntimeRetryInputs(value: unknown): EffectRuntimeFrameInputs | null {
@@ -49,7 +53,8 @@ export function returnEffectRuntimeRetryInputs(
   };
 }
 
-export function collectEffectRuntimeResultBitmaps(result: EffectRuntimeFrameResult): ImageBitmap[] {
+export function collectEffectRuntimeResultBitmaps(result: EffectRuntimeSceneResult): ImageBitmap[] {
+  if (result.kind === 'gpu-plan') return result.resources.map(({ bitmap }) => bitmap);
   return result.kind === 'frame'
     ? [result.bitmap]
     : result.code === 'cacheMiss'
@@ -59,7 +64,7 @@ export function collectEffectRuntimeResultBitmaps(result: EffectRuntimeFrameResu
 
 export function matchesEffectRuntimeRetryInputs(
   expected: EffectRuntimeFrameInputs,
-  result: EffectRuntimeFrameResult
+  result: EffectRuntimeSceneResult
 ): boolean {
   if (result.kind !== 'error' || result.code !== 'cacheMiss') return true;
   const inputs = result.retryInputs ?? {};

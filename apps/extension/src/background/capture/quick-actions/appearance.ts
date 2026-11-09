@@ -1,3 +1,5 @@
+import { findOpenPageFavicon } from '../../../workflows/browser-frame/open-page-icon';
+import { ensurePublicHttpsHeadGuard } from '../../../platform/network/https-redirect-guard';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { DEFAULT_FULL_PAGE_QUALITY_POLICY } from '../../../contracts/full-page-capture';
 import type { CaptureImagePreparation } from '../application/ports';
@@ -34,10 +36,23 @@ async function renderHeader(input: QuickActionHeaderRasterInput): Promise<string
       (async () => {
         await ensureOffscreenDocument('Render a quick-action window header');
         await waitForOffscreenReady();
+        const faviconHintUrl =
+          input.faviconWebsite && input.header.faviconEnabled && !input.header.faviconDataUrl
+            ? await findOpenPageFavicon(input.faviconWebsite, AbortSignal.timeout(20_000))
+            : null;
+        const faviconRedirectGuardReady =
+          input.faviconWebsite && input.header.faviconEnabled && !input.header.faviconDataUrl
+            ? await ensurePublicHttpsHeadGuard().then(
+                () => true,
+                () => false
+              )
+            : false;
         const response = await createRuntimeMessagingTransport().sendRuntimeMessage(
           attachOffscreenCommandCapability({
             type: MessageType.OFFSCREEN_QUICK_ACTION_HEADER,
             ...input,
+            faviconRedirectGuardReady,
+            ...(faviconHintUrl ? { faviconHintUrl } : {}),
           })
         );
         if (!response?.success)
@@ -137,7 +152,8 @@ export function beginPageAppearance(
   tabId: number,
   transactionId?: string,
   outputFormat?: AppearanceOutput['imageFormat'],
-  fullPageFileBudget = false
+  fullPageFileBudget = false,
+  capturePreferences?: Pick<AppearanceOutput, 'imageFormat' | 'imageQuality'>
 ): { prepare?: CaptureImagePreparation; assertCurrent(): void; release(): void } {
   if (transactionId === undefined) return { assertCurrent() {}, release() {} };
   const output = getQuickActionAppearanceSnapshot(tabId, transactionId);
@@ -153,7 +169,11 @@ export function beginPageAppearance(
   };
   return {
     prepare: createPreparation(
-      outputFormat === undefined ? output : { ...output, imageFormat: outputFormat },
+      {
+        ...output,
+        ...capturePreferences,
+        ...(outputFormat === undefined ? {} : { imageFormat: outputFormat }),
+      },
       assertCurrent,
       tabId,
       fullPageFileBudget

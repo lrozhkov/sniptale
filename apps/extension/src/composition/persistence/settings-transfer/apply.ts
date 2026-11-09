@@ -1,3 +1,4 @@
+import type { SecretProtectionAdmissionPermit } from '../secret-protection/model';
 import { parseDrawingPaletteState } from '../drawing-palette/parser';
 import { parseStoredSettings } from '../settings/guards';
 import { parsePageLaunchPreferences } from '../../../contracts/page-launch';
@@ -20,7 +21,7 @@ import { loadVideoSettings } from '../capture-settings';
 import { serializeStepBadgePresetCatalog } from '../step-badge-presets/migration';
 import { serializeSurfaceStylePresetCatalog } from '../surface-style-presets/parser';
 import type { SurfaceStylePresetCatalog } from '../surface-style-presets/contracts';
-import { browserStorage } from '../infrastructure/browser-storage';
+import { browserStorage, restoreSelectedStorageKeys } from '../infrastructure/browser-storage';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { loadSettings } from '../settings';
 import { parseContextMenuTree } from '../../../contracts/settings/context-menu-layout';
@@ -65,6 +66,7 @@ export async function applySettingsTransferDomains(args: {
   domains: Record<string, SettingsTransferDomainPayload>;
   summary: SettingsTransferChangeSummary;
   permit?: PersistenceMutationPermit;
+  admissionPermit?: SecretProtectionAdmissionPermit;
 }): Promise<void> {
   const [beforeSync, beforeLocal, currentSettings, currentVideo] = await Promise.all([
     browserStorage.sync.get([...SYNC_KEYS]),
@@ -102,6 +104,7 @@ export async function applySettingsTransferDomains(args: {
   const providerPlan = importedProviders
     ? await prepareAIProviderTransferMutation({
         importedProviders,
+        ...(args.admissionPermit ? { admissionPermit: args.admissionPermit } : {}),
         ...(args.permit === undefined ? {} : { permit: args.permit }),
       })
     : null;
@@ -314,37 +317,7 @@ function applyVideoWrites(context: WriteBuildContext): void {
     if (video['outputProfile'] !== undefined)
       nextVideo.outputProfile = video['outputProfile'] as typeof nextVideo.outputProfile;
   }
-  const native = data('system.native');
-  if (native) {
-    const currentNative = nextVideo.native!;
-    const capture = asRecord(native['capture']);
-    const captureVideo = asRecord(capture?.['video']);
-    nextVideo.native = {
-      ...currentNative,
-      ...(capture?.['screenshots'] === undefined
-        ? {}
-        : { screenshots: capture['screenshots'] as typeof currentNative.screenshots }),
-      ...(native['tray'] === undefined
-        ? {}
-        : { trayActions: native['tray'] as typeof currentNative.trayActions }),
-      video: {
-        ...currentNative.video,
-        ...(captureVideo?.['advanced'] === undefined
-          ? {}
-          : { advanced: captureVideo['advanced'] as typeof currentNative.video.advanced }),
-        ...(captureVideo?.['codec'] === undefined
-          ? {}
-          : { codec: captureVideo['codec'] as typeof currentNative.video.codec }),
-        ...(captureVideo?.['enabled'] === undefined
-          ? {}
-          : { enabled: captureVideo['enabled'] as boolean }),
-        ...(native['telemetry'] === undefined
-          ? {}
-          : { telemetry: native['telemetry'] as typeof currentNative.video.telemetry }),
-      },
-    };
-  }
-  if (video || native) localWrites['sniptale_video_settings'] = nextVideo;
+  if (video) localWrites['sniptale_video_settings'] = nextVideo;
 }
 
 function applyStyleWrites(context: WriteBuildContext): void {
@@ -471,15 +444,7 @@ async function restoreArea(
   keys: readonly string[],
   permit?: PersistenceMutationPermit
 ) {
-  const adapter = browserStorage[area];
-  const present = Object.fromEntries(
-    keys.filter((key) => key in before).map((key) => [key, before[key]])
-  );
-  const missing = keys.filter((key) => !(key in before));
-  if (Object.keys(present).length > 0) await adapter.set(present, permit);
-  if (missing.length > 0) await adapter.remove(missing, permit);
-  const verified = await adapter.get([...keys]);
-  if (JSON.stringify(verified) !== JSON.stringify(present))
+  if (!(await restoreSelectedStorageKeys(browserStorage[area], keys, before, permit)))
     throw new SettingsTransferRollbackError('Settings import rollback verification failed');
 }
 

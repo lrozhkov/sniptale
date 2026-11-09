@@ -8,6 +8,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../assets/opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets/opfs-store')>()),
   listReadyJournals: mocks.journals,
+  readAssetReadyPublicationClaims: vi.fn(async () => ({
+    valid: true,
+    pending: false,
+    journals: [],
+  })),
 }));
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),

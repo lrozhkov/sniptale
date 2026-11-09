@@ -14,7 +14,6 @@ import {
   WORKSPACE_BACKGROUND_PALETTE,
   clampGridSize,
   getBrowserCanvasModeOptions,
-  getBrowserContentModeOptions,
   getFrameBackgroundImageFitOptions,
   getFrameBackgroundModeOptions,
   getFrameGradientPresets,
@@ -31,7 +30,6 @@ import type { EditorInspectorConfirmDialogState } from '../content/types';
 export function createStaticSidebarOptions() {
   return {
     browserCanvasModeOptions: getBrowserCanvasModeOptions(),
-    browserContentModeOptions: getBrowserContentModeOptions(),
     frameBackgroundImageFitOptions: getFrameBackgroundImageFitOptions(),
     frameBackgroundModeOptions: getFrameBackgroundModeOptions(),
     frameGradientPresets: getFrameGradientPresets(),

@@ -106,6 +106,19 @@ function isMicrophoneDevices(value: unknown): boolean {
   );
 }
 
+function isHistoryAttachments(value: unknown, formatsKey: string, format: string): boolean {
+  if (value === undefined) return true;
+  return (
+    isRecord(value) &&
+    Object.keys(value).length === 5 &&
+    isStringArray(value[formatsKey], new Set([format]), 1) &&
+    value['maxBlockBytes'] === 65536 &&
+    value['maxBlockRecords'] === 512 &&
+    value['maxChunkRawBytes'] === 32768 &&
+    value['maxManifestEntries'] === 32
+  );
+}
+
 function isCapabilities(value: unknown): value is NativeAppCapabilities {
   const capture = isRecord(value) ? value['capture'] : null;
   const codecs = isRecord(value) ? value['codecs'] : null;
@@ -113,6 +126,13 @@ function isCapabilities(value: unknown): value is NativeAppCapabilities {
   const limits = isRecord(value) ? value['limits'] : null;
 
   return (
+    isRecord(value) &&
+    isHistoryAttachments(value['attachments'], 'cursorTrajectoryFormats', 'cursor-trajectory-v1') &&
+    isHistoryAttachments(
+      value['eventAttachments'],
+      'recordingEventFormats',
+      'recording-events-v1'
+    ) &&
     isRecord(capture) &&
     isStringArray(capture['screenshotModes'], captureModes, 4) &&
     isStringArray(capture['videoModes'], recordingModes, 3) &&
@@ -148,6 +168,8 @@ function isNumberArray(value: unknown, maxLength: number): boolean {
 export function isAppHello(value: Record<string, unknown>): boolean {
   return (
     hasProtocolVersion(value) &&
+    isNativeAppIdentity(value['appIdentity']) &&
+    value['settingsAuthority'] === 'desktop' &&
     isPositiveInteger(value['settingsSchemaVersion']) &&
     isString(value['minExtensionVersion']) &&
     isNumberArray(value['supportedProtocolVersions'], 8) &&
@@ -156,5 +178,17 @@ export function isAppHello(value: Record<string, unknown>): boolean {
     isPlatform(value['platform']) &&
     isInstallState(value['install']) &&
     isCapabilities(value['capabilities'])
+  );
+}
+
+/** Checks the stable installation identity presented by the Native Messaging host. */
+export function isNativeAppIdentity(
+  value: unknown
+): value is { clientId: string; trustVersion: 1 } {
+  return (
+    isRecord(value) &&
+    typeof value['clientId'] === 'string' &&
+    /^[a-f0-9]{64}$/.test(value['clientId']) &&
+    value['trustVersion'] === 1
   );
 }

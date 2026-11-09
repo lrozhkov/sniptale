@@ -36,7 +36,7 @@ function ActualTextLane({ selected }: { selected(id: string): void }) {
     pause: vi.fn(),
   });
   return (
-    <ReviewTextTrack editor={editor} busy={false} onSelect={selected} onOpenDocument={vi.fn()} />
+    <ReviewTextTrack editor={editor} busy={false} onSelect={selected} onToggleCaptions={vi.fn()} />
   );
 }
 
@@ -346,7 +346,7 @@ it('shows an exact range-start guide only over drawing zones, with neutral seek 
     )!,
     200
   );
-  expect(plane.style.cursor).toBe('default');
+  expect(plane.style.cursor).toContain('4 16, cell');
   hoverAt(host.querySelector('[data-ui="gallery.videoReview.trackHeader"]')!, 200);
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });
@@ -614,7 +614,7 @@ it('clears the hover guide even when a camera child intercepts pointer movement'
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });
 
-it('orders action-history controls by navigation, filtering, then applying effects', () => {
+it('keeps action-history header controls as filtering and applying-effects toggles', () => {
   const marker = {
     ref: { kind: 'action' as const, id: 'click' },
     eventType: 'CLICK',
@@ -627,21 +627,18 @@ it('orders action-history controls by navigation, filtering, then applying effec
     actionsEnabled: false,
     onToggleActions: toggle,
   });
-  const controls = ['historyOpen', 'historyAnimatedOnly', 'historyEffectsEnabled'].map((key) =>
+  const controls = ['historyAnimatedOnly', 'historyEffectsEnabled'].map((key) =>
     host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${key}"]`)!
   );
   expect(controls.every(Boolean)).toBe(true);
-  expect(controls[0]!.querySelector('svg')?.classList.contains('lucide-search')).toBe(true);
+  expect(host.querySelector('[aria-label="gallery.videoReview.historyOpen"]')).toBeNull();
   expect(
     controls[0]!.compareDocumentPosition(controls[1]!) & Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
-  expect(
-    controls[1]!.compareDocumentPosition(controls[2]!) & Node.DOCUMENT_POSITION_FOLLOWING
-  ).toBeTruthy();
-  expect(controls[2]!.getAttribute('aria-pressed')).toBe('false');
-  expect(controls[2]!.className).toContain('aria-[pressed=false]');
-  expect(controls[2]!.querySelector('svg')?.classList.contains('lucide-eye-off')).toBe(true);
-  act(() => controls[2]!.click());
+  expect(controls[1]!.getAttribute('aria-pressed')).toBe('false');
+  expect(controls[1]!.className).toContain('aria-[pressed=false]');
+  expect(controls[1]!.querySelector('svg')?.classList.contains('lucide-eye-off')).toBe(true);
+  act(() => controls[1]!.click());
   expect(toggle).toHaveBeenCalledOnce();
 });
 
@@ -665,4 +662,42 @@ it('offers the annotation placement cursor only when ready and reveals its activ
   });
   hoverAt(lane, 200);
   expect(plane.style.cursor).toBe('default');
+});
+
+it('keeps the seek cursor during plane capture from an audio lane', () => {
+  const { host } = renderTimeline({
+    audioTracks: {
+      originalAudio: <div data-ui="gallery.videoReview.audioLane" data-original-audio-lane />,
+    },
+  });
+  const plane = planeWithMetrics(host);
+  const audio = host.querySelector('[data-ui="gallery.videoReview.audioLane"]')!;
+  act(() => audio.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100 })));
+  hoverAt(plane, 200);
+  expect(plane.style.cursor).toBe('default');
+  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')?.textContent).toBe('2.0');
+  dispatchPlane(plane, [{ type: 'pointerup', x: 200 }]);
+});
+
+it.each(['zoomLane', 'audioLane'])('seeks without selecting a range on an idle %s', (laneName) => {
+  const onRangeCommit = vi.fn();
+  const { host, props } = renderTimeline({
+    onRangeCommit,
+    zoomTrack: (
+      <div
+        data-ui={`gallery.videoReview.${laneName}`}
+        data-original-audio-lane={laneName === 'audioLane' ? true : undefined}
+      />
+    ),
+  });
+  const plane = planeWithMetrics(host);
+  const lane = host.querySelector<HTMLElement>(`[data-ui="gallery.videoReview.${laneName}"]`)!;
+  dispatchPlane(lane, [{ type: 'pointerdown', x: 100 }]);
+  dispatchPlane(plane, [
+    { type: 'pointermove', x: 250 },
+    { type: 'pointerup', x: 250 },
+  ]);
+  expect(props.onSeek).toHaveBeenCalledWith(1);
+  expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
+  expect(onRangeCommit).not.toHaveBeenCalled();
 });

@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  retireCursorStages: vi.fn(),
+  retireEventStages: vi.fn(),
   abortSession: vi.fn(),
   beginRoot: vi.fn(),
   clearCurrentRoot: vi.fn(),
@@ -13,6 +15,14 @@ const mocks = vi.hoisted(() => ({
   restoreGalleryViews: vi.fn(),
   stage: vi.fn(),
   verify: vi.fn(),
+}));
+
+vi.mock('../../../composition/persistence/recordings/recording-events/staging', () => ({
+  retireJournalRecordingEventStages: mocks.retireEventStages,
+}));
+
+vi.mock('../../../composition/persistence/recordings/cursor-trajectory/staging', () => ({
+  retireJournalCursorTrajectoryStages: mocks.retireCursorStages,
 }));
 
 vi.mock('../../../composition/persistence/assets', async (importOriginal) => ({
@@ -164,6 +174,8 @@ beforeEach(() => {
     currentSession = { ...currentSession, currentRoot: null };
     return currentSession;
   });
+  mocks.retireCursorStages.mockResolvedValue(undefined);
+  mocks.retireEventStages.mockResolvedValue(undefined);
   mocks.discard.mockResolvedValue(undefined);
   mocks.deleteJournal.mockResolvedValue(undefined);
   mocks.abortSession.mockResolvedValue(undefined);
@@ -410,6 +422,14 @@ describe('media backup v6 restore orchestration', () => {
         publishers: [publisher],
       })
     ).rejects.toThrow('transaction failed');
+    expect(mocks.retireCursorStages).toHaveBeenCalledExactlyOnceWith('journal-1');
+    expect(mocks.retireEventStages).toHaveBeenCalledExactlyOnceWith('journal-1');
+    expect(mocks.retireEventStages.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.deleteJournal.mock.invocationCallOrder[0]!
+    );
+    expect(mocks.retireCursorStages.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.deleteJournal.mock.invocationCallOrder[0]!
+    );
     expect(mocks.discard).toHaveBeenCalledWith('local-asset');
     expect(mocks.abortSession).toHaveBeenCalledWith('restore-1');
   });
@@ -469,3 +489,32 @@ describe('media backup v6 restore orchestration', () => {
     expect(publisher.publish).not.toHaveBeenCalled();
   });
 });
+
+it.each(['cursor', 'events'] as const)(
+  'keeps the ready claim when private %s cleanup fails',
+  async (format) => {
+    const cleanup = format === 'cursor' ? mocks.retireCursorStages : mocks.retireEventStages;
+    cleanup.mockRejectedValueOnce(new Error('History cleanup refused'));
+    await expect(
+      restoreMediaHubBackupV6({
+        file: await archive(),
+        operationId: 'restore-1',
+        publishers: [
+          {
+            profile: 'media:library-item',
+            publish: async () => {
+              throw new Error('Publication refused');
+            },
+          },
+        ],
+      })
+    ).rejects.toThrow('ready journal cleanup failed');
+    expect(mocks.deleteJournal).not.toHaveBeenCalled();
+    expect(mocks.discard).not.toHaveBeenCalled();
+    expect(mocks.abortSession).not.toHaveBeenCalled();
+    expect(currentSession).toMatchObject({
+      currentRoot: 'media:library-item:one',
+      status: 'pending',
+    });
+  }
+);

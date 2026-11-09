@@ -17,15 +17,16 @@
       "id": "curve",
       "kind": "number",
       "label": {
-        "ru": "Плавность (%)",
-        "en": "Easing (%)"
+        "ru": "Плавность",
+        "en": "Easing"
       },
       "defaultValue": 85,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "animation",
-      "order": 0
+      "order": 0,
+      "unit": "percent"
     },
     {
       "id": "direction",

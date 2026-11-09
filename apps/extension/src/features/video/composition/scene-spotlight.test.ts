@@ -5,6 +5,7 @@ import {
   placeQuickEditLens,
   resolveQuickEditLensArea,
   authorQuickEditLensArea,
+  constrainQuickEditLensArea,
 } from '../project/scene/focus-appearance';
 import {
   resolveSceneSpotlightTarget,
@@ -226,4 +227,35 @@ it('keeps the intermediate circular cubic approximation below five millionths of
     }
     start = points.slice(4, 6);
   }
+});
+
+it.each([
+  { window: { width: 400, height: 200 }, area: { x: 0.75, y: 0.25, width: 0.25, height: 0.5 } },
+  { window: { width: 400, height: 200 }, area: { x: 0, y: 0.25, width: 0.25, height: 0.5 } },
+  { window: { width: 200, height: 400 }, area: { x: 0.25, y: 0.75, width: 0.5, height: 0.25 } },
+  { window: { width: 200, height: 400 }, area: { x: 0.25, y: 0, width: 0.5, height: 0.25 } },
+])('moves a circular lens to the visible window edge in $window', ({ window, area }) => {
+  const value = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify' as const,
+    lensShape: 'circle' as const,
+  };
+  const constrained = constrainQuickEditLensArea(value, area, window);
+  expect(constrained).toEqual(area);
+  const authored = { ...value, area: authorQuickEditLensArea(value, constrained) };
+  expect(parseQuickEditSpotlight(authored)).toEqual(authored);
+  expect(resolveQuickEditLensArea(authored, window)).toEqual(area);
+});
+
+it('retains an explicitly entered circle diameter when it must move away from a corner', () => {
+  const value = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify' as const,
+    lensShape: 'circle' as const,
+  };
+  const area = authorQuickEditLensArea(value, { x: 0.5, y: 0.5, width: 0.8, height: 0.8 });
+  expect(area.width).toBe(0.8);
+  expect(area.height).toBe(0.8);
+  expect(area.x).toBeCloseTo(0.2, 12);
+  expect(area.y).toBeCloseTo(0.2, 12);
 });

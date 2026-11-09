@@ -1,3 +1,8 @@
+import type {
+  PreviewRendererStatus,
+  VideoPreviewRenderer,
+} from '../../features/video/preview/preferences';
+import type { ReviewPresentedGeometry } from '../../workflows/video-review/gpu-preview-geometry';
 import {
   reviewPreviewSceneKey,
   sameReviewPreviewSceneKey,
@@ -12,6 +17,7 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
 import type { QuickEditWebcamPlacement } from '../../features/video/review/advanced/webcam';
 
 export type Renderer = ReturnType<typeof createReviewPreviewRenderer>;
+export type PresentedFrame = Awaited<ReturnType<Renderer['renderPresentation']>>;
 type Scene = Parameters<Renderer['prepare']>[0];
 export type Prepared = Awaited<ReturnType<Renderer['prepare']>>;
 export type RenderFrame = Parameters<Renderer['render']>[1];
@@ -32,6 +38,8 @@ export interface PresentationInput {
   preferences: QuickPreviewPreferences;
   playing: boolean;
   interacting?: boolean;
+  /** A paused inspector draft retains the displayed frame while its smaller preview renders. */
+  deferFrames?: boolean;
   visible?: boolean;
   seekRevision?: number;
   pausedSourceTime: number;
@@ -40,12 +48,19 @@ export interface PresentationInput {
   cameraTransform?: RenderFrame['cameraTransform'];
   cut?: ReviewCutPreviewBinding | undefined;
   webcam?: ReviewWebcamStageBinding | undefined;
+  onGeometry?(
+    geometry: ReviewPresentedGeometry | null,
+    sourceTime?: number,
+    sourceIdentity?: string
+  ): void;
+  onPresentationActive?(sourceIdentity: string, active: boolean): void;
   onStatistics?(status: ReviewPreviewPresentationStatus): void;
 }
 
 /** Requested FPS counts completed manual publications; native transport statistics are separate. */
 export interface ReviewPreviewPresentationStatus {
   captionConflicts?: Prepared['captionConflicts'];
+  renderer?: PreviewRendererStatus;
   phase: 'inactive' | 'pending' | 'ready' | 'failed';
   actualRaster: Size | null;
   presentedFPS: number | null;
@@ -53,6 +68,7 @@ export interface ReviewPreviewPresentationStatus {
 }
 
 export type Description = {
+  renderer?: VideoPreviewRenderer;
   scene: Scene;
   dimensions: { canonical: Size; backing: Size };
   cameraTransform: RenderFrame['cameraTransform'];
@@ -97,6 +113,7 @@ export function resolvePresentationDescription(
     input.seekRevision,
     input.backgroundPending,
     input.playing,
+    input.deferFrames,
     interacting,
     !input.playing && input.cameraTransform,
     !input.playing && input.pausedSourceTime,
@@ -118,6 +135,7 @@ export function resolvePresentationDescription(
       key,
       generation: (previous?.generation ?? 0) + 1,
       description: {
+        renderer: input.preferences.renderer,
         scene,
         dimensions: { canonical: input.canonical, backing },
         cameraTransform: !input.playing ? input.cameraTransform : undefined,
@@ -143,6 +161,8 @@ function samePresentationMetadata(
 ) {
   return (
     left.phase === right.phase &&
+    left.renderer?.backend === right.renderer?.backend &&
+    left.renderer?.fallback === right.renderer?.fallback &&
     left.nativeVideoFPS === right.nativeVideoFPS &&
     left.actualRaster?.width === right.actualRaster?.width &&
     left.actualRaster?.height === right.actualRaster?.height &&

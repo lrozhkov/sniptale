@@ -1,3 +1,4 @@
+import type { VideoEditorRecordingActionObservation } from '../../contracts/recording-events';
 import type { VideoEditorEffectApplicationTarget } from '../../contracts/effect-document-drag';
 import type { VideoEditorProjectActions } from '../../contracts/commands/project';
 import type { AutoProcessingActions } from '../../project/operations/auto-transform';
@@ -98,7 +99,11 @@ export interface ProjectTimelineProps {
   onSelectHistorySpan?: (
     target: import('../../contracts/commands/timeline').VideoEditorTypingSpanTarget
   ) => void;
-  onSelectActionOccurrence: (eventId: string, clipId: string | null) => void;
+  onSelectActionOccurrence: (
+    eventId: string,
+    clipId: string | null,
+    observedAction?: VideoEditorRecordingActionObservation
+  ) => void;
   onSelectHistoryLane?: (() => void) | undefined;
   onSelectMotionLane?: (() => void) | undefined;
   onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => void;
@@ -172,6 +177,7 @@ export interface TimelineEffectDragDraft {
 export type TimelineEffectDragTarget =
   | {
       kind: 'action';
+      observedAction?: VideoEditorRecordingActionObservation;
       eventId: string;
       clipId: string | null;
       segmentId: string;

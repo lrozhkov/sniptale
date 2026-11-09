@@ -8,7 +8,10 @@ import type { RuntimeMessagingTransport } from '../../../platform/runtime-messag
 type NativeAppRuntimeTransport = Pick<RuntimeMessagingTransport, 'sendRuntimeMessage'>;
 
 export type NativeAppRuntimeClient = {
-  mutate(operation: NativeAppMutationOperation): Promise<NativeAppRuntimeResponse>;
+  mutate(
+    operation: NativeAppMutationOperation,
+    clientId?: string
+  ): Promise<NativeAppRuntimeResponse>;
   query(): Promise<NativeAppRuntimeResponse>;
 };
 
@@ -20,9 +23,10 @@ export function createNativeAppRuntimeClient(
   transport: NativeAppRuntimeTransport
 ): NativeAppRuntimeClient {
   return {
-    mutate(operation) {
+    mutate(operation, clientId) {
       return transport.sendRuntimeMessage({
         operation,
+        ...(clientId ? { clientId } : {}),
         requestId: createRequestId(`native-${operation}`),
         type: MessageType.NATIVE_APP_MUTATION,
       });

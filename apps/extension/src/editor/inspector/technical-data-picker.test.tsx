@@ -64,16 +64,18 @@ it('groups page fields as checkboxes and text styling in compact disclosures', a
   expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(3);
   for (const checkbox of container.querySelectorAll('input[type="checkbox"]')) {
     expect(checkbox.classList.contains('sniptale-parameter-check')).toBe(true);
-    expect(checkbox.closest('label')?.querySelector('svg')).toBeNull();
+    expect(checkbox.classList.contains('sniptale-parameter-check--round')).toBe(true);
+    expect(checkbox.closest('.sniptale-boolean-parameter')).not.toBeNull();
   }
   const disclosures = Array.from(
     container.querySelectorAll<HTMLDetailsElement>('details[data-ui="editor.inspector.disclosure"]')
   );
   expect(disclosures.map((item) => item.querySelector('summary')?.textContent)).toEqual([
-    'editor.compact.technicalDataTextSettings',
     'editor.compact.technicalDataFields',
+    'editor.compact.technicalDataTextSettings',
   ]);
   expect(disclosures[0]?.open).toBe(true);
+  expect(disclosures[1]?.open).toBe(false);
   await act(async () => disclosures[0]?.querySelector('summary')?.click());
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -99,7 +101,7 @@ it('remembers both disclosure choices after the picker remounts', async () => {
     container.querySelectorAll<HTMLDetailsElement>('details[data-ui="editor.inspector.disclosure"]')
   );
   expect(restored[0]?.open).toBe(false);
-  expect(restored[1]?.open).toBe(true);
+  expect(restored[1]?.open).toBe(false);
 });
 
 it('keeps page-data typography and colors separate from the text tool', async () => {
@@ -232,12 +234,12 @@ it('offers layout only for multiple fields and inserts them in canonical order',
   expect(insert?.disabled).toBe(false);
 });
 
-it('announces the empty preview and keeps insert disabled', async () => {
+it('omits the empty caption and keeps insert disabled', async () => {
   await act(async () =>
     root.render(<EditorTechnicalDataPicker onInsert={vi.fn()} variant="compact" />)
   );
 
-  expect(container.textContent).toContain('editor.compact.technicalDataPreviewEmpty');
+  expect(container.textContent).not.toContain('editor.compact.technicalDataPreviewEmpty');
   expect(
     Array.from(container.querySelectorAll('button')).find(
       (button) => button.textContent === 'editor.compact.technicalDataInsert'

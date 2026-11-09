@@ -40,6 +40,7 @@ import {
 } from '../../composition/persistence/assets/residency-maintenance';
 import { captureRootKey } from '../../composition/persistence/sync-capture/contracts';
 import { readEnabledCaptureProfile } from '../../composition/persistence/sync-capture/capture';
+import { readCheckpointInTransaction } from '../../composition/persistence/sync-capture/checkpoints';
 import { parseSyncCaptureRecord } from '../../composition/persistence/sync-capture/guards';
 import {
   freezeImageInTransaction,
@@ -387,7 +388,10 @@ export async function releaseNativeEditingRoot(
     args.root.rootKind,
     args.root.rootId
   );
+  const pending = await readCheckpointInTransaction(tx, args.binding, args.root);
   await tx.done;
+  if (pending)
+    throw new AssetResidencyProtectedError('Native cache root has a pending checkpoint.');
 
   if (
     !state ||
@@ -463,6 +467,13 @@ export async function readNativeCacheRootStatus(
           )
       )
     : null;
+  const pending = profile
+    ? await readCheckpointInTransaction(
+        tx,
+        { ...profile, profileCreatedAt: profile.createdAt },
+        root
+      )
+    : null;
   await tx.done;
   const connection = profile ? await loadSyncConnection() : null;
   return {
@@ -472,6 +483,7 @@ export async function readNativeCacheRootStatus(
     ready: profile !== null && (await isNativeEditingRootReady(root)),
     releaseAllowed: !!(
       profile &&
+      !pending &&
       connection?.phase === 'active' &&
       connection.binding.spaceId === profile.spaceId &&
       connection.binding.profileCreatedAt === profile.createdAt &&

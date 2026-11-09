@@ -31,6 +31,14 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 
 vi.stubGlobal('HTMLElement', class HTMLElement {});
 vi.stubGlobal('ShadowRoot', class ShadowRoot {});
+vi.stubGlobal(
+  'ResizeObserver',
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+);
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

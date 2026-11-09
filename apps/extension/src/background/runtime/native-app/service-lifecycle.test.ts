@@ -63,7 +63,7 @@ it('ignores stale disconnects from an old native port after reconnect', async ()
   });
 
   service.connect();
-  service.reconnect();
+  await service.reconnect();
   firstPort.emitDisconnect();
   firstPort.emitMessage(createNativeHello());
 
@@ -88,6 +88,7 @@ it('marks the runtime connected after hello and keeps it connected after the gra
 
   service.connect();
   port.emitMessage(createNativeHello());
+  await waitForNativePost(port, 'extension.controller.acquire');
   await expect(service.getStatus()).resolves.toEqual(
     expect.objectContaining({ connectionState: 'connected' })
   );
@@ -121,10 +122,11 @@ it('pings the native app and reconnects only after a stale heartbeat timeout', a
     });
 
     service.connect();
+    firstPort.emitMessage(createNativeHello());
+    await flushNativeMicrotasks();
+    firstPort.emitMessage(createNativeLease());
     vi.advanceTimersByTime(15_000);
     expect(countPosts(firstPort, 'extension.ping')).toBe(1);
-
-    firstPort.emitMessage(createNativeHello());
     vi.advanceTimersByTime(30_000);
     firstPort.emitMessage(createPong());
     vi.advanceTimersByTime(45_000);
@@ -159,8 +161,8 @@ it('rejects duplicate and stale native control invocations before command side e
 
   service.connect();
   port.emitMessage(createNativeHello());
+  await waitForNativePost(port, 'extension.controller.acquire');
   port.emitMessage(createNativeLease());
-  await waitForNativePost(port, 'extension.settings.sync');
 
   port.emitMessage(createTrayAction('tray-1', Date.now()));
   await flushNativeServiceAsync();
@@ -168,24 +170,23 @@ it('rejects duplicate and stale native control invocations before command side e
   port.emitMessage(createTrayAction('tray-old', Date.now() - 600_000));
   await flushNativeServiceAsync();
 
-  expect(countPosts(port, 'extension.screenshot.capture')).toBe(1);
+  expect(countPosts(port, 'extension.screenshot.capture')).toBe(0);
   expect(countPosts(port, 'extension.tray.actionResult')).toBe(1);
 });
 
 function createTrayAction(invocationId: string, requestedAtEpochMs: number) {
   return {
-    actionId: 'capture-screenshot-screen',
+    actionId: 'open-gallery',
     controllerLeaseId: 'lease-1',
     invocationId,
-    protocolVersion: 1,
+    protocolVersion: 2,
     requestedAtEpochMs,
     type: 'app.tray.actionRequested',
   } as const;
 }
 
 async function flushNativeMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let turn = 0; turn < 10; turn++) await Promise.resolve();
 }
 
 function createPong() {
@@ -209,7 +210,7 @@ function createPong() {
       settingsRevision: null,
     },
     nonce: 'ping-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     sentAtEpochMs: Date.now(),
     type: 'app.pong',
   } as const;

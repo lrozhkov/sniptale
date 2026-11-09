@@ -1,8 +1,10 @@
+import { resolveReviewCursorOrientation, reviewCursorSpatialSettings } from './cursor-focus-path';
+import { evaluateCursorOrientation } from '../../composition/motion/cursor-orientation';
 import { resolveCameraWindowWeight } from '../../project/motion/spatial';
 import {
   createWindowCameraGeometry,
   createWindowCameraLinkGeometry,
-  proveWindowCameraGap,
+  planWindowCameraGap,
 } from '../../composition/motion/window-camera-geometry';
 import type { proveCameraPlan } from '../../composition/motion/camera-plan-proof';
 import type { ResolvedCameraFollowPolicy } from '../../project/camera/cursor-policy';
@@ -40,7 +42,8 @@ export function createReviewWorkingZoneCameraGeometry(input: {
   const windowWeight = resolveCameraWindowWeight(
     input.background.zoomBehavior,
     follows,
-    hasQuickEditPerspective(region.perspective)
+    hasQuickEditPerspective(reviewCursorSpatialSettings(region, region.start, true).perspective) ||
+      resolveReviewCursorOrientation(region) !== undefined
   );
   return createWindowCameraGeometry({
     output: input.output,
@@ -48,7 +51,10 @@ export function createReviewWorkingZoneCameraGeometry(input: {
     video: input.video,
     cornerRadius: input.cornerRadius,
     policy: input.policy,
-    region,
+    region: reviewCursorSpatialSettings(region, region.start, true),
+    ...(resolveReviewCursorOrientation(region)
+      ? { orientationPlan: resolveReviewCursorOrientation(region)! }
+      : {}),
     windowWeight,
     connectedIn: linkedPrevious,
     connectedOut: linkedNext,
@@ -89,13 +95,33 @@ export function createReviewCameraLinkGeometry(input: {
       end: start,
       scale: input.from.scale,
       pan: input.from.pan,
-      ...(input.from.region.perspective ? { perspective: input.from.region.perspective } : {}),
+      ...(resolveReviewCursorOrientation(input.from.region)
+        ? {
+            cursorOffset: evaluateCursorOrientation(
+              resolveReviewCursorOrientation(input.from.region),
+              start
+            ),
+          }
+        : {}),
+      ...(reviewCursorSpatialSettings(input.from.region, start, true).perspective
+        ? { perspective: reviewCursorSpatialSettings(input.from.region, start, true).perspective! }
+        : {}),
     },
     to: {
       start: end,
       scale: input.to.scale,
       pan: input.to.pan,
-      ...(input.to.region.perspective ? { perspective: input.to.region.perspective } : {}),
+      ...(resolveReviewCursorOrientation(input.to.region)
+        ? {
+            cursorOffset: evaluateCursorOrientation(
+              resolveReviewCursorOrientation(input.to.region),
+              end
+            ),
+          }
+        : {}),
+      ...(reviewCursorSpatialSettings(input.to.region, end, true).perspective
+        ? { perspective: reviewCursorSpatialSettings(input.to.region, end, true).perspective! }
+        : {}),
     },
   });
 }
@@ -137,7 +163,7 @@ export function proveReviewCameraGap(input: {
     to: { region: target, scale: input.to.scale, pan: toPan },
     policy,
   });
-  return proveWindowCameraGap({
+  return planWindowCameraGap({
     adapter,
     start: source.end,
     end: target.start,
@@ -160,6 +186,7 @@ export function reviewCameraNominalDescriptor(region: QuickEditZoomRegion) {
     linkTo: region.linkTo,
     linkEasing: region.linkEasing,
     perspective: region.perspective,
+    cursorComposition: region.cursorComposition,
     dormant: region.dormant,
     spotlight: !!region.spotlight,
     border: !!region.border,
@@ -178,7 +205,14 @@ export function reviewCameraGapSignature(
     target: reviewCameraNominalDescriptor(input.target),
     from: input.from,
     to: input.to,
-    input: input.scene,
+    // Preview callers also carry playback time and pose; these do not change the gap proof.
+    input: {
+      source: input.scene.source,
+      output: input.scene.output,
+      canvas: input.scene.canvas,
+      background: input.scene.background,
+      windowHeader: input.scene.windowHeader,
+    },
     policy: input.policy,
   });
 }

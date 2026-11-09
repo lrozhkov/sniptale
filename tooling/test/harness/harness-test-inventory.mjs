@@ -11,7 +11,18 @@ const FORK_COMPATIBILITY_FILES = new Set([
   'tooling/ci/ci-contract.test.ts',
   'tooling/qa/wrappers/advisory.test.ts',
   'tooling/qa/guards/product-contracts/react/verify-react-transform.test.ts',
+  // Vite sends VM RegExp values to Rolldown's native resolver binding.
+  // Remove when that binding accepts these values in vmThreads.
+  'tooling/test/harness/i18n-catalogs.test.ts',
+  // This 5000-fact integration test times out in the VM CI partition.
+  // Forks complete the unchanged test within its 15-second deadline.
+  // Remove when repeated VM CI runs meet the same deadline.
+  'tooling/test/harness/integration/recording-events.test.ts',
   'tooling/test/harness/vite-injected-build.test.ts',
+  // Native structuredClone returns host-realm records in vmThreads.
+  // This archive proof checks records against the calling realm's Object.prototype.
+  // Remove when vmThreads clones retain the calling realm.
+  'tooling/test/harness/webdav-checkpoints.test.ts',
 ]);
 
 function createIdentity(files) {

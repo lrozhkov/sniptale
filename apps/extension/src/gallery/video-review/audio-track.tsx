@@ -16,6 +16,7 @@ import {
 } from '../../features/video/review/voiceover-edits';
 import {
   useCallback,
+  useMemo,
   useEffect,
   useRef,
   useState,
@@ -23,9 +24,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type MutableRefObject,
   type ReactNode,
-  type RefObject,
 } from 'react';
-import { Mic, Plus, Volume2, VolumeX, AudioLines, Music } from 'lucide-react';
+import { Volume2, VolumeX, AudioLines, Music } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type {
   QuickEditAudioClip,
@@ -36,11 +36,7 @@ import {
   moveQuickEditAudioClip,
   trimQuickEditAudioClip,
 } from '../../features/video/review/advanced/audio';
-import {
-  reviewTrackStatusButtonClassName,
-  reviewIconButtonClassName,
-  ReviewButton,
-} from './controls';
+import { reviewTrackStatusButtonClassName } from './controls';
 import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
 import { ReviewAudioWaveform } from './audio-waveform';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
@@ -110,7 +106,6 @@ type ReviewAudioClipLaneProps = ReviewAudioTimelineProps & {
 
 type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
   lane?: 'originalAudio' | 'voiceover' | 'music' | undefined;
-  onOpenSpeech?: (() => void) | undefined;
   originalEditor?: ReturnType<typeof useReviewAudio> | undefined;
   selectedEditId?: string | undefined;
   edits?: readonly ReviewEdit[] | undefined;
@@ -121,8 +116,6 @@ type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
   showAddedAudio?: boolean;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
-  onRecordVoiceover(): void;
-  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
 };
 
@@ -130,11 +123,7 @@ type ReviewClipLanesProps = ReviewAudioTimelineProps & {
   lane?: 'voiceover' | 'music' | undefined;
   audio: QuickEditAudioState;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
-  onRecordVoiceover(): void;
-  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
-  pickerLane: RefObject<ReviewAudioLane | null>;
-  pickerInput: RefObject<HTMLInputElement | null>;
 };
 
 /** One semantic clip lane: move drags the block, the edges trim inside the timeline. */
@@ -143,6 +132,19 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
     clip: QuickEditAudioClip;
     guide: number | null;
   } | null>(null);
+  const clipGeometry = useMemo(
+    () =>
+      props.clips.map((stored) => {
+        const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
+        const shown = preview?.clip.id === clip.id ? preview.clip : clip;
+        const pieces =
+          props.lane === 'music' && props.projection
+            ? props.projection.slices(shown.timelineStart, shown.timelineStart + shown.duration)
+            : [undefined];
+        return { clip, shown, pieces };
+      }),
+    [props.clips, props.voiceoverSegments, props.lane, props.projection, preview]
+  );
   const dropTarget = useAudioLaneDrop(props);
   const drag = useRef<AudioDragState | null>(null);
   const boundary = drag.current;
@@ -226,13 +228,7 @@ function ReviewAudioClipLane(props: ReviewAudioClipLaneProps) {
         {...dropTarget}
         style={{ height: rowCount * reviewTrackMetrics(props.compact).step }}
       >
-        {props.clips.flatMap((stored) => {
-          const clip = retimeReviewVoiceover(stored, props.voiceoverSegments);
-          const shown = preview?.clip.id === clip.id ? preview.clip : clip;
-          const pieces =
-            props.lane === 'music' && props.projection
-              ? props.projection.slices(shown.timelineStart, shown.timelineStart + shown.duration)
-              : [undefined];
+        {clipGeometry.flatMap(({ clip, shown, pieces }) => {
           return (
             <ReviewAudioClipBlock
               compact={props.compact}
@@ -509,28 +505,13 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
 
 /** The three semantic audio lanes; the original stays bound to the video structure. */
 export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
-  const input = useRef<HTMLInputElement>(null);
-  const picker = useRef<ReviewAudioLane | null>(null);
   return (
     <div data-ui="gallery.videoReview.audioTrack">
-      <input
-        ref={input}
-        type="file"
-        accept="audio/*"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = '';
-          if (file) props.onImportFile(file, picker.current ?? 'music');
-          picker.current = null;
-        }}
-      />
       {(!props.lane || props.lane === 'originalAudio') &&
         (props.hasOriginalAudio !== false ? (
           <ReviewOriginalAudioTrack
             compact={props.compact}
             beforeAction={props.beforeAction}
-            onOpenSpeech={props.onOpenSpeech}
             duration={props.duration}
             editor={props.originalEditor}
             selectedEditId={props.selectedEditId}
@@ -569,10 +550,6 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           onMoveClip={props.onMoveClip}
           onTrimClip={props.onTrimClip}
           onImportFile={props.onImportFile}
-          onRecordVoiceover={props.onRecordVoiceover}
-          onOpenMusic={props.onOpenMusic}
-          pickerLane={picker}
-          pickerInput={input}
           lane={props.lane}
         />
       ) : null}
@@ -621,38 +598,6 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
             }
             trailing={
               <>
-                {lane.key === 'voiceover' && (
-                  <ReviewButton
-                    label={translate('gallery.videoReview.recordVoiceover')}
-                    disabled={props.busy}
-                    className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                    onClick={props.onRecordVoiceover}
-                  >
-                    <Mic size={14} />
-                  </ReviewButton>
-                )}
-                <ReviewButton
-                  label={translate(
-                    lane.key === 'music' && props.onOpenMusic
-                      ? 'gallery.videoReview.musicLibrary'
-                      : 'gallery.videoReview.audioImport'
-                  )}
-                  disabled={props.busy}
-                  className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                  onClick={(event) => {
-                    if (props.onOpenMusic) {
-                      const trigger = event.currentTarget;
-                      (props.beforeAction ?? ((action) => action()))(() =>
-                        props.onOpenMusic?.(trigger, lane.key)
-                      );
-                      return;
-                    }
-                    props.pickerLane.current = lane.key;
-                    props.pickerInput.current?.click();
-                  }}
-                >
-                  <Plus size={14} />
-                </ReviewButton>
                 {props.onMuteLane ? (
                   <ReviewTrackVisibilityButton
                     track={lane.key}

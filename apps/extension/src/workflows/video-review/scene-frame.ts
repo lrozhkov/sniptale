@@ -19,6 +19,16 @@ import type { CanvasCommentExport } from '../../features/video/review/comments';
 import { drawReviewBackgroundPaint, type createReviewBackgroundPainter } from './scene-background';
 import { drawReviewComments } from './render-comments';
 import { drawReviewSceneShadow, reviewSpatialSourceRect } from './scene-shadow';
+import {
+  drawReviewPreparedSource,
+  reviewExportWindowSampling,
+  reviewExportSpatialRaster,
+  type ReviewExportSamplingPaint,
+} from './export-source-sampling';
+import {
+  multiplyQuickEditProjections,
+  quickEditPlaneProjection,
+} from '../../features/video/composition/motion/spatial-geometry';
 
 type ReviewCommentSpace = {
   canvas: { width: number; height: number };
@@ -42,6 +52,27 @@ export function spatialReviewCommentSpace(
   };
 }
 
+function exposureSampling(
+  sampling: ReviewExportSamplingPaint | undefined,
+  index: number,
+  fallbackDemandId: string | undefined
+): { exportSampling?: ReviewExportSamplingPaint } {
+  if (!sampling) return {};
+  const lensDemandId = sampling.lens
+    ? index
+      ? `${sampling.lens.id}:${index}`
+      : sampling.lens.id
+    : undefined;
+  return {
+    exportSampling: {
+      ...sampling,
+      exposureIndex: index,
+      sourceAbsent: !!sampling.lens && !sampling.lens.demands.some((d) => d.id === lensDemandId),
+      demandId: sampling.lens ? lensDemandId : (sampling.demandId ?? fallbackDemandId),
+    },
+  };
+}
+
 /** Paints one decorated scene, accumulating only camera motion; annotations stay readable. */
 export function drawReviewSceneFrame(
   context: CanvasRenderingContext2D,
@@ -57,11 +88,46 @@ export function drawReviewSceneFrame(
 ) {
   args = { ...args, backgroundCacheContext: args.backgroundCacheContext ?? context };
   const paint = (raster: ReviewWindowRaster | null) => {
-    if (args.layout.spatial) drawSpatialScene(context, args, raster);
-    else drawReviewSceneExposure(context, args, raster);
-    args.drawOverlays?.(raster);
+    const transform = args.exportSampling?.transform;
+    if (transform && !args.layout.spatial) {
+      context.save();
+      context.transform(
+        transform[0]!,
+        transform[3]!,
+        transform[1]!,
+        transform[4]!,
+        transform[2]!,
+        transform[5]!
+      );
+    }
+    try {
+      const sourceRaster = args.exportSampling ? null : raster;
+      if (args.layout.spatial) drawSpatialScene(context, args, sourceRaster);
+      else drawReviewSceneExposure(context, args, sourceRaster);
+      args.drawOverlays?.(raster);
+    } finally {
+      if (transform && !args.layout.spatial) context.restore();
+    }
   };
-  if (args.windowRaster) paint(args.windowRaster);
+  if (
+    args.exportSampling &&
+    (args.headerImage || args.layout.sourceCrop) &&
+    args.exportSampling.frame.plan.lenses.some((l) => l.kind === 'click')
+  )
+    withReviewWindowRaster(
+      {
+        header: args.headerImage ?? undefined,
+        resources: args.resources,
+        backing: args.windowRasterBacking,
+        videoRect: args.layout.videoRect,
+        visibleVideoRect: args.layout.visibleVideoRect,
+        windowRect: args.layout.windowRect ?? args.layout.videoRect,
+        draw: args.sample.draw,
+      },
+      paint
+    );
+  else if (args.exportSampling) paint(null);
+  else if (args.windowRaster) paint(args.windowRaster);
   else if ((args.headerImage || args.layout.sourceCrop) && args.layout.windowRect)
     withReviewWindowRaster(
       {
@@ -78,6 +144,35 @@ export function drawReviewSceneFrame(
   else paint(null);
 }
 
+/** Replay only the pre-focus scene stage; models never receive its decorated output. */
+export function drawReviewExportSharpStage(
+  context: CanvasRenderingContext2D,
+  args: Parameters<typeof drawReviewSceneFrame>[1],
+  frame: ReviewExportSamplingPaint['frame'],
+  lens: ReviewExportSamplingPaint['frame']['plan']['lenses'][number]
+) {
+  const fullLayout = {
+    ...args.layout,
+    windowRect: args.layout.windowRect ?? args.layout.videoRect,
+  };
+  const layout =
+    lens.kind === 'click' && fullLayout.spatial
+      ? computeQuickEditSpatialRasterLayout(fullLayout, args.background)
+      : fullLayout;
+  const flat: Parameters<typeof drawReviewSceneFrame>[1]['layout'] = { ...layout };
+  delete flat.spatial;
+  drawReviewSceneFrame(context, {
+    ...args,
+    layout: lens.kind === 'click' ? flat : layout,
+    background:
+      lens.kind === 'click' ? { ...args.background, zoomBehavior: 'fixed' } : args.background,
+    drawOverlays: undefined,
+    ...(lens.kind === 'click' ? { motionBlur: undefined } : {}),
+    deferComments: true,
+    exportSampling: { frame, demandId: lens.id, transform: lens.transform, lens },
+  });
+}
+
 /** A background-independent decorated plane, projected with the exact export/preview GPU pass. */
 function drawSpatialScene(
   context: CanvasRenderingContext2D,
@@ -91,25 +186,41 @@ function drawSpatialScene(
   const fullLayout = { ...args.layout, windowRect: baseWindow };
   const baseLayout = computeQuickEditSpatialRasterLayout(fullLayout, args.background);
   const fixed = { ...args.background, zoomBehavior: 'fixed' as const };
-  drawReviewSceneSample(
-    context,
-    {
-      ...args,
-      background: spatial.lockBackground ? fixed : args.background,
-      sample: { draw() {} },
-      backgroundOnly: true,
-    },
-    null
-  );
+  const transform = args.exportSampling?.transform;
+  if (transform) {
+    context.save();
+    context.transform(
+      transform[0]!,
+      transform[3]!,
+      transform[1]!,
+      transform[4]!,
+      transform[2]!,
+      transform[5]!
+    );
+  }
+  try {
+    drawReviewSceneSample(
+      context,
+      {
+        ...args,
+        background: spatial.lockBackground ? fixed : args.background,
+        sample: { draw() {} },
+        backgroundOnly: true,
+      },
+      null
+    );
+  } finally {
+    if (transform) context.restore();
+  }
   const passes = args.motionBlur?.length ? args.motionBlur : [{ camera: null, alpha: 1 }];
   const exposure = renderer.surface('exposure', args.canvas.width, args.canvas.height);
-  const sourceRect = reviewSpatialSourceRect({
+  const fullSourceRect = reviewSpatialSourceRect({
     output: args.canvas,
     window: baseWindow,
     background: fixed,
     sceneScale: args.sceneScale ?? 1,
   });
-  for (const pass of passes) {
+  for (const [index, pass] of passes.entries()) {
     const layout = pass.camera
       ? {
           ...fullLayout,
@@ -117,14 +228,47 @@ function drawSpatialScene(
           videoTransform: computeQuickEditVideoTransform({ ...args.layout, camera: pass.camera }),
         }
       : fullLayout;
-    const plane = renderer.surface('plane', sourceRect.width, sourceRect.height);
+    const planExposure = args.exportSampling?.frame.plan.exposures[index];
+    const baseProjection = quickEditPlaneProjection(
+      baseWindow,
+      computeQuickEditSpatialWindow(layout, args.background),
+      pass.camera?.spatial ?? spatial
+    );
+    const projection = transform
+      ? multiplyQuickEditProjections(transform, baseProjection)
+      : baseProjection;
+    const density =
+      (planExposure?.planeDensity ?? 1) *
+      (args.exportSampling?.lens?.demand ? Math.max(1, args.exportSampling.lens.transform[0]!) : 1);
+    const raster = reviewExportSpatialRaster({
+      projection,
+      output: args.canvas,
+      frame: pass.camera?.spatial ?? spatial,
+      density,
+      fullSourceRect,
+      ...(args.exportSampling?.lens ? { lens: args.exportSampling.lens } : {}),
+    });
+    if (!raster) continue;
+    const { sourceRect } = raster;
+    const plane = renderer.surface('plane', raster.backing.width, raster.backing.height);
     const rasterLayout = computeQuickEditSpatialRasterLayout(layout, args.background);
     plane.context.save();
     try {
+      if (plane.canvas.width !== sourceRect.width || plane.canvas.height !== sourceRect.height)
+        plane.context.scale(
+          plane.canvas.width / sourceRect.width,
+          plane.canvas.height / sourceRect.height
+        );
       plane.context.translate(-sourceRect.x, -sourceRect.y);
       drawReviewSceneSample(
         plane.context,
-        { ...args, layout: rasterLayout, background: fixed, planeOnly: true },
+        {
+          ...args,
+          layout: rasterLayout,
+          background: fixed,
+          planeOnly: true,
+          ...exposureSampling(args.exportSampling, index, planExposure?.body.id),
+        },
         windowRaster
       );
     } finally {
@@ -141,6 +285,7 @@ function drawSpatialScene(
         base: baseWindow,
         target: computeQuickEditSpatialWindow(layout, args.background),
         frame: pass.camera?.spatial ?? spatial,
+        ...(transform ? { projection } : {}),
       });
     } finally {
       exposure.context.restore();
@@ -190,7 +335,7 @@ function drawReviewSceneExposure(
     });
     if (!buffer) throw new Error('Motion blur canvas is unavailable.');
     try {
-      for (const pass of passes)
+      for (const [index, pass] of passes.entries())
         buffer.drawPass(pass.alpha, (target) =>
           drawReviewSceneSample(
             target,
@@ -203,6 +348,11 @@ function drawReviewSceneExposure(
                   camera: pass.camera,
                 }),
               },
+              ...exposureSampling(
+                args.exportSampling,
+                index,
+                args.exportSampling?.frame.plan.exposures[index]?.body.id
+              ),
             },
             windowRaster
           )
@@ -337,12 +487,46 @@ function drawReviewSceneSample(
     deferComments?: boolean;
     comments?: readonly CanvasCommentExport[];
     sourceTime?: number;
+    currentTime?: number | undefined;
     cameraScale?: number;
     sceneScale?: number;
+    exportSampling?: ReviewExportSamplingPaint;
   },
   windowRaster: ReviewWindowRaster | null
 ) {
   const { layout, background, sample } = args;
+  const sampling = args.exportSampling;
+  const demandId = sampling?.demandId ?? sampling?.frame.plan.exposures[0]?.body.id;
+  const draw = (
+    target: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ) => {
+    if (sampling?.sourceAbsent) return;
+    if (
+      !sampling ||
+      !demandId ||
+      !drawReviewPreparedSource(target, sampling.frame.sampling, demandId, { x, y, width, height })
+    )
+      sample.draw(target, x, y, width, height);
+  };
+  if (!windowRaster && sampling && demandId && (args.headerImage || layout.sourceCrop)) {
+    withReviewWindowRaster(
+      {
+        header: args.headerImage ?? undefined,
+        resources: args.resources,
+        ...reviewExportWindowSampling(sampling, layout, background, demandId),
+        videoRect: layout.videoRect,
+        visibleVideoRect: layout.visibleVideoRect,
+        windowRect: layout.windowRect ?? layout.videoRect,
+        draw,
+      },
+      (raster) => drawReviewSceneSample(context, args, raster)
+    );
+    return;
+  }
   if (!args.planeOnly) drawReviewSceneBackground(context, args);
   if (args.backgroundOnly) return;
   const motion = computeQuickEditSceneCamera(layout, background);
@@ -358,19 +542,23 @@ function drawReviewSceneSample(
     clipReviewScene(context, layout, background);
     if (windowRaster) {
       const window = computeQuickEditWindowTransform(layout);
+      const rect = windowRaster.rect;
+      const baseWindow = layout.windowRect ?? layout.videoRect;
+      const sx = window.width / baseWindow.width,
+        sy = window.height / baseWindow.height;
       context.drawImage(
         windowRaster.image,
         0,
         0,
         windowRaster.width,
         windowRaster.height,
-        window.x,
-        window.y,
-        window.width,
-        window.height
+        rect ? window.x + (rect.x - baseWindow.x) * sx : window.x,
+        rect ? window.y + (rect.y - baseWindow.y) * sy : window.y,
+        rect ? rect.width * sx : window.width,
+        rect ? rect.height * sy : window.height
       );
     } else
-      sample.draw(
+      draw(
         context,
         layout.videoTransform.x,
         layout.videoTransform.y,
@@ -392,6 +580,7 @@ function drawReviewSceneBackground(
     image,
     backgroundCacheContext,
     backgroundPainter,
+    currentTime,
   }: Parameters<typeof drawReviewSceneSample>[1]
 ) {
   context.fillStyle = '#000000';
@@ -403,7 +592,7 @@ function drawReviewSceneBackground(
     context.scale(motion.backgroundScale, motion.backgroundScale);
   }
   try {
-    const paint = { background, image, width: canvas.width, height: canvas.height };
+    const paint = { background, image, width: canvas.width, height: canvas.height, currentTime };
     if (backgroundPainter) backgroundPainter.draw(context, paint);
     else drawReviewBackgroundPaint(context, paint, backgroundCacheContext);
   } finally {

@@ -110,6 +110,13 @@ it('separates codec, quality, route and complexity profiles within bounded numer
   } as const;
   const profile = createExportTimeProfile(settings);
   expect(profile).toBe('project-render-mp4-avc-p8-f30-qHIGH-c1');
+  expect(createExportTimeProfile({ ...settings, detailEnhancement: 'off' })).toBe(profile);
+  expect(createExportTimeProfile({ ...settings, detailEnhancement: 'bicubic-sharpen' })).toBe(
+    `${profile}-ebicubic-sharpen`
+  );
+  expect(createExportTimeProfile({ ...settings, detailEnhancement: 'clark-x2' })).toBe(
+    `${profile}-eclark-x2`
+  );
   expect(createExportTimeProfile({ ...settings, width: 1920, height: 1080 })).toBe(profile);
   expect(createExportTimeProfile({ ...settings, codec: 'hevc' })).not.toBe(profile);
   expect(createExportTimeProfile({ ...settings, route: 'copy' })).not.toBe(profile);

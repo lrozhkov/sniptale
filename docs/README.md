@@ -29,6 +29,7 @@ This index lists current active documents and their authority.
 
 - [Repository overview](architecture/repository-overview.md) is the canonical source map.
 - [Code organization](architecture/code-organization.md) owns source placement, dependencies, and public surfaces.
+- [Desktop connection protocol](architecture/native-app-integration.md) owns native settings authority, installation trust, destination leases, media receipts, and integration proof.
 - [Runtime contexts](architecture/runtime-contexts.md) documents runtime entrypoints that machine policy owns. The runtime contexts document owns coordination boundaries.
 - [Scenario viewing from Library](architecture/scenario-library-viewing.md) records decisions before implementation about the viewer, content source, and opening flow for guides and tours.
 - [Shared topology](architecture/shared-topology.md) owns package and app-core residency.
@@ -45,9 +46,11 @@ This index lists current active documents and their authority.
 - [Project facts](engineering/project-facts.md) is the generated projection of values that can change. These values concern product, browser, permission, persistence, runtime, security-reporting, and release-policy facts.
 - [Canonical CI/CD](tooling/ci-cd.md) owns external execution and release admission.
 - [Operator handbook](tooling/operator-handbook.md) routes commands.
+- [Preview performance](tooling/preview-performance.md) describes optional canvas measurements and new scenarios.
 - [Wrapper summary](tooling/wrapper-summary.md) explains wrapper behavior.
 - [Code quality](tooling/code-quality.md) owns gate and exception policy.
 - [Web Snapshot Smoke](tooling/web-snapshot-smoke.md) owns local checks of snapshot fidelity.
+- [Simplify laboratory](../tooling/simplify-lab/README.md) owns site capture, algorithm checks, and visual assessments.
 - [Optional WebDAV E2E](tooling/webdav-e2e.md) owns the disposable provider lab and links the retained qualification evidence.
 - [WSL setup](tooling/wsl-setup.md) owns environment setup. [Repository root inventory](tooling/repo-root-inventory.md) owns required root entries.
 - `docs/agent-tooling/agent-tooling.zip` is the optional agent-tooling distribution. `npm run agents:pack`, `npm run agents:install`, and `npm run agents:remove` own its lifecycle.

@@ -1,3 +1,4 @@
+import type { RecordingProjectActionAudioSource } from '../../workflows/video-review/recording-action-audio';
 import {
   BrowserReviewAudioBuffer,
   createReviewAudioEngine,
@@ -44,11 +45,14 @@ interface ReviewAudioRuntimeProps {
   playing: boolean;
   silent?: boolean;
   outputTime: number;
+  /** Reads the media clock in result time when React commits a delayed transport sample. */
+  sourceToResult?: ((sourceTime: number) => number | null) | undefined;
   seekRevision?: number | undefined;
   original: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
   actionPlan?: ReviewActionAudioPlan;
+  recordingActionSource?: RecordingProjectActionAudioSource | null;
   resolveAsset(assetId: string): Promise<Blob | null>;
   sessionKey: string;
   onFailure(reason?: ReviewActionAudioUnavailable['reason']): void;
@@ -105,11 +109,14 @@ export function useReviewEditorAudioRuntime(args: {
   playing: boolean;
   silent?: boolean;
   outputTime: number;
+  /** Reads the media clock in result time when React commits a delayed transport sample. */
+  sourceToResult?: ((sourceTime: number) => number | null) | undefined;
   seekRevision?: number | undefined;
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
   actionPlan?: ReviewActionAudioPlan;
+  recordingActionSource?: RecordingProjectActionAudioSource | null;
   sessionKey: string;
   onFailure(reason?: ReviewActionAudioUnavailable['reason']): void;
   onActionAudioRecovered?: (() => void) | undefined;
@@ -119,11 +126,13 @@ export function useReviewEditorAudioRuntime(args: {
     playing: args.playing,
     silent: args.silent ?? false,
     outputTime: args.outputTime,
+    sourceToResult: args.sourceToResult,
     seekRevision: args.seekRevision,
     original: args.originalAudio,
     voiceover: args.voiceover,
     music: args.music,
     ...(args.actionPlan ? { actionPlan: args.actionPlan } : {}),
+    ...(args.recordingActionSource ? { recordingActionSource: args.recordingActionSource } : {}),
     resolveAsset: resolveReviewAssetBytes,
     sessionKey: args.sessionKey,
     onFailure: args.onFailure,
@@ -142,9 +151,13 @@ class ReviewAudioPlaybackSession {
   private rollingTimer: ReturnType<typeof setTimeout> | null = null;
   private actionSource: ReviewActionAudioSource<AudioBuffer> | null = null;
   private admission: {
-    plan: ReviewActionAudioPlan;
+    identity: object;
     result: Awaited<ReturnType<typeof admitReviewActionAudioPlan>>;
   } | null = null;
+  private windowRead: Promise<ReviewActionAudioPlan> | null = null;
+  private pendingAdmission: Promise<
+    Awaited<ReturnType<RecordingProjectActionAudioSource['admit']>>
+  > | null = null;
   private auditionActive = false;
   constructor(
     private latest: { current: ReviewAudioRuntimeProps },
@@ -169,7 +182,8 @@ class ReviewAudioPlaybackSession {
     this.stop();
     const current = this.latest.current;
     const plan = current.actionPlan;
-    if (current.silent || !plan?.descriptors.length) return true;
+    if (current.silent || (!plan?.descriptors.length && !current.recordingActionSource))
+      return true;
     const controller = new AbortController();
     this.preparation = controller;
     const generation = this.generation;
@@ -178,6 +192,7 @@ class ReviewAudioPlaybackSession {
       generation === this.generation &&
       this.latest.current.sessionKey === current.sessionKey &&
       this.latest.current.actionPlan === plan &&
+      this.latest.current.recordingActionSource === current.recordingActionSource &&
       this.latest.current.seekRevision === current.seekRevision &&
       this.latest.current.silent === current.silent;
     try {
@@ -211,7 +226,7 @@ class ReviewAudioPlaybackSession {
     this.anchor = { outputTime, audioNow: engine.now() };
     engine.setOriginalGain(0);
     const job: PlaybackJob = {
-      current: { ...current, actionPlan: plan, outputTime },
+      current: { ...current, actionPlan: plan, recordingActionSource: null, outputTime },
       generation: this.generation,
       signal: controller.signal,
       engine,
@@ -236,8 +251,15 @@ class ReviewAudioPlaybackSession {
     this.actionSource?.dispose();
     this.actionSource = null;
   }
-  needsSeek(outputTime: number) {
-    if (!this.latest.current.playing || !this.anchor) return false;
+  private readOutputTime(current: ReviewAudioRuntimeProps) {
+    const media = current.video.current;
+    return current.sourceToResult && media
+      ? current.sourceToResult(media.currentTime)
+      : current.outputTime;
+  }
+  needsSeek() {
+    const outputTime = this.readOutputTime(this.latest.current);
+    if (!this.latest.current.playing || !this.anchor || outputTime === null) return false;
     const engine = this.engines.get();
     return (
       !!engine &&
@@ -268,7 +290,10 @@ class ReviewAudioPlaybackSession {
   }
   schedule(planKey: string) {
     this.auditionActive = false;
-    const current = this.latest.current;
+    const current = {
+      ...this.latest.current,
+      outputTime: this.readOutputTime(this.latest.current) ?? this.latest.current.outputTime,
+    };
     const generation = ++this.generation;
     this.preparation?.abort();
     this.clearActionResources();
@@ -303,7 +328,9 @@ class ReviewAudioPlaybackSession {
       job.generation === this.generation &&
       !!job.audition === this.auditionActive &&
       (job.audition || this.latest.current.playing) &&
-      this.latest.current.sessionKey === job.current.sessionKey
+      this.latest.current.sessionKey === job.current.sessionKey &&
+      (job.audition ||
+        this.latest.current.recordingActionSource === job.current.recordingActionSource)
     );
   }
   private async run(job: PlaybackJob) {
@@ -368,12 +395,24 @@ class ReviewAudioPlaybackSession {
     valid: () => boolean
   ) {
     const plan = current.actionPlan;
-    if (!plan?.descriptors.length || !valid()) return null;
-    let admission = this.admission?.plan === plan ? this.admission.result : null;
+    const source = current.recordingActionSource;
+    const identity = source ?? plan;
+    if (!identity || (!source && !plan?.descriptors.length) || !valid()) return null;
+    let admission = this.admission?.identity === identity ? this.admission.result : null;
     if (!admission) {
-      admission = await admitReviewActionAudioPlan(plan, signal);
+      if (source) {
+        if (this.pendingAdmission) await this.pendingAdmission.catch(() => undefined);
+        if (!valid()) return null;
+        const pending = source.admit(signal);
+        this.pendingAdmission = pending;
+        try {
+          admission = await pending;
+        } finally {
+          if (this.pendingAdmission === pending) this.pendingAdmission = null;
+        }
+      } else admission = await admitReviewActionAudioPlan(plan!, signal);
       if (!valid()) return null;
-      this.admission = { plan, result: admission };
+      this.admission = { identity, result: admission };
     }
     const missing = admission.sampleIds.filter((sampleId) => !this.actionBuffers.has(sampleId));
     if (missing.length) {
@@ -396,29 +435,46 @@ class ReviewAudioPlaybackSession {
   }
   private async startActions(job: PlaybackJob) {
     const plan = job.current.actionPlan;
-    if (!plan?.descriptors.length || !this.active(job)) return;
+    const source = job.current.recordingActionSource;
+    if ((!source && !plan?.descriptors.length) || !this.active(job)) return;
     const admission = await this.loadActions(job.current, job.signal, () => this.active(job));
     if (!admission || !this.active(job)) return;
     if (job.audition)
       this.anchor = { outputTime: job.current.outputTime, audioNow: job.engine.now() };
     job.current.onActionAudioRecovered?.();
-    const action: QuickEditActionAudioSchedule = {
-      plan,
-      offset: 0,
-      busGain: admission.busGain,
-      ...(job.until !== undefined
-        ? { bounds: { start: job.current.outputTime, end: job.until } }
-        : {}),
-    };
     const visited = new Map<string, number>();
     const pump = async () => {
       if (!this.active(job) || !this.anchor) return;
       const outputTime = this.anchor.outputTime + job.engine.now() - this.anchor.audioNow;
-      const end = job.until ?? plan.duration;
+      const end = job.until ?? source?.duration ?? plan!.duration;
       if (outputTime >= end) {
         if (job.audition) this.stop();
         return;
       }
+      let window = plan;
+      if (source) {
+        if (this.windowRead) await this.windowRead.catch(() => undefined);
+        if (!this.active(job)) return;
+        const pending = source.readWindow(
+          { start: Math.max(0, outputTime), end: Math.min(end, outputTime + 2) },
+          job.signal
+        );
+        this.windowRead = pending;
+        try {
+          window = await pending;
+        } finally {
+          if (this.windowRead === pending) this.windowRead = null;
+        }
+        if (!this.active(job)) return;
+      }
+      const action: QuickEditActionAudioSchedule = {
+        plan: window!,
+        offset: 0,
+        busGain: admission.busGain,
+        ...(job.until !== undefined
+          ? { bounds: { start: job.current.outputTime, end: job.until } }
+          : {}),
+      };
       for (const [id, end] of visited) if (end <= outputTime) visited.delete(id);
       for (const batch of iterateQuickEditActionAudioPlan(action, {
         start: outputTime,
@@ -479,12 +535,12 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
   useEffect(() => {
     if (props.playing) session.current?.schedule(planKey);
     else session.current?.pausePlayback();
-  }, [planKey, props.playing, props.sessionKey, props.seekRevision]);
+  }, [planKey, props.playing, props.sessionKey, props.seekRevision, props.recordingActionSource]);
   useEffect(() => {
     session.current?.cancelAudition();
-  }, [planKey, props.seekRevision]);
+  }, [planKey, props.seekRevision, props.recordingActionSource]);
   useEffect(() => {
-    if (session.current?.needsSeek(props.outputTime)) session.current.schedule(planKey);
+    if (session.current?.needsSeek()) session.current.schedule(planKey);
   }, [props.outputTime, planKey]);
   useEffect(() => {
     peek()?.setOriginalGain(

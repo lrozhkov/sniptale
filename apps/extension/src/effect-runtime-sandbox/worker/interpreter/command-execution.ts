@@ -3,7 +3,7 @@ import type { EffectV1Command } from '@sniptale/runtime-contracts/effect-v1';
 import { getLogicalCanvasSize } from '../canvas/logical-canvas.js';
 import { drawImage, drawPath, drawShape, drawText } from './drawing.js';
 import { n, resolveCommandLayer, type RenderState, v, valueOr } from './model.js';
-import { resolveFilter, resolvePaint, withCommandStyle } from './painting.js';
+import { paintPrimitive, resolveFilter, resolvePaint, withCommandStyle } from './painting.js';
 import { drawSampledPath } from './sampled-path.js';
 import { createSvgPartTransform } from './svg-part-transform.js';
 import { executeCommandLoop } from './command-loops.js';
@@ -57,15 +57,25 @@ function executeCommand(command: EffectV1Command, state: RenderState): void {
 
 function executeClear(command: Command<'clear'>, state: RenderState): void {
   const context = state.context;
+  state.target?.clear(state);
   context.save();
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.clearRect(0, 0, state.canvas.width, state.canvas.height);
   context.restore();
   if (command.color == null) return;
-  context.save();
-  context.fillStyle = resolvePaint(command.color, context, state);
-  context.fillRect(0, 0, state.scope.context.width, state.scope.context.height);
-  context.restore();
+  const paint = () => {
+    const context = state.context;
+    context.save();
+    context.fillStyle = resolvePaint(command.color!, context, state);
+    paintPrimitive(
+      state,
+      () => context.fillRect(0, 0, state.scope.context.width, state.scope.context.height),
+      { x: 0, y: 0, width: state.scope.context.width, height: state.scope.context.height }
+    );
+    context.restore();
+  };
+  if (state.target) state.target.primitive(state, paint);
+  else paint();
 }
 
 function executeFillRect(
@@ -73,15 +83,24 @@ function executeFillRect(
   layer: ReturnType<typeof resolveCommandLayer>,
   state: RenderState
 ): void {
-  withCommandStyle(command, layer, state, () => {
-    state.context.fillStyle = resolvePaint(command.fill, state.context, state);
-    state.context.fillRect(
-      n(command.x, state),
-      n(command.y, state),
-      n(command.width, state),
-      n(command.height, state)
-    );
-  });
+  withCommandStyle(
+    command,
+    layer,
+    state,
+    () => {
+      state.context.fillStyle = resolvePaint(command.fill, state.context, state);
+      const x = n(command.x, state),
+        y = n(command.y, state),
+        width = n(command.width, state),
+        height = n(command.height, state);
+      paintPrimitive(
+        state,
+        () => state.context.fillRect(x, y, width, height),
+        width === 0 || height === 0 ? null : { x, y, width, height }
+      );
+    },
+    true
+  );
 }
 
 function executeGroup(
@@ -103,15 +122,18 @@ function executeClip(
   state: RenderState
 ): void {
   withCommandStyle({}, layer, state, () => {
+    const rect = {
+      x: n(command.x, state),
+      y: n(command.y, state),
+      width: n(command.width, state),
+      height: n(command.height, state),
+    };
     state.context.beginPath();
-    state.context.rect(
-      n(command.x, state),
-      n(command.y, state),
-      n(command.width, state),
-      n(command.height, state)
-    );
+    state.context.rect(rect.x, rect.y, rect.width, rect.height);
     state.context.clip();
-    executeEffectV1Commands(command.commands, state);
+    const draw = () => executeEffectV1Commands(command.commands, state);
+    if (state.target) state.target.clip(state, rect, draw);
+    else draw();
   });
 }
 
@@ -161,7 +183,9 @@ function executeCompositePass(
     const y = n(command.y, state);
     state.context.translate(x + width / 2, y + height / 2);
     state.context.rotate(n(command.rotation, state));
-    state.context.drawImage(pass, -width / 2, -height / 2, width, height);
+    if (state.target)
+      state.target.composite(state, pass, { x: -width / 2, y: -height / 2, width, height });
+    else state.context.drawImage(pass, -width / 2, -height / 2, width, height);
   });
 }
 
@@ -185,6 +209,17 @@ function executeSvgParts(
       width: n(command.width, state),
       x: n(command.x, state),
       y: n(command.y, state),
+      ...(state.target
+        ? {
+            paint: (
+              draw: () => void,
+              bounds?: import('../canvas/primitive-bounds').PrimitiveGeometry,
+              stroke?: boolean
+            ) => paintPrimitive(state, draw, bounds, stroke),
+            primitive: (draw: (context: RenderState['context']) => void) =>
+              state.target!.primitive(state, () => draw(state.context)),
+          }
+        : {}),
     });
   });
 }

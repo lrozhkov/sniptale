@@ -1,17 +1,13 @@
 import { vi } from 'vitest';
 
-import type {
-  AppControllerLeaseMessage,
-  AppHelloMessage,
-  ExtensionSettingsSyncMessage,
-} from '../../../contracts/native-app';
+import type { AppControllerLeaseMessage, AppHelloMessage } from '../../../contracts/native-app';
 import { createChromeStorageArea } from './service-storage.test-support';
 import * as mutationBarrier from '../../../composition/persistence/infrastructure/mutation-barrier';
 
 type NativePortMessageListener = (message: unknown, port: chrome.runtime.Port) => void;
 type NativePortDisconnectListener = (port: chrome.runtime.Port) => void;
 
-export type NativeTestPort = chrome.runtime.Port & {
+type NativeTestPort = chrome.runtime.Port & {
   emitDisconnect(): void;
   emitMessage(message: unknown): void;
   postMessage: ReturnType<typeof vi.fn<(message: unknown) => void>>;
@@ -121,14 +117,16 @@ function createNativeCapabilities(): AppHelloMessage['capabilities'] {
 
 export function createNativeHello(patch: Partial<AppHelloMessage> = {}): AppHelloMessage {
   return {
+    appIdentity: { clientId: 'a'.repeat(64), trustVersion: 1 },
+    settingsAuthority: 'desktop',
     appInstanceId: 'app-1',
     capabilities: createNativeCapabilities(),
     install: createNativeInstallState(),
     minExtensionVersion: '0.1.0',
     platform: { arch: 'x64', kind: 'windows', version: '11' },
-    protocolVersion: 1,
+    protocolVersion: 2,
     settingsSchemaVersion: 1,
-    supportedProtocolVersions: [1],
+    supportedProtocolVersions: [2],
     supportedSettingsSchemaVersions: [1],
     type: 'app.hello',
     ...patch,
@@ -147,8 +145,9 @@ export function createNativeLease(
     },
     controllerLeaseId: 'lease-1',
     expiresAtEpochMs: Date.now() + 60_000,
-    protocolVersion: 1,
+    protocolVersion: 2,
     status: 'granted',
+    selectionStatus: patch.status && patch.status !== 'granted' ? 'available' : 'selected',
     type: 'app.controller.lease',
     ...patch,
   };
@@ -158,7 +157,13 @@ export function installChromeRuntimeInfo(): void {
   mutationBarrier.installPersistenceLockManagerForTests({
     request: async (_name, _options, operation) => operation(),
   });
-  const storageValues: Record<string, unknown> = {};
+  const storageValues: Record<string, unknown> = {
+    'sniptale.nativeApp.trustedClient': {
+      hostName: 'com.sniptale.native_host',
+      clientId: 'a'.repeat(64),
+      trustVersion: 1,
+    },
+  };
   Object.assign(globalThis, {
     chrome: {
       runtime: {
@@ -206,23 +211,8 @@ export async function waitForNativePost(
   throw new Error(`Expected ${count} native message(s): ${type}`);
 }
 
-export async function waitForNativeSettingsSync(
-  port: NativeTestPort,
-  count = 1
-): Promise<ExtensionSettingsSyncMessage> {
-  const message = await waitForNativePost(port, 'extension.settings.sync', count);
-  if (!isNativeSettingsSyncMessage(message)) {
-    throw new Error('Expected native settings sync message');
-  }
-  return message;
-}
-
 function hasNativeMessageType(message: unknown, type: string): boolean {
   return (
     typeof message === 'object' && message !== null && 'type' in message && message.type === type
   );
-}
-
-function isNativeSettingsSyncMessage(message: unknown): message is ExtensionSettingsSyncMessage {
-  return hasNativeMessageType(message, 'extension.settings.sync');
 }

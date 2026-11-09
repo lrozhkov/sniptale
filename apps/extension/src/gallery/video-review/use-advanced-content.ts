@@ -44,6 +44,7 @@ export function useReviewAdvancedContent(
   const [saveFailed, setSaveFailed] = useState(false);
   const pending = useRef<PendingContent[]>([]);
   const action = useRef<TypingAction | null>(null);
+  const checkpointEdit = useRef<(() => void) | null>(null);
   const commandGroup = useRef<string | null>(null);
   const generation = useRef(0);
   const nextRevision = useRef(0);
@@ -105,6 +106,8 @@ export function useReviewAdvancedContent(
   }, [session]);
   const endTyping = useCallback(() => {
     action.current = null;
+    checkpointEdit.current?.();
+    checkpointEdit.current = null;
     // Keep malformed captures open for correction. Close valid groups at the interaction boundary.
     const tail = pending.current.at(-1);
     if (!tail || loadQuickEditAdvancedContentState(tail.value)) commandGroup.current = null;
@@ -115,11 +118,17 @@ export function useReviewAdvancedContent(
       const base = previous?.value ?? session.getSnapshot().document.advancedContent;
       const value = mutate(base);
       if (JSON.stringify(value) === JSON.stringify(base)) return;
-      if (!target) action.current = null;
-      else {
+      if (!target) {
+        action.current = null;
+        checkpointEdit.current?.();
+        checkpointEdit.current = null;
+      } else {
         commandGroup.current = null;
-        if (!action.current || action.current.target.fragmentId !== target.fragmentId)
+        if (!action.current || action.current.target.fragmentId !== target.fragmentId) {
+          checkpointEdit.current?.();
+          checkpointEdit.current = session.beginCheckpointEdit();
           action.current = { id: crypto.randomUUID(), target, continuation: false };
+        }
       }
       const active = action.current;
       const group = active?.id ?? (commandGroup.current ??= crypto.randomUUID());
@@ -142,6 +151,13 @@ export function useReviewAdvancedContent(
     [session, schedule]
   );
   useRecoveryLifecycle(flush, mounted);
+  useEffect(
+    () => () => {
+      checkpointEdit.current?.();
+      checkpointEdit.current = null;
+    },
+    [session]
+  );
   useEffect(() => {
     if (!pending.current.length) optimistic.current = null;
     setVersion((version) => version + 1);
@@ -153,6 +169,8 @@ export function useReviewAdvancedContent(
     optimistic.current = null;
     failedCapture.current = null;
     action.current = null;
+    checkpointEdit.current?.();
+    checkpointEdit.current = null;
     commandGroup.current = null;
     if (mounted.current) {
       setSaveFailed(false);

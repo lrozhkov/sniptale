@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { drawCompositionVisualLayer } from './index';
+import { isVideoCompositionFrameSource } from './media-source';
 import { drawActionCompositionState } from './effects/actions';
 import { createVideoProjectFromRecording } from '../../project/factories/creation';
 import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
@@ -21,6 +22,7 @@ function createContext() {
     clip: vi.fn(),
     drawImage: vi.fn(),
     rect: vi.fn(),
+    roundRect: vi.fn(),
     restore: vi.fn(),
     rotate: vi.fn(),
     save: vi.fn(),
@@ -55,6 +57,13 @@ function createVideoLayer() {
 beforeEach(() => {
   vi.stubGlobal('HTMLMediaElement', FakeHTMLMediaElement);
   vi.stubGlobal('HTMLVideoElement', class extends FakeHTMLMediaElement {});
+});
+
+it('accepts optional owned GPU frame access only when it is callable', () => {
+  const source = { sourceWidth: 80, sourceHeight: 50, draw: vi.fn() };
+  expect(isVideoCompositionFrameSource(source)).toBe(true);
+  expect(isVideoCompositionFrameSource({ ...source, toVideoFrame: vi.fn() })).toBe(true);
+  expect(isVideoCompositionFrameSource({ ...source, toVideoFrame: 'frame' })).toBe(false);
 });
 
 it('renders decoded frame sources through the video layer path', () => {
@@ -313,4 +322,62 @@ it('provides original decoded window pixels to lenses without recursively drawin
   );
   expect(draw).toHaveBeenCalledTimes(2);
   expect(drawActionCompositionState).toHaveBeenCalledOnce();
+});
+
+it('admits only complete optional prepared-source capabilities and preserves original source dimensions', () => {
+  const source = { sourceWidth: 100, sourceHeight: 50, draw: vi.fn() };
+  const preparedSampling = {
+    sourceKey: {},
+    sourceTime: 1,
+    passTime: 2,
+    sourceSize: { width: 100, height: 50 },
+    drawPrepared: vi.fn(),
+    visitPreparedTiles: vi.fn(),
+  };
+  expect(isVideoCompositionFrameSource({ ...source, preparedSampling })).toBe(true);
+  expect(
+    isVideoCompositionFrameSource({
+      ...source,
+      preparedSampling: { ...preparedSampling, visitPreparedTiles: 'tiles' },
+    })
+  ).toBe(false);
+  expect(
+    isVideoCompositionFrameSource({
+      ...source,
+      preparedSampling: { ...preparedSampling, sourceTime: NaN },
+    })
+  ).toBe(false);
+  expect(
+    isVideoCompositionFrameSource({
+      ...source,
+      preparedSampling: { ...preparedSampling, sourceSize: { width: 0, height: 50 } },
+    })
+  ).toBe(false);
+  expect(
+    isVideoCompositionFrameSource({
+      ...source,
+      preparedSampling: { ...preparedSampling, sourceSize: { width: 200, height: 50 } },
+    })
+  ).toBe(false);
+});
+
+it('validates optional render resources without acquiring a scratch lease', () => {
+  const source = { sourceWidth: 100, sourceHeight: 50, draw: vi.fn() };
+  const renderResources = { canvas: vi.fn(), bytes: vi.fn() };
+  expect(isVideoCompositionFrameSource(source)).toBe(true);
+  expect(isVideoCompositionFrameSource({ ...source, renderResources: undefined })).toBe(true);
+  expect(isVideoCompositionFrameSource({ ...source, renderResources })).toBe(true);
+  for (const invalid of [
+    null,
+    false,
+    {},
+    { canvas: vi.fn() },
+    { bytes: vi.fn() },
+    { canvas: 1, bytes: vi.fn() },
+    { canvas: vi.fn(), bytes: 1 },
+  ]) {
+    expect(isVideoCompositionFrameSource({ ...source, renderResources: invalid })).toBe(false);
+  }
+  expect(renderResources.canvas).not.toHaveBeenCalled();
+  expect(renderResources.bytes).not.toHaveBeenCalled();
 });

@@ -1,3 +1,6 @@
+import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { canExpireNativeRecordingHistoryParent } from '../../../../composition/persistence/recordings/native-history/guards';
+import { abortIndexedDbMutation } from '../../../../composition/persistence/infrastructure/indexed-db/transaction';
 import {
   initDB,
   NATIVE_TRANSFER_CHUNKS_STORE,
@@ -92,18 +95,43 @@ export async function completeNativeTransferSession(
   });
 }
 
+/** Expiry and deletion use the current parent in one transaction, without a stale candidate array. */
 export async function cleanupStaleNativeTransferSessions(now = Date.now()): Promise<string[]> {
-  const db = await initDB();
-  const sessions = (await db.getAll(
-    NATIVE_TRANSFER_SESSIONS_STORE
-  )) as NativeTransferSessionEntry[];
-  const staleIds = sessions
-    .filter((session) => session.expiresAt <= now)
-    .map((session) => session.id);
-
-  for (const id of staleIds) {
-    await deleteNativeTransferSession(id);
-  }
-
-  return staleIds;
+  return runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction(
+      [NATIVE_TRANSFER_SESSIONS_STORE, NATIVE_TRANSFER_CHUNKS_STORE],
+      'readwrite'
+    );
+    const deleted: string[] = [];
+    try {
+      const sessions = tx.objectStore(NATIVE_TRANSFER_SESSIONS_STORE);
+      const chunks = tx.objectStore(NATIVE_TRANSFER_CHUNKS_STORE);
+      for (let cursor = await sessions.openCursor(); cursor; cursor = await cursor.continue()) {
+        const raw: unknown = cursor.value;
+        if (
+          !isPlainRecord(raw) ||
+          typeof raw['id'] !== 'string' ||
+          typeof raw['expiresAt'] !== 'number' ||
+          !Number.isSafeInteger(raw['expiresAt']) ||
+          raw['expiresAt'] < 0 ||
+          raw['expiresAt'] > now ||
+          !canExpireNativeRecordingHistoryParent(raw)
+        )
+          continue;
+        const id = raw['id'];
+        await cursor.delete();
+        for (
+          let chunk = await chunks.index('sessionId').openKeyCursor(id);
+          chunk;
+          chunk = await chunk.continue()
+        )
+          await chunks.delete(chunk.primaryKey);
+        deleted.push(id);
+      }
+      await tx.done;
+      return deleted;
+    } catch (error) {
+      return abortIndexedDbMutation(tx, error);
+    }
+  });
 }

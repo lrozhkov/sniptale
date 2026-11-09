@@ -7,6 +7,7 @@ export async function applyLoadedEditorDocument(options: {
   applyDocument: (document: EditorDocument, options: ApplyDocumentOptions) => Promise<void>;
   document: EditorDocument;
   scheduleZoomToFit: () => void;
+  preserveInspector?: boolean;
 }): Promise<void> {
   await options.applyDocument(options.document, {
     resetHistory: true,
@@ -15,5 +16,5 @@ export async function applyLoadedEditorDocument(options: {
 
   traceLoadedEditorDocumentApplied(options.document);
   options.scheduleZoomToFit();
-  syncLoadedDocumentState(options.document.sourceImageData);
+  syncLoadedDocumentState(options.document.sourceImageData, options.preserveInspector);
 }

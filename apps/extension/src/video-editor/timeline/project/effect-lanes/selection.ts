@@ -84,7 +84,9 @@ export function selectEffectTarget(
 ) {
   switch (target.kind) {
     case 'action':
-      callbacks.onSelectActionOccurrence?.(target.eventId, target.clipId);
+      if (target.observedAction)
+        callbacks.onSelectActionOccurrence?.(target.eventId, target.clipId, target.observedAction);
+      else callbacks.onSelectActionOccurrence?.(target.eventId, target.clipId);
       return;
     case 'cursor':
       callbacks.onSelectCursorSegment?.(target.sampleId);

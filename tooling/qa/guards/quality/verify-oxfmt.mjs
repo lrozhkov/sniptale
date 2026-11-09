@@ -3,6 +3,10 @@
  */
 
 import fs from 'node:fs';
+import path from 'node:path';
+
+import { isI18nCatalogPath } from '../product-contracts/i18n-catalog-format.mjs';
+import { collectCatalogFormatChanges } from '../product-contracts/verify-i18n.catalogs.mjs';
 
 import { collectFormattableFiles } from '../../analysis/repository/shared-files.mjs';
 import {
@@ -105,7 +109,9 @@ function collectOxfmtResult(candidateFiles, commandRunner, { repositoryWide = fa
     };
   }
 
-  for (const files of chunkFiles(admittedCandidateFiles)) {
+  for (const files of chunkFiles(
+    admittedCandidateFiles.filter((file) => !isI18nCatalogPath(file))
+  )) {
     const result = runOxfmt(['--list-different', ...files], commandRunner);
     changedFiles.push(...parseDifferentFiles(result.stdout));
   }
@@ -114,6 +120,10 @@ function collectOxfmtResult(candidateFiles, commandRunner, { repositoryWide = fa
     candidateFiles: admittedCandidateFiles,
     changedFiles: [...new Set(changedFiles)].sort(),
   };
+}
+
+function catalogChanges(candidateFiles, options) {
+  return candidateFiles.some(isI18nCatalogPath) ? collectCatalogFormatChanges(options) : [];
 }
 
 export function runFormatterCheck(candidateFiles, commandRunner = runRepoNodeEntry, options = {}) {
@@ -125,7 +135,10 @@ export function runFormatterCheck(candidateFiles, commandRunner = runRepoNodeEnt
   );
   return {
     candidateFiles: admittedCandidateFiles,
-    failures: changedFiles,
+    failures: [
+      ...changedFiles,
+      ...catalogChanges(candidateFiles, options).map(({ file }) => file),
+    ].sort(),
   };
 }
 
@@ -136,6 +149,7 @@ export function runFormatterWrite(candidateFiles, commandRunner = runRepoNodeEnt
     commandRunner,
     options
   );
+  const catalogWrites = catalogChanges(candidateFiles, options);
   for (const files of chunkFiles(changedFiles)) {
     const result = runOxfmt(['--write', ...files], commandRunner);
     if (result.status !== 0) {
@@ -143,9 +157,13 @@ export function runFormatterWrite(candidateFiles, commandRunner = runRepoNodeEnt
     }
   }
 
+  for (const { file, text } of catalogWrites) {
+    fs.writeFileSync(path.join(options.root ?? process.cwd(), file), text);
+  }
+
   return {
     candidateFiles: admittedCandidateFiles,
-    writtenFiles: changedFiles,
+    writtenFiles: [...changedFiles, ...catalogWrites.map(({ file }) => file)].sort(),
   };
 }
 

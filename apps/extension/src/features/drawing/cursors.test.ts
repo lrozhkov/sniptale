@@ -7,7 +7,16 @@ it('uses distinct outlined eraser art with a contact hotspot', () => {
   expect(decodeURIComponent(cursor)).toContain('viewBox="0 0 24 24"');
   expect(decodeURIComponent(cursor)).toContain('m4 15 10-10');
   expect(decodeURIComponent(cursor)).toContain('fill="white"');
-  for (const tool of ['pencil', 'marker', 'arrow', 'blur', 'text', 'shape', 'select'] as const)
+  for (const tool of [
+    'pencil',
+    'marker',
+    'arrow',
+    'blur',
+    'simplify',
+    'text',
+    'shape',
+    'select',
+  ] as const)
     expect(cursor).not.toBe(resolveDrawingToolCursor(tool));
 });
 
@@ -37,6 +46,7 @@ it('keeps the gesture origin clear while showing arrow direction and the blur re
   expect(resolveDrawingToolCursor('pencil')).toContain(') 4 20, crosshair');
   expect(resolveDrawingToolCursor('marker')).toContain(') 4 20, crosshair');
   expect(resolveDrawingToolCursor('shape')).toBe('crosshair');
+  expect(resolveDrawingToolCursor('simplify')).toBe('crosshair');
   expect(resolveDrawingToolCursor('text')).toBe('text');
   expect(resolveDrawingToolCursor('select')).toBe('default');
 });

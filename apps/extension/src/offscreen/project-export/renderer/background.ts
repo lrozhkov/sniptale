@@ -1,4 +1,5 @@
 import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
+import { hasSceneBackgroundMotion } from '../../../features/video/project/scene/background-motion';
 import {
   drawSceneBackground,
   getProjectSceneBackground,
@@ -16,6 +17,7 @@ export interface ExportSceneBackgroundCache {
 
 function getStaticBackgroundCacheKey(project: VideoProject, width: number, height: number) {
   const background = getProjectSceneBackground(project);
+  if (background.enabled === false || hasSceneBackgroundMotion(background.motion)) return null;
   switch (background.kind) {
     case VideoSceneBackgroundKind.SOLID:
       return `solid:${width}x${height}:${background.color}`;

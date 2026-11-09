@@ -1,6 +1,7 @@
 import {
   useCaptureActionPreference,
   usePinnedToolbarRestore,
+  usePageModeWorkerRetention,
   useQuickActionToastCountdown,
   useSessionPresetReset,
 } from './effects';
@@ -40,6 +41,18 @@ function useContentAppCoreState(): ContentAppModeState {
 export function useContentAppModeState() {
   const state = useContentAppCoreState();
   const scenarioPinned = state.captureAction === 'scenario';
+
+  usePageModeWorkerRetention(
+    Boolean(
+      state.screenshotMode ||
+      state.drawingMode ||
+      state.highlighterMode ||
+      state.quickEditMode ||
+      state.quickEditDocumentMode ||
+      state.aiPickMode ||
+      state.designReviewMode
+    )
+  );
 
   useCaptureActionPreference(state.captureAction, state.setCaptureAction);
   usePinnedToolbarRestore({

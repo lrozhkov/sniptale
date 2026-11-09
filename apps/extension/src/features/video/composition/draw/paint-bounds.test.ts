@@ -59,6 +59,41 @@ it('retains off-canvas ink after rotation nonuniform scale and the existing medi
   });
 });
 
+it('retains per-instance source feedback overflow before layer transforms', () => {
+  const clip = createVideoClip({ shadowIntensity: 0 });
+  const first: VideoCompositionVisualLayer = {
+    clip,
+    clipId: clip.id,
+    kind: 'video',
+    x: 0,
+    y: 0,
+    width: 40,
+    height: 20,
+    opacity: 1,
+    rotation: 0,
+    zIndex: 0,
+    renderState: IDENTITY_TRANSITION_VISUAL_STATE,
+  };
+  const second = {
+    ...first,
+    rotation: 90,
+    renderState: { ...IDENTITY_TRANSITION_VISUAL_STATE, translateX: 300 },
+  };
+  const bounds = resolveCompositionPaintBounds({
+    context: context(),
+    layers: [first, second],
+    output,
+    rasterScale: 1,
+    sourceFeedbackBounds: new Map([
+      [first, { x: -180, y: -160, width: 400, height: 340 }],
+      [second, { x: -20, y: -30, width: 80, height: 80 }],
+    ]),
+  });
+  expect(bounds.x).toBeLessThanOrEqual(-180);
+  expect(bounds.y).toBeLessThanOrEqual(-160);
+  expect(bounds.x + bounds.width).toBeGreaterThan(300);
+});
+
 it('includes actual painted text beyond the panel height and restores the measurement context', () => {
   const clip = createTextClip({ text: 'AAA\nBBB\nCCC\nDDD' });
   clip.style = {

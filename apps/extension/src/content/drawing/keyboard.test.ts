@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { createDrawingSession } from '../../features/drawing/public';
+import { createDrawingSession, type DrawingObject } from '../../features/drawing/public';
 import { handleDrawingKeyDown } from './keyboard';
 
 it('leaves undo and redo shortcuts to the shared page-preparation history owner', () => {
@@ -59,3 +59,61 @@ it('handles consecutive Escape presses as selection, tool, then drawing-mode res
   expect(onExit).toHaveBeenCalledTimes(1);
   expect(preventDefault).toHaveBeenCalledTimes(3);
 });
+
+it(
+  'routes repeated mixed-selection nudges through one async transform owner and ' +
+    'cancels pending work on Escape',
+  () => {
+    const commit = vi.fn(() => true);
+    const session = createDrawingSession({ onDocumentCommit: commit });
+    const mask = {
+      id: 'mask',
+      kind: 'simplify',
+      bounds: { x: 10, y: 20, width: 30, height: 30 },
+      settings: session.getSnapshot().defaults.simplify,
+    } as const;
+    const box = {
+      id: 'box',
+      kind: 'rectangle',
+      bounds: { x: 50, y: 20, width: 30, height: 30 },
+      color: '#123456',
+      width: 1,
+    } as const;
+    session.commitObject(mask);
+    session.commitObject(box);
+    session.setSelection([mask.id, box.id]);
+    commit.mockClear();
+    let pending: readonly DrawingObject[] = [];
+    const transform = vi.fn(async (objects: readonly DrawingObject[]) => {
+      pending = objects;
+    });
+    const cancel = vi.fn(() => {
+      pending = [];
+    });
+    const simplify = {
+      transform,
+      cancel,
+      getPending: () => (pending.length ? [{ object: mask, updating: true }] : []),
+      getPendingObjects: () => pending,
+    };
+    const press = (key: string) =>
+      handleDrawingKeyDown({
+        event: { key, shiftKey: false, preventDefault: vi.fn() },
+        hasDraft: false,
+        onCancelDraft: vi.fn(),
+        onEditText: vi.fn(),
+        session,
+        snapshot: session.getSnapshot(),
+        simplify,
+      });
+    press('ArrowRight');
+    press('ArrowRight');
+    expect(transform).toHaveBeenCalledTimes(2);
+    expect(pending).toMatchObject([{ bounds: { x: 12 } }, { bounds: { x: 52 } }]);
+    expect(session.getSnapshot().document.objects).toEqual([mask, box]);
+    expect(commit).not.toHaveBeenCalled();
+    press('Escape');
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(session.getSnapshot().selectedObjectIds).toEqual([mask.id, box.id]);
+  }
+);

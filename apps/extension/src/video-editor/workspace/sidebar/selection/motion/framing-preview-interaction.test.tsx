@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
@@ -11,16 +12,23 @@ import {
 } from '../../../../../features/video/project/types';
 import { useFramingInteraction } from './framing-preview-interaction';
 import { FramingPreviewSurface } from './framing-preview';
+import { resolveFramingRenderCamera } from './framing-preview-frame';
+import { resolveVideoCompositionCamera } from '../../../../../features/video/composition/motion';
 
 vi.mock('../../../../preview/cache/materializer', () => ({
   createVideoPreviewFrameMaterializer: () => ({
     dispose: vi.fn(),
-    renderFrame: async () => document.createElement('canvas'),
+    renderFrameWithPresentation: async (
+      time: number,
+      _signal: AbortSignal,
+      camera: VideoCompositionCameraState
+    ) => ({ canvas: document.createElement('canvas'), presentation: { camera, time } }),
   }),
 }));
 let root: Root;
 let host: HTMLDivElement;
 beforeEach(() => {
+  vi.useFakeTimers();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -32,6 +40,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  vi.useRealTimers();
 });
 function fixture() {
   const project = createVideoProjectFromRecording({
@@ -70,8 +79,14 @@ function fixture() {
 it('projects the admitted following camera into the inspector result viewport', () => {
   const props = fixture();
   const before = structuredClone(props.project);
+  const viewport = resolveVideoCompositionCamera({
+    project: props.project,
+    currentTime: 1.5,
+    actions: [],
+    cursorSample: null,
+  });
   function Result() {
-    const view = useFramingInteraction(props, false);
+    const view = useFramingInteraction(props, false, viewport);
     return (
       <output>
         {JSON.stringify({ left: view.left, top: view.top, width: view.width, height: view.height })}
@@ -90,6 +105,9 @@ it('keeps the real following preview read-only for pointer and keyboard interact
   const props = fixture();
   const before = structuredClone(props.project);
   await act(async () => root.render(<FramingPreviewSurface {...props} />));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
   const button = host.querySelector<HTMLButtonElement>('[data-video-editor-local-navigation]')!;
   expect(button.disabled).toBe(false);
   act(() => {
@@ -110,6 +128,9 @@ it('does not report export camera conflicts for a hidden camera lane', async () 
     camera: { visible: false, locked: false },
   };
   await act(async () => root.render(<FramingPreviewSurface {...props} />));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
   expect(host.querySelector('[role="status"]')).toBeNull();
 });
 
@@ -149,8 +170,15 @@ it.each([
     };
     const before = structuredClone(props.project);
     const inspect = vi.fn();
+    const viewport = resolveVideoCompositionCamera({
+      project: props.project,
+      currentTime: 1.5,
+      actions: [],
+      cursorSample: null,
+    });
     function View({ overview }: { overview: boolean }) {
-      inspect(useFramingInteraction(props, overview).camera);
+      const view = useFramingInteraction(props, overview, viewport);
+      inspect(resolveFramingRenderCamera(props, overview, view, viewport));
       return null;
     }
     act(() => root.render(<View overview={false} />));

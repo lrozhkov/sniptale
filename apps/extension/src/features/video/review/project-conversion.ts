@@ -64,6 +64,29 @@ type ReviewProjectConversionPlan =
   | { status: 'blocked'; issues: ReviewProjectConversionIssue[] }
   | { status: 'prepared'; project: VideoProject; timeline: ReviewProjectTimelinePlan };
 
+/** Scene settings retain their reader version independently of clip and interaction conversion. */
+function minimumConvertedSceneSchemaVersion(
+  scene: Extract<ReturnType<typeof planReviewProjectScene>, { status: 'prepared' }>
+): VideoProject['version'] {
+  const background = scene.scene.sceneBackground;
+  if (background?.motion !== undefined) return 51;
+  if (background?.zoomBehavior !== undefined) return 37;
+  if (
+    scene.video.rememberedWindowLayout ||
+    scene.scene.watermarkEnabled === false ||
+    background?.enabled !== undefined ||
+    background?.rememberedBlur !== undefined
+  )
+    return 36;
+  if (
+    scene.video.rememberedWindowHeader ||
+    scene.video.rememberedSourceCrop ||
+    scene.scene.rememberedCanvas
+  )
+    return 35;
+  return 26;
+}
+
 /** Builds a detached core conversion and refuses every currently unmapped authored branch. */
 export function planReviewProjectConversion(args: {
   seed: VideoProject;
@@ -265,7 +288,7 @@ export function planReviewProjectConversion(args: {
     audioGainEnd: original.volume,
     muted: clip.muted || (clip.type === 'VIDEO' && !originalAudioEnabled),
   });
-  const minimumVersion = camera.clips.some((clip) => clip.cameraShadowDirection !== undefined)
+  const contentVersion = camera.clips.some((clip) => clip.cameraShadowDirection !== undefined)
     ? 47
     : camera.clips.some(
           (clip) =>
@@ -279,35 +302,24 @@ export function planReviewProjectConversion(args: {
           ? 40
           : annotations.clips.length
             ? 38
-            : scene.scene.sceneBackground?.zoomBehavior !== undefined
-              ? 37
-              : scene.video.rememberedWindowLayout ||
-                  scene.scene.watermarkEnabled === false ||
-                  scene.scene.sceneBackground?.enabled !== undefined ||
-                  scene.scene.sceneBackground?.rememberedBlur !== undefined
-                ? 36
-                : scene.video.rememberedWindowHeader ||
-                    scene.video.rememberedSourceCrop ||
-                    scene.scene.rememberedCanvas
-                  ? 35
-                  : cursor?.sourceObservations
-                    ? 33
-                    : camera.clips.length
-                      ? 32
-                      : externalAudio.sourceVoiceoverDocuments.length ||
-                          externalAudio.originalSpeech !== undefined
-                        ? 31
-                        : externalAudio.clips.length
-                          ? 30
-                          : documents.textDocuments.some(
-                                (entry) => entry.durationMode !== undefined
-                              )
-                            ? 29
-                            : original.ranges?.length || sourceMutes.length
-                              ? 28
-                              : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
-                                ? 27
-                                : 26;
+            : cursor?.sourceObservations
+              ? 33
+              : camera.clips.length
+                ? 32
+                : externalAudio.sourceVoiceoverDocuments.length ||
+                    externalAudio.originalSpeech !== undefined
+                  ? 31
+                  : externalAudio.clips.length
+                    ? 30
+                    : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
+                      ? 29
+                      : original.ranges?.length || sourceMutes.length
+                        ? 28
+                        : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+                          ? 27
+                          : 26;
+  const sceneVersion = minimumConvertedSceneSchemaVersion(scene);
+  const minimumVersion = sceneVersion > contentVersion ? sceneVersion : contentVersion;
   let project: VideoProject = {
     ...structuredClone(args.seed),
     version: args.seed.version > minimumVersion ? args.seed.version : minimumVersion,
@@ -429,6 +441,7 @@ function projectRecordingFeedback(args: {
       ? {
           actionFeedback: [
             {
+              ...structuredClone(args.seed.actionFeedback?.[0] ?? {}),
               recordingId: args.recordingId,
               sourceInstanceId: args.sourceInstanceId,
               signals: structuredClone(args.seed.actionFeedback?.[0]?.signals ?? []),

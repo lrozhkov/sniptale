@@ -1,4 +1,5 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -62,6 +63,37 @@ describe('visible Settings transfer coverage guard', () => {
     expect(backgroundPolicy).toContain('Exclude it from sync, settings transfer');
   });
 
+  it('discovers the shared protection client outside sections and requires its secret classification', () => {
+    const settingsRoot = mkdtempSync(join(tmpdir(), 'sniptale-settings-coverage-'));
+    try {
+      mkdirSync(join(settingsRoot, 'sections'));
+      mkdirSync(join(settingsRoot, 'secret-protection'));
+      writeFileSync(
+        join(settingsRoot, 'secret-protection/context.tsx'),
+        `import { createSecretProtectionClient } from '../runtime/secret-protection';
+         const client = createSecretProtectionClient(transport);`
+      );
+      mkdirSync(join(settingsRoot, 'unapproved-neighbor'));
+      writeFileSync(
+        join(settingsRoot, 'unapproved-neighbor/context.tsx'),
+        `import { createSecretProtectionClient } from '../runtime/secret-protection';`
+      );
+      const identity =
+        'apps/extension/src/settings/secret-protection/context.tsx|createSecretProtectionClient';
+      expect(collectSettingsPersistenceMutations(settingsRoot)).toEqual([identity]);
+      const entry = SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE.find(
+        (candidate) => candidate.sourceFile === identity.split('|')[0]
+      );
+      expect(entry).toMatchObject({
+        classification: 'secret',
+        mutations: expect.arrayContaining(['createSecretProtectionClient']),
+      });
+      expect(entry?.transferIds).toBeUndefined();
+    } finally {
+      rmSync(settingsRoot, { recursive: true, force: true });
+    }
+  });
+
   it('classifies every Settings persistence mutation callsite exactly', () => {
     const actual = collectSettingsPersistenceMutations();
     const expected = SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE.flatMap((entry) =>
@@ -80,16 +112,26 @@ describe('visible Settings transfer coverage guard', () => {
   });
 });
 
-const SETTINGS_SECTIONS_ROOT = join(process.cwd(), 'apps/extension/src/settings/sections');
+const SETTINGS_ROOT = join(process.cwd(), 'apps/extension/src/settings');
 const MUTATION_NAME =
   /^(?:save|add|update|delete|reset|set|create|change|reorder|move|merge|mutate|patch|cleanup|clear|enable|disable|lock|unlock|request)/u;
 
-function collectSettingsPersistenceMutations(): string[] {
+function collectSettingsPersistenceMutations(settingsRoot = SETTINGS_ROOT): string[] {
+  return [
+    ...collectRootPersistenceMutations(join(settingsRoot, 'sections'), ''),
+    ...collectRootPersistenceMutations(
+      join(settingsRoot, 'secret-protection'),
+      'apps/extension/src/settings/secret-protection/'
+    ),
+  ].sort();
+}
+
+function collectRootPersistenceMutations(root: string, sourcePrefix: string): string[] {
   const result: string[] = [];
-  for (const file of walk(SETTINGS_SECTIONS_ROOT)) {
+  for (const file of walk(root)) {
     if (!/\.(?:ts|tsx)$/u.test(file) || /\.test\.(?:ts|tsx)$/u.test(file)) continue;
     const source = readFileSync(file, 'utf8');
-    const sourceFile = relative(SETTINGS_SECTIONS_ROOT, file).replaceAll('\\', '/');
+    const sourceFile = sourcePrefix + relative(root, file).replaceAll('\\', '/');
     const imports = source.matchAll(/import\s*\{([\s\S]*?)\}\s*from ['"]([^'"]+)['"]/gu);
     for (const match of imports) {
       const moduleId = match[2] ?? '';

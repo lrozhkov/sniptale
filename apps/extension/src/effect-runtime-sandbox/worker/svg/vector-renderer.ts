@@ -3,6 +3,8 @@ import type { EffectRuntimeWorkerSvgAsset } from '../../../contracts/effect-runt
 import type { RuntimeCanvasContext } from '../model/types.js';
 import { roundRect } from '../math.js';
 import { parseSvgAsset, type HydratedSvgVector } from './vector-parser.js';
+import { getSvgPartPrimitiveBounds } from './path-bounds';
+import type { PrimitiveGeometry } from '../canvas/primitive-bounds';
 
 type HydratedSvgPart = HydratedSvgVector['parts'][number];
 
@@ -31,6 +33,8 @@ export type SvgPartTransform = (
 ) => SvgPartTransformResult | undefined;
 
 export interface DrawSvgVectorArgs {
+  paint?: (draw: () => void, bounds?: PrimitiveGeometry, stroke?: boolean) => void;
+  primitive?: (draw: (context: RuntimeCanvasContext) => void) => void;
   alpha?: number;
   composite?: GlobalCompositeOperation;
   filter?: string;
@@ -61,6 +65,8 @@ export function drawSvgVectorAsset(
     partGroups,
     partIds,
     partTransform,
+    paint,
+    primitive,
     shadowBlur = 0,
     shadowColor = 'transparent',
     width = asset.width || parsed.width,
@@ -77,7 +83,7 @@ export function drawSvgVectorAsset(
   context.scale(width / parsed.width, height / parsed.height);
   parsed.parts.forEach((part, index) => {
     if (matchesSvgPart(part, { partFilter, partGroups, partIds })) {
-      drawSvgPart(context, part, index, parsed, partTransform);
+      drawSvgPart(context, part, index, parsed, partTransform, paint, primitive);
     }
   });
   context.restore();
@@ -88,7 +94,9 @@ function drawSvgPart(
   part: HydratedSvgPart,
   index: number,
   parsed: HydratedSvgVector,
-  partTransform?: SvgPartTransform
+  partTransform?: SvgPartTransform,
+  paint?: DrawSvgVectorArgs['paint'],
+  primitive?: (draw: (context: RuntimeCanvasContext) => void) => void
 ): void {
   const transform = partTransform?.(part, index, parsed) ?? {};
   const partAlpha = (transform.alpha ?? 1) * part.opacity;
@@ -104,8 +112,12 @@ function drawSvgPart(
   context.lineWidth = part.strokeWidth;
   if (part.fill) context.fillStyle = part.fill;
   if (part.stroke) context.strokeStyle = part.stroke;
-  if (part.type === 'path') drawPathPart(context, part);
-  else drawRectPart(context, part);
+  const draw = (target: RuntimeCanvasContext) => {
+    if (part.type === 'path') drawPathPart(target, part, paint);
+    else drawRectPart(target, part, paint);
+  };
+  if (primitive) primitive(draw);
+  else draw(context);
   context.restore();
 }
 
@@ -125,17 +137,41 @@ function applyPartOriginTransform(
   context.translate(-originX, -originY);
 }
 
-function drawPathPart(context: RuntimeCanvasContext, part: HydratedSvgPart): void {
+function drawPathPart(
+  context: RuntimeCanvasContext,
+  part: HydratedSvgPart,
+  paint?: DrawSvgVectorArgs['paint']
+): void {
   if (part.type !== 'path' || !part.path) return;
-  if (part.fill) context.fill(part.path);
-  if (part.stroke) context.stroke(part.path);
+  if (part.fill) {
+    const draw = () => context.fill(part.path!);
+    if (paint) paint(draw, getSvgPartPrimitiveBounds(part));
+    else draw();
+  }
+  if (part.stroke) {
+    const draw = () => context.stroke(part.path!);
+    if (paint) paint(draw, getSvgPartPrimitiveBounds(part), true);
+    else draw();
+  }
 }
 
-function drawRectPart(context: RuntimeCanvasContext, part: SerializedSvgVectorPart): void {
+function drawRectPart(
+  context: RuntimeCanvasContext,
+  part: SerializedSvgVectorPart,
+  paint?: DrawSvgVectorArgs['paint']
+): void {
   if (part.type !== 'rect') return;
   roundRect(context, part.x ?? 0, part.y ?? 0, part.width ?? 0, part.height ?? 0, part.rx ?? 0);
-  if (part.fill) context.fill();
-  if (part.stroke) context.stroke();
+  if (part.fill) {
+    const draw = () => context.fill();
+    if (paint) paint(draw, getSvgPartPrimitiveBounds(part));
+    else draw();
+  }
+  if (part.stroke) {
+    const draw = () => context.stroke();
+    if (paint) paint(draw, getSvgPartPrimitiveBounds(part), true);
+    else draw();
+  }
 }
 
 function matchesSvgPart(part: HydratedSvgPart, filters: SvgPartFilters): boolean {

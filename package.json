@@ -104,7 +104,10 @@
     "design:reference": "node tooling/design-reference/server.mjs",
     "qa:e2e:webdav": "playwright test --config tooling/test/e2e/providers/playwright.config.ts",
     "qa:e2e:webdav:lab": "node tooling/test/e2e/providers/nextcloud/run.mjs",
-    "qa:e2e:live": "node tooling/test/e2e/live/run-live.mjs"
+    "qa:e2e:live": "node tooling/test/e2e/live/run-live.mjs",
+    "qa:e2e:preview-performance": "node tooling/test/e2e/run-e2e.mjs --suite preview-performance",
+    "simplify:lab": "node tooling/simplify-lab/server.mjs",
+    "simplify:check": "node tooling/simplify-lab/run.mjs"
   },
   "dependencies": {
     "@fontsource/marck-script": "5.3.0",
@@ -171,6 +174,7 @@
     "eslint": "^10.13.0",
     "eslint-plugin-security": "^4.2.0",
     "eslint-plugin-sonarjs": "4.2.0",
+    "fake-indexeddb": "6.2.5",
     "husky": "^9.1.7",
     "istanbul-lib-coverage": "^3.2.2",
     "istanbul-lib-report": "3.0.1",

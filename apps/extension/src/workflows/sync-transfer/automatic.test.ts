@@ -1,3 +1,6 @@
+import { SyncWorkspaceError } from './workspace';
+import { SyncCatalogError } from './catalog';
+import { SyncRemoteError } from './remote-store';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
@@ -17,11 +20,16 @@ import type { SyncRemoteStore } from './remote-store';
 import { createSyncAttempt, hashSyncText, parseSyncOperationText } from './wire-record';
 
 const ports = vi.hoisted(() => ({
+  warn: vi.fn(),
+  info: vi.fn(),
   bases: vi.fn<typeof loadCatalogNativeBases>(),
   admission: vi.fn<typeof loadCatalogReplicaAdmission>(),
   receive: vi.fn<typeof receiveSelectedCatalogRoot>(),
   deletion: vi.fn<typeof applyCatalogDeletion>(),
   unloaded: vi.fn(),
+}));
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => ({ warn: ports.warn, info: ports.info }),
 }));
 vi.mock('../../composition/persistence/sync-capture/catalog-admission', () => ({
   loadCatalogNativeBases: ports.bases,
@@ -352,7 +360,12 @@ it.each(['current', 'generation', 'basis'] as const)(
         admission: selected,
         signal: input.signal,
       });
-    else expect(ports.deletion).not.toHaveBeenCalled();
+    else {
+      expect(ports.deletion).not.toHaveBeenCalled();
+      expect(ports.warn).toHaveBeenCalledExactlyOnceWith(
+        'sync.incoming.deferred stage=basis reason=basis-changed'
+      );
+    }
     expect(ports.receive).not.toHaveBeenCalled();
   }
 );
@@ -439,6 +452,7 @@ it('retains the uncompleted cursor when an incoming request is aborted', async (
   controller.abort();
   request.reject(new DOMException('Aborted', 'AbortError'));
   await refused;
+  expect(ports.warn).not.toHaveBeenCalled();
   ports.receive.mockClear();
   expect(await owner.run(input)).toEqual({ applied: 1, deferred: 0, remaining: false });
   expect(ports.receive.mock.calls.map(([call]) => call.selection.rootId)).toEqual([
@@ -499,6 +513,9 @@ it('keeps an unloaded root remote without fetching originals or blocking a later
     })
   );
   expect(input.remote.read).not.toHaveBeenCalled();
+  expect(ports.warn).toHaveBeenCalledExactlyOnceWith(
+    'sync.incoming.deferred stage=residency reason=unloaded'
+  );
 });
 
 it('does not turn an unloaded metadata-only tombstone into a download', async () => {
@@ -515,4 +532,129 @@ it('does not turn an unloaded metadata-only tombstone into a download', async ()
   expect(ports.deletion).toHaveBeenCalledTimes(1);
   expect(ports.receive).not.toHaveBeenCalled();
   expect(input.remote.read).not.toHaveBeenCalled();
+});
+
+it('retains a typed transport refusal stage without identities and continues independent roots', async () => {
+  const fixtures = await Promise.all(['a', 'b', 'c'].map((id) => successor(`project-asset:${id}`)));
+  ports.bases.mockResolvedValue(fixtures.map((f) => f.local));
+  const input = args(catalog(fixtures.flatMap((f) => [f.base, f.head])));
+  ports.receive.mockRejectedValueOnce(new SyncRemoteError('transport'));
+  const owner = createAutomaticCatalogSync();
+  expect(await owner.run(input)).toEqual({ applied: 1, deferred: 1, remaining: true });
+  expect(ports.warn).toHaveBeenCalledExactlyOnceWith(
+    'sync.incoming.deferred stage=apply reason=transport'
+  );
+  expect(ports.info).toHaveBeenCalledExactlyOnceWith(
+    'sync.incoming.applied stage=apply reason=none'
+  );
+});
+
+it.each(['basis', 'deletion', 'residency', 'apply'] as const)(
+  'logs only a bounded %s refusal without changing continuation',
+  async (stage) => {
+    const f = await successor(
+      'project-asset:private-identity',
+      stage === 'basis' || stage === 'deletion'
+    );
+    ports.bases.mockResolvedValue([f.local]);
+    const input = args(catalog([f.base, f.head]));
+    const secret =
+      'https://private.test/path?id=source Authorization: Bearer credentials filename.png';
+    const error = Object.assign(new Error(secret), { code: secret });
+    if (stage === 'basis') ports.admission.mockRejectedValueOnce(error);
+    if (stage === 'deletion') {
+      ports.admission.mockResolvedValue(admission(f.local));
+      ports.deletion.mockRejectedValueOnce(error);
+    }
+    if (stage === 'residency') ports.unloaded.mockRejectedValueOnce(error);
+    if (stage === 'apply') ports.receive.mockRejectedValueOnce(error);
+    const owner = createAutomaticCatalogSync();
+    expect(await owner.run(input)).toEqual({ applied: 0, deferred: 1, remaining: false });
+    expect(ports.warn).toHaveBeenCalledExactlyOnceWith(
+      `sync.incoming.deferred stage=${stage} reason=unexpected`
+    );
+    expect(JSON.stringify(ports.warn.mock.calls)).not.toContain(secret);
+  }
+);
+
+it.each([
+  [new SyncRemoteError('secrets-locked'), 'secrets-locked'],
+  [new SyncWorkspaceError('binding-mismatch'), 'binding-mismatch'],
+  [new SyncCatalogError('pagination-cycle'), 'pagination-cycle'],
+  [Object.assign(new SyncRemoteError('transport'), { code: 'private-hostile-code' }), 'unexpected'],
+])('retains only allowlisted typed incoming reasons: %s', async (error, reason) => {
+  const f = await successor('project-asset:safe');
+  ports.bases.mockResolvedValue([f.local]);
+  ports.receive.mockRejectedValueOnce(error);
+  expect(await createAutomaticCatalogSync().run(args(catalog([f.base, f.head])))).toEqual({
+    applied: 0,
+    deferred: 1,
+    remaining: false,
+  });
+  expect(ports.warn).toHaveBeenCalledExactlyOnceWith(
+    `sync.incoming.deferred stage=apply reason=${reason}`
+  );
+});
+
+it.each(['warn', 'info'] as const)(
+  'keeps incoming publication outcomes when the %s sink throws',
+  async (sink) => {
+    const fixtures = await Promise.all(
+      ['a', 'b', 'c'].map((id) => successor(`project-asset:${id}`))
+    );
+    ports.bases.mockResolvedValue(fixtures.map((f) => f.local));
+    if (sink === 'warn') ports.receive.mockRejectedValueOnce(new SyncRemoteError('temporary'));
+    ports[sink].mockImplementation(() => {
+      throw new Error('private sink detail');
+    });
+    const owner = createAutomaticCatalogSync();
+    const input = args(catalog(fixtures.flatMap((f) => [f.base, f.head])));
+    expect(await owner.run(input)).toEqual({
+      applied: sink === 'warn' ? 1 : 2,
+      deferred: sink === 'warn' ? 1 : 0,
+      remaining: true,
+    });
+    expect(await owner.run(input)).toEqual({ applied: 1, deferred: 0, remaining: false });
+    expect(ports.receive).toHaveBeenCalledTimes(3);
+  }
+);
+
+it('defers pending native roots without reading or replacing their resources', async () => {
+  const f = await successor();
+  ports.bases.mockResolvedValue([{ ...f.local, pending: true }]);
+  const input = args(catalog([f.base, f.head]));
+  expect(await createAutomaticCatalogSync().run(input)).toEqual({
+    applied: 0,
+    deferred: 1,
+    remaining: false,
+  });
+  expect(ports.receive).not.toHaveBeenCalled();
+  expect(ports.deletion).not.toHaveBeenCalled();
+  expect(ports.admission).not.toHaveBeenCalled();
+  expect(input.remote.read).not.toHaveBeenCalled();
+  expect(ports.warn).toHaveBeenCalledWith(
+    'sync.incoming.deferred stage=basis reason=pending-local-change'
+  );
+});
+
+it('bounds pending deferrals and continues beyond them on the next pass', async () => {
+  const roots = await Promise.all(['a', 'b', 'c'].map((id) => successor(`project-asset:${id}`)));
+  ports.bases.mockResolvedValue(roots.map(({ local }) => ({ ...local, pending: true })));
+  const input = args(catalog(roots.flatMap(({ base, head }) => [base, head])));
+  const owner = createAutomaticCatalogSync();
+  expect(await owner.run(input)).toEqual({ applied: 0, deferred: 2, remaining: true });
+  expect(await owner.run(input)).toEqual({ applied: 0, deferred: 1, remaining: false });
+  expect(ports.receive).not.toHaveBeenCalled();
+  expect(ports.deletion).not.toHaveBeenCalled();
+  expect(ports.warn).toHaveBeenCalledTimes(3);
+});
+
+it('keeps on-demand binary admission separate from the legacy resident-only contract', async () => {
+  const f = await successor();
+  ports.bases.mockResolvedValue([f.local]);
+  const input = args(catalog([f.base, f.head]));
+  await createAutomaticCatalogSync().run({ ...input, binaryAdmission: 'resident' });
+  expect(ports.receive).toHaveBeenCalledWith(
+    expect.objectContaining({ residentOnly: true, binaryAdmission: 'resident' })
+  );
 });

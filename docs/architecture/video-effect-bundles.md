@@ -24,7 +24,19 @@ An effect application creates or reuses an immutable content-addressed project s
 
 Preview and export share frame and audio plans. Before sandbox evaluation, resolve instance time, target visibility, transitions, and target-effect ordering.
 
-The manifest sandbox and inline Worker interpret only the EffectV1 vocabulary. Never convert imported bytes to script. Bind protocol version, request and sequence, snapshot and document identity, dimensions, time, controls, assets, and input frames. Enforce queue, timeout, canvas, raster, SVG, decoded-media, and failure budgets in both broker and Worker. Fail without a renderer fallback.
+The manifest sandbox and inline Worker interpret only the EffectV1 vocabulary. Never convert imported bytes to script. Bind protocol version, request and sequence, snapshot and document identity, dimensions, time, controls, assets, and input frames. Enforce queue, timeout, canvas, raster, SVG, decoded-media, and failure budgets in both broker and Worker. Evaluation, validation, and resource failures must not select another renderer.
+
+Gallery and Native live preview can select `gpu-scene` through the sandbox connection configuration. Protocol version 5 adds the explicit `prepareGpuFrame` request. The Worker evaluates EffectV1 and transfers numeric drawing operations and bitmap resources. The broker checks the plan. The parent checks the plan again before the main preview GPU executes it. A parent plan can contain at most 512 resources, 64 passes and 512 operations. Reject unknown operations, executable content, invalid references, identity mismatches and resource failures.
+
+The default `renderFrame` request remains bitmap-only. Export retains this default. During the first migration stage, a valid plan above the parent transport limits uses the existing sandbox GPU bitmap result. Dependent effects also retain their existing path. These routes are intermediate migration work, not a completed GPU-scene transition.
+
+Gallery and Native can select `gpu-scene-plan` for advisory preparation. This mode accepts only `prepareGpuFrame` requests and returns checked plans within the parent transport limits. It rejects bitmap results and oversized plans instead of using the bitmap fallback. This mode does not create a sandbox GPU renderer. Advisory sessions have separate queues and failure budgets. Their failures do not change the foreground session.
+
+Authored scene data and transient edits define the advisory context. Cursor and recording event hydration can replace render data without retiring this context. Foreground jobs retain their existing invalidation rules.
+
+The shared composition owner schedules overlay and sampled poses. Each prepared GPU frame owns its transferred resources. A retired pose closes those resources only after all GPU borrows end. The final graph includes the editor wrappers when it checks layer and depth limits. If generated effect groups exceed those limits, use the same parent GPU provider to prepare bounded chunks. Do not mutate a submitted graph or acquire a second device for this operation.
+
+If WebGPU is unavailable, preview uses the existing Canvas renderer. A typed GPU device failure permits one Canvas retry with the returned original input bitmaps. Keep those inputs alive until GPU work finishes. The original request deadline also applies to this retry. A timeout prevents late publication. Resource cleanup waits for GPU completion. Do not retry an unsupported operation, invalid plan, or resource failure through Canvas.
 
 Use the shared audio plan for preview, MP4, and WebM. Apply ordinary host-clip visibility and interval rules to standalone effect audio. Preview owns a disposable Web Audio graph with stale-decode protection and cleanup. Check decoded PCM limits after browser decode.
 

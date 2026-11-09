@@ -232,6 +232,14 @@ function protectedRefs(payload: PreparedReplicaPayload): AssetRef[] {
           ? [
               payload.input.rows.ref,
               ...('screenshotRef' in payload.input.rows ? [payload.input.rows.screenshotRef] : []),
+              ...('recording' in payload.input.rows &&
+              payload.input.rows.telemetry?.cursorTrajectorySnapshot
+                ? [payload.input.rows.telemetry.cursorTrajectorySnapshot.ref]
+                : []),
+              ...('recording' in payload.input.rows &&
+              payload.input.rows.telemetry?.recordingEventsSnapshot
+                ? [payload.input.rows.telemetry.recordingEventsSnapshot.ref]
+                : []),
             ]
           : payload.kind === 'video-review'
             ? [
@@ -303,7 +311,7 @@ export async function publishPreparedReplicaJournal(
     await applyPreparedImageReplica(payload.input, lifecyclePermit);
     await cancelAssetPublication(journal, lifecyclePermit);
   } else if (payload.kind === 'media')
-    await applyPreparedMediaReplica(payload.input, lifecyclePermit);
+    await applyPreparedMediaReplica(payload.input, lifecyclePermit, journal.journalId);
   else await applyPreparedVideoProjectRevision(payload.input, lifecyclePermit);
 }
 

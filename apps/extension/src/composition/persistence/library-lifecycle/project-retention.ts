@@ -22,7 +22,7 @@ import {
   STORE_NAME,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { isRecord } from '../infrastructure/indexed-db/read-primitives';
+import { isRecord, visitIndexedDbStoreRows } from '../infrastructure/indexed-db/read-primitives';
 import { parseVideoProjectEntry } from '../projects/read-guards';
 import { parseScenarioProjectEntry } from '../scenario/read-guards';
 import { promoteLibraryLifecycle } from './contracts';
@@ -56,15 +56,19 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
           storeName === SCENARIO_PROJECTS_STORE
             ? createScenarioProjectStore(tx)
             : tx.objectStore(storeName);
-        for (const raw of await store.getAll()) {
+        const promoteEntry = async (raw: unknown) => {
           const entry = parse(raw);
-          if (!isRecord(raw) || entry?.lifecycle?.storageClass !== 'temporary') continue;
+          if (!isRecord(raw) || entry?.lifecycle?.storageClass !== 'temporary') return true;
           await store.put({
             ...raw,
             lifecycle: promoteLibraryLifecycle(entry.lifecycle, now),
           });
           repaired += 1;
-        }
+          return true;
+        };
+        if (storeName === VIDEO_PROJECTS_STORE)
+          await visitIndexedDbStoreRows(tx.objectStore(VIDEO_PROJECTS_STORE), promoteEntry);
+        else for (const raw of await store.getAll()) await promoteEntry(raw);
       }
       const stores = {
         mediaLibraryStore: tx.objectStore(MEDIA_LIBRARY_STORE),
@@ -73,10 +77,11 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
         scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
         scenarioProjectStore: createScenarioProjectStore(tx),
       };
-      for (const raw of await tx.objectStore(VIDEO_PROJECTS_STORE).getAll()) {
+      await visitIndexedDbStoreRows(tx.objectStore(VIDEO_PROJECTS_STORE), async (raw) => {
         const entry = parseVideoProjectEntry(raw);
         if (entry) await promoteProjectSourceLifecycles(entry.project, stores, now);
-      }
+        return true;
+      });
       for (const raw of await stores.scenarioProjectStore.getAll()) {
         const entry = parseScenarioProjectEntry(raw);
         if (entry) await promoteScenarioSourceLifecycles(tx, entry, now);

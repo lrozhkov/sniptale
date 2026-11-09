@@ -1,3 +1,4 @@
+import type { TranslationDictionary } from '../platform/i18n/types';
 import { useEffect, useState, type ComponentType } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -14,8 +15,10 @@ import { PreviewNumericRow } from './compact-inspector-controls/numeric-preview'
 import type { InspectorDisclosureProps } from './compact-inspector-controls/shared';
 
 type MediaPatch = Partial<BookendImagePresentation & BookendVideoPresentation>;
-type Message =
-  keyof typeof import('../platform/i18n/messages/gallery/video-review-presentation').galleryVideoReviewPresentationMessages;
+type Message = Extract<
+  keyof TranslationDictionary['gallery']['videoReview'],
+  `presentation${string}`
+>;
 const label = (key: Message) => translate(`gallery.videoReview.${key}`);
 
 type Props = {

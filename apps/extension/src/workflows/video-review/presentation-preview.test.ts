@@ -61,6 +61,7 @@ it('uses the original late sequence lattice and a bounded unpublished writer', a
     readProjectAsset: async () => null,
   };
   const plan = preparePresentationPreview(input, 'outro', {
+    renderer: 'gpu',
     rasterPreset: 'current',
     frameRate: 'current',
     pausedQuality: 'same',
@@ -79,6 +80,7 @@ it('uses the original late sequence lattice and a bounded unpublished writer', a
     write: async (args, preview) => {
       expect(args.file).toBe(input.file);
       expect(args.provenance).toBeUndefined();
+      expect(preview!.renderer).toBe('gpu');
       expect(preview!.window.startUs).toBeGreaterThan(3590_000_000);
       expect(preview!.window.endUs - preview!.window.startUs).toBeLessThanOrEqual(4_000_000);
       await args.writer.writeAt(0, new Blob(['clip']));
@@ -180,6 +182,7 @@ it('keeps ordinary voiceover offsets and authored mute source-native in a bounde
     readProjectAsset: async () => new Blob(['accepted']),
   };
   const plan = preparePresentationPreview(input, 'outro', {
+    renderer: 'gpu',
     rasterPreset: 'current',
     frameRate: 'current',
     pausedQuality: 'same',

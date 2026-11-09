@@ -1,3 +1,5 @@
+import { useNativePreviewSourceRuntime } from './source-runtime';
+import type { VideoPreviewRenderer } from '../../../contracts/preview-runtime';
 import { useRef, type MutableRefObject } from 'react';
 
 import type {
@@ -30,8 +32,10 @@ interface PreviewStageMediaRuntimeParams {
   playbackRange: VideoEditorPlaybackRange | null;
   previewExactFrameCache: VideoPreviewExactFrameCache;
   previewMode: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer;
   previewRasterSize: VideoEditorPreviewRasterSize;
   project: VideoProject;
+  recordingProject?: VideoProject;
   renderGenerationRef: MutableRefObject<number>;
   registerPreviewRuntime: (runtime: PlaybackPreviewRuntime | null) => void;
 }
@@ -39,11 +43,19 @@ interface PreviewStageMediaRuntimeParams {
 export function usePreviewStageMediaRuntime(params: PreviewStageMediaRuntimeParams) {
   const videoRefs = useRef<Record<string, HTMLVideoElement | null>>({});
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
-  const videoBankClips = usePreviewStageVideoBankClips(
+  const sourceRuntime = useNativePreviewSourceRuntime({
+    project: params.project,
+    assetUrls: params.assetUrls,
+    enabled: params.previewMode !== 'cache',
+    retryVersion: params.effectRuntimeFeedback.retryVersion,
+  });
+  const bankedVideos = usePreviewStageVideoBankClips(
     params.project,
     params.currentTime,
     params.activeClips
   );
+  const emptyVideos = useRef<ReturnType<typeof usePreviewStageVideoBankClips>>([]);
+  const videoBankClips = sourceRuntime.selected ? emptyVideos.current : bankedVideos;
   const activeAudioClips = useActivePreviewAudioClips(params.project, params.currentTime);
   const audioBankClips = usePreviewStageAudioBankClips(
     params.project,
@@ -63,6 +75,7 @@ export function usePreviewStageMediaRuntime(params: PreviewStageMediaRuntimePara
     audioRefs,
     previewExactFrameCache: params.previewExactFrameCache,
     previewMode: params.previewMode,
+    previewRenderer: params.previewRenderer ?? 'gpu',
     playbackRange: params.playbackRange,
     onPresentationTime: params.onPresentationTime,
     previewRasterSize: params.previewRasterSize,
@@ -71,9 +84,10 @@ export function usePreviewStageMediaRuntime(params: PreviewStageMediaRuntimePara
     registerPreviewRuntime: params.registerPreviewRuntime,
     videoBankClips,
     videoRefs,
+    sourceRuntime,
   });
 
-  return { audioBankClips, audioRefs, ...previewRuntime, videoBankClips, videoRefs };
+  return { audioBankClips, audioRefs, ...previewRuntime, videoBankClips, videoRefs, sourceRuntime };
 }
 
 function usePreviewMediaSynchronization(
@@ -107,5 +121,6 @@ function usePreviewMediaSynchronization(
     feedback: params.effectRuntimeFeedback,
     isPlaying: params.isPlaying && !params.mutePreviewAudio,
     project: params.project,
+    ...(params.recordingProject ? { recordingProject: params.recordingProject } : {}),
   });
 }

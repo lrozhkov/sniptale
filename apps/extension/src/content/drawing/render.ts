@@ -15,6 +15,7 @@ import {
   isDrawingTextStencil,
   resolveDrawingTextFontFamily,
   traceDrawingTextBackground,
+  transformDrawingPoint,
   type DrawingObject,
   type DrawingBounds,
   type DrawingPoint,
@@ -135,10 +136,7 @@ function drawText(
       { x: x + bounds.width, y: y + DRAWING_TEXT_VERTICAL_PADDING },
       { x, y: y + DRAWING_TEXT_VERTICAL_PADDING + height },
       { x: x + bounds.width, y: y + DRAWING_TEXT_VERTICAL_PADDING + height },
-    ].map((point) => ({
-      x: transform.a * point.x + transform.c * point.y + transform.e,
-      y: transform.b * point.x + transform.d * point.y + transform.f,
-    }));
+    ].map((point) => transformDrawingPoint(point, transform));
     const left = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.x))) - 1);
     const top = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.y))) - 1);
     const right = Math.min(
@@ -269,6 +267,22 @@ export function renderDrawingObject(
   } else if (object.kind === 'text') {
     drawText(context, object, projection);
   }
+  context.restore();
+}
+
+/** Draws disposable hover chrome without resize or rotation controls. */
+export function renderDrawingHoverOutline(
+  context: CanvasRenderingContext2D,
+  object: DrawingObject,
+  projection: DrawingViewportProjection
+): void {
+  const bounds = getDrawingObjectBounds(object);
+  context.save();
+  applyDrawingObjectTransform(context, object, projection);
+  context.strokeStyle = '#2563eb';
+  context.lineWidth = 1;
+  context.setLineDash([4, 3]);
+  context.strokeRect(bounds.x - projection.x, bounds.y - projection.y, bounds.width, bounds.height);
   context.restore();
 }
 

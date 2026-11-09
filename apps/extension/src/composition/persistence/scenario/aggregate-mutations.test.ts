@@ -1,3 +1,5 @@
+import { captureRootKey, pendingCheckpointKey } from '../sync-capture/contracts';
+import { enableScenarioDeletionReadGuard } from './aggregate-mutations.test-support';
 import {
   stores,
   getStore,
@@ -6,7 +8,7 @@ import {
   createAsset,
   createDocument,
 } from './aggregate-mutations.test-support';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createGuideProject,
   createGuideStep,
@@ -785,4 +787,58 @@ it('protects tour-only image/audio/edit resources across saved history and prune
   await clearScenarioSavedHistory(project.id, second.project.updatedAt);
   expect(await pruneScenarioResources(project.id)).toBe(3);
   expect(getStore('scenario_assets').has('audio')).toBe(false);
+});
+
+beforeEach(enableScenarioDeletionReadGuard);
+
+it('does not borrow a later pending receipt when an already-committed asset journal replays', async () => {
+  const project = createGuideProject('Journal replay');
+  const assets = await import('../assets');
+  const rootKey = captureRootKey('scenario-replay-space', 'scenario-project', project.id);
+  const pending = {
+    version: 1,
+    kind: 'pending-checkpoint',
+    key: pendingCheckpointKey(rootKey),
+    createdAt: 100,
+    dueAt: 60100,
+    spaceId: 'scenario-replay-space',
+    profileCreatedAt: 1,
+    connectionGeneration: 1,
+    rootKind: 'scenario-project',
+    rootId: project.id,
+    rootKey,
+    revision: '11111111-1111-4111-8111-111111111111',
+  };
+  vi.mocked(assets.publishReadyJournalWithRetry).mockImplementationOnce(
+    async (journal, publish) => {
+      await publish(journal);
+      getStore('sync_capture').set('profile', {
+        version: 1,
+        kind: 'profile',
+        key: 'profile',
+        createdAt: 1,
+        enabled: true,
+        spaceId: 'scenario-replay-space',
+        connectionGeneration: 1,
+        checkpointIntervalMs: 60000,
+      });
+      getStore('sync_capture').set(pending.key, pending);
+      const beforeReplay = structuredClone(stores);
+      const read = db.get.getMockImplementation();
+      db.get.mockImplementation(async (name, id) => getStore(name).get(normalizeKey(id)));
+      try {
+        await publish(journal);
+      } finally {
+        if (read) db.get.mockImplementation(read);
+      }
+      expect(stores).toEqual(beforeReplay);
+      expect(JSON.stringify(journal.payload)).not.toContain('checkpointReceipt');
+    }
+  );
+  const replayed = await commitScenarioAggregateMutation(project, {
+    expectedRevision: null,
+    children: { assetPuts: [createAsset(project.id)] },
+  });
+  expect(replayed).not.toHaveProperty('checkpointReceipt');
+  expect(getStore('sync_capture').get(pending.key)).toEqual(pending);
 });

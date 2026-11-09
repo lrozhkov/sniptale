@@ -48,7 +48,7 @@ test('managed magnify matches shared export composition through spatial and frag
     format: 'esm',
     platform: 'browser',
     write: false,
-    loader: { '.woff2': 'dataurl', '.svg': 'text' },
+    loader: { '.woff2': 'dataurl', '.svg': 'text', '.bin': 'dataurl' },
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const results = await page.evaluate(async (text) => {
@@ -477,8 +477,8 @@ for (const size of [
       await expect(frame).toHaveCSS('left', '150px');
       await page.mouse.move(240, 140);
       await page.mouse.down();
-      await page.mouse.move(360, 140);
-      await expect(frame).toHaveCSS('left', '250px');
+      await page.mouse.move(560, 140);
+      await expect(frame).toHaveCSS('left', '300px');
       const before = await surface
         .locator('canvas')
         .first()
@@ -488,10 +488,10 @@ for (const size of [
         fullPage: false,
       });
       await page.mouse.up();
-      await expect(frame).toHaveCSS('left', '250px');
+      await expect(frame).toHaveCSS('left', '300px');
       await expect
         .poll(async () => JSON.parse((await surface.getAttribute('data-saved'))!).area.x)
-        .toBe(0.5);
+        .toBe(0.75);
       expect(
         await surface
           .locator('canvas')

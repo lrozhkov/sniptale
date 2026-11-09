@@ -7,9 +7,9 @@ import { FrameStepBadgeInteractiveSurface } from '../../features/highlighter/fra
 import type { FrameAnnotationSnapshotV1 } from '../../features/highlighter/frame-annotation';
 import type { resolveFrameAnnotationVisualScene } from '../../features/highlighter/frame-annotation';
 import type { FrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
-import { getRepresentativeColor } from '@sniptale/foundation/paint';
+import { getFrameStepBadgeAppearance } from './step-badge-appearance';
 
-/** Renders crop-mode frame content without editing controls. */
+/** Renders frame content without editing controls. */
 export function FrameProjectionReadOnlyOverlays(props: {
   coordinateSpace: FrameAnnotationCoordinateSpace;
   controlsRoot: HTMLDivElement | null;
@@ -40,16 +40,12 @@ export function FrameProjectionReadOnlyOverlays(props: {
           chrome="export"
           controlsPortalTarget={props.controlsRoot ?? props.sceneRoot}
           frameRect={props.snapshot}
+          frameId={props.snapshot.id}
           portalTheme={null}
           settings={badge}
           showSettingsHandle={false}
           surfacePortalTarget={props.sceneRoot}
-          {...(props.snapshot.borderSettings?.fillPaint
-            ? { fillColor: getRepresentativeColor(props.snapshot.borderSettings.fillPaint) }
-            : {})}
-          {...(props.snapshot.borderSettings?.shadow === undefined
-            ? {}
-            : { shadow: props.snapshot.borderSettings.shadow })}
+          {...getFrameStepBadgeAppearance(props.snapshot)}
         />
       ) : null}
     </>

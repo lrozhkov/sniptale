@@ -30,7 +30,7 @@ import { createDefaultFrameCallout } from '../../features/highlighter/frame-anno
 import { translate } from '../../platform/i18n';
 import { FrameProjectionSettings, type ProjectionSettingsMenu } from './projection-settings';
 import { resolveFrameAnnotationToolbarPlacement } from './toolbar-placement';
-import { getRepresentativeColor } from '@sniptale/foundation/paint';
+import { getFrameStepBadgeAppearance } from './step-badge-appearance';
 
 export function FrameProjection(props: {
   coordinateSpace: FrameAnnotationCoordinateSpace;
@@ -45,6 +45,7 @@ export function FrameProjection(props: {
   settingsAnchor: HTMLButtonElement | null;
   settingsMenu: ProjectionSettingsMenu;
   onMoveStart: (event: React.PointerEvent) => void;
+  onSelect?: () => void;
   onResizeStart: (
     event: React.PointerEvent,
     direction: ResizeDirection,
@@ -263,6 +264,7 @@ function FrameCalloutOverlay(props: FrameProjectionOverlayProps) {
         portalTarget={sceneRoot}
         controlsPortalTarget={props.controlsRoot}
         selected={props.selected}
+        {...(props.onSelect ? { onSelect: props.onSelect } : {})}
         snapshot={props.snapshot}
         onSnapshotChange={props.onSnapshotChange}
         onSnapshotPreview={props.onSnapshotPreview}
@@ -292,6 +294,8 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       controlsPortalTarget={props.controlsRoot}
       coordinateSpace={props.coordinateSpace}
       frameRect={props.frameRect}
+      frameId={props.snapshot.id}
+      {...(props.onSelect ? { onClick: props.onSelect } : {})}
       {...(props.snapshot.annotationKind === 'step-badge'
         ? {
             onDelete: () => props.onCommand('delete'),
@@ -317,12 +321,7 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       settingsAnchorRef={anchorRef}
       showSettingsHandle
       surfacePortalTarget={props.sceneRoot}
-      {...(props.snapshot.borderSettings?.fillPaint
-        ? { fillColor: getRepresentativeColor(props.snapshot.borderSettings.fillPaint) }
-        : {})}
-      {...(props.snapshot.borderSettings?.shadow === undefined
-        ? {}
-        : { shadow: props.snapshot.borderSettings.shadow })}
+      {...getFrameStepBadgeAppearance(props.snapshot)}
     />
   );
 }

@@ -6,6 +6,7 @@ import { afterEach, expect, it } from 'vitest';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
 import { createDefaultEditorPresetStorageState } from '../../../composition/persistence/editor-presets';
 import { useInspectorSidebarDraftState } from './drafts';
+import { useEditorStore } from '../../state/useEditorStore';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -66,6 +67,7 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  useEditorStore.getState().resetDocumentState();
 });
 
 it('resets stale resize drafts after closing the resize inspector', () => {
@@ -76,4 +78,25 @@ it('resets stale resize drafts after closing the resize inspector', () => {
 
   hook.rerender(createResizeArgs({ inspector: 'tool' }));
   expect(hook.getValue()?.canvasSizeDraft).toEqual({ height: 720, width: 1280 });
+});
+
+it('keeps the crop ratio from lock and preset intent across rounded feedback and panel changes', () => {
+  const args = createResizeArgs({ canvasWidth: 305, canvasHeight: 229 });
+  const hook = renderHook(args);
+  act(() => hook.getValue()?.setCanvasSizeLocked(true));
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBe(4 / 3);
+  hook.rerender({ ...args, cropSelection: { width: 310, height: 233 } });
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBe(4 / 3);
+  useEditorStore.getState().setCanvasCropAspectRatio(16 / 9);
+  hook.rerender({ ...args, inspector: 'tool' });
+  expect(hook.getValue()?.canvasSizeDraft).toEqual({ width: 305, height: 229 });
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBe(4 / 3);
+  hook.rerender({ ...args, inspector: 'canvas-size' });
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBe(4 / 3);
+  act(() => hook.getValue()?.setCanvasSizeLocked(false));
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBeNull();
+  act(() => hook.getValue()?.setCanvasSizeLocked(true));
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBe(4 / 3);
+  useEditorStore.getState().resetDocumentState();
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBeNull();
 });

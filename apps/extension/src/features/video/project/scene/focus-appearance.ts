@@ -169,19 +169,25 @@ export function resolveQuickEditLensArea(
   };
 }
 
-/** Store a resized circular box as one bounded diameter, keeping existing area admission intact. */
+/** Keep the circle diameter and center; narrow its stored extent near a window edge. */
 export function authorQuickEditLensArea(
   value: QuickEditSpotlight,
   area: QuickEditSpotlight['area']
 ): QuickEditSpotlight['area'] {
   if (value.effect !== 'magnify' || value.lensShape !== 'circle')
     return clampQuickEditSpotlightArea(area);
+  // Numeric diameter edits supply a square; retain their size when clamping the center.
+  if (area.width === area.height) return clampQuickEditSpotlightArea(area);
   const diameter = Math.max(area.width, area.height);
+  const centerX = area.x + area.width / 2;
+  const centerY = area.y + area.height / 2;
+  const width = Math.max(0.01, Math.min(diameter, 2 * centerX, 2 * (1 - centerX)));
+  const height = Math.max(0.01, Math.min(diameter, 2 * centerY, 2 * (1 - centerY)));
   return clampQuickEditSpotlightArea({
-    x: area.x + (area.width - diameter) / 2,
-    y: area.y + (area.height - diameter) / 2,
-    width: diameter,
-    height: diameter,
+    x: centerX - width / 2,
+    y: centerY - height / 2,
+    width,
+    height,
   });
 }
 
@@ -281,7 +287,15 @@ export function constrainQuickEditLensArea(
 ): QuickEditSpotlight['area'] {
   const origin = resolveQuickEditLensArea(value, window);
   if (areQuickEditSpotlightAreasEqual(area, origin)) return origin;
-  return resolveQuickEditLensArea({ ...value, area: authorQuickEditLensArea(value, area) }, window);
+  const bounded = {
+    ...area,
+    x: Math.max(0, Math.min(1 - area.width, area.x)),
+    y: Math.max(0, Math.min(1 - area.height, area.y)),
+  };
+  return resolveQuickEditLensArea(
+    { ...value, area: authorQuickEditLensArea(value, bounded) },
+    window
+  );
 }
 
 /** Detect declared-schema requirements before admitting the complete border payload. */

@@ -70,7 +70,10 @@ for (const variant of [
       expect(await status.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
       const statusLabel = status.locator(':scope > span').first();
       expect(await statusLabel.evaluate((node) => node.clientWidth >= node.scrollWidth)).toBe(true);
-      await expect(status.locator(':scope > span').last()).toHaveAttribute('title', longName);
+      await expect(status.getByText(longName, { exact: true })).toHaveAttribute('title', longName);
+      await expect(
+        parameters.locator('[data-section="transformations"] summary svg.lucide-move')
+      ).toHaveCount(0);
       for (const key of [
         'editor.layerEffects.rotateLeft',
         'editor.layerEffects.rotateRight',
@@ -78,6 +81,10 @@ for (const variant of [
         await parameters.getByRole('button', { name: label(key), exact: true }).click();
         await expect(parameters).toBeVisible();
       }
+      await page.screenshot({
+        path: testInfo.outputPath('image-transform-inspector.png'),
+        fullPage: false,
+      });
       await ui('editor.floating.layer-effects-panel.back').click();
       await expect(parameters).toBeHidden();
       await ui('editor.floating.view-controls.workspace').click();
@@ -216,4 +223,65 @@ for (const variant of [
       );
     }
   });
+}
+
+for (const locale of ['en', 'ru'] as const) {
+  for (const theme of ['light', 'dark'] as const) {
+    test(`workspace color stays inline ${locale} ${theme}`, async ({ page }, info) => {
+      const host = await startHostServer();
+      try {
+        await page.setViewportSize({ width: 1280, height: 560 });
+        await applyHarnessBootstrap(page, {
+          storage: {
+            'sniptale-locale-preference': locale,
+            'sniptale-theme-preference': theme,
+          },
+        });
+        await page.addInitScript((locale) => {
+          localStorage.setItem('sniptale-locale-preference', locale);
+          const canvas = document.createElement('canvas');
+          canvas.width = 320;
+          canvas.height = 180;
+          window.__sniptaleHarnessBootstrap = {
+            ...window.__sniptaleHarnessBootstrap,
+            editorBootstrapPayload: { dataUrl: canvas.toDataURL(), title: 'Color row' },
+          };
+        }, locale);
+        await page.goto(`${host.origin}${EDITOR_HARNESS_PATH}?theme=${theme}`);
+        const ui = (value: string) => page.locator(`[data-ui="${value}"]`);
+        await ui('editor.floating.view-controls.workspace').click();
+        const row = ui('editor.workspace.background-default-row');
+        const trigger = row.locator('[data-ui="shared.ui.color-selector.picker-trigger"]');
+        for (const viewport of [
+          { width: 1280, height: 560 },
+          { width: 1920, height: 900 },
+        ]) {
+          await page.setViewportSize(viewport);
+          await expect(trigger).toBeVisible();
+          const name = (await row.locator('.sniptale-parameter-name').boundingBox())!;
+          const swatch = (await trigger.boundingBox())!;
+          expect(Math.abs(name.y - swatch.y)).toBeLessThanOrEqual(4);
+          expect(await row.evaluate((node) => node.scrollWidth - node.clientWidth)).toBe(0);
+          await page.screenshot({
+            path: info.outputPath(`workspace-${viewport.width}.png`),
+            fullPage: false,
+          });
+        }
+        await trigger.click();
+        const picker = ui('shared.ui.color-selector.picker');
+        await expect(picker).toBeVisible();
+        await picker
+          .getByRole('button', {
+            name: translate('shared.ui.colorSelectorCancel', locale),
+            exact: true,
+          })
+          .click();
+        await expect(picker).toHaveCount(0);
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    });
+  }
 }

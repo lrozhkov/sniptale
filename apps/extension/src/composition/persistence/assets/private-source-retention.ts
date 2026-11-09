@@ -1,4 +1,8 @@
 import {
+  readDeletionDependencyRows,
+  readDeletionExportInputRows,
+} from '../media-library/deletion-index';
+import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
@@ -16,7 +20,6 @@ import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation'
 import { parseProjectAssetEntry } from '../projects/read-guards';
 import type { StoredProjectAssetEntry } from '../projects/contracts';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
-import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import {
   scenarioChildIsUnrelated,
@@ -70,7 +73,8 @@ export async function enqueuePrivateSourceRetirement(
 export async function releaseExpiredPrivateSources(
   operation: PhysicalDeleteAssetOperation,
   snapshot: RetentionSnapshot,
-  journals: readonly AssetReadyJournal[]
+  journals: readonly AssetReadyJournal[],
+  preparedAssetIds: ReadonlySet<string> = new Set()
 ): Promise<PhysicalDeleteAssetOperation> {
   if (!operation.privateSources?.length || !snapshot.authorityValid) return operation;
   return runWithIndexedDbMutation(async (db) => {
@@ -84,12 +88,6 @@ export async function releaseExpiredPrivateSources(
         await tx.done;
         return operation;
       }
-      const [videos, children, reviews, inputs] = await Promise.all([
-        tx.objectStore(VIDEO_PROJECTS_STORE).getAll(),
-        tx.objectStore(SCENARIO_ASSETS_STORE).getAll(),
-        readAllWorkspaceStorage(tx),
-        tx.objectStore(PROJECT_EXPORT_INPUTS_STORE).getAll(),
-      ]);
       const pending: NonNullable<PhysicalDeleteAssetOperation['privateSources']> = [];
       const assetIds = new Set(current.assetIds);
       for (const candidate of current.privateSources ?? []) {
@@ -104,13 +102,9 @@ export async function releaseExpiredPrivateSources(
         // A changed binding ends this causal candidate; it never authorizes deleting its replacement.
         if (source && source.assetId !== expectedAssetId) continue;
         if (
+          preparedAssetIds.has(expectedAssetId) ||
           !sourceBindingIsRetirable(source, candidate, snapshot, journals) ||
-          (await sourceHasDurableReferences(tx, projectAssetId, {
-            videos,
-            children,
-            reviews,
-            inputs,
-          }))
+          (await sourceHasDurableReferences(tx, projectAssetId))
         ) {
           pending.push(candidate);
           continue;
@@ -176,11 +170,17 @@ function sourceBindingIsRetirable(
 /** Fresh logical roots include detached export handoff; an own sidecar is a retained root. */
 async function sourceHasDurableReferences(
   tx: IndexedDbWriteTransaction,
-  projectAssetId: string,
-  roots: DurableSourceRoots
+  projectAssetId: string
 ): Promise<boolean> {
   const id = createProjectAssetMediaId(projectAssetId);
   const target = { id, source: { kind: 'project-asset' as const, projectAssetId } };
+  const matches = await readDeletionDependencyRows(tx, target);
+  const roots: DurableSourceRoots = {
+    videos: matches.videos,
+    children: matches.children,
+    reviews: matches.reviews,
+    inputs: await readDeletionExportInputRows(tx, target),
+  };
   const sidecars = await Promise.all(
     [MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE, VIDEO_WORKSPACES_STORE].map((store) =>
       tx.objectStore(store).get(id)

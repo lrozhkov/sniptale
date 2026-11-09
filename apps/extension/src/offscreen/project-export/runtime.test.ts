@@ -83,6 +83,8 @@ function createCleanupJob() {
   const disposers = createCleanupDisposers();
   const cleanupNode = document.createElement('div');
   const captionRenderer = { prepare: vi.fn(), clear: vi.fn() };
+  const cursorTrajectoryRenderer = { prepare: vi.fn(), clear: vi.fn() };
+  const recordingEventsRenderer = { prepare: vi.fn(), clear: vi.fn() };
   const cameraSpatialRenderer = {
     validateSizes: vi.fn(),
     surface: vi.fn(),
@@ -93,9 +95,13 @@ function createCleanupJob() {
   return {
     ...disposers,
     captionRenderer,
+    cursorTrajectoryRenderer,
+    recordingEventsRenderer,
     cameraSpatialRenderer,
     job: {
       captionRenderer,
+      cursorTrajectoryRenderer,
+      recordingEventsRenderer,
       cameraSpatialRenderer,
       mediaRecorder: null,
       clipMediaElements: new Map([
@@ -143,6 +149,10 @@ function expectCleanupJobState(cleanup: ReturnType<typeof createCleanupJob>) {
   expect(cleanup.job).not.toHaveProperty('cameraSpatialRenderer');
   expect(cleanup.captionRenderer.clear).toHaveBeenCalledOnce();
   expect(cleanup.job.captionRenderer).toBeUndefined();
+  expect(cleanup.cursorTrajectoryRenderer.clear).toHaveBeenCalledOnce();
+  expect(cleanup.job).not.toHaveProperty('cursorTrajectoryRenderer');
+  expect(cleanup.recordingEventsRenderer.clear).toHaveBeenCalledOnce();
+  expect(cleanup.job).not.toHaveProperty('recordingEventsRenderer');
   expect(cleanup.disconnectSource).toHaveBeenCalledOnce();
   expect(cleanup.disconnectGain).toHaveBeenCalledOnce();
   expect(cleanup.stopAudioTrack).toHaveBeenCalledOnce();
@@ -287,14 +297,20 @@ it('creates one spatial GPU owner per export job and replaces a lost instance on
   expect(createReviewSpatialRenderer).toHaveBeenCalledOnce();
   const lost = vi.mocked(createReviewSpatialRenderer).mock.calls[0]![0]!;
   lost();
-  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[0]!.value.dispose
+  ).toHaveBeenCalledOnce();
   expect(job).not.toHaveProperty('cameraSpatialRenderer');
   const next = getProjectExportSpatialRenderer(job);
   expect(next).not.toBe(first);
   expect(createReviewSpatialRenderer).toHaveBeenCalledTimes(2);
   lost();
-  expect(first.dispose).toHaveBeenCalledOnce();
-  expect(next.dispose).not.toHaveBeenCalled();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[0]!.value.dispose
+  ).toHaveBeenCalledOnce();
+  expect(
+    vi.mocked(createReviewSpatialRenderer).mock.results[1]!.value.dispose
+  ).not.toHaveBeenCalled();
   expect(getProjectExportSpatialRenderer(job)).toBe(next);
 });
 

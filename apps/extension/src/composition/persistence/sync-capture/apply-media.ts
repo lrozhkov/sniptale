@@ -1,3 +1,28 @@
+import { readCheckpointInTransaction } from './checkpoints';
+import { createRecordingEventsStore } from '../recordings/recording-events/store';
+import { stageRecordingEventsStream } from '../recordings/recording-events/snapshot';
+import {
+  publishStagedRecordingEventsInTransaction,
+  linkRecordingEventsSnapshotInTransaction,
+} from '../recordings/recording-events/publication';
+import {
+  recordingEventsStagingIdentity,
+  retireJournalRecordingEventStages,
+  retireJournalRecordingEventStagesInTransaction,
+} from '../recordings/recording-events/staging';
+import { retireRecordingEventSourcesInTransaction } from '../recordings/recording-events/retirement';
+import { stageRecordingCursorTrajectoryStream } from '../recordings/cursor-trajectory/snapshot';
+import { createRecordingCursorTrajectoryStore } from '../recordings/cursor-trajectory/store';
+import {
+  cursorTrajectoryStagingIdentity,
+  retireJournalCursorTrajectoryStages,
+  retireJournalCursorTrajectoryStagesInTransaction,
+} from '../recordings/cursor-trajectory/staging';
+import {
+  publishStagedCursorTrajectoryInTransaction,
+  linkCursorTrajectorySnapshotInTransaction,
+} from '../recordings/cursor-trajectory/publication';
+import { retireRecordingCursorTrajectoriesInTransaction } from '../recordings/cursor-trajectory/retirement';
 import { isCaptureReplicaPredecessor } from './guards';
 import { readAppliedCaptureReceipt } from './guards';
 import {
@@ -14,7 +39,8 @@ import {
 } from '../../../features/web-snapshot/provenance';
 import { validateRetainedWebSnapshotScreenshot } from '../../../features/web-snapshot/screenshot-validation';
 import { readAssetFile } from '../assets';
-import { freezeImageInTransaction, digestCapturedImageRows } from './image-snapshot';
+import { isImageCaptureSource } from './image-snapshot';
+import { readCompatibleImageReplicaPredecessorInTransaction } from './freeze';
 import type { IDBPTransaction } from 'idb';
 import type { AssetRef } from '../assets/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -28,6 +54,10 @@ import { abortIndexedDbMutation } from '../infrastructure/indexed-db/transaction
 import {
   STORE_NAME,
   RECORDING_TELEMETRY_STORE,
+  RECORDING_CURSOR_TRAJECTORIES_STORE,
+  RECORDING_CURSOR_BLOCKS_STORE,
+  RECORDING_EVENTS_STORE,
+  NATIVE_TRANSFER_SESSIONS_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_RESIDENCY_STORE,
@@ -416,15 +446,16 @@ export async function loadMediaReplicaPredecessorRef(input: {
     await tx.objectStore(MEDIA_LIBRARY_STORE).get(input.mediaId)
   );
   if (!media) throw new MediaReplicaConflictError('source-changed');
-  if (
-    media.source.kind === 'stored-asset' &&
-    (media.kind === 'image' || media.kind === 'screenshot')
-  ) {
-    const previous = await freezeImageInTransaction(tx, input.mediaId);
-    if (state.nativeDigest !== digestCapturedImageRows(previous))
+  if (isImageCaptureSource(media)) {
+    const previous = await readCompatibleImageReplicaPredecessorInTransaction(
+      tx,
+      input.mediaId,
+      state
+    );
+    if (state.nativeDigest !== previous.digest)
       throw new MediaReplicaConflictError('source-changed');
     await tx.done;
-    return structuredClone(previous.originalRef ?? null);
+    return structuredClone(previous.rows.originalRef ?? null);
   }
   if (
     !['project-asset', 'project-export', 'stored-asset', 'recording', 'web-snapshot'].includes(
@@ -519,10 +550,23 @@ async function publishReplica(
 /** Admit a verified original against its exact native predecessor; retain staged bytes until commit. */
 export async function applyPreparedMediaReplica(
   input: ApplyPreparedMediaReplicaInput,
-  lifecyclePermit?: DurableAssetLifecyclePermit
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  journalId?: string
 ): Promise<{ status: 'applied' | 'duplicate'; generation: number }> {
   const candidate = preparedInput(input);
-  if ('webSnapshot' in candidate.rows) {
+  const cursorSnapshot =
+    'recording' in candidate.rows ? candidate.rows.telemetry?.cursorTrajectorySnapshot : undefined;
+  const cursorDescriptor =
+    'recording' in candidate.rows ? candidate.rows.telemetry?.cursorTrajectory : undefined;
+  const eventsSnapshot =
+    'recording' in candidate.rows ? candidate.rows.telemetry?.recordingEventsSnapshot : undefined;
+  const eventsDescriptor =
+    'recording' in candidate.rows ? candidate.rows.telemetry?.recordingEvents : undefined;
+  if (eventsDescriptor?.totalBlocks && !eventsSnapshot)
+    throw new MediaReplicaConflictError('invalid-input');
+  if (cursorDescriptor?.totalBlocks && !cursorSnapshot)
+    throw new MediaReplicaConflictError('invalid-input');
+  if ('webSnapshot' in candidate.rows || cursorSnapshot || eventsSnapshot) {
     const db = await initDB();
     const tx = db.transaction([SYNC_CAPTURE_STORE], 'readonly');
     const profile = await readReplicaProfile(tx, candidate);
@@ -534,94 +578,233 @@ export async function applyPreparedMediaReplica(
       receiptKey: JSON.stringify(['applied-operation', profile.spaceId, candidate.operationId]),
     });
     await tx.done;
-    if (generation !== null) return { status: 'duplicate', generation };
+    if (generation !== null) {
+      if (journalId && cursorSnapshot) await retireJournalCursorTrajectoryStages(journalId);
+      if (journalId && eventsSnapshot) await retireJournalRecordingEventStages(journalId);
+      return { status: 'duplicate', generation };
+    }
+    if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
+      throw new MediaReplicaConflictError('profile-changed');
+  }
+  const cursorStage =
+    cursorSnapshot && cursorDescriptor
+      ? await (async () => {
+          if (!journalId || !('recording' in candidate.rows))
+            throw new MediaReplicaConflictError('invalid-input');
+          const file = await readAssetFile(cursorSnapshot.ref, 'cursor.bin');
+          if (file.size !== cursorSnapshot.ref.size || file.type !== cursorSnapshot.ref.mimeType)
+            throw new MediaReplicaConflictError('invalid-input');
+          const privateIdentity = cursorTrajectoryStagingIdentity(journalId, {
+            recordingId: candidate.rows.recording.id,
+            trajectoryId: cursorDescriptor.trajectoryId,
+          });
+          return stageRecordingCursorTrajectoryStream({
+            store: createRecordingCursorTrajectoryStore({
+              database: initDB,
+              mintGeneration: () => crypto.randomUUID(),
+            }),
+            identity: {
+              ...privateIdentity,
+              recordingId: privateIdentity.recordingId + ':' + crypto.randomUUID(),
+            },
+            sourceIdentity: { ...cursorSnapshot, descriptor: cursorDescriptor },
+            source: {
+              size: file.size,
+              pipeTo: (target, signal) => file.stream().pipeTo(target, signal ? { signal } : {}),
+            },
+            stagingJournalId: journalId,
+          });
+        })()
+      : null;
+  let eventsStage: Awaited<ReturnType<typeof stageRecordingEventsStream>> | null = null;
+  try {
+    if (eventsSnapshot && eventsDescriptor && 'recording' in candidate.rows) {
+      if (!journalId) throw new MediaReplicaConflictError('invalid-input');
+      const file = await readAssetFile(eventsSnapshot.ref, 'events.bin');
+      if (file.size !== eventsSnapshot.ref.size || file.type !== eventsSnapshot.ref.mimeType)
+        throw new MediaReplicaConflictError('invalid-input');
+      const privateIdentity = recordingEventsStagingIdentity(journalId, {
+        recordingId: candidate.rows.recording.id,
+        eventStreamId: eventsDescriptor.eventStreamId,
+      });
+      eventsStage = await stageRecordingEventsStream({
+        store: createRecordingEventsStore({
+          database: initDB,
+          mintGeneration: () => crypto.randomUUID(),
+        }),
+        identity: {
+          ...privateIdentity,
+          recordingId: `${privateIdentity.recordingId}:${crypto.randomUUID()}`,
+        },
+        sourceIdentity: { ...eventsSnapshot, descriptor: eventsDescriptor },
+        source: {
+          size: file.size,
+          pipeTo: (sink, signal) => file.stream().pipeTo(sink, signal ? { signal } : {}),
+        },
+        stagingJournalId: journalId,
+      });
+    }
+  } catch (error) {
+    if (journalId && cursorSnapshot) await retireJournalCursorTrajectoryStages(journalId);
+    if (journalId && eventsSnapshot) await retireJournalRecordingEventStages(journalId);
+    throw error;
   }
   const thumbnail =
     'webSnapshot' in candidate.rows ? await prepareSnapshotThumbnail(candidate.rows) : null;
   const operation = buildPhysicalDeleteOperation([]);
-  const result = await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [
-        STORE_NAME,
-        RECORDING_TELEMETRY_STORE,
-        RECORDING_RECOVERY_SESSIONS_STORE,
-        ASSET_OPERATIONS_STORE,
-        ASSET_RESIDENCY_STORE,
-        VIDEO_PROJECTS_STORE,
-        SCENARIO_ASSETS_STORE,
-        SYNC_CAPTURE_STORE,
-        SYNC_CONNECTION_STORE,
-        MEDIA_LIBRARY_STORE,
-        PROJECT_ASSETS_STORE,
-        PROJECT_EXPORTS_STORE,
-        ASSET_REFS_STORE,
-        ASSET_OWNERS_STORE,
-        IMAGE_WORKSPACES_STORE,
-        VIDEO_WORKSPACES_STORE,
-        VIDEO_WORKSPACE_DRAFTS_STORE,
-        VIDEO_WORKSPACE_HISTORY_STORE,
-        THUMBNAILS_STORE,
-        AGGREGATE_PRESENTATIONS_STORE,
-        WEB_SNAPSHOTS_STORE,
-      ],
-      'readwrite'
-    );
-    try {
-      const profile = await readReplicaProfile(tx, candidate);
-      const rootKey = captureRootKey(profile.spaceId, 'media', candidate.rows.media.id);
-      const identity: ReplicaIdentity = {
-        rootKey,
-        spaceId: profile.spaceId,
-        stateKey: JSON.stringify(['root-state', rootKey]),
-        receiptKey: JSON.stringify(['applied-operation', profile.spaceId, candidate.operationId]),
-      };
-      const duplicate = await readReceipt(tx, candidate, identity);
-      if (duplicate !== null) {
-        await tx.done;
-        return { status: 'duplicate' as const, generation: duplicate };
-      }
-      if (candidate.authorization !== undefined)
-        await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
-      if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
-        throw new MediaReplicaConflictError('profile-changed');
-      if (candidate.expectedLocalGeneration === 0) {
-        const retained =
-          'projectExport' in candidate.rows && candidate.rows.ref.sha256 !== null
-            ? await readUnenrolledProjectExport(tx, {
-                ...candidate,
-                mediaId: candidate.rows.media.id,
-                exportSource: {
-                  projectId: candidate.rows.projectExport.projectId,
-                  sha256: candidate.rows.ref.sha256,
-                },
-              })
-            : null;
-        if (retained) {
-          if (JSON.stringify(retained) !== JSON.stringify(candidate.rows.ref))
-            throw new MediaReplicaConflictError('source-changed');
-        } else await assertAbsentSource(tx, candidate, identity);
-      } else {
-        const previous = await assertExistingSource(tx, candidate, identity);
+  let result: { status: 'applied' | 'duplicate'; generation: number };
+  try {
+    result = await runWithIndexedDbMutation(async (db) => {
+      const tx = db.transaction(
+        [
+          STORE_NAME,
+          RECORDING_TELEMETRY_STORE,
+          RECORDING_CURSOR_TRAJECTORIES_STORE,
+          RECORDING_CURSOR_BLOCKS_STORE,
+          RECORDING_EVENTS_STORE,
+          NATIVE_TRANSFER_SESSIONS_STORE,
+          RECORDING_RECOVERY_SESSIONS_STORE,
+          ASSET_OPERATIONS_STORE,
+          ASSET_RESIDENCY_STORE,
+          VIDEO_PROJECTS_STORE,
+          SCENARIO_ASSETS_STORE,
+          SYNC_CAPTURE_STORE,
+          SYNC_CONNECTION_STORE,
+          MEDIA_LIBRARY_STORE,
+          PROJECT_ASSETS_STORE,
+          PROJECT_EXPORTS_STORE,
+          ASSET_REFS_STORE,
+          ASSET_OWNERS_STORE,
+          IMAGE_WORKSPACES_STORE,
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
+          VIDEO_WORKSPACE_HISTORY_STORE,
+          THUMBNAILS_STORE,
+          AGGREGATE_PRESENTATIONS_STORE,
+          WEB_SNAPSHOTS_STORE,
+        ],
+        'readwrite'
+      );
+      try {
+        const profile = await readReplicaProfile(tx, candidate);
+        const rootKey = captureRootKey(profile.spaceId, 'media', candidate.rows.media.id);
+        const identity: ReplicaIdentity = {
+          rootKey,
+          spaceId: profile.spaceId,
+          stateKey: JSON.stringify(['root-state', rootKey]),
+          receiptKey: JSON.stringify(['applied-operation', profile.spaceId, candidate.operationId]),
+        };
+        const duplicate = await readReceipt(tx, candidate, identity);
+        if (duplicate !== null) {
+          if (journalId && eventsSnapshot)
+            await retireJournalRecordingEventStagesInTransaction(tx, journalId);
+          if (journalId && cursorSnapshot)
+            await retireJournalCursorTrajectoryStagesInTransaction(tx, journalId);
+          await tx.done;
+          return { status: 'duplicate' as const, generation: duplicate };
+        }
+        if (candidate.authorization !== undefined)
+          await checkSyncConnectionAdmission(tx, candidate, candidate.authorization);
+        if (!profile.enabled || profile.connectionGeneration !== candidate.connectionGeneration)
+          throw new MediaReplicaConflictError('profile-changed');
         if (
-          previous &&
-          (previous.ref.assetId !== candidate.rows.ref.assetId ||
-            ('screenshotRef' in previous &&
-              'screenshotRef' in candidate.rows &&
-              previous.screenshotRef.assetId !== candidate.rows.screenshotRef.assetId))
+          await readCheckpointInTransaction(tx, candidate, {
+            rootKind: 'media',
+            rootId: candidate.rows.media.id,
+          })
         )
-          await releaseMediaSource(tx, previous.media, operation, {
-            retainRecordingRecovery: true,
+          throw new MediaReplicaConflictError('source-changed');
+        if (candidate.expectedLocalGeneration === 0) {
+          const retained =
+            'projectExport' in candidate.rows && candidate.rows.ref.sha256 !== null
+              ? await readUnenrolledProjectExport(tx, {
+                  ...candidate,
+                  mediaId: candidate.rows.media.id,
+                  exportSource: {
+                    projectId: candidate.rows.projectExport.projectId,
+                    sha256: candidate.rows.ref.sha256,
+                  },
+                })
+              : null;
+          if (retained) {
+            if (JSON.stringify(retained) !== JSON.stringify(candidate.rows.ref))
+              throw new MediaReplicaConflictError('source-changed');
+          } else await assertAbsentSource(tx, candidate, identity);
+        } else {
+          const previous = await assertExistingSource(tx, candidate, identity);
+          if (
+            previous &&
+            (previous.ref.assetId !== candidate.rows.ref.assetId ||
+              ('screenshotRef' in previous &&
+                'screenshotRef' in candidate.rows &&
+                previous.screenshotRef.assetId !== candidate.rows.screenshotRef.assetId) ||
+              ('recording' in previous &&
+                'recording' in candidate.rows &&
+                previous.telemetry?.cursorTrajectorySnapshot?.ref.assetId !==
+                  candidate.rows.telemetry?.cursorTrajectorySnapshot?.ref.assetId) ||
+              ('recording' in previous &&
+                'recording' in candidate.rows &&
+                previous.telemetry?.recordingEventsSnapshot?.ref.assetId !==
+                  candidate.rows.telemetry?.recordingEventsSnapshot?.ref.assetId))
+          )
+            await releaseMediaSource(tx, previous.media, operation, {
+              retainRecordingRecovery: true,
+            });
+        }
+        await publishReplica(tx, candidate, identity);
+        if (cursorStage && cursorDescriptor && cursorSnapshot && 'recording' in candidate.rows) {
+          await retireRecordingCursorTrajectoriesInTransaction(tx, candidate.rows.recording.id);
+          const published = await publishStagedCursorTrajectoryInTransaction({
+            tx,
+            stagingWriter: cursorStage,
+            recordingId: candidate.rows.recording.id,
+            descriptor: cursorDescriptor,
+            mintGeneration: () => crypto.randomUUID(),
           });
+          await linkCursorTrajectorySnapshotInTransaction(
+            tx,
+            published,
+            cursorSnapshot.ref.assetId
+          );
+        }
+        if (eventsStage && eventsDescriptor && eventsSnapshot && 'recording' in candidate.rows) {
+          await retireRecordingEventSourcesInTransaction(tx, candidate.rows.recording.id);
+          const published = await publishStagedRecordingEventsInTransaction({
+            tx,
+            stagingWriter: eventsStage,
+            recordingId: candidate.rows.recording.id,
+            descriptor: eventsDescriptor,
+            mintGeneration: () => crypto.randomUUID(),
+          });
+          await linkRecordingEventsSnapshotInTransaction(tx, published, eventsSnapshot.ref.assetId);
+        }
+        if (journalId && eventsSnapshot)
+          await retireJournalRecordingEventStagesInTransaction(tx, journalId);
+        if (journalId && cursorSnapshot)
+          await retireJournalCursorTrajectoryStagesInTransaction(tx, journalId);
+        if (thumbnail) await tx.objectStore(THUMBNAILS_STORE).put(thumbnail);
+        if (operation.assetIds.length) await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
+        await tx.done;
+        return { status: 'applied' as const, generation: candidate.expectedLocalGeneration + 1 };
+      } catch (error) {
+        return abortIndexedDbMutation(tx, error);
       }
-      await publishReplica(tx, candidate, identity);
-      if (thumbnail) await tx.objectStore(THUMBNAILS_STORE).put(thumbnail);
-      if (operation.assetIds.length) await tx.objectStore(ASSET_OPERATIONS_STORE).put(operation);
-      await tx.done;
-      return { status: 'applied' as const, generation: candidate.expectedLocalGeneration + 1 };
-    } catch (error) {
-      return abortIndexedDbMutation(tx, error);
+    });
+  } catch (error) {
+    if (journalId && (cursorSnapshot || eventsSnapshot)) {
+      try {
+        if (cursorSnapshot) await retireJournalCursorTrajectoryStages(journalId);
+        if (eventsSnapshot) await retireJournalRecordingEventStages(journalId);
+      } catch (cleanup) {
+        throw new AggregateError(
+          [error, cleanup],
+          'Replica cursor publication and cleanup failed.',
+          { cause: cleanup }
+        );
+      }
     }
-  });
+    throw error;
+  }
   if (operation.assetIds.length) await completePhysicalDeleteOperation(operation, lifecyclePermit);
   return result;
 }

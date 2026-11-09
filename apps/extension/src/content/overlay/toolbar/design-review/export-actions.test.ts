@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import type { BrowserAnnotationSessionSnapshot } from '../../../parser/page-preparation/annotations';
 import { MAX_BROWSER_ANNOTATIONS_EXPORT_TEXT_BYTES } from '@sniptale/runtime-contracts/export';
 import { MAX_CLIPBOARD_TEXT_LENGTH } from '@sniptale/runtime-contracts/validation/text';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -14,8 +15,21 @@ const mocks = vi.hoisted(() => ({
     };
   }),
   prepareText: vi.fn(),
+  finalize: vi.fn(),
+  flush: vi.fn(),
+  print: vi.fn(),
   sendRuntimeMessage: vi.fn(),
   writeText: vi.fn(),
+}));
+
+vi.mock('../../design-review/session/comment-draft-finalization', () => ({
+  finalizeDesignReviewCommentDraft: mocks.finalize,
+}));
+vi.mock('../../design-review/runtime/actions', () => ({
+  flushPendingPageStyleHistory: mocks.flush,
+}));
+vi.mock('../../../parser/page-preparation/annotations/format/print', () => ({
+  printReviewReport: mocks.print,
 }));
 
 vi.mock('@sniptale/platform/browser/clipboard', () => ({
@@ -43,6 +57,9 @@ import { executeToolbarAnnotationExportAction } from './export-actions';
 
 beforeEach(() => {
   mocks.attachContentActionIntent.mockClear();
+  mocks.finalize.mockReset();
+  mocks.flush.mockReset();
+  mocks.print.mockReset();
   mocks.prepareText.mockReset();
   mocks.sendRuntimeMessage.mockReset();
   mocks.writeText.mockReset();
@@ -200,4 +217,104 @@ it('surfaces popup export launch failures', async () => {
   await expect(executeToolbarAnnotationExportAction('export-page', source)).rejects.toThrow(
     'popup unavailable'
   );
+});
+
+function aggregate() {
+  const snapshot: BrowserAnnotationSessionSnapshot = {
+    schemaVersion: 1,
+    nextAnnotationId: 3,
+    nextCreationOrder: 3,
+    nextMarkerNumber: 3,
+    frameOrders: [],
+    domRecords: [1, 2].map((annotationId) => ({
+      annotationId,
+      creationOrder: annotationId,
+      comment: `Saved note ${annotationId}`,
+      propertyChanges: [],
+      evidence: {
+        fileLabel: `Source ${annotationId}`,
+        frame: { kind: 'top-document' },
+        locator: 'private',
+        nodePosition: { x: 0, y: 0 },
+        pageUrl: `https://example.test/page-${annotationId}`,
+        targetPath: 'p',
+        targetSelector: '#missing',
+        targetText: 'Missing target',
+        viewport: { width: 1280, height: 560 },
+      },
+    })),
+  };
+  return {
+    snapshot,
+    previews: new Map([[2, { dataUrl: 'data:image/png;base64,aGVsbG8=', width: 120, height: 40 }]]),
+  };
+}
+it.each(['copy', 'download'] as const)(
+  'exports immutable full-session %s text after draft finalization',
+  async (action) => {
+    const saved = aggregate();
+    const capture = vi.fn(() => saved);
+    mocks.finalize.mockImplementation(() => {
+      saved.snapshot.domRecords[1]!.comment = 'Finalized draft';
+    });
+    mocks.sendRuntimeMessage.mockResolvedValue({ success: true });
+    const pending = executeToolbarAnnotationExportAction(
+      action,
+      { kind: 'trusted-content-event' },
+      capture
+    );
+    expect(mocks.finalize).toHaveBeenCalledBefore(mocks.flush);
+    expect(mocks.flush).toHaveBeenCalledBefore(capture);
+    saved.snapshot.domRecords[1]!.comment = 'Changed after initiating export';
+    await pending;
+    const text: unknown =
+      action === 'copy'
+        ? mocks.writeText.mock.calls[0]?.[0]
+        : mocks.sendRuntimeMessage.mock.calls[0]?.[0]?.text;
+    expect(text).toEqual(expect.stringContaining('Finalized draft'));
+    expect(text).toEqual(expect.stringContaining('Saved note 1'));
+    expect(text).toEqual(expect.stringContaining('https://example.test/page-2'));
+    expect(text).not.toEqual(expect.stringContaining('Changed after initiating export'));
+    expect(capture).toHaveBeenCalledOnce();
+    expect(mocks.prepareText).not.toHaveBeenCalled();
+  }
+);
+it('prints full-session saved evidence without capturing a current page', async () => {
+  const saved = aggregate();
+  const capture = vi.fn(() => saved);
+  const pending = executeToolbarAnnotationExportAction(
+    'pdf',
+    { kind: 'trusted-content-event' },
+    capture
+  );
+  saved.snapshot.domRecords[0]!.comment = 'Later change';
+  saved.previews.clear();
+  await pending;
+  expect(mocks.print).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({
+      domRecords: [
+        expect.objectContaining({ comment: 'Saved note 1' }),
+        expect.objectContaining({ comment: 'Saved note 2' }),
+      ],
+    }),
+    expect.objectContaining({
+      previews: new Map([
+        [2, { dataUrl: 'data:image/png;base64,aGVsbG8=', width: 120, height: 40 }],
+      ]),
+    })
+  );
+  expect(capture).toHaveBeenCalledOnce();
+  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
+});
+it('preserves the draft and refuses aggregate export when finalization fails', async () => {
+  const capture = vi.fn(aggregate);
+  mocks.finalize.mockImplementation(() => {
+    throw new Error('Draft refused');
+  });
+  await expect(
+    executeToolbarAnnotationExportAction('copy', { kind: 'trusted-content-event' }, capture)
+  ).rejects.toThrow('Draft refused');
+  expect(capture).not.toHaveBeenCalled();
+  expect(mocks.writeText).not.toHaveBeenCalled();
 });

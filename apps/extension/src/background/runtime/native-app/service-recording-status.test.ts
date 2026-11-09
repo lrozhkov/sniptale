@@ -75,6 +75,7 @@ function createContext(args: {
 
 function createStatus(): NativeAppRuntimeStatus {
   return {
+    appIdentity: null,
     appStatus: null,
     capabilities: null,
     connectionState: 'connected',
@@ -87,8 +88,9 @@ function createStatus(): NativeAppRuntimeStatus {
       },
       controllerLeaseId: 'lease-1',
       expiresAtEpochMs: 10,
-      protocolVersion: 1,
+      protocolVersion: 2,
       status: 'granted',
+      selectionStatus: 'selected',
       type: 'app.controller.lease',
     },
     effectiveSettings: null,

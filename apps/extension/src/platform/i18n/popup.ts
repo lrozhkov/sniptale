@@ -1,59 +1,12 @@
-import {
-  DEFAULT_LOCALE,
-  FALLBACK_LOCALE,
-  SUPPORTED_LOCALES,
-  localeLanguageMessages,
-  type AppLocale,
-} from '@sniptale/platform/i18n/config';
-import { commonMessages } from './messages/common';
-import { backgroundMessages } from './messages/background';
-import { contentRuntimeMessages } from './messages/content/runtime';
-import { contentToolbarMessages } from './messages/content/toolbar';
-import { exportModalMessages } from './messages/export-modal';
-import { popupMessages } from './messages/popup';
-import { settingsQuickActionsMessages } from './messages/settings/quick-actions';
-import { sharedUiMessages } from './messages/shared/ui';
-import { viewportPresetsMessages } from './messages/viewport-presets';
-import { imageSettingsMessages } from './messages/image-settings';
-import { defineMessageSource } from './messages/source';
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type AppLocale } from '@sniptale/platform/i18n/config';
+import { catalogs } from 'sniptale:i18n/popup';
+import { readCatalogTranslation } from './catalog-reader';
 import { useAppLocale } from './locale/hook';
 import { getCurrentLocale, setLocalePreference } from './locale/state';
 import type { Translate, TranslationKey } from './types';
 
-const popupTranslationMessages = defineMessageSource({
-  background: backgroundMessages,
-  common: defineMessageSource({ ...commonMessages, languages: localeLanguageMessages }),
-  content: defineMessageSource({
-    runtime: contentRuntimeMessages,
-    toolbar: contentToolbarMessages,
-  }),
-  exportModal: exportModalMessages,
-  imageSettings: imageSettingsMessages,
-  popup: popupMessages,
-  settings: defineMessageSource({ quickActions: settingsQuickActionsMessages }),
-  shared: defineMessageSource({ ui: sharedUiMessages }),
-  viewportPresets: viewportPresetsMessages,
-});
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function readPopupTranslation(locale: AppLocale, key: TranslationKey): string {
-  let current: unknown = popupTranslationMessages;
-
-  for (const part of key.split('.')) {
-    if (!isRecord(current) || !(part in current)) return key;
-    current = current[part];
-  }
-
-  if (!isRecord(current)) return key;
-  const localizedValue = current[locale] ?? current[FALLBACK_LOCALE];
-  return typeof localizedValue === 'string' ? localizedValue : key;
-}
-
 export function createTranslator(locale: AppLocale = DEFAULT_LOCALE): Translate {
-  return (key) => readPopupTranslation(locale, key);
+  return (key) => readCatalogTranslation(catalogs, locale, key);
 }
 
 export function translate(key: TranslationKey, locale?: AppLocale): string {

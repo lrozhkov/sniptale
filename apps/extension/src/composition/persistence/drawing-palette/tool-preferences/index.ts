@@ -43,6 +43,7 @@ function mergeDrawingToolPreferences(
   patch: DrawingToolPreferencesPatch
 ): DrawingToolDefaults {
   return {
+    simplify: { ...current.simplify, ...patch.simplify },
     pencil: { ...current.pencil, ...patch.pencil },
     marker: { ...current.marker, ...patch.marker },
     shape: { ...current.shape, ...patch.shape },

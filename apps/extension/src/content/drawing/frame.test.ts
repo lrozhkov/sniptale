@@ -7,9 +7,13 @@ import {
   registerDrawingSnapshotSource,
   drawDrawingFrame,
 } from './frame';
-import { renderDrawingObject, renderDrawingSelection } from './render';
+import { renderDrawingObject, renderDrawingSelection, renderDrawingHoverOutline } from './render';
 
-vi.mock('./render', () => ({ renderDrawingObject: vi.fn(), renderDrawingSelection: vi.fn() }));
+vi.mock('./render', () => ({
+  renderDrawingObject: vi.fn(),
+  renderDrawingSelection: vi.fn(),
+  renderDrawingHoverOutline: vi.fn(),
+}));
 afterEach(() => vi.restoreAllMocks());
 import type { DrawingObject } from '../../features/drawing/public';
 import type { PointerDraft } from './interaction';
@@ -299,4 +303,191 @@ it('does not spend the ink raster budget on independently rendered text or blur'
   } finally {
     unregister();
   }
+});
+
+it.each([false, true])(
+  'uses the anchor clipping policy for Simplify selection (inside=%s)',
+  async (inside) => {
+    const { createDefaultSimplifySettings } = await import('../../features/simplify/settings');
+    const scroll = document.createElement('div'),
+      anchor = document.createElement('div');
+    if (inside) scroll.append(anchor);
+    vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 100, 800, 500));
+    const stack: boolean[] = [];
+    let clipped = false,
+      atSelection: boolean | undefined;
+    const context = {
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      save: () => {
+        stack.push(clipped);
+      },
+      restore: () => {
+        clipped = stack.pop() ?? false;
+      },
+      clip: () => {
+        clipped = true;
+      },
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      context as unknown as CanvasRenderingContext2D
+    );
+    vi.mocked(renderDrawingSelection).mockImplementationOnce(() => {
+      atSelection = clipped;
+    });
+    const object = {
+      id: 'mask',
+      kind: 'simplify' as const,
+      bounds: { x: 20, y: -80, width: 60, height: 30 },
+      settings: createDefaultSimplifySettings(),
+    };
+    drawDrawingFrame({
+      canvas: document.createElement('canvas'),
+      objects: [object],
+      draft: null,
+      selectedIds: ['mask'],
+      root: { kind: 'element', element: scroll },
+      showChrome: true,
+      renderObjects: false,
+      getObjectAnchor: () => anchor,
+    });
+    expect(atSelection).toBe(inside);
+  }
+);
+
+it('exports header masks without the internal root clip and clips body masks independently', async () => {
+  const { createDefaultSimplifySettings } = await import('../../features/simplify/settings');
+  const scroll = document.createElement('div'),
+    headerAnchor = document.createElement('div'),
+    bodyAnchor = document.createElement('div');
+  scroll.append(bodyAnchor);
+  vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 100, 800, 500));
+  const stack: boolean[] = [];
+  let clipped = false;
+  const context = {
+    setTransform: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    save: () => {
+      stack.push(clipped);
+    },
+    restore: () => {
+      clipped = stack.pop() ?? false;
+    },
+    clip: () => {
+      clipped = true;
+    },
+  };
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as unknown as CanvasRenderingContext2D
+  );
+  const header = {
+    id: 'header-export',
+    kind: 'simplify' as const,
+    bounds: { x: 20, y: -80, width: 80, height: 30 },
+    settings: createDefaultSimplifySettings(),
+  };
+  const body = { ...header, id: 'body-export', bounds: { x: 20, y: 200, width: 80, height: 30 } };
+  const canvas = document.createElement('canvas');
+  const cleanup = registerDrawingSnapshotSource(canvas, () => ({
+    objects: [header, body],
+    root: { kind: 'element', element: scroll },
+    getObjectAnchor: (object) => (object.id === header.id ? headerAnchor : bodyAnchor),
+  }));
+  const parts = captureDrawingObjects(canvas)!;
+  expect(parts[0]!.clip).toBeNull();
+  expect(parts[0]!.canvas!.style.clipPath).toBe('');
+  expect(parts[1]!.clip).not.toBeNull();
+  const seen: { id: string; clipped: boolean }[] = [];
+  vi.mocked(renderDrawingObject).mockImplementation((_context, object) => {
+    seen.push({ id: object.id, clipped });
+  });
+  const combined = captureDrawingFrame(canvas)!;
+  expect(combined.style.clipPath).toBe('');
+  expect(seen).toEqual([
+    { id: header.id, clipped: false },
+    { id: body.id, clipped: true },
+  ]);
+  cleanup();
+});
+
+it('paints a hover boundary without selection or export chrome', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.mocked(renderDrawingHoverOutline).mockClear();
+  const args = {
+    canvas: document.createElement('canvas'),
+    objects: [{ ...original, fillColor: '#fff' }],
+    draft: null,
+    selectedIds: [],
+    root: { kind: 'viewport' as const, element: null },
+    hoverPoint: { clientX: 20, clientY: 30 },
+    renderObjects: false,
+  };
+  drawDrawingFrame({ ...args, showChrome: true });
+  expect(renderDrawingHoverOutline).toHaveBeenCalledOnce();
+  drawDrawingFrame({ ...args, showChrome: false });
+  expect(renderDrawingHoverOutline).toHaveBeenCalledOnce();
+});
+
+it.each(['selected', 'draft', 'bend-only'] as const)('omits hover chrome during %s', (mode) => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.mocked(renderDrawingHoverOutline).mockClear();
+  const object = { ...original, fillColor: '#fff' };
+  drawDrawingFrame({
+    canvas: document.createElement('canvas'),
+    objects: [object],
+    selectedIds: mode === 'selected' ? [object.id] : [],
+    draft:
+      mode === 'draft' ? { kind: 'move', original: object, object, start: { x: 20, y: 30 } } : null,
+    bendOnly: mode === 'bend-only',
+    root: { kind: 'viewport', element: null },
+    showChrome: true,
+    renderObjects: false,
+    hoverPoint: { clientX: 20, clientY: 30 },
+  });
+  expect(renderDrawingHoverOutline).not.toHaveBeenCalled();
+});
+
+it('projects and clips a hover outline to its scrolled element root', () => {
+  const context = {
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+  };
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as unknown as CanvasRenderingContext2D
+  );
+  const element = document.createElement('section');
+  element.scrollLeft = 100;
+  element.scrollTop = 100;
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(20, 30, 300, 200));
+  vi.mocked(renderDrawingHoverOutline).mockClear();
+  drawDrawingFrame({
+    canvas: document.createElement('canvas'),
+    objects: [untouched],
+    selectedIds: [],
+    draft: null,
+    root: { kind: 'element', element },
+    showChrome: true,
+    renderObjects: false,
+    hoverPoint: { clientX: 25, clientY: 35 },
+  });
+  expect(renderDrawingHoverOutline).toHaveBeenCalledWith(context, untouched, { x: 80, y: 70 });
+  expect(context.rect).toHaveBeenCalledWith(20, 30, 300, 200);
 });

@@ -52,7 +52,7 @@ it('returns early when the LLM session route handles the message', () => {
 
   expectListenerResult(true, listener, message, sender, sendResponse);
 
-  expect(routeLlmSessionMessageMock).toHaveBeenCalledWith(message, sender, sendResponse);
+  expect(routeLlmSessionMessageMock).toHaveBeenCalledWith(message, sender, sendResponse, undefined);
 });
 
 it('returns early when the content LLM router handles the message', async () => {
@@ -83,7 +83,7 @@ it('returns early when the content LLM router handles the message', async () => 
   expectListenerResult(true, listener, message, sender, sendResponse);
 
   await vi.waitFor(() => {
-    expect(routeLlmMessageMock).toHaveBeenCalledWith(message, sendResponse, sender);
+    expect(routeLlmMessageMock).toHaveBeenCalledWith(message, sendResponse, sender, undefined);
   });
 });
 
@@ -119,6 +119,11 @@ it('returns early when the scenario-editor LLM router handles the message', asyn
   expectListenerResult(true, listener, message, sender, sendResponse);
 
   await vi.waitFor(() => {
-    expect(routeScenarioEditorLlmMessageMock).toHaveBeenCalledWith(message, sendResponse, sender);
+    expect(routeScenarioEditorLlmMessageMock).toHaveBeenCalledWith(
+      message,
+      sendResponse,
+      sender,
+      undefined
+    );
   });
 });

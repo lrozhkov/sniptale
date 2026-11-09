@@ -226,7 +226,7 @@ it('keeps the v3 resource ceiling and refuses unknown layouts in v4 admission', 
       totals: { ...manifest.totals, objects: MAX_MEDIA_ARCHIVE_ENTRIES + 1 },
     })
   ).toThrow('resource profile');
-  expect(() => parseManifestV6({ ...manifest, layout: 'library-folders-v5' })).toThrow(
+  expect(() => parseManifestV6({ ...manifest, layout: 'library-folders-v6' })).toThrow(
     'Unsupported'
   );
 });

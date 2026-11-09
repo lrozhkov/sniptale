@@ -1,3 +1,4 @@
+import { createReviewRecordingHistoryProject } from './recording-review';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { projectRecordingObservationClock } from '../../features/video/project/observation-clock';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
@@ -125,10 +126,18 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
     stage = 'metadata';
     const { source, provenance } = await inspectReviewVideo(original.file, signal);
     stage = 'telemetry';
-    const telemetry =
+    const rawTelemetry =
       media.source.kind === 'recording' && !media.recordingMetadata
         ? await getRecordingTelemetry(media.source.recordingId)
         : undefined;
+    const telemetry =
+      rawTelemetry &&
+      (!media.recordingMetadata || rawTelemetry.cursorTrajectory || rawTelemetry.recordingEvents)
+        ? projectRecordingObservationClock(rawTelemetry)
+        : null;
+    const historyProject = telemetry
+      ? createReviewRecordingHistoryProject(telemetry, source, media.filename)
+      : null;
     signal.throwIfAborted();
     stage = 'workspace';
     const snapshot = await openVideoWorkspace(aggregateId, source, original.assetId);
@@ -140,7 +149,8 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
       source,
       ...(provenance ? { provenance } : {}),
       snapshot,
-      telemetry: telemetry ? projectRecordingObservationClock(telemetry) : null,
+      telemetry,
+      ...(historyProject ? { historyProject } : {}),
       ...(media.recordingMetadata ? { recordingMetadata: media.recordingMetadata } : {}),
     };
   } catch (error) {

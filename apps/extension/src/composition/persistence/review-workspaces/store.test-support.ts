@@ -1,3 +1,9 @@
+import { projectRowReferenceKeys } from '../assets/retention-index-projection';
+import { projectWorkspaceReferenceKeys } from '../review-workspaces/index-projection';
+import {
+  ROW_REFERENCE_INDEX,
+  UNKNOWN_HISTORY_REFERENCES,
+} from '../infrastructure/indexed-db/row-index-contract';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
 import { materializeWorkspaceStorage } from './storage-format';
@@ -56,17 +62,46 @@ function fixturePrimaryKeys(
   return structuredClone(selected.slice(0, count ?? selected.length));
 }
 
-/** Shared transactional fixture retains commit/abort and quota behavior. */
-export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) => boolean) {
-  const id = 'recording:beta-v1-recording';
-  const rows: Map<string, Map<string, unknown>> = new Map([
+function fixtureReferenceKeys(
+  pending: Map<string, Map<string, unknown>>,
+  name: string,
+  value: unknown
+): string[] {
+  if (name === 'video_workspaces') {
+    const own = isRecord(value)
+      ? [...(pending.get('video_workspace_history')?.values() ?? [])].filter(
+          (row) => isRecord(row) && row['aggregateId'] === value['aggregateId']
+        )
+      : [];
+    return projectWorkspaceReferenceKeys(value, own);
+  }
+  if (name === 'video_workspace_history') {
+    const id = isRecord(value) ? value['aggregateId'] : undefined;
+    const head = typeof id === 'string' ? pending.get('video_workspaces')?.get(id) : undefined;
+    const own = [...(pending.get('video_workspace_history')?.values() ?? [])].filter(
+      (row) => isRecord(row) && row['aggregateId'] === id
+    );
+    return projectWorkspaceReferenceKeys(head, own).includes(UNKNOWN_HISTORY_REFERENCES)
+      ? [UNKNOWN_HISTORY_REFERENCES]
+      : [];
+  }
+  return projectRowReferenceKeys(name, value);
+}
+
+function createWorkspaceFixtureRows(id: string): Map<string, Map<string, unknown>> {
+  return new Map<string, Map<string, unknown>>([
     ['media_library', new Map([[id, betaV1Fixture.records.media_library[0]]])],
     ['recordings', new Map([['beta-v1-recording', betaV1Fixture.records.recordings[0]]])],
     ['project_assets', new Map()],
     ['project_exports', new Map()],
     ...[
       'video_projects',
+      'project_export_inputs',
       'recording_telemetry',
+      'recording_cursor_trajectories',
+      'recording_cursor_blocks',
+      'recording_events',
+      'native_transfer_sessions',
       'recording_recovery_sessions',
       'recording_recovery_blocks',
       'scenario_assets',
@@ -81,12 +116,30 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
       'sync_outbox',
       'sync_connection',
       'video_project_revisions',
+      'scenario_projects',
+      'scenario_project_history',
+      'scenario_project_units',
     ].map((name): [string, Map<string, unknown>] => [name, new Map()]),
     ['video_workspaces', new Map()],
     ['video_workspace_history', new Map()],
     ['video_workspace_drafts', new Map()],
   ]);
+}
+
+/** Shared transactional fixture retains commit/abort and quota behavior. */
+export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) => boolean) {
+  const id = 'recording:beta-v1-recording';
+  const rows = createWorkspaceFixtureRows(id);
   const database = {
+    getAllFromIndex: async (name: string, index: string, query: IDBValidKey) => {
+      if (index !== 'kind') throw new Error('Unsupported direct fixture index');
+      const store = rows.get(name);
+      if (!store) throw new Error('Unknown fixture store');
+      return structuredClone(
+        [...store.values()].filter((value) => isRecord(value) && value[index] === query)
+      );
+    },
+    get: async (name: string, key: string) => structuredClone(rows.get(name)?.get(key)),
     transaction: (stores: string[], mode: string) => {
       const pending = structuredClone(rows);
       let aborted = false;
@@ -99,29 +152,46 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
           const store = pending.get(name)!;
           const keyOf = (key: IDBValidKey) => (typeof key === 'string' ? key : JSON.stringify(key));
           const ownRows = (key: IDBValidKey, indexName = 'aggregateId') =>
-            [...store].filter(([, value]) => isRecord(value) && value[indexName] === key);
+            [...store].filter(([, value]) =>
+              indexName === ROW_REFERENCE_INDEX
+                ? fixtureReferenceKeys(pending, name, value).includes(
+                    typeof key === 'string' ? key : ''
+                  )
+                : isRecord(value) && value[indexName] === key
+            );
           const write = async (value: unknown, add: boolean) => {
             if (failure(name)) throw new DOMException('No space', 'QuotaExceededError');
             if (!isRecord(value)) throw new Error('Invalid fixture row');
             const key =
-              name === 'sync_capture' || name === 'sync_outbox' || name === 'sync_connection'
-                ? value['key']
-                : name === 'video_project_revisions'
-                  ? value['projectId']
-                  : name === 'scenario_project_history'
-                    ? JSON.stringify([value['projectId'], value['revision']])
-                    : name === 'scenario_project_units'
-                      ? JSON.stringify([value['projectId'], value['unitId'], value['revision']])
-                      : name === 'video_workspace_history'
-                        ? JSON.stringify([value['aggregateId'], value['ordinal']])
-                        : name === 'recording_telemetry'
-                          ? value['recordingId']
-                          : name === 'asset_owners'
-                            ? JSON.stringify([value['ownerKind'], value['ownerId'], value['role']])
-                            : (value['aggregateId'] ??
-                              value['id'] ??
-                              value['operationId'] ??
-                              value['assetId']);
+              name === 'recording_events'
+                ? JSON.stringify([
+                    value['recordingId'],
+                    value['eventStreamId'],
+                    value['kind'],
+                    value['entryId'],
+                  ])
+                : name === 'sync_capture' || name === 'sync_outbox' || name === 'sync_connection'
+                  ? value['key']
+                  : name === 'video_project_revisions'
+                    ? value['projectId']
+                    : name === 'scenario_project_history'
+                      ? JSON.stringify([value['projectId'], value['revision']])
+                      : name === 'scenario_project_units'
+                        ? JSON.stringify([value['projectId'], value['unitId'], value['revision']])
+                        : name === 'video_workspace_history'
+                          ? JSON.stringify([value['aggregateId'], value['ordinal']])
+                          : name === 'recording_telemetry'
+                            ? value['recordingId']
+                            : name === 'asset_owners'
+                              ? JSON.stringify([
+                                  value['ownerKind'],
+                                  value['ownerId'],
+                                  value['role'],
+                                ])
+                              : (value['aggregateId'] ??
+                                value['id'] ??
+                                value['operationId'] ??
+                                value['assetId']);
             if (typeof key !== 'string' || !key) throw new Error('Missing test row identity');
             if (add && store.has(key))
               throw new DOMException('Duplicate fixture row', 'ConstraintError');
@@ -129,22 +199,41 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
           };
           return {
             get: async (key: IDBValidKey) => structuredClone(store.get(keyOf(key))),
-            getAll: async () => structuredClone([...store.values()]),
+            getAll: async (query?: IDBValidKey | IDBKeyRange, count?: number) =>
+              structuredClone(
+                query === undefined && count === undefined
+                  ? [...store.values()]
+                  : fixturePrimaryKeys(store, query, count).map((key) => store.get(keyOf(key)))
+              ),
             getAllKeys: async (query?: IDBValidKey | IDBKeyRange, count?: number) =>
               fixturePrimaryKeys(store, query, count),
             count: async () => store.size,
             index: (indexName: string) => {
               if (
+                indexName !== ROW_REFERENCE_INDEX &&
+                indexName !== 'recoveryId' &&
                 indexName !== 'aggregateId' &&
                 indexName !== 'assetId' &&
+                indexName !== 'snapshotAssetId' &&
                 indexName !== 'kind' &&
                 indexName !== 'rootKey' &&
                 indexName !== 'projectId' &&
+                indexName !== 'recordingId' &&
                 indexName !== 'id'
               )
                 throw new Error('Unexpected test index');
               return {
+                openCursor: async (key: IDBValidKey) => {
+                  const items = ownRows(key, indexName).map(([, value]) => structuredClone(value));
+                  type Cursor = { value: unknown; continue(): Promise<Cursor | null> };
+                  const at = (index: number): Cursor | null =>
+                    index >= items.length
+                      ? null
+                      : { value: items[index], continue: async () => at(index + 1) };
+                  return at(0);
+                },
                 count: async (key: IDBValidKey) => ownRows(key, indexName).length,
+                getKey: async (key: IDBValidKey) => ownRows(key, indexName)[0]?.[0],
                 getAll: async (key: IDBValidKey) =>
                   structuredClone(ownRows(key, indexName).map(([, value]) => value)),
                 getAllKeys: async (key: IDBValidKey, count?: number) =>

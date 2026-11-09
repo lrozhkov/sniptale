@@ -28,6 +28,7 @@ vi.mock('@sniptale/platform/security/local-secret-crypto', async (original) => (
   ...(await original<typeof import('@sniptale/platform/security/local-secret-crypto')>()),
   encryptSecret: io.encrypt,
 }));
+const policy = { version: 1, mode: 'on-demand' } as const;
 const authentication = { kind: 'basic', username: 'alice', password: 'synthetic-password' };
 function deferred() {
   let resolve!: () => void;
@@ -48,8 +49,14 @@ beforeEach(async () => {
   const pending = new Map<string, Promise<unknown>>();
   vi.stubGlobal('navigator', {
     locks: {
-      request(name: string, _options: unknown, callback: () => unknown) {
+      request(name: string, options: unknown, callback: () => unknown) {
         observeLock?.(name);
+        if (
+          name === 'sniptale.secret-protection.writers' &&
+          isRecord(options) &&
+          options['mode'] === 'shared'
+        )
+          return Promise.resolve().then(callback);
         const result = (pending.get(name) ?? Promise.resolve()).then(callback);
         pending.set(
           name,
@@ -88,6 +95,7 @@ function setup() {
   const rows = new Map<string, Map<string, unknown>>([
     ['sync_capture', new Map()],
     ['sync_connection', new Map()],
+    ['secret_protection', new Map()],
     ['sync_outbox', new Map()],
   ]);
   const allocation = readyAllocation();
@@ -100,6 +108,12 @@ function setup() {
   const makeDatabase = () => {
     const database = {
       closed: false,
+      async get(name: string, key: string) {
+        if (database.closed) throw new DOMException('Closed database', 'InvalidStateError');
+        const table = rows.get(name);
+        if (!table) throw new Error('Unknown fixture store');
+        return structuredClone(table.get(key));
+      },
       transaction(stores: string[], mode: string) {
         if (database.closed) throw new DOMException('Closed database', 'InvalidStateError');
         const pending = structuredClone(rows);
@@ -192,9 +206,10 @@ function holdEncryption() {
 }
 it('installs one complete enrollment from native ready evidence', async () => {
   const f = setup();
-  const active = await enrollSyncWorkspaceConnection(f.source, authentication);
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication, policy);
   expect(active).toMatchObject({
     phase: 'active',
+    storagePolicy: policy,
     identity: { revision: 1 },
     binding: {
       rootUrl: f.allocation.rootUrl,
@@ -216,6 +231,7 @@ it('installs one complete enrollment from native ready evidence', async () => {
     spaceId: f.allocation.spaceId,
     connectionGeneration: 1,
     createdAt: active.binding.profileCreatedAt,
+    checkpointIntervalMs: 300000,
   });
   expect([...f.table().keys()].sort()).toEqual([
     'connection',
@@ -224,6 +240,10 @@ it('installs one complete enrollment from native ready evidence', async () => {
     'workspace-enrollment',
   ]);
   expect(f.table().get('workspace-allocation')).toEqual(f.allocation);
+  expect(f.table().get('connection')).toEqual(active);
+  expect(f.table().get('workspace-enrollment')).toMatchObject({
+    connection: { storagePolicy: policy },
+  });
   expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(authentication);
   expect(JSON.stringify([...f.table().values()])).not.toContain(authentication.password);
   expect(io.database).toHaveBeenCalledTimes(2);
@@ -231,10 +251,17 @@ it('installs one complete enrollment from native ready evidence', async () => {
 it('admits one complete enrollment for parallel writers', async () => {
   const f = setup();
   const [first, second] = await Promise.all([
-    enrollSyncWorkspaceConnection(f.source, authentication),
-    enrollSyncWorkspaceConnection(f.source, { ...authentication, password: 'different-password' }),
+    enrollSyncWorkspaceConnection(f.source, authentication, policy),
+    enrollSyncWorkspaceConnection(
+      f.source,
+      { ...authentication, password: 'different-password' },
+      policy
+    ),
   ]);
   expect(second).toEqual(first);
+  expect(first.storagePolicy).toEqual(policy);
+  expect(f.table().get('connection')).toEqual(first);
+  expect(f.table().get('workspace-enrollment')).toMatchObject({ connection: first });
   expect(f.table('sync_capture').size).toBe(1);
   expect(f.table().size).toBe(4);
   const resolved = await loadSyncConnectionAuthentication(first.identity);
@@ -244,14 +271,18 @@ it('admits one complete enrollment for parallel writers', async () => {
 });
 it('replays the winning source without replacing credentials', async () => {
   const f = setup();
-  const active = await enrollSyncWorkspaceConnection(f.source, authentication);
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication, policy);
   const before = structuredClone(f.rows);
   io.encrypt.mockClear();
   expect(
-    await enrollSyncWorkspaceConnection(f.source, {
-      ...authentication,
-      password: 'replacement-password',
-    })
+    await enrollSyncWorkspaceConnection(
+      f.source,
+      {
+        ...authentication,
+        password: 'replacement-password',
+      },
+      policy
+    )
   ).toEqual(active);
   expect(io.encrypt).not.toHaveBeenCalled();
   expect(f.rows).toEqual(before);
@@ -259,18 +290,20 @@ it('replays the winning source without replacing credentials', async () => {
 });
 it('replays current same-binding state after pause resume and auth rotation', async () => {
   const f = setup();
-  const active = await enrollSyncWorkspaceConnection(f.source, authentication);
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication, policy);
   const paused = await commandSyncConnection(active.identity, 'pause');
-  expect(await enrollSyncWorkspaceConnection(f.source, authentication)).toEqual(paused);
+  expect(await enrollSyncWorkspaceConnection(f.source, authentication, policy)).toEqual(paused);
   const resumed = await commandSyncConnection(paused.identity, 'resume');
   const reservation = await beginSyncConnectionAuthUpdate(resumed.binding, resumed.identity);
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   const rotated = await commitSyncConnectionAuthentication(reservation, {
     kind: 'bearer',
     accessToken: 'synthetic-token',
   });
   expect(rotated.workspace).toEqual(active.workspace);
-  expect(await enrollSyncWorkspaceConnection(f.source, authentication)).toEqual(rotated);
+  expect(await enrollSyncWorkspaceConnection(f.source, authentication, policy)).toEqual(rotated);
   expect(await loadSyncConnectionAuthentication(rotated.identity)).toEqual({
     kind: 'bearer',
     accessToken: 'synthetic-token',
@@ -280,30 +313,42 @@ it.each([1, 2, 3, 4])('rolls back enrollment after write %s fails', async (index
   const f = setup();
   const before = structuredClone(f.rows);
   f.failWrite(index);
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(f.rows).toEqual(before);
   expect(f.aborted()).toBe(1);
   expect(f.drained()).toBe(1);
   f.failWrite(0);
-  expect((await enrollSyncWorkspaceConnection(f.source, authentication)).phase).toBe('active');
+  expect((await enrollSyncWorkspaceConnection(f.source, authentication, policy)).phase).toBe(
+    'active'
+  );
 });
 it('aborts and drains failed enrollment before retry', async () => {
   const f = setup();
   const before = structuredClone(f.rows);
   f.failCommit();
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(f.rows).toEqual(before);
   expect(f.aborted()).toBe(1);
   expect(f.drained()).toBe(1);
-  expect((await enrollSyncWorkspaceConnection(f.source, authentication)).phase).toBe('active');
+  expect((await enrollSyncWorkspaceConnection(f.source, authentication, policy)).phase).toBe(
+    'active'
+  );
 });
 it('preserves ready evidence after crypto failure and permits retry', async () => {
   const f = setup();
   const before = structuredClone(f.rows);
   io.encrypt.mockRejectedValueOnce(new Error('Sensitive encryption failure'));
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(f.rows).toEqual(before);
-  expect((await enrollSyncWorkspaceConnection(f.source, authentication)).phase).toBe('active');
+  expect((await enrollSyncWorkspaceConnection(f.source, authentication, policy)).phase).toBe(
+    'active'
+  );
 });
 it.each(['stale', 'abandoned', 'marker', 'missing'] as const)(
   'refuses %s source evidence without repair',
@@ -319,7 +364,7 @@ it.each(['stale', 'abandoned', 'marker', 'missing'] as const)(
       });
     if (change === 'missing') f.table().delete('workspace-allocation');
     const before = structuredClone(f.rows);
-    await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow(
+    await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
       'refused'
     );
     expect(f.rows).toEqual(before);
@@ -334,7 +379,9 @@ it.each([
 ])('refuses malformed or unsupported source %#', async (source) => {
   const f = setup();
   const before = structuredClone(f.rows);
-  await expect(enrollSyncWorkspaceConnection(source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(f.rows).toEqual(before);
   expect(io.encrypt).not.toHaveBeenCalled();
 });
@@ -350,7 +397,7 @@ it.each(['capture', 'outbox', 'profile', 'connection', 'credential', 'unrelated'
           : 'sync_connection';
     f.table(store).set(kind, { key: kind, retained: 'original-data' });
     const before = structuredClone(f.rows);
-    await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow(
+    await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
       'refused'
     );
     expect(f.rows).toEqual(before);
@@ -369,7 +416,7 @@ it.each([
   'unrelated',
 ] as const)('refuses changed %s during receipt replay', async (change) => {
   const f = setup();
-  const active = await enrollSyncWorkspaceConnection(f.source, authentication);
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication, policy);
   if (change === 'source')
     f.table().set('workspace-allocation', {
       ...f.allocation,
@@ -397,7 +444,9 @@ it.each([
       identity: { ...active.identity, incarnation: crypto.randomUUID() },
     });
   const before = structuredClone(f.rows);
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(f.rows).toEqual(before);
 });
 it.each(['revision', 'binding', 'capture', 'outbox'] as const)(
@@ -405,7 +454,7 @@ it.each(['revision', 'binding', 'capture', 'outbox'] as const)(
   async (change) => {
     const f = setup();
     const held = holdEncryption();
-    const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+    const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
     await held.entered;
     if (change === 'revision')
       f.table().set('workspace-allocation', {
@@ -425,7 +474,7 @@ it.each(['revision', 'binding', 'capture', 'outbox'] as const)(
 it('refuses delayed enrollment after source abandonment', async () => {
   const f = setup();
   const held = holdEncryption();
-  const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
   await held.entered;
   await revokeSyncWorkspaceAllocation(f.allocation.identity.incarnation);
   const before = structuredClone(f.rows);
@@ -436,7 +485,7 @@ it('refuses delayed enrollment after source abandonment', async () => {
 it('cannot reopen erased and recreated storage after crypto', async () => {
   const f = setup();
   const held = holdEncryption();
-  const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
   await held.entered;
   f.erase();
   f.table().set('workspace-allocation', structuredClone(f.allocation));
@@ -455,7 +504,7 @@ it('captures the old handle before waiting for initial admission', async () => {
     await release.promise;
   });
   await entered.promise;
-  const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
   expect(io.capture).toHaveBeenCalledTimes(1);
   f.erase();
   f.table().set('workspace-allocation', structuredClone(f.allocation));
@@ -469,7 +518,7 @@ it('captures the old handle before waiting for initial admission', async () => {
 it('refuses recreation while final admission waits', async () => {
   const f = setup();
   const held = holdEncryption();
-  const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
   await held.entered;
   const entered = deferred();
   const release = deferred();
@@ -497,7 +546,9 @@ it('refuses recreation while final admission waits', async () => {
 it('refuses cold enrollment without opening the database', async () => {
   const f = setup();
   io.capture.mockReturnValue(null);
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(io.database).not.toHaveBeenCalled();
   expect(io.encrypt).not.toHaveBeenCalled();
 });
@@ -505,10 +556,13 @@ it('detaches inputs before asynchronous enrollment work', async () => {
   const f = setup();
   const callerSource = structuredClone(f.source);
   const callerAuth = structuredClone(authentication);
-  const pending = enrollSyncWorkspaceConnection(callerSource, callerAuth);
+  const callerPolicy: { version: number; mode: string } = { ...policy };
+  const pending = enrollSyncWorkspaceConnection(callerSource, callerAuth, callerPolicy);
+  callerPolicy.version = 2;
   callerSource.identity.revision += 1;
   callerAuth.password = 'changed-password';
   const active = await pending;
+  expect(active.storagePolicy).toEqual(policy);
   expect(await loadSyncConnectionAuthentication(active.identity)).toEqual(authentication);
 });
 
@@ -540,17 +594,21 @@ function joined(retainAbandonedAllocation = false) {
 }
 it('replays joined enrollment without replacing credentials', async () => {
   const f = joined();
-  const active = await enrollSyncWorkspaceConnection(f.source, authentication);
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication, policy);
   expect(active.binding.rootUrl).toBe(f.intent.rootUrl);
   expect(active.workspace).toEqual(f.intent.workspace);
   expect(f.table('sync_capture').size).toBe(1);
   const before = structuredClone(f.rows);
   io.encrypt.mockClear();
   expect(
-    await enrollSyncWorkspaceConnection(f.source, {
-      ...authentication,
-      password: 'different-password',
-    })
+    await enrollSyncWorkspaceConnection(
+      f.source,
+      {
+        ...authentication,
+        password: 'different-password',
+      },
+      policy
+    )
   ).toEqual(active);
   expect(io.encrypt).not.toHaveBeenCalled();
   expect(f.rows).toEqual(before);
@@ -559,28 +617,30 @@ it('replays joined enrollment without replacing credentials', async () => {
 it('enrolls JOIN with retained abandoned allocation without adopting its root', async () => {
   const f = joined(true);
   const before = structuredClone(f.table().get('workspace-allocation'));
-  const active = await enrollSyncWorkspaceConnection(f.source, authentication);
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication, policy);
   expect(active.binding.rootUrl).toBe(f.intent.rootUrl);
   expect(active.binding.rootUrl).not.toBe(f.allocation.rootUrl);
   expect(f.table().size).toBe(5);
   expect(f.table().get('workspace-allocation')).toEqual(before);
-  expect(await enrollSyncWorkspaceConnection(f.source, authentication)).toEqual(active);
+  expect(await enrollSyncWorkspaceConnection(f.source, authentication, policy)).toEqual(active);
 });
 it.each([1, 2, 3, 4])('preserves joined ready evidence after write %s fails', async (index) => {
   const f = joined();
   const before = structuredClone(f.rows);
   f.failWrite(index);
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(f.rows).toEqual(before);
   f.failWrite(0);
-  expect((await enrollSyncWorkspaceConnection(f.source, authentication)).workspace).toEqual(
+  expect((await enrollSyncWorkspaceConnection(f.source, authentication, policy)).workspace).toEqual(
     f.intent.workspace
   );
 });
 it('refuses joined publication after lifetime revocation during crypto', async () => {
   const f = joined();
   const held = holdEncryption();
-  const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
   await held.entered;
   await revokeSyncWorkspaceJoin(f.intent.identity.incarnation);
   const before = structuredClone(f.rows);
@@ -591,7 +651,7 @@ it('refuses joined publication after lifetime revocation during crypto', async (
 it('cannot enroll joined evidence in recreated storage after crypto', async () => {
   const f = joined();
   const held = holdEncryption();
-  const pending = enrollSyncWorkspaceConnection(f.source, authentication);
+  const pending = enrollSyncWorkspaceConnection(f.source, authentication, policy);
   await held.entered;
   f.erase();
   f.table().set('workspace-join', structuredClone(f.intent));
@@ -602,7 +662,7 @@ it('cannot enroll joined evidence in recreated storage after crypto', async () =
 });
 it('refuses a receipt whose source kind differs from the joined source', async () => {
   const f = joined();
-  await enrollSyncWorkspaceConnection(f.source, authentication);
+  await enrollSyncWorkspaceConnection(f.source, authentication, policy);
   const receipt = f.table().get('workspace-enrollment');
   if (!isRecord(receipt)) throw new Error('Missing fixture receipt');
   f.table().set('workspace-enrollment', {
@@ -610,14 +670,54 @@ it('refuses a receipt whose source kind differs from the joined source', async (
     source: { kind: 'allocation', identity: f.source.identity },
   });
   const before = structuredClone(f.rows);
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(f.rows).toEqual(before);
 });
 it.each(['planned', 'checking'])('refuses joined %s evidence before enrollment', async (phase) => {
   const f = joined();
   f.table().set('workspace-join', { ...f.intent, phase, workspace: null });
   const before = structuredClone(f.rows);
-  await expect(enrollSyncWorkspaceConnection(f.source, authentication)).rejects.toThrow('refused');
+  await expect(enrollSyncWorkspaceConnection(f.source, authentication, policy)).rejects.toThrow(
+    'refused'
+  );
   expect(f.rows).toEqual(before);
   expect(io.encrypt).not.toHaveBeenCalled();
+});
+
+it.each([
+  undefined,
+  null,
+  {},
+  { version: 2, mode: 'on-demand' },
+  { version: 1, mode: 'full-download' },
+  { version: 1, mode: 'on-demand', extra: true },
+])(
+  'refuses absent or malformed enrollment storage policy %# before writes',
+  async (storagePolicy) => {
+    const f = setup();
+    const before = structuredClone(f.rows);
+    await expect(
+      enrollSyncWorkspaceConnection(f.source, authentication, storagePolicy)
+    ).rejects.toThrow('refused');
+    expect(f.rows).toEqual(before);
+    expect(io.encrypt).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses malformed policy during receipt replay and preserves the winning policy and credential', async () => {
+  const f = setup();
+  const active = await enrollSyncWorkspaceConnection(f.source, authentication, policy);
+  const before = structuredClone(f.rows);
+  io.encrypt.mockClear();
+  await expect(
+    enrollSyncWorkspaceConnection(f.source, authentication, { version: 1, mode: 'unsupported' })
+  ).rejects.toThrow('refused');
+  expect(f.rows).toEqual(before);
+  expect(io.encrypt).not.toHaveBeenCalled();
+  expect(await enrollSyncWorkspaceConnection(f.source, authentication, { ...policy })).toEqual(
+    active
+  );
+  expect(f.rows).toEqual(before);
 });

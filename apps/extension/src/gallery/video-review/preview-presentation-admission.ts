@@ -1,3 +1,5 @@
+import { reviewGpuPreviewConcurrency } from '../../workflows/video-review/gpu-preview';
+import { reviewGpuPreviewAllocation } from '../../workflows/video-review/gpu-preview-geometry';
 import { createPreviewRenderResources } from '../../workflows/video-review/preview-render-resources';
 import {
   calculatePreviewRenderAllocation,
@@ -5,8 +7,14 @@ import {
   type PreviewRenderAllocationInput,
 } from '../../workflows/video-review/preview-render-allocation';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
+import type { ReviewGpuPresentedFrame } from '../../workflows/video-review/gpu-preview';
 import { previewTransitionBacking } from './preview-presentation-frame';
-import type { Description, Renderer } from './preview-presentation-state';
+import type { Description } from './preview-presentation-state';
+
+type Front = { canvas: HTMLCanvasElement } & (
+  | { outputKind: 'canvas2d' }
+  | Pick<ReviewGpuPresentedFrame, 'outputKind' | 'retainedProviderBytes' | 'isRetiredProvider'>
+);
 
 const emptyAssets = (): PreviewRenderAllocationInput['assets'] => ({
   headerBitmap: null,
@@ -20,10 +28,11 @@ export function createPresentationAdmission(
   transport: () => { playing: boolean; video: HTMLVideoElement | null },
   description: () => Description | null,
   time: () => number,
-  front: () => Awaited<ReturnType<Renderer['render']>> | null
+  front: () => Front | null,
+  maximumInFlight: (scene: Description['scene']) => 1 | 2 = reviewGpuPreviewConcurrency
 ) {
   const resources = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
-  let sourceBytes: number | null = null;
+  const sourceFrames = new Map<symbol, number>();
   let retainedCameraBytes: number | null = null;
   let activeCameraBytes: number | null = null;
   let transitionBytes: readonly [number, number] | null = null;
@@ -39,7 +48,10 @@ export function createPresentationAdmission(
       dimensions: current.dimensions,
       resultTime,
       ...(current.cameraTransform ? { cameraTransform: current.cameraTransform } : {}),
-      sourceAllocationBytes: sourceBytes,
+      maximumInFlight: current.renderer === 'legacy' ? 1 : maximumInFlight(current.scene),
+      sourceAllocationBytes: sourceFrames.size
+        ? [...sourceFrames.values()].reduce((sum, bytes) => sum + bytes, 0)
+        : null,
       sourceTime: playing && video ? video.currentTime : current.sourceTime,
       sourceBacking: previewTransitionBacking(current, resultTime),
       camera: { retainedBytes: retainedCameraBytes, activeBytes: activeCameraBytes },
@@ -47,10 +59,34 @@ export function createPresentationAdmission(
       previousFront: previousFront
         ? { width: previousFront.canvas.width, height: previousFront.canvas.height }
         : null,
+      outputKind:
+        current.renderer !== 'legacy' && typeof navigator !== 'undefined' && navigator.gpu
+          ? 'gpu-surface'
+          : 'canvas2d',
+      ...(previousFront ? { previousFrontKind: previousFront.outputKind } : {}),
+      previousProviderBytes:
+        previousFront?.outputKind === 'gpu-surface' && previousFront.isRetiredProvider()
+          ? previousFront.retainedProviderBytes()
+          : 0,
       assets,
     });
   };
-  const admit = () => resources.replaceLimits(calculatePreviewRenderAllocation(graph()));
+  const admit = () => {
+    const limits = calculatePreviewRenderAllocation(graph());
+    const current = description();
+    const gpu =
+      current && typeof navigator !== 'undefined' && navigator.gpu
+        ? reviewGpuPreviewAllocation(
+            current.scene,
+            current.dimensions,
+            current.renderer === 'legacy' ? 1 : 2
+          )
+        : { maximumManagedBytes: 0, maximumCanvases: 0 };
+    resources.replaceLimits({
+      maximumManagedBytes: limits.maximumManagedBytes + gpu.maximumManagedBytes,
+      maximumCanvases: limits.maximumCanvases + gpu.maximumCanvases,
+    });
+  };
   const cameraResources: RenderResources = {
     canvas: (role, size, options) => resources.canvas(role, size, options),
     bytes(role, count) {
@@ -86,7 +122,8 @@ export function createPresentationAdmission(
       assets = next;
     },
     reserveSource(bytes: number, next: PreviewRenderAllocationInput['assets']) {
-      sourceBytes = bytes;
+      const identity = Symbol();
+      sourceFrames.set(identity, bytes);
       assets = next;
       try {
         admit();
@@ -94,11 +131,11 @@ export function createPresentationAdmission(
         return {
           release() {
             reservation.release();
-            sourceBytes = null;
+            sourceFrames.delete(identity);
           },
         };
       } catch (error) {
-        sourceBytes = null;
+        sourceFrames.delete(identity);
         throw error;
       }
     },

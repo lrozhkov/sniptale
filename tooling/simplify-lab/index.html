@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Simplify · лаборатория</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Simplify <span>Лаборатория текущего алгоритма</span></h1>
+      <output id="stamp"></output>
+    </header>
+    <main>
+      <aside>
+        <label>Сайт для проверки<select id="case"></select></label
+        ><label
+          >Своё изображение<input id="upload" type="file" accept="image/png,image/jpeg,image/webp"
+        /></label>
+        <fieldset>
+          <legend>Обработка</legend>
+          <label><input id="automatic" type="checkbox" checked /> Автоматически</label
+          ><label
+            >Содержимое<select id="content">
+              <option value="text">Только текст</option>
+              <option value="all">Все элементы</option>
+            </select></label
+          ><label
+            >Ручной режим<select id="manualKind">
+              <option value="text">Текст</option>
+              <option value="image">Изображение</option>
+            </select></label
+          ><label
+            >Чувствительность<select id="sensitivity">
+              <option>10</option>
+              <option selected>55</option>
+              <option>90</option>
+            </select></label
+          ><label
+            >Толщина<select id="thickness">
+              <option>0.35</option>
+              <option selected>0.5</option>
+              <option>0.65</option>
+            </select></label
+          ><label><input id="customColor" type="checkbox" /> Свой цвет</label
+          ><input id="color" type="color" value="#536b84" aria-label="Цвет" />
+        </fieldset>
+        <fieldset>
+          <legend>Область в пикселях</legend>
+          <div class="roi">
+            <label>X<input id="x" type="number" value="0" min="0" /></label
+            ><label>Y<input id="y" type="number" value="0" min="0" /></label
+            ><label>Ширина<input id="width" type="number" min="1" /></label
+            ><label>Высота<input id="height" type="number" min="1" /></label>
+          </div>
+        </fieldset>
+        <div class="actions">
+          <button id="run">Обработать</button><button id="cancel" disabled>Отменить</button>
+        </div>
+        <output id="status" role="status">Загрузка…</output>
+      </aside>
+      <section class="workspace" aria-label="Сравнение">
+        <div class="comparison">
+          <figure>
+            <figcaption>До <span id="dimensions"></span></figcaption>
+            <canvas id="before"></canvas>
+          </figure>
+          <figure>
+            <figcaption>После <span id="timing"></span></figcaption>
+            <canvas id="after"></canvas>
+          </figure>
+        </div>
+        <p id="roles"></p>
+        <p>Результат требует ручной проверки. Отметки ниже не вычисляются алгоритмом.</p>
+        <fieldset id="assessment">
+          <legend>Оценка текущего результата</legend>
+          <div class="judgments"></div>
+          <label
+            >Комментарий<textarea
+              id="notes"
+              rows="2"
+              placeholder="Что осталось или было потеряно?"
+            ></textarea></label
+          ><button id="saveReview" disabled>Сохранить оценку</button>
+        </fieldset>
+        <div class="actions">
+          <button id="downloadPng" disabled>PNG результата</button
+          ><button id="downloadReport">JSON отчёта</button>
+        </div>
+      </section>
+    </main>
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>

@@ -6,6 +6,7 @@ import { isEditorHiddenEdgeControl } from '../document/interaction-border-contro
 
 import {
   applyCropGuideSelection,
+  constrainEditorCropResize,
   configureCropGuideForEditing,
   createCropGuideRect,
   createCropSelectionFromRect,
@@ -233,3 +234,77 @@ function runEditorControllerCropRenderFailureSuite() {
 describe('editor-controller-crop guides', runEditorControllerCropGuideSuite);
 describe('editor-controller-crop rendering', runEditorControllerCropRenderSuite);
 describe('editor-controller-crop render failures', runEditorControllerCropRenderFailureSuite);
+
+it.each([
+  { x: 0, y: 0 },
+  { x: 1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 1, y: 1 },
+  { x: 0, y: 0.5 },
+  { x: 1, y: 0.5 },
+  { x: 0.5, y: 0 },
+  { x: 0.5, y: 1 },
+])('keeps crop ratio and fixed origin during resize $x/$y', (origin) => {
+  const raw = { left: 200, top: 200, width: 300, height: 100 };
+  const bounds = { left: 0, top: 0, right: 1000, bottom: 800 };
+  const result = constrainEditorCropResize(
+    raw,
+    16 / 9,
+    {
+      ...origin,
+      axis: origin.x === 0.5 ? 'y' : origin.y === 0.5 ? 'x' : 'both',
+    },
+    bounds
+  );
+  expect(Math.abs(result.width - (result.height * 16) / 9)).toBeLessThanOrEqual(1.5);
+  expect(
+    Math.abs(result.left + result.width * origin.x - (raw.left + raw.width * origin.x))
+  ).toBeLessThanOrEqual(0.5);
+  expect(
+    Math.abs(result.top + result.height * origin.y - (raw.top + raw.height * origin.y))
+  ).toBeLessThanOrEqual(0.5);
+});
+
+it.each([16 / 9, 3 / 4, 1])(
+  'fits ratio %s inside crop and expansion bounds without clipping one axis',
+  (ratio) => {
+    for (const bounds of [
+      { left: 0, top: 0, right: 500, bottom: 300 },
+      { left: -100, top: -200, right: 500, bottom: 300 },
+    ]) {
+      const result = constrainEditorCropResize(
+        { left: 50, top: 50, width: 900, height: 800 },
+        ratio,
+        { x: 0, y: 0, axis: 'both' },
+        bounds
+      );
+      expect(Math.abs(result.width - result.height * ratio)).toBeLessThanOrEqual(1.5);
+      expect(result.left + result.width).toBeLessThanOrEqual(bounds.right);
+      expect(result.top + result.height).toBeLessThanOrEqual(bounds.bottom);
+    }
+  }
+);
+
+it('uses horizontal movement when a corner resize has a centered fixed origin', () => {
+  const origin = { x: 0.5, y: 0.5, axis: 'both' } as const;
+  const result = constrainEditorCropResize(
+    { left: 100, top: 100, width: 400, height: 100 },
+    2,
+    origin,
+    { left: 0, top: 0, right: 1000, bottom: 800 }
+  );
+  expect(result.width).toBeGreaterThan(200);
+  expect(result.width).toBe(result.height * 2);
+});
+
+it.each([1 / 100, 100])('retains a minimum representable crop for custom ratio %s', (ratio) => {
+  const result = constrainEditorCropResize(
+    { left: 100, top: 100, width: 1, height: 1 },
+    ratio,
+    { x: 0, y: 0, axis: 'both' },
+    { left: 0, top: 0, right: 1000, bottom: 800 }
+  );
+  expect(result.width).toBeGreaterThanOrEqual(1);
+  expect(result.height).toBeGreaterThanOrEqual(1);
+  expect(Math.abs(result.width - ratio * result.height)).toBeLessThanOrEqual((1 + ratio) / 2);
+});

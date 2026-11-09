@@ -1,3 +1,23 @@
+import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
+import { createReviewPreviewFrameExecution } from './preview-frame-execution';
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
+import { planReviewExportSource } from './export-source-plan';
+import {
+  createReviewGpuPreview,
+  reviewGpuPreviewConcurrency,
+  type ReviewGpuPresentedFrame,
+} from './gpu-preview';
+import type { PreviewGpuCanvasFactory } from './preview-render-resources';
+import {
+  reviewGpuPreviewAllocation,
+  reviewPresentedGeometry,
+  type ReviewPresentedGeometry,
+} from './gpu-preview-geometry';
+import type {
+  PreviewRendererStatus,
+  VideoPreviewRenderer,
+} from '../../features/video/preview/preferences';
+import type { ReviewRecordingRenderSource } from './recording-render';
 import { prepareReviewCameraPlans } from '../../features/video/review/advanced/camera-plan-preparation';
 import { reviewWatermarkAssets } from './asset-bytes';
 import {
@@ -10,7 +30,7 @@ import {
   type PreviewScene as Scene,
   type PreviewSceneDimensions as Dimensions,
 } from './preview-scene';
-import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
+import { quickEditRegionNeedsSpatialRenderer } from '../../features/video/review/advanced/spatial';
 import {
   paintPreviewOuterFade,
   paintReviewCameraSplitScreen,
@@ -50,7 +70,14 @@ import {
   type PreviewRenderAllocationInput,
 } from './preview-render-allocation';
 import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
-import { drawReviewSceneFrame } from './scene-frame';
+import { drawReviewSceneFrame, drawReviewExportSharpStage } from './scene-frame';
+import {
+  prepareReviewExportSourceSampling,
+  reviewExportSamplingAllocation,
+  type ReviewExportSamplingFrame,
+} from './export-source-sampling';
+import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
+import { selectReviewCutTransitionSource } from './cut-transition-frames';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
 import { drawReviewWebcam } from './render-webcam';
 import { drawReviewKeys } from './render-key-animation';
@@ -70,7 +97,15 @@ import {
 } from './annotation-renderer';
 
 type Size = { width: number; height: number };
-type Drawable = {
+type CanvasPublicationOutput = RenderCanvasLease & {
+  outputKind: 'canvas2d';
+  retainedProviderBytes?: never;
+  isRetiredProvider?: never;
+};
+type PublicationOutput = CanvasPublicationOutput | ReviewGpuPresentedFrame;
+type Drawable = Pick<VideoCompositionFrameSource, 'orientation'> & {
+  prepare?(signal: AbortSignal): Promise<void>;
+  videoFrame?(): VideoFrame; // Borrowed until the captured frame lease is released.
   draw(
     context: CanvasRenderingContext2D,
     x: number,
@@ -80,11 +115,18 @@ type Drawable = {
   ): void;
 };
 type Frame = {
+  exportEnhancer?: ExportEnhancer;
+  recordingHistory?: ReviewRecordingRenderSource;
   fps?: number;
   generation: number;
   sourceTime: number;
   resultTime: number;
-  source: Drawable & { timestamp: number; backing: Size };
+  source: Drawable & {
+    /** Actual source PTS, absent only for a draw-only RGB compatibility snapshot. */
+    timestamp?: number;
+    backing: Size;
+    prepare?(signal: AbortSignal): Promise<void>;
+  };
   camera?: {
     representedMediaTime: number;
     generation: number;
@@ -114,6 +156,15 @@ type Allocation = {
   replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }): void;
 };
 type Assets = {
+  borrowers: number;
+  retired: boolean;
+  closed: boolean;
+  lifetime: AbortController;
+  maximumInFlight: 1 | 2;
+  warmBudgetBytes: number;
+  renderer: VideoPreviewRenderer;
+  onContextLost: (() => void) | undefined;
+  gpu: ReturnType<typeof createReviewGpuPreview> | null;
   annotations: Awaited<ReturnType<typeof createReviewAnnotationRenderer>> | null;
   captions: Awaited<ReturnType<typeof prepareReviewCaptions>> | null;
   allocation: PreviewRenderAllocationInput['assets'];
@@ -142,6 +193,15 @@ function validSize(size: Size) {
 }
 
 function disposeAssets(assets: Assets) {
+  if (!assets.retired) {
+    assets.retired = true;
+    assets.lifetime.abort();
+    assets.gpu?.releaseScene();
+    assets.gpu = null;
+  }
+  // A newer scene can already own the shared GPU when the final old borrower returns.
+  if (assets.borrowers || assets.closed) return;
+  assets.closed = true;
   assets.windowRaster?.lease.release();
   assets.windowRaster = null;
   assets.annotations?.dispose();
@@ -173,7 +233,10 @@ function scaledBackground(background: Scene['background'], scale: number): Scene
 }
 
 /** Authored inputs feed both layouts; raster-dependent paint properties are scaled exactly once. */
-function sceneRequest(prepared: PreparedScene, frame: Frame) {
+function sceneRequest(
+  prepared: PreparedScene,
+  frame: Pick<Frame, 'cameraTransform' | 'resultTime'>
+) {
   const { scene, dimensions } = prepared;
   const camera =
     frame.cameraTransform ??
@@ -216,7 +279,8 @@ async function prepareAssets(
   signal: AbortSignal,
   readAsset: typeof resolveReviewAssetBytes,
   admit: (measurement: boolean) => void,
-  annotationExecutor: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor']
+  annotationExecutor: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor'],
+  annotationWarmExecutor: Parameters<typeof createReviewAnnotationRenderer>[1]['createWarmExecutor']
 ) {
   const { scene, dimensions } = prepared;
   const annotationScene = scene.annotationEffects
@@ -323,6 +387,7 @@ async function prepareAssets(
         return blob;
       },
       ...(annotationExecutor ? { createExecutor: annotationExecutor } : {}),
+      ...(annotationWarmExecutor ? { createWarmExecutor: annotationWarmExecutor } : {}),
     });
     signal.throwIfAborted();
   }
@@ -363,6 +428,14 @@ function prepareRetainedSceneCaptions(
   return enabled ? prepareSceneCaptions(prepared, assets, resources, signal) : null;
 }
 
+/** Transition membership requires actual sample PTS, independently of the authored clock. */
+function knownTransitionSource(source: Frame['source']) {
+  const timestamp = source.timestamp;
+  if (timestamp === undefined || !Number.isFinite(timestamp))
+    throw new Error('Transition source timestamp is unavailable.');
+  return { ...source, timestamp };
+}
+
 /** Keep the admitted static window plane; camera and overlays do not change its pixels. */
 function retainedWindowRaster(
   scene: Scene,
@@ -373,6 +446,7 @@ function retainedWindowRaster(
 ): ReviewWindowRaster | undefined {
   // Click magnification changes raster density over time; its original lease path stays dynamic.
   if (
+    frame.source.timestamp === undefined ||
     (!assets.header && !layout.sourceCrop) ||
     frame.transition ||
     scene.clicks.some((cue) => cue.settings.effect === 'magnify')
@@ -410,7 +484,103 @@ function retainedWindowRaster(
   return view;
 }
 
+async function recordingHistoryScene(
+  prepared: PreparedScene,
+  frame: Frame,
+  signal: AbortSignal
+): Promise<Scene> {
+  const history = await frame.recordingHistory?.read(
+    frame.sourceTime,
+    frame.resultTime,
+    { ...prepared.dimensions.backing, frameDuration: 1 / (frame.fps ?? 30) },
+    signal
+  );
+  return history
+    ? {
+        ...prepared.scene,
+        zoomRegions: history.effective.zoomRegions,
+        clicks: history.clickCues,
+        keys: history.keyCues,
+      }
+    : prepared.scene;
+}
+
 async function drawPreparedFrame(
+  prepared: PreparedScene,
+  assets: Assets,
+  canvasOutput: () => CanvasPublicationOutput,
+  frame: Frame,
+  resources: RenderResources,
+  signal: AbortSignal,
+  admit: (frame: Frame, bitmaps: readonly Size[]) => void,
+  acquireOutput: PreviewGpuCanvasFactory | undefined,
+  beforeCanvas: () => Promise<void>
+): Promise<{
+  output: PublicationOutput;
+  geometry?: ReviewPresentedGeometry;
+  renderer: PreviewRendererStatus;
+}> {
+  signal.throwIfAborted();
+  const scene = await recordingHistoryScene(prepared, frame, signal);
+  const { dimensions } = prepared;
+  const raw = frame.exportEnhancer ? undefined : frame.source.videoFrame?.();
+  if (raw && assets.gpu) {
+    const geometry = reviewPresentedGeometry(
+      scene,
+      dimensions,
+      frame.resultTime,
+      frame.cameraTransform
+    );
+    const input = {
+      scene,
+      dimensions,
+      geometry,
+      frame: raw,
+      orientation: frame.source.orientation,
+      sourceTime: frame.sourceTime,
+      header: assets.header,
+      image: assets.background,
+      painter: assets.painter,
+      captions: scene.captions?.settings?.enabled ? assets.captions : null,
+      annotations:
+        scene.annotationEffects?.lane.enabled &&
+        scene.annotationEffects.lane.instances.some((instance) => instance.enabled)
+          ? assets.annotations
+          : null,
+      watermark: scene.watermark && scene.watermark.mode !== 'none' ? assets.watermark : null,
+      fps: frame.fps ?? 30,
+      ...(frame.camera ? { camera: frame.camera } : {}),
+      ...(frame.cameraTransform ? { cameraOverride: frame.cameraTransform } : {}),
+      ...(frame.transition ? { transition: frame.transition } : {}),
+      admit: (bitmaps: readonly Size[]) => admit(frame, bitmaps),
+      sceneAt: (resultTime: number, sourceTime: number) =>
+        recordingHistoryScene(prepared, { ...frame, resultTime, sourceTime }, signal),
+      signal,
+    };
+    if (acquireOutput) {
+      const output = await assets.gpu.renderPresentation({ ...input, acquireOutput });
+      if (output) return { output, geometry, renderer: { backend: 'gpu' } };
+    } else {
+      const output = canvasOutput();
+      const rendered = await assets.gpu.render({ ...input, context: output.context });
+      if (rendered) return { output, geometry, renderer: { backend: 'gpu' } };
+    }
+  }
+  await beforeCanvas();
+  const output = canvasOutput();
+  const presentation = await drawPreparedCanvasFrame(
+    { ...prepared, scene },
+    assets,
+    output,
+    frame,
+    resources,
+    signal,
+    admit
+  );
+  return { ...presentation, output };
+}
+
+async function drawPreparedCanvasFrame(
   prepared: PreparedScene,
   assets: Assets,
   output: RenderCanvasLease,
@@ -418,14 +588,31 @@ async function drawPreparedFrame(
   resources: RenderResources,
   signal: AbortSignal,
   admit: (frame: Frame, bitmaps: readonly Size[]) => void
-) {
-  const request = sceneRequest(prepared, frame);
+): Promise<{ geometry: ReviewPresentedGeometry; renderer: PreviewRendererStatus }> {
   const { scene, dimensions } = prepared;
+  const request = sceneRequest(prepared, frame);
   const { context, canvas } = output;
+  let geometry: ReviewPresentedGeometry;
+  await frame.source.prepare?.(signal);
+  await frame.camera?.drawable.prepare?.(signal);
+  signal.throwIfAborted();
+  if (assets.retired) throw new Error('Preview scene is stale.');
+  if (request.layout.spatial && !assets.spatial)
+    assets.spatial = createReviewSpatialRenderer(assets.onContextLost, resources);
   let transition: RenderCanvasLease | undefined;
   try {
     let sample: Drawable = frame.source;
-    if (frame.transition && frame.transition.blend.plan.type !== 'dissolve') {
+    if (
+      frame.transition &&
+      frame.exportEnhancer &&
+      frame.transition.blend.plan.type !== 'dissolve'
+    ) {
+      sample = selectReviewCutTransitionSource(
+        frame.transition.blend,
+        frame.transition.frames,
+        knownTransitionSource(frame.source)
+      );
+    } else if (frame.transition && frame.transition.blend.plan.type !== 'dissolve') {
       validSize(frame.source.backing);
       transition = resources.canvas('preview-transition-source', frame.source.backing);
       paintReviewCutTransition(
@@ -433,7 +620,7 @@ async function drawPreparedFrame(
         transition.canvas,
         frame.transition.blend,
         frame.transition.frames,
-        frame.source
+        knownTransitionSource(frame.source)
       );
       const raster = transition.canvas;
       sample = {
@@ -446,7 +633,8 @@ async function drawPreparedFrame(
       frame: Frame,
       sample: Drawable
     ) => {
-      const request = sceneRequest(prepared, frame);
+      const scene = await recordingHistoryScene(prepared, frame, signal);
+      const request = sceneRequest({ ...prepared, scene }, frame);
       if (request.layout.spatial && !assets.spatial)
         throw new Error('Preview spatial preparation is unavailable.');
       const drawScene = {
@@ -464,6 +652,7 @@ async function drawPreparedFrame(
             scene.showEditorComments ? { ...comment, renderToVideo: true } : comment
           ),
         sourceTime: frame.sourceTime,
+        currentTime: frame.resultTime,
         cameraScale: request.camera.scale,
         sceneScale: request.sceneScale,
         resources,
@@ -485,7 +674,9 @@ async function drawPreparedFrame(
           height: dimensions.backing.height / dimensions.canonical.height,
         },
       };
-      const plans = assets.annotations?.describe(frame.resultTime, density, frame.fps ?? 30) ?? [];
+      const instances = scene.annotationEffects?.lane.instances;
+      const plans =
+        assets.annotations?.describe(frame.resultTime, density, frame.fps ?? 30, instances) ?? [];
       admit(
         frame,
         plans.map(({ plan }) => plan.renderDimensions)
@@ -494,14 +685,41 @@ async function drawPreparedFrame(
         frame.resultTime,
         density,
         frame.fps ?? 30,
-        signal
+        signal,
+        instances
       );
+      let enhanced: ReviewExportSamplingFrame | null = null;
       try {
         signal.throwIfAborted();
-        drawReviewSceneFrame(context, {
+        if (frame.exportEnhancer)
+          enhanced = await prepareReviewExportSourceSampling({
+            enhancer: frame.exportEnhancer,
+            scene: {
+              sourceSize: scene.source,
+              ...(scene.canvas ? { baseCanvas: scene.canvas } : {}),
+              windowHeader: scene.windowHeader,
+              background: scene.background,
+              zoomRegions: scene.zoomRegions,
+              clickCues: scene.clicks,
+              sceneScale: request.sceneScale,
+            },
+            output: canvas,
+            sample,
+            sourceTime: frame.sourceTime,
+            resultTime: frame.resultTime,
+            signal,
+            ...(frame.cameraTransform ? { camera: frame.cameraTransform } : {}),
+          });
+        const sceneArgs: Parameters<typeof drawReviewSceneFrame>[1] = {
           ...drawScene,
+          ...(enhanced ? { sample: enhanced.original } : {}),
+          ...(enhanced
+            ? { layout: enhanced.plan.layout, exportSampling: { frame: enhanced } }
+            : {}),
           spatialRenderer: assets.spatial,
-          windowRaster: retainedWindowRaster(scene, assets, frame, request.layout, resources),
+          windowRaster: enhanced
+            ? undefined
+            : retainedWindowRaster(scene, assets, frame, request.layout, resources),
           windowRasterBacking: reviewWindowRasterBacking({
             windowRect: request.layout.windowRect,
             sourceWidth: scene.source.width * (request.layout.sourceCrop?.width ?? 1),
@@ -525,19 +743,32 @@ async function drawPreparedFrame(
               sourceWidth: scene.source.width,
               clicks: scene.clicks,
               windowRaster,
+              ...(enhanced
+                ? {
+                    exportSampling: enhanced,
+                    sharpPaint: (
+                      target: CanvasRenderingContext2D,
+                      lens: ReviewExportSamplingFrame['plan']['lenses'][number]
+                    ) => drawReviewExportSharpStage(target, sceneArgs, enhanced!, lens),
+                  }
+                : {}),
               ...(annotations ? { annotationFrames: annotations.entries } : {}),
             }),
-        });
+        };
+        drawReviewSceneFrame(context, sceneArgs);
       } finally {
+        enhanced?.dispose();
         annotations?.release();
       }
+      return reviewPresentedGeometry(scene, dimensions, frame.resultTime, request.camera);
     };
     if (frame.transition?.blend.plan.type === 'dissolve') {
+      geometry = reviewPresentedGeometry(scene, dimensions, frame.resultTime, request.camera);
       const { blend, frames, resultOffset } = frame.transition;
       const sides = reviewCutTransitionSides(
         blend,
         frames,
-        frame.source,
+        knownTransitionSource(frame.source),
         frame.resultTime,
         resultOffset
       );
@@ -546,9 +777,9 @@ async function drawPreparedFrame(
         context,
         transition,
         blend.incoming,
-        (target, surface, side) => {
+        async (target, surface, side) => {
           const endpoint = sides[side];
-          return draw(
+          await draw(
             target,
             surface,
             { ...frame, resultTime: endpoint.resultTime, sourceTime: endpoint.sample.timestamp },
@@ -557,7 +788,7 @@ async function drawPreparedFrame(
         },
         canvas
       );
-    } else await draw(context, canvas, frame, sample);
+    } else geometry = await draw(context, canvas, frame, sample);
     signal.throwIfAborted();
     const splitScreen = reviewSplitScreenAt(scene.webcam, frame.sourceTime, !!frame.camera);
     paintReviewCameraSplitScreen(context, canvas, dimensions.backing, splitScreen, resources);
@@ -585,6 +816,15 @@ async function drawPreparedFrame(
   } finally {
     transition?.release();
   }
+  return {
+    geometry,
+    renderer: {
+      backend: 'legacy',
+      ...(assets.renderer === 'gpu' && !frame.exportEnhancer
+        ? { fallback: assets.gpu?.fallbackReason ?? 'unavailable' }
+        : {}),
+    },
+  };
 }
 
 function admitRender(
@@ -593,7 +833,8 @@ function admitRender(
   assets: Assets,
   frame?: Frame,
   annotationBitmaps?: readonly Size[],
-  captionMeasurement = false
+  captionMeasurement = false,
+  exportEnhancer?: ExportEnhancer
 ) {
   if (!allocation) return;
   const splitRaster = reviewSplitRasterAt(
@@ -606,21 +847,78 @@ function admitRender(
   const previousCache = assets.painter.retainedCacheSize;
   const base = {
     ...input,
-    publication: { ...input.publication, backing: prepared.dimensions.backing },
+    publication: {
+      ...input.publication,
+      backing: prepared.dimensions.backing,
+      maximumInFlight: assets.maximumInFlight,
+    },
     assets: assets.allocation,
     background: input.background ? { ...input.background, previousCache } : null,
     scene: {
       ...input.scene,
       splitRaster,
+      exportWindowRaster: null as Size | null,
       ...(annotationBitmaps ? { annotationBitmaps } : {}),
     },
   };
+  const retainedSpatial = assets.spatial?.allocations ?? [];
+  const enhancement = frame?.exportEnhancer ?? exportEnhancer;
+  if (enhancement) {
+    if (frame && frame.source.timestamp === undefined)
+      throw new Error('Export enhancement source timestamp is unavailable.');
+    const request = sceneRequest(prepared, frame ?? { resultTime: 0 });
+    const plan = planReviewExportSource({
+      scene: {
+        sourceSize: prepared.scene.source,
+        ...(prepared.scene.canvas ? { baseCanvas: prepared.scene.canvas } : {}),
+        windowHeader: prepared.scene.windowHeader,
+        background: prepared.scene.background,
+        zoomRegions: prepared.scene.zoomRegions,
+        clickCues: prepared.scene.clicks,
+        sceneScale: request.sceneScale,
+      },
+      output: prepared.dimensions.backing,
+      identity: {
+        sourceKey: prepared.scene,
+        sourceTime: frame?.source.timestamp ?? 0,
+        passTime: frame?.resultTime ?? 0,
+        sourceSize: prepared.scene.source,
+      },
+      resultTime: frame?.resultTime ?? 0,
+      ...(frame?.cameraTransform ? { camera: frame.cameraTransform } : {}),
+    });
+    const physical = reviewExportSamplingAllocation(
+      plan,
+      prepared.dimensions.backing,
+      prepared.scene.background,
+      request.sceneScale
+    );
+    if (physical.active && (assets.header || plan.layout.sourceCrop))
+      base.scene.exportWindowRaster = physical.window;
+    if (physical.active && (base.scene.spatial || retainedSpatial.length))
+      base.scene.spatial = {
+        output: prepared.dimensions.backing,
+        halfFloat: base.scene.spatial?.halfFloat ?? true,
+        plane: physical.plane,
+        overlay: physical.overlay,
+        retained: retainedSpatial,
+      };
+  }
+  if (retainedSpatial.length) {
+    base.scene.spatial = {
+      output: prepared.dimensions.backing,
+      plane: base.scene.spatial?.plane ?? { width: 1, height: 1 },
+      halfFloat: base.scene.spatial?.halfFloat ?? true,
+      ...base.scene.spatial,
+      retained: retainedSpatial,
+    };
+  }
   const candidates = [calculatePreviewRenderAllocation(base)];
   if (frame?.transition?.blend.plan.type === 'dissolve') {
     const sides = reviewCutTransitionSides(
       frame.transition.blend,
       frame.transition.frames,
-      frame.source,
+      knownTransitionSource(frame.source),
       frame.resultTime,
       frame.transition.resultOffset
     );
@@ -645,6 +943,8 @@ function admitRender(
           background: graph.background,
           scene: {
             ...graph.scene,
+            spatial: base.scene.spatial,
+            exportWindowRaster: base.scene.exportWindowRaster,
             transitionRaster: prepared.dimensions.backing,
             splitRaster,
             ...(annotationBitmaps ? { annotationBitmaps } : {}),
@@ -653,33 +953,44 @@ function admitRender(
       );
     }
   }
+  const gpu =
+    assets.renderer === 'gpu' &&
+    !exportEnhancer &&
+    !frame?.exportEnhancer &&
+    typeof navigator !== 'undefined' &&
+    navigator.gpu
+      ? reviewGpuPreviewAllocation(prepared.scene, prepared.dimensions, assets.maximumInFlight)
+      : { maximumManagedBytes: 0, maximumCanvases: 0 };
   allocation.replaceLimits({
     // Caption refresh retains the scene resources while borrowing one 1×1 measurement canvas.
     maximumManagedBytes:
       Math.max(...candidates.map((value) => value.maximumManagedBytes)) +
-      (captionMeasurement ? 4 : 0),
+      (captionMeasurement ? 4 : 0) +
+      gpu.maximumManagedBytes +
+      assets.warmBudgetBytes,
     maximumCanvases:
-      Math.max(...candidates.map((value) => value.maximumCanvases)) + (captionMeasurement ? 1 : 0),
+      Math.max(...candidates.map((value) => value.maximumCanvases)) +
+      (captionMeasurement ? 1 : 0) +
+      gpu.maximumCanvases,
   });
 }
 
-function needsSpatialRenderer(scene: Scene) {
-  return scene.zoomRegions.some(
-    (region) =>
-      !region.dormant &&
-      !region.border &&
-      !region.spotlight &&
-      (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
-  );
-}
+const needsSpatialRenderer = (scene: Scene) =>
+  scene.zoomRegions.some(quickEditRegionNeedsSpatialRenderer);
 
-/** One prepared scene owner; transport, immutable capture and publication remain with the caller. */
+/** Owns prepared scenes and one session GPU; callers retain capture and publication. */
 export function createReviewPreviewRenderer(args: {
+  maximumInFlight?: 1 | 2;
+  renderer?: VideoPreviewRenderer;
   resources: RenderResources;
+  exportEnhancer?: ExportEnhancer;
   allocation?: Allocation;
   readAsset?: (assetId: string, signal: AbortSignal) => Promise<Blob | null>;
   onContextLost?: () => void;
   annotationExecutor?: Parameters<typeof createReviewAnnotationRenderer>[1]['createExecutor'];
+  annotationWarmExecutor?: Parameters<
+    typeof createReviewAnnotationRenderer
+  >[1]['createWarmExecutor'];
 }) {
   const captureScene = createReviewPreviewSceneCapture();
   let generation = 0;
@@ -690,13 +1001,17 @@ export function createReviewPreviewRenderer(args: {
     key: PreviewSceneKey;
     preparationKey: string;
   } | null = null;
+  let preparedSource: Scene | null = null;
   let preparation: AbortController | null = null;
   let captionRefresh: AbortController | null = null;
-  let rendering = false;
+  let rendering = 0;
+  const execution = createReviewPreviewFrameExecution(args.maximumInFlight ?? 1);
+  let gpu: ReturnType<typeof createReviewGpuPreview> | null = null;
   const leases = new Set<Prepared>();
   const clear = () => {
     if (current) disposeAssets(current.assets);
     current = null;
+    preparedSource = null;
   };
   const lease = (prepared: PreparedScene, assets: Assets, signal: AbortSignal): Prepared => {
     const handle: Prepared = {
@@ -715,7 +1030,153 @@ export function createReviewPreviewRenderer(args: {
     signal.addEventListener('abort', handle.release, { once: true });
     return handle;
   };
+  const renderFrame = async (
+    prepared: Prepared,
+    frame: Frame,
+    signal?: AbortSignal,
+    acquireOutput?: PreviewGpuCanvasFactory
+  ) => {
+    const capacity =
+      current?.assets.renderer === 'gpu' &&
+      reviewGpuPreviewConcurrency(
+        current.prepared.scene,
+        current.assets.annotations?.maximumInFlight
+      ) === 2
+        ? (args.maximumInFlight ?? 1)
+        : 1;
+    if (rendering >= capacity) throw new Error('Preview frame is already admitted.');
+    if (disposed || !leases.has(prepared) || current?.prepared.generation !== prepared.generation)
+      throw new Error('Preview scene is stale.');
+    if (
+      ![frame.sourceTime, frame.resultTime].every(Number.isFinite) ||
+      (frame.source.timestamp !== undefined && !Number.isFinite(frame.source.timestamp)) ||
+      (frame.source.videoFrame !== undefined && frame.source.timestamp === undefined)
+    )
+      throw new Error('Invalid preview frame time.');
+    if ((frame.exportEnhancer || args.exportEnhancer) && frame.source.timestamp === undefined)
+      throw new Error('Export enhancement source timestamp is unavailable.');
+    const captured = current;
+    const callerSignal = signal ?? preparation?.signal;
+    if (!callerSignal) throw new Error('Preview scene is stale.');
+    const renderingSignal = AbortSignal.any([callerSignal, captured.assets.lifetime.signal]);
+    renderingSignal.throwIfAborted();
+    const checkCurrent = () => {
+      renderingSignal.throwIfAborted();
+      if (disposed || current !== captured || !leases.has(prepared))
+        throw new Error('Preview scene is stale.');
+    };
+    let exclusive =
+      capacity === 1 ||
+      !!frame.recordingHistory ||
+      !!frame.exportEnhancer ||
+      !!frame.camera ||
+      !!frame.cameraTransform ||
+      !!frame.transition;
+    captured.assets.borrowers++;
+    rendering++;
+    let releaseExecution: (() => void) | undefined;
+    const beforeCanvas = async () => {
+      if (!exclusive) {
+        // Finish the shared GPU attempt before requesting exclusive fallback; two upgrades must not deadlock.
+        releaseExecution?.();
+        releaseExecution = undefined;
+        exclusive = true;
+        releaseExecution = await execution.acquire(true, renderingSignal);
+      }
+      checkCurrent();
+    };
+    let output: PublicationOutput | undefined;
+    const canvasOutput = (): CanvasPublicationOutput => {
+      if (output) {
+        if (output.outputKind !== 'canvas2d')
+          throw new Error('Preview output context is unavailable.');
+        return output;
+      }
+      output = {
+        ...args.resources.canvas('preview-publication', captured.prepared.dimensions.backing, {
+          alpha: false,
+        }),
+        outputKind: 'canvas2d',
+      };
+      return output;
+    };
+    try {
+      releaseExecution = await execution.acquire(exclusive, renderingSignal);
+      checkCurrent();
+      admitRender(
+        args.allocation,
+        captured.prepared,
+        captured.assets,
+        frame,
+        undefined,
+        false,
+        args.exportEnhancer
+      );
+      const presentation = await drawPreparedFrame(
+        captured.prepared,
+        captured.assets,
+        canvasOutput,
+        frame,
+        args.resources,
+        renderingSignal,
+        (endpoint, bitmaps) => {
+          if (disposed || current !== captured || !leases.has(prepared))
+            throw new Error('Preview scene is stale.');
+          admitRender(
+            args.allocation,
+            captured.prepared,
+            captured.assets,
+            endpoint,
+            bitmaps,
+            false,
+            args.exportEnhancer
+          );
+        },
+        acquireOutput,
+        beforeCanvas
+      );
+      output = presentation.output;
+      renderingSignal.throwIfAborted();
+      if (disposed || current !== captured || !leases.has(prepared))
+        throw new Error('Preview scene is stale.');
+      return {
+        ...output,
+        generation: frame.generation,
+        sceneGeneration: prepared.generation,
+        sourceTime: frame.sourceTime,
+        resultTime: frame.resultTime,
+        representedMediaTime: frame.source.timestamp ?? null,
+        cameraMediaTime: frame.camera?.representedMediaTime ?? null,
+        cameraGeneration: frame.camera?.generation ?? null,
+        captionConflicts: prepared.captionConflicts,
+        renderer: presentation.renderer,
+        geometry: presentation.geometry
+          ? {
+              ...presentation.geometry,
+              generation: frame.generation,
+              sceneGeneration: prepared.generation,
+            }
+          : null,
+      };
+    } catch (failure) {
+      output?.release();
+      throw failure;
+    } finally {
+      releaseExecution?.();
+      rendering--;
+      captured.assets.borrowers--;
+      if (captured.assets.retired) disposeAssets(captured.assets);
+    }
+  };
   return {
+    /** Report capacity from the prepared owner; the first publication initializes it serially. */
+    maximumInFlight(scene: Scene): 1 | 2 {
+      return scene === preparedSource &&
+        current?.assets.renderer === 'gpu' &&
+        args.maximumInFlight === 2
+        ? reviewGpuPreviewConcurrency(scene, current.assets.annotations?.maximumInFlight)
+        : 1;
+    },
     async prepare(
       sourceScene: Scene,
       dimensions: Dimensions,
@@ -732,7 +1193,16 @@ export function createReviewPreviewRenderer(args: {
       const key = reviewPreviewSceneKey(scene, dimensions);
       if (current && sameReviewPreviewSceneKey(current.key, key)) {
         current.key = key;
-        admitRender(args.allocation, current.prepared, current.assets);
+        admitRender(
+          args.allocation,
+          current.prepared,
+          current.assets,
+          undefined,
+          undefined,
+          false,
+          args.exportEnhancer
+        );
+        preparedSource = sourceScene;
         return lease(current.prepared, current.assets, signal);
       }
       const assetsKey = reviewPreviewPreparationKey(scene, dimensions, needsSpatialRenderer(scene));
@@ -759,9 +1229,19 @@ export function createReviewPreviewRenderer(args: {
           const captions = refresh ? await refresh : captured.assets.captions;
           controller.signal.throwIfAborted();
           if (disposed || current !== captured) throw new Error('Preview scene is stale.');
-          if (refresh) admitRender(args.allocation, prepared, captured.assets);
+          if (refresh)
+            admitRender(
+              args.allocation,
+              prepared,
+              captured.assets,
+              undefined,
+              undefined,
+              false,
+              args.exportEnhancer
+            );
           captured.assets.captions = captions;
           current = { ...captured, prepared, key };
+          preparedSource = sourceScene;
           return lease(prepared, current.assets, signal);
         } finally {
           signal.removeEventListener('abort', abort);
@@ -780,7 +1260,33 @@ export function createReviewPreviewRenderer(args: {
         dimensions: structuredClone(dimensions),
       };
       prepareSceneCameraPlans(prepared);
+      const useGpu =
+        args.renderer !== 'legacy' &&
+        !args.exportEnhancer &&
+        typeof navigator !== 'undefined' &&
+        !!navigator.gpu;
+      if (useGpu && !gpu)
+        gpu = createReviewGpuPreview({
+          resources: args.resources,
+          reserve: (bytes) => args.resources.bytes('preview-gpu', bytes),
+          maximumInFlight: args.maximumInFlight ?? 1,
+        });
       const assets: Assets = {
+        borrowers: 0,
+        retired: false,
+        closed: false,
+        lifetime: new AbortController(),
+        maximumInFlight: args.maximumInFlight ?? 1,
+        warmBudgetBytes:
+          useGpu &&
+          args.annotationWarmExecutor &&
+          prepared.scene.annotationEffects?.lane.enabled &&
+          prepared.scene.annotationEffects.lane.instances.some((instance) => instance.enabled)
+            ? EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes + 4
+            : 0,
+        renderer: args.exportEnhancer ? 'legacy' : (args.renderer ?? 'gpu'),
+        onContextLost: args.onContextLost,
+        gpu: useGpu ? gpu : null,
         annotations: null,
         captions: null,
         allocation: {
@@ -810,26 +1316,57 @@ export function createReviewPreviewRenderer(args: {
             controller.signal.throwIfAborted();
             if (!args.allocation) return;
             const input = args.allocation.describe();
-            args.allocation.replaceLimits(
-              calculatePreviewPreparationAllocation({
-                previousFront: input.publication.previousFront,
-                retainedCamera: input.admission.camera.retained,
-                retainedTransition: input.admission.transition,
-                backgroundBitmap: assets.allocation.backgroundBitmap,
-                headerBitmap: assets.allocation.headerBitmap,
-                watermark: assets.allocation.watermark,
-                measurement,
-                annotationSourceBytes: assets.allocation.annotationSourceBytes ?? 0,
-              })
-            );
+            const limits = calculatePreviewPreparationAllocation({
+              previousFront: input.publication.previousFront,
+              ...(input.publication.previousFrontKind
+                ? { previousFrontKind: input.publication.previousFrontKind }
+                : {}),
+              ...(input.publication.previousProviderBytes !== undefined
+                ? { previousProviderBytes: input.publication.previousProviderBytes }
+                : {}),
+              retainedCamera: input.admission.camera.retained,
+              retainedTransition: input.admission.transition,
+              backgroundBitmap: assets.allocation.backgroundBitmap,
+              headerBitmap: assets.allocation.headerBitmap,
+              watermark: assets.allocation.watermark,
+              measurement,
+              annotationSourceBytes: assets.allocation.annotationSourceBytes ?? 0,
+            });
+            const previousFront = input.publication.previousFront;
+            const sharedFrontBytes =
+              gpu &&
+              previousFront &&
+              input.publication.previousFrontKind === 'gpu-surface' &&
+              !input.publication.previousProviderBytes
+                ? previousFront.width * previousFront.height * 8
+                : 0;
+            args.allocation.replaceLimits({
+              ...limits,
+              // The current provider already owns the GPU front storage counted by preparation.
+              maximumManagedBytes:
+                limits.maximumManagedBytes +
+                // One isolated advisory packet must not reduce the two foreground packet budgets.
+                assets.warmBudgetBytes +
+                Math.max(0, (gpu?.allocatedBytes ?? 0) - sharedFrontBytes),
+            });
           },
-          args.annotationExecutor
+          args.annotationExecutor,
+          args.annotationWarmExecutor
         );
         controller.signal.throwIfAborted();
-        admitRender(args.allocation, prepared, assets);
-        if (needsSpatialRenderer(prepared.scene))
+        admitRender(
+          args.allocation,
+          prepared,
+          assets,
+          undefined,
+          undefined,
+          false,
+          args.exportEnhancer
+        );
+        if (needsSpatialRenderer(prepared.scene) && !assets.gpu)
           assets.spatial = createReviewSpatialRenderer(args.onContextLost, args.resources);
         current = { prepared, assets, key, preparationKey: assetsKey };
+        preparedSource = sourceScene;
         return lease(prepared, assets, signal);
       } catch (failure) {
         disposeAssets(assets);
@@ -839,57 +1376,39 @@ export function createReviewPreviewRenderer(args: {
         signal.removeEventListener('abort', abort);
       }
     },
-    async render(prepared: Prepared, frame: Frame, signal?: AbortSignal) {
-      if (rendering) throw new Error('Preview frame is already admitted.');
+    /** Admit decoded captures before their owner reserves or paints the next frame. */
+    admit(prepared: Prepared, frame: Frame) {
       if (disposed || !leases.has(prepared) || current?.prepared.generation !== prepared.generation)
         throw new Error('Preview scene is stale.');
-      if (![frame.source.timestamp, frame.sourceTime, frame.resultTime].every(Number.isFinite))
-        throw new Error('Invalid preview frame time.');
-      const captured = current;
-      const renderingSignal = signal ?? preparation?.signal;
-      if (!renderingSignal) throw new Error('Preview scene is stale.');
-      renderingSignal.throwIfAborted();
-      admitRender(args.allocation, current.prepared, current.assets, frame);
-      const output = args.resources.canvas(
-        'preview-publication',
-        current.prepared.dimensions.backing,
-        { alpha: false }
+      admitRender(
+        args.allocation,
+        current.prepared,
+        current.assets,
+        frame,
+        undefined,
+        false,
+        args.exportEnhancer
       );
-      rendering = true;
-      try {
-        await drawPreparedFrame(
-          captured.prepared,
-          captured.assets,
-          output,
-          frame,
-          args.resources,
-          renderingSignal,
-          (endpoint, bitmaps) => {
-            if (disposed || current !== captured || !leases.has(prepared))
-              throw new Error('Preview scene is stale.');
-            admitRender(args.allocation, captured.prepared, captured.assets, endpoint, bitmaps);
-          }
-        );
-        renderingSignal.throwIfAborted();
-        if (disposed || current !== captured || !leases.has(prepared))
-          throw new Error('Preview scene is stale.');
-        return {
-          ...output,
-          generation: frame.generation,
-          sceneGeneration: prepared.generation,
-          sourceTime: frame.sourceTime,
-          resultTime: frame.resultTime,
-          representedMediaTime: frame.source.timestamp,
-          cameraMediaTime: frame.camera?.representedMediaTime ?? null,
-          cameraGeneration: frame.camera?.generation ?? null,
-          captionConflicts: prepared.captionConflicts,
-        };
-      } catch (failure) {
+    },
+    async render(prepared: Prepared, frame: Frame, signal?: AbortSignal) {
+      const output = await renderFrame(prepared, frame, signal);
+      if (output.outputKind !== 'canvas2d') {
         output.release();
-        throw failure;
-      } finally {
-        rendering = false;
+        throw new Error('Preview output context is unavailable.');
       }
+      return output;
+    },
+    /** The mounted caller leases nonfront GPU canvases and owns visible publication. */
+    renderPresentation(
+      prepared: Prepared,
+      frame: Frame,
+      signal: AbortSignal,
+      acquireOutput: PreviewGpuCanvasFactory
+    ) {
+      return renderFrame(prepared, frame, signal, acquireOutput);
+    },
+    cancelWarmAnnotations() {
+      current?.assets.annotations?.cancelWarm(true);
     },
     dispose() {
       if (disposed) return;
@@ -900,6 +1419,8 @@ export function createReviewPreviewRenderer(args: {
       preparation?.abort();
       preparation = null;
       clear();
+      gpu?.dispose();
+      gpu = null;
     },
   };
 }

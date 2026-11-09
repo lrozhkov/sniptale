@@ -1,3 +1,4 @@
+import type { EditorCompositionBase } from '../../../../features/editor/document/types';
 import { reportEditorActionFailure } from '../../../runtime/async-actions';
 import { applyEditorViewportZoom } from '../../viewport';
 import type {
@@ -7,6 +8,7 @@ import type {
 import type { Canvas } from 'fabric';
 
 export type RelayoutOptions = {
+  compositionBase?: EditorCompositionBase;
   canvasSize?: { width: number; height: number };
   sourceSize?: { width: number; height: number };
   preserveCanvasSize?: boolean;

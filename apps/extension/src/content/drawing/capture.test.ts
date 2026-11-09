@@ -207,3 +207,86 @@ it('waits for requested text fonts and keeps stencil glyphs transparent over sou
     Reflect.deleteProperty(document, 'fonts');
   }
 });
+
+it('flattens only accepted Simplify tiles at the existing capture boundary', async () => {
+  vi.stubGlobal('Image', CanvasImage);
+  const tile = document.createElement('canvas');
+  tile.width = 20;
+  tile.height = 10;
+  const tileContext = tile.getContext('2d')!;
+  tileContext.fillStyle = '#eecc00';
+  tileContext.fillRect(0, 0, 20, 10);
+  const settings = {
+    automatic: true,
+    content: 'text',
+    manualKind: 'text',
+    sensitivity: 55,
+    thickness: 0.5,
+    lineSpacing: 1.5,
+    textPattern: 'typical',
+    textAlign: 'left',
+    color: null,
+  } as const;
+  const original = source();
+  const result = await compositeContentDrawingCapture(original, {
+    ...snapshot(),
+    objects: [
+      {
+        id: 'accepted',
+        kind: 'simplify',
+        bounds: { x: 30, y: 40, width: 20, height: 10 },
+        settings,
+        result: { dataUrl: tile.toDataURL(), width: 20, height: 10 },
+      },
+      {
+        id: 'unaccepted',
+        kind: 'simplify',
+        bounds: { x: 0, y: 0, width: 200, height: 150 },
+        settings,
+      },
+    ],
+  });
+  expect(pixel(result, 60, 75)).toEqual([238, 204, 0, 255]);
+  expect(pixel(result, 10, 10)).toEqual([34, 102, 170, 255]);
+  expect(pixel(original, 60, 75)).toEqual([34, 102, 170, 255]);
+});
+
+it('clips a rotated Auto mask without rotating its recognized source content', async () => {
+  vi.stubGlobal('Image', CanvasImage);
+  const tile = document.createElement('canvas');
+  tile.width = 20;
+  tile.height = 40;
+  const context = tile.getContext('2d')!;
+  context.fillStyle = '#ff0000';
+  context.fillRect(0, 0, 10, 40);
+  context.fillStyle = '#0000ff';
+  context.fillRect(10, 0, 10, 40);
+  const settings = {
+    automatic: true,
+    content: 'text',
+    manualKind: 'text',
+    sensitivity: 55,
+    thickness: 0.5,
+    lineSpacing: 1.5,
+    textPattern: 'typical',
+    textAlign: 'left',
+    color: null,
+  } as const;
+  const result = await compositeContentDrawingCapture(source(), {
+    projection: { x: 0, y: 0 },
+    viewport: { width: 200, height: 150 },
+    objects: [
+      {
+        id: 'rotated-mask',
+        kind: 'simplify',
+        rotation: 90,
+        bounds: { x: 10, y: 20, width: 40, height: 20 },
+        settings,
+        result: { dataUrl: tile.toDataURL(), width: 20, height: 40 },
+      },
+    ],
+  });
+  expect(pixel(result, 25, 15)).toEqual([255, 0, 0, 255]);
+  expect(pixel(result, 35, 15)).toEqual([0, 0, 255, 255]);
+  expect(pixel(result, 15, 30)).toEqual([34, 102, 170, 255]);
+});

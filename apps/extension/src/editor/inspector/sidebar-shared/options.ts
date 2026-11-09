@@ -46,15 +46,8 @@ export function getStepAlphabetOptions(): CompactSelectOption<'cyrillic' | 'lati
 
 export function getBrowserCanvasModeOptions(): CompactSelectOption<'resize' | 'keep-size'>[] {
   return [
-    { value: 'resize', label: translate('editor.compact.browserCanvasModeResize') },
-    { value: 'keep-size', label: translate('editor.compact.browserCanvasModeKeepSize') },
-  ];
-}
-
-export function getBrowserContentModeOptions(): CompactSelectOption<'push-down' | 'fit-content'>[] {
-  return [
-    { value: 'push-down', label: translate('editor.compact.browserContentModePushDown') },
-    { value: 'fit-content', label: translate('editor.compact.browserContentModeFitContent') },
+    { value: 'resize', label: translate('windowHeader.expandCanvas') },
+    { value: 'keep-size', label: translate('windowHeader.fitCanvas') },
   ];
 }
 

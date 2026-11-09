@@ -20,7 +20,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderPanel(status: NativeAppRuntimeStatus): void {
+function renderPanel(status: NativeAppRuntimeStatus | null): void {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -96,6 +96,7 @@ it('shows operation-level screenshot failures without changing connection status
 
 function createStatus(patch: Partial<NativeAppRuntimeStatus> = {}): NativeAppRuntimeStatus {
   return {
+    appIdentity: null,
     appStatus: null,
     capabilities: null,
     connectionState: 'connected',
@@ -113,3 +114,10 @@ function createStatus(patch: Partial<NativeAppRuntimeStatus> = {}): NativeAppRun
     ...patch,
   };
 }
+
+it('shows a disconnected fallback and a connection action before status is available', () => {
+  renderPanel(null);
+  expect(container?.textContent).toContain('Не подключено');
+  expect(container?.textContent).toContain('Проверить подключение');
+  expect(container?.textContent).not.toContain('Доверять приложению');
+});

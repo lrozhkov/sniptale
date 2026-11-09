@@ -176,18 +176,18 @@ for (const variant of [
         await expect(
           page.getByRole('button', { name: label('editor.compact.apply'), exact: true })
         ).toHaveCount(0);
-        const reset = page.getByRole('button', {
-          name: label('windowHeader.reset'),
-          exact: true,
-        });
-        await reset.scrollIntoViewIfNeeded();
-        await expect(reset).toBeInViewport();
+        await expect(
+          page.getByRole('button', { name: label('windowHeader.reset'), exact: true })
+        ).toHaveCount(0);
+        const off = button('windowHeader.none');
+        await off.scrollIntoViewIfNeeded();
+        await expect(off).toBeInViewport();
         await expect.poll(hasHeader).toBe(true);
         await page.screenshot({
           path: info.outputPath('image-application-header.png'),
           fullPage: false,
         });
-        await reset.click();
+        await off.click();
         await expect.poll(hasHeader).toBe(false);
         await page.getByRole('button', { name: label('editor.toolbar.undo'), exact: true }).click();
         await expect.poll(hasHeader).toBe(true);
@@ -203,6 +203,8 @@ for (const variant of [
         await checkLocalWindowIcon(page, settings, variant.locale);
         await expect.poll(artwork).toContain('data:image/png;base64,');
         await page.evaluate(() => window.scrollTo(0, 0));
+        if (viewport.width < 1280)
+          await page.evaluate(() => window.__sniptaleEditorHarness!.setZoomLevel(0.3));
         await checkRenderedWindowIcon(
           page,
           page.locator('[data-ui="editor.canvas.surface-hit-area"] > div'),
@@ -213,9 +215,7 @@ for (const variant of [
         if (viewport.width < 1280) {
           expect(
             await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
-          ).toBe(true);
-          await page.evaluate(() => window.scrollTo(document.documentElement.scrollWidth, 0));
-          expect(await page.evaluate(() => window.scrollX)).toBeGreaterThan(0);
+          ).toBe(false);
         }
         await page.screenshot({
           path: info.outputPath('image-window-header.png'),

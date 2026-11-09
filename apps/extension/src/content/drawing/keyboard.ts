@@ -1,3 +1,4 @@
+import type { ContentSimplifyRuntime } from './simplify';
 import { useEffect, type RefObject } from 'react';
 import {
   translateDrawingObject,
@@ -29,10 +30,19 @@ export function handleDrawingKeyDown(args: {
   onCancelDraft: () => void;
   onEditText: (object: DrawingTextObject) => void;
   onExit?: () => void;
+  simplify?: Pick<
+    ContentSimplifyRuntime,
+    'transform' | 'cancel' | 'getPending' | 'getPendingObjects'
+  >;
   session: DrawingSession;
   snapshot: DrawingSessionSnapshot;
 }): void {
   const { event, session, snapshot } = args;
+  if (event.key === 'Escape' && args.simplify?.getPending().length) {
+    event.preventDefault();
+    args.simplify.cancel();
+    return;
+  }
   if (event.key === 'Delete' || event.key === 'Backspace') {
     event.preventDefault();
     session.deleteSelected();
@@ -52,7 +62,14 @@ export function handleDrawingKeyDown(args: {
           : event.key === 'ArrowUp'
             ? { x: 0, y: -amount }
             : { x: 0, y: amount };
-    session.replaceObjects(selected.map((object) => translateDrawingObject(object, delta)));
+    if (selected.some((object) => object.kind === 'simplify')) {
+      const pending = new Map(
+        args.simplify?.getPendingObjects().map((object) => [object.id, object])
+      );
+      void args.simplify?.transform(
+        selected.map((object) => translateDrawingObject(pending.get(object.id) ?? object, delta))
+      );
+    } else session.replaceObjects(selected.map((object) => translateDrawingObject(object, delta)));
     return;
   }
   const editableText = selected.length === 1 && selected[0]?.kind === 'text' ? selected[0] : null;
@@ -138,6 +155,10 @@ export function useDrawingEscapeOwnership(args: {
   exitImmediately?: boolean;
   onExit?: () => void;
   pointerDraftRef: RefObject<unknown | null>;
+  simplify?: Pick<
+    ContentSimplifyRuntime,
+    'transform' | 'cancel' | 'getPending' | 'getPendingObjects'
+  >;
   session: DrawingSession;
 }) {
   useEffect(() => {
@@ -175,6 +196,7 @@ export function useDrawingEscapeOwnership(args: {
         },
         onEditText: args.editText,
         ...(args.onExit === undefined ? {} : { onExit: args.onExit }),
+        ...(args.simplify ? { simplify: args.simplify } : {}),
         session: args.session,
         snapshot: args.session.getSnapshot(),
       });

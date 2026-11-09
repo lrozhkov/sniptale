@@ -352,3 +352,19 @@ A distinct periodic alarm wakes retry maintenance. A synchronous browser startup
 A running executor job causes native metadata deferral. Missing execution permits recovery only through the workflow operation lock. Elapsed time cannot establish containment. Failed observation preserves work for a later wake-up.
 
 Automatic execution remains inside the security qualification boundary. This change does not activate production enrollment or unrestricted start ingress.
+
+
+## Shared secret runtime authority
+
+Background constructs one shared secret service with explicit AI and WebDAV participant dependencies. The service owns the only unlocked phrase-derived key. Runtime constructors receive its narrow admission or command ports. Domain adapters preserve native identities, AAD and metadata ownership. No WebDAV consumer imports AI settings as its security authority.
+
+The sync runtime issues worker-bound credential leases outside disposable status snapshots. Offscreen resolves authentication through the trusted background bridge for each HTTP attempt. The final dispatch checks the durable protection epoch under the existing connection admission lock. The background bridge does not acquire that caller-held lock or enter the coordinator queue. Lock and startup recovery stop and drain the existing executor before they report containment. They preserve the separate user pause.
+
+The unlock route accepts a bounded sync purpose from the canonical popup document. Settings submission remains bound to the request identity. After derivation, the common service checks that request before it publishes the unlocked key. The route consumes the exact sync intent before it requests a native checkpoint flush. Cancellation, expiry, replacement and stale native selection refuse that continuation. A normal unlock resumes blocked work without changing checkpoint deadlines.
+## Design Review sessions
+
+Design Review stores one local session for each active browser tab. The background session owner serializes native document commands. Local records retain feedback and bounded PNG previews across page navigation. Session storage binds native tabs to local session identities. A closed tab detaches its session. Explicit Resume selects the last detached session. Opening a page does not create or update a session.
+
+Content owns DOM access and target matching. Each restored target must match its saved page and semantic evidence. A cached page closes its old Port before it reads the current session. A missing or ambiguous target keeps its feedback and preview. It does not permit a different target to receive the saved changes. Navigation mode releases page input without ending the review session. Feedback visibility and position remain part of that session.
+
+The navigation restoration path requires existing page access. Stored review data grants no host permission or capture authority. A trusted content gesture authorizes each preview capture through the existing capture capability flow. Copy, download and PDF use one immutable session snapshot. Multipage PDF output uses retained previews without visiting source pages.

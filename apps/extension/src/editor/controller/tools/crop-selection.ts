@@ -123,3 +123,38 @@ export function clampEditorCropSelectionPosition(
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+/** Constrains a handle resize around its fixed origin before integer crop normalization. */
+export function constrainEditorCropResize(
+  selection: CropSelection,
+  ratio: number,
+  origin: { x: number; y: number; axis: 'x' | 'y' | 'both' },
+  bounds: { left: number; top: number; right: number; bottom: number }
+): CropSelection {
+  const anchorX = selection.left + selection.width * origin.x;
+  const anchorY = selection.top + selection.height * origin.y;
+  const available = (anchor: number, fraction: number, min: number, max: number) =>
+    fraction === 0
+      ? max - anchor
+      : fraction === 1
+        ? anchor - min
+        : 2 * Math.min(anchor - min, max - anchor);
+  const maxWidth = available(anchorX, origin.x, bounds.left, bounds.right);
+  const maxHeight = available(anchorY, origin.y, bounds.top, bounds.bottom);
+  const requestedHeight =
+    origin.axis === 'y'
+      ? selection.height
+      : origin.axis === 'x'
+        ? selection.width / ratio
+        : (selection.width * ratio + selection.height) / (ratio * ratio + 1);
+  const minimumHeight = Math.max(1, 1 / ratio);
+  const height = Math.max(minimumHeight, Math.min(requestedHeight, maxHeight, maxWidth / ratio));
+  const width = Math.max(1, Math.round(height * ratio));
+  const roundedHeight = Math.max(1, Math.round(height));
+  return {
+    left: Math.round(anchorX - width * origin.x),
+    top: Math.round(anchorY - roundedHeight * origin.y),
+    width,
+    height: roundedHeight,
+  };
+}

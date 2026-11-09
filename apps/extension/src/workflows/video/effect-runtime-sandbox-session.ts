@@ -10,6 +10,7 @@ import {
 import {
   EFFECT_RUNTIME_SANDBOX_CONNECT_MESSAGE,
   type EffectRuntimeFrameResult,
+  type EffectRuntimeSceneResult,
   type EffectRuntimeRenderCommand,
 } from '../../contracts/effect-runtime/types';
 import type { PendingEffectRuntimeRequest } from './effect-runtime-sandbox-request';
@@ -31,8 +32,22 @@ export class EffectRuntimeSandboxSessionManager {
 
   constructor(
     private readonly ownerDocument: Document,
-    private readonly timeouts: { loadTimeoutMs: number; requestTimeoutMs: number }
+    private readonly configuration: {
+      loadTimeoutMs: number;
+      requestTimeoutMs: number;
+      compositionBackend?: 'gpu-preview' | 'gpu-scene' | 'gpu-scene-plan';
+    }
   ) {}
+
+  /** Start transport readiness without admitting a frame; actual requests can retry a failed load. */
+  preload(): void {
+    if (this.disposed) return;
+    try {
+      this.ensureSession();
+    } catch {
+      this.clearSession();
+    }
+  }
 
   dispose(): void {
     if (this.disposed) return;
@@ -44,7 +59,31 @@ export class EffectRuntimeSandboxSessionManager {
   }
 
   async renderFrame(command: EffectRuntimeRenderCommand): Promise<EffectRuntimeFrameResult> {
+    if (this.configuration.compositionBackend === 'gpu-scene-plan') {
+      closeEffectRuntimeBitmaps(command.inputFrames);
+      return createEffectRuntimeFailure(command, 'inputRejected');
+    }
     return renderEffectRuntimeSandboxFrame(this.createRenderAuthority(), command);
+  }
+
+  async prepareGpuFrame(command: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult> {
+    if (
+      this.configuration.compositionBackend !== 'gpu-scene' &&
+      this.configuration.compositionBackend !== 'gpu-scene-plan'
+    ) {
+      closeEffectRuntimeBitmaps(command.inputFrames);
+      return createEffectRuntimeFailure(command, 'inputRejected');
+    }
+    const result = await renderEffectRuntimeSandboxFrame(
+      this.createRenderAuthority(),
+      command,
+      'prepareGpuFrame'
+    );
+    if (this.configuration.compositionBackend === 'gpu-scene-plan' && result.kind === 'frame') {
+      result.bitmap.close();
+      return createEffectRuntimeFailure(command, 'outputRejected');
+    }
+    return result;
   }
 
   private createRenderAuthority(): EffectRuntimeSandboxRenderAuthority {
@@ -57,21 +96,29 @@ export class EffectRuntimeSandboxSessionManager {
       ensureSession: () => this.ensureSession(),
       isCurrentSession: (session) => this.session === session,
       isDisposed: () => this.disposed,
-      requestTimeoutMs: this.timeouts.requestTimeoutMs,
+      requestTimeoutMs: this.configuration.requestTimeoutMs,
     };
   }
 
   private ensureSession(): EffectRuntimeSandboxSession {
     if (this.session) return this.session;
     const connectionNonce = createEffectRuntimeSandboxConnectionNonce();
-    const iframe = createSandboxIframe(this.ownerDocument, connectionNonce);
+    const iframe = createSandboxIframe(
+      this.ownerDocument,
+      connectionNonce,
+      this.configuration.compositionBackend
+    );
     const created: EffectRuntimeSandboxSession = {
       cancelLoad: () => {},
       controlPort: null,
       iframe,
       load: Promise.resolve(),
     };
-    created.load = initializeSandboxSession(created, connectionNonce, this.timeouts.loadTimeoutMs);
+    created.load = initializeSandboxSession(
+      created,
+      connectionNonce,
+      this.configuration.loadTimeoutMs
+    );
     this.session = created;
     void created.load.catch(() => this.clearSession(created));
     (this.ownerDocument.body ?? this.ownerDocument.documentElement).append(iframe);
@@ -94,14 +141,17 @@ export class EffectRuntimeSandboxSessionManager {
   }
 }
 
-function createSandboxIframe(ownerDocument: Document, connectionNonce: string): HTMLIFrameElement {
+function createSandboxIframe(
+  ownerDocument: Document,
+  connectionNonce: string,
+  compositionBackend?: 'gpu-preview' | 'gpu-scene' | 'gpu-scene-plan'
+): HTMLIFrameElement {
   const iframe = ownerDocument.createElement('iframe');
   iframe.hidden = true;
   iframe.setAttribute('sandbox', 'allow-scripts');
-  iframe.src = createEffectRuntimeSandboxUrl(
-    runtimeInfo.getURL(EFFECT_RUNTIME_SANDBOX_PAGE_PATH),
-    connectionNonce
-  );
+  const url = new URL(runtimeInfo.getURL(EFFECT_RUNTIME_SANDBOX_PAGE_PATH));
+  if (compositionBackend) url.searchParams.set('composition', compositionBackend);
+  iframe.src = createEffectRuntimeSandboxUrl(url.href, connectionNonce);
   return iframe;
 }
 

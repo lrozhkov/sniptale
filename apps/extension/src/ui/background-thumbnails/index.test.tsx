@@ -50,3 +50,44 @@ it.each([undefined, 4])(
     }
   }
 );
+
+it('keeps pending thumbnails enabled-looking while blocking duplicate picks and image drag', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const select = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <BackgroundThumbnails
+          items={[{ id: 'one', name: 'One' }]}
+          label="Choices"
+          pending
+          onSelect={select}
+        />
+      )
+    );
+    const button = host.querySelector('button')!;
+    expect(button.disabled).toBe(false);
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    act(() => button.click());
+    expect(select).not.toHaveBeenCalled();
+    const drag = new Event('dragstart', { bubbles: true, cancelable: true });
+    button.dispatchEvent(drag);
+    expect(drag.defaultPrevented).toBe(true);
+    await act(async () =>
+      root.render(
+        <BackgroundThumbnails
+          items={[{ id: 'one', name: 'One' }]}
+          label="Choices"
+          onSelect={select}
+        />
+      )
+    );
+    act(() => button.click());
+    expect(select).toHaveBeenCalledWith('one');
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

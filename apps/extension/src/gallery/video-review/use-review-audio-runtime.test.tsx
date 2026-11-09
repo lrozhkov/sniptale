@@ -621,3 +621,95 @@ it('retries a missing accepted asset after explicit resume instead of caching ab
   expect(resolveAsset).toHaveBeenCalledTimes(2);
   expect(engine.scheduled).toHaveLength(1);
 });
+
+it('does not replay voiceover when a delayed React sample trails the current media clock', async () => {
+  const engine = new FakeEngine();
+  const video = document.createElement('video');
+  video.currentTime = 2;
+  const { Harness } = renderRuntime({
+    video: { current: video },
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2,
+    sourceToResult: (source: number) => source,
+    seekRevision: 0,
+    voiceover: [clip()],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  expect(engine.scheduled).toHaveLength(1);
+  const stops = engine.stops;
+  engine.currentTime = 100.25;
+  video.currentTime = 2.25;
+  await act(async () => root.render(<Harness outputTime={2.01} />));
+  expect(engine.scheduled).toHaveLength(1);
+  expect(engine.stops).toBe(stops);
+  video.currentTime = 4;
+  await act(async () => root.render(<Harness outputTime={4} seekRevision={1} />));
+  expect(engine.scheduled).toHaveLength(2);
+  expect(engine.scheduled[1]!.schedule).toMatchObject({ offset: 2 });
+});
+
+it('anchors real drift recovery to the current mapped media time instead of a stale React sample', async () => {
+  const map = createReviewTimeMap(12, [
+    { id: 'cut', kind: 'cut', start: 3, end: 6, requestedStart: 3, requestedEnd: 6 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  const engine = new FakeEngine();
+  const video = document.createElement('video');
+  video.currentTime = 6.5;
+  const { Harness } = renderRuntime({
+    video: { current: video },
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 3,
+    sourceToResult: map.sourceToTimeline,
+    music: [clip({ timelineStart: 0, duration: 8 })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  expect(engine.scheduled[0]!.schedule).toMatchObject({ offset: 3.25 });
+  engine.currentTime = 100.25;
+  video.currentTime = 7;
+  await act(async () => root.render(<Harness outputTime={3.01} />));
+  expect(engine.scheduled).toHaveLength(1);
+  video.currentTime = 8;
+  await act(async () => root.render(<Harness outputTime={3.02} />));
+  expect(engine.scheduled).toHaveLength(2);
+  expect(engine.scheduled[1]!.schedule).toMatchObject({ offset: 4 });
+});
+
+it('ignores an unmapped cut sample and resumes clock comparison on the next retained frame', async () => {
+  const map = createReviewTimeMap(12, [
+    { id: 'cut', kind: 'cut', start: 3, end: 6, requestedStart: 3, requestedEnd: 6 },
+  ]);
+  const engine = new FakeEngine();
+  const video = document.createElement('video');
+  video.currentTime = 2.9;
+  const { Harness } = renderRuntime({
+    video: { current: video },
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2.9,
+    sourceToResult: map.sourceToTimeline,
+    music: [clip({ timelineStart: 0, duration: 8 })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  engine.currentTime = 100.3;
+  video.currentTime = 4;
+  await act(async () => root.render(<Harness outputTime={2.91} />));
+  expect(engine.scheduled).toHaveLength(1);
+  video.currentTime = 6.2;
+  await act(async () => root.render(<Harness outputTime={3.2} />));
+  expect(engine.scheduled).toHaveLength(1);
+});

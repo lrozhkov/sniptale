@@ -39,6 +39,7 @@ export function preparePresentationPreview(
   if (!sequence.ok) throw new Error('Presentation preview cannot be represented');
   return {
     sequence: sequence.plan,
+    renderer: preferences.renderer,
     ...planPresentationPreview({
       sequence: sequence.plan,
       edge: edge === 'intro' ? 'beginning' : 'ending',
@@ -119,7 +120,7 @@ export async function renderPresentationPreview(
     signal.throwIfAborted();
     await deps.write(
       { ...input, writer, signal, exportAudio },
-      { window, backing: { width: plan.width, height: plan.height } }
+      { window, backing: { width: plan.width, height: plan.height }, renderer: plan.renderer }
     );
     const profile = resolveReviewOutputProfile(input.index, input.advanced, input.renderSettings);
     return writer.finish(profile.format === 'webm' ? 'video/webm' : 'video/mp4');

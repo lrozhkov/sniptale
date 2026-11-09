@@ -1,4 +1,6 @@
+import type { ReviewRecordingRenderSource } from './recording-render';
 import { createPresentationDecoder } from './presentation-decoder';
+import { readPreviewSourceLeadingSampleTime } from '../video/preview-source';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink, type InputAudioTrack } from 'mediabunny';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -13,10 +15,7 @@ import { createReviewTransitionFrames } from './cut-transition-frames';
 import { createReviewWebcamRenderer } from './render-webcam';
 import { createReviewPreviewRenderer } from './render-preview';
 import { createPreviewRenderResources } from './preview-render-resources';
-import {
-  calculatePreviewRenderAllocation,
-  resolvePreviewRenderAllocation,
-} from './preview-render-allocation';
+import { resolvePreviewRenderAllocation } from './preview-render-allocation';
 import type { PreviewRenderAllocationInput } from './preview-render-allocation';
 import type { ReviewMediaIndex } from './media-index';
 import { QuickEditExportUnavailable } from './export-unavailable';
@@ -28,8 +27,12 @@ type Scene = Parameters<Renderer['prepare']>[0];
 type Frame = Parameters<Renderer['render']>[1];
 type SampleSink = ReturnType<typeof createReviewDecodedSampleSink>;
 type Camera = Awaited<ReturnType<typeof createReviewWebcamRenderer>>;
+import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 
 export interface ReviewPresentationMainInput {
+  renderer?: import('../../features/video/preview/preferences').VideoPreviewRenderer;
+  exportEnhancer?: ExportEnhancer;
+  recordingHistory?: ReviewRecordingRenderSource;
   file: Blob;
   index: ReviewMediaIndex;
   edits: readonly ReviewEdit[];
@@ -84,6 +87,7 @@ class PresentationMain {
   private decoder: ReturnType<typeof createPresentationDecoder> | null = null;
   private camera: Camera | null = null;
   private resolution = 0;
+  private leadingSampleTime: number | undefined;
   private disposed = false;
   private busy = false;
   private frameGeneration = 0;
@@ -110,6 +114,8 @@ class PresentationMain {
     this.input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
     this.renderer = createReviewPreviewRenderer({
       resources: this.resources,
+      renderer: args.renderer ?? 'legacy',
+      ...(args.exportEnhancer ? { exportEnhancer: args.exportEnhancer } : {}),
       readAsset: args.readAsset,
       allocation: {
         describe: this.graph,
@@ -149,6 +155,12 @@ class PresentationMain {
       )
     )
       throw new Error('Invalid main source dimensions or time resolution');
+    this.leadingSampleTime = await readPreviewSourceLeadingSampleTime(
+      video,
+      this.args.index.duration,
+      signal,
+      this.resolution
+    );
     signal.throwIfAborted();
     const audio = await this.input.getPrimaryAudioTrack();
     signal.throwIfAborted();
@@ -218,6 +230,20 @@ class PresentationMain {
       this.camera = camera;
     }
     signal.throwIfAborted();
+    if (this.args.recordingHistory) {
+      const history = await this.args.recordingHistory.read(
+        this.segments[0]!.sourceStart,
+        this.args.fragmentOffset,
+        { ...this.args.dimensions.backing, frameDuration: 1 / (this.args.fps ?? 30) },
+        signal
+      );
+      this.scene = {
+        ...this.scene,
+        zoomRegions: history.effective.zoomRegions,
+        keys: history.keyCues,
+        clicks: history.clickCues,
+      };
+    }
     if (effective.captions) {
       this.scene = { ...this.scene, webcamDuration: this.camera?.duration };
       if (this.args.fragmentOffset > 0 && !this.args.captionTimeMap)
@@ -244,7 +270,7 @@ class PresentationMain {
         candidate.mapping.holdLast
       )
         continue;
-      yield { tick: candidate.tick, time: this.map(candidate, undefined).sourceTime };
+      yield { tick: candidate.tick, time: this.map(candidate, undefined).sampleTime };
     }
   }
 
@@ -276,7 +302,16 @@ class PresentationMain {
       Math.max(firstTick, Math.round(requested * this.resolution) / this.resolution)
     );
     if (firstTick > lastTick) throw new Error('Main source interval has no representable tick');
+    // Capture encoders can place the first video sample one frame after the media origin.
+    // Decode that sample only inside the retained interval; scene and audio clocks keep their origin.
+    const sampleTime =
+      this.leadingSampleTime !== undefined &&
+      sourceTime < this.leadingSampleTime &&
+      this.leadingSampleTime < segment.sourceEnd
+        ? this.leadingSampleTime
+        : sourceTime;
     return {
+      sampleTime,
       sourceTime,
       resultTime: this.args.fragmentOffset + localTime,
       localTime,
@@ -315,15 +350,30 @@ class PresentationMain {
     const transition = createReviewTransitionFrames(this.transitionSink!, signal);
     const cameraFrames = this.camera?.sourceFrames([this.sourceTime]);
     let source: Awaited<ReturnType<SampleSink['getSample']>> = null;
+    let raw: VideoFrame | undefined;
     let prepared: Awaited<ReturnType<Renderer['prepare']>> | undefined;
     try {
       signal.throwIfAborted();
+      if (this.args.recordingHistory) {
+        const history = await this.args.recordingHistory.read(
+          this.sourceTime,
+          this.resultTime,
+          { ...this.args.dimensions.backing, frameDuration: 1 / (this.args.fps ?? 30) },
+          signal
+        );
+        this.scene = {
+          ...this.scene!,
+          zoomRegions: history.effective.zoomRegions,
+          keys: history.keyCues,
+          clicks: history.clickCues,
+        };
+      }
       prepared = await this.renderer.prepare(this.scene!, this.args.dimensions, signal);
       signal.throwIfAborted();
       this.assets = prepared.allocationAssets;
       source = await (this.decoder
-        ? this.decoder.read(plannedTick, this.sourceTime)
-        : this.sink!.getSample(this.sourceTime));
+        ? this.decoder.read(plannedTick, mapped.sampleTime)
+        : this.sink!.getSample(mapped.sampleTime));
       signal.throwIfAborted();
       if (!source) throw new Error('Main source frame is unavailable');
       const blend = reviewCutTransitionAt(mapped.localTime, this.transitions);
@@ -338,15 +388,10 @@ class PresentationMain {
       this.transitionBytes = endpoints
         ? [endpoints.left.allocationSize!(), endpoints.right.allocationSize!()]
         : null;
-      this.resources.replaceLimits(calculatePreviewRenderAllocation(this.graph()));
-      leases.push(this.resources.bytes('main-source', this.sourceBytes));
-      if (this.cameraBytes !== null)
-        leases.push(this.resources.bytes('main-camera', this.cameraBytes));
-      if (this.transitionBytes)
-        leases.push(
-          this.resources.bytes('main-transition', this.transitionBytes[0] + this.transitionBytes[1])
-        );
+      if (this.args.renderer === 'gpu' && !this.args.exportEnhancer) raw = source.toVideoFrame();
       const frame: Frame = {
+        ...(this.args.exportEnhancer ? { exportEnhancer: this.args.exportEnhancer } : {}),
+        ...(this.args.recordingHistory ? { recordingHistory: this.args.recordingHistory } : {}),
         generation,
         fps: this.args.fps ?? this.args.index.frameRate ?? 30,
         sourceTime: this.sourceTime,
@@ -355,6 +400,12 @@ class PresentationMain {
           timestamp: source.timestamp,
           backing: this.scene!.source,
           draw: source.draw.bind(source),
+          ...(raw
+            ? {
+                videoFrame: () => raw!,
+                orientation: { rotation: source.rotation, flip: source.flip },
+              }
+            : {}),
         },
         ...(camera
           ? {
@@ -372,6 +423,14 @@ class PresentationMain {
           ? { transition: { blend, frames: endpoints, resultOffset: this.args.fragmentOffset } }
           : {}),
       };
+      this.renderer.admit(prepared, frame);
+      leases.push(this.resources.bytes('main-source', this.sourceBytes));
+      if (this.cameraBytes !== null)
+        leases.push(this.resources.bytes('main-camera', this.cameraBytes));
+      if (this.transitionBytes)
+        leases.push(
+          this.resources.bytes('main-transition', this.transitionBytes[0] + this.transitionBytes[1])
+        );
       const output = await this.renderer.render(prepared, frame, signal);
       this.front = output;
       let released = false;
@@ -386,6 +445,7 @@ class PresentationMain {
         },
       };
     } finally {
+      raw?.close();
       source?.close();
       transition.dispose();
       try {
@@ -395,6 +455,7 @@ class PresentationMain {
         prepared?.release();
         this.sourceBytes = this.cameraBytes = this.transitionBytes = null;
         this.busy = false;
+        if (this.disposed) this.retire();
         signal.throwIfAborted();
       }
     }
@@ -405,6 +466,10 @@ class PresentationMain {
     this.disposed = true;
     this.args.signal.removeEventListener('abort', this.dispose);
     this.controller.abort();
+    if (!this.busy) this.retire();
+  };
+
+  private retire() {
     this.camera?.dispose();
     this.front?.release();
     this.front = null;
@@ -414,5 +479,5 @@ class PresentationMain {
     // Input disposal above terminates native decoding; pending iterator cleanup can reject on abort.
     void this.decoder?.dispose().catch(() => undefined);
     this.decoder = null;
-  };
+  }
 }

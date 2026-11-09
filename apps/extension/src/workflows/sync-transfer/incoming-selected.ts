@@ -1,3 +1,5 @@
+import { retireJournalRecordingEventStages } from '../../composition/persistence/recordings/recording-events/staging';
+import { retireJournalCursorTrajectoryStages } from '../../composition/persistence/recordings/cursor-trajectory/staging';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 import { loadSyncConnection } from '../../composition/persistence/remote-connection/store';
@@ -5,7 +7,11 @@ import {
   sameConnectionScope,
   sameSyncConnectionIdentity,
 } from '../../composition/persistence/remote-connection/model';
-import { isNativeEditingRootReady, prepareNativeEditingRoot } from './native-residency';
+import {
+  isNativeEditingRootReady,
+  prepareNativeEditingRoot,
+  type SyncDownloadAllowance,
+} from './native-residency';
 import type { CaptureRootKind } from '../../composition/persistence/sync-capture/contracts';
 import type {
   SyncConnectionIdentity,
@@ -124,7 +130,8 @@ async function prepareReceivedDependency(
   root: SelectedCatalogRoot
 ): Promise<void> {
   if (await isNativeEditingRootReady(root)) return;
-  if (args.residentOnly) throw new Error('Background incoming requires resident dependencies.');
+  if (args.residentOnly || args.binaryAdmission === 'resident')
+    throw new Error('Background incoming requires resident dependencies.');
   args.signal.throwIfAborted();
   const connection = await loadSyncConnection();
   if (
@@ -140,6 +147,7 @@ async function prepareReceivedDependency(
     authorization: args.authorization,
     remote: args.remote,
     signal: args.signal,
+    ...(args.downloadAllowance ? { downloadAllowance: args.downloadAllowance } : {}),
   });
 }
 
@@ -151,6 +159,8 @@ export async function receiveSelectedCatalogRoot(args: {
   authorization: SyncConnectionIdentity;
   selection: SelectedCatalogRoot;
   residentOnly?: true;
+  binaryAdmission?: 'resident';
+  downloadAllowance?: SyncDownloadAllowance;
   preserveNative?: true;
   signal: AbortSignal;
 }): Promise<{ rootKind: CaptureRootKind; rootId: string; operationId: string }> {
@@ -223,20 +233,28 @@ export async function receiveSelectedCatalogRoot(args: {
         admission,
         signal: args.signal,
         ...(args.residentOnly ? { residentOnly: true as const } : {}),
+        ...(args.binaryAdmission ? { binaryAdmission: args.binaryAdmission } : {}),
+        ...(args.downloadAllowance ? { downloadAllowance: args.downloadAllowance } : {}),
       });
       try {
         await publishReadyJournalWithRetry(journal, async (ready, permit) => {
           // Cancellation and publication use the same lifecycle exclusion as startup replay.
-          if (args.signal.aborted && !(await receipt()))
+          if (args.signal.aborted && !(await receipt())) {
+            await retireJournalCursorTrajectoryStages(ready.journalId);
+            await retireJournalRecordingEventStages(ready.journalId);
             throw new SupersededAssetPublicationError();
+          }
           await publishPreparedReplicaJournal(ready, permit);
         });
       } catch (error) {
         if (!args.signal.aborted) throw error;
         const committed = await runWithDurableAssetLifecycleLock(async (permit) => {
           if (await receipt()) return true;
-          if (!(error instanceof SupersededAssetPublicationError))
+          if (!(error instanceof SupersededAssetPublicationError)) {
+            await retireJournalCursorTrajectoryStages(journal.journalId);
+            await retireJournalRecordingEventStages(journal.journalId);
             await cancelAssetPublication(journal, permit);
+          }
           return false;
         });
         if (!committed) args.signal.throwIfAborted();

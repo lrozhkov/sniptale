@@ -4,7 +4,8 @@ import { mediaWindowPadding } from '../../../../../features/video/project/window
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { MediaCropControls } from './media-crop';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
+import { RuntimePlaybackContext } from '../../../../runtime/controller/composition/contexts';
 import { WindowHeaderSettings } from '../../../../../workflows/browser-frame/settings';
 import {
   maximumMediaPadding,
@@ -75,6 +76,7 @@ type MediaFrameFieldProps = {
 };
 
 export function MediaFrameControls(props: MediaFrameControlsProps) {
+  const playback = useContext(RuntimePlaybackContext);
   if (!isVideoClip(props.clip) && props.clip.type !== VideoProjectClipType.IMAGE) {
     return null;
   }
@@ -93,6 +95,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
         project={props.project}
         clip={props.clip}
         currentTime={props.currentTime ?? props.clip.startTime}
+        playbackTimeSource={playback?.playbackTimeSource}
         disabled={props.locked}
         onEdit={props.onEditMediaClip}
       />

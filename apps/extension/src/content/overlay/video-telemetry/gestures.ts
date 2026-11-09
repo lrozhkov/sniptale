@@ -1,5 +1,7 @@
+import { RECORDING_EVENT_LABELS } from '../../../features/video/project/recording-events/types';
 import { describeTelemetryTarget } from './target';
 import type { RecordingActionEvent } from '../../../features/video/project/types';
+import type { RecordingViewportGeometry } from '../../../features/video/project/types';
 import type { TelemetryState } from './types';
 
 const RECORDING_DRAG_THRESHOLD_CSS_PX = 12;
@@ -25,10 +27,9 @@ export function createPointerGestureRecorder(state: TelemetryState) {
 
 class PointerGestureRecorder {
   private readonly targets = new WeakMap<Element, string>();
-  private readonly released = new Map<
-    number,
-    { action: RecordingActionEvent; target: Element | null }
-  >();
+  private get released() {
+    return this.state.releasedGestures;
+  }
   constructor(private readonly state: TelemetryState) {}
   down = (event: MouseEvent) => {
     const { state, targets, released } = this;
@@ -40,6 +41,8 @@ class PointerGestureRecorder {
       state.gestures.has(event.button)
     )
       return;
+    const previous = released.get(event.button);
+    if (previous) this.emit(previous);
     released.delete(event.button);
     const target = describeTelemetryTarget(event);
     const element = target.clickElement ?? target.element;
@@ -65,6 +68,7 @@ class PointerGestureRecorder {
         gestureType: 'hold',
         button: event.button,
         downTime: time,
+        lastObservedTime: time,
         downX: event.clientX,
         downY: event.clientY,
         maxExcursionCssPx: 0,
@@ -75,10 +79,12 @@ class PointerGestureRecorder {
       },
       preset: 'CLICK_PRESS' as const,
     };
-    state.actionEvents.push(action);
+    if (!state.eventSource) state.actionEvents.push(action);
     state.gestures.set(event.button, {
       action,
       downTimestampMs: event.timeStamp,
+      viewport: viewport(),
+      sourceClockId: state.observationClock.id,
       target: element,
       pointerId:
         'pointerId' in event && typeof event.pointerId === 'number' ? event.pointerId : null,
@@ -119,38 +125,55 @@ class PointerGestureRecorder {
       action.preset = 'CLICK_RIPPLE';
     }
     state.gestures.delete(event.button);
-    released.set(event.button, { action, target: gesture.target });
+    released.set(event.button, {
+      action,
+      target: gesture.target,
+      viewport: gesture.viewport,
+      upViewport: viewport(),
+      sourceClockId: gesture.sourceClockId,
+    });
   };
-  lose = (completion: 'lost' | 'cancelled', timestamp: number, retainNative = false) => {
+  lose = (completion: 'lost' | 'cancelled', retainNative = false) => {
     const { state } = this;
-    for (const [button, { action }] of state.gestures) {
-      action.data['lastObservedTime'] = elapsed(state, timestamp);
+    for (const [button, gesture] of state.gestures) {
+      const { action } = gesture;
       if (retainNative && action.data['gestureType'] === 'native-drag') continue;
       action.data['completion'] = completion;
+      this.emit(gesture);
       state.gestures.delete(button);
     }
+    for (const completed of this.released.values()) this.emit(completed);
+    this.released.clear();
   };
   click = (event: MouseEvent) => {
     const { released } = this;
-    if (!event.isTrusted || event.detail < 1) return;
+    if (!event.isTrusted || event.type !== 'click') return;
     const completed = released.get(event.button);
-    if (!completed) return;
+    if (!completed) {
+      if (this.state.eventSource) this.emitSemantic(event);
+      return;
+    }
+    if (event.detail < 1) return;
     const target = describeTelemetryTarget(event);
     if ((target.clickElement ?? target.element) !== completed.target) return;
     released.delete(event.button);
     completed.action.data['clickCount'] = event.detail;
+    this.emit(completed);
   };
   cancel = (event: MouseEvent) => {
     const { state } = this;
     if (!event.isTrusted) return;
-    for (const [button, { action, pointerId }] of state.gestures) {
+    for (const [button, gesture] of state.gestures) {
+      const { action, pointerId } = gesture;
       if ('pointerId' in event && pointerId !== null && event.pointerId !== pointerId) continue;
+      action.data['lastObservedTime'] = elapsed(state, event.timeStamp);
       if (action.data['gestureType'] === 'native-drag') {
         action.data['pointerCancelled'] = true;
         continue;
       }
       action.data['completion'] = 'cancelled';
       action.data['lastObservedTime'] = elapsed(state, event.timeStamp);
+      this.emit(gesture);
       state.gestures.delete(button);
     }
   };
@@ -167,15 +190,19 @@ class PointerGestureRecorder {
     ) {
       gesture.action.data['gestureType'] = 'native-drag';
       gesture.action.data['dragStartTime'] = elapsed(state, event.timeStamp);
+      gesture.action.data['lastObservedTime'] = elapsed(state, event.timeStamp);
     }
   };
   dragEnd = (event: DragEvent) => {
     const { state } = this;
     if (!event.isTrusted) return;
-    for (const [button, { action }] of state.gestures) {
+    for (const [button, gesture] of state.gestures) {
+      const { action } = gesture;
       if (action.data['gestureType'] !== 'native-drag') continue;
       action.data['completion'] = 'semantic';
       action.data['semanticEndTime'] = elapsed(state, event.timeStamp);
+      action.data['lastObservedTime'] = elapsed(state, event.timeStamp);
+      this.emit(gesture);
       state.gestures.delete(button);
     }
   };
@@ -183,7 +210,10 @@ class PointerGestureRecorder {
     const { state } = this;
     if (!event.isTrusted) return;
     for (const { action } of state.gestures.values())
-      if (action.data['gestureType'] === 'native-drag') action.data['dropObserved'] = true;
+      if (action.data['gestureType'] === 'native-drag') {
+        action.data['dropObserved'] = true;
+        action.data['lastObservedTime'] = elapsed(state, event.timeStamp);
+      }
   };
   selectionChange = (event: Event) => {
     const { state } = this;
@@ -193,8 +223,10 @@ class PointerGestureRecorder {
     for (const { action, target } of state.gestures.values()) {
       if (action.data['gestureType'] === 'native-drag' || action.data['button'] !== 0) continue;
       const anchor = selection.anchorNode;
-      if (target && anchor && (target.contains(anchor) || anchor.parentElement?.contains(target)))
+      if (target && anchor && (target.contains(anchor) || anchor.parentElement?.contains(target))) {
         action.data['gestureType'] = 'selection';
+        action.data['lastObservedTime'] = elapsed(state, event.timeStamp);
+      }
     }
   };
   controlInput = (event: Event) => {
@@ -203,6 +235,134 @@ class PointerGestureRecorder {
     const target = describeTelemetryTarget(event).element;
     if (!(target instanceof HTMLInputElement) || target.type !== 'range') return;
     for (const gesture of state.gestures.values())
-      if (gesture.target === target) gesture.action.data['gestureType'] = 'drag';
+      if (gesture.target === target) {
+        gesture.action.data['gestureType'] = 'drag';
+        gesture.action.data['lastObservedTime'] = elapsed(state, event.timeStamp);
+      }
   };
+  private emit(gesture: {
+    action: RecordingActionEvent;
+    viewport: RecordingViewportGeometry;
+    sourceClockId: string;
+    upViewport?: RecordingViewportGeometry;
+  }) {
+    const source = this.state.eventSource;
+    if (!source) return;
+    const { action, viewport: geometry } = gesture;
+    const data = action.data;
+    const lastObservedTimeUs = microseconds(data['lastObservedTime']);
+    const kind = data['gestureType'];
+    const completion = data['completion'];
+    const upTimeUs = microseconds(data['upTime']);
+    const downTimeUs = microseconds(data['downTime']);
+    const upViewport = gesture.upViewport;
+    const sameGeometry =
+      upViewport !== undefined &&
+      Object.keys(geometry).every(
+        (key) => Reflect.get(geometry, key) === Reflect.get(upViewport, key)
+      );
+    source.emit(
+      {
+        sourceClockId: gesture.sourceClockId,
+        observationTimeSeconds: (lastObservedTimeUs ?? Math.round(action.time * 1000000)) / 1000000,
+        viewport: geometry,
+      },
+      {
+        kind: 'action',
+        action: {
+          id: action.id,
+          kind: 'CLICK',
+          timeUs: Math.round(action.time * 1000000),
+          durationUs: 0,
+          point: normalizedPoint(action.point?.x, action.point?.y, geometry),
+          label: RECORDING_EVENT_LABELS.CLICK,
+          preset: 'NONE',
+          data: {
+            button: typeof data['button'] === 'number' ? data['button'] : 0,
+            gestureId: action.id,
+            downTimeUs,
+            upTimeUs,
+            pressDurationUs:
+              downTimeUs !== null && upTimeUs !== null ? upTimeUs - downTimeUs : null,
+            lastObservedTimeUs,
+            semanticEndTimeUs: microseconds(data['semanticEndTime']),
+            dragStartTimeUs: microseconds(data['dragStartTime']),
+            clickCount: typeof data['clickCount'] === 'number' ? data['clickCount'] : 1,
+            gestureType:
+              kind === 'click' ||
+              kind === 'hold' ||
+              kind === 'drag' ||
+              kind === 'selection' ||
+              kind === 'native-drag'
+                ? kind
+                : null,
+            completion:
+              completion === 'released' || completion === 'cancelled' || completion === 'semantic'
+                ? completion
+                : 'lost',
+            pointerCancelled:
+              typeof data['pointerCancelled'] === 'boolean' ? data['pointerCancelled'] : null,
+            dropObserved: typeof data['dropObserved'] === 'boolean' ? data['dropObserved'] : null,
+            upPoint: sameGeometry ? normalizedPoint(data['upX'], data['upY'], geometry) : null,
+            ctrlKey: typeof data['ctrlKey'] === 'boolean' ? data['ctrlKey'] : null,
+            altKey: typeof data['altKey'] === 'boolean' ? data['altKey'] : null,
+            shiftKey: typeof data['shiftKey'] === 'boolean' ? data['shiftKey'] : null,
+            metaKey: typeof data['metaKey'] === 'boolean' ? data['metaKey'] : null,
+          },
+        },
+      }
+    );
+  }
+  private emitSemantic(event: MouseEvent) {
+    const time = elapsed(this.state, event.timeStamp);
+    const id = crypto.randomUUID();
+    this.emit({
+      sourceClockId: this.state.observationClock.id,
+      viewport: viewport(),
+      action: {
+        id,
+        kind: 'CLICK',
+        time,
+        duration: 0,
+        point: event.detail === 0 ? null : { x: event.clientX, y: event.clientY },
+        label: RECORDING_EVENT_LABELS.CLICK,
+        preset: 'NONE',
+        data: {
+          button: event.button,
+          clickCount: Math.max(1, event.detail),
+          gestureType: 'click',
+          completion: 'semantic',
+          semanticEndTime: time,
+          lastObservedTime: time,
+          ...modifiers(event),
+        },
+      },
+    });
+  }
+}
+
+function microseconds(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? Math.round(value * 1000000)
+    : null;
+}
+function viewport(): RecordingViewportGeometry {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+    visualViewportScale: window.visualViewport?.scale ?? 1,
+    visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
+    visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
+  };
+}
+function normalizedPoint(x: unknown, y: unknown, geometry: RecordingViewportGeometry) {
+  return typeof x === 'number' &&
+    typeof y === 'number' &&
+    x >= 0 &&
+    x <= geometry.width &&
+    y >= 0 &&
+    y <= geometry.height
+    ? { x: x / geometry.width, y: y / geometry.height }
+    : null;
 }

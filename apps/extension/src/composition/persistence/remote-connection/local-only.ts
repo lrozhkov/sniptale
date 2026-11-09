@@ -1,3 +1,5 @@
+import { withSecretProtectionWriter } from '../secret-protection/service';
+import { assertSecretProtectionStableInTransaction } from '../secret-protection/transition.store';
 import { readSyncQueueHistoryProgressInTransaction } from '../sync-capture/queue-history';
 import {
   queueHash,
@@ -22,6 +24,7 @@ import type { IDBPTransaction } from 'idb';
 type Transaction = IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>;
 const retainedStores = [stores.ASSET_REFS_STORE, stores.MEDIA_LIBRARY_STORE];
 const detachStores = [
+  stores.SECRET_PROTECTION_STORE,
   ...retainedStores,
   stores.SYNC_CAPTURE_STORE,
   stores.SYNC_OUTBOX_STORE,
@@ -135,47 +138,50 @@ export async function completeSyncLocalOnly(
   const expected = parseConnectionMetadata(structuredClone(expectedInput));
   if (!expected || expected.phase !== 'paused') throw new SyncLocalOnlyError('invalid-data');
   const db = await initDB();
-  return withSyncConnectionAdmissionLock(() =>
-    runWithPersistenceMutationPermit(() =>
-      runWithAssetResourceRead(async () => {
-        const before = db.transaction(retainedStores, 'readonly');
-        const retained = await retainedSet(before);
-        await before.done;
-        for (const ref of retained.refs) {
+  return withSecretProtectionWriter(() =>
+    withSyncConnectionAdmissionLock(() =>
+      runWithPersistenceMutationPermit(() =>
+        runWithAssetResourceRead(async () => {
+          const before = db.transaction(retainedStores, 'readonly');
+          const retained = await retainedSet(before);
+          await before.done;
+          for (const ref of retained.refs) {
+            try {
+              await readAssetFile(ref, ref.assetId);
+            } catch {
+              throw new SyncLocalOnlyError('missing-bytes');
+            }
+          }
+          const tx = db.transaction(detachStores, 'readwrite');
           try {
-            await readAssetFile(ref, ref.assetId);
-          } catch {
-            throw new SyncLocalOnlyError('missing-bytes');
+            await assertSecretProtectionStableInTransaction(tx);
+            if (JSON.stringify(await retainedSet(tx)) !== JSON.stringify(retained))
+              throw new SyncLocalOnlyError('local-changed');
+            const historyComplete = await settledCaptures(tx, expected.binding);
+            await clearLocalOnlySyncConnectionInTransaction(tx, expected);
+            await tx.objectStore(stores.SYNC_CATALOG_CACHE_STORE).clear();
+            // Pins/budget are local preferences. Remote recovery descriptors lose authority with the profile.
+            for (const key of await tx.objectStore(stores.ASSET_RESIDENCY_STORE).getAllKeys()) {
+              const record = parseAssetResidencyRecord(
+                await tx.objectStore(stores.ASSET_RESIDENCY_STORE).get(key)
+              );
+              if (!record) throw new SyncLocalOnlyError('invalid-data');
+              if (record.kind === 'copy')
+                await tx.objectStore(stores.ASSET_RESIDENCY_STORE).delete(key);
+            }
+            await tx.done;
+            return historyComplete ? ('delivered' as const) : ('incomplete' as const);
+          } catch (error) {
+            try {
+              tx.abort();
+            } catch {
+              /* The transaction may already have aborted. */
+            }
+            await tx.done.catch(() => undefined);
+            throw error;
           }
-        }
-        const tx = db.transaction(detachStores, 'readwrite');
-        try {
-          if (JSON.stringify(await retainedSet(tx)) !== JSON.stringify(retained))
-            throw new SyncLocalOnlyError('local-changed');
-          const historyComplete = await settledCaptures(tx, expected.binding);
-          await clearLocalOnlySyncConnectionInTransaction(tx, expected);
-          await tx.objectStore(stores.SYNC_CATALOG_CACHE_STORE).clear();
-          // Pins/budget are local preferences. Remote recovery descriptors lose authority with the profile.
-          for (const key of await tx.objectStore(stores.ASSET_RESIDENCY_STORE).getAllKeys()) {
-            const record = parseAssetResidencyRecord(
-              await tx.objectStore(stores.ASSET_RESIDENCY_STORE).get(key)
-            );
-            if (!record) throw new SyncLocalOnlyError('invalid-data');
-            if (record.kind === 'copy')
-              await tx.objectStore(stores.ASSET_RESIDENCY_STORE).delete(key);
-          }
-          await tx.done;
-          return historyComplete ? ('delivered' as const) : ('incomplete' as const);
-        } catch (error) {
-          try {
-            tx.abort();
-          } catch {
-            /* The transaction may already have aborted. */
-          }
-          await tx.done.catch(() => undefined);
-          throw error;
-        }
-      })
+        })
+      )
     )
   );
 }

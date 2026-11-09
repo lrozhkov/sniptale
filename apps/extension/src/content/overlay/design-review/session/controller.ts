@@ -1,3 +1,4 @@
+import type { ReviewSessionRuntime } from '../../../application/design-review-session/runtime';
 import {
   useCallback,
   useEffect,
@@ -50,6 +51,7 @@ import { queryContentUiElement } from '../../../platform/dom-host';
 
 interface UseDesignReviewControllerParams {
   enabled: boolean;
+  session?: ReviewSessionRuntime;
 }
 
 function createDesignReviewNavigationAction(args: {
@@ -250,7 +252,8 @@ function reviewPresentation(args: {
     toolPanelOpen:
       enabled &&
       workspaceOpen &&
-      (mode.checkOpen || (mode.tool !== 'comment' && mode.tool !== 'move')) &&
+      (mode.checkOpen ||
+        (mode.tool !== 'comment' && mode.tool !== 'move' && mode.tool !== 'navigate')) &&
       !mode.editingText,
   };
 }
@@ -260,8 +263,9 @@ function createSelectedElementActions(args: {
   cancelVoiceInput(): void;
   setSettingsOpen: Dispatch<SetStateAction<boolean>>;
   setPopoverOpen: Dispatch<SetStateAction<boolean>>;
+  session: ReviewSessionRuntime | undefined;
 }) {
-  const { selection, cancelVoiceInput, setSettingsOpen, setPopoverOpen } = args;
+  const { selection, cancelVoiceInput, setSettingsOpen, setPopoverOpen, session } = args;
   return {
     copyElement: async () =>
       selection
@@ -276,6 +280,18 @@ function createSelectedElementActions(args: {
     },
     delete: () => {
       if (!selection) return;
+      if (session) {
+        const annotationId = browserAnnotationSession.getAnnotationId(selection.element);
+        const entry = session
+          .getSnapshot()
+          .records.find(
+            (item) =>
+              item.record.evidence.pageUrl === location.href &&
+              item.record.annotationId === annotationId
+          );
+        if (entry) void session.deleteRecord(entry.id).catch(() => undefined);
+        return;
+      }
       deleteDesignReviewRecord(selection.element);
       cancelVoiceInput();
       dismissDesignReviewSelection();
@@ -390,6 +406,35 @@ function openRecord(annotationId: number): boolean {
   return openDesignReviewTarget(target, 'feedback');
 }
 
+function useReviewFeedbackPanel(args: {
+  enabled: boolean;
+  session: ReviewSessionRuntime | undefined;
+  panelOpen: boolean;
+  setPanelOpen: Dispatch<SetStateAction<boolean>>;
+}) {
+  const { enabled, session, panelOpen, setPanelOpen } = args;
+  const sessionState = useSyncExternalStore(
+    session?.subscribe ?? subscribeWithoutReviewSession,
+    session?.getSnapshot ?? getNoReviewSession,
+    getNoReviewSession
+  );
+  return {
+    close: () => {
+      setPanelOpen(false);
+      session?.setPanelOpen(false);
+    },
+    openRecord,
+    open: enabled && (sessionState?.panelOpen ?? panelOpen),
+    toggle: () => {
+      if (session) session.setPanelOpen(!sessionState?.panelOpen);
+      else setPanelOpen((current) => !current);
+    },
+  };
+}
+
+const subscribeWithoutReviewSession = () => () => undefined;
+const getNoReviewSession = () => null;
+
 export function useDesignReviewController(params: UseDesignReviewControllerParams) {
   const modeState = useSyncExternalStore(
     subscribeToDesignReviewMode,
@@ -406,15 +451,13 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
     tool: modeState.tool,
     checkOpen: modeState.checkOpen,
   });
-  const {
-    popoverOpen,
-    setPopoverOpen,
-    panelOpen,
-    setPanelOpen,
-    settingsOpen,
-    setSettingsOpen,
-    workspaceOpen,
-  } = ui;
+  const { popoverOpen, setPopoverOpen, settingsOpen, setSettingsOpen, workspaceOpen } = ui;
+  const panel = useReviewFeedbackPanel({
+    enabled: params.enabled,
+    session: params.session,
+    panelOpen: ui.panelOpen,
+    setPanelOpen: ui.setPanelOpen,
+  });
   const presentation = reviewPresentation({ enabled, mode: modeState, popoverOpen, workspaceOpen });
   const comment = useDesignReviewCommentController({
     open: popoverOpen && presentation.commentAllowed,
@@ -475,6 +518,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
         cancelVoiceInput,
         setSettingsOpen,
         setPopoverOpen,
+        session: params.session,
       }),
       navigateElement: createDesignReviewNavigationAction({
         readTargets: readTreeNavigation,
@@ -506,12 +550,7 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
     workspace: transitions.workspace,
     inspectorOpen: presentation.inspectorOpen,
     enabled,
-    panel: {
-      close: () => setPanelOpen(false),
-      openRecord,
-      open: panelOpen,
-      toggle: () => setPanelOpen((current) => !current),
-    },
+    panel,
     viewState: {
       action,
       valueError: valueActions.error,

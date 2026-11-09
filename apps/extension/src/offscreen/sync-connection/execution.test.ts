@@ -14,7 +14,10 @@ import type { runSyncQueueOperation } from '../../workflows/sync-transfer/queue'
 import type { createWebdavRemoteStore } from '../../workflows/sync-transfer/webdav';
 import { DIAGNOSTIC_LOG_PORT } from '../../contracts/diagnostics';
 import { SyncRemoteError, type SyncRemoteStore } from '../../workflows/sync-transfer/remote-store';
-import { createSyncQueueExecution, createSyncWorkspaceExecution } from './execution';
+import {
+  createSyncQueueExecution as createQueueExecution,
+  createSyncWorkspaceExecution,
+} from './execution';
 import type { verifySyncWorkspaceIdentity } from '../../workflows/sync-transfer/workspace';
 import type { createWebdavWorkspaceCreation } from '../../workflows/sync-transfer/webdav-workspace';
 import type { createWebdavWorkspaceJoin } from '../../workflows/sync-transfer/webdav-workspace-join';
@@ -83,6 +86,16 @@ function deferred<T>() {
     resolve = done;
   });
   return { promise, resolve };
+}
+function createSyncQueueExecution(...args: Parameters<typeof createQueueExecution>) {
+  return createQueueExecution(
+    args[0],
+    args[1],
+    args[2] ?? {
+      resolveAuthentication: () => mocks.authentication(args[0].authorization),
+      checkProtection: async () => true,
+    }
+  );
 }
 function input(): SyncExecutionInput {
   return {
@@ -178,6 +191,7 @@ describe('native queue admission and authorization', () => {
     expect(mocks.requests).toHaveBeenCalledExactlyOnceWith({
       identity: selected.authorization,
       hasOriginPermission,
+      checkProtection: expect.any(Function),
     });
     expect(await execution.run()).toEqual({
       containment: 'contained',
@@ -534,6 +548,125 @@ describe('workspace execution adapter', () => {
     mocks.workspaceClose.mockResolvedValue(undefined);
   });
 
+  it('projects discovery with its exact advanced checking source and finite issue codes', async () => {
+    const selected = {
+      ...workspaceInput(),
+      source: { kind: 'join' as const, identity: input().authorization },
+      operation: 'discover' as const,
+    };
+    const source = {
+      kind: 'join' as const,
+      identity: { ...selected.source.identity, revision: 2 },
+    };
+    mocks.joinRun.mockResolvedValue({
+      operation: 'discover',
+      source,
+      discovery: {
+        scope: 'children',
+        complete: false,
+        candidates: [],
+        issues: [
+          { prefix: 'denied/', code: 'access-denied' },
+          { prefix: 'bad/', code: 'invalid-marker' },
+        ],
+      },
+    });
+    const permission = vi.fn(async () => true);
+    const execution = createSyncWorkspaceExecution(selected, permission);
+    expect(mocks.join).toHaveBeenCalledExactlyOnceWith({
+      identity: selected.source.identity,
+      authentication: selected.authentication,
+      hasOriginPermission: permission,
+      operation: 'discover',
+    });
+    expect(await execution.run()).toEqual({
+      snapshot: {
+        state: 'discovered',
+        failureCode: null,
+        discovery: {
+          source,
+          scope: 'children',
+          complete: false,
+          candidates: [],
+          issues: [
+            { prefix: 'denied/', code: 'access-denied' },
+            { prefix: 'bad/', code: 'invalid-workspace' },
+          ],
+        },
+      },
+      containment: 'contained',
+    });
+    expect(mocks.workspace).not.toHaveBeenCalled();
+    expect(mocks.history).not.toHaveBeenCalled();
+  });
+
+  it('refuses discovery for allocation before constructing any credential owner', () => {
+    expect(() =>
+      createSyncWorkspaceExecution({ ...workspaceInput(), operation: 'discover' }, async () => true)
+    ).toThrow();
+    expect(mocks.workspace).not.toHaveBeenCalled();
+    expect(mocks.join).not.toHaveBeenCalled();
+  });
+
+  it('bounds discovery prefixes and issue counts without reporting a complete truncated search', async () => {
+    const selected = {
+      ...workspaceInput(),
+      source: { kind: 'join' as const, identity: input().authorization },
+      operation: 'discover' as const,
+    };
+    const source = {
+      kind: 'join' as const,
+      identity: { ...selected.source.identity, revision: 2 },
+    };
+    mocks.joinRun.mockResolvedValue({
+      operation: 'discover',
+      source,
+      discovery: {
+        scope: 'children',
+        complete: true,
+        candidates: [],
+        issues: Array.from({ length: 322 }, () => ({
+          prefix: 'x'.repeat(4096) + '/',
+          code: 'invalid-marker' as const,
+        })),
+      },
+    });
+    const result = await createSyncWorkspaceExecution(selected, async () => true).run();
+    expect(result.snapshot.state).toBe('discovered');
+    if (result.snapshot.state !== 'discovered') throw new Error('Discovery missing');
+    expect(result.snapshot.discovery.complete).toBe(false);
+    expect(result.snapshot.discovery.issues.length).toBeLessThanOrEqual(321);
+    expect(result.snapshot.discovery.issues.every((issue) => issue.prefix.length <= 4096)).toBe(
+      true
+    );
+    expect(result.snapshot.discovery.issues).toContainEqual({ prefix: '', code: 'metadata-limit' });
+  });
+
+  it('does not publish discovery if cancellation wins a held workflow result', async () => {
+    const selected = {
+      ...workspaceInput(),
+      source: { kind: 'join' as const, identity: input().authorization },
+      operation: 'discover' as const,
+    };
+    const held = deferred<void>();
+    mocks.joinRun.mockImplementation(async () => {
+      await held.promise;
+      return {
+        operation: 'discover',
+        source: selected.source,
+        discovery: { scope: 'exact', complete: true, candidates: [], issues: [] },
+      };
+    });
+    const execution = createSyncWorkspaceExecution(selected, async () => true);
+    const running = execution.run();
+    await execution.drain();
+    held.resolve();
+    expect(await running).toEqual({
+      snapshot: { state: 'interrupted', failureCode: 'interrupted' },
+      containment: 'contained',
+    });
+  });
+
   it.each(['join', 'allocation'] as const)('routes %s through the existing owner', async (kind) => {
     const selected = { ...workspaceInput(), source: { kind, identity: input().authorization } };
     const permission = vi.fn(async () => true);
@@ -727,4 +860,14 @@ describe('queue publication retirement and reconciliation', () => {
       selected.signal
     );
   });
+});
+
+it('preserves secrets-locked in the queue execution projection', async () => {
+  mocks.webdav.mockRejectedValueOnce(new SyncRemoteError('secrets-locked'));
+  const execution = createSyncQueueExecution(input(), async () => true);
+  await expect(execution.run()).resolves.toMatchObject({
+    snapshot: { state: 'failed', failureCode: 'secrets-locked' },
+    containment: 'contained',
+  });
+  expect(mocks.run).not.toHaveBeenCalled();
 });

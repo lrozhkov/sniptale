@@ -1,88 +1,27 @@
-import { RotateCcw } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
-import { fireAndReportEditorAction } from '../../../runtime/async-actions';
-import { CompactCommandField, CompactCommandToken, type CompactCommand } from '..';
+import { CompactCommandToken, type CompactCommand } from '..';
 import type { InspectorCommandParams } from './command-types';
-import { SelectField } from '../../../chrome/ui';
-
-function buildBrowserFrameCanvasModeCommand(params: InspectorCommandParams): CompactCommand {
-  return {
-    id: 'browser-frame-canvas-mode',
-    title: translate('editor.compact.canvasBehavior'),
-    trigger: <CompactCommandToken>CV</CompactCommandToken>,
-    value:
-      params.browserFrame.canvasMode === 'resize'
-        ? translate('editor.compact.increase')
-        : translate('editor.compact.noChanges'),
-    content: (
-      <CompactCommandField
-        label={translate('editor.compact.canvasBehavior')}
-        value={
-          params.browserFrame.canvasMode === 'resize'
-            ? translate('editor.compact.browserCanvasModeResize')
-            : translate('editor.compact.canvasSizeUnchanged')
-        }
-      >
-        <SelectField
-          label={translate('editor.compact.canvasBehavior')}
-          options={params.browserCanvasModeOptions}
-          value={params.browserFrame.canvasMode}
-          onChange={(value) =>
-            fireAndReportEditorAction('compact-browser-frame-canvas-mode', () =>
-              params.syncBrowserFrame({ canvasMode: value })
-            )
-          }
-        />
-      </CompactCommandField>
-    ),
-  };
-}
-
-function buildBrowserFrameContentModeCommand(params: InspectorCommandParams): CompactCommand {
-  return {
-    id: 'browser-frame-content-mode',
-    title: translate('editor.compact.sceneBehavior'),
-    trigger: <CompactCommandToken>SC</CompactCommandToken>,
-    value:
-      params.browserFrame.contentMode === 'push-down'
-        ? translate('editor.compact.shiftDown')
-        : translate('editor.compact.fit'),
-    content: (
-      <CompactCommandField
-        label={translate('editor.compact.sceneBehavior')}
-        value={
-          params.browserFrame.contentMode === 'push-down'
-            ? translate('editor.compact.shiftDown')
-            : translate('editor.compact.browserContentModeFitContent')
-        }
-      >
-        <SelectField
-          label={translate('editor.compact.sceneBehavior')}
-          options={params.browserContentModeOptions}
-          value={params.browserFrame.contentMode}
-          onChange={(value) =>
-            fireAndReportEditorAction('compact-browser-frame-content-mode', () =>
-              params.syncBrowserFrame({ contentMode: value })
-            )
-          }
-        />
-      </CompactCommandField>
-    ),
-  };
-}
+import { BrowserFrameBehaviorSections } from '../../environment/browser-frame-sections';
 
 export function buildBrowserFrameBaseCommands(params: InspectorCommandParams): CompactCommand[] {
+  if (!params.browserFrame.enabled) return [];
   return [
     {
-      id: 'browser-frame-action',
-      title: translate('windowHeader.reset'),
-      trigger: <RotateCcw size={15} strokeWidth={2} />,
-      onClick: () =>
-        fireAndReportEditorAction('compact-browser-frame-reset', () =>
-          params.syncBrowserFrame({ enabled: false })
-        ),
+      id: 'browser-frame-composition',
+      title: translate('editor.scene.placementSection'),
+      trigger: <CompactCommandToken>CV</CompactCommandToken>,
+      value: translate(
+        params.browserFrame.canvasMode === 'resize'
+          ? 'windowHeader.expandCanvas'
+          : 'windowHeader.fitCanvas'
+      ),
+      content: (
+        <BrowserFrameBehaviorSections
+          browserCanvasModeOptions={params.browserCanvasModeOptions}
+          browserFrame={params.browserFrame}
+          syncBrowserFrame={params.syncBrowserFrame}
+        />
+      ),
     },
-    buildBrowserFrameCanvasModeCommand(params),
-    buildBrowserFrameContentModeCommand(params),
   ];
 }

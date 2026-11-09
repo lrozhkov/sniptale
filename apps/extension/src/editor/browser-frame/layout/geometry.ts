@@ -7,6 +7,11 @@ import type {
 import { MIN_CANVAS_SIZE } from '../../document/model';
 import type { EditorSceneLayout, Rect, ResolveEditorSceneLayoutInput, Size } from './types';
 
+function snapSceneSize(value: number): number {
+  const nearest = Math.round(value);
+  return Math.abs(value - nearest) < 1e-7 ? nearest : value;
+}
+
 function roundSize(value: number): number {
   return Math.max(MIN_CANVAS_SIZE, Math.round(value));
 }
@@ -62,8 +67,8 @@ function createSceneContentRect(
 
 function normalizeSceneSource(input: ResolveEditorSceneLayoutInput) {
   return {
-    width: roundSize(input.source.width),
-    height: roundSize(input.source.height),
+    width: Math.max(MIN_CANVAS_SIZE, input.source.width),
+    height: Math.max(MIN_CANVAS_SIZE, input.source.height),
   };
 }
 
@@ -127,12 +132,8 @@ function resolveFittedSourceRect(args: {
     }
     const scale = hasBrowserFrame ? lower : upper;
     const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
-    sourceWidth = hasBrowserFrame
-      ? Math.max(MIN_CANVAS_SIZE, Math.floor(source.width * safeScale + 1e-7))
-      : roundSize(source.width * safeScale);
-    sourceHeight = hasBrowserFrame
-      ? Math.max(MIN_CANVAS_SIZE, Math.floor(source.height * safeScale + 1e-7))
-      : roundSize(source.height * safeScale);
+    sourceWidth = Math.max(MIN_CANVAS_SIZE, snapSceneSize(source.width * safeScale));
+    sourceHeight = Math.max(MIN_CANVAS_SIZE, snapSceneSize(source.height * safeScale));
     const headerHeight = hasBrowserFrame
       ? windowHeaderGeometry(resolveEditorWindowHeader(args.browserFrame), {
           width: sourceWidth,

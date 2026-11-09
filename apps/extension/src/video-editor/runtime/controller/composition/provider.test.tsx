@@ -1,9 +1,17 @@
 // @vitest-environment jsdom
+import {
+  VideoProjectTrackRole,
+  VideoProjectActionEventKind,
+  VideoProjectActionPreset,
+  type VideoProject,
+  type VideoProjectActionEvent,
+} from '../../../../features/video/project/types';
 
 import { RuntimePlaybackContext } from './contexts';
 import { useVideoEditorOverlayPlayback } from '../overlay-playback';
 
-import { act, useContext, type ReactNode } from 'react';
+import { act, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -30,7 +38,11 @@ const mocks = vi.hoisted(() => {
     setPlaying: action,
     togglePlaying: action,
   };
-  const selection = {
+  const selection: {
+    selection: import('../../../contracts/selection').VideoEditorSelection;
+    selectedClipId: string | null;
+    selectedTrackId: string | null;
+  } = {
     selection: { kind: 'scene' },
     selectedClipId: null,
     selectedTrackId: null,
@@ -143,6 +155,10 @@ const mocks = vi.hoisted(() => {
   };
   return {
     commands,
+    playbackListeners: new Set<() => void>(),
+    actionOccurrence: null as
+      | import('../../../../features/video/project/action-occurrences').VideoProjectActionOccurrence
+      | null,
     commandHook: fn(
       (_ports: Parameters<typeof import('../../commands').useVideoEditorActionHandlers>[0]) =>
         commands
@@ -183,21 +199,34 @@ vi.mock('../playback-range', () => ({ usePlaybackRangeSanity: vi.fn() }));
 vi.mock('../recording-telemetry', () => ({ useRecordingTelemetry: vi.fn() }));
 vi.mock('../selections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../selections')>()),
-  useVideoEditorSelections: () => ({
-    selectedActionOccurrence: null,
-    selectedClip: null,
-    selectedCursorSample: null,
-    selectedMotionRegion: null,
-    selectedObjectTrack: null,
-    selectedTrack: null,
-    selectedTransition: null,
-    selection: mocks.selection.selection,
-  }),
+  useVideoEditorSelections: (
+    project: import('../../../../features/video/project/types').VideoProject | null,
+    selection: import('../../../contracts/selection').VideoEditorSelection,
+    selectedClipId: string | null
+  ) =>
+    useMemo(
+      () => ({
+        selectedActionOccurrence: mocks.actionOccurrence,
+        selectedClip: project?.clips.find((clip) => clip.id === selectedClipId) ?? null,
+        selectedCursorSample: null,
+        selectedMotionRegion: null,
+        selectedObjectTrack: null,
+        selectedTrack: null,
+        selectedTransition: null,
+        selection,
+      }),
+      [project, selection, selectedClipId]
+    ),
 }));
 vi.mock('../workspace-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../workspace-state')>()),
   useVideoEditorWorkspaceState: () => mocks.workspace,
 }));
+function subscribeMockPlayback(listener: () => void) {
+  mocks.playbackListeners.add(listener);
+  return () => mocks.playbackListeners.delete(listener);
+}
+
 vi.mock('../store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../store')>()),
   getCurrentVideoEditorCurrentTime: () => mocks.playback.currentTime,
@@ -216,8 +245,10 @@ vi.mock('../store', async (importOriginal) => ({
     selector(mocks.exportPort),
   useVideoEditorHistoryPort: (selector: (port: typeof mocks.history) => unknown) =>
     selector(mocks.history),
-  useVideoEditorPlaybackPort: (selector: (port: typeof mocks.playback) => unknown) =>
-    selector(mocks.playback),
+  useVideoEditorPlaybackPort: (selector: (port: typeof mocks.playback) => unknown) => {
+    const selectSnapshot = useShallow((port: typeof mocks.playback) => selector({ ...port }));
+    return useSyncExternalStore(subscribeMockPlayback, () => selectSnapshot(mocks.playback));
+  },
   useVideoEditorProjectLifecyclePort: (selector: (port: typeof mocks.lifecycle) => unknown) =>
     selector(mocks.lifecycle),
   useVideoEditorRuntimeSessionPort: (selector: (port: typeof mocks.session) => unknown) =>
@@ -229,7 +260,10 @@ vi.mock('../store', async (importOriginal) => ({
 import { VideoEditorBlockingOverlayContext, VideoEditorLibrariesContext } from './contexts';
 import { VideoEditorCompositionProvider } from './provider';
 import { useVideoEditorSidebarController, useVideoEditorPreviewController } from './hooks';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectFromRecording,
+} from '../../../../features/video/project/factories/creation';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -237,6 +271,11 @@ let root: Root;
 beforeEach(() => {
   mocks.workspace.autoProcessingModalOpen = false;
   mocks.playback.currentTime = 0;
+  mocks.playbackListeners.clear();
+  mocks.actionOccurrence = null;
+  mocks.selection.selection = { kind: 'scene' };
+  mocks.selection.selectedClipId = null;
+  mocks.selection.selectedTrackId = null;
   mocks.lifecycle.project = null;
   mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState = { dialogOpen: false, error: null, isRunning: false };
@@ -355,6 +394,43 @@ it('binds export only to the ready montage workspace outside blocking layers and
   act(() => render());
   expect(exportKey().defaultPrevented).toBe(true);
   expect(mocks.exportPort.openExportDialog).toHaveBeenCalledTimes(2);
+});
+
+it('keeps ordinary media inspector rendering independent of clock-only updates', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'inspector-clock',
+    filename: 'clock.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 10,
+  });
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  mocks.lifecycle.project = project;
+  mocks.selection.selection = { kind: 'clip', clipId: clip.id };
+  mocks.selection.selectedClipId = clip.id;
+  mocks.selection.selectedTrackId = clip.trackId;
+  let renders = 0;
+  function InspectorConsumer() {
+    const controller = useVideoEditorSidebarController();
+    expect(controller?.state.selectedClip?.id).toBe(clip.id);
+    renders++;
+    return null;
+  }
+  act(() =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <InspectorConsumer />
+      </VideoEditorCompositionProvider>
+    )
+  );
+  const before = renders;
+  act(() => {
+    mocks.playback.currentTime = 3.5;
+    for (const listener of mocks.playbackListeners) listener();
+  });
+  expect(renders).toBe(before);
 });
 
 it('keeps inspector time on the live playback port across seeks', () => {
@@ -479,4 +555,146 @@ it('cancels an acquisition started during project loading before applying the lo
   mocks.commandHook.mock.lastCall![0].project.applyLoadedProject(project, null);
   expect(order).toEqual(['cancel', 'apply']);
   expect(mocks.runtime.applyLoadedProject).toHaveBeenLastCalledWith(project, null);
+});
+
+it('keeps camera position fields live and an existing camera command reads the latest time', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'live-camera',
+    filename: 'camera.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 10,
+  });
+  const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+  project.tracks.find((track) => track.id === clip.trackId)!.role = VideoProjectTrackRole.CAMERA;
+  mocks.lifecycle.project = project;
+  mocks.selection.selection = { kind: 'clip', clipId: clip.id };
+  mocks.selection.selectedClipId = clip.id;
+  mocks.selection.selectedTrackId = clip.trackId;
+  const snapshots: (number | undefined)[] = [];
+  let controller: ReturnType<typeof useVideoEditorSidebarController> = null;
+  const originalSetTime = mocks.playback.setCurrentTime;
+  const setTime = vi.fn();
+  mocks.playback.setCurrentTime = setTime;
+  Reflect.set(mocks.timeline, 'updateProject', (update: (value: VideoProject) => VideoProject) => {
+    mocks.lifecycle.project = update(project);
+  });
+  function InspectorConsumer() {
+    controller = useVideoEditorSidebarController();
+    snapshots.push(controller?.state.currentTime);
+    return null;
+  }
+  try {
+    act(() =>
+      root.render(
+        <VideoEditorCompositionProvider>
+          <InspectorConsumer />
+        </VideoEditorCompositionProvider>
+      )
+    );
+    const readController = () => controller;
+    const add = readController()?.clipActions.onEditCameraPosition;
+    expect(add).toBeDefined();
+    act(() => {
+      mocks.playback.currentTime = 3;
+      for (const listener of mocks.playbackListeners) listener();
+    });
+    expect(snapshots).toEqual([0, 3]);
+    add?.(clip.id, { kind: 'add' });
+    expect(setTime).toHaveBeenLastCalledWith(3.5);
+    expect(mocks.lifecycle.project?.clips[0]).toMatchObject({
+      cameraPositions: [{ sourceTime: 3, transition: { kind: 'smooth' } }],
+    });
+  } finally {
+    Reflect.deleteProperty(mocks.timeline, 'updateProject');
+    mocks.playback.setCurrentTime = originalSetTime;
+  }
+});
+
+it('keeps selected action placement tied to the live playhead', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'live-action',
+    filename: 'action.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 10,
+  });
+  const event: VideoProjectActionEvent = {
+    data: { button: 'primary' },
+    capturedDuration: 0.2,
+    id: 'action-clock',
+    kind: VideoProjectActionEventKind.CLICK,
+    label: 'Click',
+    point: { x: 100, y: 120 },
+    presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+    anchor: { kind: 'project', time: 1 },
+  };
+  project.actionEvents.push(event);
+  mocks.lifecycle.project = project;
+  mocks.selection.selection = { kind: 'action-occurrence', eventId: event.id, clipId: null };
+  mocks.actionOccurrence = {
+    event,
+    eventId: event.id,
+    clipId: null,
+    time: 1,
+    sourceInstanceId: null,
+    playbackRun: null,
+  };
+  const snapshots: (number | undefined)[] = [];
+  function InspectorConsumer() {
+    const controller = useVideoEditorSidebarController();
+    snapshots.push(controller?.state.currentTime);
+    return null;
+  }
+  act(() =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <InspectorConsumer />
+      </VideoEditorCompositionProvider>
+    )
+  );
+  act(() => {
+    mocks.playback.currentTime = 1;
+    for (const listener of mocks.playbackListeners) listener();
+  });
+  expect(snapshots).toEqual([0, 1]);
+});
+
+it('keeps a non-following preview controller idle while time queries and following consumers stay current', () => {
+  mocks.lifecycle.project = createEmptyVideoProject('Preview clock isolation');
+  let snapshotController: ReturnType<typeof useVideoEditorPreviewController> = null;
+  const snapshotRenders = vi.fn();
+  const followingTimes: number[] = [];
+  function SnapshotConsumer() {
+    snapshotController = useVideoEditorPreviewController(false);
+    snapshotRenders();
+    return null;
+  }
+  function FollowingConsumer() {
+    const controller = useVideoEditorPreviewController();
+    if (controller) followingTimes.push(controller.transport.currentTime);
+    return null;
+  }
+  act(() =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <SnapshotConsumer />
+        <FollowingConsumer />
+      </VideoEditorCompositionProvider>
+    )
+  );
+  const renders = snapshotRenders.mock.calls.length;
+  const readSnapshotController = () => snapshotController;
+  const retained = readSnapshotController();
+  act(() => {
+    mocks.playback.currentTime = 3.5;
+    mocks.playbackListeners.forEach((listener) => listener());
+  });
+  expect(followingTimes.at(-1)).toBe(3.5);
+  expect(snapshotRenders).toHaveBeenCalledTimes(renders);
+  expect(retained?.transport.currentTime).toBe(3.5);
 });

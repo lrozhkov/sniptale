@@ -1,7 +1,10 @@
 import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { useRef } from 'react';
 import { NumericRow } from '../../../../../ui/compact-inspector-controls';
-import type { CompactInspectorUnit } from '../../../../../ui/compact-inspector-controls/shared';
+import type {
+  CompactInspectorUnit,
+  CompactInspectorNumericScrub,
+} from '../../../../../ui/compact-inspector-controls/shared';
 import { useDedupedNumberChange } from '../shared/number-commit';
 
 export function NumberInput({
@@ -15,6 +18,8 @@ export function NumberInput({
   step = 1,
   scrub = min !== undefined && max !== undefined,
   unit = '',
+  scrubRange,
+  revealScrub = false,
   disabled = false,
 }: {
   value: number;
@@ -27,6 +32,8 @@ export function NumberInput({
   step?: number;
   scrub?: boolean;
   unit?: CompactInspectorUnit;
+  scrubRange?: CompactInspectorNumericScrub | undefined;
+  revealScrub?: boolean | undefined;
   disabled?: boolean;
 }) {
   const gesture = useRef<'pointer' | 'keyboard' | null>(null);
@@ -37,8 +44,11 @@ export function NumberInput({
   };
   const numericValue = Number.isFinite(value) ? value : 0;
   const commitValue = useDedupedNumberChange(onChange, numericValue);
-  const scrubProps =
-    scrub && min !== undefined && max !== undefined ? { scrub: { min, max, step } } : {};
+  const scrubProps = scrubRange
+    ? { scrub: scrubRange }
+    : scrub && min !== undefined && max !== undefined
+      ? { scrub: { min, max, step } }
+      : {};
 
   const row = (
     <NumericRow
@@ -51,6 +61,7 @@ export function NumberInput({
       max={max}
       step={step}
       unit={unit}
+      revealScrub={revealScrub}
       disabled={disabled}
       onPreviewValue={(next) => {
         onPreview?.();

@@ -29,6 +29,7 @@ export class SnapshotHistory<T> {
   private readonly limit: number;
   private stack: T[];
   private index: number;
+  private revision = 0;
   private readonly maxBytes: number | undefined;
   private readonly measureBytes: ((snapshots: readonly T[]) => number) | undefined;
 
@@ -82,6 +83,11 @@ export class SnapshotHistory<T> {
     };
   }
 
+  /** Возвращает ревизию владельца для защиты от устаревшего асинхронного результата. */
+  getRevision(): number {
+    return this.revision;
+  }
+
   getCurrent(): T {
     return cloneHistorySnapshot(this.readSnapshot(this.index));
   }
@@ -94,6 +100,7 @@ export class SnapshotHistory<T> {
   reset(snapshot: T): SnapshotHistoryState<T> {
     this.stack = [cloneHistorySnapshot(snapshot)];
     this.index = 0;
+    this.revision += 1;
     return this.getState();
   }
 
@@ -107,6 +114,21 @@ export class SnapshotHistory<T> {
     nextStack.push(cloneHistorySnapshot(snapshot));
 
     this.retain(nextStack, nextStack.length - 1);
+    this.revision += 1;
+    return this.getState();
+  }
+
+  /** Обновляет текущий снимок при совпавшей ревизии, сохраняя Undo и Redo. */
+  replaceCurrent(expectedRevision: number, snapshot: T): SnapshotHistoryState<T> | null {
+    if (this.revision !== expectedRevision) return null;
+    const current = this.readSnapshot(this.index);
+    if (!shouldTreatSnapshotsAsDistinct(current, snapshot) && current === snapshot) {
+      return this.getState();
+    }
+    const nextStack = [...this.stack];
+    nextStack[this.index] = cloneHistorySnapshot(snapshot);
+    this.retain(nextStack, this.index);
+    this.revision += 1;
     return this.getState();
   }
 
@@ -115,6 +137,7 @@ export class SnapshotHistory<T> {
       return null;
     }
     this.index -= 1;
+    this.revision += 1;
     this.retain(this.stack, this.index);
     return this.getState();
   }
@@ -124,6 +147,7 @@ export class SnapshotHistory<T> {
       return null;
     }
     this.index += 1;
+    this.revision += 1;
     this.retain(this.stack, this.index);
     return this.getState();
   }

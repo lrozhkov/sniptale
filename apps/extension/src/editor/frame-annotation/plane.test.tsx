@@ -242,3 +242,29 @@ function createRect(input: { left: number; top: number; width: number; height: n
     toJSON: () => ({}),
   } as DOMRect;
 }
+
+it.each(['pencil', 'shape', 'marker', 'arrow', 'text', 'blur', 'simplify', 'crop'] as const)(
+  'keeps annotation content visible and noninteractive in %s mode',
+  (activeTool) => {
+    interactionMocks.projected.push({ object: {}, snapshot: { id: 'visible-frame' } });
+    const host = document.createElement('div');
+    const canvasRef = createRef<HTMLCanvasElement>();
+    canvasRef.current = document.createElement('canvas');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() =>
+      root.render(
+        <EditorFrameAnnotationPlane
+          activeTool={activeTool}
+          canvasRef={canvasRef}
+          controller={createPlaneController()}
+          layers={[]}
+        />
+      )
+    );
+    expect(interactionMocks.projection).toHaveBeenCalledWith(
+      expect.objectContaining({ interactive: false, showVisualOverlays: true })
+    );
+    act(() => root.unmount());
+  }
+);

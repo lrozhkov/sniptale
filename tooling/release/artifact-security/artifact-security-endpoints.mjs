@@ -6,7 +6,96 @@ const LOCAL_PROVIDER_DEFAULTS = new Map([
   ['lm-studio', { label: 'LM Studio', baseUrl: 'http://localhost:1234/v1', catalog: 'openai' }],
   ['ollama', { label: 'Ollama', baseUrl: 'http://localhost:11434/api', catalog: 'ollama' }],
 ]);
-const OLLAMA_FACTORY_DIGEST = '753da5d13a398045ce5f602d560a3327d730319bd7908aec17f1b14b400a6c31';
+// Structural fingerprints cover the SDK factory and its direct dependency roles.
+// Binding names are disposable; properties, values, operations and reference identity are not.
+const OLLAMA_FACTORY_DIGEST = '6d93bfe657fab7b5ebed5b1773db371f3692f886365126fb09558dc0ff82513e';
+const OLLAMA_DEPENDENCY_DIGESTS = new Map([
+  ['55431c4d69aee63fcb15701268b4e513a2d444e4101cbdfc758251e495a3d9ab', 'model-error'],
+  ['0a82a153dd605695b9757ce9e0352f5e0c7a3509104210aa976db97dac1de017', 'url-normalizer'],
+  ['5be52982711a415e03ee7a911670d54f3411493abb276c42d43a4f28b6e96018', 'completion'],
+  ['e10360aaff96387ff56c20f8deba225cfdd8e4a28fd1dc441e04d3ab484d8acd', 'embedding'],
+  ['20cad813503e2239bccbfffe78941b36936cec22ee8b8b0376e88ae5da39dacf', 'responses'],
+]);
+const sdkContexts = new WeakMap();
+
+function isFixedIdentifier(node) {
+  const parent = node.parent;
+  return (
+    (ts.isPropertyAccessExpression(parent) && parent.name === node) ||
+    (ts.isPropertyAssignment(parent) && parent.name === node) ||
+    (ts.isBindingElement(parent) && parent.propertyName === node) ||
+    ((ts.isMethodDeclaration(parent) || ts.isPropertyDeclaration(parent)) &&
+      parent.name === node) ||
+    ts.isShorthandPropertyAssignment(parent) ||
+    ts.isMetaProperty(parent)
+  );
+}
+
+function getSdkContext(sourceFile) {
+  let context = sdkContexts.get(sourceFile);
+  if (context) return context;
+  const options = { allowJs: true, noLib: true, noResolve: true, types: [] };
+  const host = ts.createCompilerHost(options);
+  host.getSourceFile = (name) => (name === sourceFile.fileName ? sourceFile : undefined);
+  const program = ts.createProgram([sourceFile.fileName], options, host);
+  context = { sourceFile, checker: program.getTypeChecker(), dependencies: new Map() };
+  sdkContexts.set(sourceFile, context);
+  return context;
+}
+
+function directDependency(symbol, context) {
+  if (context.dependencies.has(symbol)) return context.dependencies.get(symbol);
+  const declaration = symbol.declarations?.find(
+    (node) => node.getSourceFile() === context.sourceFile
+  );
+  let role = null;
+  if (
+    declaration &&
+    (ts.isFunctionDeclaration(declaration) || ts.isVariableDeclaration(declaration))
+  ) {
+    const digest = structuralDigest(declaration, context, false);
+    role = OLLAMA_DEPENDENCY_DIGESTS.get(digest) ?? null;
+  }
+  context.dependencies.set(symbol, role);
+  return role;
+}
+
+function structuralDigest(root, context, resolveDependencies) {
+  const locals = new Map();
+  const externals = new Map();
+  const tokens = [];
+  let invalid = false;
+  function collect(node) {
+    const children = node.getChildren(context.sourceFile);
+    if (children.length) {
+      children.forEach(collect);
+      return;
+    }
+    let value = node.getText(context.sourceFile);
+    if (ts.isIdentifier(node) && !isFixedIdentifier(node)) {
+      const symbol = context.checker.getSymbolAtLocation(node);
+      if (!symbol) value = `global:${value}`;
+      else if (
+        symbol.declarations?.some(
+          (declaration) => declaration.pos >= root.pos && declaration.end <= root.end
+        )
+      ) {
+        if (!locals.has(symbol)) locals.set(symbol, locals.size);
+        value = `local:${locals.get(symbol)}`;
+      } else if (resolveDependencies) {
+        const role = directDependency(symbol, context);
+        if (!role) invalid = true;
+        value = `dependency:${role}`;
+      } else {
+        if (!externals.has(symbol)) externals.set(symbol, externals.size);
+        value = `external:${externals.get(symbol)}`;
+      }
+    }
+    tokens.push([node.kind, value]);
+  }
+  collect(root);
+  return invalid ? null : createHash('sha256').update(JSON.stringify(tokens)).digest('hex');
+}
 
 function isTextLiteral(node) {
   return ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node);
@@ -17,14 +106,7 @@ function approvedSdkSpan(node, sourceFile) {
   let factory = node.parent;
   while (factory && !ts.isFunctionDeclaration(factory)) factory = factory.parent;
   if (!factory) return null;
-  const tokens = [];
-  function collect(current) {
-    const children = current.getChildren(sourceFile);
-    if (children.length) children.forEach(collect);
-    else tokens.push([current.kind, current.getText(sourceFile)]);
-  }
-  collect(factory);
-  const digest = createHash('sha256').update(JSON.stringify(tokens)).digest('hex');
+  const digest = structuralDigest(factory, getSdkContext(sourceFile), true);
   if (digest !== OLLAMA_FACTORY_DIGEST) return null;
   return { start: node.getStart(sourceFile), end: node.end };
 }

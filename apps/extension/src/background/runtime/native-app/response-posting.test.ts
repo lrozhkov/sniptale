@@ -10,7 +10,7 @@ describe('native app response posting', () => {
     const rejectMessage: NativeAppOutboundMessage = {
       captureId: 'capture-1',
       controllerLeaseId: 'lease-1',
-      protocolVersion: 1,
+      protocolVersion: 2,
       reason: 'storage-failed',
       type: 'extension.screenshot.reject',
     };

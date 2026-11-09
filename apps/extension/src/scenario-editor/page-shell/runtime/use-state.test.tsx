@@ -14,6 +14,10 @@ import { useGuidePageState } from './use-state';
 const io = vi.hoisted(() => ({
   load: vi.fn(),
   autosave: vi.fn(),
+  flush: vi.fn(),
+  prepareExit: vi.fn(),
+  requestExit: vi.fn(),
+  beginEdit: vi.fn(),
   list: vi.fn(),
   enter: vi.fn(),
   importImages: vi.fn(),
@@ -23,6 +27,9 @@ vi.mock('../../../composition/persistence/scenario/store/public', async (origina
   ...(await original<typeof import('../../../composition/persistence/scenario/store/public')>()),
   listScenarioProjectSummaries: io.list,
   importScenarioImages: io.importImages,
+}));
+vi.mock('../../../platform/runtime-messaging/sync-product-client', () => ({
+  createSyncProductClient: () => ({ requestCheckpointExit: io.requestExit }),
 }));
 vi.mock('./autosave', () => ({ useGuideAutosave: io.autosave }));
 vi.mock('./resource-session', () => ({ useGuideResourceSession: () => enterSession }));
@@ -55,6 +62,10 @@ function Probe() {
 beforeEach(() => {
   vi.clearAllMocks();
   io.enter.mockResolvedValue(true);
+  io.flush.mockImplementation(async () => autosave.project);
+  io.prepareExit.mockImplementation(async () =>
+    (await io.flush()) ? { receipt: null, isCurrent: () => true } : null
+  );
   io.asset.mockResolvedValue(undefined);
   io.list.mockResolvedValue([{ id: 'guide', availability: 'available' }]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -66,7 +77,16 @@ beforeEach(() => {
   });
   io.autosave.mockImplementation((input: Parameters<typeof useGuideAutosave>[0]) => {
     autosave = input;
-    return { save: async () => true, flushLatest: async () => input.project, flushEdits: () => {} };
+    return {
+      save: async () => true,
+      flushLatest: io.flush,
+      prepareCheckpointExit: io.prepareExit,
+      flushEdits: () => {},
+      beginEdit: io.beginEdit,
+      completeEdit: () => {},
+      beginInteraction: () => {},
+      endInteraction: () => {},
+    };
   });
   host = document.createElement('div');
   document.body.append(host);
@@ -443,3 +463,96 @@ it('rejects obsolete media reads and releases only removed or unmounted resource
   await act(async () => root.unmount());
   expect(revoke).toHaveBeenCalledWith(source);
 });
+
+it('retains old draft and resource session when navigation flush refuses', async () => {
+  const field = await mount();
+  act(() => input(field, 'Unsaved draft'));
+  const retained = state.project;
+  io.enter.mockClear();
+  io.flush.mockResolvedValueOnce(null);
+  await act(async () => state.openExisting('next'));
+  expect(io.flush).toHaveBeenCalledOnce();
+  expect(io.enter).not.toHaveBeenCalled();
+  expect(state.project).toBe(retained);
+});
+
+it('waits for the old native acknowledgement before switching resource sessions', async () => {
+  await mount();
+  let acknowledge!: (value: typeof state.project) => void;
+  io.flush.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        acknowledge = resolve;
+      })
+  );
+  io.enter.mockClear();
+  let opened!: Promise<void>;
+  await act(async () => {
+    opened = state.openExisting('next');
+  });
+  expect(io.enter).not.toHaveBeenCalled();
+  const next = createGuideProject('Next', 'next', 3);
+  io.list.mockResolvedValue([{ id: 'next', availability: 'available' }]);
+  io.load.mockResolvedValue({
+    currentRevision: 1,
+    versions: [{ project: next, revision: 1, savedAt: 3 }],
+  });
+  await act(async () => {
+    acknowledge(state.project);
+    await opened;
+  });
+  expect(io.enter).toHaveBeenCalledWith('next');
+  expect(state.project?.id).toBe('next');
+});
+
+it('starts publication admission synchronously in the accepted input handler', async () => {
+  const field = await mount();
+  act(() => {
+    input(field, 'Synchronous edit');
+    expect(io.beginEdit).toHaveBeenCalledOnce();
+  });
+});
+
+it.each(['accepted', 'rejected', 'changed', 'changed-rejected', 'reloaded'] as const)(
+  'checks the Scenario saved generation after the normal-exit request: %s',
+  async (outcome) => {
+    const field = await mount();
+    const retained = state.project;
+    const receipt = {
+      rootKind: 'scenario-project' as const,
+      rootId: 'guide',
+      revision: crypto.randomUUID(),
+    };
+    const request = Promise.withResolvers<void>();
+    const entered = Promise.withResolvers<void>();
+    io.prepareExit.mockResolvedValueOnce({
+      receipt,
+      isCurrent: () => autosave.project === retained,
+    });
+    io.requestExit.mockImplementationOnce(() => {
+      entered.resolve();
+      return request.promise;
+    });
+    io.enter.mockClear();
+    let exiting!: Promise<boolean>;
+    await act(async () => {
+      exiting = state.prepareExit();
+    });
+    await Promise.race([
+      entered.promise,
+      exiting.then(() => {
+        throw new Error('Exit bypassed checkpoint intent.');
+      }),
+    ]);
+    expect(io.requestExit).toHaveBeenCalledWith(receipt);
+    expect(io.enter).not.toHaveBeenCalled();
+    if (outcome.startsWith('changed')) act(() => input(field, 'New edit during exit'));
+    if (outcome === 'reloaded') await act(async () => state.reload());
+    await act(async () => {
+      if (outcome.includes('rejected')) request.reject(new Error('runtime refused'));
+      else request.resolve();
+    });
+    expect(await exiting).toBe(!outcome.startsWith('changed') && outcome !== 'reloaded');
+    if (outcome.startsWith('changed')) expect(state.project?.name).toBe('New edit during exit');
+  }
+);

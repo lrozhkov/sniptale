@@ -1,3 +1,4 @@
+import { initDB } from '../infrastructure/indexed-db/core';
 import type { IDBPTransaction } from 'idb';
 import type { PhysicalDeleteAssetOperation } from '../assets';
 import {
@@ -14,7 +15,20 @@ import {
 import { createProjectDeletionStores } from './mutation-stores';
 import { parseVideoProjectEntry } from './read-guards';
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '../assets';
-import { recoverProjectMediaPublications } from './asset-publication';
+import {
+  projectAssetPublicationAdapter,
+  projectExportPublicationAdapter,
+} from './asset-publication';
+import { recoverSelectedAssetPublications } from '../assets/recovery';
+import { readAssetReadyPublicationClaims } from '../assets/opfs-store';
+import {
+  runWithDurableAssetLifecycleLock,
+  runWithPersistenceMutationTransition,
+} from '../infrastructure/mutation-barrier';
+import {
+  MediaAssetDeletionBlockedError,
+  StaleMediaAssetDeletePreviewError,
+} from '../media-library/deletion-errors';
 
 /** Delete an admitted project in the caller transaction without capture or transaction completion. */
 export async function deleteVideoProjectInTransaction(
@@ -33,27 +47,68 @@ export async function deleteVideoProjectInTransaction(
 }
 
 export async function deleteVideoProject(id: string): Promise<string[]> {
-  await recoverProjectMediaPublications();
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  const deletedProjectAssetIds = await runWithIndexedDbMutation(async (db) => {
-    const { assetOperationStore, projectStore, tx } = createProjectDeletionStores(db);
-    try {
-      const existing = parseVideoProjectEntry(await projectStore.get(id));
-      const deletedProjectAssetIds = await deleteVideoProjectInTransaction(tx, id, physicalDelete);
-      if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
-      if (existing) await captureDeletionInTransaction(tx, 'video-project', id);
-      await tx.done;
-      return deletedProjectAssetIds;
-    } catch (error) {
-      try {
-        tx.abort();
-      } catch {
-        /* Transaction may already be closed. */
+  const db = await initDB();
+  return runWithPersistenceMutationTransition((transitionPermit) =>
+    runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+      const readSelection = async () => {
+        const raw: unknown = await db.get(VIDEO_PROJECTS_STORE, id);
+        const entry = parseVideoProjectEntry(raw);
+        if (raw !== undefined && (!entry || entry.id !== id))
+          throw new MediaAssetDeletionBlockedError('source-unavailable');
+        return [...new Set(collectProjectOwnedAssetIds(entry?.project))].sort();
+      };
+      let projectAssetIds = await readSelection();
+      const recoverSelection = async () =>
+        recoverSelectedAssetPublications(
+          [projectAssetPublicationAdapter, projectExportPublicationAdapter],
+          { id, projectAssetIds },
+          { transitionPermit, lifecyclePermit }
+        );
+      await recoverSelection();
+      const refreshedIds = await readSelection();
+      if (JSON.stringify(refreshedIds) !== JSON.stringify(projectAssetIds)) {
+        projectAssetIds = refreshedIds;
+        await recoverSelection();
       }
-      await tx.done.catch(() => undefined);
-      throw error;
-    }
-  });
-  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
-  return deletedProjectAssetIds;
+      const claims = await readAssetReadyPublicationClaims(
+        { id, projectAssetIds },
+        lifecyclePermit
+      );
+      if (!claims.valid || claims.pending)
+        throw new MediaAssetDeletionBlockedError('pending-publication');
+      const physicalDelete = buildPhysicalDeleteOperation([]);
+      const deletedProjectAssetIds = await runWithIndexedDbMutation(async (db) => {
+        const { assetOperationStore, projectStore, tx } = createProjectDeletionStores(db);
+        try {
+          const raw: unknown = await projectStore.get(id);
+          const existing = parseVideoProjectEntry(raw);
+          if (raw !== undefined && (!existing || existing.id !== id))
+            throw new MediaAssetDeletionBlockedError('source-unavailable');
+          const currentIds = [...new Set(collectProjectOwnedAssetIds(existing?.project))].sort();
+          if (JSON.stringify(currentIds) !== JSON.stringify(projectAssetIds))
+            throw new StaleMediaAssetDeletePreviewError();
+          const deletedProjectAssetIds = await deleteVideoProjectInTransaction(
+            tx,
+            id,
+            physicalDelete
+          );
+          if (physicalDelete.assetIds.length > 0) await assetOperationStore.put(physicalDelete);
+          if (existing) await captureDeletionInTransaction(tx, 'video-project', id);
+          await tx.done;
+          return deletedProjectAssetIds;
+        } catch (error) {
+          try {
+            tx.abort();
+          } catch {
+            /* Transaction may already be closed. */
+          }
+          await tx.done.catch(() => undefined);
+          throw error;
+        }
+      });
+      if (physicalDelete.assetIds.length > 0)
+        await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit);
+      return deletedProjectAssetIds;
+    })
+  );
 }

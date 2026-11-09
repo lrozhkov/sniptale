@@ -24,6 +24,7 @@ it.each<{ type: CameraTransitionType; enter: number; exit: number }>([
   expect(sample(2)).toMatchObject({
     id: 'border',
     width: 6,
+    bounds: { x: 203, y: 103, width: 194, height: 94 },
     color: '#ff8800ff',
     style: 'solid',
     opacity: 1,
@@ -83,6 +84,8 @@ it('keeps ripple energy inside the retained hold and uses one independent outlin
   expect(active[1]).toMatchObject({ id: 'ripple:ripple', start: 0, end: 1 });
   expect(active[1]!.opacity).toBeCloseTo(0.6 * Math.SQRT1_2, 12);
   expect(active[1]!.perimeter).toBeGreaterThan(active[0]!.perimeter);
+  expect(active[1]!.bounds!.width).toBeGreaterThan(active[0]!.bounds!.width);
+  expect(active[1]!.bounds!.x).toBeLessThan(active[0]!.bounds!.x);
 });
 
 it.each(['source', 'window', 'legacy'] as const)(

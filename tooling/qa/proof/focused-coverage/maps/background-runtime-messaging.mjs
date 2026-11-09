@@ -1,10 +1,21 @@
 export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
   {
+    owner: 'background-shared-secret-startup',
+    productionFile: 'apps/extension/src/background/runtime/routing/runtime-wiring/startup.ts',
+    reason:
+      'Shared protection readiness must precede AI-only reset and storage initialization; refusals remain retryable.',
+    testFiles: [
+      'apps/extension/src/background/runtime/routing/runtime-wiring/startup.test.ts',
+      'apps/extension/src/background/runtime/routing/runtime-wiring/startup.secret-protection.test.ts',
+    ],
+  },
+  {
     owner: 'background-page-launch-runtime-routing',
     productionFile:
       'apps/extension/src/background/runtime/routing/action-kernel/owned-route-handlers.ts',
     reason: 'The corner command requires registered dispatch and rejected action-kind proof.',
     testFiles: [
+      'apps/extension/src/background/runtime/routing/action-kernel/owned-route-handlers.test.ts',
       'apps/extension/src/background/runtime/routing/action-kernel/handlers.page-launch.test.ts',
       'apps/extension/src/background/runtime/routing/action-kernel/background-owned-route-topology.test.ts',
       'apps/extension/src/background/runtime/routing/action-kernel/handlers.content-action-capabilities.test.ts',
@@ -195,6 +206,18 @@ export const BG_RUNTIME_MESSAGING_OWNER_MAPPINGS = [
       'apps/extension/src/background/runtime/tab-mode-router/editing.test.ts',
       'apps/extension/src/background/runtime/tab-mode-router/router.test.ts',
       'apps/extension/src/background/runtime/tab-mode-router/screenshot.test.ts',
+    ],
+  },
+  {
+    owner: 'sync-credential-bridge',
+    productionPrefix: 'apps/extension/src/background/sync-connection/',
+    allowCrossOwner: true,
+    reason: 'Credential leases and containment control actual offscreen request admission.',
+    testFiles: [
+      'apps/extension/src/background/ai/settings/secret-unlock-route.lifecycle.test.ts',
+      'apps/extension/src/background/sync-connection/coordinator.test.ts',
+      'apps/extension/src/background/sync-connection/credential-route.test.ts',
+      'apps/extension/src/workflows/sync-transfer/connection-requests.test.ts',
     ],
   },
 ];

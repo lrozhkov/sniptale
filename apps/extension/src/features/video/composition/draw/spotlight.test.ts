@@ -75,3 +75,17 @@ it('skips inactive lens frames without touching scene pixels', () => {
   ]);
   expect(drawLens).not.toHaveBeenCalled();
 });
+
+it('forwards an explicit per-demand sharp painter through the single-mask fast path', () => {
+  const target = context();
+  const sharpPaint = vi.fn();
+  drawSceneSpotlights(target, source, null, [{ ...frame, sharpPaint }]);
+  expect(drawLens).toHaveBeenCalledExactlyOnceWith(
+    target,
+    source,
+    opening,
+    frame.lens,
+    frame.radius,
+    sharpPaint
+  );
+});

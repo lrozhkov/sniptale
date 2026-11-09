@@ -42,3 +42,26 @@ it('keeps the repository harness inventory complete and balances node VM source 
   expect(inventory.nodeVmThreadsFilesA.length).toBeGreaterThan(0);
   expect(inventory.nodeVmThreadsFilesB.length).toBeGreaterThan(0);
 });
+
+it.each([
+  [
+    'tooling/test/harness/webdav-checkpoints.test.ts',
+    'tooling/test/harness/webdav-checkpoints-peer.test.ts',
+  ],
+  ['tooling/test/harness/i18n-catalogs.test.ts', 'tooling/test/harness/i18n-catalogs-peer.test.ts'],
+  [
+    'tooling/test/harness/integration/recording-events.test.ts',
+    'tooling/test/harness/integration/recording-events-peer.test.ts',
+  ],
+])('keeps exact compatibility files in forks without matching peers: %s', (file, peer) => {
+  const inventory = classifyHarnessTestFiles({
+    files: [file, peer].sort(),
+    readFile: () => 'it("archive", () => structuredClone({ metadata: true }));',
+  });
+
+  expect(inventory.forkFiles).toEqual([file]);
+  expect([...inventory.nodeVmThreadsFilesA, ...inventory.nodeVmThreadsFilesB]).toEqual([peer]);
+  const live = collectHarnessTestInventory();
+  expect(live.forkFiles).toContain(file);
+  expect([...live.nodeVmThreadsFilesA, ...live.nodeVmThreadsFilesB]).not.toContain(file);
+});

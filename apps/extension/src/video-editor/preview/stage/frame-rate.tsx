@@ -1,3 +1,7 @@
+import type {
+  PreviewRendererStatus,
+  VideoPreviewRenderer,
+} from '../../../features/video/preview/preferences';
 import {
   createContext,
   useCallback,
@@ -36,6 +40,8 @@ interface FrameRateState {
   enabled: boolean;
   playing: boolean;
   record(): void;
+  rendererStatus: PreviewRendererStatus | null;
+  reportRenderer(status: PreviewRendererStatus): void;
   counter: ReturnType<typeof createPreviewFrameRateCounter>;
   onChange(value: boolean): void;
 }
@@ -45,9 +51,28 @@ export function PreviewFrameRateProvider(props: {
   children: ReactNode;
   enabled: boolean;
   live: boolean;
+  rendererPreference?: VideoPreviewRenderer;
   playing: boolean;
   onChange(value: boolean): void;
 }) {
+  const preference = props.rendererPreference ?? 'gpu';
+  const [observed, setObserved] = useState<{
+    preference: VideoPreviewRenderer;
+    status: PreviewRendererStatus;
+  } | null>(null);
+  const reportRenderer = useCallback(
+    (status: PreviewRendererStatus) => {
+      setObserved((previous) =>
+        previous?.preference === preference &&
+        previous.status.backend === status.backend &&
+        previous.status.fallback === status.fallback
+          ? previous
+          : { preference, status }
+      );
+    },
+    [preference]
+  );
+  const rendererStatus = observed?.preference === preference ? observed.status : null;
   const counter = useMemo(() => createPreviewFrameRateCounter(), []);
   const active = props.enabled && props.live && props.playing;
   useLayoutEffect(() => counter.reset(), [counter, active]);
@@ -57,12 +82,14 @@ export function PreviewFrameRateProvider(props: {
   const value = useMemo(
     () => ({
       counter,
+      rendererStatus,
+      reportRenderer,
       record,
       enabled: props.enabled,
       playing: props.playing,
       onChange: props.onChange,
     }),
-    [counter, record, props.enabled, props.playing, props.onChange]
+    [counter, rendererStatus, reportRenderer, record, props.enabled, props.playing, props.onChange]
   );
   return <FrameRateContext.Provider value={value}>{props.children}</FrameRateContext.Provider>;
 }

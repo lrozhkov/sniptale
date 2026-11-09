@@ -8,7 +8,10 @@ export interface EditorFrameAnnotationPlaneController {
   clearSelection?: () => void;
   commitHistory: () => void;
   prepareObject: (object: FabricObject) => void;
-  selectLayer?: (id: string, options?: { focusViewport?: boolean }) => void;
+  selectLayer?: (
+    id: string,
+    options?: { focusViewport?: boolean; preserveActiveTool?: boolean }
+  ) => void;
   sendBackwardSelection?: () => void;
   snapFrameAnnotationRect?: (input: {
     excludeId?: string;

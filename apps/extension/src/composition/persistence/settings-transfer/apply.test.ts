@@ -23,7 +23,8 @@ const mocks = vi.hoisted(() => ({
   loadVideoSettings: vi.fn(),
 }));
 
-vi.mock('../infrastructure/browser-storage', () => ({
+vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/browser-storage')>()),
   browserStorage: {
     local: { get: mocks.localGet, remove: mocks.localRemove, set: mocks.localSet },
     sync: { get: mocks.syncGet, remove: mocks.syncRemove, set: mocks.syncSet },
@@ -542,14 +543,6 @@ function allDomainFixtures(): Record<string, SettingsTransferDomainPayload> {
         profiles: video.qualityProfiles,
         qualityProfileId: video.qualityProfileId,
         outputProfile: video.outputProfile,
-      },
-    },
-    'system.native': {
-      schemaVersion: 1,
-      data: {
-        capture: { screenshots: video.native?.screenshots, video: video.native?.video },
-        tray: video.native?.trayActions,
-        telemetry: video.native?.video.telemetry,
       },
     },
     'styles.borders': { schemaVersion: 1, data: { borderPresets: [] } },

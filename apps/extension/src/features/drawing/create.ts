@@ -29,6 +29,8 @@ export function createDrawingObject(
         dynamicWidth: defaults.arrow.dynamicWidth,
         width: defaults.arrow.width,
       };
+    case 'simplify':
+      return { id, kind: 'simplify', bounds, settings: { ...defaults.simplify } };
     case 'blur':
       return { id, kind: 'blur', bounds, amount: defaults.blur.amount };
     case 'select':

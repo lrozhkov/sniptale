@@ -76,6 +76,7 @@ export async function buildPreviewCacheAttempt(params: {
       ownerDocument: document,
       playbackRange: latest.playbackRange,
       project: latest.project,
+      previewRenderer: latest.previewRenderer ?? 'gpu',
       rasterSize: latest.previewRasterSize,
       signal: linked.controller.signal,
     });

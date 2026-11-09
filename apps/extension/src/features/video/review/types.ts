@@ -99,6 +99,8 @@ export type ReviewOperation = { id: string; at: number } & (
       preserveUnderCuts?: true;
       /** Preserves whole voiceover records in source coordinates; playback alone is projected. */
       preserveVoiceoverAnchors?: true;
+      /** Text follows native voiceover timing only for operations that record this policy. */
+      preserveTextAnchors?: true;
       /** New Speed commands restore native sample timing before applying their absolute rate. */
       normalizeVoiceoverTempo?: true;
     }

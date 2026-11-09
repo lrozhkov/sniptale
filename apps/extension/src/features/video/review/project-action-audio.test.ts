@@ -1,3 +1,12 @@
+import { prepareCursorTrajectoryProject } from '../project/cursor-trajectory/project-window';
+import type {
+  CursorTrajectoryDescriptor,
+  CursorTrajectoryRecord,
+} from '../project/cursor-trajectory/types';
+import { prepareRecordingEventsProject } from '../project/recording-events/project-window';
+import { encodeRecordingEventCadence } from '../project/recording-events/records';
+import type { RecordingEventWindowRecord } from '../project/recording-events/project-facts';
+import { REVIEW_KEY_DEFAULT } from '../project/action-feedback/key-animation';
 import { materializeVideoProjectCursorSourceObservations } from '../project/cursor-source-observations';
 import { normalizeVideoProjectCursorSkin } from '../project/cursor';
 import { getVideoProjectActionPresentation } from '../project/action-presentation';
@@ -622,4 +631,220 @@ it('retains the full captured gesture path when only a held source frame remains
     expected
   );
   expect(candidate).toEqual(before);
+});
+
+it('renders and sounds prepared source facts while the persisted project keeps empty history', async () => {
+  const project = fixture();
+  project.actionEvents = [];
+  const group = project.actionFeedback![0]!;
+  group.signals = [];
+  group.events = {
+    format: 'recording-events-v1',
+    formatVersion: 1,
+    algorithm: 'lossless-v1',
+    encoding: 'json-utf8-v1',
+    eventStreamId: 'a'.repeat(32),
+    state: 'complete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 6,
+    totalBytes: 2000,
+    streamSha256: 'b'.repeat(64),
+  };
+  group.keyStyles = [{ id: 'key', ...REVIEW_KEY_DEFAULT, enabled: true }];
+  group.settings = [
+    {
+      ref: { kind: 'action', id: 'key' },
+      enabled: true,
+      presetId: 'keyboard-recorded-v2',
+      includeRepeats: true,
+      volume: 0.5,
+      offset: 0,
+    },
+    {
+      ref: { kind: 'signal', id: 'typing' },
+      enabled: true,
+      presetId: 'typing-recorded-v2',
+      volume: 0.5,
+      offset: 0,
+    },
+  ];
+  const records: RecordingEventWindowRecord[] = [
+    {
+      kind: 'action',
+      recordSeq: 1,
+      segmentId: 0,
+      activeTimeUs: 1000001,
+      action: {
+        id: 'key',
+        kind: 'KEY',
+        timeUs: 1000001,
+        durationUs: 100000,
+        point: null,
+        label: 'Ctrl+S',
+        preset: 'NONE',
+        data: {
+          downTimeUs: 1000001,
+          upTimeUs: 1100001,
+          pressDurationUs: 100000,
+          lastObservedTimeUs: 1100001,
+          repeatCount: 1,
+          completion: 'released',
+          keyboardAttackId: 'attack',
+          keyboardOnsetTimeUs: 1000001,
+          groupId: null,
+          continuationOf: null,
+          ctrlKey: true,
+          altKey: false,
+          shiftKey: false,
+          metaKey: false,
+        },
+      },
+    },
+    {
+      kind: 'signal',
+      recordSeq: 2,
+      segmentId: 0,
+      activeTimeUs: 1100001,
+      signal: {
+        id: 'typing',
+        kind: 'typing',
+        startTimeUs: 1000001,
+        endTimeUs: 1000101,
+        point: null,
+        data: {
+          eventCount: 2,
+          activity: 'keyboard',
+          privacy: 'normal',
+          groupId: 'typing',
+          continuationOf: null,
+        },
+      },
+    },
+    {
+      kind: 'keyboard-repeat-block',
+      recordSeq: 3,
+      segmentId: 0,
+      activeTimeUs: 1100001,
+      ownerKind: 'signal',
+      ownerId: 'typing',
+      phase: 'onset',
+      cadence: encodeRecordingEventCadence('typed', [1000001, 1000101]),
+    },
+    {
+      kind: 'keyboard-repeat-block',
+      recordSeq: 4,
+      segmentId: 0,
+      activeTimeUs: 1100001,
+      ownerKind: 'action',
+      ownerId: 'key',
+      phase: 'repeat',
+      cadence: encodeRecordingEventCadence('repeated', [1000051]),
+    },
+  ];
+  const before = JSON.stringify(project);
+  const rendered = await prepareRecordingEventsProject(project, { start: 1, end: 2 }, async () => ({
+    writerGeneration: 'generation',
+    records,
+  }));
+  const markers = projectActionFeedbackMarkers(rendered, group);
+  expect(markers.find((marker) => marker.ref.id === 'key')?.keyboardAttack?.time).toBe(1.000001);
+  expect(cues(buildProjectActionAudioPlan(rendered)).map((cue) => cue.start)).toEqual([
+    1.000001, 1.000001, 1.000051, 1.000101,
+  ]);
+  expect(resolveVideoCompositionActions(rendered, 1.05)).toHaveLength(1);
+  expect(JSON.stringify(rendered)).toBe(before);
+  expect(project.actionEvents).toEqual([]);
+  expect(group.signals).toEqual([]);
+});
+
+it('uses prepared archived cursor points for the recorded drag path instead of a straight down-up guess', async () => {
+  const descriptor: CursorTrajectoryDescriptor = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: 'a'.repeat(32),
+    state: 'complete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 5,
+    totalSamples: 3,
+    totalBytes: 2000,
+    streamSha256: 'b'.repeat(64),
+  };
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'drag.webm',
+    width: 100,
+    height: 100,
+    duration: 2,
+    mimeType: 'video/webm',
+    size: 100,
+    cursorTrajectory: descriptor,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'drag',
+        kind: 'CLICK',
+        time: 0,
+        duration: 1,
+        point: { x: 0.1, y: 0.2 },
+        label: 'Click',
+        preset: 'NONE',
+        data: {
+          gestureId: 'gesture',
+          gestureType: 'drag',
+          button: 0,
+          downTime: 0,
+          upTime: 1,
+          pressDuration: 1,
+          completion: 'released',
+          upX: 0.1,
+          upY: 0.2,
+        },
+      },
+    ],
+  });
+  const records: CursorTrajectoryRecord[] = [
+    {
+      kind: 'segment',
+      segmentId: 0,
+      activeTimeUs: 0,
+      width: 100,
+      height: 100,
+      reason: 'start',
+      clock: {
+        source: 'dom-event-time',
+        timestampQuantumUs: null,
+        resolutionBoundUs: null,
+        mappingUncertaintyUs: null,
+      },
+    },
+  ];
+  for (const [index, x] of [10, 90, 10].entries())
+    records.push({
+      kind: 'sample',
+      segmentId: 0,
+      observationSeq: index,
+      activeTimeUs: index * 500000,
+      xQ8: x * 256,
+      yQ8: 20 * 256,
+      observed: true,
+      visible: true,
+      event: 'move',
+      button: 'none',
+      relatedObservationSeq: null,
+      anchors: [],
+    });
+  records.push({ kind: 'boundary', segmentId: 0, activeTimeUs: 1100000, reason: 'stop' });
+  const prepared = await prepareCursorTrajectoryProject(project, 0.5, async () => ({
+    fromTimeUs: 0,
+    toTimeUs: null,
+    initialSegment: null,
+    records,
+  }));
+  const marker = projectActionFeedbackMarkers(prepared, prepared.actionFeedback![0]!)[0];
+  expect(marker?.gesture?.path).toEqual(
+    expect.arrayContaining([expect.objectContaining({ time: 0.5, x: 0.9, y: 0.2 })])
+  );
 });

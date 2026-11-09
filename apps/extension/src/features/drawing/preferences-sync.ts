@@ -29,6 +29,7 @@ function diffPreferences(
   after: DrawingToolDefaults
 ): DrawingToolPreferencesPatch {
   return {
+    ...(samePreference(before.simplify, after.simplify) ? {} : { simplify: after.simplify }),
     ...(samePreference(before.pencil, after.pencil) ? {} : { pencil: after.pencil }),
     ...(samePreference(before.marker, after.marker) ? {} : { marker: after.marker }),
     ...(samePreference(before.shape, after.shape) ? {} : { shape: after.shape }),
@@ -43,6 +44,7 @@ function mergePreferences(
   patch: DrawingToolPreferencesPatch
 ): DrawingToolDefaults {
   return {
+    simplify: { ...defaults.simplify, ...patch.simplify },
     pencil: { ...defaults.pencil, ...patch.pencil },
     marker: { ...defaults.marker, ...patch.marker },
     shape: { ...defaults.shape, ...patch.shape },
@@ -54,7 +56,13 @@ function mergePreferences(
 
 function hasPatch(patch: DrawingToolPreferencesPatch): boolean {
   return Boolean(
-    patch.pencil || patch.marker || patch.shape || patch.arrow || patch.blur || patch.text
+    patch.simplify ||
+    patch.pencil ||
+    patch.marker ||
+    patch.shape ||
+    patch.arrow ||
+    patch.blur ||
+    patch.text
   );
 }
 
@@ -63,6 +71,9 @@ function removeAcknowledged(
   authoritative: DrawingToolDefaults
 ): DrawingToolPreferencesPatch {
   return {
+    ...(patch.simplify && !samePreference(patch.simplify, authoritative.simplify)
+      ? { simplify: patch.simplify }
+      : {}),
     ...(patch.pencil && !samePreference(patch.pencil, authoritative.pencil)
       ? { pencil: patch.pencil }
       : {}),
@@ -85,6 +96,10 @@ function removeApplied(
   applied: DrawingToolPreferencesPatch
 ): DrawingToolPreferencesPatch {
   return {
+    ...(pending.simplify &&
+    (!applied.simplify || !samePreference(pending.simplify, applied.simplify))
+      ? { simplify: pending.simplify }
+      : {}),
     ...(pending.pencil && (!applied.pencil || !samePreference(pending.pencil, applied.pencil))
       ? { pencil: pending.pencil }
       : {}),

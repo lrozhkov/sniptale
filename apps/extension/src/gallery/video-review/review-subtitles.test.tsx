@@ -84,7 +84,13 @@ it('exports the actual inspector document on the final video clock without chang
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.exportSection"]')
     ).not.toBeNull();
-    await fixture.click('textTrackOpen');
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="text"] [data-review-track-select]'
+        )!
+        .click()
+    );
     await fixture.click('subtitlesTitle');
     expect(fixture.host.textContent).toContain('Hidden authored phrase');
     expect(fixture.button('subtitlesDownload').disabled).toBe(false);
@@ -114,7 +120,13 @@ it('exports the actual inspector document on the final video clock without chang
     );
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.textDocument"]')).toBeNull();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Hidden authored phrase');
-    await fixture.click('historyOpen');
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="actions"] [data-review-track-select]'
+        )!
+        .click()
+    );
     await act(async () =>
       fixture.host
         .querySelector<HTMLButtonElement>(
@@ -123,7 +135,13 @@ it('exports the actual inspector document on the final video clock without chang
         .click()
     );
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.textSubtitles"]')).toBeNull();
-    await fixture.click('textTrackOpen');
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="text"] [data-review-track-select]'
+        )!
+        .click()
+    );
     expect(fixture.host.textContent).toContain('Hidden authored phrase');
     expect(integration.commit).not.toHaveBeenCalled();
   } finally {
@@ -134,3 +152,58 @@ it('exports the actual inspector document on the final video clock without chang
 vi.mock('../../workflows/sync-transfer/editing-admission', () => ({
   ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
 }));
+
+it('shares caption visibility between the text eye and scene without disabling text authoring', async () => {
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    const eye = () =>
+      fixture.host.querySelector<HTMLButtonElement>(
+        '[data-review-header-track="text"] [aria-label="gallery.videoReview.captionsEnabled"]'
+      )!;
+    expect(eye().getAttribute('aria-pressed')).toBe('false');
+    expect(
+      fixture.host
+        .querySelector('[data-review-track="text"]')
+        ?.getAttribute('data-review-track-muted')
+    ).toBe('false');
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLButtonElement>(
+          '[data-review-header-track="text"] [data-review-track-select]'
+        )!
+        .click()
+    );
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.textDocument"]')
+    ).not.toBeNull();
+    expect(
+      fixture.host.querySelector<HTMLButtonElement>(
+        '[data-ui="gallery.videoReview.editingTools"] button[aria-label="gallery.videoReview.textFragmentAdd"]'
+      )!.disabled
+    ).toBe(false);
+    await act(async () => eye().click());
+    expect(eye().getAttribute('aria-pressed')).toBe('true');
+    await act(async () => {
+      const navigation = fixture.host.querySelector(
+        '[data-ui="gallery.videoReview.inspectorNavigation"]'
+      )!;
+      Array.from(navigation.querySelectorAll('button'))
+        .find((button) => button.textContent === 'gallery.videoReview.scene')!
+        .click();
+    });
+    const toggle = fixture.host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.captionScene"] [role="switch"]'
+    )!;
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    await act(async () => toggle.click());
+    expect(eye().getAttribute('aria-pressed')).toBe('false');
+    expect(fixture.host.querySelector('[data-review-track="text"]')).not.toBeNull();
+    expect(fixture.snapshot.workspace.advanced.audio.voiceover).toEqual([]);
+  } finally {
+    await fixture.cleanup();
+  }
+});

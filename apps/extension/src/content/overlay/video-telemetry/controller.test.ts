@@ -12,6 +12,7 @@ import * as telemetryEvents from './events';
 import { isRecordingTelemetrySnapshot } from '../../../features/video/project/validation/recording-telemetry';
 import { parseRecordingTelemetryEntry } from '../../../composition/persistence/recordings/telemetry.guards';
 import { iterateRecordingKeyboardRhythm } from '../../../features/video/project/keyboard-rhythm';
+import type { RecordingCursorObservationPacket } from '../../../contracts/video/cursor-observations';
 
 function disableProjected(controller: ReturnType<typeof createVideoTelemetryController>) {
   const raw = controller.disable();
@@ -580,6 +581,96 @@ it.each([false, true])(
   }
 );
 
+it('streams 10000 trusted DOM observations in blocks mode without a full cursor snapshot', async () => {
+  const packets: RecordingCursorObservationPacket[] = [];
+  const controller = createVideoTelemetryController({
+    publishCursor: async (packet) => {
+      packets.push(packet);
+    },
+  });
+  controller.enable('blocks-recording', 0, null, 'blocks');
+  for (let batch = 0; batch < 100; batch++) {
+    for (let i = 0; i < 100; i++) sendTrusted(createPointerLikeEvent(batch * 100 + i, 60));
+    expect(await controller.flushCursor()).toBe(true);
+  }
+  const snapshot = controller.disable();
+  await controller.flushCursor();
+  expect(snapshot?.cursorTrack).toBeNull();
+  const records = packets.flatMap((packet) => packet.records);
+  expect(records.filter((record) => record.kind === 'sample')).toHaveLength(10000);
+  expect(records.at(-1)).toMatchObject({ kind: 'boundary', reason: 'stop' });
+});
+
+it('uses native coalesced timestamps once and links raw click only to the matching pointer up', async () => {
+  class TestPointerEvent extends MouseEvent {
+    readonly pointerId = 7;
+    coalesced: TestPointerEvent[] = [];
+    getCoalescedEvents() {
+      return this.coalesced;
+    }
+  }
+  vi.stubGlobal('PointerEvent', TestPointerEvent);
+  const packets: RecordingCursorObservationPacket[] = [];
+  const controller = createVideoTelemetryController({
+    publishCursor: async (packet) => {
+      packets.push(packet);
+    },
+  });
+  controller.enable('coalesced', 0, null, 'blocks');
+  const parent = new TestPointerEvent(
+    'onpointerrawupdate' in window ? 'pointerrawupdate' : 'pointermove',
+    { clientX: 999, clientY: 999 }
+  );
+  parent.coalesced = [
+    new TestPointerEvent('pointermove', { clientX: 10, clientY: 20 }),
+    new TestPointerEvent('pointermove', { clientX: 30, clientY: 40 }),
+  ];
+  for (let i = 0; i < parent.coalesced.length; i++)
+    Object.defineProperty(parent.coalesced[i], 'timeStamp', { value: performance.now() + i + 1 });
+  sendTrusted(parent);
+  sendTrusted(new TestPointerEvent('pointerdown', { clientX: 30, clientY: 40 }));
+  sendTrusted(new TestPointerEvent('pointerup', { clientX: 30, clientY: 40 }));
+  sendTrusted(new TestPointerEvent('click', { clientX: 30, clientY: 40 }));
+  controller.disable();
+  await controller.flushCursor();
+  const samples = packets
+    .flatMap((packet) => packet.records)
+    .filter((record) => record.kind === 'sample');
+  expect(samples.map((record) => [record.event, record.x, record.y])).toEqual([
+    ['move', 10, 20],
+    ['move', 30, 40],
+    ['down', 30, 40],
+    ['up', 30, 40],
+    ['click', 30, 40],
+  ]);
+  expect(samples[1]!.activeTimeUs - samples[0]!.activeTimeUs).toBe(1000);
+  expect(samples.at(-1)?.relatedLocalSequence).toBe(samples.at(-2)?.localSequence);
+});
+
+it('closes paused source without Resume or a fabricated stop position', async () => {
+  const packets: RecordingCursorObservationPacket[] = [];
+  const controller = createVideoTelemetryController({
+    publishCursor: async (packet) => {
+      packets.push(packet);
+    },
+  });
+  controller.enable('paused-blocks', 0, null, 'blocks');
+  sendTrusted(createPointerLikeEvent(10, 20));
+  controller.pause();
+  vi.advanceTimersByTime(5000);
+  controller.disable();
+  await controller.flushCursor();
+  const records = packets.flatMap((packet) => packet.records);
+  expect(records.filter((record) => record.kind === 'sample')).toHaveLength(1);
+  expect(
+    records.filter((record) => record.kind === 'boundary').map((record) => record.reason)
+  ).toEqual(['pause', 'stop']);
+  const pause = records.at(-2);
+  expect(pause?.kind).toBe('boundary');
+  if (pause?.kind === 'boundary')
+    expect(records.at(-1)).toMatchObject({ activeTimeUs: pause.activeTimeUs });
+});
+
 it.each(['pause', 'disable'] as const)(
   'releases observation even if %s finalization throws',
   (operation) => {
@@ -618,3 +709,95 @@ it.each([false, true])(
     expect(vi.getTimerCount()).toBe(0);
   }
 );
+
+it('streams keyboard and click facts across Pause/Resume and returns only compact inline history', async () => {
+  const packets: import('../../../contracts/video/event-observations').RecordingEventObservationPacket[] =
+    [];
+  const controller = createVideoTelemetryController({
+    publishEvents: async (packet) => {
+      packets.push(packet);
+    },
+  });
+  controller.enable('event-blocks', 0, null, undefined, 'blocks');
+  sendTrusted(new KeyboardEvent('keydown', { key: 'F5', code: 'F5' }));
+  vi.advanceTimersByTime(50);
+  sendTrusted(new KeyboardEvent('keydown', { key: 'F5', code: 'F5', repeat: true }));
+  controller.pause();
+  await controller.flushEvents();
+  vi.advanceTimersByTime(5000);
+  controller.resume();
+  sendTrusted(new MouseEvent('pointerdown', { clientX: 20, clientY: 30 }));
+  vi.advanceTimersByTime(10);
+  sendTrusted(new MouseEvent('pointerup', { clientX: 20, clientY: 30 }));
+  const snapshot = controller.disable();
+  expect(await controller.flushEvents()).toBe(true);
+  const records = packets.flatMap((packet) => packet.records);
+  expect(records.filter((record) => record.kind === 'action')).toMatchObject([
+    { action: { kind: 'KEY', label: 'F5' } },
+    { action: { kind: 'CLICK', data: { completion: 'released' } } },
+  ]);
+  expect(records.find((record) => record.kind === 'action-update')).toMatchObject({
+    data: { completion: 'lost', repeatCount: 1, upTimeUs: null, pressDurationUs: null },
+  });
+  expect(
+    records.filter((record) => record.kind === 'boundary').map((record) => record.reason)
+  ).toEqual(['pause', 'stop']);
+  expect(
+    records.filter((record) => record.kind === 'segment').map((record) => record.reason)
+  ).toEqual(['start', 'resume']);
+  expect(snapshot?.actionEvents).toEqual([]);
+  expect(snapshot?.signals).toEqual([]);
+});
+
+it('drains paused events at Stop without reopening source time or stretching a hold', async () => {
+  const packets: import('../../../contracts/video/event-observations').RecordingEventObservationPacket[] =
+    [];
+  const controller = createVideoTelemetryController({
+    publishEvents: async (packet) => {
+      packets.push(packet);
+    },
+  });
+  controller.enable('paused-event-blocks', 0, null, undefined, 'blocks');
+  sendTrusted(new KeyboardEvent('keydown', { key: 'F5', code: 'F5' }));
+  vi.advanceTimersByTime(100);
+  controller.pause();
+  vi.advanceTimersByTime(9000);
+  controller.disable();
+  await controller.flushEvents();
+  const records = packets.flatMap((packet) => packet.records);
+  expect(records.filter((record) => record.kind === 'segment')).toHaveLength(1);
+  expect(
+    records.filter((record) => record.kind === 'boundary').map((record) => record.reason)
+  ).toEqual(['pause', 'stop']);
+  const completion = records.find((record) => record.kind === 'action-update');
+  expect(completion).toMatchObject({
+    data: { completion: 'lost', upTimeUs: null, pressDurationUs: null },
+  });
+  expect(completion?.activeTimeUs).toBe(0);
+  expect(records.at(-1)?.activeTimeUs).toBe(100000);
+});
+
+it('holds initial events for calibration and retries a refused packet after disable', async () => {
+  let release!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const publishEvents = vi.fn(
+    async (
+      _packet: import('../../../contracts/video/event-observations').RecordingEventObservationPacket
+    ) => {}
+  );
+  publishEvents.mockRejectedValueOnce(new Error('Transport refused.'));
+  const controller = createVideoTelemetryController({ publishEvents });
+  controller.enable('calibrated-events', 0, null, undefined, 'blocks');
+  controller.waitForEventsCalibration(barrier);
+  sendTrusted(new KeyboardEvent('keydown', { key: 'F5', code: 'F5' }));
+  controller.disable();
+  await Promise.resolve();
+  expect(publishEvents).not.toHaveBeenCalled();
+  release();
+  expect(await controller.flushEvents()).toBe(false);
+  const first = structuredClone(publishEvents.mock.calls[0]?.[0]);
+  expect(await controller.flushEvents()).toBe(true);
+  expect(publishEvents.mock.calls[1]?.[0]).toEqual(first);
+});

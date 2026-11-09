@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { RefObject } from 'react';
 import {
   getDrawingObjectRotation,
@@ -20,6 +20,7 @@ import { handleDrawingKeyDown, useDrawingEscapeOwnership } from './keyboard';
 import {
   getDrawingViewportProjection,
   isDrawingMultiRotationHandle,
+  isDrawingMultiSelectionBody,
   resolveDrawingResizeHandle,
   resolveDrawingRotationHandle,
   toDrawingScenePoint,
@@ -28,6 +29,7 @@ import {
 import { TEXT_DRAG_THRESHOLD, useDrawingPointerRuntime } from './pointer-runtime';
 import { DrawingTextEditor, useDrawingTextEditor, type DrawingTextDraft } from './text-editor';
 import { DrawingVisualLayers } from './surface-visual-layers';
+import { DrawingSimplifyFeedback } from './simplify-layer';
 import { DrawingMoveAlignmentGuides } from './move-alignment-guides';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import { toggleContentHostClass } from '../platform/dom-host';
@@ -146,6 +148,16 @@ function resolveDrawingCanvasHoverCursor(args: {
       )
     );
     if (bounds && isDrawingMultiRotationHandle(bounds, args.point)) return 'grab';
+    if (
+      args.snapshot.activeTool === 'select' &&
+      isDrawingMultiSelectionBody(
+        args.snapshot.document.objects.filter((object) =>
+          args.snapshot.selectedObjectIds.includes(object.id)
+        ),
+        args.point
+      )
+    )
+      return 'move';
   }
   const handle = selected ? resolveDrawingResizeHandle(selected, args.point) : null;
   if (handle && selected)
@@ -218,7 +230,7 @@ function createDrawingPointerHandlers(args: {
       }
       pointer.onPointerDown(event);
       const draft = pointer.draftRef.current;
-      setSelectionDragHidden(isNonTextSelectionDrag(draft));
+      setSelectionDragHidden(false);
       textGestureRef.current =
         draft?.kind === 'rotate' || draft?.kind === 'rotate-selection' || draft?.kind === 'bend'
           ? { dragged: true, start: toDrawingScenePoint(event, root) }
@@ -243,6 +255,12 @@ function createDrawingPointerHandlers(args: {
           Math.hypot(point.x - gesture.start.x, point.y - gesture.start.y) >= TEXT_DRAG_THRESHOLD;
       }
       pointer.onPointerMove(event);
+      const draft = pointer.draftRef.current;
+      if (draft && isNonTextSelectionDrag(draft)) {
+        const point = toDrawingScenePoint(event, root);
+        if (Math.hypot(point.x - draft.start.x, point.y - draft.start.y) >= TEXT_DRAG_THRESHOLD)
+          setSelectionDragHidden(true);
+      }
       event.currentTarget.style.cursor = selectionDragHiddenRef.current
         ? 'none'
         : resolveDrawingCanvasHoverCursor({
@@ -280,6 +298,7 @@ function DrawingCanvasLayer(props: {
   controller: ContentDrawingController;
   onExit?: () => void;
   pointer: DrawingPointerRuntime;
+  pendingGeometry: boolean;
   root: PageScrollRoot;
   snapshot: DrawingSessionSnapshot;
   textEditor: DrawingTextEditorRuntime;
@@ -347,6 +366,7 @@ function DrawingCanvasLayer(props: {
         onMouseUp={stopDrawingHostEvent}
         onPointerLeave={() => {
           props.pointer.hoverBendRef.current = null;
+          props.pointer.hoverPointRef.current = null;
           props.pointer.changed();
         }}
         onLostPointerCapture={props.pointer.cancelLostPointer}
@@ -393,6 +413,7 @@ function DrawingCanvasLayer(props: {
             onCancelDraft: props.pointer.cancelDraft,
             onEditText: props.textEditor.edit,
             ...(props.onExit === undefined ? {} : { onExit: props.onExit }),
+            ...(props.controller.simplify ? { simplify: props.controller.simplify } : {}),
             session: props.controller.session,
             snapshot: props.snapshot,
           });
@@ -406,7 +427,7 @@ function DrawingCanvasLayer(props: {
           position: 'fixed',
           inset: 0,
           pointerEvents: 'none',
-          opacity: selectionDragHidden ? 0 : 1,
+          opacity: selectionDragHidden || props.pendingGeometry ? 0 : 1,
           zIndex: 'var(--sniptale-drawing-chrome-layer)',
           transition: reducedMotion
             ? 'none'
@@ -415,6 +436,42 @@ function DrawingCanvasLayer(props: {
       />
     </>
   );
+}
+
+function resolvePendingFrameObjects(
+  objects: readonly DrawingObject[],
+  pendingObjects: readonly DrawingObject[]
+): { frameObjects: DrawingObject[]; pendingGeometry: boolean } {
+  const pending = new Map(pendingObjects.map((object) => [object.id, object]));
+  let pendingGeometry = false;
+  const frameObjects = objects.map((object) => {
+    const candidate = pending.get(object.id);
+    if (
+      object.kind !== 'simplify' ||
+      candidate?.kind !== 'simplify' ||
+      (!candidate.settings.automatic && candidate.settings.manualKind !== 'text')
+    )
+      return object;
+    const changed =
+      candidate.bounds.x !== object.bounds.x ||
+      candidate.bounds.y !== object.bounds.y ||
+      candidate.bounds.width !== object.bounds.width ||
+      candidate.bounds.height !== object.bounds.height ||
+      (candidate.rotation ?? 0) !== (object.rotation ?? 0);
+    if (!changed) return object;
+    pendingGeometry = true;
+    const { result, ...preview } = candidate;
+    void result;
+    return preview;
+  });
+  const existingIds = new Set(objects.map((object) => object.id));
+  for (const object of pendingObjects) {
+    if (object.kind !== 'simplify' || existingIds.has(object.id)) continue;
+    const { result, ...preview } = object;
+    void result;
+    frameObjects.push(preview);
+  }
+  return { frameObjects, pendingGeometry };
 }
 
 export function DrawingSurface(props: {
@@ -442,6 +499,11 @@ export function DrawingSurface(props: {
     props.visualEffects?.getRevision ?? ZERO_VISUAL_EFFECTS_REVISION,
     ZERO_VISUAL_EFFECTS_REVISION
   );
+  useSyncExternalStore(
+    controller.simplify?.subscribe ?? NO_VISUAL_EFFECTS_SUBSCRIPTION,
+    controller.simplify?.getRevision ?? ZERO_VISUAL_EFFECTS_REVISION,
+    ZERO_VISUAL_EFFECTS_REVISION
+  );
   const textEditor = useDrawingTextEditor(controller);
   const {
     cancel: cancelText,
@@ -466,16 +528,14 @@ export function DrawingSurface(props: {
     hasTextDraft: Boolean(textEditor.draft),
     exitImmediately: props.escapeImmediately ?? false,
     ...(props.onExit === undefined ? {} : { onExit: props.onExit }),
+    ...(controller.simplify ? { simplify: controller.simplify } : {}),
     pointerDraftRef: pointer.draftRef,
     session: controller.session,
   });
-  const { draftRef, draftRevision, finalizeDraft } = pointer;
-  const frameObjects = useMemo(
-    () =>
-      textDraft?.id
-        ? snapshot.document.objects.filter((object) => object.id !== textDraft.id)
-        : snapshot.document.objects,
-    [snapshot.document.objects, textDraft?.id]
+  const { draftRevision, finalizeDraft } = pointer;
+  const { frameObjects, pendingGeometry } = resolvePendingFrameObjects(
+    snapshot.document.objects.filter((object) => object.id !== textDraft?.id),
+    controller.simplify?.getPendingObjects() ?? []
   );
   const editingTextObject = textDraft?.id
     ? snapshot.document.objects.find(
@@ -492,11 +552,12 @@ export function DrawingSurface(props: {
     active,
     canvasRef,
     chromeCanvasRef,
-    chromeHidden,
+    chromeHidden: chromeHidden || pendingGeometry,
     controller,
-    draftRef,
+    draftRef: pointer.visualDraftRef,
     draftRevision,
     hoverBendRef: pointer.hoverBendRef,
+    hoverPointRef: pointer.hoverPointRef,
     objects: frameObjects,
     selectedIds: snapshot.selectedObjectIds,
     showSelectionChrome: props.showSelectionChrome ?? true,
@@ -549,6 +610,7 @@ export function DrawingSurface(props: {
       controller={controller}
       editingTextObject={editingTextObject}
       frameObjects={frameObjects}
+      pendingGeometry={pendingGeometry}
       alignmentVisible={active && !chromeHidden}
       pointer={pointer}
       projection={projection}
@@ -571,6 +633,7 @@ function DrawingSurfaceContent(props: {
   controller: ContentDrawingController;
   editingTextObject: DrawingObject | null | undefined;
   frameObjects: readonly DrawingObject[];
+  pendingGeometry: boolean;
   getObjectOpacity?: (objectId: string) => number;
   onExit?: () => void;
   pointer: DrawingPointerRuntime;
@@ -581,7 +644,10 @@ function DrawingSurfaceContent(props: {
   textEditor: DrawingTextEditorRuntime;
   viewportRevision: number;
 }) {
-  const layers = resolveDrawingVisualLayers(props.frameObjects, props.pointer.draftRef.current);
+  const layers = resolveDrawingVisualLayers(
+    props.frameObjects,
+    props.pointer.visualDraftRef.current
+  );
   return (
     <div
       aria-hidden={!props.active}
@@ -601,14 +667,19 @@ function DrawingSurfaceContent(props: {
         layers={layers}
         projection={props.projection}
         root={props.root}
+        {...(props.controller.getObjectAnchor
+          ? { getObjectAnchor: props.controller.getObjectAnchor }
+          : {})}
         {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}
       />
+      <DrawingSimplifyFeedback controller={props.controller} projection={props.projection} />
       <DrawingCanvasLayer
         active={props.active}
         canvasRef={props.canvasRef}
         chromeCanvasRef={props.chromeCanvasRef}
         controller={props.controller}
         pointer={props.pointer}
+        pendingGeometry={props.pendingGeometry}
         root={props.root}
         snapshot={props.snapshot}
         textEditor={props.textEditor}

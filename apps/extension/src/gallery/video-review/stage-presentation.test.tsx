@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useLayoutEffect, useState } from 'react';
+import { ReviewStage } from './stage';
+import { reviewPresentedGeometry } from '../../workflows/video-review/gpu-preview-geometry';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { useStagePresentation, ReviewStagePresentationFeedback } from './stage-presentation';
@@ -13,7 +15,7 @@ const io = vi.hoisted(() => ({ present: vi.fn() }));
 vi.mock('./use-preview-presentation', () => ({ useReviewPreviewPresentation: io.present }));
 afterEach(() => vi.unstubAllGlobals());
 
-it('keeps inspector draft interaction active independently of local stage pointer capture', () => {
+it('keeps inspector draft interaction and rendering live independently of local stage pointer capture', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   io.present.mockReturnValue({ status: { actualRaster: null } });
   const host = document.createElement('div');
@@ -25,12 +27,14 @@ it('keeps inspector draft interaction active independently of local stage pointe
     source: { width: 640, height: 360, duration: 10, mimeType: 'video/webm', size: 1 },
     preview: {
       preferences: {
+        renderer: 'gpu',
         rasterPreset: 'current',
         frameRate: 'current',
         pausedQuality: 'same',
         showFrameRate: false,
       },
       playing: false,
+      onPresentationActive: vi.fn(),
       sourceToResult: (time) => time,
       interacting: false,
     },
@@ -50,16 +54,29 @@ it('keeps inspector draft interaction active independently of local stage pointe
   };
   try {
     render(false);
+    expect(io.present.mock.lastCall![0].onPresentationActive).toBe(
+      props.preview!.onPresentationActive
+    );
     expect(io.present.mock.lastCall![0].interacting).toBe(false);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
+    render(true);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
+    render(false);
     act(() =>
       host.firstElementChild!.dispatchEvent(
         new MouseEvent('pointerdown', { bubbles: true, button: 0 })
       )
     );
     expect(io.present.mock.lastCall![0].interacting).toBe(true);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
     render(true);
     act(() => window.dispatchEvent(new Event('pointerup')));
     expect(io.present.mock.lastCall![0].interacting).toBe(true);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
+    props.preview = { ...props.preview!, playing: true };
+    render(true);
+    expect(io.present.mock.lastCall![0].deferFrames ?? false).toBe(false);
+    props.preview = { ...props.preview!, playing: false };
     render(false);
     expect(io.present.mock.lastCall![0].interacting).toBe(false);
   } finally {
@@ -126,6 +143,7 @@ it('reports raster dimensions only when their values or receiver change', () => 
     source: { width: 640, height: 360, duration: 10, mimeType: 'video/webm', size: 1 },
     preview: {
       preferences: {
+        renderer: 'gpu',
         rasterPreset: 'current',
         frameRate: 'current',
         pausedQuality: 'same',
@@ -165,5 +183,90 @@ it('reports raster dimensions only when their values or receiver change', () => 
   } finally {
     act(() => root.unmount());
     host.remove();
+  }
+});
+
+it('batches the exact published stage geometry and root display clock and rejects another source', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(800);
+  const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(450);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const commits: { time: number; transform: string }[] = [];
+  const source = { width: 320, height: 180, duration: 4, mimeType: 'video/webm', size: 1 };
+  const background = { enabled: false as const };
+  const camera = { scale: 1.7, centerX: 0.6, centerY: 0.4 };
+  io.present.mockReturnValue({
+    active: true,
+    status: { phase: 'ready', actualRaster: { width: 800, height: 450 } },
+    retry: vi.fn(),
+    onCommentPreview: vi.fn(),
+    onWebcamPreview: vi.fn(),
+    webcamManual: { phase: 'ready', duration: 4, ready: true, onPreviewPlacement: vi.fn() },
+    watermarkManual: { bounds: null },
+  });
+  function Harness() {
+    const [time, setTime] = useState(0);
+    useLayoutEffect(() => {
+      commits.push({ time, transform: host.querySelector('video')!.style.transform });
+    });
+    return (
+      <ReviewStage
+        source={source}
+        url="blob:source"
+        video={{ current: null }}
+        drawing={false}
+        region={undefined}
+        scene={{ background, camera: { scale: 1, centerX: 0.5, centerY: 0.5 } }}
+        preview={{
+          playing: true,
+          preferences: {
+            renderer: 'gpu',
+            rasterPreset: 'current',
+            frameRate: 'current',
+            pausedQuality: 'same',
+            showFrameRate: false,
+          },
+          sourceToResult: (value) => value,
+          onPresentedTime: (_source, value) => setTime(value),
+        }}
+        onRegion={vi.fn()}
+        onReady={vi.fn()}
+        onTime={vi.fn()}
+        onPlaying={vi.fn()}
+        onError={vi.fn()}
+      />
+    );
+  }
+  try {
+    act(() => root.render(<Harness />));
+    commits.length = 0;
+    const receipt = reviewPresentedGeometry(
+      { source, background, zoomRegions: [], comments: [], keys: [], clicks: [] },
+      { canonical: source, backing: { width: 800, height: 450 } },
+      1,
+      camera
+    );
+    const receive = io.present.mock.lastCall![0].onGeometry;
+    act(() => receive(receipt, 1.234567, 'blob:source'));
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.time).toBe(1.234567);
+    expect(commits[0]!.transform).toContain('scale(1.7)');
+    commits.length = 0;
+    act(() => receive(receipt, 2, 'blob:old-source'));
+    expect(commits).toEqual([]);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    width.mockRestore();
+    height.mockRestore();
   }
 });

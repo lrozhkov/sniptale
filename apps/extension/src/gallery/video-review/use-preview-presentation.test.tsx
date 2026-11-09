@@ -8,8 +8,6 @@ import {
   type ReviewPreviewPresentationInput,
 } from './use-preview-presentation';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
-import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
-import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { createCanvasComment } from '../../features/video/review/comments';
 
 const io = vi.hoisted(() => ({
@@ -66,6 +64,7 @@ const assets = {
 };
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   time = 0;
   nextTick = 0;
@@ -132,14 +131,17 @@ beforeEach(() => {
     releases.push(release);
     return {
       canvas,
+      outputKind: 'canvas2d',
       context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
       release,
       generation: frame.generation,
+      sourceTime: frame.sourceTime,
     };
   });
   io.factory.mockImplementation(() => ({
+    maximumInFlight: () => 2,
     prepare: io.prepare,
-    render: io.render,
+    renderPresentation: io.render,
     dispose: io.dispose,
   }));
   io.bytes.mockImplementation(() => ({ release: vi.fn() }));
@@ -150,6 +152,7 @@ afterEach(async () => {
   host.remove();
   vi.restoreAllMocks();
   vi.resetAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 function Harness() {
@@ -165,6 +168,7 @@ const step = async (value: number) => {
     const callbacks = [...ticks.values()];
     ticks.clear();
     callbacks.forEach((callback) => callback(time));
+    await vi.runOnlyPendingTimersAsync();
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -174,6 +178,7 @@ it('preserves Current mode and allocates no manual renderer for an FPS readout',
   props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, showFrameRate: true };
   await render();
   expect(result.active).toBe(false);
+  expect(result.status.renderer).toEqual({ backend: 'legacy', fallback: 'unavailable' });
   expect(io.factory).not.toHaveBeenCalled();
   expect(io.prepare).not.toHaveBeenCalled();
   expect(isReviewPreviewManual({ ...props.preferences, pausedQuality: 'detailed' }, false)).toBe(
@@ -256,6 +261,89 @@ it('publishes a complete manual frame at exact paused clocks and retains only it
   expect(releases[0]).toHaveBeenCalledOnce();
   expect(releases[1]).not.toHaveBeenCalled();
   expect(result.status.presentedFPS).toBeNull();
+});
+
+it.each(['commit', 'cancel'] as const)(
+  'retains the published frame during inspector drafts and resumes the latest %s scene',
+  async (completion) => {
+    const geometry = vi.fn();
+    props = { ...props, onGeometry: geometry };
+    await render();
+    await step(0);
+    const initialScene = props.scene;
+    const front = props.host.current!.querySelector('canvas[data-preview-front="true"]');
+    expect(front).not.toBeNull();
+    const preparations = io.prepare.mock.calls.length;
+    const captures = closed.mock.calls.length;
+    geometry.mockClear();
+    for (const value of ['draft-first', 'draft-latest']) {
+      props = {
+        ...props,
+        interacting: true,
+        deferFrames: true,
+        scene: {
+          ...initialScene,
+          comments: [{ ...initialScene.comments[0]!, resolvedText: value }],
+        },
+      };
+      await render();
+      await step(50);
+    }
+    expect(io.prepare).toHaveBeenCalledTimes(preparations);
+    expect(closed).toHaveBeenCalledTimes(captures);
+    expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBe(front);
+    expect(releases[0]).not.toHaveBeenCalled();
+    expect(geometry).not.toHaveBeenCalled();
+    expect(io.dispose).not.toHaveBeenCalled();
+    expect(result.status.phase).toBe('ready');
+    props = {
+      ...props,
+      deferFrames: false,
+      interacting: false,
+      scene: completion === 'cancel' ? initialScene : props.scene,
+    };
+    await render();
+    await step(100);
+    expect(io.prepare).toHaveBeenCalledTimes(preparations + 1);
+    expect(io.prepare.mock.lastCall![0].comments[0].resolvedText).toBe(
+      completion === 'cancel' ? 'Live' : 'draft-latest'
+    );
+    expect(releases[0]).toHaveBeenCalledOnce();
+    expect(result.status.phase).toBe('ready');
+  }
+);
+
+it('drains an in-flight frame without publishing it when inspector priority starts', async () => {
+  await render();
+  await step(0);
+  const front = props.host.current!.querySelector('canvas[data-preview-front="true"]');
+  const draw = io.render.getMockImplementation()!;
+  let finish!: () => void;
+  io.render.mockImplementationOnce(
+    (...args: unknown[]) =>
+      new Promise((resolve) => {
+        finish = () => resolve(draw(...args));
+      })
+  );
+  props = { ...props, pausedResultTime: 1.1 };
+  await render();
+  await step(50);
+  expect(io.render).toHaveBeenCalledTimes(2);
+  const signal = io.render.mock.lastCall![2] as AbortSignal;
+  expect(signal.aborted).toBe(false);
+  props = { ...props, interacting: true, deferFrames: true, pausedResultTime: 1.2 };
+  await render();
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish());
+  expect(releases[1]).toHaveBeenCalledOnce();
+  expect(releases[0]).not.toHaveBeenCalled();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).toBe(front);
+  props = { ...props, interacting: false, deferFrames: false, pausedResultTime: 1.3 };
+  await render();
+  await step(100);
+  expect(io.render).toHaveBeenCalledTimes(3);
+  expect(io.render.mock.lastCall![1].resultTime).toBe(1.3);
+  expect(releases[0]).toHaveBeenCalledOnce();
 });
 
 it('does not capture stale source pixels after asynchronous preparation finishes for a replaced source', async () => {
@@ -460,132 +548,6 @@ it('retains cut admission until its mounted source lifetime changes', async () =
   expect(() => replacement([100, 200])).toThrow('Preview endpoint owner unavailable');
 });
 
-function cameraBinding() {
-  const settings = createQuickEditWebcam(
-    'project-asset:camera',
-    { width: 160, height: 90 },
-    props.canonical
-  );
-  const released = vi.fn();
-  const frame = {
-    allocationBytes: 500,
-    representedMediaTime: 1.2,
-    generation: 2,
-    source: { width: 160, height: 90 },
-    placement: settings.placement,
-    drawable: { draw: vi.fn() },
-    release: released,
-  };
-  const captureAccepted = vi.fn<(request: unknown, resources: RenderResources) => unknown>(() => ({
-    status: 'ready',
-    frame,
-  }));
-  const dispose = vi.fn();
-  io.camera.mockReturnValue({ captureAccepted, dispose });
-  props.webcam = {
-    settings,
-    disabled: false,
-    onResourceReady: vi.fn(),
-    editor: {
-      selection: { kind: 'webcam' },
-      placement: settings.placement,
-      crop: { zoom: 1.2, panX: 0.1, panY: 0.2 },
-      resourceAttempt: 0,
-      place: vi.fn(),
-      retry: vi.fn(),
-      selectVisible: vi.fn(),
-      time: 1.2,
-    },
-  };
-  return {
-    settings,
-    frame,
-    released,
-    captureAccepted,
-    dispose,
-    events: () =>
-      io.camera.mock.lastCall![3] as {
-        loaded(duration: number): void;
-        ready(visible: boolean): void;
-        failed(): void;
-      },
-  };
-}
-
-it('waits for camera load, admits selected crop and releases both camera reservations', async () => {
-  const camera = cameraBinding();
-  camera.captureAccepted.mockImplementation((_request, resources) => {
-    const retained = resources.bytes('webcam.retained', 500);
-    const active = resources.bytes('webcam.active', 500);
-    return {
-      status: 'ready',
-      frame: {
-        ...camera.frame,
-        release() {
-          camera.released();
-          active.release();
-          retained.release();
-        },
-      },
-    };
-  });
-  await render();
-  await step(0);
-  expect(result.status.phase).toBe('pending');
-  expect(closed).toHaveBeenCalledOnce();
-  act(() => {
-    camera.events().loaded(20);
-    camera.events().ready(true);
-  });
-  await step(50);
-  expect(result.status.phase).toBe('ready');
-  expect(props.webcam!.onResourceReady).toHaveBeenCalledOnce();
-  expect(camera.captureAccepted.mock.lastCall![0]).toEqual({
-    placement: camera.settings.placement,
-    crop: props.webcam!.editor.crop,
-  });
-  expect(io.render.mock.lastCall![1].camera.representedMediaTime).toBe(1.2);
-  expect(camera.released).toHaveBeenCalledOnce();
-  expect(
-    io.graph.mock.calls.some(
-      ([graph]) => graph.camera.retainedBytes === 500 && graph.camera.activeBytes === 500
-    )
-  ).toBe(true);
-  props = { ...props, visible: false };
-  await render();
-  expect(camera.dispose).toHaveBeenCalledOnce();
-});
-
-it.each(['unavailable', 'failed'] as const)(
-  'releases source capture when camera admission is %s',
-  async (status) => {
-    const camera = cameraBinding();
-    camera.captureAccepted.mockReturnValue({ status });
-    await render();
-    act(() => camera.events().loaded(20));
-    await step(0);
-    expect(result.status.phase).toBe(status === 'failed' ? 'failed' : 'pending');
-    expect(closed).toHaveBeenCalledOnce();
-    expect(io.render).not.toHaveBeenCalled();
-    camera.captureAccepted.mockReturnValue({ status: 'ready', frame: camera.frame });
-    act(() => (status === 'failed' ? result.retry() : camera.events().ready(true)));
-    await step(50);
-    expect(result.status.phase).toBe('ready');
-    expect(camera.released).toHaveBeenCalledOnce();
-  }
-);
-
-it('leaves an offset-hidden loaded camera uncaptured', async () => {
-  const camera = cameraBinding();
-  props.webcam!.settings.offsetSeconds = 10;
-  await render();
-  act(() => camera.events().loaded(20));
-  await step(0);
-  expect(result.status.phase).toBe('ready');
-  expect(camera.captureAccepted).not.toHaveBeenCalled();
-  expect(io.render.mock.lastCall![1].camera).toBeUndefined();
-});
-
 it.each([false, true])(
   'retries a cut provider with failed=%s without exposing a partial frame',
   async (failed) => {
@@ -672,116 +634,6 @@ it('requires explicit retry after context loss and ignores loss after disposal',
   expect(result.status.phase).toBe('inactive');
 });
 
-it.each([
-  ['webcam.retained', 'limits'],
-  ['webcam.retained', 'bytes'],
-  ['webcam.active', 'limits'],
-  ['webcam.active', 'bytes'],
-] as const)('rolls back %s charge when %s admission fails', async (role, failure) => {
-  const camera = cameraBinding();
-  camera.captureAccepted.mockImplementation((_request, resources) => {
-    resources.bytes(role, 500);
-    return { status: 'ready', frame: camera.frame };
-  });
-  if (failure === 'bytes') {
-    io.bytes.mockImplementation((requested) => {
-      if (requested === role) throw new Error('Camera reservation refused');
-      return { release: vi.fn() };
-    });
-  } else {
-    io.limits.mockImplementation(() => {
-      const graph = io.graph.mock.lastCall![0];
-      const charge =
-        role === 'webcam.retained' ? graph.camera.retainedBytes : graph.camera.activeBytes;
-      if (charge === 500) throw new Error('Camera limit refused');
-    });
-  }
-  await render();
-  act(() => camera.events().loaded(20));
-  await step(0);
-  expect(result.status.phase).toBe('failed');
-  expect(closed).toHaveBeenCalledOnce();
-  io.limits.mockReset();
-  io.bytes.mockImplementation(() => ({ release: vi.fn() }));
-  props.webcam!.settings.offsetSeconds = 10;
-  act(() => result.retry());
-  await step(50);
-  expect(result.status.phase).toBe('ready');
-  expect(io.graph.mock.lastCall![0].camera).toEqual({ retainedBytes: null, activeBytes: null });
-});
-
-it('retries a failed camera through its acquisition owner and rejects disposed-source callbacks', async () => {
-  const camera = cameraBinding();
-  const binding = props.webcam!;
-  const retry: ReturnType<typeof vi.fn<() => undefined>> = vi.fn(() => {
-    props = {
-      ...props,
-      webcam: {
-        ...binding,
-        editor: {
-          ...binding.editor,
-          resourceAttempt: binding.editor.resourceAttempt + 1,
-          retry,
-        },
-      },
-    };
-    return undefined;
-  });
-  binding.editor.retry = retry;
-  await render();
-  const oldEvents = camera.events();
-  act(() => oldEvents.failed());
-  await step(0);
-  expect(result.status.phase).toBe('failed');
-  act(() => result.retry());
-  expect(retry).toHaveBeenCalledOnce();
-  await render();
-  expect(camera.dispose).toHaveBeenCalledOnce();
-  expect(io.camera).toHaveBeenCalledTimes(2);
-  expect(result.webcamManual.phase).toBe('loading');
-  const freshEvents = camera.events();
-  expect(freshEvents).not.toBe(oldEvents);
-  act(() => {
-    freshEvents.loaded(20);
-    freshEvents.ready(true);
-  });
-  await step(50);
-  expect(result.status.phase).toBe('ready');
-  const published = props.host.current!.firstChild;
-  const readyCalls = vi.mocked(binding.onResourceReady!).mock.calls.length;
-  act(() => {
-    oldEvents.failed();
-    oldEvents.loaded(900);
-    oldEvents.ready(false);
-  });
-  await step(100);
-  expect(result.webcamManual.phase).toBe('ready');
-  expect(result.webcamManual.duration).toBe(20);
-  expect(result.webcamManual.ready).toBe(true);
-  expect(binding.onResourceReady).toHaveBeenCalledTimes(readyCalls);
-  expect(props.host.current!.firstChild).toBe(published);
-});
-
-it('keeps a healthy camera lifetime when retrying an unrelated renderer failure', async () => {
-  const camera = cameraBinding();
-  io.render.mockImplementationOnce(() => {
-    throw new Error('Renderer failed');
-  });
-  await render();
-  act(() => {
-    camera.events().loaded(20);
-    camera.events().ready(true);
-  });
-  await step(0);
-  expect(result.status.phase).toBe('failed');
-  act(() => result.retry());
-  await step(50);
-  expect(result.status.phase).toBe('ready');
-  expect(props.webcam!.editor.retry).not.toHaveBeenCalled();
-  expect(camera.dispose).not.toHaveBeenCalled();
-  expect(io.camera).toHaveBeenCalledOnce();
-});
-
 it('keeps the composed owner for dissolve projects even at Current quality outside the seam', async () => {
   props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
   props.cut = {
@@ -841,37 +693,6 @@ it('waits for attached background publication and resumes the same paused frame 
   expect(props.video.current!.currentTime).toBe(1.234567);
 });
 
-it('retains one detailed renderer across native playback and waits for the new paused publication', async () => {
-  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES, pausedQuality: 'detailed' };
-  const camera = cameraBinding();
-  await render();
-  act(() => {
-    camera.events().loaded(20);
-    camera.events().ready(true);
-  });
-  await step(0);
-  expect(result.status.actualRaster).not.toBeNull();
-  props = { ...props, playing: true };
-  await render();
-  await step(50);
-  expect(result.active).toBe(false);
-  expect(io.dispose).not.toHaveBeenCalled();
-  expect(camera.dispose).toHaveBeenCalledOnce();
-  expect(io.render).toHaveBeenCalledOnce();
-  props = { ...props, playing: false, pausedSourceTime: 2, pausedResultTime: 1.75 };
-  await render();
-  expect(result.status.actualRaster).toBeNull();
-  expect(io.camera).toHaveBeenCalledTimes(2);
-  act(() => {
-    camera.events().loaded(20);
-    camera.events().ready(true);
-  });
-  await step(100);
-  expect(result.status.actualRaster).not.toBeNull();
-  expect(io.factory).toHaveBeenCalledOnce();
-  expect(io.render.mock.lastCall![1].sourceTime).toBe(2);
-});
-
 it('does not publish again when persistence only reorders scene properties', async () => {
   props.scene.background = {
     enabled: true,
@@ -926,23 +747,29 @@ it('does not publish again when persistence only reorders scene properties', asy
   expect(io.render).toHaveBeenCalledTimes(3);
 });
 
-it.each(['shift', 'overlay'] as const)(
-  'keeps the resolved camera panel when selected in %s mode',
-  async (screenBehavior) => {
-    const camera = cameraBinding();
-    camera.settings.split = 'left';
-    camera.settings.screenBehavior = screenBehavior;
-    await render();
-    await step(0);
-    act(() => {
-      camera.events().loaded(20);
-      camera.events().ready(true);
-    });
-    await step(50);
-    expect(result.status.phase).toBe('ready');
-    expect(camera.captureAccepted.mock.lastCall![0]).toEqual({
-      placement: undefined,
-      crop: props.webcam!.editor.crop,
-    });
-  }
-);
+it('routes Current mode through the retained compositor when WebGPU is exposed', async () => {
+  vi.stubGlobal('navigator', { gpu: {} });
+  props.preferences = { ...DEFAULT_QUICK_PREVIEW_PREFERENCES };
+  await render();
+  expect(result.active).toBe(true);
+  await step(0);
+  expect(io.render).toHaveBeenCalledOnce();
+  expect(io.render.mock.calls[0]![1].source.videoFrame()).toBeDefined();
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBeNull();
+});
+
+it('publishes geometry only with the matching completed front frame', async () => {
+  const geometry = { resultTime: props.pausedResultTime };
+  const report = vi.fn();
+  props.onGeometry = report;
+  const draw = io.render.getMockImplementation()!;
+  io.render.mockImplementationOnce((...args: unknown[]) => ({ ...draw(...args), geometry }));
+  await render();
+  expect(report).not.toHaveBeenCalled();
+  await step(0);
+  expect(report).toHaveBeenLastCalledWith(geometry, props.pausedSourceTime, props.sourceIdentity);
+  expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBeNull();
+  props.visible = false;
+  await render();
+  expect(report).toHaveBeenLastCalledWith(null, undefined, props.sourceIdentity);
+});

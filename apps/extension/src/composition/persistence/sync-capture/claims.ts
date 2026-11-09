@@ -25,11 +25,31 @@ export function collectSyncCaptureClaims(raw: unknown): {
       assetIds.add(record.change.rows.ref.assetId);
       if ('screenshotRef' in record.change.rows)
         assetIds.add(record.change.rows.screenshotRef.assetId);
+      if (
+        'recording' in record.change.rows &&
+        record.change.rows.telemetry?.recordingEventsSnapshot
+      )
+        assetIds.add(record.change.rows.telemetry.recordingEventsSnapshot.ref.assetId);
+      if (
+        'recording' in record.change.rows &&
+        record.change.rows.telemetry?.cursorTrajectorySnapshot
+      )
+        assetIds.add(record.change.rows.telemetry.cursorTrajectorySnapshot.ref.assetId);
       continue;
     }
     if (record.change.kind === 'video-review') {
       assetIds.add(record.change.rows.source.ref.assetId);
       for (const ref of record.change.rows.refs) assetIds.add(ref.assetId);
+      if (
+        'recording' in record.change.rows.source &&
+        record.change.rows.source.telemetry?.recordingEventsSnapshot
+      )
+        assetIds.add(record.change.rows.source.telemetry.recordingEventsSnapshot.ref.assetId);
+      if (
+        'recording' in record.change.rows.source &&
+        record.change.rows.source.telemetry?.cursorTrajectorySnapshot
+      )
+        assetIds.add(record.change.rows.source.telemetry.cursorTrajectorySnapshot.ref.assetId);
       continue;
     }
     if (record.change.kind === 'image') {
@@ -39,6 +59,13 @@ export function collectSyncCaptureClaims(raw: unknown): {
     }
     if (record.change.kind === 'video-project' || record.change.kind === 'scenario-project')
       for (const ref of record.change.rows.refs) assetIds.add(ref.assetId);
+    if (record.change.kind === 'video-project')
+      for (const telemetry of record.change.rows.telemetry ?? []) {
+        if (telemetry.cursorTrajectorySnapshot)
+          assetIds.add(telemetry.cursorTrajectorySnapshot.ref.assetId);
+        if (telemetry.recordingEventsSnapshot)
+          assetIds.add(telemetry.recordingEventsSnapshot.ref.assetId);
+      }
   }
   return { valid, assetIds };
 }

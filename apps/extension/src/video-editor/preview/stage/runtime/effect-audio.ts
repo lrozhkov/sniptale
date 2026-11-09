@@ -1,3 +1,4 @@
+import { createRecordingProjectActionAudioSource } from '../../../../workflows/video-review/recording-action-audio';
 import type { VideoEditorPreviewPrepareRequest } from '../../../contracts/preview-runtime';
 import { planProjectSourceVoiceoverPlayback } from '../../../../features/video/project/source-voiceover-playback';
 import { createProjectSourceVoiceoverAudioRuntime } from './source-voiceover-audio';
@@ -25,19 +26,38 @@ export function usePreviewEffectAudio(args: {
   feedback: PreviewEffectRuntimeFeedback;
   isPlaying: boolean;
   project: VideoProject;
+  recordingProject?: VideoProject;
 }) {
   const outputGain = getVideoProjectSceneEdgeAudioGain(args.project, args.currentTime);
   const plans = useMemo(() => resolveEffectRuntimeAudioPlans(args.project), [args.project]);
   const stateRef = useRef(createPreviewEffectAudioState());
   const actionStateRef = useRef(createProjectActionAudioRuntime());
-  const actionPlan = useMemo(() => buildProjectActionAudioPlan(args.project), [args.project]);
+  const recordingProject = args.recordingProject ?? args.project;
+  const { onFailure, onRecovery, retryVersion } = args.feedback;
+  const recordingSource = useMemo(() => {
+    // Retry replaces source-owned admission and window caches.
+    void retryVersion;
+    return recordingProject.actionPresentation?.enabled !== false &&
+      recordingProject.actionFeedback?.some(
+        (group) =>
+          group.events &&
+          group.events.totalBlocks > 0 &&
+          group.settings.some(
+            (setting) => setting.enabled && setting.presetId !== null && setting.volume > 0
+          )
+      )
+      ? createRecordingProjectActionAudioSource(recordingProject)
+      : null;
+  }, [recordingProject, retryVersion]);
+  const actionProject = recordingSource ? recordingProject : args.project;
+  const actionPlan = useMemo(() => buildProjectActionAudioPlan(actionProject), [actionProject]);
+  useEffect(() => () => recordingSource?.dispose(), [recordingSource]);
   const voiceStateRef = useRef(createProjectSourceVoiceoverAudioRuntime());
   const voiceEntries = useMemo(
-    () => planProjectSourceVoiceoverPlayback(args.project).map((item) => item.entry),
-    [args.project]
+    () => planProjectSourceVoiceoverPlayback(recordingProject).map((item) => item.entry),
+    [recordingProject]
   );
   const retryVersionRef = useRef(args.feedback.retryVersion);
-  const { onFailure, onRecovery, retryVersion } = args.feedback;
 
   useLayoutEffect(() => {
     if (retryVersionRef.current !== retryVersion) {
@@ -64,6 +84,7 @@ export function usePreviewEffectAudio(args: {
       }),
       actionStateRef.current.sync({
         plan: actionPlan,
+        ...(recordingSource ? { recordingSource } : {}),
         currentTime: args.currentTime,
         isPlaying: args.isPlaying,
         outputGain,
@@ -88,6 +109,7 @@ export function usePreviewEffectAudio(args: {
     onRecovery,
     plans,
     actionPlan,
+    recordingSource,
     retryVersion,
     outputGain,
   ]);
@@ -95,17 +117,27 @@ export function usePreviewEffectAudio(args: {
   const prepareSourceVoiceover = useCallback(
     async (request: VideoEditorPreviewPrepareRequest) => {
       try {
-        await voiceStateRef.current.prepare(
-          { entries: voiceEntries, assetUrls: args.assetUrls, currentTime: request.time },
-          request.signal
-        );
+        await Promise.all([
+          voiceStateRef.current.prepare(
+            { entries: voiceEntries, assetUrls: args.assetUrls, currentTime: request.time },
+            request.signal
+          ),
+          ...(recordingSource
+            ? [
+                actionStateRef.current.prepare(
+                  { plan: actionPlan, recordingSource },
+                  request.signal
+                ),
+              ]
+            : []),
+        ]);
       } catch (error) {
         if (request.signal.aborted || retryVersionRef.current !== retryVersion) return;
         onFailure('audio', error);
         throw error;
       }
     },
-    [voiceEntries, args.assetUrls, onFailure, retryVersion]
+    [voiceEntries, args.assetUrls, onFailure, retryVersion, recordingSource, actionPlan]
   );
 
   useEffect(() => {

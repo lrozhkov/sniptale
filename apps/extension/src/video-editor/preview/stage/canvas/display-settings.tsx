@@ -13,6 +13,7 @@ import { translate } from '../../../../platform/i18n';
 import type {
   VideoEditorPreviewFrameRate,
   VideoEditorPreviewMode,
+  VideoPreviewRenderer,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
 } from '../../../contracts/preview-runtime';
@@ -20,6 +21,8 @@ import type {
 interface PreviewDisplaySettingsProps {
   frameRate?: VideoEditorPreviewFrameRate;
   onFrameRateChange?: (frameRate: VideoEditorPreviewFrameRate) => void;
+  renderer?: VideoPreviewRenderer;
+  onRendererChange?: (renderer: VideoPreviewRenderer) => void;
   mode: VideoEditorPreviewMode;
   onModeChange: (mode: VideoEditorPreviewMode) => void;
   rasterPreset: VideoEditorPreviewRasterPreset;
@@ -177,6 +180,24 @@ function PreviewDisplayChoices(props: PreviewDisplaySettingsProps) {
         '!max-h-[calc(100vh-32px)] overflow-y-auto !rounded-[4px] !p-[5px]',
       ].join(' ')}
     >
+      <DisplayChoiceSection
+        label={translate('editor.scene.previewRenderer')}
+        value={props.renderer ?? 'gpu'}
+        onChange={props.onRendererChange ?? (() => undefined)}
+        options={[
+          { value: 'gpu', label: translate('editor.scene.previewRendererGpu') },
+          { value: 'legacy', label: translate('editor.scene.previewRendererLegacy') },
+        ]}
+      />
+      {props.renderer !== 'legacy' && frameRate?.rendererStatus?.fallback ? (
+        <p role="status" className="m-0 px-2 pb-2 text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate(
+            frameRate.rendererStatus.fallback === 'device-failed'
+              ? 'editor.scene.previewRendererFailed'
+              : 'editor.scene.previewRendererUnavailable'
+          )}
+        </p>
+      ) : null}
       <DisplayChoiceSection
         label={translate('videoEditor.stage.previewMode')}
         value={props.mode}

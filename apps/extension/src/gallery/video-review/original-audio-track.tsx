@@ -7,7 +7,7 @@ import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions'
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Captions, Volume2, VolumeX, Link2 } from 'lucide-react';
+import { Volume2, VolumeX, Link2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type {
@@ -19,7 +19,7 @@ import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
 import type { useReviewAudio } from './use-review-audio';
 import { ReviewAudioWaveform } from './audio-waveform';
-import { ReviewButton, reviewTrackStatusButtonClassName } from './controls';
+import { reviewTrackStatusButtonClassName } from './controls';
 
 type Drag = {
   admission: ReturnType<typeof deferReviewGesture>;
@@ -50,7 +50,6 @@ export function ReviewOriginalAudioTrack(props: {
   selectedEditId?: string | undefined;
   onRange?: ((range: ReviewAnchor) => void) | undefined;
   onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
-  onOpenSpeech?: (() => void) | undefined;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
 }) {
   const duration = props.projection?.duration ?? props.duration;
@@ -79,7 +78,6 @@ export function ReviewOriginalAudioTrack(props: {
       }
       controls={
         <OriginalAudioControls
-          onOpenSpeech={props.onOpenSpeech}
           original={props.original}
           busy={props.busy}
           beforeAction={props.beforeAction}
@@ -180,22 +178,11 @@ function OriginalAudioControls(props: {
   original: QuickEditOriginalAudio;
   busy: boolean;
   beforeAction?: ReviewBeforeAction | undefined;
-  onOpenSpeech?: (() => void) | undefined;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
 }) {
   const muted = props.original.muted || props.original.volume === 0;
   return (
     <>
-      {props.onOpenSpeech ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.speechTitle')}
-          disabled={props.busy}
-          className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={() => (props.beforeAction ?? ((action) => action()))(props.onOpenSpeech!)}
-        >
-          <Captions size={14} aria-hidden="true" />
-        </ReviewButton>
-      ) : null}
       <ReviewTrackVisibilityButton
         track="originalAudio"
         label={translate(

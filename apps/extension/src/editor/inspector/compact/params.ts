@@ -95,7 +95,6 @@ function buildCompactFrameOptions(
 ): BuildEditorInspectorCompactCommandGroupsParams['frameOptions'] {
   return {
     browserCanvasModeOptions: params.browserCanvasModeOptions,
-    browserContentModeOptions: params.browserContentModeOptions,
     frameLayoutModeOptions: params.frameLayoutModeOptions,
     frameBackgroundModeOptions: params.frameBackgroundModeOptions,
     frameBackgroundImageFitOptions: params.frameBackgroundImageFitOptions,
@@ -143,6 +142,7 @@ function buildCompactEditorActions(
     setCanvasSizeLocked: params.setCanvasSizeLocked,
     setLayerSizeLocked: params.setLayerSizeLocked,
     setFrameDraft: params.setFrameDraft,
+    previewFrameDraft: params.previewFrameDraft,
     applyWorkspaceColor: params.applyWorkspaceColor,
     saveWorkspaceColorAsDefault: params.saveWorkspaceColorAsDefault,
     syncBrowserFrame: params.syncBrowserFrame,

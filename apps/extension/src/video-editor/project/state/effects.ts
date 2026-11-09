@@ -1,3 +1,4 @@
+import { resolveRecordingActionOccurrences } from '../operations/recording-events-selection';
 import { isMotionFocusArea } from '../../../features/video/project/motion/focus-area';
 import {
   motionWindowFocusToComposition,
@@ -166,7 +167,18 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
     set((state) =>
       applyProjectUpdate(state, (project) => {
         if (isVideoProjectUtilityLaneLocked(project, 'actions')) return project;
-        const event = project.actionEvents.find((item) => item.id === actionEventId);
+        const observed =
+          state.selection.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE &&
+          state.selection.eventId === actionEventId
+            ? state.selection.observedAction
+            : undefined;
+        const event =
+          project.actionEvents.find((item) => item.id === actionEventId) ??
+          (observed
+            ? resolveRecordingActionOccurrences(project, observed).find(
+                (item) => item.eventId === actionEventId
+              )?.event
+            : undefined);
         if (
           !event ||
           (patch.presentation === undefined &&
@@ -176,7 +188,7 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
           return project;
         if (
           (patch.point !== undefined || patch.presentation?.point !== undefined) &&
-          !resolveVideoProjectActionOccurrences(project).some(
+          !resolveVideoProjectActionOccurrences(project, [event]).some(
             (item) => item.eventId === actionEventId && item.clipId === patch.clipId
           )
         )
@@ -184,7 +196,7 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
         const occurrence =
           patch.time === undefined
             ? null
-            : resolveVideoProjectActionOccurrences(project).find(
+            : resolveVideoProjectActionOccurrences(project, [event]).find(
                 (item) => item.eventId === actionEventId && item.clipId === patch.clipId
               );
         if (patch.time !== undefined && (!Number.isFinite(patch.time) || !occurrence))
@@ -215,7 +227,13 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
                 item.sourceInstanceId === anchor.sourceInstanceId
             )!;
             authored = patchVideoProjectActionFeedback(project, anchor, {
-              keyStyles: patchReviewKeys(group.keyStyles ?? [], [anchor.sourceEventId], { offset }),
+              keyStyles: patchReviewKeys(
+                group.keyStyles?.some((item) => item.id === anchor.sourceEventId)
+                  ? group.keyStyles
+                  : [...(group.keyStyles ?? []), { ...keyStyle, id: anchor.sourceEventId }],
+                [anchor.sourceEventId],
+                { offset }
+              ),
             });
           }
         }
@@ -266,6 +284,21 @@ function createActionDetailsUpdater(set: VideoEditorStoreSet) {
           };
         if ((style || keyStyle) && patch.presentation === undefined)
           return authored === project ? project : applyVideoProjectMutationPatch(authored, {});
+        if (observed && event.anchor.kind === 'recording-source') {
+          const anchor = event.anchor;
+          const group = authored.actionFeedback!.find(
+            (item) =>
+              item.recordingId === anchor.recordingId &&
+              item.sourceInstanceId === anchor.sourceInstanceId
+          )!;
+          const actionOverrides = (group.actionOverrides ?? []).filter(
+            (item) => item.id !== anchor.sourceEventId
+          );
+          if (presentation && Object.keys(presentation).length > 0)
+            actionOverrides.push({ id: anchor.sourceEventId, presentation });
+          const changed = patchVideoProjectActionFeedback(authored, anchor, { actionOverrides });
+          return changed === authored ? project : applyVideoProjectMutationPatch(changed, {});
+        }
         const { presentation: _previous, ...captured } = event;
         const updated =
           presentation && Object.keys(presentation).length > 0
@@ -323,7 +356,7 @@ function resolveSourceActionOffset(
   time: number,
   offset: number
 ): number | null {
-  const row = resolveVideoProjectActionPresentations(project).find(
+  const row = resolveVideoProjectActionPresentations(project, [event]).find(
     (item) => item.occurrence.eventId === event.id && item.occurrence.clipId === clipId
   );
   if (!row) return null;
@@ -535,6 +568,7 @@ function mergeMotionRegionProperties(
     ...properties
   } = patch;
   const {
+    cursorComposition: _cursorComposition,
     perspective: _perspective,
     depthOfField: _depth,
     spatialReference: _reference,
@@ -542,6 +576,7 @@ function mergeMotionRegionProperties(
   } = transition ?? region;
   let updated = {
     ...(spatial ? withoutSpatial : (transition ?? region)),
+    ...(spatial?.cursorComposition ? { cursorComposition: spatial.cursorComposition } : {}),
     ...(spatial?.perspective ? { perspective: spatial.perspective } : {}),
     ...(spatial?.depthOfField ? { depthOfField: spatial.depthOfField } : {}),
     ...(spatial?.spatialReference ? { spatialReference: spatial.spatialReference } : {}),

@@ -1,3 +1,4 @@
+import { isPortableRecordingEventsAttachment } from '../media-hub-backup/v6/root-codecs/recording-events';
 import { portableSyncRootDependencyIds } from './prepared-scenario';
 import {
   captureProfileBounds,
@@ -8,6 +9,8 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseBoundedJson } from '../media-hub-backup/v6/codec';
 import type { MediaHubBackupRootEnvelope } from '../media-hub-backup/v6/contracts';
 import { parsePortableSyncRoot, portableSyncDependencyIds } from './prepared-root';
+import { hasCursorAttachmentMetadata } from '../media-hub-backup/v6/layout';
+import { isPortableCursorTrajectoryAttachment } from '../media-hub-backup/v6/root-codecs/cursor-trajectory';
 
 const MAX_TEXT_BYTES = 4 * 1024 * 1024;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u;
@@ -15,7 +18,7 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u;
 /** Logical changes contain portable metadata and hashes, never native file locations. */
 interface SyncOperation {
   format: 'sniptale-sync-operation';
-  version: 1;
+  version: 1 | 2;
   spaceId: string;
   operationId: string;
   rootKind: 'media' | 'video-project' | 'video-review' | 'scenario-project';
@@ -27,6 +30,11 @@ interface SyncOperation {
   rootDependencies?: CausalRootDependency[];
   envelope: MediaHubBackupRootEnvelope | null;
   objects: { objectId: string; sha256: string }[];
+}
+
+/** History-bearing roots require a reader that understands their typed attachment inventory. */
+export function syncOperationVersionForRoot(envelope: MediaHubBackupRootEnvelope | null): 1 | 2 {
+  return envelope && hasCursorAttachmentMetadata(envelope.metadata) ? 2 : 1;
 }
 
 function check(condition: unknown): asserts condition {
@@ -127,7 +135,10 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
     'envelope',
     'objects',
   ]);
-  check(value['format'] === 'sniptale-sync-operation' && value['version'] === 1);
+  check(
+    value['format'] === 'sniptale-sync-operation' &&
+      (value['version'] === 1 || value['version'] === 2)
+  );
   check(identity(value['spaceId']) && identity(value['operationId']) && identity(value['rootId']));
   check(
     value['rootKind'] === 'media' ||
@@ -150,6 +161,25 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
       ? null
       : await parsePortableSyncRoot(value['envelope'], reviewSourceMediaId);
   const envelope = portable?.envelope ?? null;
+  const version = syncOperationVersionForRoot(envelope);
+  check(value['version'] === version);
+  const recording = envelope && isRecord(envelope.metadata) ? envelope.metadata['recording'] : null;
+  if (isRecord(recording) && recording['cursorAttachment'] !== undefined) {
+    const attachment = recording['cursorAttachment'];
+    check(isPortableCursorTrajectoryAttachment(attachment));
+    check(
+      objects.find((object) => object.objectId === attachment.objectId)?.sha256 ===
+        attachment.descriptor.streamSha256
+    );
+  }
+  if (isRecord(recording) && recording['eventsAttachment'] !== undefined) {
+    const attachment = recording['eventsAttachment'];
+    check(isPortableRecordingEventsAttachment(attachment));
+    check(
+      objects.find((object) => object.objectId === attachment.objectId)?.sha256 ===
+        attachment.descriptor.streamSha256
+    );
+  }
   const needed = portable
     ? portableSyncDependencyIds(
         portable,
@@ -179,7 +209,7 @@ export async function parseSyncOperationText(text: string): Promise<SyncOperatio
   if (value['rootKind'] === 'media') check(dependencies.length === 0);
   const operation: SyncOperation = {
     format: 'sniptale-sync-operation',
-    version: 1,
+    version,
     spaceId: value['spaceId'],
     operationId: value['operationId'],
     rootKind: value['rootKind'],

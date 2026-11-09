@@ -1,6 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { createBackgroundRuntimeState } from '../../../application/runtime-state';
+import { createSyncCredentialRoute } from '../../../sync-connection/credential-route';
+import type {
+  SyncCredentialLease,
+  SyncCredentialRequest,
+  SyncCredentialResponse,
+} from '../../../../contracts/messaging/contracts/runtime-message/sync-connection.types';
+import { createActionContext } from './context';
 import type { BackgroundOwnedRouteContext } from '../../../routing-contracts/owned-route-context';
 import type { BackgroundOwnedAction } from './types';
 
@@ -211,13 +219,16 @@ function expectContextAwareRouteAdaptersCalled() {
     expect.objectContaining({ type: MessageType.AI_SECRET_UNLOCK }),
     sender,
     sendResponse,
-    routeContext
+    routeContext,
+    undefined,
+    undefined
   );
   expect(routeAiSettingsQueryMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ type: MessageType.AI_SETTINGS_QUERY }),
     sender,
     sendResponse,
-    routeContext
+    routeContext,
+    undefined
   );
   expect(routeAiSettingsNavigationMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({ type: MessageType.AI_SETTINGS_NAVIGATION }),
@@ -319,4 +330,63 @@ it('leaves malformed product ingress unhandled without invoking a response', () 
     handled: false,
   });
   expect(sendResponse).not.toHaveBeenCalled();
+});
+
+it('keeps a delayed credential refusal private from the origin permission owner', async () => {
+  const credentialLease: SyncCredentialLease = {
+    leaseId: '00000000-0000-4000-8000-000000000001',
+    workerEpoch: '00000000-0000-4000-8000-000000000002',
+    protectionEpoch: 3,
+    offscreenStartupId: '00000000-0000-4000-8000-000000000003',
+    executorId: '00000000-0000-4000-8000-000000000004',
+    credentialId: '00000000-0000-4000-8000-000000000005',
+    authorization: { incarnation: '00000000-0000-4000-8000-000000000006', revision: 1 },
+  };
+  let finish!: (value: SyncCredentialResponse) => void;
+  const pending = new Promise<SyncCredentialResponse>((resolve) => {
+    finish = resolve;
+  });
+  type Resolver = Parameters<
+    typeof createSyncCredentialRoute
+  >[0]['leases']['resolveAuthentication'];
+  const resolveAuthentication = vi.fn<Resolver>(async (_lease, publish) => {
+    const response = await pending;
+    publish?.(response);
+    return response;
+  });
+  const runtimeState = createBackgroundRuntimeState();
+  runtimeState.syncCredentialRoute = createSyncCredentialRoute({
+    leases: { resolveAuthentication },
+    hasTrustedSender: (value) => value.url === 'chrome-extension://owned/offscreen.html',
+  });
+  const permission = vi.fn<NonNullable<typeof runtimeState.syncOriginPermissionRoute>>();
+  runtimeState.syncOriginPermissionRoute = permission;
+  const message: SyncCredentialRequest = {
+    type: MessageType.SYNC_CONNECTION_CREDENTIAL,
+    requestId: '00000000-0000-4000-8000-000000000007',
+    credentialLease,
+  };
+  const input: BackgroundOwnedAction = {
+    actionKind: 'background-owned',
+    context: createActionContext({
+      runtimeState,
+      logger: { warn: vi.fn() },
+      sender: { id: 'owned', url: 'chrome-extension://owned/offscreen.html', frameId: 0 },
+      sendResponse,
+    }),
+    message,
+    routeName: `background-owned:${MessageType.SYNC_CONNECTION_CREDENTIAL}`,
+  };
+  expect(dispatchBackgroundOwnedRoute(input, null)).toEqual({
+    handled: true,
+    keepChannelOpen: true,
+  });
+  expect(resolveAuthentication).toHaveBeenCalledExactlyOnceWith(credentialLease, sendResponse);
+  expect(permission).not.toHaveBeenCalled();
+  expect(sendResponse).not.toHaveBeenCalled();
+  const refusal: SyncCredentialResponse = { success: false, error: 'secrets-locked' };
+  finish(refusal);
+  await pending;
+  expect(sendResponse).toHaveBeenCalledExactlyOnceWith(refusal);
+  expect(permission).not.toHaveBeenCalled();
 });

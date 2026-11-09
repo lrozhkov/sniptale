@@ -1,3 +1,9 @@
+import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
+import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
+import { decodeRecordingEventsBlock } from '../../../../features/video/project/recording-events/blocks';
+import { isRecordingEventsDescriptor } from '../../../../features/video/project/recording-events/records';
+import fixtureData from '../../../../features/video/project/recording-events/fixtures.json';
+import { projectRecordingEventAction } from '../../../../features/video/project/recording-events/project-facts';
 import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { bindMotionRegionToClip } from '../../../../features/video/project/motion/source-binding';
 import { expect, it, vi } from 'vitest';
@@ -540,3 +546,63 @@ it.each(['LINEAR', 'EASE_OUT', 'EASE_IN_OUT', 'INSTANT'] as const)(
     expect(store.selectMotionRegion).toHaveBeenCalledWith(destination.id, 'connection');
   }
 );
+
+it('disables the selected canonical stream event through Delete without requiring an inline event', () => {
+  const base = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 10,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: false,
+    sourceNormalizedActionEvents: [],
+    recordingSignals: [],
+  });
+  const events = fixtureData.descriptor;
+  const block = decodeRecordingEventsBlock(new TextEncoder().encode(fixtureData.blocks[0]!.utf8));
+  const record = block?.records.find((record) => record.kind === 'action');
+  if (!isRecordingEventsDescriptor(events) || record?.kind !== 'action')
+    throw new Error('Invalid fixture.');
+  const project = applyVideoProjectMutationPatch(base, {
+    actionFeedback: base.actionFeedback!.map((group) => ({ ...group, events })),
+  });
+  const group = project.actionFeedback![0]!;
+  const event = projectRecordingEventAction(group, record);
+  const observedAction = {
+    recordingId: group.recordingId,
+    sourceInstanceId: group.sourceInstanceId,
+    eventStreamId: events.eventStreamId,
+    streamSha256: events.streamSha256,
+    record,
+  };
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+  const store = createStore(project);
+  store.selection = {
+    kind: 'action-occurrence',
+    eventId: event.id,
+    clipId: clip.id,
+    observedAction,
+  };
+  createWorkspaceTimelineEditingActions(
+    store,
+    createWorkspace(),
+    createSelectedClipActions()
+  ).onDeleteSelectedTimelineObject();
+  expect(store.updateActionEventDetails).toHaveBeenCalledWith(event.id, {
+    presentation: { enabled: false },
+  });
+  expect(project.actionEvents).toEqual([]);
+  store.selection = {
+    ...store.selection,
+    observedAction: { ...observedAction, streamSha256: 'c'.repeat(64) },
+  };
+  vi.mocked(store.updateActionEventDetails).mockClear();
+  createWorkspaceTimelineEditingActions(
+    store,
+    createWorkspace(),
+    createSelectedClipActions()
+  ).onDeleteSelectedTimelineObject();
+  expect(store.updateActionEventDetails).not.toHaveBeenCalled();
+});

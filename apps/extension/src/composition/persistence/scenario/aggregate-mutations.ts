@@ -3,6 +3,8 @@ import {
   captureScenarioProjectInTransaction,
   readScenarioRevisionFence,
 } from '../sync-capture/capture';
+import { captureCheckpointReceiptInTransaction } from '../sync-capture/checkpoints';
+import type { SyncCheckpointReceipt } from '../sync-capture/contracts';
 import { SCENARIO_CAPTURE_STORES } from '../sync-capture/scenario-snapshot';
 import { getScenarioStoredProject, readScenarioStorage, writeScenarioStorage } from './storage';
 import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
@@ -349,6 +351,7 @@ async function commitScenarioAggregateInTransaction(
   const physicalDelete = buildPhysicalDeleteOperation([]);
   const tx = db.transaction(getMutationStoreNames(options.children), 'readwrite');
   let entry: ScenarioProjectEntry;
+  let checkpointReceipt: SyncCheckpointReceipt | null = null;
   try {
     const storage = await readScenarioStorage(tx, project.id);
     const existing = requireSupportedScenarioEntry(storage.logical);
@@ -368,10 +371,18 @@ async function commitScenarioAggregateInTransaction(
         });
       }
       await promoteScenarioSourceLifecycles(tx, existing, Date.now());
-      await captureScenarioProjectInTransaction(tx, project.id);
+      checkpointReceipt = await captureCheckpointReceiptInTransaction(
+        tx,
+        { rootKind: 'scenario-project', rootId: project.id },
+        () => captureScenarioProjectInTransaction(tx, project.id)
+      );
       await tx.done;
       return {
-        result: { project: existing.project, workspaceRevision: existing.workspaceRevision ?? 0 },
+        result: {
+          project: existing.project,
+          workspaceRevision: existing.workspaceRevision ?? 0,
+          ...(checkpointReceipt ? { checkpointReceipt } : {}),
+        },
         physicalDelete,
       };
     }
@@ -396,7 +407,11 @@ async function commitScenarioAggregateInTransaction(
       tx,
       updatedAt: entry.updatedAt,
     });
-    await captureScenarioProjectInTransaction(tx, project.id);
+    checkpointReceipt = await captureCheckpointReceiptInTransaction(
+      tx,
+      { rootKind: 'scenario-project', rootId: project.id },
+      () => captureScenarioProjectInTransaction(tx, project.id)
+    );
     await tx.done;
   } catch (error) {
     try {
@@ -408,7 +423,11 @@ async function commitScenarioAggregateInTransaction(
     throw error;
   }
   return {
-    result: { project: entry.project, workspaceRevision: entry.workspaceRevision ?? 0 },
+    result: {
+      project: entry.project,
+      workspaceRevision: entry.workspaceRevision ?? 0,
+      ...(checkpointReceipt ? { checkpointReceipt } : {}),
+    },
     physicalDelete,
   };
 }

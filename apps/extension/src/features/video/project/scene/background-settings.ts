@@ -1,4 +1,5 @@
 import { parseCameraBackgroundZoomBehavior } from '../motion/spatial';
+import { parseSceneBackgroundMotion } from './background-motion';
 import { parsePaint } from '@sniptale/foundation/paint';
 import { isColorString, isRecord, isString, isBoundedNumber } from '../validation/primitives';
 import type { VideoProjectSceneBackground, VideoProjectBackgroundVariants } from '../types';
@@ -17,6 +18,7 @@ function parseVariant(value: unknown): Background | null {
     value['blur'] !== undefined ||
     value['enabled'] !== undefined ||
     value['rememberedBlur'] !== undefined ||
+    value['motion'] !== undefined ||
     value['zoomBehavior'] !== undefined
   )
     return null;
@@ -65,7 +67,9 @@ function parseVariant(value: unknown): Background | null {
 /** Admit a bounded scene background and at most one retained variant of each kind. */
 export function parseSceneBackgroundSettings(value: unknown): Background | null {
   if (!isRecord(value)) return null;
-  const { enabled, blur, rememberedBlur, remembered, zoomBehavior, ...active } = value;
+  const { enabled, blur, rememberedBlur, remembered, zoomBehavior, motion, ...active } = value;
+  const animation = motion === undefined ? undefined : parseSceneBackgroundMotion(motion);
+  if (animation === null) return null;
   const mode =
     zoomBehavior === undefined ? undefined : parseCameraBackgroundZoomBehavior(zoomBehavior);
   if (mode === null) return null;
@@ -76,6 +80,7 @@ export function parseSceneBackgroundSettings(value: unknown): Background | null 
   if (!parsed) return null;
   const background: Background = {
     ...parsed,
+    ...(animation === undefined ? {} : { motion: animation }),
     ...(mode !== undefined ? { zoomBehavior: mode } : {}),
     ...(enabled === false ? { enabled: false as const } : {}),
     ...(blur !== undefined ? { blur } : {}),
@@ -116,7 +121,11 @@ export function resolveSceneBackgroundKind(
   if (!next && kind === 'gradient') next = createSceneGradientBackground();
   if (!next && kind === 'image' && fallbackImageId) next = { kind, assetId: fallbackImageId };
   return next
-    ? { ...next, ...(background.blur !== undefined ? { blur: background.blur } : {}) }
+    ? {
+        ...next,
+        ...(background.motion ? { motion: background.motion } : {}),
+        ...(background.blur !== undefined ? { blur: background.blur } : {}),
+      }
     : null;
 }
 
@@ -127,12 +136,14 @@ export function retainSceneBackgroundVariants(previous: Background, next: Backgr
     blur: nextBlur,
     rememberedBlur: nextMemoryBlur,
     zoomBehavior: nextZoomBehavior,
+    motion: nextMotion,
     ...paint
   } = next;
   const blur = nextBlur ?? previous.blur;
   const rememberedBlur = nextMemoryBlur ?? previous.rememberedBlur;
   const active = {
     ...paint,
+    ...((nextMotion ?? previous.motion) ? { motion: nextMotion ?? previous.motion } : {}),
     ...((nextZoomBehavior ?? previous.zoomBehavior) !== undefined
       ? { zoomBehavior: nextZoomBehavior ?? previous.zoomBehavior }
       : {}),
@@ -150,6 +161,7 @@ export function retainSceneBackgroundVariants(previous: Background, next: Backgr
     enabled: _disabled,
     rememberedBlur: _memoryBlur,
     zoomBehavior: _previousZoomBehavior,
+    motion: _previousMotion,
     ...outgoing
   } = previous;
   return { ...active, remembered: { ...remembered, [previous.kind]: outgoing } };

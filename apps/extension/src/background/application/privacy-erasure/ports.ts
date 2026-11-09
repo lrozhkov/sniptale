@@ -17,7 +17,7 @@ interface DiagnosticsCleanupPort {
 }
 
 interface MediaCleanupPort {
-  cleanup(): Promise<readonly ErasureParticipantResult[]>;
+  cleanup(state?: BackgroundRuntimeState): Promise<readonly ErasureParticipantResult[]>;
   reserveErasureExclusion(): ErasureExclusion;
 }
 
@@ -46,7 +46,7 @@ interface StorageCleanupPort {
 
 /** Reserves sync admission before queued erasure and drains producers before local cleanup. */
 export interface SyncPrivacyErasurePort {
-  reserveErasureExclusion(): {
+  reserveErasureExclusion(options?: LocalExtensionDataErasureOptions): {
     release(): void;
     quiesce(): Promise<void>;
   };
@@ -62,4 +62,12 @@ export interface PrivacyErasurePorts {
   runtime: RuntimeCleanupPort;
   storage: StorageCleanupPort;
   sync: SyncPrivacyErasurePort;
+}
+
+/** The common owner reserves writer exclusion until persistent erasure settles. */
+export interface SecretProtectionPrivacyErasurePort {
+  reserveErasure(): {
+    release(): void;
+    prepare(options: { includeAiProviderSecrets: boolean }): Promise<void>;
+  };
 }

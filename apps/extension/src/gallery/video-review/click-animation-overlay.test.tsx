@@ -59,6 +59,7 @@ it('paints the raster-local click and repaints its lens after paused video decod
     roundRect: vi.fn(),
     clip: vi.fn(),
     arc: vi.fn(),
+    moveTo: vi.fn(),
     stroke: vi.fn(),
     restore: vi.fn(),
     rect: vi.fn(),

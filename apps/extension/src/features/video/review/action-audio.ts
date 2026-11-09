@@ -1,3 +1,5 @@
+import { decodeRecordingEventCadence } from '../project/recording-events/records';
+import type { RecordingEventCadence } from '../project/recording-events/types';
 import { isReviewKey } from './key-animation';
 import { iterateRecordingKeyboardRhythm } from '../project/keyboard-rhythm';
 import type { RecordingKeyboardRhythmBlock } from '../project/types/interaction';
@@ -28,7 +30,7 @@ type SampleDescriptor = DescriptorBase & { kind: 'sample'; sampleId: ActionSound
 type TypingDescriptor = DescriptorBase & { kind: 'typing'; seed: number };
 type RecordedDescriptor = DescriptorBase & {
   kind: 'recorded';
-  block: RecordingKeyboardRhythmBlock;
+  block: RecordingKeyboardRhythmBlock | RecordingEventCadence;
   run: KeptRun;
   offset: number;
   queryBounds: Bounds;
@@ -87,7 +89,11 @@ export function reviewActionAudioTarget(
     ? {
         ref: { kind: marker.ref.kind, id: marker.ref.id },
         family,
-        ...(marker.observed || marker.gesture || marker.keyboardAttack || marker.keyboardRhythm
+        ...(marker.observed ||
+        marker.gesture ||
+        marker.keyboardAttack ||
+        marker.keyboardRhythm ||
+        marker.recordingCadence
           ? { recorded: true }
           : {}),
       }
@@ -335,20 +341,27 @@ function* recordedDescriptors(
 ): Generator<RecordedDescriptor> {
   const blocks = [
     ...(marker.keyboardRhythm ?? []),
-    ...(setting.includeRepeats ? (marker.keyboardRepeats ?? []) : []),
+    ...(marker.ref.kind === 'signal' ? (marker.recordingCadence?.onsets ?? []) : []),
+    ...(setting.includeRepeats
+      ? [...(marker.keyboardRepeats ?? []), ...(marker.recordingCadence?.repeats ?? [])]
+      : []),
   ];
   for (const block of blocks) {
-    const elapsed =
-      block.encoding === 'delta'
+    const exact = 'quantumUs' in block ? decodeRecordingEventCadence(block) : null;
+    if ('quantumUs' in block && !exact) throw new Error('Recorded microsecond cadence is invalid.');
+    const startTime = 'startTimeUs' in block ? block.startTimeUs / 1_000_000 : block.startTime;
+    const elapsed = exact
+      ? 0
+      : block.encoding === 'delta'
         ? block.ticks.reduce((sum, tick) => sum + tick, 0)
         : block.ticks.reduce(
             (sum, tick, index) => (index % 2 === 0 ? sum + tick * block.ticks[index + 1]! : sum),
             0
           );
-    const blockEnd = block.startTime + elapsed / 1000;
+    const blockEnd = exact ? exact.at(-1)! / 1_000_000 : startTime + elapsed / 1000;
     for (const run of runs) {
-      if (block.startTime >= run.sourceEnd || blockEnd < run.sourceStart) continue;
-      const first = resultTime(run, Math.max(run.sourceStart, block.startTime)) + setting.offset;
+      if (startTime >= run.sourceEnd || blockEnd < run.sourceStart) continue;
+      const first = resultTime(run, Math.max(run.sourceStart, startTime)) + setting.offset;
       const last = resultTime(run, Math.min(run.sourceEnd, blockEnd)) + setting.offset;
       const queryBounds = {
         start: first,
@@ -369,6 +382,24 @@ function* recordedDescriptors(
         volume: setting.volume,
       };
     }
+  }
+}
+
+/** Every cadence block is bounded. Filtering retains original attack indices and identities. */
+function* recordedAttacks(
+  block: RecordingKeyboardRhythmBlock | RecordingEventCadence,
+  from: number,
+  to: number
+) {
+  if (!('quantumUs' in block)) {
+    yield* iterateRecordingKeyboardRhythm(block, from, to);
+    return;
+  }
+  const times = decodeRecordingEventCadence(block);
+  if (!times) throw new Error('Recorded microsecond cadence is invalid.');
+  for (let index = 0; index < times.length; index++) {
+    const time = times[index]! / 1_000_000;
+    if (time >= from && time < to) yield { id: JSON.stringify([block.id, index]), time };
   }
 }
 
@@ -409,11 +440,7 @@ function* descriptorCues(descriptor: Descriptor, window: Bounds): Generator<Revi
     const run = descriptor.run;
     if (descriptor.queryBounds.end <= window.start || descriptor.queryBounds.start >= window.end)
       return;
-    for (const attack of iterateRecordingKeyboardRhythm(
-      descriptor.block,
-      run.sourceStart,
-      run.sourceEnd
-    )) {
+    for (const attack of recordedAttacks(descriptor.block, run.sourceStart, run.sourceEnd)) {
       if (attack.time >= run.sourceEnd) continue;
       const time = resultTime(run, attack.time) + descriptor.offset;
       if (time >= window.end) break;
@@ -501,26 +528,40 @@ export function* iterateReviewActionAudioCues(
   if (batch.length) yield batch;
 }
 
+/** One owner checks a complete chronological cue stream without retaining completed attacks. */
+export function createReviewActionAudioAdmission() {
+  const active: number[] = [];
+  const samples = new Set<ActionSoundSampleId>();
+  const sooner = (a: number, b: number) => a < b;
+  let maxVoices = 0;
+  let lastStart = -Infinity;
+  return {
+    append(cues: readonly ReviewActionAudioCue[]) {
+      for (const cue of cues) {
+        if (cue.start < lastStart)
+          throw new Error('Action audio admission requires chronological cues.');
+        lastStart = cue.start;
+        while (active.length && active[0]! <= cue.start) pop(active, sooner);
+        push(active, cue.end, sooner);
+        if (active.length > MAX_VOICES) throw new ReviewActionAudioUnavailable('voice-limit');
+        maxVoices = Math.max(maxVoices, active.length);
+        samples.add(cue.sampleId);
+      }
+    },
+    finish() {
+      return { maxVoices, busGain: 1 / Math.max(1, maxVoices), sampleIds: [...samples].sort() };
+    },
+  };
+}
+
 /** Full main-axis admission happens once per immutable plan; workflow owns yielding/cancellation. */
 export function* reviewActionAudioAdmission(
   plan: ReviewActionAudioPlan
-): Generator<
-  void,
-  { maxVoices: number; busGain: number; sampleIds: readonly ActionSoundSampleId[] }
-> {
-  const active: number[] = [],
-    samples = new Set<ActionSoundSampleId>();
-  const sooner = (a: number, b: number) => a < b;
-  let maxVoices = 0;
+): Generator<void, ReturnType<ReturnType<typeof createReviewActionAudioAdmission>['finish']>> {
+  const admission = createReviewActionAudioAdmission();
   for (const batch of iterateReviewActionAudioCues(plan, { start: 0, end: plan.duration })) {
-    for (const cue of batch) {
-      while (active.length && active[0]! <= cue.start) pop(active, sooner);
-      push(active, cue.end, sooner);
-      if (active.length > MAX_VOICES) throw new ReviewActionAudioUnavailable('voice-limit');
-      maxVoices = Math.max(maxVoices, active.length);
-      samples.add(cue.sampleId);
-    }
+    admission.append(batch);
     yield;
   }
-  return { maxVoices, busGain: 1 / Math.max(1, maxVoices), sampleIds: [...samples].sort() };
+  return admission.finish();
 }

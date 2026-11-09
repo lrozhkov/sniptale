@@ -16,9 +16,13 @@ import { parsePortableVideoReview, prepareVideoReviewRestore } from './backup-re
 
 function legacyWorkspace(cursor: number) {
   const before = { ...createQuickEditAdvancedContent(), schemaVersion: 2 };
+  const { cursorComposition: _modernCursorComposition, ...region } = createQuickEditZoomRegion({
+    id: 'old-zoom',
+    at: 1,
+  });
   const after = {
     ...before,
-    zoom: { enabled: true, regions: [createQuickEditZoomRegion({ id: 'old-zoom', at: 1 })] },
+    zoom: { enabled: true, regions: [region] },
   };
   return {
     aggregateId: 'recording:focus-compatibility',

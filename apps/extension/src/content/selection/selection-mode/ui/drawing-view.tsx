@@ -182,6 +182,7 @@ function DrawingToolbar(props: {
               <ToolbarDrawingControls
                 controller={props.controller}
                 displayMode="horizontal"
+                pageAlignment
                 owner={owner}
               />
               <ContentToolbarDivider dataUi="content.crop.capture-divider" />
@@ -224,6 +225,7 @@ export function createCropDrawingView(options: {
             <DrawingSurface
               controller={options.controller}
               active={state.drawing}
+              alignMovesToPage
               chromeHidden={false}
               showSelectionChrome={state.drawing}
               onExit={options.onExitDrawing}

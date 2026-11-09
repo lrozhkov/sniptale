@@ -13,16 +13,24 @@
     "debtId": "accepted.scc.editor-document-annotation-import"
   },
   {
-    "owners": ["apps/extension/src/content/overlay", "apps/extension/src/content/selection"],
+    "owners": [
+      "apps/extension/src/content/application",
+      "apps/extension/src/content/overlay",
+      "apps/extension/src/content/selection"
+    ],
     "edges": [
+      ["apps/extension/src/content/application", "apps/extension/src/content/overlay"],
+      ["apps/extension/src/content/application", "apps/extension/src/content/selection"],
+      ["apps/extension/src/content/overlay", "apps/extension/src/content/application"],
       ["apps/extension/src/content/overlay", "apps/extension/src/content/selection"],
+      ["apps/extension/src/content/selection", "apps/extension/src/content/application"],
       ["apps/extension/src/content/selection", "apps/extension/src/content/overlay"]
     ],
-    "id": "content-crop-drawing-controls",
+    "id": "content-review-selection-composition",
     "owner": "apps/extension/src/content",
     "classification": "accepted-architecture",
-    "reason": "Allowed composition: overlay composes selection workflows. Crop selection UI reuses toolbar drawing controls through ToolbarDrawingControlsOwner and borrows floating menu geometry. These exact two owner edges have no module cycle and introduce no second mode, persistence, or runtime authority.",
-    "removalCondition": "Remove when either exact owner edge disappears. Reassess added owner edges, module cycles, or changed interaction and state authority before retaining this composition.",
-    "debtId": "accepted.scc.content-crop-drawing-controls"
+    "reason": "Allowed composition: Application workflows compose review projection, finalization and selection mode. Overlay and selection UI consume those workflows; crop selection reuses overlay drawing controls. These exact six owner edges have no module cycle and retain the existing session, navigation-lock and persistence authorities.",
+    "removalCondition": "Remove when any exact edge disappears. Reassess added owner edges, module cycles, or changed workflow and state authority before retaining this composition.",
+    "debtId": "accepted.scc.content-review-selection-composition"
   }
 ]

@@ -1,3 +1,4 @@
+import { RECORDING_HISTORY_OWNER_MAPPINGS } from './recording-history.mjs';
 import { AI_OWNER_MAPPINGS } from './ai.mjs';
 import { AS_NEVER_REMOVAL_OWNER_MAPPINGS } from './as-never.mjs';
 import { AUDIT_OWNER_MAPPINGS } from './audit.mjs';
@@ -26,6 +27,7 @@ import { VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS } from './video-editor-archite
 import { VIDEO_RECORDING_OWNER_MAPPINGS } from './video-recording.mjs';
 
 export const FOCUSED_COVERAGE_OWNER_MAPPINGS = [
+  ...RECORDING_HISTORY_OWNER_MAPPINGS,
   ...MESSAGING_OWNER_MAPPINGS,
   ...VIDEO_RECORDING_OWNER_MAPPINGS,
   ...FOCUSED_COVERAGE_DB_OWNER_MAPPINGS,

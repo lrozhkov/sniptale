@@ -5,10 +5,6 @@ vi.mock('./loader/apply-loaded-data', () => ({
   applyLoadedAiProvidersRuntimeData: vi.fn(),
 }));
 
-vi.mock('./loader/default-model', () => ({
-  ensureDefaultAiProvidersModel: vi.fn(),
-}));
-
 vi.mock('./loader/use-loader', () => ({
   useAiProvidersLoader: vi.fn(),
 }));

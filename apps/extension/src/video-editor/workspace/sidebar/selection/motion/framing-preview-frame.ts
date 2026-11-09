@@ -1,18 +1,51 @@
-import { useEffect, useRef, useState } from 'react';
+import type { GpuPreviewOutput } from '../../../../../features/video/composition/canvas/preview-presentation';
+import { createPreviewPresentationSession } from '../../../../../features/video/composition/canvas/preview-presentation';
+
+import { useContext, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
 import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 import { createVideoPreviewFrameMaterializer } from '../../../../preview/cache/materializer';
 import { createVideoPreviewRenderIdentity } from '../../../../preview/cache/revision';
-import type { FramingPreviewProps } from './framing-preview-interaction';
+import {
+  resolveCursorFramingView,
+  type FramingPreviewProps,
+  type useFramingInteraction,
+} from './framing-preview-interaction';
+import { evaluateMotionSpatial } from '../../../../../features/video/composition/motion/spatial';
+import { resolveMotionOverlayZoomMode } from '../../../../../features/video/project/motion';
+import { resolveVideoCompositionCamera } from '../../../../../features/video/composition/motion';
+import { resolveProjectCursorCameraPlan } from '../../../../../features/video/composition/motion/project-follow';
+import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
+import { isVideoProjectUtilityLaneVisible } from '../../../../../features/video/project/utility-lanes';
+
+interface FramingRequest {
+  source: { key: string; identity: string };
+  project: FramingPreviewProps['project'];
+  region: FramingPreviewProps['region'];
+  overview: boolean;
+  camera: VideoCompositionCameraState;
+  key: string;
+}
+interface FramingResult {
+  output?: GpuPreviewOutput;
+  canvas: HTMLCanvasElement;
+  nominalScale: number;
+  viewport?: VideoCompositionCameraState;
+  plan?: ReturnType<typeof resolveProjectCursorCameraPlan> | null;
+}
 
 export function useFramingFrame(
   props: FramingPreviewProps,
   canvasRef: React.RefObject<HTMLCanvasElement | null>,
-  camera: VideoCompositionCameraState
+  gpuHostRef: React.RefObject<HTMLDivElement | null>,
+  canRender = true
 ) {
   const { project, region, assetUrls } = props;
+  const renderer = useContext(WorkspacePreviewContext)?.preferences.preferences.renderer ?? 'gpu';
   const identity = useFramingSourceIdentity(project);
   const time = Math.min(project.duration, region.startTime + region.duration / 2);
   const key = JSON.stringify([
+    renderer,
     time,
     Object.entries(assetUrls).sort(([a], [b]) => a.localeCompare(b)),
   ]);
@@ -23,18 +56,53 @@ export function useFramingFrame(
   const [frame, setFrame] = useState<{
     request: typeof request;
     hasFrame: boolean;
+    nominalScale?: number;
     failed: boolean;
+    viewport?: VideoCompositionCameraState | undefined;
+    plan?: ReturnType<typeof resolveProjectCursorCameraPlan> | null | undefined;
   } | null>(null);
+  const [hasPresentedFrame, setHasPresentedFrame] = useState(false);
+  const presenterRef = useRef<ReturnType<typeof createPreviewPresentationSession> | null>(null);
+  const activeGeneration = useRef<AbortController | null>(null);
+  const previousTransaction = useRef<Promise<void>>(Promise.resolve());
+  useLayoutEffect(() => {
+    const presenter = createPreviewPresentationSession({
+      fallback: () => canvasRef.current,
+      host: () => gpuHostRef.current,
+      role: 'inspector',
+    });
+    presenter.mount();
+    presenterRef.current = presenter;
+    return () => {
+      activeGeneration.current?.abort();
+      presenterRef.current = null;
+      presenter.dispose();
+    };
+  }, [canvasRef, gpuHostRef]);
   const [retry, setRetry] = useState(0);
-  const cameraKey = JSON.stringify(camera);
-  const latestCamera = useRef(camera);
-  latestCamera.current = camera;
-  const enqueue = useRef<((camera: VideoCompositionCameraState) => void) | null>(null);
+  const latest = useRef<FramingRequest | null>(null);
+  const enqueue = useRef<ReturnType<typeof createFramingRenderQueue> | null>(null);
+  const committed = useRef({ project, region, canRender, request });
+  useLayoutEffect(() => {
+    const previous = committed.current;
+    committed.current = { project, region, canRender, request };
+    if (
+      !canRender ||
+      previous.request !== request ||
+      ((previous.region.focusMode === VideoMotionFocusMode.CURSOR ||
+        region.focusMode === VideoMotionFocusMode.CURSOR) &&
+        (previous.project !== project || previous.region !== region))
+    )
+      enqueue.current?.invalidate();
+  });
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const controller = new AbortController();
+    activeGeneration.current = controller;
+    const predecessor = previousTransaction.current;
     const materializer = createVideoPreviewFrameMaterializer({
+      previewRenderer: renderer,
       assetUrls: request.assetUrls,
       ownerDocument: canvas.ownerDocument,
       project: { ...request.project, motionRegions: [] },
@@ -43,69 +111,234 @@ export function useFramingFrame(
         height: Math.max(2, Math.round((480 * request.project.height) / request.project.width)),
       },
     });
+    const accept = (next: FramingRequest) => {
+      const current = committed.current;
+      const following =
+        next.region.focusMode === VideoMotionFocusMode.CURSOR ||
+        current.region.focusMode === VideoMotionFocusMode.CURSOR;
+      return (
+        current.canRender &&
+        current.request === request &&
+        next.source === request &&
+        (!following || (next.project === current.project && next.region === current.region))
+      );
+    };
     const queue = createFramingRenderQueue({
-      render: (nextCamera) => materializer.renderFrame(request.time, controller.signal, nextCamera),
+      predecessor,
+      accept,
+      render: async (next) => {
+        const prepared = prepareFramingRequest(next, request.time);
+        const presenter = presenterRef.current;
+        if (!presenter) throw new Error('Inspector presentation is unavailable.');
+        const result = await materializer.renderFrameWithPresentation(
+          request.time,
+          controller.signal,
+          prepared.camera,
+          presenter.acquire
+        );
+        return {
+          canvas: result.canvas,
+          ...(result.presentation.output ? { output: result.presentation.output } : {}),
+          ...prepared,
+        };
+      },
       signal: controller.signal,
-      present: (source) => {
-        canvas.width = source.width;
-        canvas.height = source.height;
-        canvas.getContext('2d')?.drawImage(source, 0, 0);
-        setFrame({ request, hasFrame: true, failed: false });
+      present: (result) => {
+        const presenter = presenterRef.current;
+        if (!presenter) throw new Error('Inspector presentation is unavailable.');
+        if (!result.output) {
+          canvas.width = result.canvas.width;
+          canvas.height = result.canvas.height;
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('Inspector fallback context is unavailable.');
+          context.drawImage(result.canvas, 0, 0);
+        }
+        presenter.publish(result.output ?? null, () => {
+          setFrame({
+            request,
+            hasFrame: true,
+            nominalScale: result.nominalScale,
+            failed: false,
+            viewport: result.viewport,
+            plan: result.plan,
+          });
+          setHasPresentedFrame(true);
+        });
       },
       fail: () =>
         setFrame((previous) => ({
+          ...(previous?.request === request ? previous : {}),
           request,
           hasFrame: previous?.request === request && previous.hasFrame,
           failed: true,
         })),
     });
     enqueue.current = queue;
-    queue(latestCamera.current);
+    if (latest.current && accept(latest.current)) queue(latest.current);
     return () => {
       enqueue.current = null;
       controller.abort();
-      materializer.dispose();
+      if (activeGeneration.current === controller) activeGeneration.current = null;
+      const completed = queue.settled().finally(() => materializer.dispose());
+      previousTransaction.current = completed;
+      void completed.catch(() => {});
     };
-  }, [request, retry, canvasRef]);
-  useEffect(() => {
-    enqueue.current?.(latestCamera.current);
-  }, [cameraKey]);
+  }, [request, retry, canvasRef, renderer]);
+  const update = useCallback(
+    (camera: VideoCompositionCameraState, overview: boolean) => {
+      const next = {
+        source: request,
+        project,
+        region,
+        overview,
+        camera,
+        key: JSON.stringify(camera),
+      };
+      latest.current = next;
+      enqueue.current?.(next);
+    },
+    [project, region, request]
+  );
   return {
-    ready: frame?.request === request && frame.hasFrame,
+    update,
+    visible: hasPresentedFrame,
+    ready: canRender && frame?.request === request && frame.hasFrame,
     failed: frame?.request === request && frame.failed,
     reload: () => setRetry((value) => value + 1),
+    viewport: frame?.request === request ? frame.viewport : undefined,
+    plan: frame?.request === request ? frame.plan : undefined,
+    nominalScale: frame?.request === request ? frame.nominalScale : undefined,
   };
 }
 
-/** One active render and one latest request: no parallel effects or stale frame publication. */
+function prepareFramingRequest(input: FramingRequest, time: number) {
+  if (input.region.focusMode !== VideoMotionFocusMode.CURSOR)
+    return { camera: input.camera, nominalScale: input.region.scale };
+  const viewport = resolveVideoCompositionCamera({
+    project: input.project,
+    currentTime: time,
+    actions: [],
+    cursorSample: null,
+  });
+  const plan = isVideoProjectUtilityLaneVisible(input.project, 'camera')
+    ? resolveProjectCursorCameraPlan(input.project, input.region)
+    : null;
+  const world = resolveCursorFramingView(input.project, input.overview, viewport);
+  const camera = resolveFramingRenderCamera(input, input.overview, world, viewport);
+  return { camera, viewport, plan, nominalScale: input.region.scale };
+}
+
+/** Rendering owns the selected target pose; gestures consume only its projected world. */
+export function resolveFramingRenderCamera(
+  props: Pick<FramingPreviewProps, 'project' | 'region'>,
+  overview: boolean,
+  view: Pick<
+    ReturnType<typeof useFramingInteraction>,
+    'left' | 'top' | 'width' | 'height' | 'viewport'
+  >,
+  cursorViewport?: VideoCompositionCameraState
+): VideoCompositionCameraState {
+  const { project, region } = props;
+  const spatial = overview
+    ? undefined
+    : region.focusMode === VideoMotionFocusMode.CURSOR && region.cursorComposition !== undefined
+      ? cursorViewport?.spatial
+      : evaluateMotionSpatial(project, null, region, 1);
+  return {
+    ...(spatial ? { spatial } : {}),
+    viewportX: view.left,
+    viewportY: view.top,
+    viewportWidth: view.width,
+    viewportHeight: view.height,
+    focusPoint: { x: view.left + view.width / 2, y: view.top + view.height / 2 },
+    scale: project.width / view.width,
+    regionId: region.id,
+    motionBlurAmount: 0,
+    overlayZoomMode: resolveMotionOverlayZoomMode(region.overlayZoomMode),
+    ...(!overview && region.sourceBinding?.coordinateSpace === 'source-window'
+      ? view.viewport
+      : {}),
+  };
+}
+
+/** One active render and one latest request; preparation starts after an inspector paint. */
 function createFramingRenderQueue(params: {
-  render: (camera: VideoCompositionCameraState) => Promise<HTMLCanvasElement>;
+  predecessor: Promise<void>;
+  accept: (request: FramingRequest) => boolean;
+  render: (request: FramingRequest) => Promise<FramingResult>;
   signal: AbortSignal;
-  present: (canvas: HTMLCanvasElement) => void;
+  present: (result: FramingResult) => void;
   fail: () => void;
 }) {
-  let latest: { camera: VideoCompositionCameraState; key: string } | null = null;
-  let running = false;
+  let latest: FramingRequest | null = null;
+  let running: Promise<void> | null = null;
+  const afterPaint = () =>
+    new Promise<void>((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const finish = () => {
+        cancelAnimationFrame(frame);
+        if (timer !== null) clearTimeout(timer);
+        params.signal.removeEventListener('abort', finish);
+        resolve();
+      };
+      const frame = requestAnimationFrame(() => {
+        timer = setTimeout(finish, 0);
+      });
+      params.signal.addEventListener('abort', finish, { once: true });
+    });
   const drain = async () => {
-    running = true;
-    while (latest && !params.signal.aborted) {
-      const current = latest;
+    try {
       try {
-        const canvas = await params.render(current.camera);
-        if (!params.signal.aborted && current === latest) params.present(canvas);
+        await params.predecessor;
       } catch {
-        if (!params.signal.aborted && current === latest) params.fail();
+        if (!params.signal.aborted) params.fail();
+        return;
       }
-      if (current === latest) break;
+      while (latest && !params.signal.aborted) {
+        await afterPaint();
+        if (params.signal.aborted || !latest) break;
+        const current = latest;
+        if (!params.accept(current)) break;
+        let result: FramingResult | undefined;
+        let accepted = false;
+        try {
+          result = await params.render(current);
+          if (!params.signal.aborted && current === latest && params.accept(current)) {
+            params.present(result);
+            accepted = true;
+          }
+        } catch {
+          if (!params.signal.aborted && current === latest && params.accept(current)) params.fail();
+        } finally {
+          if (!accepted) result?.output?.release();
+        }
+        if (current === latest) break;
+      }
+    } finally {
+      running = null;
     }
-    running = false;
   };
-  return (camera: VideoCompositionCameraState) => {
-    const key = JSON.stringify(camera);
-    if (params.signal.aborted || latest?.key === key) return;
-    latest = { camera, key };
-    if (!running) void drain();
+  const enqueue = (request: FramingRequest) => {
+    if (
+      params.signal.aborted ||
+      (latest?.key === request.key &&
+        latest.overview === request.overview &&
+        (request.region.focusMode !== VideoMotionFocusMode.CURSOR ||
+          (latest.project === request.project && latest.region === request.region)))
+    )
+      return;
+    latest = request;
+    if (!running) {
+      running = drain();
+      void running.catch(() => {});
+    }
   };
+  return Object.assign(enqueue, {
+    settled: () => running ?? Promise.resolve(),
+    invalidate: () => {
+      latest = null;
+    },
+  });
 }
 
 /** Immutable editor snapshots replace changed fields; motion and metadata do not change this source. */

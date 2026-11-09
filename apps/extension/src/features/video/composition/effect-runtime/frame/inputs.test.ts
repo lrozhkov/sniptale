@@ -773,3 +773,123 @@ it.each(['clip', 'transition', 'track', 'video-group'] as const)(
     }
   }
 );
+
+it('delegates normalized clip input to GPU before acquiring any Canvas materialization resource', async () => {
+  const bitmap = new FakeBitmap(20, 10);
+  const composeInput = vi.fn(async () => bitmap);
+  const resourceScope = createEffectRuntimeCompositionResourceLedger().createFrameScope();
+  const args = {
+    clipMediaElements: new Map(),
+    imageBank: {},
+    visualLayers: [createLayer('clip')],
+    composeInput,
+    resourceScope,
+  };
+  const materializer = createEffectRuntimeInputMaterializer(args);
+  const plan = createPlan({
+    kind: 'clip',
+    clipId: 'clip',
+    chainIndex: 0,
+    placement: { x: 3, y: 4, width: 20, height: 10, rotation: 30, opacity: 0.5 },
+  });
+  plan.bitmapBounds = { x: -0.1, y: -0.2, width: 1.2, height: 1.4 };
+  const output = await materializer.materializeTargetSource(plan);
+  expect(composeInput).toHaveBeenCalledWith(
+    expect.objectContaining({
+      dimensions: plan.dimensions,
+      renderDimensions: plan.renderDimensions,
+      applyCamera: false,
+      layers: [
+        expect.objectContaining({ x: 2, y: 2, width: 20, height: 10, rotation: 0, opacity: 1 }),
+      ],
+    })
+  );
+  expect(resourceScope.snapshot().aggregatePixels).toBe(200);
+  expect(output).toBe(bitmap);
+  expect(drawLayer).not.toHaveBeenCalled();
+  closeEffectRuntimeBitmap(output);
+});
+
+it('closes a completed GPU transition side when the next input composition fails', async () => {
+  const from = new FakeBitmap(20, 10);
+  const failure = new Error('Second input GPU failure');
+  const composeInput = vi.fn(async () => from).mockRejectedValueOnce(failure);
+  // The first input succeeds; failure happens only after its owned bitmap was retained.
+  composeInput.mockReset().mockResolvedValueOnce(from).mockRejectedValueOnce(failure);
+  const materializer = createEffectRuntimeInputMaterializer({
+    clipMediaElements: new Map(),
+    imageBank: {},
+    visualLayers: [createLayer('from'), createLayer('to')],
+    composeInput,
+  });
+  await expect(
+    materializer.materializeTransitionInputs(
+      createPlan({
+        kind: 'transition',
+        leadingClipId: 'from',
+        trailingClipId: 'to',
+        transitionId: 'join',
+      })
+    )
+  ).rejects.toThrow('EFFECT_RUNTIME_FRAME_INPUT_FAILED');
+  expect(from.close).toHaveBeenCalledOnce();
+  expect(composeInput).toHaveBeenCalledTimes(2);
+  expect(drawLayer).not.toHaveBeenCalled();
+});
+
+it('refuses an incorrectly sized GPU input and closes its unadopted bitmap', async () => {
+  const bitmap = new FakeBitmap(1, 1);
+  const composeInput = vi.fn(async () => bitmap);
+  const materializer = createEffectRuntimeInputMaterializer({
+    clipMediaElements: new Map(),
+    imageBank: {},
+    visualLayers: [createLayer('clip')],
+    composeInput,
+  });
+  await expect(
+    materializer.materializeTargetSource(
+      createPlan({
+        kind: 'clip',
+        clipId: 'clip',
+        chainIndex: 0,
+        placement: { x: 0, y: 0, width: 20, height: 10, rotation: 0, opacity: 1 },
+      })
+    )
+  ).rejects.toThrow('EFFECT_RUNTIME_FRAME_INPUT_FAILED');
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(drawLayer).not.toHaveBeenCalled();
+});
+it('separates FX sampling from the visible body and retains physical dimensions', async () => {
+  const plan = createPlan({
+    kind: 'clip',
+    clipId: 'clip',
+    chainIndex: 0,
+    placement: { x: 0, y: 0, width: 20, height: 10, rotation: 0, opacity: 1 },
+  });
+  plan.renderDimensions = { width: 80, height: 40 };
+  const bodyMedia = new Map(),
+    fullInput = new Map();
+  const marker = { outsideCameraROI: true };
+  fullInput.set('marker', marker);
+  const bitmap = new FakeBitmap(80, 40);
+  const createBitmap = vi.fn(async () => bitmap);
+  const mediaForPlan = vi.fn(() => fullInput);
+  const materializer = createEffectRuntimeInputMaterializer({
+    clipMediaElements: bodyMedia,
+    mediaForPlan,
+    createBitmap,
+    imageBank: {},
+    visualLayers: [createLayer('clip')],
+  });
+  await expect(materializer.materializeTargetSource(plan)).resolves.toBe(bitmap);
+  expect(mediaForPlan).toHaveBeenCalledWith(plan);
+  expect(drawLayer).toHaveBeenCalledWith(
+    context,
+    expect.objectContaining({ width: 20, height: 10 }),
+    4,
+    4,
+    {},
+    fullInput
+  );
+  expect(createBitmap).toHaveBeenCalledWith(expect.objectContaining({ width: 80, height: 40 }));
+});

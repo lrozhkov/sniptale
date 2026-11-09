@@ -1,0 +1,229 @@
+{
+  "cases": [
+    {
+      "id": "commerce-vercel",
+      "title": "Vercel · Product",
+      "url": "https://demo.vercel.store/product/acme-geometric-circles-t-shirt",
+      "ready": "main",
+      "category": "commerce"
+    },
+    {
+      "id": "commerce-books",
+      "title": "Books to Scrape · Catalogue",
+      "url": "https://books.toscrape.com/",
+      "ready": ".product_pod",
+      "category": "commerce"
+    },
+    {
+      "id": "commerce-webscraper",
+      "title": "Webscraper · Store",
+      "url": "https://webscraper.io/test-sites/e-commerce/allinone",
+      "ready": ".product-wrapper",
+      "category": "commerce"
+    },
+    {
+      "id": "commerce-vercel-home",
+      "title": "Vercel Commerce · Storefront (alternative)",
+      "url": "https://demo.vercel.store/",
+      "ready": "main",
+      "category": "commerce"
+    },
+    {
+      "id": "commerce-demoblaze",
+      "title": "Demoblaze · Product catalogue (alternative)",
+      "url": "https://www.demoblaze.com/",
+      "ready": ".card",
+      "category": "commerce"
+    },
+    {
+      "id": "commerce-books-product",
+      "title": "Books to Scrape · Product detail (alternative)",
+      "url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html",
+      "ready": ".product_main",
+      "category": "commerce"
+    },
+    {
+      "id": "knowledge-wikipedia",
+      "title": "Wikipedia · World Wide Web",
+      "url": "https://en.wikipedia.org/wiki/World_Wide_Web",
+      "ready": "#firstHeading",
+      "category": "article"
+    },
+    {
+      "id": "knowledge-python",
+      "title": "Python · Tutorial",
+      "url": "https://docs.python.org/3/tutorial/",
+      "ready": "main",
+      "category": "docs"
+    },
+    {
+      "id": "knowledge-mdn-grid",
+      "title": "MDN · CSS Grid",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_grid_layout",
+      "ready": "main",
+      "category": "docs"
+    },
+    {
+      "id": "knowledge-python-library",
+      "title": "Python · Standard Library",
+      "url": "https://docs.python.org/3/library/",
+      "ready": "body",
+      "category": "docs"
+    },
+    {
+      "id": "cyrillic-wikipedia",
+      "title": "Википедия · Скриншот",
+      "url": "https://ru.wikipedia.org/wiki/Скриншот",
+      "ready": "#firstHeading",
+      "category": "cyrillic",
+      "locale": "ru-RU"
+    },
+    {
+      "id": "cyrillic-godot-body",
+      "title": "Godot · Введение",
+      "url": "https://docs.godotengine.org/ru/stable/getting_started/introduction/index.html",
+      "ready": "body",
+      "category": "cyrillic",
+      "locale": "ru-RU"
+    },
+    {
+      "id": "cyrillic-wikisource-body",
+      "title": "Викитека · Главная",
+      "url": "https://ru.wikisource.org/wiki/Заглавная_страница",
+      "ready": "body",
+      "category": "cyrillic",
+      "locale": "ru-RU"
+    },
+    {
+      "id": "developer-github",
+      "title": "GitHub · Sniptale repository",
+      "url": "https://github.com/lrozhkov/sniptale",
+      "ready": "main",
+      "category": "developer"
+    },
+    {
+      "id": "developer-monaco",
+      "title": "Monaco · Editor playground",
+      "url": "https://microsoft.github.io/monaco-editor/playground.html",
+      "ready": ".monaco-editor",
+      "category": "editor"
+    },
+    {
+      "id": "developer-vscode",
+      "title": "VS Code · Getting started",
+      "url": "https://code.visualstudio.com/docs/getstarted/getting-started",
+      "ready": "main",
+      "category": "docs"
+    },
+    {
+      "id": "enterprise-sap-dark",
+      "title": "SAP UI5 · Dark cart",
+      "url": "https://ui5.sap.com/test-resources/sap/m/demokit/cart/webapp/index.html?sap-ui-theme=sap_horizon_dark#/categories",
+      "ready": ".sapMSLITitleOnly",
+      "category": "dark-app"
+    },
+    {
+      "id": "enterprise-mui-grid",
+      "title": "MUI · Data grid",
+      "url": "https://mui.com/x/react-data-grid/virtualization/",
+      "ready": ".MuiDataGrid-root",
+      "scrollTo": ".MuiDataGrid-root",
+      "category": "data-grid"
+    },
+    {
+      "id": "enterprise-ant-table",
+      "title": "Ant Design · Table",
+      "url": "https://ant.design/components/table/",
+      "ready": ".ant-table",
+      "scrollTo": ".ant-table",
+      "category": "data-grid"
+    },
+    {
+      "id": "forms-bootstrap",
+      "title": "Bootstrap · Form controls",
+      "url": "https://getbootstrap.com/docs/5.3/forms/form-control/",
+      "ready": "main",
+      "scrollTo": ".bd-example",
+      "category": "forms"
+    },
+    {
+      "id": "forms-govuk",
+      "title": "GOV.UK · Checkboxes",
+      "url": "https://design-system.service.gov.uk/components/checkboxes/",
+      "ready": "main",
+      "category": "forms"
+    },
+    {
+      "id": "forms-w3schools",
+      "title": "W3Schools · HTML forms",
+      "url": "https://www.w3schools.com/html/html_forms.asp",
+      "ready": "#main",
+      "category": "forms",
+      "scrollTo": "#fname"
+    },
+    {
+      "id": "forms-mdn-checkbox",
+      "title": "MDN · Checkbox input",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/input/checkbox",
+      "ready": "main",
+      "scrollTo": "iframe[title=runner]",
+      "category": "forms"
+    },
+    {
+      "id": "forms-bootstrap-checks",
+      "title": "Bootstrap · Checks and radios",
+      "url": "https://getbootstrap.com/docs/5.3/forms/checks-radios/",
+      "ready": "main",
+      "scrollTo": ".bd-example",
+      "category": "forms"
+    },
+    {
+      "id": "holdout-bulma",
+      "title": "Bulma navbar documentation",
+      "url": "https://bulma.io/documentation/components/navbar/",
+      "ready": "body",
+      "category": "holdout",
+      "locale": "en-US"
+    },
+    {
+      "id": "holdout-tabler",
+      "title": "Tabler dashboard preview",
+      "url": "https://preview.tabler.io/",
+      "ready": "body",
+      "category": "holdout",
+      "locale": "en-US"
+    },
+    {
+      "id": "holdout-vue",
+      "title": "Vue guide introduction",
+      "url": "https://vuejs.org/guide/introduction.html",
+      "ready": "body",
+      "category": "holdout",
+      "locale": "en-US"
+    },
+    {
+      "id": "holdout-mozilla",
+      "title": "Firefox download",
+      "url": "https://www.mozilla.org/en-US/firefox/new/",
+      "ready": "body",
+      "category": "holdout",
+      "locale": "en-US"
+    },
+    {
+      "id": "holdout-nasa",
+      "title": "NASA home",
+      "url": "https://www.nasa.gov/",
+      "ready": "body",
+      "category": "holdout",
+      "locale": "en-US"
+    },
+    {
+      "id": "holdout-pexels",
+      "title": "Pexels home",
+      "url": "https://www.pexels.com/",
+      "ready": "body",
+      "category": "holdout",
+      "locale": "en-US"
+    }
+  ]
+}

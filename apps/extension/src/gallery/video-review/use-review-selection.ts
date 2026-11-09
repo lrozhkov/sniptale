@@ -111,6 +111,7 @@ export function useReviewSelectionLifecycle(args: {
   markers?: readonly ReviewTelemetryMarker[];
   cursorFocusPath?: CursorFocusPath;
   cursorFocusKeys?: readonly { id: string }[];
+  historyPending?: boolean;
   deleteCursorFocus?(id: string): void;
   commit(operation: ReviewOperation): Promise<unknown>;
   run(action: () => Promise<unknown>): Promise<unknown>;
@@ -159,6 +160,7 @@ export function useReviewSelectionLifecycle(args: {
     args.setSelection({ kind: 'none' });
   };
   useEffect(() => {
+    if (args.selection.kind === 'cursor-focus' && args.historyPending) return;
     if (
       args.selection.kind !== 'none' &&
       !reviewSelectionExists(

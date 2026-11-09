@@ -387,6 +387,43 @@ export function drawFittedMediaLayer(params: {
   }
 }
 
+/** Shared joined-header raster geometry. The source plane stays in logical scene coordinates. */
+export function resolveFittedWindowRaster(
+  params: Parameters<typeof fittedWindowMediaPlane>[0],
+  deviceScale: number,
+  fallbackHeaderHeight = 0
+) {
+  if (
+    !Number.isFinite(deviceScale) ||
+    deviceScale < 0 ||
+    params.frame.width <= 0 ||
+    params.frame.height <= 0
+  )
+    throw new RangeError('Invalid fitted window raster scale.');
+  const rasterScale = Math.min(
+    deviceScale,
+    4096 / Math.max(params.frame.width, params.frame.height)
+  );
+  const width = Math.max(1, Math.ceil(params.frame.width * rasterScale));
+  const height = Math.max(1, Math.ceil(params.frame.height * rasterScale));
+  const window = fittedWindowMediaPlane(params, fallbackHeaderHeight);
+  const scaleX = width / params.frame.width;
+  const scaleY = height / params.frame.height;
+  const x = (window.x - params.frame.x) * scaleX;
+  const y = (window.y - params.frame.y) * scaleY;
+  const w = window.width * scaleX;
+  const join = Math.round((window.y + window.headerHeight - params.frame.y) * scaleY);
+  const bottom = (window.y + window.height - params.frame.y) * scaleY;
+  const visible = {
+    x: window.x,
+    y: params.frame.y + join / scaleY,
+    width: window.width,
+    height: (bottom - join) / scaleY,
+  };
+  const source = params.sourceCrop ? uncropMediaSourceRect(visible, params.sourceCrop) : visible;
+  return { width, height, scaleX, scaleY, x, y, w, join, bottom, visible, source };
+}
+
 /** Rasterize adjoining edges before the clip transform, so subpixel scaling cannot open a seam. */
 function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]): void {
   const header = params.windowHeaderImage;
@@ -395,12 +432,8 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
   const deviceScale = transform
     ? Math.max(Math.hypot(transform.a, transform.b), Math.hypot(transform.c, transform.d))
     : 1;
-  const rasterScale = Math.min(
-    deviceScale,
-    4096 / Math.max(params.frame.width, params.frame.height)
-  );
-  const width = Math.max(1, Math.ceil(params.frame.width * rasterScale));
-  const height = Math.max(1, Math.ceil(params.frame.height * rasterScale));
+  const { width, height, scaleX, scaleY, x, y, w, join, bottom, visible, source } =
+    resolveFittedWindowRaster(params, deviceScale, header.naturalHeight);
   const lease = acquireVideoCompositionBuffer(width, height, params.context.canvas.ownerDocument);
   const context = lease?.canvas.getContext('2d');
   if (!lease || !context || !('setTransform' in context)) {
@@ -412,14 +445,6 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
     plane.reset?.();
     plane.setTransform(1, 0, 0, 1, 0, 0);
     plane.clearRect(0, 0, width, height);
-    const window = fittedWindowMediaPlane(params, header.naturalHeight);
-    const scaleX = width / params.frame.width;
-    const scaleY = height / params.frame.height;
-    const x = (window.x - params.frame.x) * scaleX;
-    const y = (window.y - params.frame.y) * scaleY;
-    const w = window.width * scaleX;
-    const join = Math.round((window.y + window.headerHeight - params.frame.y) * scaleY);
-    const bottom = (window.y + window.height - params.frame.y) * scaleY;
     if (!params.hideWindowHeader) plane.drawImage(header, x, y, w, join - y);
     plane.save();
     try {
@@ -429,15 +454,6 @@ function drawWindowMediaPlane(params: Parameters<typeof drawFittedMediaLayer>[0]
       // Raster density must not change the composition coordinates of source actions.
       plane.scale(scaleX, scaleY);
       plane.translate(-params.frame.x, -params.frame.y);
-      const visible = {
-        x: window.x,
-        y: params.frame.y + join / scaleY,
-        width: window.width,
-        height: (bottom - join) / scaleY,
-      };
-      const source = params.sourceCrop
-        ? uncropMediaSourceRect(visible, params.sourceCrop)
-        : visible;
       if (params.sourceCrop)
         params.render(source.x, source.y, source.width, source.height, plane, visible);
       else params.render(source.x, source.y, source.width, source.height, plane);

@@ -299,7 +299,7 @@ it('excludes quick-action artwork and private text from send, response and failu
 });
 
 describe('sync product trace privacy', () => {
-  it.each(['SYNC_PRODUCT_COMMAND', 'OFFSCREEN_SYNC_PRODUCT_COMMAND'])(
+  it.each(['SYNC_PRODUCT_COMMAND', 'OFFSCREEN_SYNC_PRODUCT_COMMAND', 'SYNC_CONNECTION_CREDENTIAL'])(
     'omits request, response and raw failure content for %s',
     (type) => {
       const observer = installObserver();

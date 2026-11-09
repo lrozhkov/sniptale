@@ -13,6 +13,7 @@
     "packages/*/src/**/*.{ts,tsx,js,mjs,cjs}",
     "tooling/**/*.{ts,tsx,js,mjs,cjs}"
   ],
+  "paths": {"/generated/adapter.mjs": ["./tooling/simplify-lab/adapter.mjs"]},
   "include": ["unresolved", "unlisted", "binaries"],
   "ignoreBinaries": ["codeql", "flock", "gcc", "import", "mkfifo", "printf", "xwininfo"],
   "ignoreDependencies": ["@fontsource/marck-script"],

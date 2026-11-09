@@ -1,14 +1,16 @@
-import {
-  ALL_FORMATS,
-  BlobSource,
-  Input,
-  VideoSampleSink,
-  type InputAudioTrack,
-  type VideoSample,
-} from 'mediabunny';
+import { ALL_FORMATS, BlobSource, Input, type InputAudioTrack, type VideoSample } from 'mediabunny';
 import type { QuickEditPresentationSettings } from '../../features/video/review/advanced/presentation';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
-import { createReviewDecodedSampleSink } from './decoded-video-sample';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+  type PreviewSourceLease,
+} from '../video/preview-source';
+import {
+  prepareDecodedVideoSample,
+  borrowDecodedSourceSample,
+} from '../../features/video/composition/draw/decoded-sample';
+import { reviewExportPhase } from './export-diagnostics';
 import { drawReviewPresentationFrame } from './presentation-frame';
 
 type Slot = Exclude<QuickEditPresentationSettings['intro'], { mode: 'none' }>;
@@ -30,6 +32,8 @@ class PresentationMediaError extends Error {
 /** One caller-owned drawing lease. Release before requesting the next frame. */
 interface PresentationMediaFrame {
   draw(context: CanvasRenderingContext2D): void;
+  /** Detaches normalized source pixels; the caller owns the returned bitmap. */
+  snapshot(): ImageBitmap;
   release(): void;
 }
 
@@ -90,7 +94,9 @@ export async function createReviewPresentationMedia(args: {
   let bitmap: ImageBitmap | null = null;
   let sample: VideoSample | null = null;
   let currentLease: PresentationMediaFrame | null = null;
-  let sink: ReturnType<typeof createReviewDecodedSampleSink> | null = null;
+  let provider: PreviewSourceProvider | null = null;
+  let sourceLease: PreviewSourceLease | null = null;
+  let sourceUrl: string | null = null;
   let audioTrack: InputAudioTrack | null = null;
   let resolution = 0;
   const assertLive = () => {
@@ -101,8 +107,18 @@ export async function createReviewPresentationMedia(args: {
     if (disposed) return;
     disposed = true;
     currentLease?.release();
-    sample?.close();
-    sample = null;
+    // An uncancellable clone normalization owns its resources until frame() settles.
+    if (!pending) {
+      sample?.close();
+      sample = null;
+      sourceLease?.release();
+      sourceLease = null;
+    }
+    provider?.dispose();
+    if (sourceUrl) {
+      URL.revokeObjectURL(sourceUrl);
+      sourceUrl = null;
+    }
     bitmap?.close();
     bitmap = null;
     input?.dispose();
@@ -131,14 +147,11 @@ export async function createReviewPresentationMedia(args: {
         throw new PresentationMediaError('metadata');
       input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
       const admitted = await admitVideo(input, slot.video);
-      const { track, audio, resolution: admittedResolution } = admitted;
+      const { audio, resolution: admittedResolution } = admitted;
       resolution = admittedResolution;
       assertLive();
-      sink = createReviewDecodedSampleSink(
-        new VideoSampleSink(track),
-        signal,
-        await track.getDecoderConfig()
-      );
+      sourceUrl = URL.createObjectURL(blob);
+      provider = createPreviewSourceProvider();
       audioTrack = audio[0] ?? null;
     }
   } catch (error) {
@@ -180,21 +193,49 @@ export async function createReviewPresentationMedia(args: {
             (mapping.holdLast ? start !== trim.end || end !== trim.end : start >= trim.end)
           )
             throw new PresentationMediaError('mapping');
-          // Track ticks, rather than an arbitrary epsilon, define the half-open endpoint.
-          const time = mapping.holdLast
-            ? (Math.ceil(trim.end * resolution) - 1) / resolution
-            : start;
-          if (time < trim.start || time >= trim.end) throw new PresentationMediaError('mapping');
-          const decoded = await sink!.getSample(time);
-          if (!decoded) throw new PresentationMediaError('decode');
-          sample = decoded;
+          // Keep the existing container-tick admission for a retained window with no representable endpoint.
+          const finalTick = (Math.ceil(trim.end * resolution) - 1) / resolution;
+          if (mapping.holdLast && finalTick < trim.start)
+            throw new PresentationMediaError('mapping');
+          const time = mapping.holdLast ? trim.end : start;
+          sourceLease = await reviewExportPhase(signal, 'decode', () =>
+            provider!.acquire(
+              [
+                {
+                  id: 'bookend',
+                  url: sourceUrl!,
+                  time,
+                  rangeEnd: trim.end,
+                  ...(mapping.holdLast ? { endpoint: 'retained-end' as const } : {}),
+                },
+              ],
+              signal
+            )
+          );
+          assertLive();
+          const binding = sourceLease?.bindings.get('bookend');
+          if (!binding?.source.toVideoFrame) throw new PresentationMediaError('decode');
+          const effective = binding.sampleTime ?? time;
+          if (
+            binding.target !== time ||
+            ![binding.timestamp, binding.nextTimestamp, effective].every(Number.isFinite) ||
+            binding.nextTimestamp <= binding.timestamp ||
+            binding.timestamp >= trim.end ||
+            binding.nextTimestamp <= trim.start ||
+            (mapping.holdLast && (!binding.heldAtRetainedEnd || binding.nextTimestamp < trim.end))
+          )
+            throw new PresentationMediaError('metadata');
+          sample = await prepareDecodedVideoSample(
+            borrowDecodedSourceSample(
+              binding.source.toVideoFrame(),
+              binding.timestamp,
+              binding.source.orientation
+            ),
+            signal
+          );
           assertLive();
           if (
             !Number.isFinite(sample.timestamp) ||
-            !Number.isFinite(sample.duration) ||
-            sample.duration <= 0 ||
-            sample.timestamp > time ||
-            sample.timestamp + sample.duration <= time ||
             sample.displayWidth !== slot.video.source.width ||
             sample.displayHeight !== slot.video.source.height
           )
@@ -202,6 +243,7 @@ export async function createReviewPresentationMedia(args: {
         }
         let released = false;
         const heldSample = sample;
+        const heldSource = sourceLease;
         const source = slot.mode === 'image' ? slot.image : slot.video.source;
         const lease: PresentationMediaFrame = {
           draw(context) {
@@ -218,11 +260,44 @@ export async function createReviewPresentationMedia(args: {
               }
             );
           },
+          snapshot() {
+            let canvas: OffscreenCanvas | undefined;
+            let detached: ImageBitmap | undefined;
+            const assertLease = () => {
+              assertLive();
+              if (released) throw new PresentationMediaError('disposed');
+            };
+            try {
+              assertLease();
+              canvas = new OffscreenCanvas(source.width, source.height);
+              const target = canvas.getContext('2d');
+              if (!target) throw new PresentationMediaError('decode');
+              if (heldSample) heldSample.draw(target, 0, 0, source.width, source.height);
+              else target.drawImage(bitmap!, 0, 0, source.width, source.height);
+              assertLease();
+              detached = canvas.transferToImageBitmap();
+              assertLease();
+              return detached;
+            } catch (error) {
+              detached?.close();
+              signal.throwIfAborted();
+              throw error instanceof PresentationMediaError
+                ? error
+                : new PresentationMediaError('decode', { cause: error });
+            } finally {
+              if (canvas) {
+                canvas.width = 0;
+                canvas.height = 0;
+              }
+            }
+          },
           release() {
             if (released) return;
             released = true;
             heldSample?.close();
+            heldSource?.release();
             if (sample === heldSample) sample = null;
+            if (sourceLease === heldSource) sourceLease = null;
             if (currentLease === lease) currentLease = null;
           },
         };
@@ -231,6 +306,8 @@ export async function createReviewPresentationMedia(args: {
       } catch (error) {
         sample?.close();
         sample = null;
+        sourceLease?.release();
+        sourceLease = null;
         if (!(error instanceof PresentationMediaError) || error.code !== 'mapping') dispose();
         signal.throwIfAborted();
         throw error instanceof PresentationMediaError

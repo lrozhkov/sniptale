@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -86,5 +87,8 @@ export function useVideoEditorPreviewPreferences() {
     [persistPreferences]
   );
 
-  return { preferences, retrySave, saveFailed, updatePreferences };
+  return useMemo(
+    () => ({ preferences, retrySave, saveFailed, updatePreferences }),
+    [preferences, retrySave, saveFailed, updatePreferences]
+  );
 }

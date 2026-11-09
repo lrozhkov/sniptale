@@ -47,7 +47,11 @@ export const backgroundIngressBackgroundOwnedRouteGroups = [
     sideEffects:
       'read-only native connection or workspace allocation and optional host permission query',
     transitiveStateOwner: 'native remote-connection owner and browser permission authority',
-    messageTypes: ['SYNC_CONNECTION_ORIGIN_PERMISSION', 'SYNC_WORKSPACE_ORIGIN_PERMISSION'],
+    messageTypes: [
+      'SYNC_CONNECTION_ORIGIN_PERMISSION',
+      'SYNC_WORKSPACE_ORIGIN_PERMISSION',
+      'SYNC_CONNECTION_CREDENTIAL',
+    ],
   },
   {
     acceptedSenderClass: 'checked top-level content runtime including the owned shim sender',
@@ -502,6 +506,28 @@ export const backgroundIngressBackgroundOwnedRouteGroups = [
     sideEffects: 'owner-scoped background storage, AI, privacy, page-access, or runtime effects',
     transitiveStateOwner: 'declared background route owner module',
     messageTypes: ['OFFSCREEN_VOICE_INPUT_EVENT'],
+  },
+  {
+    acceptedSenderClass: 'authorized extension page or content runtime selected by owner policy',
+    actionKind: 'background-owned',
+    alternateAuthorizationPolicyIds: [],
+    alternateAuthorityFamilies: [],
+    authorizationPolicyId: 'background-owned',
+    boundary: 'background-runtime',
+    errorShape: 'standard runtime error response with sanitized message',
+    freshnessReplayPolicy:
+      'owner policy checks sender and route-specific freshness before dispatch',
+    handlerId: 'simplify',
+    keepChannelBehaviorSource: 'background-owned-route-handler',
+    ownerModule: 'apps/extension/src/background/simplify/route.ts',
+    policyAuthorityFamily: 'simplify-authority',
+    policyStateIds: ['simplify-compute-sessions'],
+    requiredAuthority: 'background-owned authorization policy registry entry',
+    responseShape: 'owner route response contract',
+    routeAuthorityFamily: 'background-owned-ipc',
+    sideEffects: 'owner-scoped background storage, AI, privacy, page-access, or runtime effects',
+    transitiveStateOwner: 'declared background route owner module',
+    messageTypes: ['SIMPLIFY_COMMAND'],
   },
   {
     acceptedSenderClass: 'authorized extension page or content runtime selected by owner policy',

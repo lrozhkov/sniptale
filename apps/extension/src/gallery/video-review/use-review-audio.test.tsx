@@ -629,3 +629,38 @@ it('edits ordinary original gain without modifying admitted alpha speech metadat
     vi.unstubAllGlobals();
   }
 });
+
+it('retains original mute playback data across clock-only owner rerenders and refreshes edited audio', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let audio: QuickEditAudioState = {
+    original: {
+      muted: false,
+      volume: 1,
+      mutes: [{ id: 'mute', kind: 'range', start: 1, end: 2, volume: 0 }],
+    },
+    voiceover: [],
+    music: [],
+  };
+  const root = createRoot(document.createElement('div'));
+  let current!: ReturnType<typeof useReviewAudio>;
+  const setAudio = vi.fn();
+  function Harness() {
+    current = useReviewAudio({ audio, setAudio, timelineDuration: 10 });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    const before = current.originalPlayback,
+      views = current.originalRanges;
+    act(() => root.render(<Harness />));
+    expect(current.originalPlayback).toBe(before);
+    expect(current.originalRanges).toBe(views);
+    audio = { ...audio, original: { ...audio.original, volume: 0.5 } };
+    act(() => root.render(<Harness />));
+    expect(current.originalPlayback).not.toBe(before);
+    expect(current.originalPlayback.volume).toBe(0.5);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

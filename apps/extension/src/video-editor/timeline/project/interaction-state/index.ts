@@ -90,8 +90,15 @@ function useTimelineRangeSelectionState(
   timelineRef: React.MutableRefObject<HTMLDivElement | null>,
   readTimelineStartTime: () => number
 ) {
-  const { onSeek, onSelectScene, onSetPlaybackRange, pixelsPerSecond, playbackRange, project } =
-    props;
+  const {
+    onSeek,
+    onSelectScene,
+    onSelectTrack,
+    onSetPlaybackRange,
+    pixelsPerSecond,
+    playbackRange,
+    project,
+  } = props;
   const { beginRangeSelection, createSurfaceRangeSelectionStartHandler, visiblePlaybackRange } =
     useProjectTimelineRangeSelection({
       pixelsPerSecond,
@@ -111,12 +118,14 @@ function useTimelineRangeSelectionState(
     [createSurfaceRangeSelectionStartHandler, onSeek, onSelectScene]
   );
   const beginTrackRangeSelection = useMemo(
-    () => (_trackId: string) =>
-      createSurfaceRangeSelectionStartHandler((time) => {
-        onSelectScene();
-        onSeek(time);
-      }),
-    [createSurfaceRangeSelectionStartHandler, onSeek, onSelectScene]
+    () => (trackId: string) => (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      // Opening the inspector can move the lane before pointerup; retain the click target.
+      event.currentTarget.setPointerCapture?.(event.pointerId);
+      onSelectTrack(trackId);
+      createSurfaceRangeSelectionStartHandler(onSeek)(event);
+    },
+    [createSurfaceRangeSelectionStartHandler, onSeek, onSelectTrack]
   );
 
   return {

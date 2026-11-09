@@ -291,7 +291,10 @@ async function commitMusicClip(args: {
           )?.resultEnd);
   const placement =
     target.lane === 'voiceover'
-      ? { start: target.sourceStart, end: target.sourceStart + duration }
+      ? {
+          start: target.sourceStart,
+          end: Math.min(target.sourceStart + duration, target.sourceEnd ?? Infinity),
+        }
       : reviewMusicPlacement(start, end ?? map.getDuration(), before.audio.music);
   const imported = {
     ...importedAudioClip(assetId, duration, placement.start, placement.end),

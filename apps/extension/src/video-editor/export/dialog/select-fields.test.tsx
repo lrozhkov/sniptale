@@ -66,6 +66,7 @@ it('refreshes source resolution and every quality label after a mounted locale c
     }
   }
   expect(onChange).not.toHaveBeenCalled();
+  expect(container!.textContent).toContain('detailEnhancementHint');
 });
 
 afterEach(() => {
@@ -463,4 +464,37 @@ it('keeps an unavailable current format visible until an available replacement i
   ).toBe(true);
   await act(async () => available[0]!.click());
   expect(onChange).toHaveBeenCalledWith({ format: VideoExportFormat.WEBM, webmVideoCodec: 'VP9' });
+});
+
+it('forwards only the selected export enhancement patch', async () => {
+  const onChange = vi.fn();
+  await act(async () =>
+    root!.render(
+      <ExportDialogSelectFields
+        capabilities={null}
+        onChange={onChange}
+        selectedClipAvailable={false}
+        sourceDimensions={{ width: 160, height: 90 }}
+        settings={{
+          format: 'WEBM',
+          webmVideoCodec: 'VP9',
+          resolution: 'SOURCE',
+          fps: 30,
+          width: 160,
+          height: 90,
+          quality: 'HIGH',
+          downloadAfterExport: false,
+        }}
+      />
+    )
+  );
+  const trigger = container!.querySelector<HTMLButtonElement>(
+    '[data-ui="video.exportDetailEnhancement"] button[aria-haspopup="listbox"]'
+  )!;
+  await act(async () => trigger.click());
+  const sharpen = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+    (option) => option.textContent === 'videoEditor.exportDialog.detailEnhancementBicubic'
+  )!;
+  await act(async () => sharpen.click());
+  expect(onChange).toHaveBeenCalledExactlyOnceWith({ detailEnhancement: 'bicubic-sharpen' });
 });

@@ -1,3 +1,4 @@
+import { retimeReviewTextDocument } from './text-timing';
 import { sameHistoryArray, sameHistoryRecord } from '@sniptale/foundation/history/equal';
 import { loadQuickEditAdvancedContentState } from './advanced/validation';
 import { anchorReviewVoiceover, normalizeReviewVoiceoverTempo } from './voiceover-edits';
@@ -15,6 +16,7 @@ const historyMessages = {
   'edit-overlap': 'Review edit ranges overlap.',
   'entire-video-cut': 'Review cuts remove the entire video.',
   'voiceover-invalid': 'Voiceover placement is invalid.',
+  'text-invalid': 'Text placement is invalid.',
   'cursor-invalid': 'Review history cursor is invalid.',
   'unexpected-replay-failure': 'Review history could not be replayed.',
 } as const;
@@ -208,7 +210,7 @@ export function applyReviewOperation(
     if (edit.kind === 'cut') removed += edit.end - edit.start;
   }
   if (removed >= source.duration) throw new ReviewHistoryError('entire-video-cut');
-  const advancedContent = operation.preserveFocusAnchors
+  let advancedContent = operation.preserveFocusAnchors
     ? {
         ...document.advancedContent,
         zoom: {
@@ -224,6 +226,21 @@ export function applyReviewOperation(
         },
       }
     : document.advancedContent;
+  if (operation.preserveTextAnchors && advancedContent.text) {
+    advancedContent = {
+      ...advancedContent,
+      text: retimeReviewTextDocument(
+        advancedContent.text,
+        buildReviewTimeMap(source.duration, document.edits),
+        buildReviewTimeMap(source.duration, edits),
+        operation.before,
+        operation.after
+      ),
+    };
+    const admitted = loadQuickEditAdvancedContentState(advancedContent);
+    if (!admitted) throw new ReviewHistoryError('text-invalid');
+    advancedContent = admitted;
+  }
   if (operation.preserveVoiceoverAnchors) {
     const previous = buildReviewTimeMap(source.duration, document.edits);
     const content = loadQuickEditAdvancedContentState({

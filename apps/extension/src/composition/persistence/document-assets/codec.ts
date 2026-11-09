@@ -29,6 +29,7 @@ const ASSET_URL_PREFIX = 'sniptale-asset:';
 const CANVAS_BINARY_FIELDS = new Set([
   'src',
   'sniptaleBackgroundImageData',
+  'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
 ]);
 
@@ -72,7 +73,7 @@ async function stageDataUrl(
   runtimeAssetsByUrl: Map<string, AssetRef>,
   reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>
 ): Promise<PersistedEditorAssetPointer> {
-  const reusable = reusableAssetsByRuntimeUrl?.get(binaryUrl);
+  const reusable = runtimeAssetsByUrl.get(binaryUrl) ?? reusableAssetsByRuntimeUrl?.get(binaryUrl);
   if (reusable) {
     refsById.set(reusable.assetId, reusable);
     runtimeAssetsByUrl.set(binaryUrl, reusable);
@@ -313,6 +314,7 @@ export async function hydratePersistedEditorDocument(args: {
 function projectEditorImageMetadata(
   document: Pick<
     EditorDocument,
+    | 'compositionBase'
     | 'sourceName'
     | 'displayName'
     | 'sourceWidth'
@@ -326,6 +328,7 @@ function projectEditorImageMetadata(
   >
 ) {
   return {
+    ...(document.compositionBase ? { compositionBase: { ...document.compositionBase } } : {}),
     sourceName: document.sourceName,
     ...(document.displayName === undefined ? {} : { displayName: document.displayName }),
     sourceWidth: document.sourceWidth,

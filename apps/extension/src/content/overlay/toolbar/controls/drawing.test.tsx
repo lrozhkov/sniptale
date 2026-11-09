@@ -39,7 +39,7 @@ it('keeps pencil quick options beside its icon without extending the toolbar flo
     host.querySelectorAll(
       'button[data-ui^="content.toolbar.drawing."]:not([data-ui^="content.toolbar.drawing-options."])'
     )
-  ).toHaveLength(7);
+  ).toHaveLength(8);
   expect(
     host.querySelector('[data-ui="content.toolbar.drawing.pencil"] .lucide-pen-line')
   ).not.toBeNull();
@@ -651,7 +651,7 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   act(() => opacity30?.click());
   act(() => green?.click());
   expect(session.getSnapshot().defaults.marker).toMatchObject({
-    color: '#32cd324d',
+    color: '#32cd32',
     opacity: 1,
     width: 44,
   });

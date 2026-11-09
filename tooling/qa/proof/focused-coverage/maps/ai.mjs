@@ -185,7 +185,7 @@ export const AI_OWNER_MAPPINGS = [
       'apps/extension/src/settings/sections/ai/connections/index.test.tsx',
       'apps/extension/src/settings/sections/ai/connections/surface/content.test.tsx',
       'apps/extension/src/settings/sections/ai/connections/surface/content.modals.test.tsx',
-      'apps/extension/src/settings/sections/ai/connections/surface/content.secret-protection-dialog.test.tsx',
+      'apps/extension/src/settings/secret-protection/integration.test.tsx',
       'apps/extension/src/workflows/ai-settings/query.test.ts',
       'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
       'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
@@ -209,7 +209,7 @@ export const AI_OWNER_MAPPINGS = [
       'apps/extension/src/settings/sections/ai/connections/index.test.tsx',
       'apps/extension/src/settings/sections/ai/connections/surface/content.test.tsx',
       'apps/extension/src/settings/sections/ai/connections/surface/content.modals.test.tsx',
-      'apps/extension/src/settings/sections/ai/connections/surface/content.secret-protection-dialog.test.tsx',
+      'apps/extension/src/settings/secret-protection/integration.test.tsx',
       'apps/extension/src/workflows/ai-settings/query.test.ts',
       'apps/extension/src/background/ai/settings/catalog-runtime.test.ts',
       'apps/extension/src/background/ai/settings/managed-catalog.test.ts',
@@ -792,19 +792,8 @@ through their existing consumer tests.',
     owner: 'settings-ai-runtime-mutation-client',
     productionFile: 'apps/extension/src/settings/runtime/ai-settings/mutations.ts',
     reason:
-      'Settings AI mutation client and secret-status transport are covered by runtime client fixtures.',
-    testFiles: [
-      'apps/extension/src/settings/sections/ai/connections/runtime/secret-protection-status.test.ts',
-    ],
-  },
-  {
-    owner: 'settings-ai-runtime-secret-status-client',
-    productionFile:
-      'apps/extension/src/settings/sections/ai/connections/runtime/secret-protection-status.ts',
-    reason: 'Settings AI secret protection status client is covered by runtime client fixtures.',
-    testFiles: [
-      'apps/extension/src/settings/sections/ai/connections/runtime/secret-protection-status.test.ts',
-    ],
+      'Moved runtime client fixtures cover retained AI provider/model mutation routing and structured failures.',
+    testFiles: ['apps/extension/src/settings/runtime/secret-protection.test.ts'],
   },
   {
     owner: 'ai-payload-limits',

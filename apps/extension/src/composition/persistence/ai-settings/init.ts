@@ -4,7 +4,6 @@ import {
   AI_STORAGE_VERSION,
   AI_STORAGE_VERSION_KEY,
 } from './constants';
-import { recoverStoredAISecretPassphraseProtectionTransition } from './secret-protection-transition.store';
 import { resetIncompatibleAISettings } from './alpha-reset';
 
 let aiStoragePreparationPromise: Promise<void> | null = null;
@@ -39,7 +38,6 @@ export function initializeAiStorageAccess(): Promise<void> {
   aiStoragePreparationPromise = readAiStorageReadiness()
     .then(async ({ isReady }) => {
       if (!isReady) await resetIncompatibleAISettings();
-      await recoverStoredAISecretPassphraseProtectionTransition();
     })
     .catch((error) => {
       aiStoragePreparationPromise = null;

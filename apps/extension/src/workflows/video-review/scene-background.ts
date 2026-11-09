@@ -5,8 +5,15 @@ import type {
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
 import { drawEdgePaddedBlur } from '../../features/video/composition/canvas/edge-padded-blur';
+import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
+import {
+  drawSceneBackgroundMotion,
+  releaseSceneBackgroundMotionRaster,
+  getSceneBackgroundMotionRasterSize,
+} from '../../features/video/project/scene/background-motion-canvas';
 
 type BackgroundPaint = {
+  currentTime?: number | undefined;
   background: QuickEditBackgroundSettings;
   image: (CanvasImageSource & { width: number; height: number }) | null;
   width: number;
@@ -28,6 +35,8 @@ export function drawReviewBackgroundPaint(
   cacheOwner = context
 ) {
   const { background, image, width, height } = args;
+  if (paintMotion(context, args, cacheOwner)) return;
+  releaseSceneBackgroundMotionRaster(cacheOwner);
   const blur = background.enabled ? (background.layout.blur ?? 0) : 0;
   if (!background.enabled || background.type === 'solid' || blur <= 0) {
     rasters.delete(cacheOwner);
@@ -58,6 +67,7 @@ export function drawReviewBackgroundPaint(
 
 /** Owns the retained blurred background for one prepared preview session. */
 export function createReviewBackgroundPainter(resources: RenderResources) {
+  let motionOwner: CanvasRenderingContext2D | null = null;
   let cached: { key: string; image: BackgroundPaint['image']; lease: RenderCanvasLease } | null =
     null;
   let disposed = false;
@@ -68,12 +78,22 @@ export function createReviewBackgroundPainter(resources: RenderResources) {
   return {
     /** Geometry only; the painter retains exclusive ownership of its cache lease. */
     get retainedCacheSize() {
+      if (motionOwner) return getSceneBackgroundMotionRasterSize(motionOwner);
       return cached
         ? { width: cached.lease.canvas.width, height: cached.lease.canvas.height }
         : null;
     },
     draw(context: CanvasRenderingContext2D, args: BackgroundPaint) {
       if (disposed) throw new Error('Background painter is disposed.');
+      if (paintMotion(context, args, context, resources)) {
+        clear();
+        if (motionOwner && motionOwner !== context) releaseSceneBackgroundMotionRaster(motionOwner);
+        motionOwner = context;
+        return;
+      }
+      releaseSceneBackgroundMotionRaster(context);
+      if (motionOwner && motionOwner !== context) releaseSceneBackgroundMotionRaster(motionOwner);
+      motionOwner = null;
       const { background, image, width, height } = args;
       const blur = background.enabled ? (background.layout.blur ?? 0) : 0;
       if (!background.enabled || background.type === 'solid' || blur <= 0) {
@@ -108,8 +128,62 @@ export function createReviewBackgroundPainter(resources: RenderResources) {
       if (disposed) return;
       disposed = true;
       clear();
+      if (motionOwner) releaseSceneBackgroundMotionRaster(motionOwner);
+      motionOwner = null;
     },
   };
+}
+
+function paintMotion(
+  context: CanvasRenderingContext2D,
+  args: BackgroundPaint,
+  cacheOwner = context,
+  resources?: RenderResources
+) {
+  const background = args.background;
+  if (
+    !background.enabled ||
+    background.type === 'solid' ||
+    !hasSceneBackgroundMotion(background.motion)
+  )
+    return false;
+  const { motion, ...paint } = background;
+  if (!motion) return false;
+  drawSceneBackgroundMotion({
+    context,
+    cacheOwner,
+    motion,
+    currentTime: args.currentTime ?? 0,
+    width: args.width,
+    height: args.height,
+    paintKey: JSON.stringify(paint),
+    image: args.image,
+    ...(resources
+      ? {
+          acquire: (width: number, height: number) =>
+            resources.canvas('background-cache', { width, height }),
+        }
+      : {}),
+    paint: (target, width, height) => {
+      if (!resources) {
+        drawReviewBackgroundPaint(target, { ...args, background: paint, width, height });
+        return;
+      }
+      const blur = paint.layout.blur ?? 0;
+      if (blur <= 0) {
+        drawPaint(target, { ...args, background: paint, width, height }, resources);
+        return;
+      }
+      const source = resources.canvas('background-source', { width, height });
+      try {
+        drawPaint(source.context, { ...args, background: paint, width, height }, resources);
+        drawEdgePaddedBlur(target, source.canvas, null, (blur * width) / args.width, resources);
+      } finally {
+        source.release();
+      }
+    },
+  });
+  return true;
 }
 
 function drawPaint(

@@ -7,16 +7,23 @@ import type {
   MediaHubBackupSharedReference,
   MediaHubBackupManifestV6,
 } from './contracts';
-import { isSharedBackupLayout, assertReviewProjectLayout } from './layout';
+import {
+  isSharedBackupLayout,
+  assertReviewProjectLayout,
+  assertCursorAttachmentLayout,
+} from './layout';
 
 /** Each read receives its own strictly parsed manifest; legacy layouts cannot admit aliases. */
 export function parseBackupRootEnvelope(value: unknown, manifest: MediaHubBackupManifestV6) {
   if (isSharedBackupLayout(manifest.layout)) {
     if (!manifest.sharedObjects) throw new Error('Media backup shared object table is missing.');
-    return parseSharedRootEnvelope(value, manifest.sharedObjects);
+    const admitted = parseSharedRootEnvelope(value, manifest.sharedObjects);
+    assertCursorAttachmentLayout(admitted.envelope.metadata, manifest.layout);
+    return admitted;
   }
   const envelope = parseRootEnvelope(value);
   assertReviewProjectLayout(envelope.metadata, manifest.layout);
+  assertCursorAttachmentLayout(envelope.metadata, manifest.layout);
   return { envelope, directObjects: envelope.objects, sharedIds: [] };
 }
 

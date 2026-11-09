@@ -3,6 +3,8 @@ import {
   VIDEO_EDITOR_PREVIEW_MODES,
   VIDEO_EDITOR_PREVIEW_RASTER_PRESETS,
   VIDEO_EDITOR_PREVIEW_ZOOM_LEVELS,
+  VIDEO_PREVIEW_RENDERERS,
+  type VideoPreviewRenderer,
   type VideoEditorPreviewFrameRate,
   type VideoEditorPreviewMode,
   type VideoEditorPreviewRasterPreset,
@@ -17,6 +19,7 @@ export {
 export type { VideoEditorPreviewMode, VideoEditorPreviewRasterPreset, VideoEditorPreviewZoom };
 
 export interface VideoEditorPreviewPreferences {
+  renderer: VideoPreviewRenderer;
   frameRate: VideoEditorPreviewFrameRate;
   showFrameRate: boolean;
   mode: VideoEditorPreviewMode;
@@ -25,6 +28,7 @@ export interface VideoEditorPreviewPreferences {
 }
 
 export const DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES: VideoEditorPreviewPreferences = {
+  renderer: 'gpu',
   frameRate: 'project',
   showFrameRate: false,
   mode: 'live',
@@ -60,6 +64,9 @@ export function parseVideoEditorPreviewPreferences(
 
   const preferences = { ...DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES };
   let invalidFieldCount = 0;
+  if (includesValue(VIDEO_PREVIEW_RENDERERS, value['renderer']))
+    preferences.renderer = value['renderer'];
+  else if (value['renderer'] !== undefined) invalidFieldCount += 1;
   if (includesValue(VIDEO_EDITOR_PREVIEW_MODES, value['mode'])) preferences.mode = value['mode'];
   else if (value['mode'] !== undefined) invalidFieldCount += 1;
   if (includesValue(VIDEO_EDITOR_PREVIEW_RASTER_PRESETS, value['rasterPreset'])) {
@@ -82,12 +89,14 @@ export function parseCompleteVideoEditorPreviewPreferences(
   value: unknown
 ): VideoEditorPreviewPreferences | null {
   if (!isRecord(value) || Object.keys(value).some((key) => !PREFERENCE_KEYS.has(key))) return null;
+  if (!includesValue(VIDEO_PREVIEW_RENDERERS, value['renderer'])) return null;
   if (!includesValue(VIDEO_EDITOR_PREVIEW_MODES, value['mode'])) return null;
   if (!includesValue(VIDEO_EDITOR_PREVIEW_RASTER_PRESETS, value['rasterPreset'])) return null;
   if (!includesValue(VIDEO_EDITOR_PREVIEW_ZOOM_LEVELS, value['zoom'])) return null;
   if (!includesValue(VIDEO_EDITOR_PREVIEW_FRAME_RATES, value['frameRate'])) return null;
   if (typeof value['showFrameRate'] !== 'boolean') return null;
   return {
+    renderer: value['renderer'],
     showFrameRate: value['showFrameRate'],
     frameRate: value['frameRate'],
     mode: value['mode'],
@@ -97,4 +106,11 @@ export function parseCompleteVideoEditorPreviewPreferences(
 }
 
 // policyStateIds: [] - preference keys are a static parser allowlist, not mutable authority.
-const PREFERENCE_KEYS = new Set(['showFrameRate', 'frameRate', 'mode', 'rasterPreset', 'zoom']);
+const PREFERENCE_KEYS = new Set([
+  'renderer',
+  'showFrameRate',
+  'frameRate',
+  'mode',
+  'rasterPreset',
+  'zoom',
+]);

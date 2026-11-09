@@ -261,7 +261,7 @@ it('passes the selected render options through the real export hook', async () =
   try {
     await act(async () => fixture.root.render(<fixture.Harness />));
     const selects = fixture.host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]');
-    expect(selects).toHaveLength(5);
+    expect(selects).toHaveLength(6);
     for (const [label, option] of [
       [translate('gallery.videoReview.exportCodec'), 'VP9'],
       [translate('gallery.videoReview.exportFrameRate'), '24'],
@@ -513,51 +513,95 @@ it('binds time estimates to the current attempt and clears them on cancel and pu
   }
 });
 
-it('retains completion metadata until dismissal or the next attempt, without clearing the report receipt', async () => {
-  const fixture = setup();
-  const value = {
-    file: new File(['copy'], 'copy.webm'),
-    receipt: { filename: 'copy.webm', mediaId: 'recording:copy' },
-  };
-  mocks.export.mockResolvedValue(value);
-  try {
-    await act(async () => fixture.root.render(<fixture.Harness />));
-    await act(async () => fixture.hook.start());
-    expect(fixture.hook.completion).toEqual({ destination: 'gallery', mediaId: 'recording:copy' });
-    expect(fixture.hook.progress).toBe(100);
-    expect(fixture.hook.timeEstimate).toBeNull();
-    act(() => fixture.hook.dismissCompletion());
-    expect(fixture.hook.completion).toBeNull();
-    expect(fixture.hook.result).toBe(value);
-    await act(async () => fixture.hook.start());
-    let finish!: (value: unknown) => void;
-    mocks.export.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          finish = resolve;
+it.each(['direct', 'wrapped', 'cycle', 'nonmatching'] as const)(
+  'retains completion metadata and recovers %s enhancement failures',
+  async (kind) => {
+    const { ExportEnhancementError } =
+      await import('../../features/video/composition/export-enhancement/enhancer');
+    const fixture = setup((advanced) => {
+      advanced.ui.mode = 'advanced';
+    });
+    const value = {
+      file: new File(['copy'], 'copy.webm'),
+      receipt: { filename: 'copy.webm', mediaId: 'recording:copy' },
+    };
+    mocks.export.mockResolvedValue(value);
+    try {
+      await act(async () => fixture.root.render(<fixture.Harness />));
+      await act(async () => fixture.hook.start());
+      expect(fixture.hook.completion).toEqual({
+        destination: 'gallery',
+        mediaId: 'recording:copy',
+      });
+      expect(fixture.hook.progress).toBe(100);
+      expect(fixture.hook.timeEstimate).toBeNull();
+      act(() => fixture.hook.dismissCompletion());
+      expect(fixture.hook.completion).toBeNull();
+      expect(fixture.hook.result).toBe(value);
+      await act(async () => fixture.hook.start());
+      let finish!: (value: unknown) => void;
+      mocks.export.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          })
+      );
+      let pending!: Promise<void>;
+      await act(async () => {
+        pending = fixture.hook.start();
+      });
+      expect(fixture.hook.completion).toBeNull();
+      act(() => mocks.export.mock.calls.at(-1)![0].onProgress(1));
+      expect(fixture.hook.completion).toBeNull();
+      act(() => fixture.hook.dismissCompletion());
+      await act(async () => {
+        finish(value);
+        await pending;
+      });
+      expect(fixture.hook.completion).toBeNull();
+      await act(async () =>
+        fixture.hook.setRenderSettings({
+          frameRate: 0,
+          quality: 'HIGH',
+          detailEnhancement: 'clark-x2',
         })
-    );
-    let pending!: Promise<void>;
-    await act(async () => {
-      pending = fixture.hook.start();
-    });
-    expect(fixture.hook.completion).toBeNull();
-    act(() => mocks.export.mock.calls.at(-1)![0].onProgress(1));
-    expect(fixture.hook.completion).toBeNull();
-    act(() => fixture.hook.dismissCompletion());
-    await act(async () => {
-      finish(value);
-      await pending;
-    });
-    expect(fixture.hook.completion).toBeNull();
-    mocks.export.mockRejectedValue(new Error('failed'));
-    await act(async () => fixture.hook.start());
-    expect(fixture.hook.completion).toBeNull();
-    expect(fixture.hook.failed).toBe(true);
-  } finally {
-    await fixture.cleanup();
+      );
+      const { classifyReviewExportFailure } =
+        await import('../../workflows/video-review/export-diagnostics');
+      const selectedError = new ExportEnhancementError('clark-x2', 'device-lost');
+      const cycle = new Error('Unrelated failure');
+      cycle.cause = cycle;
+      const error =
+        kind === 'direct'
+          ? selectedError
+          : kind === 'wrapped'
+            ? classifyReviewExportFailure(undefined, 'compose', selectedError)
+            : kind === 'cycle'
+              ? cycle
+              : new Error('Unrelated wrapper', { cause: { cause: selectedError } });
+      mocks.export.mockRejectedValueOnce(error);
+      await act(async () => fixture.hook.start());
+      expect(fixture.hook.completion).toBeNull();
+      expect(fixture.hook.failed).toBe(true);
+      expect(fixture.hook.failureDetail).toBe(
+        kind === 'direct' || kind === 'wrapped'
+          ? translate('videoEditor.exportDialog.detailEnhancementDeviceLost')
+          : null
+      );
+      expect(fixture.hook.renderSettings.detailEnhancement).toBe('clark-x2');
+      await act(async () =>
+        fixture.hook.setRenderSettings({ frameRate: 0, quality: 'HIGH', detailEnhancement: 'off' })
+      );
+      mocks.export.mockResolvedValueOnce(value);
+      await act(async () => fixture.hook.start());
+      expect(fixture.hook.failed).toBe(false);
+      expect(fixture.hook.failureDetail).toBeNull();
+      expect(mocks.export.mock.lastCall![0].renderSettings.detailEnhancement).toBe('off');
+    } finally {
+      await fixture.cleanup();
+    }
   }
-});
+);
 
 it('reports direct downloads and ignores cleanup errors from an older completed download', async () => {
   const fixture = setup();
@@ -694,7 +738,7 @@ it('shows full sequence duration without a fragment bookend option', async () =>
       fixture.host.querySelector('[data-ui="gallery.videoReview.exportDuration"]')?.textContent
     ).toContain('9.0');
     expect(fixture.hook.presentationDuration?.totalDurationUs).toBe(9_000_000);
-    expect(fixture.host.querySelectorAll('[aria-haspopup="listbox"]')).toHaveLength(5);
+    expect(fixture.host.querySelectorAll('[aria-haspopup="listbox"]')).toHaveLength(6);
   } finally {
     await fixture.cleanup();
   }

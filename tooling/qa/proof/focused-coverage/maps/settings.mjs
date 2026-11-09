@@ -38,15 +38,29 @@ export const SETTINGS_OWNER_MAPPINGS = [
   },
   {
     exclusive: true,
-    owner: 'settings-ai-secret-protection-dialog',
-    productionFile:
-      'apps/extension/src/settings/sections/ai/connections/surface/secret-protection-dialog.tsx',
-    reason:
-      'Secret protection dialog modes and submissions are covered by the focused dialog suites.',
+    owner: 'settings-shared-secret-protection',
+    productionPrefix: 'apps/extension/src/settings/secret-protection/',
+    reason: `Shared protection status, participant commands and dialog lifecycle retain direct and AI/WebDAV
+composition proof.`,
     testFiles: [
+      'apps/extension/src/settings/secret-protection/controller.test.tsx',
+      'apps/extension/src/settings/secret-protection/context.test.tsx',
+      'apps/extension/src/settings/secret-protection/view.test.tsx',
+      'apps/extension/src/settings/secret-protection/dialog.test.tsx',
+      'apps/extension/src/settings/secret-protection/integration.test.tsx',
       'apps/extension/src/settings/sections/ai/connections/surface/content.modals.test.tsx',
-      'apps/extension/src/settings/sections/ai/connections/surface/content.secret-protection-dialog.test.tsx',
+      'apps/extension/src/settings/sections/capture/saving/sync-connection.test.tsx',
+      'apps/extension/src/settings/sections/system/access-data/index.test.tsx',
+      'apps/extension/src/settings/shell/page/index.test.tsx',
     ],
+  },
+  {
+    exclusive: true,
+    owner: 'settings-shared-secret-protection-client',
+    productionFile: 'apps/extension/src/settings/runtime/secret-protection.ts',
+    reason:
+      'The injected shared protection client retains status, participant command and wire failure proof.',
+    testFiles: ['apps/extension/src/settings/runtime/secret-protection.test.ts'],
   },
   {
     exclusive: true,

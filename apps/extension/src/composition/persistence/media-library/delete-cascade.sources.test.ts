@@ -1,15 +1,14 @@
 import { releaseUnpublishedProjectAssets } from './delete-cascade.sources';
 import { buildPhysicalDeleteOperation } from '../assets';
-import { readReviewWorkspaceFixture } from './delete-cascade.test-support';
-import { withVideoProjectUsage } from './usage-index-keys';
+import { readReviewWorkspaceFixture, installCascadeSource } from './delete-cascade.test-support';
 import { expect, it, vi } from 'vitest';
 import { mediaId, physicalId, mediaEntry, rows, harness } from './delete-cascade.test-support';
 import {
   deleteMediaAssetWithProjectCascade,
+  deleteUnreferencedMediaSource,
   StaleMediaAssetDeletePreviewError,
 } from './delete-cascade';
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
-import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 import type { MediaAssetSource } from './contracts';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { deleteRecording } from '../recordings';
@@ -23,6 +22,7 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
 vi.mock('../assets/opfs-store', async (original) => ({
   ...(await original<typeof import('../assets/opfs-store')>()),
   listReadyJournals: async () => [],
+  readAssetReadyPublicationClaims: async () => ({ valid: true, pending: false, journals: [] }),
 }));
 
 const sources = [
@@ -34,106 +34,10 @@ const sources = [
   { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
 ] satisfies MediaAssetSource[];
 
-function installSource(source: MediaAssetSource) {
-  rows.get('asset_owners')!.clear();
-  rows.get('media_library')!.set(mediaId, {
-    ...mediaEntry(),
-    source,
-    ...(source.kind === 'screenshot'
-      ? { kind: 'image', mimeType: 'image/png', blob: new Blob(['png']) }
-      : {}),
-  });
-  const own = (ownerKind: string, ownerId: string, assetId = physicalId, role = 'body') => {
-    rows
-      .get('asset_owners')!
-      .set(JSON.stringify([ownerKind, ownerId, role]), { ownerKind, ownerId, assetId, role });
-  };
-  if (source.kind === 'recording') {
-    rows.set(
-      'recordings',
-      new Map([
-        [
-          source.recordingId,
-          {
-            id: source.recordingId,
-            assetId: physicalId,
-            filename: 'clip.webm',
-            mimeType: 'video/webm',
-            size: 5,
-            createdAt: 1,
-          },
-        ],
-      ])
-    );
-    own('recording', source.recordingId);
-  } else if (source.kind === 'project-asset') own('project-asset', source.projectAssetId);
-  else if (source.kind === 'stored-asset') own('media-library', mediaId, physicalId, 'source');
-  else if (source.kind === 'project-export') {
-    rows.set(
-      'project_exports',
-      new Map([
-        [
-          source.exportId,
-          {
-            id: source.exportId,
-            assetId: physicalId,
-            projectId: source.projectId,
-            filename: 'export.webm',
-            size: 5,
-            createdAt: 1,
-            duration: 2,
-            width: 100,
-            height: 100,
-            fps: 30,
-          },
-        ],
-      ])
-    );
-    own('project-export', source.exportId);
-  } else if (source.kind === 'web-snapshot') {
-    rows.set(
-      'web_snapshots',
-      new Map([
-        [
-          source.snapshotId,
-          {
-            id: source.snapshotId,
-            packageAssetId: physicalId,
-            screenshotAssetId: 'snapshot-image',
-            screenshotMimeType: 'image/png',
-            screenshotSize: 3,
-            size: 5,
-            createdAt: 1,
-            updatedAt: 1,
-            manifest: createPagePackageManifestFixture({
-              id: source.snapshotId,
-              source: { faviconUrl: null, title: 'Page', url: 'https://example.com/' },
-            }),
-          },
-        ],
-      ])
-    );
-    own('web-snapshot', source.snapshotId, physicalId, 'package');
-    own('web-snapshot', source.snapshotId, 'snapshot-image', 'screenshot');
-    rows.get('asset_refs')!.set('snapshot-image', {
-      assetId: 'snapshot-image',
-      size: 3,
-      mimeType: 'image/png',
-      createdAt: 1,
-      location: { kind: 'opfs', objectKey: 'snapshot-image' },
-    });
-  }
-  const video = createVideoProjectEntryWithMediaClip();
-  video.project.assets[0]!.source = { kind: 'library-asset', mediaId };
-  rows.get('video_projects')!.clear();
-  rows.get('video_projects')!.set(video.id, withVideoProjectUsage(video));
-  return video;
-}
-
 it.each(sources)(
   'atomically removes confirmed $kind media and its video placements',
   async (source) => {
-    const video = installSource(source);
+    const video = installCascadeSource(source);
     await deleteMediaAssetWithProjectCascade(mediaId, [
       { id: video.id, kind: 'video', name: video.project.name, primary: false },
     ]);
@@ -155,7 +59,7 @@ it.each(sources)(
 );
 
 it.each(sources)('rolls back the whole $kind graph when confirmation is stale', async (source) => {
-  installSource(source);
+  installCascadeSource(source);
   const before = structuredClone(rows);
   await expect(deleteMediaAssetWithProjectCascade(mediaId, [])).rejects.toBeInstanceOf(
     StaleMediaAssetDeletePreviewError
@@ -167,7 +71,7 @@ it.each(sources)('rolls back the whole $kind graph when confirmation is stale', 
 it.each([false, true])(
   'releases a detached representation only when it is private (published=%s)',
   async (published) => {
-    const video = installSource({ kind: 'screenshot' });
+    const video = installCascadeSource({ kind: 'screenshot' });
     video.project.assets[0]!.source = {
       kind: 'project-asset',
       projectAssetId: 'representation',
@@ -210,7 +114,7 @@ it.each([false, true])(
 );
 
 it('purges a private acquisition linked to the root before any project placement was saved', async () => {
-  installSource({ kind: 'screenshot' });
+  installCascadeSource({ kind: 'screenshot' });
   rows.get('video_projects')!.clear();
   rows.get('project_assets')!.set('acquired', {
     id: 'acquired',
@@ -254,7 +158,7 @@ it('purges a private acquisition linked to the root before any project placement
 });
 
 it('retains the complete graph when the selected row contains a different Library identity', async () => {
-  installSource({ kind: 'screenshot' });
+  installCascadeSource({ kind: 'screenshot' });
   rows
     .get('media_library')!
     .set(mediaId, { ...(rows.get('media_library')!.get(mediaId) as object), id: 'different-root' });
@@ -273,7 +177,7 @@ it.each(
   async ({ mode, resource }) => {
     const { createQuickEditAdvancedState } =
       await import('../../../features/video/review/advanced/defaults');
-    installSource(
+    installCascadeSource(
       mode === 'root-self'
         ? { kind: 'project-asset', projectAssetId: 'project-asset-1' }
         : { kind: 'screenshot' }
@@ -397,7 +301,7 @@ it.each(
 it('retains a private source and its auxiliaries while its own saved project remains', async () => {
   const { createQuickEditAdvancedState } =
     await import('../../../features/video/review/advanced/defaults');
-  installSource({ kind: 'screenshot' });
+  installCascadeSource({ kind: 'screenshot' });
   rows.get('video_projects')!.clear();
   const advanced = createQuickEditAdvancedState();
   advanced.audio.music.push({
@@ -471,7 +375,7 @@ it('confirmed image-origin purge strips active and remembered logos from the ret
     await import('../../../features/video/project/scene/watermark');
   const { parseVideoWorkspace } = await import('../review-workspaces/parser');
   const { collectReviewAssetReferences } = await import('../review-workspaces/asset-refs');
-  installSource({ kind: 'screenshot' });
+  installCascadeSource({ kind: 'screenshot' });
   rows.get('video_projects')!.clear();
   const watermark = {
     ...createQuickEditWatermark('Keep brand text'),
@@ -543,7 +447,7 @@ it.each(['recording-1', 'restored'])(
   'deletes safety bytes atomically with admitted canonical deletion of %s',
   async (target) => {
     const source = { kind: 'recording' as const, recordingId: target };
-    installSource(source);
+    installCascadeSource(source);
     rows.get('video_projects')!.clear();
     rows.set(
       'recording_recovery_sessions',
@@ -587,7 +491,7 @@ it.each(['recording-1', 'restored'])(
 );
 
 it('preserves safety bytes when canonical deletion admission is refused', async () => {
-  installSource({ kind: 'recording', recordingId: 'recording-1' });
+  installCascadeSource({ kind: 'recording', recordingId: 'recording-1' });
   rows.set('recording_recovery_sessions', new Map([['recording-1', { id: 'recording-1' }]]));
   rows.set(
     'recording_recovery_blocks',
@@ -601,7 +505,7 @@ it('preserves safety bytes when canonical deletion admission is refused', async 
 });
 
 it('preserves the coordination epoch and unrelated recovery when deleting canonical recording @epoch', async () => {
-  installSource({ kind: 'recording', recordingId: '@epoch' });
+  installCascadeSource({ kind: 'recording', recordingId: '@epoch' });
   rows.get('video_projects')!.clear();
   const epoch = { id: '@epoch', token: 'coordination-generation' };
   const unrelated = {
@@ -640,7 +544,7 @@ it('preserves the coordination epoch and unrelated recovery when deleting canoni
 });
 
 it('keeps the original canonical recording when deleting its restored copy and safety data', async () => {
-  installSource({ kind: 'recording', recordingId: 'restored' });
+  installCascadeSource({ kind: 'recording', recordingId: 'restored' });
   rows.get('video_projects')!.clear();
   const original = {
     id: 'original',
@@ -709,7 +613,7 @@ it.each(['recording', 'project-export'] as const)(
       kind === 'recording'
         ? { kind, recordingId: 'recording-1' }
         : { kind, exportId: 'export-1', projectId: 'origin-project' };
-    installSource(source);
+    installCascadeSource(source);
     rows.get('video_projects')!.clear();
     const sourceMediaId = kind === 'recording' ? 'recording:recording-1' : 'export:export-1';
     rows.get('media_library')!.delete(mediaId);
@@ -753,5 +657,66 @@ it.each(['recording', 'project-export'] as const)(
     expect(rows).toEqual(before);
     expect(rows.get('asset_refs')?.has(physicalId)).toBe(true);
     expect(harness.complete).not.toHaveBeenCalled();
+  }
+);
+
+it.each([true, false])(
+  'retains only the private source selected by a detached export input: related=%s',
+  async (related) => {
+    installCascadeSource({ kind: 'project-asset', projectAssetId: 'project-asset-1' });
+    rows.get('media_library')!.clear();
+    rows.get('video_projects')!.clear();
+    const input = createVideoProjectEntryWithMediaClip();
+    input.project.assets[0]!.source = {
+      kind: 'project-asset',
+      projectAssetId: related ? 'project-asset-1' : 'unrelated',
+    };
+    rows.set(
+      'project_export_inputs',
+      new Map([['detached-export', { jobId: 'detached-export', project: input.project }]])
+    );
+    const db = await harness.db();
+    const tx = db.transaction([...rows.keys()], 'readwrite');
+    const operation = buildPhysicalDeleteOperation([]);
+    await releaseUnpublishedProjectAssets(tx, new Set(['project-asset-1']), operation);
+    await tx.done;
+    expect(rows.get('project_assets')!.has('project-asset-1')).toBe(related);
+    expect(rows.get('asset_refs')!.has(physicalId)).toBe(related);
+    expect(
+      rows.get('asset_owners')!.has(JSON.stringify(['project-asset', 'project-asset-1', 'body']))
+    ).toBe(related);
+    expect(rows.get('project_export_inputs')!.size).toBe(1);
+    expect(operation.assetIds).toEqual(related ? [] : [physicalId]);
+  }
+);
+
+it.each(sources)(
+  'deletes the unreferenced lower $kind source through canonical admission',
+  async (source) => {
+    installCascadeSource(source);
+    rows.get('video_projects')!.clear();
+    await deleteUnreferencedMediaSource({ id: mediaId, source });
+    expect(rows.get('media_library')!.has(mediaId)).toBe(false);
+    expect(rows.get('asset_refs')!.has(physicalId)).toBe(source.kind === 'screenshot');
+    expect(harness.complete).toHaveBeenCalledTimes(source.kind === 'screenshot' ? 0 : 1);
+    if (source.kind === 'project-asset')
+      expect(rows.get('project_assets')!.has(source.projectAssetId)).toBe(false);
+    if (source.kind === 'project-export')
+      expect(rows.get('project_exports')!.has(source.exportId)).toBe(false);
+    if (source.kind === 'recording')
+      expect(rows.get('recordings')!.has(source.recordingId)).toBe(false);
+    if (source.kind === 'web-snapshot')
+      expect(rows.get('web_snapshots')!.has(source.snapshotId)).toBe(false);
+    expect([...(rows.get('asset_operations')?.values() ?? [])]).toEqual(
+      source.kind === 'screenshot'
+        ? []
+        : [
+            expect.objectContaining({
+              kind: 'physical-delete',
+              assetIds:
+                source.kind === 'web-snapshot' ? [physicalId, 'snapshot-image'] : [physicalId],
+            }),
+          ]
+    );
   }
 );

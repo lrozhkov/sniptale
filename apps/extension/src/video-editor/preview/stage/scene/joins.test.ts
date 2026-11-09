@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createImageClip,
@@ -49,7 +50,25 @@ function fixture() {
   const renderFrame = vi.fn<VideoPreviewFrameMaterializer['renderFrame']>(async () => frame);
   const dispose = vi.fn();
   const updateProject = vi.fn(() => true);
-  media.create.mockReturnValue({ canvas: frame, renderFrame, dispose, updateProject });
+  media.create.mockReturnValue({
+    canvas: frame,
+    renderFrame,
+    dispose,
+    updateProject,
+    renderFrameWithPresentation: vi.fn(
+      async (
+        time: number,
+        signal: AbortSignal,
+        camera?: import('../../../../features/video/composition/types').VideoCompositionCameraState
+      ) => ({
+        canvas: await renderFrame(time, signal, camera),
+        presentation: {
+          camera: camera ?? resolveVideoCompositionFrame(project, time).camera,
+          time,
+        },
+      })
+    ),
+  });
   const live = document.createElement('video');
   live.src = 'blob:source-one';
   const raw = vi.fn<typeof renderPreviewScene>(async () => {});
@@ -214,4 +233,172 @@ it('cannot publish a late frame after an incompatible snapshot replaces its owne
   expect(await old).toBe(false);
   expect(f.pixel(8, 5)).toEqual([0, 255, 0, 255]);
   expect(f.dispose).toHaveBeenCalledOnce();
+});
+
+it('returns the materialized pose only after final join publication', async () => {
+  const f = fixture();
+  const camera = {
+    ...resolveVideoCompositionFrame(f.input.project, 1).camera,
+    scale: 2.4,
+    viewportX: 123,
+  };
+  const presentation = { camera, time: 1 };
+  const materializer = media.create;
+  const original = materializer.getMockImplementation();
+  materializer.mockReturnValueOnce({
+    canvas: f.frame,
+    dispose: vi.fn(),
+    updateProject: () => true,
+    renderFrameWithPresentation: async () => ({ canvas: f.frame, presentation }),
+  });
+  await expect(f.owner.render(f.input)).resolves.toBe(presentation);
+  expect(f.pixel(8, 5)).toEqual([255, 0, 0, 128]);
+  if (original) materializer.mockImplementation(original);
+});
+
+it('prepares the ordinary scene while joins and held windows retain serial admission', async () => {
+  const f = fixture();
+  const release = vi.fn();
+  const prepare = vi.fn(async (input: Parameters<typeof renderPreviewScene>[0]) => ({
+    input,
+    release,
+  }));
+  const owner = createVideoPreviewCompositionJoinRenderer(f.raw, prepare);
+  owners.push(owner);
+  expect(owner.prepare(f.input)).toBeUndefined();
+  expect(prepare).not.toHaveBeenCalled();
+  const body = { ...f.input, currentTime: 2 };
+  const prepared = await owner.prepare(body);
+  expect(prepared?.input).toBe(body);
+  expect(prepare).toHaveBeenCalledOnce();
+  const windowed = {
+    ...body,
+    project: {
+      ...body.project,
+      clips: body.project.clips.map((clip) =>
+        clip.type === 'VIDEO' ? { ...clip, playbackWindow: { offset: 0, holdAt: 0.9 } } : clip
+      ),
+    },
+  };
+  expect(owner.prepare(windowed)).toBeUndefined();
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(media.create).not.toHaveBeenCalled();
+  prepared?.release();
+  owner.dispose();
+  expect(() => owner.prepare(body)).toThrow('disposed');
+});
+
+it('passes the original admitted preparation context through the materializer route', async () => {
+  const f = fixture();
+  const context = { project: f.input.project, signal: new AbortController().signal };
+  const preparation = { context, project: f.input.project, time: f.input.currentTime };
+  await f.owner.render({ ...f.input, effectPreparation: preparation });
+  const materializer = media.create.mock.results[0]!.value;
+  expect(materializer.renderFrameWithPresentation).toHaveBeenCalledWith(
+    f.input.currentTime,
+    expect.any(AbortSignal),
+    undefined,
+    undefined,
+    preparation
+  );
+  expect(f.raw).not.toHaveBeenCalled();
+});
+
+it('hands off the exact final GPU receipt for a window without copying it to Canvas2D', async () => {
+  const f = fixture();
+  f.input.project.compositionJoins = [];
+  f.input.project.clips.find(({ id }) => id === 'underlay')!.playbackWindow = {
+    offset: 0,
+    holdAt: 2.9,
+  };
+  vi.spyOn(f.input.stage!, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 16, 8));
+  const acquire = vi.fn<NonNullable<typeof f.input.acquireGpuOutput>>();
+  const release = vi.fn();
+  const camera = { ...resolveVideoCompositionFrame(f.input.project, 2.95).camera, scale: 1.4 };
+  const presentation = {
+    camera,
+    time: 2.95,
+    output: { canvas: f.frame, release },
+    renderer: { backend: 'gpu' as const },
+  };
+  const render = vi.fn<VideoPreviewFrameMaterializer['renderFrameWithPresentation']>(async () => ({
+    canvas: f.frame,
+    presentation,
+  }));
+  media.create.mockReturnValueOnce({
+    renderFrameWithPresentation: render,
+    updateProject: f.updateProject,
+    dispose: f.dispose,
+  });
+  const context = f.input.canvas.getContext('2d')!;
+  const copy = vi.spyOn(context, 'drawImage');
+  const result = await f.owner.render({
+    ...f.input,
+    currentTime: 2.95,
+    cameraOverride: camera,
+    acquireGpuOutput: acquire,
+  });
+  expect(render).toHaveBeenCalledWith(2.95, expect.any(AbortSignal), camera, acquire, undefined);
+  expect(result).toBe(presentation);
+  expect(copy).not.toHaveBeenCalled();
+  expect(release).not.toHaveBeenCalled();
+  f.owner.clear();
+  expect(release).not.toHaveBeenCalled();
+  presentation.output.release();
+  expect(release).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'clear', 'dispose', 'replace'] as const)(
+  'releases an untransferred GPU receipt after late %s',
+  async (reason) => {
+    const f = fixture();
+    const controller = new AbortController();
+    const release = vi.fn();
+    const pending =
+      Promise.withResolvers<
+        Awaited<ReturnType<VideoPreviewFrameMaterializer['renderFrameWithPresentation']>>
+      >();
+    media.create.mockReturnValueOnce({
+      renderFrameWithPresentation: vi.fn(() => pending.promise),
+      updateProject: f.updateProject,
+      dispose: f.dispose,
+    });
+    const context = f.input.canvas.getContext('2d')!;
+    const copy = vi.spyOn(context, 'drawImage');
+    const job = f.owner.render({ ...f.input, signal: controller.signal });
+    if (reason === 'abort') controller.abort();
+    else if (reason === 'replace') {
+      f.updateProject.mockReturnValueOnce(false);
+      await f.owner.render({ ...f.input, project: { ...f.input.project, id: 'replacement' } });
+      copy.mockClear();
+    } else f.owner[reason]();
+    pending.resolve({
+      canvas: f.frame,
+      presentation: {
+        camera: resolveVideoCompositionFrame(f.input.project, 1).camera,
+        time: 1,
+        output: { canvas: f.frame, release },
+      },
+    });
+    expect(await job).toBe(false);
+    expect(copy).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledOnce();
+  }
+);
+
+it('retains Canvas publication when the materializer declines direct GPU output', async () => {
+  const f = fixture();
+  const acquire = vi.fn<NonNullable<typeof f.input.acquireGpuOutput>>();
+  const result = await f.owner.render({ ...f.input, acquireGpuOutput: acquire });
+  expect(media.create.mock.results[0]!.value.renderFrameWithPresentation).toHaveBeenCalledWith(
+    1,
+    expect.any(AbortSignal),
+    undefined,
+    acquire,
+    undefined
+  );
+  expect(result).toMatchObject({ time: 1 });
+  expect(f.pixel(8, 5)).toEqual([255, 0, 0, 128]);
+  expect(f.pixel(8, 0)).toEqual([0, 0, 255, 128]);
+  expect(acquire).not.toHaveBeenCalled();
 });

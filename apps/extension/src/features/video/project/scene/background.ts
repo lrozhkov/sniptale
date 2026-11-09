@@ -1,5 +1,10 @@
 import { acquireVideoCompositionBuffer } from '../../composition/canvas/buffer-pool';
 import { drawEdgePaddedBlur } from '../../composition/canvas/edge-padded-blur';
+import { hasSceneBackgroundMotion } from './background-motion';
+import {
+  drawSceneBackgroundMotion,
+  releaseSceneBackgroundMotionRaster,
+} from './background-motion-canvas';
 import { parseSceneBackgroundSettings, retainSceneBackgroundVariants } from './background-settings';
 import { DEFAULT_VIDEO_PROJECT_BACKGROUND } from '../defaults';
 import {
@@ -145,6 +150,30 @@ interface SceneBackgroundDraw {
 }
 
 function drawSharpSceneBackground(params: SceneBackgroundDraw) {
+  if (
+    params.sceneBackground.kind !== 'solid' &&
+    hasSceneBackgroundMotion(params.sceneBackground.motion)
+  ) {
+    const { motion, ...paint } = params.sceneBackground;
+    if (!motion) return;
+    drawSceneBackgroundMotion({
+      context: params.context,
+      width: params.width,
+      height: params.height,
+      currentTime: params.currentTime ?? 0,
+      motion,
+      paintKey: JSON.stringify(paint),
+      image: paint.kind === 'image' ? (params.loadedImages?.[paint.assetId] ?? null) : null,
+      animatedPaint:
+        paint.kind === 'gradient' &&
+        paint.animation?.mode !== undefined &&
+        paint.animation.mode !== 'none',
+      paint: (context, width, height) =>
+        drawSharpSceneBackground({ ...params, context, width, height, sceneBackground: paint }),
+    });
+    return;
+  }
+  releaseSceneBackgroundMotionRaster(params.context);
   switch (params.sceneBackground.kind) {
     case VideoSceneBackgroundKind.SOLID:
       params.context.fillStyle = params.sceneBackground.color;
@@ -207,6 +236,7 @@ function staticRasterKey(
   const { remembered: _memory, blur: _blur, ...paint } = params.sceneBackground;
   if (
     paint.kind === 'solid' ||
+    hasSceneBackgroundMotion(paint.motion) ||
     (paint.kind === 'gradient' && paint.animation?.mode && paint.animation.mode !== 'none')
   )
     return null;
@@ -223,6 +253,7 @@ function staticRasterKey(
 /** Filter only the scene paint; foreground layers keep their own rendering semantics. */
 export function drawSceneBackground(params: SceneBackgroundDraw) {
   if (params.sceneBackground.enabled === false) {
+    releaseSceneBackgroundMotionRaster(params.context);
     const previous = backgroundRasters.get(params.context);
     if (previous) {
       releaseBackgroundRaster(previous);

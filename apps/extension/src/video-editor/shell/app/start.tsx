@@ -18,6 +18,7 @@ import { translate } from '../../../platform/i18n';
 import { openGalleryPage } from '../../../platform/navigation/extension-pages';
 import {
   EditorStart,
+  getEditorStartCommonLabels,
   type EditorStartSourceItem,
   useEditorStartItems,
 } from '../../../ui/editor-start';
@@ -88,12 +89,7 @@ export function VideoEditorStart() {
       createLabel={translate('videoEditor.app.newProjectAction')}
       openLabel={translate('shared.editorStart.open')}
       recentLabel={translate('videoEditor.app.startRecent')}
-      emptyLabel={translate('shared.editorStart.empty')}
-      loadingLabel={translate('shared.editorStart.loading')}
-      errorLabel={translate('shared.editorStart.error')}
-      retryLabel={translate('shared.editorStart.retry')}
-      searchLabel={translate('shared.editorStart.search')}
-      unavailableLabel={translate('shared.editorStart.unavailable')}
+      {...getEditorStartCommonLabels(translate)}
       items={items}
       status={status}
       actionError={actionError}

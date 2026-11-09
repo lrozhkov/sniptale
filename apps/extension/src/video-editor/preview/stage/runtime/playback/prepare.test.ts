@@ -166,3 +166,37 @@ it('does not prime camera video or audio outside metadata coverage', async () =>
   expect(video.currentTime).toBe(0);
   expect(audio.currentTime).toBe(0);
 });
+
+it('retains already prepared audio and video without same-position native seeks', async () => {
+  vi.stubGlobal('requestAnimationFrame', ((callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  }) as typeof requestAnimationFrame);
+  const audioClip = { ...createAudioClip(), sourceStart: 2.0000004 };
+  const videoClip = { ...createVideoClip(), sourceStart: 1.0000004 };
+  const audio = createPreparedAudioElement();
+  const video = createPreparedVideoElement();
+  const audioSeek = vi.fn();
+  const videoSeek = vi.fn();
+  Object.defineProperty(audio, 'currentTime', { configurable: true, get: () => 3, set: audioSeek });
+  Object.defineProperty(video, 'currentTime', {
+    configurable: true,
+    get: () => 2.5,
+    set: videoSeek,
+  });
+  await preparePreviewStagePlayback(
+    {
+      audioBankClips: [audioClip],
+      audioRefs: { current: { [audioClip.id]: audio } },
+      videoBankClips: [videoClip],
+      videoRefs: { current: { [videoClip.id]: video } },
+    },
+    6
+  );
+  expect(audioSeek).not.toHaveBeenCalled();
+  expect(videoSeek).not.toHaveBeenCalled();
+  expect(audio.playbackRate).toBe(0.5);
+  expect(video.playbackRate).toBe(0.5);
+  expect(audio.pause).toHaveBeenCalledOnce();
+  expect(video.pause).toHaveBeenCalledOnce();
+});

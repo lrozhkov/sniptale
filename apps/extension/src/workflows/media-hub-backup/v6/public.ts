@@ -38,8 +38,20 @@ import { listGallerySavedViews } from '../../../composition/persistence/gallery-
 import { runWithScenarioResourceRead } from '../../../composition/persistence/scenario/resource-sessions';
 import { backfillScenarioLibraryAssets } from '../../../composition/persistence/scenario/library-publication';
 
-function productBackupPreparation(signal?: AbortSignal): MediaHubBackupRootPreparation | undefined {
+function productBackupPreparation(
+  signal?: AbortSignal,
+  requirePreparedNative = false
+): MediaHubBackupRootPreparation {
   return async (root) => {
+    signal?.throwIfAborted();
+    if (requirePreparedNative) {
+      const { needsNativeEditingPreparation } =
+        await import('../../sync-transfer/native-residency');
+      const missing = await needsNativeEditingPreparation(root, 'backup');
+      signal?.throwIfAborted();
+      if (missing) throw new Error('Native backup resources are unavailable.');
+      return;
+    }
     const { ensureNativeBackupRootAvailable } =
       await import('../../sync-transfer/editing-admission');
     await ensureNativeBackupRootAvailable(root, signal);
@@ -78,7 +90,7 @@ export async function inspectLocalMediaHubBackup(
   const options = createMediaHubBackupExportOptions(rawOptions);
   const prepareRoot = productBackupPreparation();
   const plan = await runWithScenarioResourceRead(() =>
-    buildMediaHubBackupExportPlanFromLibraryV6(options, prepareRoot ? { prepareRoot } : {})
+    buildMediaHubBackupExportPlanFromLibraryV6(options, { prepareRoot })
   );
   const summary = plan.roots.reduce(
     (total, root) => ({
@@ -137,6 +149,7 @@ export async function exportMediaHubBackup(
   runtime: {
     expectedReview?: VideoWorkspaceSnapshot;
     requireSelected?: boolean;
+    requirePreparedNative?: boolean;
     filename?: string;
     onProgress?: (progress: ArchiveTransferProgress) => void;
     signal?: AbortSignal;
@@ -158,10 +171,10 @@ export async function exportMediaHubBackup(
       mimeType: 'application/zip',
     });
     try {
-      const prepareRoot = productBackupPreparation(runtime.signal);
+      const prepareRoot = productBackupPreparation(runtime.signal, runtime.requirePreparedNative);
       const plan = await buildMediaHubBackupExportPlanFromLibraryV6(options, {
         ...runtime,
-        ...(prepareRoot ? { prepareRoot } : {}),
+        prepareRoot,
       });
       await exportMediaHubBackupV6({
         plan,

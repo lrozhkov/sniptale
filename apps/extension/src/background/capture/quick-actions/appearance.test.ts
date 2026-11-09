@@ -15,6 +15,14 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   ensure: vi.fn(),
   ready: vi.fn(),
+  guard: vi.fn(),
+  findIcon: vi.fn(),
+}));
+vi.mock('../../../workflows/browser-frame/open-page-icon', () => ({
+  findOpenPageFavicon: mocks.findIcon,
+}));
+vi.mock('../../../platform/network/https-redirect-guard', () => ({
+  ensurePublicHttpsHeadGuard: mocks.guard,
 }));
 vi.mock('./flow/surface', () => ({
   getQuickActionAppearanceSnapshot: mocks.snapshot,
@@ -55,6 +63,7 @@ function output(text = 'Caption') {
 }
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.findIcon.mockResolvedValue(null);
   mocks.snapshot.mockImplementation(() => structuredClone(output()));
   mocks.current.mockImplementation(() => undefined);
   mocks.render.mockResolvedValue('styled');
@@ -63,6 +72,47 @@ beforeEach(() => {
 });
 
 describe('quick-action appearance admission and delivery preparation', () => {
+  it('uses selection preferences for appearance encoding without changing its snapshot', async () => {
+    const accepted = output();
+    mocks.snapshot.mockReturnValueOnce(accepted);
+    const admission = beginPageAppearance(1, 'tx', undefined, false, {
+      imageFormat: 'jpeg',
+      imageQuality: 37,
+    });
+    try {
+      await expect(admission.prepare!('raw', 'capture.png')).resolves.toEqual({
+        dataUrl: 'styled',
+        filename: 'capture.jpg',
+      });
+      expect(mocks.render).toHaveBeenCalledWith(
+        expect.objectContaining({
+          imageFormat: 'jpeg',
+          imageQuality: 37,
+          appearance: accepted.appearance,
+        })
+      );
+      expect(mocks.current).toHaveBeenCalledWith(1, 'tx');
+      expect(accepted).toMatchObject({ imageFormat: 'png', imageQuality: 90 });
+    } finally {
+      admission.release();
+    }
+  });
+
+  it('keeps clipboard appearance PNG when selection preferences request JPEG', async () => {
+    const admission = beginPageAppearance(1, 'tx', 'png', false, {
+      imageFormat: 'jpeg',
+      imageQuality: 37,
+    });
+    try {
+      await admission.prepare!('raw', 'capture.jpg');
+      expect(mocks.render).toHaveBeenCalledWith(
+        expect.objectContaining({ imageFormat: 'png', imageQuality: 37 })
+      );
+    } finally {
+      admission.release();
+    }
+  });
+
   it('keeps parallel tab preparations isolated when raster replies resolve out of order', async () => {
     const first = deferred<string>(),
       second = deferred<string>();
@@ -231,6 +281,7 @@ it('prepares the offscreen header before publishing its raster and retains sourc
     expect(mocks.ensure.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.ready.mock.invocationCallOrder[0]!
     );
+    expect(mocks.findIcon).not.toHaveBeenCalled();
     expect(mocks.ready.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.send.mock.invocationCallOrder[0]!
     );
@@ -303,3 +354,39 @@ it('retains the lossless full-page source when the final appearance exceeds its 
     admission.release();
   }
 });
+
+it.each([true, false])(
+  'dispatches header artwork after guard installation, including refusal: %s',
+  async (ready) => {
+    mocks.ensure.mockResolvedValue(undefined);
+    mocks.ready.mockResolvedValue(undefined);
+    mocks.findIcon.mockResolvedValue('https://example.test/brand.svg');
+    if (ready) mocks.guard.mockResolvedValue(undefined);
+    else mocks.guard.mockRejectedValue(new Error('guard unavailable'));
+    mocks.send.mockResolvedValue({ success: true, dataUrl: 'header-raster' });
+    mocks.render.mockImplementation(async (options: QuickActionRasterOptions) =>
+      options.renderHeader({
+        header: { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true },
+        source: { width: 640, height: 480 },
+        faviconWebsite: 'https://example.test',
+      })
+    );
+    const admission = beginPageAppearance(1, 'tx');
+    try {
+      await expect(admission.prepare!('raw', 'capture.png')).resolves.toMatchObject({
+        dataUrl: 'header-raster',
+      });
+      expect(mocks.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          faviconRedirectGuardReady: ready,
+          faviconHintUrl: 'https://example.test/brand.svg',
+        })
+      );
+      expect(mocks.guard.mock.invocationCallOrder[0]).toBeLessThan(
+        mocks.send.mock.invocationCallOrder[0]!
+      );
+    } finally {
+      admission.release();
+    }
+  }
+);

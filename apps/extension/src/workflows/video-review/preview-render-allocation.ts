@@ -1,5 +1,8 @@
+import { reviewSpatialOverlayBounds } from './spatial-overlay-bounds';
+import { calculateSpatialRenderAllocations } from './spatial-render-allocation';
+import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
-import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
+import { quickEditRegionNeedsSpatialRenderer } from '../../features/video/review/advanced/spatial';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,
@@ -33,9 +36,20 @@ interface Allocation extends Cost {
   role: string;
 }
 
+/** Selects the managed backing cost of a publication canvas. */
+export type PreviewPublicationOutputKind = 'gpu-surface' | 'canvas2d';
+
 /** Concrete dimensions come from preparation/admission, never from a quality multiplier. */
 export interface PreviewRenderAllocationInput {
-  publication: { backing: Size; previousFront: Size | null };
+  publication: {
+    backing: Size;
+    previousFront: Size | null;
+    maximumInFlight?: 1 | 2;
+    outputKind?: PreviewPublicationOutputKind;
+    previousFrontKind?: PreviewPublicationOutputKind;
+    /** Total retired GPU provider storage, including its front; zero excludes the current provider. */
+    previousProviderBytes?: number;
+  };
   admission: {
     source: Capture | null;
     camera: { retained: Capture | null; active: Capture | null };
@@ -61,9 +75,16 @@ export interface PreviewRenderAllocationInput {
     transitionRaster: Size | null;
     splitRaster?: Size | null;
     windowRaster: Size | null;
+    exportWindowRaster?: Size | null;
     clickLens?: boolean;
     motionPass: Size | null;
-    spatial: null | { output: Size; plane: Size; halfFloat: boolean };
+    spatial: null | {
+      output: Size;
+      plane: Size;
+      halfFloat: boolean;
+      overlay?: Size;
+      retained?: readonly { role: string; bytes: number; canvases: number }[];
+    };
     spotlight: null | { backing: Size; frameCount: number; blurRadius: number; fastPath: boolean };
     border: Size | null;
     denseCommentGradient: Size | null;
@@ -91,6 +112,30 @@ function bytes(role: string, count: number): Allocation {
 }
 function canvas(role: string, size: Size): Allocation {
   return { role, bytes: integer(pixels(size) * 4), canvases: 1 };
+}
+function publicationCanvas(
+  role: string,
+  size: Size,
+  kind: PreviewPublicationOutputKind = 'canvas2d'
+): Allocation {
+  return { role, bytes: integer(pixels(size) * (kind === 'gpu-surface' ? 8 : 4)), canvases: 1 };
+}
+function retainedPublication(
+  previousFront: Size | null,
+  previousFrontKind: PreviewPublicationOutputKind = 'canvas2d',
+  previousProviderBytes = 0
+): Allocation[] {
+  integer(previousProviderBytes, true);
+  if (!previousFront) {
+    if (previousProviderBytes) throw new Error('Invalid preview allocation graph');
+    return [];
+  }
+  const front = publicationCanvas('publication-front', previousFront, previousFrontKind);
+  if (!previousProviderBytes) return [front];
+  if (previousFrontKind !== 'gpu-surface' || previousProviderBytes < front.bytes)
+    throw new Error('Invalid preview allocation graph');
+  const extra = previousProviderBytes - front.bytes;
+  return extra ? [front, bytes('publication-retired-provider', extra)] : [front];
 }
 function bitmap(role: string, size: Size | null): Allocation[] {
   return size ? [bytes(role, pixels(size) * 4)] : [];
@@ -125,31 +170,7 @@ function gradient(size: Size | null): Allocation[] {
       ]
     : [];
 }
-function spatial(value: PreviewRenderAllocationInput['scene']['spatial']): Allocation[] {
-  if (!value) return [];
-  const { output, plane, halfFloat } = value;
-  const result = [
-    canvas('spatial-plane', plane),
-    ...['exposure', 'overlay'].map((role) => canvas(`spatial-${role}`, output)),
-  ];
-  result.push(
-    bytes('spatial-drawing-buffer', pixels(output) * 4),
-    bytes('spatial-vertex-and-matrices', 132),
-    bytes('spatial-level-sizes', 64)
-  );
-  let { width, height } = plane;
-  for (let level = 0; level < 8; level++) {
-    result.push(
-      bytes(
-        `spatial-texture-${level}`,
-        pixels({ width, height }) * (level > 0 && halfFloat ? 8 : 4)
-      )
-    );
-    width = Math.max(1, Math.ceil(width / 2));
-    height = Math.max(1, Math.ceil(height / 2));
-  }
-  return result;
-}
+
 function phase(name: string, allocations: Allocation[]) {
   return {
     name,
@@ -187,7 +208,10 @@ function spotlight(value: PreviewRenderAllocationInput['scene']['spotlight']): {
         'spotlight.coverage',
         frameCount === 1
           ? integer(3 * pixels(tile) * 4)
-          : sum([integer((2 * frameCount + 2) * pixels(tile) * 4), integer((frameCount + 1) * 8)])
+          : sum([
+              integer((2 * frameCount + 2) * pixels(tile) * 4),
+              integer((3 * frameCount + 1) * 8),
+            ])
       ),
     ],
     composite:
@@ -255,9 +279,19 @@ function preparation(input: PreviewRenderAllocationInput, front: Allocation[]) {
 
 /** Managed graph limits exclude decoder queues, driver storage and opaque browser overhead. */
 export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationInput) {
-  const front = [
-    canvas('publication-front', input.publication.previousFront ?? input.publication.backing),
-  ];
+  const front = retainedPublication(
+    input.publication.previousFront,
+    input.publication.previousFrontKind,
+    input.publication.previousProviderBytes
+  );
+  if (!input.publication.previousFront)
+    front.push(
+      publicationCanvas(
+        'publication-front',
+        input.publication.backing,
+        input.publication.outputKind
+      )
+    );
   const admitted = [
     ...(input.admission.source ? [capture('source', input.admission.source)] : []),
     ...Object.entries(input.admission.camera).flatMap(([role, value]) =>
@@ -274,18 +308,27 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
   ];
   const retained = [
     ...front,
-    canvas('publication-staging', input.publication.backing),
+    ...Array.from({ length: input.publication.maximumInFlight ?? 1 }, () =>
+      publicationCanvas(
+        'publication-staging',
+        input.publication.backing,
+        input.publication.outputKind
+      )
+    ),
     ...admitted,
     ...assets,
     ...optionalCanvas('preview-transition-source', input.scene.transitionRaster),
-    ...spatial(input.scene.spatial),
+    ...calculateSpatialRenderAllocations(input.scene.spatial),
     ...(input.scene.annotationBitmaps?.flatMap((size) =>
       bitmap('annotation-output-bitmap', size)
     ) ?? []),
   ];
   const cached = optionalCanvas('background-cache', input.background?.cache ?? null);
   const normal = [...retained, ...cached];
-  const window = optionalCanvas('decorated-window', input.scene.windowRaster);
+  const window = [
+    ...optionalCanvas('decorated-window', input.scene.windowRaster),
+    ...optionalCanvas('export-decorated-window', input.scene.exportWindowRaster ?? null),
+  ];
   const motion = input.scene.motionPass
     ? [
         canvas('motion-accumulator', input.scene.motionPass),
@@ -352,6 +395,9 @@ export function calculatePreviewRenderAllocation(input: PreviewRenderAllocationI
 /** Discovery describes only resources whose dimensions or storage size are already known. */
 export interface PreviewPreparationAllocationInput {
   previousFront: Size | null;
+  previousFrontKind?: PreviewPublicationOutputKind;
+  /** Total retired GPU provider storage, including the previous front. */
+  previousProviderBytes?: number;
   retainedCamera: Capture | null;
   retainedTransition?: readonly [Capture, Capture] | null;
   backgroundBitmap: Size | null;
@@ -364,7 +410,11 @@ export interface PreviewPreparationAllocationInput {
 /** Positive empty-ledger limits are constructor control values, not allocated storage. */
 export function calculatePreviewPreparationAllocation(input: PreviewPreparationAllocationInput) {
   const allocations = [
-    ...optionalCanvas('publication-front', input.previousFront),
+    ...retainedPublication(
+      input.previousFront,
+      input.previousFrontKind,
+      input.previousProviderBytes
+    ),
     ...(input.retainedCamera ? [capture('camera-retained', input.retainedCamera)] : []),
     ...(input.retainedTransition?.map((value, index) => capture(`transition-${index}`, value)) ??
       []),
@@ -394,11 +444,16 @@ export interface PreviewRuntimeAllocationInput {
   resultTime: number;
   sourceTime: number;
   cameraTransform?: QuickEditCameraTransform;
+  maximumInFlight?: 1 | 2;
   sourceAllocationBytes: number | null;
   sourceBacking: Size;
   camera: { retainedBytes: number | null; activeBytes: number | null };
   transitionBytes: readonly [number, number] | null;
   previousFront: Size | null;
+  outputKind?: PreviewPublicationOutputKind;
+  previousFrontKind?: PreviewPublicationOutputKind;
+  /** Total retired GPU provider storage; omit storage already counted for the current provider. */
+  previousProviderBytes?: number;
   assets: PreviewRenderAllocationInput['assets'];
   spatialHalfFloat?: boolean;
   previousBackgroundCache?: Size | null;
@@ -505,13 +560,14 @@ function focusAllocation(
         (layout.spatial ? spatialWindow.width / layout.windowRect.width : motion.scale)
       : 0,
   };
-  const spatialRetained = scene.zoomRegions.some(
-    (region) =>
-      !region.dormant &&
-      !region.border &&
-      !region.spotlight &&
-      (hasQuickEditPerspective(region.perspective) || region.depthOfField?.enabled)
-  );
+  const spatialRetained = scene.zoomRegions.some(quickEditRegionNeedsSpatialRenderer);
+  const overlayBounds = reviewSpatialOverlayBounds({
+    output: backing,
+    layout,
+    background,
+    sourceWidth: scene.source.width,
+    clicks: evaluateReviewClicks(scene.clicks, input.resultTime),
+  });
   return {
     spatial: spatialRetained
       ? {
@@ -522,6 +578,10 @@ function focusAllocation(
             background,
             sceneScale,
           }),
+          overlay: {
+            width: Math.ceil(overlayBounds.width),
+            height: Math.ceil(overlayBounds.height),
+          },
           halfFloat: input.spatialHalfFloat ?? true,
         }
       : null,
@@ -550,12 +610,16 @@ function backgroundAllocation(
   const dense = background.enabled && background.type === 'gradient';
   const blur =
     background.enabled && background.type !== 'solid' ? (background.layout.blur ?? 0) : 0;
+  const animated =
+    background.enabled &&
+    background.type !== 'solid' &&
+    hasSceneBackgroundMotion(background.motion);
   const cacheScale = Math.min(1, 2048 / Math.max(backing.width, backing.height));
   return {
     dense,
-    gradient: dense && blur <= 0 ? backing : null,
+    gradient: dense && blur <= 0 && !animated ? backing : null,
     cache:
-      blur > 0
+      blur > 0 || animated
         ? {
             cache: {
               width: Math.max(1, Math.round(backing.width * cacheScale)),
@@ -589,7 +653,16 @@ export function resolvePreviewRenderAllocation(
     (click) => (click.lens?.scale ?? 1) > 1
   );
   return {
-    publication: { backing, previousFront: input.previousFront },
+    publication: {
+      backing,
+      previousFront: input.previousFront,
+      ...(input.outputKind ? { outputKind: input.outputKind } : {}),
+      ...(input.previousFrontKind ? { previousFrontKind: input.previousFrontKind } : {}),
+      ...(input.previousProviderBytes === undefined
+        ? {}
+        : { previousProviderBytes: input.previousProviderBytes }),
+      ...(input.maximumInFlight ? { maximumInFlight: input.maximumInFlight } : {}),
+    },
     admission: {
       source: frameCapture(input.sourceAllocationBytes),
       camera: {

@@ -45,6 +45,15 @@ vi.mock('../web-snapshots', async (importOriginal) => ({
   deleteWebSnapshotMediaAsset: mocks.deleteWebSnapshotMediaAsset,
   getWebSnapshotPackageFile: mocks.getWebSnapshotPackageFile,
 }));
+vi.mock('../assets/opfs-store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets/opfs-store')>()),
+  readAssetReadyPublicationClaims: vi.fn(async () => ({
+    valid: true,
+    pending: false,
+    journals: [],
+  })),
+}));
+
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
   listReadyJournals: vi.fn(async () => []),
@@ -108,7 +117,7 @@ it('resolves and deletes web snapshot media through the linked package owner', a
   await deleteMediaLibraryAsset('asset-web');
 
   expect(mocks.getWebSnapshotPackageFile).toHaveBeenCalledWith('snapshot-1');
-  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-web', []);
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-web', [], expect.any(Object));
   expect(mocks.txDelete).not.toHaveBeenCalledWith('asset-web');
 });
 
@@ -180,8 +189,8 @@ it('deletes regular media assets after cleaning their source records', async () 
   await deleteMediaLibraryAsset('asset-project');
   await deleteMediaLibraryAsset('missing');
 
-  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-recording', []);
-  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-export', []);
-  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-project', []);
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-recording', [], expect.any(Object));
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-export', [], expect.any(Object));
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-project', [], expect.any(Object));
   expect(mocks.txDelete).not.toHaveBeenCalledWith('asset-export');
 });

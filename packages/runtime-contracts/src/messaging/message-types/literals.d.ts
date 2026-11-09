@@ -1,5 +1,7 @@
 declare module './' {
   export namespace MessageType {
+    type SIMPLIFY_COMMAND = typeof import('./').MessageType.SIMPLIFY_COMMAND;
+    type OFFSCREEN_SIMPLIFY_COMMAND = typeof import('./').MessageType.OFFSCREEN_SIMPLIFY_COMMAND;
     type OFFSCREEN_SYNC_WORKSPACE_START =
       typeof import('./').MessageType.OFFSCREEN_SYNC_WORKSPACE_START;
     type SYNC_WORKSPACE_ORIGIN_PERMISSION =
@@ -10,6 +12,7 @@ declare module './' {
     type OFFSCREEN_SYNC_START = typeof import('./').MessageType.OFFSCREEN_SYNC_START;
     type OFFSCREEN_SYNC_INSPECT = typeof import('./').MessageType.OFFSCREEN_SYNC_INSPECT;
     type OFFSCREEN_SYNC_STOP = typeof import('./').MessageType.OFFSCREEN_SYNC_STOP;
+    type SYNC_CONNECTION_CREDENTIAL = typeof import('./').MessageType.SYNC_CONNECTION_CREDENTIAL;
     type SYNC_CONNECTION_ORIGIN_PERMISSION =
       typeof import('./').MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION;
     type ENABLE_SCREENSHOT_MODE = typeof import('./').MessageType.ENABLE_SCREENSHOT_MODE;

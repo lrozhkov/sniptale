@@ -69,6 +69,7 @@ import {
   loadEditorPageDefaults,
   resolveEditorPageSessionSeed,
 } from './runtime';
+import { useEditorStore } from '../../state/useEditorStore';
 import { DEFAULT_BORDER_PRESET } from '../../../composition/persistence/highlighter';
 
 async function flushRuntimeDefaultsWork() {
@@ -224,7 +225,7 @@ async function verifiesDefaultPresetLoading() {
     borderPreset: expect.objectContaining({ id: 'default-border' }),
   });
   expect(hydrateWorkspaceDefaults).toHaveBeenCalledWith({
-    backgroundColor: '#f2f4f7',
+    backgroundColor: '#808080',
     hideSelectionWhileDragging: true,
   });
 }
@@ -256,6 +257,13 @@ async function verifiesConditionalAutosaveFlush() {
 }
 
 describe('editor-page.runtime', () => {
+  it('clears frame preview activity with the document transient state', () => {
+    expect(useEditorStore.getInitialState().framePreviewActive).toBe(false);
+    useEditorStore.setState({ framePreviewActive: true });
+    useEditorStore.getState().resetDocumentState();
+    expect(useEditorStore.getState().framePreviewActive).toBe(false);
+  });
+
   useEditorPageRuntimeTestScope();
 
   it(

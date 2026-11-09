@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { TimelineProjection } from '../../interaction-state/projection';
 import { buildVideoCompositionTransitionSegments } from '../../../../../features/video/composition/timeline/lanes';
 import { getTrackClips } from '../../../../../features/video/project/timeline';
@@ -35,7 +36,11 @@ export function ProjectTimelineTrackClipStack(props: {
   onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSetHoveredClipId: (clipId: string | null) => void;
 }) {
-  const stackLayout = getTrackClipStackLayout(props);
+  const { project, trackId, trackLayout } = props;
+  const stackLayout = useMemo(
+    () => getTrackClipStackLayout({ project, trackId, trackLayout }),
+    [project, trackId, trackLayout]
+  );
 
   return (
     <div
@@ -47,7 +52,12 @@ export function ProjectTimelineTrackClipStack(props: {
   );
 }
 
-function getTrackClipStackLayout(props: Parameters<typeof ProjectTimelineTrackClipStack>[0]) {
+function getTrackClipStackLayout(
+  props: Pick<
+    Parameters<typeof ProjectTimelineTrackClipStack>[0],
+    'project' | 'trackId' | 'trackLayout'
+  >
+) {
   const clipRows = buildTimelineTrackClipRows(props.project, props.trackId);
   const laneMetrics =
     props.trackLayout?.logicalLaneMetrics ??
@@ -58,7 +68,9 @@ function getTrackClipStackLayout(props: Parameters<typeof ProjectTimelineTrackCl
       trackId: props.trackId,
       transitionSegments: buildVideoCompositionTransitionSegments(props.project),
     });
-  return { clipRows, laneMetrics };
+  const clips = getTrackClips(props.project, props.trackId);
+  const junctions = clips.length ? getTrackJunctions(props.project) : [];
+  return { clipRows, laneMetrics, clips, junctions };
 }
 
 function getClipLaneMetrics(
@@ -71,13 +83,10 @@ function getClipLaneMetrics(
 }
 
 function ProjectTimelineTrackClipItems(
-  props: Parameters<typeof ProjectTimelineTrackClipStack>[0] & {
-    clipRows: ReturnType<typeof buildTimelineTrackClipRows>;
-    laneMetrics: ReadonlyMap<string, TimelineLogicalLaneMetrics>;
-  }
+  props: Parameters<typeof ProjectTimelineTrackClipStack>[0] &
+    ReturnType<typeof getTrackClipStackLayout>
 ) {
-  const clips = getTrackClips(props.project, props.trackId);
-  const junctions = clips.length ? getTrackJunctions(props.project) : [];
+  const { clips, junctions } = props;
   return clips.map((clip) => {
     const metrics = getClipLaneMetrics(props.clipRows, props.laneMetrics, clip.id);
     return (

@@ -26,8 +26,8 @@ export function validateFilter(
   path: string,
   report: EffectV1DiagnosticReporter
 ): void {
-  if (!isRecord(value)) {
-    report.error('COMMAND_OBJECT_TYPE', path, 'Expected an object.');
+  if (!isRecord(value) || Object.keys(value).length === 0) {
+    report.error('COMMAND_OBJECT_TYPE', path, 'Expected a non-empty object.');
     return;
   }
   rejectUnknownKeys(value, FILTER_KEYS, path, report);
@@ -41,8 +41,8 @@ export function validateShadow(
   path: string,
   report: EffectV1DiagnosticReporter
 ): void {
-  if (!isRecord(value)) {
-    report.error('COMMAND_OBJECT_TYPE', path, 'Expected a shadow object.');
+  if (!isRecord(value) || Object.keys(value).length === 0) {
+    report.error('COMMAND_OBJECT_TYPE', path, 'Expected a non-empty shadow object.');
     return;
   }
   rejectUnknownKeys(value, SHADOW_KEYS, path, report);

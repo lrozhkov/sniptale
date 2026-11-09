@@ -1,4 +1,4 @@
-import { Rect } from 'fabric';
+import { ActiveSelection, Group, Path, Rect, type FabricObject } from 'fabric';
 import { describe, expect, it, vi } from 'vitest';
 import type { EditorObjectType, EditorTool } from '../../../features/editor/document/types';
 import type {
@@ -50,7 +50,7 @@ function createRect(options: {
 }
 
 function createCanvas(
-  objects: Rect[],
+  objects: FabricObject[],
   options: {
     throwOnMissingTopContext?: boolean;
     topContext?: MagnetTestTopContext | null;
@@ -68,7 +68,7 @@ function createCanvas(
       }
     }),
     contextTop: topContext ?? undefined,
-    forEachObject(callback: (object: Rect) => void) {
+    forEachObject(callback: (object: FabricObject) => void) {
       objects.forEach(callback);
     },
     getTopContext() {
@@ -100,7 +100,7 @@ function createManagerHarness(options: {
   canvasOptions?: Parameters<typeof createCanvas>[1];
   cropGuide?: Rect | null;
   magnetEnabled?: boolean;
-  objects: Rect[];
+  objects: FabricObject[];
   size?: { height: number; width: number };
 }) {
   const state = {
@@ -366,3 +366,61 @@ function expectListenerSetSize(listeners: Map<string, Set<unknown>>, size: numbe
   expect(listeners.get('before:render')?.size ?? 0).toBe(size);
   expect(listeners.get('after:render')?.size ?? 0).toBe(size);
 }
+
+it.each(['pencil', 'marker', 'arrow'] as const)(
+  'snaps a real %s path by its selection bounds and respects the magnet switch',
+  (type) => {
+    const path = new Path('M 0 0 L 20 20', { left: 43, top: 38, strokeWidth: 0 });
+    path.sniptaleType = type;
+    path.isOnScreen = () => true;
+    const sibling = createRect({ left: 60, top: 40, width: 20, height: 20 });
+    const { manager, state } = createManagerHarness({ objects: [path, sibling] });
+    manager.moving({ target: path });
+    expect(path.left).toBe(40);
+    expect(path.top).toBe(40);
+    state.magnetEnabled = false;
+    path.set({ left: 43, top: 38 });
+    manager.moving({ target: path });
+    expect(path.left).toBe(43);
+    expect(path.top).toBe(38);
+    expect(manager.hasActiveGuides()).toBe(false);
+  }
+);
+
+it.each([
+  { name: 'group', Selection: Group },
+  { name: 'selection', Selection: ActiveSelection },
+])('snaps an aggregate $name without moving its children independently', ({ Selection }) => {
+  const first = createRect({ left: 43, top: 38, width: 10, height: 10 });
+  const second = createRect({ left: 53, top: 48, width: 10, height: 10 });
+  const selected = new Selection([first, second], { strokeWidth: 0 });
+  selected.sniptaleType = 'group';
+  selected.isOnScreen = () => true;
+  const sibling = createRect({ left: 60, top: 40, width: 20, height: 20 });
+  const relative = { left: second.left - first.left, top: second.top - first.top };
+  const { manager } = createManagerHarness({ objects: [selected, sibling] });
+  manager.moving({ target: selected });
+  selected.setCoords();
+  expect(selected.getBoundingRect().left).toBe(40);
+  expect(selected.getBoundingRect().top).toBe(30);
+  expect({ left: second.left - first.left, top: second.top - first.top }).toEqual(relative);
+});
+
+it.each([
+  { screenWidth: 800, margin: 6 },
+  { screenWidth: 1600, margin: 3 },
+])(
+  'keeps a six CSS pixel snap radius when canvas and document sizes differ ($screenWidth)',
+  ({ screenWidth, margin }) => {
+    const target = createRect({ left: 43, top: 38, width: 20, height: 20 });
+    const sibling = createRect({ left: 60, top: 40, width: 20, height: 20 });
+    const { canvas, manager } = createManagerHarness({ objects: [target, sibling] });
+    Object.assign(canvas, {
+      getWidth: () => 800,
+      upperCanvasEl: { getBoundingClientRect: () => ({ width: screenWidth }) },
+    });
+    manager.moving({ target });
+    expect(manager.margin).toBe(margin);
+    expect(target.left).toBe(40);
+  }
+);

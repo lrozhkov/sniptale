@@ -1,3 +1,4 @@
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { useReviewZoomPreview } from './zoom-editor';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
@@ -38,10 +39,13 @@ type PreviewState = Pick<
   | 'onTime'
   | 'setSelection'
   | 'setPlaying'
+  | 'setPresentationActive'
+  | 'onPresentedTime'
   | 'onEnded'
   | 'onMediaError'
   | 'recovering'
 > & {
+  history?: EditorState['history'];
   setCursorFocusPath?: EditorState['setCursorFocusPath'];
   selectCursorFocusKey?: EditorState['selectCursorFocusKey'];
   cursorFocusPath?: EditorState['cursorFocusPath'];
@@ -93,6 +97,7 @@ export function ReviewPreviewBinding({
   sceneActive,
   previewPreferences,
   onPreviewRaster,
+  onPreviewRendererStatus,
   onOpenPreviewSettings,
 }: {
   resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
@@ -100,10 +105,22 @@ export function ReviewPreviewBinding({
   state: PreviewState;
   sceneActive: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
+  onPreviewRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
   onOpenPreviewSettings?: ((trigger: HTMLButtonElement) => void) | undefined;
 }) {
-  const zoom = useReviewZoomPreview(sourceState.zoom);
+  const observedZoom = useReviewZoomPreview(sourceState.zoom);
+  const zoom = {
+    ...observedZoom,
+    previewRegion: (region: Parameters<typeof observedZoom.previewRegion>[0]) => {
+      const following =
+        !region.border &&
+        !region.spotlight &&
+        (region.followCursor ?? sourceState.advanced.cursorFocusPath?.mode === 'follow');
+      // Follow planning waits for the authored gesture result; manual framing remains live.
+      return observedZoom.previewing && following ? region : observedZoom.previewRegion(region);
+    },
+  };
   const state = { ...sourceState, zoom };
   const { busy, audio } = state;
   return (
@@ -111,6 +128,28 @@ export function ReviewPreviewBinding({
       aria-busy={state.recovering}
       className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3"
     >
+      {state.history?.failed || state.history?.initialLoading || state.history?.incomplete ? (
+        <div
+          role={state.history.failed ? 'alert' : 'status'}
+          className="flex items-center gap-2 text-xs"
+        >
+          <span>
+            {translate(
+              state.history.failed
+                ? 'gallery.videoReview.recordingHistoryFailed'
+                : state.history.initialLoading
+                  ? 'gallery.videoReview.recordingHistoryLoading'
+                  : 'gallery.videoReview.recordingHistoryIncomplete'
+            )}
+          </span>
+          {state.history.failed ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.retry')}
+              onClick={state.history.retry}
+            />
+          ) : null}
+        </div>
+      ) : null}
       {state.webcam.failed || state.webcam.pending ? (
         <div
           role={state.webcam.failed ? 'alert' : 'status'}
@@ -165,6 +204,7 @@ export function ReviewPreviewBinding({
             focusInteracting={zoom.previewing}
             previewPreferences={previewPreferences}
             onPreviewRaster={onPreviewRaster}
+            onPreviewRendererStatus={onPreviewRendererStatus}
           />
         )}
       </ReviewPreviewFrame>
@@ -206,6 +246,7 @@ function ReviewPreviewStage({
   focusInteracting,
   previewPreferences,
   onPreviewRaster,
+  onPreviewRendererStatus,
 }: {
   resource: Pick<LoadedReview, 'file' | 'url' | 'session'> &
     Partial<Pick<LoadedReview, 'telemetry'>>;
@@ -214,6 +255,7 @@ function ReviewPreviewStage({
   fullscreen: boolean;
   focusInteracting: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
+  onPreviewRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
 }) {
   const { busy, features, composer, snapshot, canvasComments } = state;
@@ -224,7 +266,11 @@ function ReviewPreviewStage({
   return (
     <ReviewStageBinding
       {...captionPreview}
-      cursorPath={reviewCursorPathOverlayBinding(state, resource.telemetry, sceneEditable)}
+      cursorPath={reviewCursorPathOverlayBinding(
+        state,
+        state.history?.telemetry ?? resource.telemetry,
+        sceneEditable
+      )}
       annotationEffects={
         features.annotationEffects
           ? {
@@ -270,9 +316,12 @@ function ReviewPreviewStage({
           ? {
               preferences: previewPreferences,
               playing: state.playing,
+              onPresentationActive: state.setPresentationActive,
+              onPresentedTime: state.onPresentedTime,
               interacting: focusInteracting,
               sourceToResult: state.timeline.timeMap.sourceToTimeline,
               onRaster: onPreviewRaster,
+              onRendererStatus: onPreviewRendererStatus,
               sourceFrameRate: state.exporter.index?.frameRate,
             }
           : undefined

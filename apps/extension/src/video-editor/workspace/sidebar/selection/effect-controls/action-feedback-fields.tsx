@@ -1,3 +1,7 @@
+import {
+  createRecordingProjectActionAudioSource,
+  type RecordingProjectActionAudioSource,
+} from '../../../../../workflows/video-review/recording-action-audio';
 import { REVIEW_CLICK_DEFAULT } from '../../../../../features/video/project/action-feedback/validation';
 import { RotateCcw } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -7,6 +11,7 @@ import { createProjectActionAudioRuntime } from '../../../../preview/stage/runti
 import { ActionAudioFields } from '../../../../../ui/action-audio/fields';
 import {
   buildProjectActionAudioAuditionPlan,
+  buildProjectActionAudioAuditionProject,
   projectActionFeedbackMarkers,
   getProjectGestureFeedbackDefaults,
 } from '../../../../../features/video/review/project-action-audio';
@@ -18,7 +23,10 @@ import {
   useVideoEditorProjectLifecyclePort,
   useVideoEditorTimelineEditingPort,
 } from '../../../../runtime/controller/store';
-import type { VideoProject } from '../../../../../features/video/project/types';
+import type {
+  VideoProject,
+  VideoProjectActionEvent,
+} from '../../../../../features/video/project/types';
 import { patchVideoProjectActionFeedback } from '../../../../../features/video/project/action-feedback/projection';
 import {
   patchReviewActionAudio,
@@ -34,6 +42,7 @@ import {
 /** Local inspector adapter sends one authored update to the established project history port. */
 interface FeedbackProps {
   project: VideoProject;
+  recordedAction?: VideoProjectActionEvent;
   recordingId: string;
   sourceInstanceId: string;
   target: ReviewActionAudioTarget;
@@ -82,7 +91,25 @@ export function ActionFeedbackFields(props: FeedbackProps) {
   const changeGesture = (patch: Partial<ReviewClickStyle> | null) => {
     if (props.disabled) return;
     updateProject((project) => {
+      const current = project.actionFeedback?.find(
+        (item) =>
+          item.recordingId === identity.recordingId &&
+          item.sourceInstanceId === identity.sourceInstanceId
+      );
+      const recorded = props.recordedAction;
+      const source = recorded?.anchor;
+      const streamed =
+        current?.events &&
+        group.events &&
+        current.events.eventStreamId === group.events.eventStreamId &&
+        current.events.streamSha256 === group.events.streamSha256 &&
+        source?.kind === 'recording-source' &&
+        source.recordingId === identity.recordingId &&
+        source.sourceInstanceId === identity.sourceInstanceId &&
+        props.target.ref.kind === 'action' &&
+        source.sourceEventId === props.target.ref.id;
       if (
+        !streamed &&
         !project.actionEvents.some(
           (event) =>
             event.anchor.kind === 'recording-source' &&
@@ -94,11 +121,6 @@ export function ActionFeedbackFields(props: FeedbackProps) {
       )
         return project;
 
-      const current = project.actionFeedback?.find(
-        (item) =>
-          item.recordingId === identity.recordingId &&
-          item.sourceInstanceId === identity.sourceInstanceId
-      );
       if (
         patch === null &&
         !current?.gestureStyles?.some((style) => style.id === props.target.ref.id)
@@ -119,7 +141,12 @@ export function ActionFeedbackFields(props: FeedbackProps) {
                     ...patch,
                   },
               patch?.gestureAppearance === 'area'
-                ? projectActionFeedbackMarkers(project, current)
+                ? projectActionFeedbackMarkers(
+                    project,
+                    current,
+                    true,
+                    streamed && recorded ? [recorded] : []
+                  )
                 : []
             ),
           })
@@ -190,12 +217,14 @@ function useActionSoundAudition(props: FeedbackProps) {
   const active = useRef<{
     controller: AbortController;
     runtime: ReturnType<typeof createProjectActionAudioRuntime>;
+    source: RecordingProjectActionAudioSource | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const stop = useCallback(() => {
     const previous = active.current;
     active.current = null;
     previous?.controller.abort();
+    previous?.source?.dispose();
     if (previous) void previous.runtime.close().catch(() => undefined);
   }, []);
   useEffect(() => {
@@ -223,9 +252,21 @@ function useActionSoundAudition(props: FeedbackProps) {
     if (props.disabled || !project || project.id !== props.project.id) return;
     stop();
     setError(null);
+    const selected = buildProjectActionAudioAuditionProject(
+      project,
+      { recordingId: props.recordingId, sourceInstanceId: props.sourceInstanceId },
+      target,
+      style
+    );
+    const source = selected?.actionFeedback?.some(
+      (group) => group.events && group.events.totalBlocks > 0
+    )
+      ? createRecordingProjectActionAudioSource(selected)
+      : null;
     const session = {
       controller: new AbortController(),
       runtime: createProjectActionAudioRuntime(),
+      source,
     };
     active.current = session;
     setPlaying(false);
@@ -238,8 +279,10 @@ function useActionSoundAudition(props: FeedbackProps) {
       target,
       style
     );
-    void session.runtime
-      .audition(plan, session.controller.signal)
+    const pending = source
+      ? session.runtime.audition(plan, session.controller.signal, source)
+      : session.runtime.audition(plan, session.controller.signal);
+    void pending
       .catch((failure: unknown) => {
         if (active.current === session && !session.controller.signal.aborted)
           setError(
@@ -251,6 +294,7 @@ function useActionSoundAudition(props: FeedbackProps) {
           );
       })
       .finally(() => {
+        session.source?.dispose();
         if (active.current === session) active.current = null;
         void session.runtime.close().catch(() => undefined);
       });

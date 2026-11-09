@@ -1,29 +1,32 @@
-import {
-  NATIVE_APP_PROTOCOL_VERSION,
-  type ExtensionRecordingChunkRequestMessage,
-} from '../../../contracts/native-app';
 import { listNativeTransferSessions } from './persistence/staging';
-import { getNextMissingChunkIndex } from './sessions';
+import { resumeNativeRecordingTransfer } from './recording';
+import type {
+  NativeAppIngestionControllerDeps,
+  NativeIngestionOutboundMessage,
+} from './ingestion-types';
 
 export async function createNativeTransferResumeRequests(
-  controllerLeaseId: string
-): Promise<ExtensionRecordingChunkRequestMessage[]> {
+  controllerLeaseId: string,
+  deps: NativeAppIngestionControllerDeps = { getCurrentControllerLeaseId: () => controllerLeaseId },
+  run: (
+    key: string,
+    task: () => Promise<NativeIngestionOutboundMessage[]>
+  ) => Promise<NativeIngestionOutboundMessage[]> = (_key, task) => task()
+): Promise<NativeIngestionOutboundMessage[]> {
   const sessions = await listNativeTransferSessions();
-  return sessions.flatMap((session) => {
-    if (session.controllerLeaseId !== controllerLeaseId || session.kind !== 'recording') {
-      return [];
+  const responses: NativeIngestionOutboundMessage[] = [];
+  for (const session of sessions) {
+    if (
+      session.controllerLeaseId !== controllerLeaseId ||
+      (session.kind !== 'recording' && session.kind !== 'recording-complete')
+    ) {
+      continue;
     }
-    const nextMissingChunk = getNextMissingChunkIndex(session);
-    return nextMissingChunk === null
-      ? []
-      : [
-          {
-            chunkIndex: nextMissingChunk,
-            controllerLeaseId,
-            protocolVersion: NATIVE_APP_PROTOCOL_VERSION,
-            recordingId: session.id,
-            type: 'extension.recording.chunkRequest' as const,
-          },
-        ];
-  });
+    responses.push(
+      ...(await run(session.id, () =>
+        resumeNativeRecordingTransfer(deps, session.id, controllerLeaseId)
+      ))
+    );
+  }
+  return responses;
 }

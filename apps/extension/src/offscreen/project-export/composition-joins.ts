@@ -119,7 +119,8 @@ function createProjectExportCompositionJoinRenderer(
       args.project.clips.some(
         (clip) => clip.type === 'VIDEO' && clip.playbackWindow && isClipActiveAtTime(clip, time)
       );
-    if (!bounded && !nested)
+    const managed = args.job.sourceSampling?.managesSources === true;
+    if (!managed && !bounded && !nested)
       for (const clip of args.project.clips) {
         signal.throwIfAborted();
         if (clip.type !== 'VIDEO' || !isClipActiveAtTime(clip, time)) continue;
@@ -141,10 +142,10 @@ function createProjectExportCompositionJoinRenderer(
         await waitForMediaElementReady(video, { signal });
         signal.throwIfAborted();
       }
-    if (!bounded && !nested)
+    if (!managed && !bounded && !nested)
       await syncVideoClipFrame({ clipMediaElements: videos }, args.project, time, signal);
     signal.throwIfAborted();
-    if (bounded)
+    if (bounded && !managed)
       cutSampler ??= createCompositionCutSampleSource({
         project: args.project,
         sourceUrl: (clip) => {
@@ -152,9 +153,10 @@ function createProjectExportCompositionJoinRenderer(
           return source?.currentSrc || source?.src;
         },
       });
-    const frames = bounded
-      ? await cutSampler!.sample(time, signal, !cutPlan || time < cutPlan.seam ? 'last' : 'first')
-      : undefined;
+    const frames =
+      bounded && !managed
+        ? await cutSampler!.sample(time, signal, !cutPlan || time < cutPlan.seam ? 'last' : 'first')
+        : undefined;
     let sample: ReturnType<typeof resources.canvas> | undefined;
     try {
       sample = resources.canvas('export-composition-sample', size);
@@ -166,8 +168,14 @@ function createProjectExportCompositionJoinRenderer(
           ...args,
           context: sample.context,
           currentTime: time,
+          ...(args.job.sourceSampling && cutPlan
+            ? {
+                sourceSamplingFallback:
+                  time < cutPlan.seam ? ('last' as const) : ('first' as const),
+              }
+            : {}),
           captionSampleTime: time,
-          clipMediaElements: frames?.media ?? videos,
+          clipMediaElements: managed ? args.job.clipMediaElements : (frames?.media ?? videos),
           ownerDocument,
           effectRuntime,
           signal,

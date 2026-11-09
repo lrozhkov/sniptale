@@ -1,3 +1,4 @@
+import { useLayoutEffect, useMemo, useRef } from 'react';
 import { Lock, Mic } from 'lucide-react';
 import {
   projectSourceVoiceoverViews,
@@ -8,7 +9,7 @@ import { getProjectAudioWaveformPeaks } from '../../../../../features/video/proj
 import type { VideoProject } from '../../../../../features/video/project/types';
 import type { VideoEditorSelection } from '../../../../contracts/selection';
 import { useVideoEditorTimelineController } from '../../../../runtime/controller/composition/hooks';
-import { translate } from '../../../../../platform/i18n';
+import { translate, useAppLocale } from '../../../../../platform/i18n';
 import { AudioClipWaveform } from '../../clip/waveform';
 import {
   projectTimelineInterval,
@@ -37,37 +38,51 @@ export function ProjectTimelineSourceVoiceoverViews(props: VoiceViewsProps) {
 
 function SourceVoiceoverTrackViews(props: VoiceViewsProps) {
   const controller = useVideoEditorTimelineController();
-  const track = props.project.tracks.find((track) => track.id === props.trackId);
-  if (track?.kind !== 'AUDIO') return null;
-  return (
-    <>
-      {(props.project.sourceVoiceoverDocuments ?? [])
-        .filter((document) => document.trackId === props.trackId)
-        .flatMap((document) => {
-          const selected =
-            props.selection.kind === 'source-voiceover' &&
-            props.selection.documentId === document.id;
-          const locked = !isProjectSourceVoiceoverEditable(props.project, document);
-          return projectSourceVoiceoverViews(props.project, document).map((view) => (
-            <VoiceView
-              key={view.clip.id}
-              {...props}
-              view={view}
-              selected={selected}
-              locked={locked}
-              inactive={
-                !document.enabled || document.take.muted || !track.visible || !view.sourceVisible
-              }
-              onSelect={() => controller?.actions.onSelectSourceVoiceover(document.id)}
-            />
-          ));
-        })}
-    </>
-  );
+  const controllerRef = useRef(controller);
+  useLayoutEffect(() => {
+    controllerRef.current = controller;
+  });
+  const locale = useAppLocale();
+  const { project, trackId, pixelsPerSecond, projection, height } = props;
+  const selectedDocumentId =
+    props.selection.kind === 'source-voiceover' ? props.selection.documentId : null;
+  return useMemo(() => {
+    const track = project.tracks.find((track) => track.id === trackId);
+    if (track?.kind !== 'AUDIO') return null;
+    return (
+      <>
+        {(project.sourceVoiceoverDocuments ?? [])
+          .filter((document) => document.trackId === trackId)
+          .flatMap((document) => {
+            const selected = selectedDocumentId === document.id;
+            const locked = !isProjectSourceVoiceoverEditable(project, document);
+            return projectSourceVoiceoverViews(project, document).map((view) => (
+              <VoiceView
+                key={view.clip.id}
+                project={project}
+                trackId={trackId}
+                pixelsPerSecond={pixelsPerSecond}
+                projection={projection}
+                height={height}
+                locale={locale}
+                view={view}
+                selected={selected}
+                locked={locked}
+                inactive={
+                  !document.enabled || document.take.muted || !track.visible || !view.sourceVisible
+                }
+                onSelect={() => controllerRef.current?.actions.onSelectSourceVoiceover(document.id)}
+              />
+            ));
+          })}
+      </>
+    );
+  }, [project, trackId, pixelsPerSecond, projection, height, selectedDocumentId, locale]);
 }
 
 function VoiceView(
-  props: VoiceViewsProps & {
+  props: Omit<VoiceViewsProps, 'selection'> & {
+    locale: ReturnType<typeof useAppLocale>;
     view: VideoProjectSourceVoiceoverView;
     selected: boolean;
     locked: boolean;
@@ -88,20 +103,31 @@ function VoiceView(
         offsetSeconds: 0,
         durationSeconds: clip.duration,
       };
-  if (!interval) return null;
-  const asset = props.project.assets.find((asset) => asset.id === clip.assetId);
-  const name = asset?.name ?? translate('gallery.videoReview.audioVoiceover');
-  const label = `${translate('gallery.videoReview.audioVoiceover')}: ${name}`;
+  const { project } = props;
+  const { assetId } = clip;
   const rate = clip.playbackRate ?? 1;
-  const peaks = getProjectAudioWaveformPeaks(
-    props.project,
-    {
-      assetId: clip.assetId,
-      sourceStart: clip.sourceOffset + interval.offsetSeconds * rate,
-      sourceDuration: interval.durationSeconds * rate,
-    },
-    Math.ceil(interval.width)
+  const sourceStart = clip.sourceOffset + (interval?.offsetSeconds ?? 0) * rate;
+  const sourceDuration = (interval?.durationSeconds ?? 0) * rate;
+  const sampleCount = interval ? Math.ceil(interval.width) : 0;
+  const peaks = useMemo(
+    () =>
+      sampleCount > 0
+        ? getProjectAudioWaveformPeaks(
+            project,
+            {
+              assetId,
+              sourceStart,
+              sourceDuration,
+            },
+            sampleCount
+          )
+        : [],
+    [project, assetId, sourceStart, sourceDuration, sampleCount]
   );
+  if (!interval) return null;
+  const asset = project.assets.find((asset) => asset.id === assetId);
+  const name = asset?.name ?? translate('gallery.videoReview.audioVoiceover', props.locale);
+  const label = `${translate('gallery.videoReview.audioVoiceover', props.locale)}: ${name}`;
   return (
     <button
       {...TIMELINE_OBJECT_MARKER_PROPS}

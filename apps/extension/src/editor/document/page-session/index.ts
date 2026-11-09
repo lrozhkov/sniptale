@@ -8,6 +8,7 @@ import {
   type EditorBootstrapPayload,
 } from '../../../workflows/editor/bootstrap';
 import { EDITOR_BOOTSTRAP_QUERY_PARAM } from '../../../features/editor/contracts/bootstrap';
+import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import { readEditorAssetId } from '@sniptale/runtime-contracts/editor/session';
 import { createSecureRandomUuid as createAggregateId } from '@sniptale/platform/security/secure-random-id';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
@@ -84,6 +85,18 @@ function buildCurrentEditorAggregateUrl(aggregateId: string): string {
 /** Rebinds the current editor tab to a newly created aggregate without reloading the document. */
 export function replaceEditorPageAggregateId(aggregateId: string): void {
   window.history.replaceState({}, '', buildCurrentEditorAggregateUrl(aggregateId));
+}
+
+/** Updates a successfully loaded library image URL and returns its transaction rollback. */
+export function replaceEditorPageImageLocation(aggregateId: string): () => void {
+  const previousUrl = window.location.href;
+  const previousState: unknown = window.history.state;
+  const nextUrl = buildEditorUrl({ assetId: aggregateId });
+  window.history.replaceState({}, '', nextUrl);
+  return () => {
+    if (window.location.href === nextUrl)
+      window.history.replaceState(previousState, '', previousUrl);
+  };
 }
 
 /** Starts a fresh standalone draft for a local image opened in the current editor tab. */

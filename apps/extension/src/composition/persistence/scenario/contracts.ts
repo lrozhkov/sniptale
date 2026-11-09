@@ -1,3 +1,4 @@
+import type { SyncCheckpointReceipt } from '../sync-capture/checkpoint-contracts';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
@@ -14,6 +15,8 @@ export interface ScenarioSavedVersion {
 export interface ScenarioProjectSnapshot {
   readonly project: GuideProject;
   readonly workspaceRevision: number;
+  /** Transient receipt for pending work minted by this save, issued only after commit. */
+  readonly checkpointReceipt?: SyncCheckpointReceipt;
 }
 
 export interface ScenarioProjectEntry {

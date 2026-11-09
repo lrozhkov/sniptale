@@ -9,6 +9,27 @@ import type { PageScrollRoot } from '../platform/page-scroll';
 import { getDrawingViewportProjection } from './interaction';
 import { resolveContentShadowRoot } from '../platform/dom-host';
 
+/** Simplify anchored outside the internal scroller belongs to the viewport. */
+export function clipDrawingObjectToRoot(
+  object: DrawingObject,
+  root: PageScrollRoot,
+  anchor?: Element | null
+): boolean {
+  if (root.kind !== 'element' || object.kind !== 'simplify') return true;
+  if (anchor) return root.element.contains(anchor);
+  const bounds = getDrawingObjectBounds(object);
+  const projection = getDrawingViewportProjection(root);
+  const x = bounds.x - projection.x;
+  const y = bounds.y - projection.y;
+  const rect = root.element.getBoundingClientRect();
+  return (
+    x < rect.right &&
+    x + bounds.width > rect.left &&
+    y < rect.bottom &&
+    y + bounds.height > rect.top
+  );
+}
+
 interface Binding {
   target: Element;
   origin: DrawingPoint;
@@ -51,7 +72,8 @@ export function createDrawingLayout(getRoot: () => PageScrollRoot) {
       target = target.parentElement;
     if (!target || target === document.documentElement) return null;
     const root = getRoot();
-    if (root.kind === 'element' && !root.element.contains(target)) return null;
+    if (root.kind === 'element' && !root.element.contains(target) && object.kind !== 'simplify')
+      return null;
     const rect = target.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0 ? target : null;
   };
@@ -80,7 +102,34 @@ export function createDrawingLayout(getRoot: () => PageScrollRoot) {
         binding.projected = object;
         return object;
       }
-      const projected = translateDrawingObject(object, delta);
+      let projected = translateDrawingObject(object, delta);
+      // External masks share the nested root's changing scene projection.
+      // Document-root snapshots keep their original retained-pixel boundary.
+      const root = getRoot();
+      if (
+        object.kind === 'simplify' &&
+        projected.kind === 'simplify' &&
+        root.kind === 'element' &&
+        !root.element.contains(binding.target)
+      ) {
+        const { sourceDirty: _dirty, ...rest } = projected;
+        projected = {
+          ...rest,
+          ...(object.sourceDirty === undefined ? {} : { sourceDirty: object.sourceDirty }),
+          ...(object.source
+            ? {
+                source: {
+                  ...object.source,
+                  bounds: {
+                    ...object.source.bounds,
+                    x: object.source.bounds.x + delta.x,
+                    y: object.source.bounds.y + delta.y,
+                  },
+                },
+              }
+            : {}),
+        };
+      }
       binding.projected = projected;
       bindings.set(projected, { target: binding.target, origin: current, latest: current });
       return projected;

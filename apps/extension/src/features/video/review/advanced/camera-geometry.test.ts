@@ -355,7 +355,7 @@ it.each(
       target: to,
       from: transform,
       to: transform,
-      policy,
+      policy: { ...policy, settings: { ...policy.settings, allowExpansion: false } },
       observations: [1, 2, 3].map((time) => ({
         time,
         segmentId: 'source',

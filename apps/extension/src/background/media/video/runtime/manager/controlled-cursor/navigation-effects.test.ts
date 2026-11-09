@@ -103,6 +103,7 @@ it('flushes telemetry without owning recorder pause or resume transport', async 
   expect(mocks.setAutoPaused).toHaveBeenCalledWith(true);
   expect(mocks.setOffset).not.toHaveBeenCalled();
   expect(mocks.appendTelemetry).toHaveBeenCalledWith({ signals: [] });
+  expect(mocks.disable).toHaveBeenCalledExactlyOnceWith(7, 'observation');
 });
 
 it('restores content telemetry state and clears pending effects', async () => {

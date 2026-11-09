@@ -32,10 +32,33 @@ vi.mock('./encode', async (importOriginal) => ({
   encodePersistentVideoPreview: mocks.encode,
 }));
 
-vi.mock('./materializer', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./materializer')>()),
-  createVideoPreviewFrameMaterializer: mocks.createMaterializer,
-}));
+vi.mock('./materializer', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./materializer')>();
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  return {
+    ...original,
+    createVideoPreviewFrameMaterializer: (
+      params: Parameters<typeof original.createVideoPreviewFrameMaterializer>[0]
+    ) => {
+      const materializer = mocks.createMaterializer(params);
+      return {
+        ...materializer,
+        renderFrameWithPresentation: async (
+          time: number,
+          signal: AbortSignal,
+          camera?: import('../../../features/video/composition/types').VideoCompositionCameraState
+        ) => ({
+          canvas: await materializer.renderFrame(time, signal),
+          presentation: {
+            camera: camera ?? resolveVideoCompositionFrame(params.project, time).camera,
+            time,
+          },
+        }),
+      };
+    },
+  };
+});
 
 vi.mock('./revision', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./revision')>()),

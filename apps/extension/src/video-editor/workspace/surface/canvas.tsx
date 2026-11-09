@@ -48,13 +48,15 @@ import {
 } from '../../runtime/controller/composition/hooks';
 import {
   useVideoEditorEffectEditingPort,
+  useVideoEditorPlaybackPort,
+  useVideoEditorProjectLifecyclePort,
   useVideoEditorTimelineEditingPort,
 } from '../../runtime/controller/store';
 
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
   const [revealRequest, setRevealRequest] = useState<TimelineRevealRequest>();
   const layout = useVideoEditorLayoutController();
-  const preview = useVideoEditorPreviewController();
+  const projectId = useVideoEditorProjectLifecyclePort((port) => port.project?.id);
   const viewer = useWorkspacePreviewContext();
   const previewHeight = props.previewHeightStyle.height ?? '60%';
   return (
@@ -70,7 +72,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
       >
         <div data-ui="video-editor.workspace.upper" className="contents">
           <VideoEditorWorkspaceUpper
-            key={preview?.project.id ?? 'empty'}
+            key={projectId ?? 'empty'}
             {...props}
             onRevealTarget={(target) =>
               setRevealRequest((previous) => ({ ...target, serial: (previous?.serial ?? 0) + 1 }))
@@ -142,7 +144,7 @@ function VideoEditorWorkspaceUpper(
   const recordingLayout = useVideoEditorLayoutController();
   const recording = useContext(RuntimeProjectContext)?.recordingLeave;
   const header = useVideoEditorHeaderController();
-  const preview = useVideoEditorPreviewController();
+  const preview = useVideoEditorPreviewController(false);
   const viewer = useWorkspacePreviewContext();
   const blocking = useVideoEditorBlockingOverlayContext();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -227,7 +229,7 @@ function VideoEditorWorkspaceUpper(
         data-ui="video-editor.workspace.viewer"
         data-viewer={sourceActive ? 'source' : 'montage'}
       >
-        <PreviewStage
+        <WorkspacePreviewStage
           mutePreviewAudio={
             recordingLayout.audioRecordingDialogOpen || (recording?.capturing ?? false)
           }
@@ -363,20 +365,28 @@ function WorkspaceLibraryPanel(
   );
 }
 
+/** Keep high-frequency time updates inside the montage stage instead of its materials owner. */
+function WorkspacePreviewStage(
+  props: Omit<React.ComponentProps<typeof PreviewStage>, 'currentTime'>
+) {
+  const currentTime = useVideoEditorPlaybackPort((port) => port.currentTime);
+  return <PreviewStage {...props} currentTime={currentTime} />;
+}
+
 function createWorkspacePreviewProps(
   props: VideoEditorWorkspaceCanvasProps,
   preview: NonNullable<ReturnType<typeof useVideoEditorPreviewController>>
-): React.ComponentProps<typeof PreviewStage> {
+): Omit<React.ComponentProps<typeof PreviewStage>, 'currentTime'> {
   return {
     activeInsertKind: props.activeInsertKind,
     assetUrls: preview.assetUrls,
-    currentTime: preview.transport.currentTime,
     grid: preview.grid,
     isPlaying: preview.transport.isPlaying,
     playbackRange: preview.transport.playbackRange,
     placementMode: preview.selection.placementMode,
     project: preview.project,
     previewMode: preview.preferences.mode,
+    previewRenderer: preview.preferences.renderer,
     previewPreferencesSaveFailed: preview.preferences.saveFailed,
     previewShowFrameRate: preview.preferences.showFrameRate,
     onPreviewShowFrameRateChange: preview.preferences.onShowFrameRateChange,
@@ -456,6 +466,7 @@ function createWorkspacePreviewActions(
   | 'onClearPlacementMode'
   | 'onPausePlayback'
   | 'onPreviewModeChange'
+  | 'onPreviewRendererChange'
   | 'onPreviewPreferencesRetry'
   | 'onPreviewFrameRateChange'
   | 'onPreviewRasterPresetChange'
@@ -474,6 +485,7 @@ function createWorkspacePreviewActions(
     onClearPlacementMode: preview.pointAuthoring.onClearPlacementMode,
     onPausePlayback: preview.transport.onPausePlayback,
     onPreviewModeChange: preview.preferences.onModeChange,
+    onPreviewRendererChange: preview.preferences.onRendererChange,
     onPreviewPreferencesRetry: preview.preferences.onRetrySave,
     onPreviewFrameRateChange: preview.preferences.onFrameRateChange,
     onPreviewRasterPresetChange: preview.preferences.onRasterPresetChange,

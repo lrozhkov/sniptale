@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { LucideIcon } from 'lucide-react';
 
 export type InspectorSectionSemantic =
   | 'actions'
@@ -33,6 +34,7 @@ export type InspectorSectionSemantic =
 export interface InspectorGroupDefinition<TId extends string> {
   content: React.ReactNode;
   semantic: InspectorSectionSemantic;
+  icon?: LucideIcon;
   defaultActive?: boolean;
   id: TId;
   label: string;

@@ -7,7 +7,7 @@ import { createDefaultGradientPresetCatalog } from '../../../composition/persist
 
 it('exposes stable palette and gradient preset data', () => {
   expect(WORKSPACE_BACKGROUND_PALETTE).toHaveLength(10);
-  expect(WORKSPACE_BACKGROUND_PALETTE[0]).toBe('#f2f4f7');
+  expect(WORKSPACE_BACKGROUND_PALETTE[0]).toBe('#808080');
   expect(GRID_COLOR_PALETTE).toHaveLength(14);
   expect(GRID_COLOR_PALETTE).not.toEqual(
     expect.arrayContaining(['#2563eb', '#0f766e', '#ca8a04', '#f97316'])

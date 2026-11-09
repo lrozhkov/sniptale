@@ -70,11 +70,12 @@ export function getVideoProjectActionPresentation(
 
 /** Resolves every history event, retaining disabled rows and immutable event identity. */
 export function resolveVideoProjectActionPresentations(
-  project: VideoProject
+  project: VideoProject,
+  selectedSourceActions: readonly VideoProjectActionEvent[] = []
 ): ResolvedVideoProjectActionPresentation[] {
   const defaults = getVideoProjectActionPresentation(project);
   const leaders = new Map<string, VideoProjectActionOccurrence>();
-  return resolveVideoProjectActionOccurrences(project).map((occurrence) => {
+  return resolveVideoProjectActionOccurrences(project, selectedSourceActions).map((occurrence) => {
     const row = resolveEvent(project, defaults, occurrence);
     const event = occurrence.event;
     if (

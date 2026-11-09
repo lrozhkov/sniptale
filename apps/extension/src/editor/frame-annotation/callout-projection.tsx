@@ -21,13 +21,14 @@ import {
   setFrameCallout,
 } from '../../features/highlighter/frame-annotation/callout/collection';
 
-export function EditorFrameCallout(props: {
+type EditorFrameCalloutProps = {
   calloutIndex: number;
   coordinateSpace: FrameAnnotationCoordinateSpace;
   controlsPortalTarget: HTMLDivElement | null;
   object: FabricObject;
   portalTarget: HTMLDivElement;
   selected: boolean;
+  onSelect?: () => void;
   snapshot: FrameAnnotationSnapshotV1;
   onSnapshotChange: (snapshot: FrameAnnotationSnapshotV1) => void;
   onSnapshotPreview: (snapshot: FrameAnnotationSnapshotV1) => void;
@@ -42,7 +43,9 @@ export function EditorFrameCallout(props: {
     width: number;
     height: number;
   };
-}) {
+};
+
+export function EditorFrameCallout(props: EditorFrameCalloutProps) {
   const callout = getFrameCallout(props.snapshot, props.calloutIndex)!;
   const [isEditing, setIsEditing] = React.useState(
     () => callout.content.bodyHtml.trim() === '' && callout.content.titleText.trim() === ''
@@ -105,6 +108,10 @@ export function EditorFrameCallout(props: {
     onStartEditing: () => setIsEditing(true),
     onStopEditing: stopEditing,
   });
+  const selectAndEdit: typeof editing.events.click = (event) => {
+    props.onSelect?.();
+    editing.events.click(event);
+  };
   const surface = resolveFrameSurface(props.snapshot);
   const settings = {
     ...callout,
@@ -114,58 +121,58 @@ export function EditorFrameCallout(props: {
     ),
   };
   return (
-    <>
-      <FrameCalloutInteractiveSurface
-        {...(props.snapshot.annotationKind === 'callout'
-          ? {
-              onAnchorPositionChange: (point, placement) =>
-                props.onSnapshotChange({
-                  ...props.snapshot,
-                  ...point,
-                  callout: { ...callout, placement },
-                }),
-            }
-          : {})}
-        {...(props.onDelete ? { onDelete: props.onDelete } : {})}
-        chromeScale={1}
-        coordinateSpace={props.coordinateSpace}
-        {...(props.controlsPortalTarget
-          ? { controlsPortalTarget: props.controlsPortalTarget }
-          : {})}
-        editing={{
-          ...editing,
-          events: { ...editing.events, blur: handleEditingBlur },
-          layout: { ...editing.layout, floatingToolbarRect: null },
-        }}
-        frameBorderWidth={surface.strokeVisible ? surface.geometry.strokeWidth : 0}
-        frameId={props.snapshot.id}
-        frameRect={props.snapshot}
-        isEditing={isEditing}
-        isFrameEditing={false}
-        {...(props.onMoveEnd ? { onMoveEnd: props.onMoveEnd } : {})}
-        isSettingsOpen={props.isSettingsOpen}
-        {...actions}
-        portalTarget={props.portalTarget}
-        portalTheme={null}
-        {...(props.projectMoveRect ? { projectMoveRect: props.projectMoveRect } : {})}
-        renderVoiceSlot={({ calloutLeft, calloutWidth, viewportWidth }) => (
-          <CalloutVoiceButton
-            dataUi="editor.frame-annotation.callout-voice-input"
-            isEditing={isEditing}
-            leftOffset={resolveCalloutVoiceButtonLeftOffset({
-              calloutLeft,
-              calloutWidth,
-              viewportWidth,
-            })}
-            voice={voice}
-          />
-        )}
-        settings={settings}
-        settingsAnchorRef={settingsAnchorRef}
-        showSettingsHandle
-        zIndex={props.snapshot.ordering + 1}
-      />
-    </>
+    <FrameCalloutInteractiveSurface
+      {...(props.snapshot.annotationKind === 'callout'
+        ? {
+            onAnchorPositionChange: (point, placement) =>
+              props.onSnapshotChange({
+                ...props.snapshot,
+                ...point,
+                callout: { ...callout, placement },
+              }),
+          }
+        : {})}
+      {...(props.onDelete ? { onDelete: props.onDelete } : {})}
+      chromeScale={1}
+      coordinateSpace={props.coordinateSpace}
+      {...(props.controlsPortalTarget ? { controlsPortalTarget: props.controlsPortalTarget } : {})}
+      editing={{
+        ...editing,
+        events: {
+          ...editing.events,
+          blur: handleEditingBlur,
+          click: selectAndEdit,
+        },
+        layout: { ...editing.layout, floatingToolbarRect: null },
+      }}
+      frameBorderWidth={surface.strokeVisible ? surface.geometry.strokeWidth : 0}
+      frameId={props.snapshot.id}
+      frameRect={props.snapshot}
+      isEditing={isEditing}
+      isFrameEditing={false}
+      {...(props.onMoveEnd ? { onMoveEnd: props.onMoveEnd } : {})}
+      isSettingsOpen={props.isSettingsOpen}
+      {...actions}
+      portalTarget={props.portalTarget}
+      portalTheme={null}
+      {...(props.projectMoveRect ? { projectMoveRect: props.projectMoveRect } : {})}
+      renderVoiceSlot={({ calloutLeft, calloutWidth, viewportWidth }) => (
+        <CalloutVoiceButton
+          dataUi="editor.frame-annotation.callout-voice-input"
+          isEditing={isEditing}
+          leftOffset={resolveCalloutVoiceButtonLeftOffset({
+            calloutLeft,
+            calloutWidth,
+            viewportWidth,
+          })}
+          voice={voice}
+        />
+      )}
+      settings={settings}
+      settingsAnchorRef={settingsAnchorRef}
+      showSettingsHandle
+      zIndex={props.snapshot.ordering + 1}
+    />
   );
 }
 

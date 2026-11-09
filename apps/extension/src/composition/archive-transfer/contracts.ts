@@ -54,6 +54,11 @@ export interface ArchiveEntrySource extends ArchiveEntryInfo {
   text(maxBytes?: number): Promise<string>;
 }
 
+/** A local byte stream needs no ZIP central-directory metadata. */
+export type ArchiveStreamSource = Pick<ArchiveEntrySource, 'size' | 'pipeTo'> & {
+  directory?: boolean;
+};
+
 export interface ArchiveReader {
   entries(): readonly ArchiveEntryInfo[];
   entry(path: string): ArchiveEntrySource | null;
@@ -75,7 +80,7 @@ export interface ArchiveWriter {
   ): Promise<void>;
   addSource(
     path: string,
-    source: ArchiveEntrySource,
+    source: ArchiveStreamSource,
     options?: { compress?: boolean; signal?: AbortSignal }
   ): Promise<void>;
   addText(path: string, text: string, options?: { signal?: AbortSignal }): Promise<void>;

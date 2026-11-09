@@ -77,7 +77,7 @@ export function planReviewProjectAudio(args: {
     binding: VideoProjectSourceVoiceoverDocument['binding'];
     reference: readonly ReviewTimeSegment[];
   };
-  textDocumentIds?: { source: string; result: string };
+  textDocumentIds?: { source: string; result: string; fragments?: ReadonlyMap<string, string> };
   mainDuration: number;
   originalAudioTarget?: NonNullable<VideoProjectAudioClip['originalAudioMute']>['targets'][number];
   resources?: ReviewProjectAudioResources;
@@ -257,7 +257,9 @@ export function planReviewProjectAudio(args: {
         text && binding && args.textDocumentIds && digest
           ? parseVideoProjectVoiceTextSnapshot({
               version: 1,
-              documentId: args.textDocumentIds[text.timeDomain],
+              documentId:
+                args.textDocumentIds.fragments?.get(text.textId) ??
+                args.textDocumentIds[text.timeDomain],
               binding,
               basisHash: digest.basisHash,
               text,

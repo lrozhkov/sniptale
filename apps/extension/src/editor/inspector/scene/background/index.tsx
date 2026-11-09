@@ -37,18 +37,16 @@ function FrameBackgroundPresetChoices(props: EditorInspectorFrameBackgroundEdito
   const colors = props.frameBackgroundPalette.map((color, index) => ({
     id: `color:${index}`,
     name: color,
-    groupLabel: index === 0 ? translate('editor.compact.frameBackgroundModeColor') : undefined,
     active:
       props.frameDraft.backgroundMode === 'color' &&
       serializePaintToCss(createSolidPaint(color)) ===
         serializePaintToCss(createSolidPaint(props.frameDraft.backgroundColor)),
     style: { backgroundColor: color },
   }));
-  const gradientChoices = gradients.map((preset, index) => {
+  const gradientChoices = gradients.map((preset) => {
     return {
       id: `gradient:${preset.id}`,
       name: preset.name,
-      groupLabel: index === 0 ? translate('editor.compact.frameBackgroundModeGradient') : undefined,
       active:
         props.frameDraft.backgroundMode === 'gradient' &&
         serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }) ===
@@ -62,7 +60,9 @@ function FrameBackgroundPresetChoices(props: EditorInspectorFrameBackgroundEdito
     <BackgroundThumbnails
       label={translate('editor.scene.sceneBackgroundLabel')}
       dataUi="editor.frame.paint-presets"
-      items={[...colors, ...gradientChoices]}
+      items={Array.from({ length: Math.max(colors.length, gradientChoices.length) }, (_, index) =>
+        [colors[index], gradientChoices[index]].filter((item) => item !== undefined)
+      ).flat()}
       onSelect={(id) => {
         const color = colors.find((item) => item.id === id);
         if (color) {
@@ -96,6 +96,8 @@ export function EditorInspectorFrameBackgroundFillEditor(
         value={transactionValue ?? frameToPaint(props.frameDraft)}
         recentColors={props.recentColors}
         palette={props.frameBackgroundPalette}
+        onPreviewChange={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
+        onPreviewReset={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
         onChange={(paint) => props.applyFramePatch(paintToFramePatch(paint))}
         onOpenChange={(open) =>
           setTransactionValue((current) =>

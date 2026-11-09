@@ -3,13 +3,9 @@ import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row
 import { ReviewWebcamHiddenMarker } from './webcam-hidden-marker';
 import { ReviewWebcamPositionMarker } from './webcam-position-marker';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Camera, Eye, EyeOff, Scissors, Settings2 } from 'lucide-react';
+import { Camera, Eye, EyeOff, Scissors } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import {
-  ReviewButton,
-  reviewCompactTrackButtonClassName,
-  reviewTimelineItemTone,
-} from './controls';
+import { reviewCompactTrackButtonClassName, reviewTimelineItemTone } from './controls';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { useReviewDragEscape } from './timeline-drag';
 import type { ReviewTrackProjection } from './track-projection';
@@ -88,13 +84,6 @@ export function ReviewWebcamTrack(props: {
       icon={<Camera size={14} aria-hidden />}
       controls={
         <>
-          <ReviewButton
-            label={translate('gallery.videoReview.webcamSettings')}
-            className={reviewCompactTrackButtonClassName}
-            onClick={() => admit(() => editor.select({ kind: 'webcam' }))}
-          >
-            <Settings2 size={14} aria-hidden />
-          </ReviewButton>
           <ReviewTrackVisibilityButton
             track="webcam"
             label={translate('gallery.videoReview.webcamApply')}

@@ -164,6 +164,100 @@ describe('loadInitialProjectFromLocation', () => {
   it('fails for a missing explicit project', verifyMissingProject);
   it('stays idle without an explicit target', verifyBlankProjectCreation);
   it('hydrates cursor telemetry from a recording', verifyRecordingHydration);
+  it('opens a recording with its compact trajectory reference instead of copying source samples', async () => {
+    await mockRecordingProjectLoad();
+    const telemetry = await getRecordingTelemetry('recording-1');
+    const descriptor = {
+      format: 'cursor-trajectory-v1',
+      formatVersion: 1,
+      algorithm: 'sed-window-v1',
+      encoding: 'json-ascii-int-v1',
+      trajectoryId: 'a'.repeat(32),
+      state: 'incomplete',
+      finalized: true,
+      totalBlocks: 100,
+      totalRecords: 20000,
+      totalSamples: 19500,
+      totalBytes: 2000000,
+      streamSha256: 'b'.repeat(64),
+    };
+    getRecordingTelemetry.mockResolvedValue({ ...telemetry, cursorTrajectory: descriptor });
+    window.history.replaceState({}, '', '/video-editor.html?id=recording-1');
+    const result = await loadInitialProjectFromLocation();
+    expect(result.project?.version).toBe(49);
+    expect(result.project?.cursorTrack?.samples).toEqual([]);
+    const sourceClip = result.project?.clips.find((clip) => clip.type === 'VIDEO');
+    expect(result.project?.cursorTrack?.sourceObservations).toEqual([
+      {
+        recordingId: 'recording-1',
+        sourceInstanceId: sourceClip?.sourceInstanceId,
+        samples: [],
+        trajectory: descriptor,
+      },
+    ]);
+    expect(result.project?.cursorTrack?.skin.color).toBe('#ff7a1a');
+    expect(descriptor).toEqual(result.project?.cursorTrack?.sourceObservations?.[0]?.trajectory);
+    expect(saveVideoProject).toHaveBeenCalledOnce();
+  });
+  it.each([false, true])(
+    'opens event history as a compact source reference (cursor=%s)',
+    async (cursor) => {
+      await mockRecordingProjectLoad();
+      const telemetry = await getRecordingTelemetry('recording-1');
+      const recordingEvents = {
+        format: 'recording-events-v1',
+        formatVersion: 1,
+        algorithm: 'lossless-v1',
+        encoding: 'json-utf8-v1',
+        eventStreamId: 'c'.repeat(32),
+        state: 'complete',
+        finalized: true,
+        totalBlocks: 100,
+        totalRecords: 20000,
+        totalBytes: 2000000,
+        streamSha256: 'd'.repeat(64),
+      };
+      getRecordingTelemetry.mockResolvedValue({
+        ...telemetry,
+        recordingEvents,
+        ...(cursor
+          ? {
+              cursorTrajectory: {
+                format: 'cursor-trajectory-v1',
+                formatVersion: 1,
+                algorithm: 'sed-window-v1',
+                encoding: 'json-ascii-int-v1',
+                trajectoryId: 'a'.repeat(32),
+                state: 'complete',
+                finalized: true,
+                totalBlocks: 100,
+                totalRecords: 20000,
+                totalSamples: 19500,
+                totalBytes: 2000000,
+                streamSha256: 'b'.repeat(64),
+              },
+            }
+          : {}),
+      });
+      window.history.replaceState({}, '', '/video-editor.html?id=recording-1');
+      const result = await loadInitialProjectFromLocation();
+      expect(result.project?.version).toBe(50);
+      expect(result.project?.actionEvents).toEqual([]);
+      const sourceClip = result.project?.clips.find((clip) => clip.type === 'VIDEO');
+      expect(result.project?.actionFeedback).toEqual([
+        {
+          recordingId: 'recording-1',
+          sourceInstanceId: sourceClip?.sourceInstanceId,
+          settings: [],
+          signals: [],
+          events: recordingEvents,
+        },
+      ]);
+      expect(Boolean(result.project?.cursorTrack?.sourceObservations?.[0]?.trajectory)).toBe(
+        cursor
+      );
+    }
+  );
   it(
     'preserves the shared recording when project persistence fails',
     verifyRecordingPersistenceFailure

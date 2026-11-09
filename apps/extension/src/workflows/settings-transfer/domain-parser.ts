@@ -2,7 +2,6 @@ import { DEFAULT_PAGE_LAUNCH_PREFERENCES } from '../../contracts/page-launch';
 import { hasQuickActionArtwork } from '../../contracts/quick-action-appearance';
 import { normalizeConfigurableCaptureAction } from '../../features/quick-actions-presets/policy';
 import { z } from 'zod';
-import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type {
   SettingsTransferDomainPayload,
   SettingsTransferJsonValue,
@@ -46,15 +45,20 @@ export function parseSettingsTransferDomains(
 ): Record<string, SettingsTransferDomainPayload> {
   const known = new Set(SETTINGS_TRANSFER_DOMAIN_IDS);
   return Object.fromEntries(
-    Object.entries(domains).map(([domainId, payload]) => {
-      if (!known.has(domainId)) {
-        throw new SettingsTransferDomainError(domainId, `Unsupported settings domain: ${domainId}`);
-      }
-      if (payload.schemaVersion !== 1) {
-        throw new SettingsTransferDomainError(domainId, 'Unsupported domain schema version');
-      }
-      return [domainId, { schemaVersion: 1, data: parseDomainData(domainId, payload.data) }];
-    })
+    Object.entries(domains)
+      .filter(([domainId]) => domainId !== 'system.native')
+      .map(([domainId, payload]) => {
+        if (!known.has(domainId)) {
+          throw new SettingsTransferDomainError(
+            domainId,
+            `Unsupported settings domain: ${domainId}`
+          );
+        }
+        if (payload.schemaVersion !== 1) {
+          throw new SettingsTransferDomainError(domainId, 'Unsupported domain schema version');
+        }
+        return [domainId, { schemaVersion: 1, data: parseDomainData(domainId, payload.data) }];
+      })
   );
 }
 
@@ -191,30 +195,23 @@ function parseCoreDomain(
         failSettingsTransferDomain(domainId);
       return json(coreSettingsTransferData(domainId, value, parsed.value));
     }
-    case 'capture.video':
-    case 'system.native': {
-      const storageShape =
-        domainId === 'capture.video'
-          ? {
-              qualityProfiles: value['profiles'],
-              qualityProfileId: value['qualityProfileId'],
-              outputProfile: value['outputProfile'],
-            }
-          : { ...DEFAULT_VIDEO_SETTINGS, native: buildNativeSettingsShape(domainId, value) };
-      const parsed = parseStoredVideoSettings(storageShape);
+    case 'capture.video': {
+      const parsed = parseStoredVideoSettings({
+        qualityProfiles: value['profiles'],
+        qualityProfileId: value['qualityProfileId'],
+        outputProfile: value['outputProfile'],
+      });
       if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0)
         failSettingsTransferDomain(domainId);
-      return domainId === 'capture.video'
-        ? json({
-            ...(value['profiles'] === undefined ? {} : { profiles: parsed.value.qualityProfiles }),
-            ...(value['qualityProfileId'] === undefined
-              ? {}
-              : { qualityProfileId: parsed.value.qualityProfileId }),
-            ...(value['outputProfile'] === undefined
-              ? {}
-              : { outputProfile: parsed.value.outputProfile }),
-          })
-        : json(canonicalNativeTransferData(value, parsed.value.native));
+      return json({
+        ...(value['profiles'] === undefined ? {} : { profiles: parsed.value.qualityProfiles }),
+        ...(value['qualityProfileId'] === undefined
+          ? {}
+          : { qualityProfileId: parsed.value.qualityProfileId }),
+        ...(value['outputProfile'] === undefined
+          ? {}
+          : { outputProfile: parsed.value.outputProfile }),
+      });
     }
   }
   return failSettingsTransferDomain(domainId);
@@ -310,54 +307,6 @@ function parseAiDomain(
     }
   }
   return failSettingsTransferDomain(domainId);
-}
-
-function buildNativeSettingsShape(domainId: string, value: Record<string, unknown>) {
-  const defaults = DEFAULT_VIDEO_SETTINGS.native!;
-  const capture = asRecord(value['capture']);
-  const captureVideo = asRecord(capture['video']);
-  if (
-    Object.keys(value).some((key) => key !== 'capture' && key !== 'tray' && key !== 'telemetry') ||
-    Object.keys(capture).some((key) => key !== 'screenshots' && key !== 'video') ||
-    Object.keys(captureVideo).some(
-      (key) => key !== 'advanced' && key !== 'codec' && key !== 'enabled'
-    )
-  ) {
-    failSettingsTransferDomain(domainId);
-  }
-  return {
-    screenshots: capture['screenshots'] ?? defaults.screenshots,
-    trayActions: value['tray'] ?? defaults.trayActions,
-    video: {
-      advanced: captureVideo['advanced'] ?? defaults.video.advanced,
-      codec: captureVideo['codec'] ?? defaults.video.codec,
-      enabled: captureVideo['enabled'] ?? defaults.video.enabled,
-      telemetry: value['telemetry'] ?? defaults.video.telemetry,
-    },
-  };
-}
-
-function canonicalNativeTransferData(
-  source: Record<string, unknown>,
-  native: (typeof DEFAULT_VIDEO_SETTINGS)['native'] | undefined
-) {
-  if (!native) failSettingsTransferDomain('system.native');
-  return {
-    ...(source['capture'] === undefined
-      ? {}
-      : {
-          capture: {
-            screenshots: native.screenshots,
-            video: {
-              advanced: native.video.advanced,
-              codec: native.video.codec,
-              enabled: native.video.enabled,
-            },
-          },
-        }),
-    ...(source['tray'] === undefined ? {} : { tray: native.trayActions }),
-    ...(source['telemetry'] === undefined ? {} : { telemetry: native.video.telemetry }),
-  };
 }
 
 function mainSettingsStorageShape(domainId: string, value: Record<string, unknown>) {

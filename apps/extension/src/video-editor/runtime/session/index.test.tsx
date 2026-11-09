@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 
@@ -166,4 +167,39 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
     params.projectState.setError
   );
   expect(applyLoadedProject).toHaveBeenCalledWith(params.project, 'recording-2');
+});
+
+it('suspends thumbnail work during playback and retains manual suspension after pause', async () => {
+  const { act } = await import('react');
+  const { createRoot } = await import('react-dom/client');
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const params = createParams();
+  mocks.useVideoEditorAssetUrls.mockReturnValue({});
+  mocks.useTimelineClipPreviews.mockReturnValue({});
+  mocks.useVideoEditorPlayback.mockReturnValue({});
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  let controller!: VideoEditorRuntimeController;
+  function Probe({ playing }: { playing: boolean }) {
+    controller = useVideoEditorRuntime({
+      ...params,
+      playback: { ...params.playback, isPlaying: playing },
+    });
+    return null;
+  }
+  const suspended = () => mocks.useTimelineClipPreviews.mock.lastCall?.[2]?.suspended;
+  try {
+    await act(async () => root.render(<Probe playing={false} />));
+    expect(suspended()).toBe(false);
+    await act(async () => root.render(<Probe playing />));
+    expect(suspended()).toBe(true);
+    await act(async () => controller.setTimelinePreviewSuspended(true));
+    await act(async () => root.render(<Probe playing={false} />));
+    expect(suspended()).toBe(true);
+    await act(async () => controller.setTimelinePreviewSuspended(false));
+    expect(suspended()).toBe(false);
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
 });

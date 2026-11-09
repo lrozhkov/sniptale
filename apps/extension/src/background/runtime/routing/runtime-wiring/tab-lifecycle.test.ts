@@ -1,10 +1,15 @@
 import { expect, it, vi } from 'vitest';
 
 const pinSessionMocks = vi.hoisted(() => ({
+  retireSimplifySessionsForTab: vi.fn(),
   clearAnnotationForkSessionForTab: vi.fn(),
   clearRecentCaptureEditorAssetCapabilitiesForTab: vi.fn(),
   clearPinnedToolbarOperationState: vi.fn(),
   clearPinToTabSessionStorageState: vi.fn(),
+}));
+
+vi.mock('../action-kernel/owned-route-handlers', () => ({
+  retireSimplifySessionsForTab: pinSessionMocks.retireSimplifySessionsForTab,
 }));
 
 vi.mock('../../../capture/editor/recent-asset-capability', async (importOriginal) => ({
@@ -55,6 +60,7 @@ it('restores screenshot ownership before clearing mode state on tab removal', as
 
   registerTabLifecycleListeners(state, logger);
   removedListenerRef.current?.(7);
+  expect(pinSessionMocks.retireSimplifySessionsForTab).toHaveBeenCalledWith(7);
   expect(handleRegionSelectionNavigationStart).toHaveBeenCalledWith(7);
   await flushMicrotasks();
 

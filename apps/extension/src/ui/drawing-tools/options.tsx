@@ -11,7 +11,6 @@ import {
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import { getColorAlpha, replaceColorChannels } from '@sniptale/foundation/color';
 import { useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
@@ -45,7 +44,8 @@ const DRAWING_COLOR_PICKER_CLASS = [
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span]:shrink-0",
 ].join(' ');
 
-function QuickOptionButton(props: {
+/** Renders a compact drawing property choice with the current toolbar theme. */
+export function QuickOptionButton(props: {
   active: boolean;
   children: ReactNode;
   dataUi: string;
@@ -317,8 +317,6 @@ export function ArrowDrawDirectionOption(props: {
 }
 
 export function DrawingColorOptions(props: {
-  /** Apply each palette entry's alpha; otherwise opaque entries preserve the current alpha. */
-  preservePaletteAlpha?: boolean;
   allowAlpha?: boolean;
   colors: readonly string[];
   dataUi?: string;
@@ -337,10 +335,6 @@ export function DrawingColorOptions(props: {
   const quickColors = props.colors.slice(0, 5);
   const selectedValue = props.selectedValue === undefined ? props.value : props.selectedValue;
   const previewReset = props.onPreviewReset ?? props.onPreview;
-  const resolveQuickColor = (color: string) =>
-    !props.preservePaletteAlpha && getColorAlpha(color) === 1
-      ? (replaceColorChannels(props.value, color) ?? color)
-      : color;
   return (
     <div
       role="group"
@@ -377,14 +371,14 @@ export function DrawingColorOptions(props: {
         data-ui="content.toolbar.drawing-options.quick-colors"
       >
         {quickColors.map((color, index) => {
-          const active = selectedValue?.toLowerCase() === resolveQuickColor(color).toLowerCase();
+          const active = selectedValue?.toLowerCase() === color.toLowerCase();
           return (
             <ProductGlassColorOption
               key={index}
               active={active}
               aria-label={`${props.label}: ${color}`}
               aria-pressed={active}
-              onClick={() => props.onSelect(resolveQuickColor(color))}
+              onClick={() => props.onSelect(color)}
               style={{ backgroundColor: color }}
               title={color}
             />
@@ -427,7 +421,7 @@ const DRAWING_FILL_UI = {
   },
 } as const;
 
-function DrawingFillToggle(props: {
+export function DrawingFillToggle(props: {
   filled: boolean;
   label: string;
   dataUi: string;

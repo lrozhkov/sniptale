@@ -92,7 +92,7 @@ it('routes controller actions and rich-shape arrangement branches', async () => 
     enabled: true,
     id: 'brightness',
   });
-  props.onApplyFrame();
+  await props.onApplyFrame();
   props.onResizeCanvas(640, 480);
   props.onResizeImage(320, 240);
 
@@ -180,4 +180,32 @@ it('does not reopen parameters after the user leaves a pending raster action', a
   } finally {
     useEditorStore.setState(previous);
   }
+});
+
+it('keeps a fresh image pending until frame application completes', async () => {
+  const controller = createController();
+  let complete!: () => void;
+  controller.applyFrameSettings.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      complete = resolve;
+    })
+  );
+  const props = createControllerActionProps({ controller, store: createStoreSlice() });
+  useEditorStore.getState().setFreshImageBackgroundPending(true);
+  const completion = props.onApplyFrame();
+  expect(useEditorStore.getState().freshImageBackgroundPending).toBe(true);
+  complete();
+  await completion;
+  expect(useEditorStore.getState().freshImageBackgroundPending).toBe(false);
+});
+
+it('preserves a fresh image pending flag when frame application fails', async () => {
+  const controller = createController();
+  const failure = new Error('frame failed');
+  controller.applyFrameSettings.mockRejectedValueOnce(failure);
+  const props = createControllerActionProps({ controller, store: createStoreSlice() });
+  useEditorStore.getState().setFreshImageBackgroundPending(true);
+  await expect(props.onApplyFrame()).rejects.toBe(failure);
+  expect(useEditorStore.getState().freshImageBackgroundPending).toBe(true);
+  useEditorStore.getState().setFreshImageBackgroundPending(false);
 });

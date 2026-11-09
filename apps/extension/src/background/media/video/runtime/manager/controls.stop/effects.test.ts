@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import type { CursorTrajectoryDescriptor } from '../../../../../../features/video/project/cursor-trajectory/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { installBackgroundRuntimeMessagingMock } from '../../../../../routing-contracts/runtime-messaging/mock';
 
@@ -107,6 +108,44 @@ beforeEach(() => {
 function flushStopSideEffects(): Promise<void> {
   return waitForStopSideEffects();
 }
+
+it('retains cursor blocks when the source snapshot is unavailable', async () => {
+  getVideoRecordingIdMock.mockReturnValue('recording-blocks');
+  let resolve!: (value: CursorTrajectoryDescriptor) => void;
+  const cursorTrajectory = new Promise<CursorTrajectoryDescriptor>((done) => {
+    resolve = done;
+  });
+  const descriptor: CursorTrajectoryDescriptor = {
+    format: 'cursor-trajectory-v1',
+    formatVersion: 1,
+    algorithm: 'sed-window-v1',
+    encoding: 'json-ascii-int-v1',
+    trajectoryId: 'a'.repeat(32),
+    state: 'unavailable',
+    finalized: true,
+    totalBlocks: 0,
+    totalRecords: 0,
+    totalSamples: 0,
+    totalBytes: 0,
+    streamSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+  };
+  await runStopSideEffects({ mode: CaptureMode.TAB, tabId: 7 }, 'detailed', { cursorTrajectory });
+  expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
+  resolve(descriptor);
+  await flushStopSideEffects();
+  expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      recordingId: 'recording-blocks',
+      cursorTrajectory: descriptor,
+      signals: [
+        expect.objectContaining({
+          kind: 'static-frame',
+          data: { source: 'recording-events', code: 'source-unavailable', severity: 'warning' },
+        }),
+      ],
+    })
+  );
+});
 
 function createControlledCursorTelemetry() {
   return {
@@ -353,6 +392,52 @@ it.each([true, false])(
               recordingPoint: null,
             }),
           ],
+        })
+      );
+  }
+);
+
+it.each([false, true])(
+  'waits for the independent event descriptor before saving or discarding; discard=%s',
+  async (discard) => {
+    getVideoRecordingIdMock.mockReturnValue('recording-events');
+    let resolve!: (
+      descriptor: import('../../../../../../features/video/project/recording-events/types').RecordingEventsDescriptor
+    ) => void;
+    const recordingEvents = new Promise<
+      import('../../../../../../features/video/project/recording-events/types').RecordingEventsDescriptor
+    >((done) => {
+      resolve = done;
+    });
+    const descriptor: import('../../../../../../features/video/project/recording-events/types').RecordingEventsDescriptor =
+      {
+        format: 'recording-events-v1',
+        formatVersion: 1,
+        algorithm: 'lossless-v1',
+        encoding: 'json-utf8-v1',
+        eventStreamId: 'b'.repeat(32),
+        state: 'incomplete',
+        finalized: true,
+        totalBlocks: 1,
+        totalRecords: 3,
+        totalBytes: 512,
+        streamSha256: 'd'.repeat(64),
+      };
+    await runStopSideEffects({ mode: CaptureMode.TAB, tabId: 7 }, 'detailed', {
+      recordingEvents,
+      discard,
+    });
+    expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
+    resolve(descriptor);
+    await flushStopSideEffects();
+    if (discard) expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
+    else
+      expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recordingId: 'recording-events',
+          recordingEvents: descriptor,
+          actionEvents: [],
+          signals: [],
         })
       );
   }

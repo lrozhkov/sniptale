@@ -22,6 +22,7 @@ import type { VideoEditorPlaybackRange } from '../../../interaction/playback/ran
 import type { PlaybackPreviewRuntime } from '../../../interaction/playback/types';
 import type {
   VideoEditorPreviewMode,
+  VideoPreviewRenderer,
   VideoEditorPreviewFrameRate,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
@@ -45,6 +46,8 @@ export interface PreviewStageProps {
   mutePreviewAudio?: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
   previewMode: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer | undefined;
+  onPreviewRendererChange?: ((renderer: VideoPreviewRenderer) => void) | undefined;
   previewPreferencesSaveFailed: boolean;
   previewShowFrameRate?: boolean | undefined;
   onPreviewShowFrameRateChange?: ((value: boolean) => void) | undefined;

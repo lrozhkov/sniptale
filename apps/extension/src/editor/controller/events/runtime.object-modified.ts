@@ -1,3 +1,5 @@
+import { ActiveSelection } from 'fabric';
+import { synchronizeFrameAnnotationProxyTransform } from '../../frame-annotation/proxy';
 import {
   getBlurSettings,
   isBlurObject,
@@ -51,8 +53,12 @@ export function createObjectModifiedHandler(
             source: bindings.getSource(),
           })
         : null;
-      (canonical ?? [event.target]).forEach((object) => {
+      const modified =
+        canonical ??
+        (event.target instanceof ActiveSelection ? event.target.getObjects() : [event.target]);
+      modified.forEach((object) => {
         bindings.ensureObjectReachable(object);
+        synchronizeFrameAnnotationProxyTransform(object);
         syncSourceState(bindings, object);
       });
     }

@@ -34,6 +34,7 @@ import {
   connectionUuid,
   parseConnectionAuthentication,
   parseConnectionMetadata,
+  sameSyncConnectionIdentity,
   type SyncWorkspaceSource,
 } from '../../../apps/extension/src/composition/persistence/remote-connection/model';
 import {
@@ -55,6 +56,7 @@ import {
   releasePublishedOutgoing,
 } from '../../../apps/extension/src/workflows/sync-transfer/outgoing';
 import { createWebdavRemoteStore } from '../../../apps/extension/src/workflows/sync-transfer/webdav';
+import { createWebdavWorkspaceJoin } from '../../../apps/extension/src/workflows/sync-transfer/webdav-workspace-join';
 import { createSyncConnectionRequests } from '../../../apps/extension/src/workflows/sync-transfer/connection-requests';
 import { verifySyncWorkspaceIdentity } from '../../../apps/extension/src/workflows/sync-transfer/workspace';
 import { deleteMediaAssetWithProjectCascade } from '../../../apps/extension/src/composition/persistence/media-library/delete-cascade';
@@ -78,7 +80,7 @@ interface LifecycleControl {
   ): Promise<unknown>;
 }
 
-/** Native source setup never creates a page-owned WebDAV client or opens a runtime keepalive. */
+/** Native handoff setup uses checked workflow ownership without opening a runtime keepalive. */
 export function createWebdavLifecycleHarness(control: LifecycleControl) {
   const portable = createWebdavPortableHarness(() => {
     throw new Error('The native lifecycle fixture has no page-owned DAV client.');
@@ -179,6 +181,34 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
 
   async function startWorkspace(authentication: unknown) {
     if (!workspaceSelection) throw new Error('Native workspace fixture is not prepared.');
+    if (workspaceSelection.kind === 'join') {
+      const prior = await loadSyncWorkspaceJoin();
+      if (prior?.expected === null) {
+        if (!sameSyncConnectionIdentity(prior.identity, workspaceSelection.identity))
+          throw new Error('Native workspace fixture selection changed.');
+        const discovery = createWebdavWorkspaceJoin({
+          operation: 'discover',
+          identity: workspaceSelection.identity,
+          authentication,
+          hasOriginPermission: (origin) =>
+            chrome.permissions.contains({ origins: [`${origin}/*`] }),
+        });
+        const discovered = await discovery.run().finally(() => discovery.close());
+        const candidate = discovered.discovery.candidates[0];
+        if (
+          !discovered.discovery.complete ||
+          discovered.discovery.scope !== 'exact' ||
+          discovered.discovery.candidates.length !== 1 ||
+          candidate?.prefix !== ''
+        )
+          throw new Error('Native workspace fixture requires one checked exact root.');
+        const selected = await createSyncWorkspaceJoin(
+          { rootUrl: prior.rootUrl, accountId: prior.accountId, expected: candidate.identity },
+          discovered.source.identity
+        );
+        workspaceSelection = { kind: 'join', identity: selected.identity };
+      }
+    }
     const receipt = await control.command('sync-workspace-start', {
       source: workspaceSelection,
       authentication,
@@ -216,6 +246,7 @@ export function createWebdavLifecycleHarness(control: LifecycleControl) {
     const value = await control.command('sync-workspace-enroll', {
       source: current.source,
       authentication,
+      storagePolicy: { version: 1, mode: 'on-demand' },
     });
     const connection = parseConnectionMetadata(value);
     if (!connection?.workspace) throw new Error('Checked enrollment receipt is invalid.');

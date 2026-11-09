@@ -30,17 +30,24 @@ export function SelectionVisibilitySetting() {
 
   return (
     <div data-ui="editor.workspace.selection-visibility" className="sniptale-parameter-stack">
-      <div data-inspector-toggle className="flex min-h-8 items-center justify-between gap-3">
+      <div
+        data-inspector-toggle
+        className="sniptale-parameter-row sniptale-boolean-parameter"
+        title={translate('editor.compact.hideSelectionWhileDraggingHint')}
+      >
         <span className="min-w-0 text-[13px] font-medium leading-[18px] text-[var(--sniptale-color-text-secondary)]">
           {translate('editor.compact.hideSelectionWhileDragging')}
         </span>
-        <ProductGlassSwitch
-          aria-label={translate('editor.compact.hideSelectionWhileDragging')}
-          aria-pressed={enabled}
-          on={enabled}
-          disabled={pending}
-          onClick={() => void toggle()}
-        />
+        <div className="sniptale-parameter-value">
+          <ProductGlassSwitch
+            title={translate('editor.compact.hideSelectionWhileDraggingHint')}
+            aria-label={translate('editor.compact.hideSelectionWhileDragging')}
+            aria-pressed={enabled}
+            on={enabled}
+            disabled={pending}
+            onClick={() => void toggle()}
+          />
+        </div>
       </div>
       {error && (
         <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">

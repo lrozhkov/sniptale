@@ -26,11 +26,8 @@ export function applyGridSnapForController(
 
 export function snapExternalEditorRectForController(
   controller: EditorControllerInstance,
-  input: {
-    excludeId?: string;
-    rect: { x: number; y: number; width: number; height: number };
-  }
-): { x: number; y: number; width: number; height: number } {
+  input: Parameters<EditorControllerInstance['snapFrameAnnotationRect']>[0]
+): ReturnType<EditorControllerInstance['snapFrameAnnotationRect']> {
   const workspace = useEditorStore.getState().workspace;
   const snapped = controller.magnetManager?.snapRect(input) ?? input.rect;
   if (workspace.magnetEnabled && controller.magnetManager?.hasActiveGuides()) return snapped;
@@ -55,17 +52,12 @@ export function snapExternalEditorRectForController(
 
 export function snapExternalEditorResizeRectForController(
   controller: EditorControllerInstance,
-  input: {
-    direction: 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
-    excludeId?: string;
-    minimumSize: number;
-    rect: { x: number; y: number; width: number; height: number };
-  }
-): { x: number; y: number; width: number; height: number } {
+  input: Parameters<EditorControllerInstance['snapFrameAnnotationResizeRect']>[0]
+): ReturnType<EditorControllerInstance['snapFrameAnnotationResizeRect']> {
   const workspace = useEditorStore.getState().workspace;
   const snapped = controller.magnetManager?.snapResizeRect?.(input) ?? input.rect;
   if (workspace.magnetEnabled && controller.magnetManager?.hasActiveGuides()) return snapped;
-  if (!workspace.gridEnabled || !workspace.gridSnapEnabled) return snapped;
+  if (!workspace.gridSnapEnabled) return snapped;
   const size = Math.max(1, workspace.gridSize);
   const right = snapped.x + snapped.width;
   const bottom = snapped.y + snapped.height;

@@ -8,6 +8,12 @@ import type {
 
 export interface ExtensionHelloMessage {
   type: 'extension.hello';
+  connectionIntent: 'user-requested' | 'automatic';
+  capabilities: [
+    'desktop-settings-v1',
+    'durable-media-ack-v1',
+    ...Array<'cursor-trajectory-v1' | 'recording-events-v1'>,
+  ];
   protocolVersion: number;
   settingsSchemaVersion: number;
   extensionVersion: string;
@@ -19,6 +25,8 @@ export interface ExtensionHelloMessage {
 
 export interface AppHelloMessage {
   type: 'app.hello';
+  appIdentity: { clientId: string; trustVersion: 1 };
+  settingsAuthority: 'desktop';
   protocolVersion: number;
   settingsSchemaVersion: number;
   minExtensionVersion: string;
@@ -57,6 +65,7 @@ export interface AppControllerLeaseMessage {
   controller: NativeControllerIdentity;
   expiresAtEpochMs: number;
   status: 'granted' | 'owned-by-other-profile' | 'rejected';
+  selectionStatus: 'selected' | 'available' | 'selection-required';
 }
 
 export interface ExtensionSettingsSyncMessage {
@@ -97,4 +106,11 @@ export interface AppPongMessage {
   nonce: string;
   sentAtEpochMs: number;
   appStatus: NativeAppStatus;
+}
+
+/** Signals a deliberate Desktop exit before the Native Messaging bridge closes. */
+export interface AppConnectionClosedMessage {
+  type: 'app.connection.closed';
+  protocolVersion: number;
+  reason: 'user-quit';
 }

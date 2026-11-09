@@ -1,11 +1,12 @@
-import type { DrawingBounds } from '../../features/drawing/public';
+import type { DrawingBounds, DrawingPoint } from '../../features/drawing/public';
 import { isContentOwnedElement } from '../platform/dom-host';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import { getDrawingViewportProjection } from './interaction';
 
 function readDrawingDomAlignmentBounds(
   bounds: DrawingBounds,
-  root: PageScrollRoot
+  root: PageScrollRoot,
+  probe?: Partial<DrawingPoint>
 ): DrawingBounds[] {
   if (typeof document.elementsFromPoint !== 'function') return [];
   const projection = getDrawingViewportProjection(root);
@@ -17,8 +18,14 @@ function readDrawingDomAlignmentBounds(
   const height = window.innerHeight;
   const found = new Set<Element>();
   const result: DrawingBounds[] = [];
-  const xs = [bounds.x - 32, bounds.x + bounds.width / 2, bounds.x + bounds.width + 32];
-  const ys = [bounds.y - 32, bounds.y + bounds.height / 2, bounds.y + bounds.height + 32];
+  const xs =
+    probe?.x === undefined
+      ? [bounds.x - 32, bounds.x + bounds.width / 2, bounds.x + bounds.width + 32]
+      : [probe.x - 6, probe.x, probe.x + 6];
+  const ys =
+    probe?.y === undefined
+      ? [bounds.y - 32, bounds.y + bounds.height / 2, bounds.y + bounds.height + 32]
+      : [probe.y - 6, probe.y, probe.y + 6];
   for (const x of xs)
     for (const y of ys) {
       const clientX = x - projection.x;
@@ -71,10 +78,11 @@ function readDrawingDomAlignmentBounds(
 /** Reads nearby page geometry with bounded hit tests, without traversing the document. */
 export function collectDrawingDomAlignmentBounds(
   bounds: DrawingBounds,
-  root: PageScrollRoot
+  root: PageScrollRoot,
+  probe?: Partial<DrawingPoint>
 ): DrawingBounds[] {
   try {
-    return readDrawingDomAlignmentBounds(bounds, root);
+    return readDrawingDomAlignmentBounds(bounds, root, probe);
   } catch {
     return [];
   }

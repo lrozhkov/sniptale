@@ -1,0 +1,9 @@
+{
+  "sourceCommit": "4e90cf04721e9870c286e0dd5dfd002a46fe313c",
+  "corpusArchiveSha256": "5e0857800bdfbd413f3a35658acd730cc06122bb63a80adb37bba2a7cd677b65",
+  "sourceCasesSha256": "523ad3f216bb1795d64f67257e022b452ae7adc33ff7a3de7c7bc08e12fb03e3",
+  "schemaSha256": "f7c864dccf506496a83061735e96e575ccd2574d8a2088978c6b9076dd4546c7",
+  "paritySha256": "333f1cc50a56ad2427e6695a02ef774840565b859227fc446b5b951c7334e398",
+  "caseCount": 10455,
+  "acceptedCount": 840
+}

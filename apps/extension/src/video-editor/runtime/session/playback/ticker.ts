@@ -9,7 +9,11 @@ import type {
   PlaybackPreviewRuntime,
   PlaybackRefState,
 } from '../../../interaction/playback/types';
-import { resolvePlaybackFrameTime, shouldPublishPlaybackTime } from './cadence';
+import {
+  resolvePlaybackFrameTime,
+  resolvePlaybackPublishIntervalMs,
+  shouldPublishPlaybackTime,
+} from './cadence';
 
 function isPlaybackRangeRestart(
   nextTime: number,
@@ -76,11 +80,39 @@ function startPlaybackTicker(params: PlaybackTickerParams): () => void {
     lastPresentedTime: Number.NaN,
     lastPublishedAt: Number.NEGATIVE_INFINITY,
   };
-  const tick = (now: number) => {
-    if (runPlaybackTick(params, state, now)) state.frameId = requestAnimationFrame(tick);
+  let active = true;
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+  let lastTickNow = Number.NEGATIVE_INFINITY;
+  const stop = () => {
+    if (!active) return;
+    active = false;
+    cancelAnimationFrame(state.frameId);
+    if (timerId !== undefined) clearTimeout(timerId);
+  };
+  const wake = (timestamp = performance.now()) => {
+    if (!active) return false;
+    const now = Math.max(performance.now(), timestamp, lastTickNow);
+    lastTickNow = now;
+    if (!runPlaybackTick(params, state, now)) stop();
+    return active;
+  };
+  const tick = (timestamp: number) => {
+    if (wake(timestamp)) state.frameId = requestAnimationFrame(tick);
+  };
+  const timerTick = () => {
+    timerId = undefined;
+    if (wake()) scheduleTimer();
+  };
+  const scheduleTimer = () => {
+    if (active)
+      timerId = setTimeout(
+        timerTick,
+        resolvePlaybackPublishIntervalMs(params.latestStateRef.current.project?.fps ?? 30)
+      );
   };
   state.frameId = requestAnimationFrame(tick);
-  return () => cancelAnimationFrame(state.frameId);
+  scheduleTimer();
+  return stop;
 }
 
 export function usePlaybackTicker(
@@ -113,5 +145,6 @@ export function resolvePlaybackTickTime(
     return 0;
   }
 
-  return playback.initialTime + (now - playback.startedAt) / 1000;
+  // A frame timestamp can precede the performance.now() anchor created during that frame.
+  return playback.initialTime + Math.max(0, now - playback.startedAt) / 1000;
 }

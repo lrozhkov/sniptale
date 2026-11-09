@@ -1,3 +1,5 @@
+import { reviewTextSourceInterval } from '../../features/video/review/text-timing';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { useMemo, useState } from 'react';
 import type { ReviewTextTypingTarget } from '../../features/video/review/text-types';
 import {
@@ -104,6 +106,10 @@ export function useReviewText(args: {
     null
   );
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const segments = useMemo(
+    () => buildReviewTimeMap(args.sourceDuration, args.edits),
+    [args.sourceDuration, args.edits]
+  );
   const projection = useMemo(
     () => createTrackProjection(args.sourceDuration, args.edits),
     [args.sourceDuration, args.edits]
@@ -147,20 +153,26 @@ export function useReviewText(args: {
         ? { kind: 'text', fragmentId: id, field: 'text' }
         : undefined
     );
-  const add = (select = true) =>
+  const add = (select = true, sourceRange?: { start: number; end: number }) =>
     guard(() => {
       args.pause();
       const id = crypto.randomUUID();
       const start = Math.max(
         0,
-        Math.min(projection.output(args.sourceTime), projection.resultDuration - 0.05)
+        Math.min(
+          projection.output(sourceRange?.start ?? args.sourceTime),
+          sourceRange ? projection.resultDuration : projection.resultDuration - 0.05
+        )
       );
       if (
         mutate((current) =>
           addReviewTextFragment(current, {
             id,
             start,
-            end: Math.min(projection.resultDuration, start + 3),
+            end: Math.min(
+              projection.resultDuration,
+              sourceRange ? projection.output(sourceRange.end) : start + 3
+            ),
           })
         )
       ) {
@@ -169,9 +181,11 @@ export function useReviewText(args: {
       }
     });
   const sourceInterval = (fragment: ReviewTextFragment) =>
-    fragment.timeDomain === 'source'
-      ? { start: fragment.start, end: fragment.end }
-      : { start: projection.source(fragment.start), end: projection.source(fragment.end, 'end') };
+    fragment.sourceAnchor
+      ? reviewTextSourceInterval(fragment, segments)
+      : fragment.timeDomain === 'source'
+        ? { start: fragment.start, end: fragment.end }
+        : { start: projection.source(fragment.start), end: projection.source(fragment.end, 'end') };
   return {
     document,
     captions: args.captions ?? createReviewCaptionSettings(),

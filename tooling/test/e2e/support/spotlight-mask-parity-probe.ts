@@ -188,6 +188,19 @@ export function probe() {
     fixture('projected-fractional', 321, 181, true, true),
     fixture('full-1080p', 1920, 1080, true, true),
   ];
+  for (const [name, width, height, clipped, projected] of [
+    ['shared-fractional', 37, 23, false, false],
+    ['shared-clipped', 321, 181, true, false],
+    ['shared-projected-1080p', 1920, 1080, true, true],
+  ] as const) {
+    const entry = fixture(name, width, height, clipped, projected);
+    entry.frames = entry.frames.slice(0, 2).map((frame) => ({
+      ...frame,
+      protectionOpening: { ...frame.opening },
+      protectionRadius: frame.radius,
+    }));
+    cases.push(entry);
+  }
   cases.push({
     name: 'full-protection',
     output: { width: 17, height: 11 },

@@ -1,3 +1,4 @@
+import type { PreparedBackgroundLayer } from '../../../background/sync';
 import type { Canvas, FabricObject } from 'fabric';
 import type { BrowserFrameState } from '../../../../../features/editor/document/types';
 
@@ -7,6 +8,7 @@ import type { EditorSceneStoreBridge, RelayoutOptions } from '../helpers';
 export type BrowserFrameActionOptions = {
   canvas: Canvas | null;
   isMutationCurrent?: () => boolean;
+  prepareBackground?: (size: { width: number; height: number }) => Promise<PreparedBackgroundLayer>;
   canvasDocumentSize: { width: number; height: number };
   source: SourceState | null;
   store: Pick<EditorSceneStoreBridge, 'getBrowserFrame' | 'getFrame' | 'setBrowserFrame'>;

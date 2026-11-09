@@ -399,3 +399,40 @@ it.each(['ready', 'pending'])(
     }
   }
 );
+
+it('keeps an unsupported selected Clark mode without disabling a no-demand export', async () => {
+  renderDialog({ settings: { ...createSettings(), detailEnhancement: 'clark-x2' } });
+  await act(async () => Promise.resolve());
+  const field = container!.querySelector('[data-ui="video.exportDetailEnhancement"]')!;
+  expect(field.textContent).toContain('detailEnhancementClark');
+  const submit = [...container!.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('videoEditor.exportDialog.submit')
+  )!;
+  expect(submit.disabled).toBe(false);
+});
+
+it('invalidates the off size estimate when a detail enhancement mode is selected', async () => {
+  vi.useFakeTimers();
+  const calculate = vi
+    .spyOn(sizeEstimator, 'estimateProjectExportSize')
+    .mockResolvedValueOnce({ bytes: 100, lowerBytes: 75, upperBytes: 135, sampledSeconds: 1 })
+    .mockRejectedValueOnce(new Error('Enhanced export size estimate is unavailable.'));
+  const estimateContext = { project: { ...createEmptyVideoProject(), duration: 5 }, assetUrls: {} };
+  try {
+    renderDialog({ estimateContext });
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(container!.textContent).toContain('videoEditor.exportDialog.estimatedSize');
+    renderDialog({
+      estimateContext,
+      settings: { ...createSettings(), detailEnhancement: 'bicubic-sharpen' },
+    });
+    expect(container!.textContent).not.toContain('videoEditor.exportDialog.estimatedSize');
+    await act(async () => vi.advanceTimersByTimeAsync(1000));
+    expect(calculate).toHaveBeenCalledTimes(2);
+    expect(calculate.mock.calls[1]![0].settings.detailEnhancement).toBe('bicubic-sharpen');
+    expect(container!.textContent).toContain('videoEditor.exportDialog.sizeUnavailable');
+  } finally {
+    calculate.mockRestore();
+    vi.useRealTimers();
+  }
+});

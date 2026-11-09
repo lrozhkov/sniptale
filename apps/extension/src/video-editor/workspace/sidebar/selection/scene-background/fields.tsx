@@ -1,4 +1,5 @@
-import { NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { NumericRow, SegmentedRow } from '../../../../../ui/compact-inspector-controls';
+import { DEFAULT_BACKGROUND_MOTION } from '../../../../../features/video/project/scene/background-motion';
 import { useEffect, useState } from 'react';
 import { BackgroundImagePicker } from '../../../../../composition/background-resources/picker';
 import { resolveSceneBackgroundKind } from '../../../../../features/video/project/scene/background-settings';
@@ -89,6 +90,62 @@ export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
             }}
           />
         )}
+      {props.sceneBackground.enabled !== false && !imageRequested ? (
+        <SceneBackgroundMotionControls {...props} />
+      ) : null}
+    </div>
+  );
+}
+
+function SceneBackgroundMotionControls(props: SceneBackgroundFieldProps) {
+  const value = props.sceneBackground.motion ?? DEFAULT_BACKGROUND_MOTION;
+  if (props.sceneBackground.kind === 'solid')
+    return (
+      <p className={PANEL_META_CLASS_NAME}>{translate('editor.scene.backgroundMotionSolidHint')}</p>
+    );
+  const commit = (motion: typeof value) => {
+    props.onSetSceneBackground({ ...props.sceneBackground, motion });
+    props.onResetSceneBackgroundPreview();
+  };
+  return (
+    <div className="sniptale-parameter-stack">
+      <SegmentedRow<typeof value.mode>
+        columns={4}
+        ariaLabel={translate('editor.scene.backgroundMotion')}
+        label={translate('editor.scene.backgroundMotion')}
+        value={value.mode}
+        options={[
+          { value: 'none', label: translate('editor.scene.backgroundMotionNone') },
+          { value: 'drift', label: translate('editor.scene.backgroundMotionDrift') },
+          { value: 'glow', label: translate('editor.scene.backgroundMotionGlow') },
+          { value: 'waves', label: translate('editor.scene.backgroundMotionWaves') },
+        ]}
+        onChange={(mode) => commit({ ...value, mode })}
+      />
+      {value.mode !== 'none'
+        ? (['speed', 'intensity'] as const).map((key) => (
+            <NumericRow
+              key={key}
+              label={translate(
+                key === 'speed'
+                  ? 'editor.scene.backgroundMotionSpeed'
+                  : 'editor.scene.backgroundMotionIntensity'
+              )}
+              value={value[key]}
+              min={0}
+              max={100}
+              step={1}
+              unit="%"
+              onPreviewValue={(number) =>
+                props.onPreviewSceneBackground({
+                  ...props.sceneBackground,
+                  motion: { ...value, [key]: number },
+                })
+              }
+              onCommitValue={(number) => commit({ ...value, [key]: number })}
+            />
+          ))
+        : null}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { parsePagePreparationRecovery } from './recovery-parser';
 import { parseDrawingDocument } from '../../../../features/drawing/public';
-import type { DrawingDocumentV1 } from '../../../../features/drawing/model';
+import type { DrawingDocument } from '../../../../features/drawing/model';
 import { captureDomElementState, createDomMutationPatch, portableElementState } from './dom';
 import {
   applyHistoryEntry,
@@ -30,7 +30,7 @@ function canRecover(state: HistoryStoreRuntimeState): boolean {
 }
 function captureRecovery(
   state: HistoryStoreRuntimeState,
-  captureDrawing: (() => DrawingDocumentV1) | undefined
+  captureDrawing: (() => DrawingDocument) | undefined
 ): PagePreparationRecovery | null {
   if (!canRecover(state)) throw new Error('Page recovery is not ready');
   if (state.past.length === 0) return null;
@@ -84,9 +84,9 @@ function captureRecovery(
 }
 
 type DrawingReplay = {
-  replay: (document: DrawingDocumentV1) => boolean;
+  replay: (document: DrawingDocument) => boolean;
   hasChanges: () => boolean;
-  captureDocument: () => DrawingDocumentV1;
+  captureDocument: () => DrawingDocument;
 };
 
 /** Prepares one ordered step after earlier edits have created its possible DOM targets. */
@@ -200,9 +200,9 @@ export function createHistoryRecoveryApi(state: HistoryStoreRuntimeState, applie
       return sourceToken;
     },
     registerDrawingRecovery(
-      replay: (document: DrawingDocumentV1) => boolean,
+      replay: (document: DrawingDocument) => boolean,
       hasChanges: () => boolean,
-      captureDocument: () => DrawingDocumentV1
+      captureDocument: () => DrawingDocument
     ) {
       drawing = { replay, hasChanges, captureDocument };
       return () => {

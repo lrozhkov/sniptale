@@ -1,10 +1,19 @@
-import { parseAssetRef } from '../../composition/persistence/assets/guards';
+import { parseAssetRef, parseAssetOwner } from '../../composition/persistence/assets/guards';
+import {
+  MAX_MEDIA_ARCHIVE_INFLATED_BYTES,
+  MAX_MEDIA_ARCHIVE_ENTRIES,
+} from '../../composition/archive-transfer/contracts';
 import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import {
   ASSET_RESIDENCY_STORE,
   MEDIA_LIBRARY_STORE,
   VIDEO_PROJECTS_STORE,
   SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
+  SCENARIO_EXPORTS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
   VIDEO_WORKSPACES_STORE,
 } from '../../composition/persistence/infrastructure/indexed-db/core.stores';
 import { loadSyncConnection } from '../../composition/persistence/remote-connection/store';
@@ -36,6 +45,7 @@ import type { AssetRef } from '../../composition/persistence/assets/contracts';
 import { runWithAssetResourceRead } from '../../composition/persistence/assets/resource-sessions';
 import {
   readAssetFile,
+  createAggregateAssetReservation,
   discardPreparedAsset,
   MissingAssetObjectError,
   AssetObjectSizeMismatchError,
@@ -43,6 +53,40 @@ import {
 import { restoreVerifiedAssetObject } from '../../composition/persistence/assets/residency-maintenance';
 import { stageRootObjects } from '../media-hub-backup/v6/staging';
 import type { SyncRemoteStore } from './remote-store';
+import {
+  parseScenarioProjectEntry,
+  parseScenarioExportEntry,
+} from '../../composition/persistence/scenario/read-guards';
+import { readScenarioStorage } from '../../composition/persistence/scenario/storage';
+
+/** One selected action shares this allowance across its physical remote object reads. */
+export interface SyncDownloadAllowance {
+  reserveObject(size: number): void;
+}
+
+/** Failed or missing reads keep their reservation until the selected action ends. */
+export function createSyncDownloadAllowance(
+  limits: { maxBytes: number; maxObjects: number } = {
+    maxBytes: MAX_MEDIA_ARCHIVE_INFLATED_BYTES,
+    maxObjects: MAX_MEDIA_ARCHIVE_ENTRIES,
+  }
+): SyncDownloadAllowance {
+  const { maxBytes, maxObjects } = limits;
+  const bytes = createAggregateAssetReservation(maxBytes);
+  if (!Number.isSafeInteger(maxObjects) || maxObjects <= 0)
+    throw new Error('Sync download object limit must be a positive safe integer.');
+  let objects = 0;
+  return {
+    reserveObject(size) {
+      if (!Number.isSafeInteger(size) || size < 0)
+        throw new Error('Sync download object size must be a non-negative safe integer.');
+      if (objects >= maxObjects || size > maxBytes - bytes.getReservedBytes())
+        throw new Error('Sync download allowance exceeded.');
+      bytes.reserve(size);
+      objects++;
+    },
+  };
+}
 
 type Database = Awaited<ReturnType<typeof initDB>>;
 type Resource =
@@ -170,24 +214,38 @@ export async function isNativeEditingRootReady(
   });
 }
 
-/** Explicit foreground preparation. The native editor retains its own reader during activation and editing. */
-export async function prepareNativeEditingRoot(args: {
-  root: NativeEditingRoot;
+interface NativePreparationArgs {
   binding: SyncConnectionBinding;
   authorization: SyncConnectionIdentity;
   remote: SyncRemoteStore;
   signal: AbortSignal;
-  purpose?: 'editing' | 'backup';
+  downloadAllowance?: SyncDownloadAllowance;
   onBytesRead?: (bytes: number) => void;
-}): Promise<{ downloaded: number }> {
+}
+
+/** Explicit foreground preparation. The native editor retains its own reader during activation and editing. */
+export async function prepareNativeEditingRoot(
+  args: NativePreparationArgs & {
+    root: NativeEditingRoot;
+    purpose?: 'editing' | 'backup';
+  }
+): Promise<{ downloaded: number }> {
   const root = structuredClone(args.root);
+  return prepareNativeResources(args, (db) => loadResources(db, root, args.purpose));
+}
+
+async function prepareNativeResources(
+  args: NativePreparationArgs,
+  load: (db: Database) => Promise<Resource[]>,
+  assertCurrent?: (db: Database) => Promise<void>
+): Promise<{ downloaded: number }> {
   const binding = structuredClone(args.binding);
   const authorization = structuredClone(args.authorization);
   const db = await initDB();
   return runWithPersistenceMutationTransition((transition) =>
     runWithAssetResourceRead(async () => {
       args.signal.throwIfAborted();
-      const resources = await loadResources(db, root, args.purpose);
+      const resources = await load(db);
       let downloaded = 0;
       for (const resource of resources) {
         args.signal.throwIfAborted();
@@ -195,6 +253,8 @@ export async function prepareNativeEditingRoot(args: {
         if (existing && (!resource.copy || resource.copy.phase === 'resident')) continue;
         const copy = recoveryCopy(resource, binding);
         const restore = async (sourceBlob: Blob) => {
+          await assertCurrent?.(db);
+          args.signal.throwIfAborted();
           const result = await restoreVerifiedAssetObject(
             { copy, sourceBlob, authorization, signal: args.signal },
             { persistenceTransitionPermit: transition }
@@ -220,6 +280,9 @@ export async function prepareNativeEditingRoot(args: {
           transitionPermit: transition,
           ...(args.onBytesRead ? { onBytesRead: (bytes) => args.onBytesRead?.(bytes) } : {}),
           async readObject() {
+            await assertCurrent?.(db);
+            args.signal.throwIfAborted();
+            args.downloadAllowance?.reserveObject(object.size);
             const stream = await args.remote.read(copy.remote.key, args.signal);
             return { pipeTo: (sink, signal) => stream.pipeTo(sink, signal ? { signal } : {}) };
           },
@@ -250,7 +313,7 @@ export async function prepareNativeEditingRoot(args: {
         if (failed) throw failure;
       }
       // A current closure with missing dependencies cannot be reported ready after a concurrent native edit.
-      for (const resource of await loadResources(db, root, args.purpose)) {
+      for (const resource of await load(db)) {
         args.signal.throwIfAborted();
         if (!(await localBytes(resource)))
           throw new Error('Native editing dependencies changed during preparation.');
@@ -259,6 +322,109 @@ export async function prepareNativeEditingRoot(args: {
       return { downloaded };
     })
   );
+}
+
+type ScenarioHtmlTarget = { projectId: string; exportId: string };
+const SCENARIO_HTML_RESOURCE_STORES = [
+  SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
+  SCENARIO_EXPORTS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_RESIDENCY_STORE,
+];
+
+async function loadScenarioHtmlResource(db: Database, target: ScenarioHtmlTarget) {
+  const tx = db.transaction(SCENARIO_HTML_RESOURCE_STORES, 'readonly');
+  const project = parseScenarioProjectEntry(
+    (await readScenarioStorage(tx, target.projectId)).logical
+  );
+  const entry = parseScenarioExportEntry(
+    await tx.objectStore(SCENARIO_EXPORTS_STORE).get(target.exportId)
+  );
+  const ref = entry?.html
+    ? parseAssetRef(await tx.objectStore(ASSET_REFS_STORE).get(entry.html.assetId))
+    : null;
+  const owner = parseAssetOwner(
+    await tx.objectStore(ASSET_OWNERS_STORE).get(['scenario-export', target.exportId, 'body'])
+  );
+  const copy = ref
+    ? await readAssetResidencyCopyInTransaction(tx, assetResidencyCopyId({ kind: 'opfs', ref }))
+    : null;
+  await tx.done;
+  if (
+    !project ||
+    project.id !== target.projectId ||
+    project.lifecycle?.trashedAt !== undefined ||
+    !entry ||
+    entry.id !== target.exportId ||
+    entry.projectId !== project.id ||
+    entry.trashState?.trashedAt !== undefined ||
+    entry.format !== 'html' ||
+    !entry.html ||
+    !ref ||
+    ref.assetId !== entry.html.assetId ||
+    ref.size !== entry.size ||
+    !/^text\/html(?:;charset=utf-8)?$/iu.test(ref.mimeType) ||
+    !owner ||
+    owner.ownerKind !== 'scenario-export' ||
+    owner.ownerId !== entry.id ||
+    owner.role !== 'body' ||
+    owner.assetId !== ref.assetId
+  )
+    return null;
+  return {
+    stamp: JSON.stringify([
+      project.id,
+      project.createdAt,
+      entry.id,
+      entry.projectId,
+      entry.createdAt,
+      entry.html,
+      entry.size,
+      ref,
+    ]),
+    resource: { kind: 'opfs' as const, ref, copy },
+  };
+}
+
+/** The chosen historical body has its own immutable identity, independent of editing readiness. */
+export async function isNativeScenarioExportReady(target: ScenarioHtmlTarget): Promise<boolean> {
+  const selected = { ...target };
+  const db = await initDB();
+  return runWithAssetResourceRead(async () => {
+    const current = await loadScenarioHtmlResource(db, selected);
+    if (!current || !(await localBytes(current.resource))) return false;
+    const latest = await loadScenarioHtmlResource(db, selected);
+    return latest !== null && latest.stamp === current.stamp;
+  });
+}
+
+/** Restore one selected immutable saved HTML file without reading its editing or sibling closure. */
+export async function prepareNativeScenarioExport(
+  args: NativePreparationArgs & ScenarioHtmlTarget
+): Promise<{ downloaded: number }> {
+  const target = { projectId: args.projectId, exportId: args.exportId };
+  let expected: Awaited<ReturnType<typeof loadScenarioHtmlResource>> | undefined;
+  const load = async (db: Database): Promise<Resource[]> => {
+    const current = await loadScenarioHtmlResource(db, target);
+    if (!current) throw new Error('Selected Scenario HTML is unavailable.');
+    if (expected) {
+      const copy = expected.resource.copy;
+      const completed = copy ? { ...copy, revision: copy.revision + 1, phase: 'resident' } : null;
+      if (
+        current.stamp !== expected.stamp ||
+        (JSON.stringify(current.resource.copy) !== JSON.stringify(copy) &&
+          JSON.stringify(current.resource.copy) !== JSON.stringify(completed))
+      )
+        throw new Error('Selected Scenario HTML source changed.');
+    } else expected = current;
+    return [current.resource];
+  };
+  return prepareNativeResources(args, load, async (db) => {
+    await load(db);
+  });
 }
 
 /** Reuse an incoming checked staging body to recover a shared original, without another GET or new native identity. */

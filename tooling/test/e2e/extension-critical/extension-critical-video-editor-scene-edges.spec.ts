@@ -15,6 +15,10 @@ import {
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
+import {
+  configureGpuPreviewProofBrowser,
+  enableGpuPreviewProof,
+} from '../support/gpu-preview-proof';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { readNativeVideoProject } from '../support/native-video-project';
 import { checkInspectorLabels, checkInspectorPaintedFont } from '../support/inspector-utilities';
@@ -25,225 +29,228 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
-for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
-  const locale = index === 0 ? 'ru' : 'en';
-  const theme = index === 0 ? 'light' : 'dark';
-  test(`Native scene edges preserve composition ${viewport.size.width} ${locale}`, async ({
-    page,
-  }, info) => {
-    test.setTimeout(180000);
-    await page.setViewportSize({ ...viewport.size });
-    await page.emulateMedia({ colorScheme: theme });
-    const host = await startHostServer();
-    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    try {
-      const bytes = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
-      const project = createVideoProjectFromRecording({
-        recordingId: 'beta-v1-recording',
-        filename: 'beta-v1.webm',
-        width: 160,
-        height: 90,
-        duration: 12,
-        mimeType: 'video/webm',
-        size: bytes.length,
-      });
-      project.version = 24;
-      project.sceneEdges = {
-        intro: { enabled: false, duration: 0.8, color: '#ff0000ff', audioFade: true },
-        outro: { enabled: false, duration: 1.2, color: '#0000ffff', audioFade: false },
-      };
-      await applyHarnessBootstrap(page, {
-        preserveMediaLibrary: true,
-        videoProjects: [project],
-        storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
-      });
-      await page.addInitScript((language) => {
-        localStorage.setItem('sniptale-locale-preference', language);
-        if (sessionStorage.getItem('scene-edges-seeded')) {
-          const bootstrap: unknown = Reflect.get(window, '__sniptaleHarnessBootstrap');
-          if (typeof bootstrap === 'object' && bootstrap !== null)
-            Reflect.deleteProperty(bootstrap, 'videoProjects');
-        }
-      }, locale);
-      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
-      await page.locator('[data-ui="gallery.page.root"]').waitFor();
-      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
-      await page.evaluate(() => sessionStorage.setItem('scene-edges-seeded', 'true'));
-      await page.goto(
-        `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${theme}`
-      );
-      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
-      // The first accepted write materializes the existing default lane, independently of scene edges.
-      const clips = (await readNativeVideoProject(page))!.clips.map((clip) => ({
-        ...clip,
-        timelineLaneId: clip.timelineLaneId ?? null,
-      }));
-      const select = async () => {
-        await page
-          .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
-          .click();
-        const category = page.getByRole('button', {
-          name: label('videoEditor.sidebar.sceneEdges'),
+configureGpuPreviewProofBrowser();
+
+test.describe('Native scene edge live GPU preview', () => {
+  enableGpuPreviewProof({ configureBrowser: false });
+
+  for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
+    const locale = index === 0 ? 'ru' : 'en';
+    const theme = index === 0 ? 'light' : 'dark';
+    test(`Native scene edges preserve composition ${viewport.size.width} ${locale}`, async ({
+      page,
+    }, info) => {
+      test.setTimeout(180000);
+      await page.setViewportSize({ ...viewport.size });
+      await page.emulateMedia({ colorScheme: theme });
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+      const errors: string[] = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      try {
+        const bytes = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
+        const project = createVideoProjectFromRecording({
+          recordingId: 'beta-v1-recording',
+          filename: 'beta-v1.webm',
+          width: 160,
+          height: 90,
+          duration: 12,
+          mimeType: 'video/webm',
+          size: bytes.length,
+        });
+        project.version = 24;
+        project.sceneEdges = {
+          intro: { enabled: false, duration: 0.8, color: '#ff0000ff', audioFade: true },
+          outro: { enabled: false, duration: 1.2, color: '#0000ffff', audioFade: false },
+        };
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          videoProjects: [project],
+          storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
+        });
+        await page.addInitScript((language) => {
+          localStorage.setItem('sniptale-locale-preference', language);
+          if (sessionStorage.getItem('scene-edges-seeded')) {
+            const bootstrap: unknown = Reflect.get(window, '__sniptaleHarnessBootstrap');
+            if (typeof bootstrap === 'object' && bootstrap !== null)
+              Reflect.deleteProperty(bootstrap, 'videoProjects');
+          }
+        }, locale);
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedReviewVideo(page, 'review-vp8-opus.webm', {
+          width: 160,
+          height: 90,
+          duration: 12,
+        });
+        await page.evaluate(() => sessionStorage.setItem('scene-edges-seeded', 'true'));
+        await page.goto(
+          `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${theme}`
+        );
+        await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+        // The first accepted write materializes the existing default lane, independently of scene edges.
+        const clips = (await readNativeVideoProject(page))!.clips.map((clip) => ({
+          ...clip,
+          timelineLaneId: clip.timelineLaneId ?? null,
+        }));
+        const select = async () => {
+          await page
+            .getByRole('button', {
+              name: label('videoEditor.sidebar.sceneProperties'),
+              exact: true,
+            })
+            .click();
+          const category = page.getByRole('button', {
+            name: label('videoEditor.sidebar.sceneEdges'),
+            exact: true,
+          });
+          await expect(category).toBeVisible();
+          await category.click();
+        };
+        await select();
+        const owner = page.locator('[data-ui="video-editor.scene-edges.inspector"]');
+        const intro = owner.getByRole('group', {
+          name: label('gallery.videoReview.presentationIntro'),
           exact: true,
         });
-        await expect(category).toBeVisible();
-        await category.click();
-      };
-      await select();
-      const owner = page.locator('[data-ui="video-editor.scene-edges.inspector"]');
-      const intro = owner.getByRole('group', {
-        name: label('gallery.videoReview.presentationIntro'),
-        exact: true,
-      });
-      const outro = owner.getByRole('group', {
-        name: label('gallery.videoReview.presentationOutro'),
-        exact: true,
-      });
-      await intro
-        .getByRole('button', { name: label('gallery.videoReview.presentationFadeIn'), exact: true })
-        .click();
-      await expect
-        .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.enabled)
-        .toBe(true);
-      const canvas = page.locator('[data-preview-stage-canvas]');
-      await expect
-        .poll(() =>
-          canvas.evaluate((node: HTMLCanvasElement) =>
-            Array.from(
-              node
-                .getContext('2d')!
-                .getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1).data
-            )
-          )
-        )
-        .toEqual([255, 0, 0, 255]);
-      const fields = owner.locator('[data-ui="shared.ui.presentation-fade-fields"]');
-      await fields.first().locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
-      const picker = page.locator('[data-ui="shared.ui.color-selector.picker"]');
-      await expect(picker).toBeVisible();
-      await picker
-        .getByRole('textbox', { name: label('shared.ui.colorSelectorHex'), exact: true })
-        .fill('#00ff00');
-      await expect
-        .poll(() =>
-          canvas.evaluate((node: HTMLCanvasElement) =>
-            Array.from(
-              node
-                .getContext('2d')!
-                .getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1).data
-            )
-          )
-        )
-        .toEqual([0, 255, 0, 255]);
-      expect((await readNativeVideoProject(page))?.sceneEdges?.intro.color).toBe('#ff0000ff');
-      await picker
-        .getByRole('button', { name: label('shared.ui.colorSelectorCancel'), exact: true })
-        .click();
-      await expect(picker).not.toBeVisible();
-      await expect
-        .poll(() =>
-          canvas.evaluate((node: HTMLCanvasElement) =>
-            Array.from(
-              node
-                .getContext('2d')!
-                .getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1).data
-            )
-          )
-        )
-        .toEqual([255, 0, 0, 255]);
-      const duration = fields.first().getByRole('textbox', {
-        name: label('gallery.videoReview.presentationDuration'),
-        exact: true,
-      });
-      await duration.fill('0.6');
-      await duration.press('Escape');
-      expect((await readNativeVideoProject(page))?.sceneEdges?.intro.duration).toBe(0.8);
-      await duration.fill('0.6');
-      await duration.press('Enter');
-      await expect
-        .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.duration)
-        .toBe(0.6);
-      await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
-      await expect
-        .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.duration)
-        .toBe(0.8);
-      await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
-      await expect
-        .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.duration)
-        .toBe(0.6);
-      await outro
-        .getByRole('button', {
-          name: label('gallery.videoReview.presentationFadeOut'),
+        const outro = owner.getByRole('group', {
+          name: label('gallery.videoReview.presentationOutro'),
           exact: true,
-        })
-        .click();
-      await expect(fields).toHaveCount(2);
-      await checkInspectorPaintedFont(page, intro.getByRole('button').first(), 'scene-edge-font');
-      const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
-      const handle = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
-      const rail = inspector.locator('[data-ui="video-editor.inspector.categories"] > nav');
-      await page.locator('[data-ui="video-editor.materials.close"]').click();
-      for (const width of [359, 360, 361, 520]) {
-        const current = (await inspector.boundingBox())!.width;
-        const box = (await handle.boundingBox())!;
-        await page.mouse.move(box.x + box.width / 2, box.y + 12);
-        await page.mouse.down();
-        await page.mouse.move(box.x + box.width / 2 + current - width, box.y + 12);
-        await page.mouse.up();
-        await expect
-          .poll(async () => Math.round((await inspector.boundingBox())!.width))
-          .toBe(width);
-        const before = await rail.boundingBox();
-        await fields.last().getByRole('switch').scrollIntoViewIfNeeded();
-        expect((await rail.boundingBox())?.y).toBe(before?.y);
-        await checkInspectorLabels(owner);
-        expect(
-          await owner.evaluate((node) => {
-            const body = node.closest('[data-ui="video-editor.inspector.categories"] > div');
-            return body instanceof HTMLElement && body.scrollWidth <= body.clientWidth + 1;
+        });
+        await intro
+          .getByRole('button', {
+            name: label('gallery.videoReview.presentationFadeIn'),
+            exact: true,
           })
-        ).toBe(true);
-        await page.screenshot({
-          path: info.outputPath(`scene-edges-${width}.png`),
-          fullPage: false,
-        });
-      }
-      await intro
-        .getByRole('button', {
-          name: label('gallery.videoReview.presentationNoEffect'),
+          .click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.enabled)
+          .toBe(true);
+        const canvas = page.locator('[data-preview-stage-canvas]');
+        const centerPixel = () =>
+          canvas.evaluate((node: HTMLCanvasElement) => {
+            const readback = document.createElement('canvas');
+            readback.width = node.width;
+            readback.height = node.height;
+            try {
+              const context = readback.getContext('2d');
+              if (!context) throw new Error('Scene edge pixel readback is unavailable');
+              context.drawImage(node, 0, 0);
+              return Array.from(
+                context.getImageData(Math.floor(node.width / 2), Math.floor(node.height / 2), 1, 1)
+                  .data
+              );
+            } finally {
+              readback.width = readback.height = 0;
+            }
+          });
+        await expect.poll(centerPixel).toEqual([255, 0, 0, 255]);
+        const fields = owner.locator('[data-ui="shared.ui.presentation-fade-fields"]');
+        await fields.first().locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+        const picker = page.locator('[data-ui="shared.ui.color-selector.picker"]');
+        await expect(picker).toBeVisible();
+        await picker
+          .getByRole('textbox', { name: label('shared.ui.colorSelectorHex'), exact: true })
+          .fill('#00ff00');
+        await expect.poll(centerPixel).toEqual([0, 255, 0, 255]);
+        expect((await readNativeVideoProject(page))?.sceneEdges?.intro.color).toBe('#ff0000ff');
+        await picker
+          .getByRole('button', { name: label('shared.ui.colorSelectorCancel'), exact: true })
+          .click();
+        await expect(picker).not.toBeVisible();
+        await expect.poll(centerPixel).toEqual([255, 0, 0, 255]);
+        const duration = fields.first().getByRole('textbox', {
+          name: label('gallery.videoReview.presentationDuration'),
           exact: true,
-        })
-        .click();
-      await expect
-        .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.enabled)
-        .toBe(false);
-      const accepted = (await readNativeVideoProject(page))!;
-      expect(accepted.sceneEdges?.intro).toEqual({
-        enabled: false,
-        duration: 0.6,
-        color: '#ff0000ff',
-        audioFade: true,
-      });
-      expect(accepted.clips).toEqual(clips);
-      await page.reload();
-      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
-      await select();
-      expect((await readNativeVideoProject(page))?.sceneEdges).toEqual(accepted.sceneEdges);
-      await page.setViewportSize({ width: 1100, height: 560 });
-      expect(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)
-      ).toBe(true);
-      expect(errors).toEqual([]);
-    } finally {
-      host.server.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        host.server.close((error) => (error ? reject(error) : resolve()))
-      );
-    }
-  });
-}
+        });
+        await duration.fill('0.6');
+        await duration.press('Escape');
+        expect((await readNativeVideoProject(page))?.sceneEdges?.intro.duration).toBe(0.8);
+        await duration.fill('0.6');
+        await duration.press('Enter');
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.duration)
+          .toBe(0.6);
+        await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.duration)
+          .toBe(0.8);
+        await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.duration)
+          .toBe(0.6);
+        await outro
+          .getByRole('button', {
+            name: label('gallery.videoReview.presentationFadeOut'),
+            exact: true,
+          })
+          .click();
+        await expect(fields).toHaveCount(2);
+        await checkInspectorPaintedFont(page, intro.getByRole('button').first(), 'scene-edge-font');
+        const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
+        const handle = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
+        const rail = inspector.locator('[data-ui="video-editor.inspector.categories"] > nav');
+        await page.locator('[data-ui="video-editor.materials.close"]').click();
+        for (const width of [359, 360, 361, 520]) {
+          const current = (await inspector.boundingBox())!.width;
+          const box = (await handle.boundingBox())!;
+          await page.mouse.move(box.x + box.width / 2, box.y + 12);
+          await page.mouse.down();
+          await page.mouse.move(box.x + box.width / 2 + current - width, box.y + 12);
+          await page.mouse.up();
+          await expect
+            .poll(async () => Math.round((await inspector.boundingBox())!.width))
+            .toBe(width);
+          const before = await rail.boundingBox();
+          await fields.last().getByRole('switch').scrollIntoViewIfNeeded();
+          expect((await rail.boundingBox())?.y).toBe(before?.y);
+          await checkInspectorLabels(owner);
+          expect(
+            await owner.evaluate((node) => {
+              const body = node.closest('[data-ui="video-editor.inspector.categories"] > div');
+              return body instanceof HTMLElement && body.scrollWidth <= body.clientWidth + 1;
+            })
+          ).toBe(true);
+          await page.screenshot({
+            path: info.outputPath(`scene-edges-${width}.png`),
+            fullPage: false,
+          });
+        }
+        await intro
+          .getByRole('button', {
+            name: label('gallery.videoReview.presentationNoEffect'),
+            exact: true,
+          })
+          .click();
+        await expect
+          .poll(async () => (await readNativeVideoProject(page))?.sceneEdges?.intro.enabled)
+          .toBe(false);
+        const accepted = (await readNativeVideoProject(page))!;
+        expect(accepted.sceneEdges?.intro).toEqual({
+          enabled: false,
+          duration: 0.6,
+          color: '#ff0000ff',
+          audioFade: true,
+        });
+        expect(accepted.clips).toEqual(clips);
+        await page.reload();
+        await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+        await select();
+        expect((await readNativeVideoProject(page))?.sceneEdges).toEqual(accepted.sceneEdges);
+        await page.setViewportSize({ width: 1100, height: 560 });
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)
+        ).toBe(true);
+        expect(errors).toEqual([]);
+      } finally {
+        host.server.closeAllConnections();
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    });
+  }
+});
 
 for (const format of ['MP4', 'WEBM'] as const) {
   test(`Native scene edges cover the encoded ${format} composition`, async ({ page }) => {

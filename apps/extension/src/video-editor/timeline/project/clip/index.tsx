@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { buildProjectTimelineClipViewModel } from './model';
 import type { ProjectTimelineClipProps } from './types';
 import { ProjectTimelineClipLayout } from './view';
@@ -19,19 +20,35 @@ export function ProjectTimelineClip({
   onClipHoverChange,
   onBeginClipInteraction,
 }: ProjectTimelineClipProps) {
-  const viewModel = buildProjectTimelineClipViewModel({
-    hideClipNames,
-    clip,
-    isHovered,
-    isSelected,
-    pixelsPerSecond,
-    projection,
-    project,
-    ...(junctions === undefined ? {} : { junctions }),
-    trackLocked,
-    ...(trackClipTop === undefined ? {} : { trackClipTop }),
-    ...(trackClipRowHeight === undefined ? {} : { trackClipRowHeight }),
-  });
+  const viewModel = useMemo(
+    () =>
+      buildProjectTimelineClipViewModel({
+        hideClipNames,
+        clip,
+        isHovered,
+        isSelected,
+        pixelsPerSecond,
+        projection,
+        project,
+        ...(junctions === undefined ? {} : { junctions }),
+        trackLocked,
+        ...(trackClipTop === undefined ? {} : { trackClipTop }),
+        ...(trackClipRowHeight === undefined ? {} : { trackClipRowHeight }),
+      }),
+    [
+      hideClipNames,
+      clip,
+      isHovered,
+      isSelected,
+      pixelsPerSecond,
+      projection,
+      project,
+      junctions,
+      trackLocked,
+      trackClipTop,
+      trackClipRowHeight,
+    ]
+  );
 
   return (
     <ProjectTimelineClipLayout

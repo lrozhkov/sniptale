@@ -1,3 +1,5 @@
+import type { EditorMagnetManager } from '../../magnet';
+import type { FrameSceneMutationOptions } from '../../public-actions/scene/resize/types';
 import type { FabricObject, Point, Rect } from 'fabric';
 
 import type {
@@ -79,7 +81,13 @@ export interface EditorControllerInstanceSelectionActions {
   sendSelectionToBack(): void;
   selectLayer(
     id: string,
-    options?: { additive?: boolean; focusViewport?: boolean; range?: boolean; toggle?: boolean }
+    options?: {
+      additive?: boolean;
+      focusViewport?: boolean;
+      preserveActiveTool?: boolean;
+      range?: boolean;
+      toggle?: boolean;
+    }
   ): void;
 }
 
@@ -106,7 +114,10 @@ export interface EditorControllerInstanceLayerActions {
 export interface EditorControllerInstanceSceneActions {
   resizeCanvas(width: number, height: number): void;
   resizeImage(width: number, height: number): void;
-  applyFrameSettings(frame: EditorFrameSettings): void;
+  applyFrameSettings(
+    frame: EditorFrameSettings,
+    options?: FrameSceneMutationOptions
+  ): Promise<boolean>;
   applyBrowserFrame(browserFrame: BrowserFrameState): Promise<void>;
   previewBrowserFrame(browserFrame: BrowserFrameState): Promise<void>;
   removeBrowserFrame(): Promise<void>;
@@ -123,16 +134,8 @@ export interface EditorControllerInstanceSceneActions {
 export interface EditorControllerInstanceObjectCapabilities {
   getPublicApiAdapter(): EditorControllerPublicApiAdapter;
   applyGridSnap(object: FabricObject): void;
-  snapFrameAnnotationRect(input: {
-    excludeId?: string;
-    rect: { x: number; y: number; width: number; height: number };
-  }): { x: number; y: number; width: number; height: number };
-  snapFrameAnnotationResizeRect(input: {
-    direction: 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
-    excludeId?: string;
-    minimumSize: number;
-    rect: { x: number; y: number; width: number; height: number };
-  }): { x: number; y: number; width: number; height: number };
+  snapFrameAnnotationRect: EditorMagnetManager['snapRect'];
+  snapFrameAnnotationResizeRect: NonNullable<EditorMagnetManager['snapResizeRect']>;
   clearFrameAnnotationSnap(): void;
   buildViewportState(): EditorViewportState;
   syncViewportState(): void;

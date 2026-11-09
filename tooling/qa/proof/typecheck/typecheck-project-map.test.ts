@@ -231,3 +231,9 @@ it('routes reference build configuration to the Node owner before its browser ow
     });
   }
 });
+
+it('selects full type proof when canonical JSON translation keys change', () => {
+  expect(
+    resolveAffectedTypecheckProjects(['apps/extension/src/platform/i18n/catalogs/en.json']).mode
+  ).toBe('full');
+});

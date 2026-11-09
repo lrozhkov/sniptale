@@ -1,3 +1,4 @@
+import * as sandboxRuntime from '../video/effect-runtime-sandbox';
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
 import {
@@ -8,6 +9,7 @@ import {
 } from '@sniptale/runtime-contracts/effect-v1';
 import type {
   EffectRuntimeFrameResult,
+  EffectRuntimeGpuPlanResult,
   EffectRuntimeRenderCommand,
   EffectRuntimeSandboxExecutor,
 } from '../../contracts/effect-runtime/types';
@@ -103,7 +105,9 @@ async function fixture(names = ['title']) {
   };
   const bitmaps: { width: number; height: number; close: ReturnType<typeof vi.fn<() => void>> }[] =
     [];
-  const success = (request: EffectRuntimeRenderCommand): EffectRuntimeFrameResult => {
+  const success = (
+    request: EffectRuntimeRenderCommand
+  ): Extract<EffectRuntimeFrameResult, { kind: 'frame' }> => {
     const bitmap = {
       width: request.renderWidth,
       height: request.renderHeight,
@@ -126,7 +130,9 @@ async function fixture(names = ['title']) {
     };
   };
   const executor = {
-    renderFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => success(request)),
+    renderFrame: vi.fn<EffectRuntimeSandboxExecutor['renderFrame']>(async (request) =>
+      success(request)
+    ),
     dispose: vi.fn(),
   } satisfies EffectRuntimeSandboxExecutor;
   const deps = {
@@ -375,6 +381,11 @@ it.each(['abort', 'dispose'] as const)(
     await rejected;
     expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
     expect(renderer.counters().liveRasterResources).toBe(0);
+    expect(f.executor.dispose).toHaveBeenCalledTimes(kind === 'abort' ? 0 : 1);
+    if (kind === 'abort') {
+      (await renderer.render(6, density, 30, f.deps.signal)).release();
+      expect(f.deps.createExecutor).toHaveBeenCalledOnce();
+    }
     renderer.dispose();
     expect(f.managed()).toBe(0);
   }
@@ -524,4 +535,364 @@ it('keeps Gallery annotation phase and anchors in ordinary Native cut and rate i
       ).toBe(false);
     }
   }
+});
+
+it('updates callout anchor controls and body geometry without replacing verified resources', async () => {
+  const f = await fixture(['callout']);
+  const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
+  (await renderer.render(6, density, 30, f.deps.signal)).release();
+  const original = f.executor.renderFrame.mock.calls[0]![0].controls;
+  const instances = structuredClone(f.scene.lane.instances);
+  const instance = instances[0]!;
+  instance.transform.x += 0.1;
+  instance.transform.width *= 0.8;
+  instance.transform.rotation += 0.2;
+  const anchor = Object.values(instance.anchors!)[0]!;
+  anchor.x = 0.9;
+  const batch = await renderer.render(6, density, 30, f.deps.signal, instances);
+  expect(f.executor.renderFrame.mock.calls[1]![0].controls).not.toEqual(original);
+  expect(batch.entries[0]!.instance).toEqual(instance);
+  batch.release();
+  expect(renderer.describe(6, density, 30)[0]!.instance.transform).toEqual(
+    f.scene.lane.instances[0]!.transform
+  );
+  expect(f.deps.createExecutor).toHaveBeenCalledOnce();
+  expect(f.executor.dispose).not.toHaveBeenCalled();
+  renderer.dispose();
+  expect(f.managed()).toBe(0);
+});
+
+it('defers prepared disposal and bitmap reservations until a GPU batch borrower releases after its fence', async () => {
+  const f = await fixture();
+  const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
+  const batch = await renderer.render(6, density, 30, f.deps.signal);
+  const retained = f.managed();
+  const hold = batch.retain();
+  const otherHold = batch.retain();
+  batch.release();
+  renderer.dispose();
+  expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+  expect(renderer.counters().liveRasterResources).toBe(1);
+  expect(f.managed()).toBeGreaterThan(0);
+  expect(f.managed()).toBeLessThan(retained);
+  hold.release();
+  expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+  otherHold.release();
+  hold.release();
+  batch.release();
+  expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+  expect(renderer.counters().liveRasterResources).toBe(0);
+  expect(f.managed()).toBe(0);
+});
+it('retains the one-batch admission guard until its last GPU borrower releases', async () => {
+  const f = await fixture();
+  const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
+  const batch = await renderer.render(6, density, 30, f.deps.signal);
+  const hold = batch.retain();
+  batch.release();
+  await expect(renderer.render(6, density, 30, f.deps.signal)).rejects.toThrow('already admitted');
+  hold.release();
+  const next = await renderer.render(6, density, 30, f.deps.signal);
+  next.release();
+  renderer.dispose();
+  expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
+});
+
+it('preserves the no-argument sandbox factory for default annotation consumers', async () => {
+  const f = await fixture();
+  const factory = vi
+    .spyOn(sandboxRuntime, 'createEffectRuntimeSandboxExecutor')
+    .mockReturnValue(f.executor);
+  try {
+    const renderer = await createReviewAnnotationRenderer(f.scene, {
+      resources: f.deps.resources,
+      signal: f.deps.signal,
+      readAsset: f.deps.readAsset,
+    });
+    const batch = await renderer.render(6, density, 30, f.deps.signal);
+    expect(factory).toHaveBeenCalledOnce();
+    expect(factory).toHaveBeenCalledWith();
+    batch.release();
+    renderer.dispose();
+    expect(f.executor.dispose).toHaveBeenCalledOnce();
+  } finally {
+    factory.mockRestore();
+  }
+});
+
+it.each([undefined, 2] as const)(
+  'uses only the explicit executor capability %s after lazy initialization',
+  async (maximumGpuFramesInFlight) => {
+    const f = await fixture();
+    const executor = {
+      ...f.executor,
+      ...(maximumGpuFramesInFlight ? { maximumGpuFramesInFlight } : {}),
+      prepareGpuFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => f.success(request)),
+    };
+    const renderer = await createReviewAnnotationRenderer(f.scene, {
+      ...f.deps,
+      createExecutor: () => executor,
+    });
+    expect(renderer.maximumInFlight).toBe(1);
+    const first = await renderer.prepareGpu(6, density, 30, f.deps.signal);
+    expect(renderer.maximumInFlight).toBe(maximumGpuFramesInFlight ?? 1);
+    const borrow = first.retain();
+    first.release();
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    borrow.release();
+    expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+    expect(f.managed()).toBe(0);
+  }
+);
+
+it.each([undefined, 2] as const)(
+  'keeps full-size packet budgets through the last GPU borrow for executor capacity %s',
+  async (maximumGpuFramesInFlight) => {
+    const f = await fixture();
+    const packets: { width: number; height: number; close: ReturnType<typeof vi.fn> }[][] = [];
+    const executor = {
+      ...f.executor,
+      ...(maximumGpuFramesInFlight ? { maximumGpuFramesInFlight } : {}),
+      prepareGpuFrame: async (
+        request: EffectRuntimeRenderCommand
+      ): Promise<EffectRuntimeGpuPlanResult> => {
+        const masks = Array.from({ length: 9 }, () => ({
+          width: 1904,
+          height: 1072,
+          close: vi.fn(),
+        }));
+        packets.push(masks);
+        return {
+          kind: 'gpu-plan',
+          effectInstanceId: request.effectInstanceId,
+          requestId: request.requestId,
+          sequenceId: request.sequenceId,
+          snapshotId: request.snapshotId,
+          acknowledged: {
+            documentId: request.documentRef.id,
+            assetSelectionId: request.assetSelectionRef.id,
+          },
+          width: request.renderWidth,
+          height: request.renderHeight,
+          logicalWidth: request.width,
+          logicalHeight: request.height,
+          inputResources: {},
+          rootPass: 0,
+          resources: masks.map((bitmap, id) => ({
+            bitmap,
+            id,
+            kind: 'coverage',
+            width: bitmap.width,
+            height: bitmap.height,
+          })),
+          passes: [
+            {
+              id: 0,
+              width: request.renderWidth,
+              height: request.renderHeight,
+              logicalWidth: request.width,
+              logicalHeight: request.height,
+              operations: [],
+            },
+          ],
+        };
+      },
+    };
+    const renderer = await createReviewAnnotationRenderer(f.scene, {
+      ...f.deps,
+      createExecutor: () => executor,
+    });
+    const immutableBytes = f.managed();
+    const first = await renderer.prepareGpu(6, density, 30, f.deps.signal);
+    const borrow = first.retain();
+    first.release();
+    const packetBytes = 9 * 1904 * 1072 * 4;
+    expect(f.managed()).toBe(immutableBytes + packetBytes);
+    if (maximumGpuFramesInFlight === 2) {
+      const second = await renderer.prepareGpu(7, density, 30, f.deps.signal);
+      expect(f.managed()).toBe(immutableBytes + packetBytes * 2);
+      second.release();
+    } else {
+      await expect(renderer.prepareGpu(7, density, 30, f.deps.signal)).rejects.toThrow();
+    }
+    expect(f.managed()).toBe(immutableBytes + packetBytes);
+    renderer.dispose();
+    expect(f.managed()).toBe(packetBytes);
+    for (const bitmap of packets[0]!) expect(bitmap.close).not.toHaveBeenCalled();
+    for (const bitmap of packets[1]!) expect(bitmap.close).toHaveBeenCalledOnce();
+    borrow.release();
+    expect(f.managed()).toBe(0);
+    for (const packet of packets)
+      for (const bitmap of packet) expect(bitmap.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('warms one isolated future plan and closes packet sources before asynchronous compilation settles', async () => {
+  const f = await fixture();
+  let finish!: () => void;
+  const compile = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const warm = {
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn(
+      async (request: EffectRuntimeRenderCommand): Promise<EffectRuntimeGpuPlanResult> => {
+        const frame = f.success(request);
+        return {
+          ...frame,
+          kind: 'gpu-plan',
+          logicalWidth: request.width,
+          logicalHeight: request.height,
+          inputResources: {},
+          rootPass: 0,
+          resources: [
+            {
+              id: 0,
+              kind: 'primitive',
+              bitmap: frame.bitmap,
+              width: frame.width,
+              height: frame.height,
+            },
+          ],
+          passes: [
+            {
+              id: 0,
+              width: frame.width,
+              height: frame.height,
+              logicalWidth: request.width,
+              logicalHeight: request.height,
+              operations: [],
+            },
+          ],
+        };
+      }
+    ),
+  };
+  const createWarmExecutor = vi.fn(() => warm);
+  const renderer = await createReviewAnnotationRenderer(f.scene, { ...f.deps, createWarmExecutor });
+  const held = f.managed(),
+    context = {};
+  const prepare = vi.fn(() => {
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    return compile;
+  });
+  const densityAt = vi.fn(() => density);
+  const args = { time: 1.5, fps: 30, context, signal: f.deps.signal, densityAt, prepare };
+  renderer.warmUpcomingGpu(args);
+  await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce());
+  expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+  expect(f.managed()).toBe(held);
+  renderer.warmUpcomingGpu({ ...args, time: 1.6 });
+  expect(createWarmExecutor).toHaveBeenCalledOnce();
+  expect(densityAt).toHaveBeenCalledOnce();
+  expect(f.executor.renderFrame).not.toHaveBeenCalled();
+  expect(warm.renderFrame).not.toHaveBeenCalled();
+  finish();
+  renderer.dispose();
+});
+
+it('does not speculate through a custom foreground executor without an explicit warm dependency', async () => {
+  const f = await fixture(),
+    renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
+  renderer.warmUpcomingGpu({
+    time: 1.5,
+    fps: 30,
+    context: {},
+    signal: f.deps.signal,
+    densityAt: () => density,
+    prepare: vi.fn(),
+  });
+  expect(f.deps.createExecutor).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('cancels isolated execution before foreground admission and closes a late warm packet', async () => {
+  const f = await fixture(['title', 'frame']);
+  f.scene.lane.instances[1]!.start = 4;
+  let deliver!: (result: EffectRuntimeGpuPlanResult) => void;
+  let command!: EffectRuntimeRenderCommand;
+  const warm = {
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn((request: EffectRuntimeRenderCommand) => {
+      command = request;
+      return new Promise<EffectRuntimeGpuPlanResult>((resolve) => {
+        deliver = resolve;
+      });
+    }),
+  };
+  const renderer = await createReviewAnnotationRenderer(f.scene, {
+    ...f.deps,
+    createWarmExecutor: () => warm,
+  });
+  const held = f.managed(),
+    prepare = vi.fn();
+  renderer.warmUpcomingGpu({
+    time: 3.5,
+    fps: 30,
+    context: {},
+    signal: f.deps.signal,
+    densityAt: () => density,
+    prepare,
+  });
+  await vi.waitFor(() => expect(warm.prepareGpuFrame).toHaveBeenCalledOnce());
+  const earlier = await renderer.prepareGpu(3.6, density, 30, f.deps.signal);
+  expect(warm.dispose).not.toHaveBeenCalled();
+  earlier.release();
+  const foreground = await renderer.prepareGpu(4.1, density, 30, f.deps.signal);
+  expect(warm.dispose).toHaveBeenCalledOnce();
+  foreground.release();
+  expect(f.managed()).toBe(held);
+  const late = f.success(command);
+  deliver({
+    ...late,
+    kind: 'gpu-plan',
+    logicalWidth: command.width,
+    logicalHeight: command.height,
+    resources: [
+      { id: 0, kind: 'primitive', bitmap: late.bitmap, width: late.width, height: late.height },
+    ],
+    inputResources: {},
+    rootPass: 0,
+    passes: [
+      {
+        id: 0,
+        width: late.width,
+        height: late.height,
+        logicalWidth: command.width,
+        logicalHeight: command.height,
+        operations: [],
+      },
+    ],
+  });
+  await vi.waitFor(() => expect(late.bitmap.close).toHaveBeenCalledOnce());
+  expect(warm.dispose).toHaveBeenCalledOnce();
+  expect(prepare).not.toHaveBeenCalled();
+  expect(f.managed()).toBe(held);
+  renderer.dispose();
+});
+
+it('contains advisory factory failure and attempts that event only once', async () => {
+  const f = await fixture(),
+    createWarmExecutor = vi.fn(() => {
+      throw new Error('startup');
+    });
+  const renderer = await createReviewAnnotationRenderer(f.scene, { ...f.deps, createWarmExecutor });
+  const args = {
+    time: 1.5,
+    fps: 30,
+    context: {},
+    signal: f.deps.signal,
+    densityAt: () => density,
+    prepare: vi.fn(),
+  };
+  expect(() => renderer.warmUpcomingGpu(args)).not.toThrow();
+  renderer.warmUpcomingGpu({ ...args, time: 1.7 });
+  expect(createWarmExecutor).toHaveBeenCalledOnce();
+  renderer.warmUpcomingGpu({ ...args, inputs: [{}] });
+  expect(createWarmExecutor).toHaveBeenCalledTimes(2);
+  renderer.dispose();
 });

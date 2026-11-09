@@ -118,7 +118,10 @@ export function editReviewTextFragment(
   if (textChanged || timingChanged) {
     next.alignment = 'manual';
     delete next.words;
+    if (next.sourceAnchor) next.sourceAnchor = { ...next.sourceAnchor };
+    if (next.sourceAnchor) delete next.sourceAnchor.words;
   }
+  if (timingChanged) delete next.sourceAnchor;
   return replaceFragments(
     document,
     document.fragments.map((fragment) => (fragment.id === id ? next : fragment))
@@ -187,7 +190,7 @@ export function splitReviewTextFragment(
     leftEnd > rightStart
   )
     return { ok: false, reason: 'invalid' };
-  const { words: _words, ...base } = fragment;
+  const { words: _words, sourceAnchor: _anchor, ...base } = fragment;
   const left: ReviewTextFragment = {
     ...base,
     text: leftText,
@@ -243,7 +246,7 @@ export function mergeReviewTextFragments(
     Math.abs(left.origin.end - right.origin.start) > 1e-7
   )
     return { ok: false, reason: 'gap' };
-  const { words: _words, ...base } = left;
+  const { words: _words, sourceAnchor: _anchor, ...base } = left;
   const merged: ReviewTextFragment = {
     ...base,
     ...mergedReviewPhraseFields(left, right),
@@ -279,7 +282,7 @@ export function deleteReviewTextFragments(
   return { ...document, fragments: document.fragments.filter((entry) => !selected.has(entry.id)) };
 }
 
-/** Reports content and placement separately; caption edits never invalidate a voice take. */
+/** Manual timing revisions invalidate takes; implicit native projection and caption edits do not. */
 export function reviewVoiceTextStatus(
   fragment: ReviewTextFragment | undefined,
   snapshot: ReviewVoiceTextSnapshot
@@ -293,9 +296,10 @@ export function reviewVoiceTextStatus(
     return 'text-changed';
   if (
     fragment.timingRevision !== snapshot.timingRevision ||
-    fragment.start !== snapshot.start ||
-    fragment.end !== snapshot.end ||
-    fragment.timeDomain !== snapshot.timeDomain
+    (!fragment.sourceAnchor &&
+      (fragment.start !== snapshot.start ||
+        fragment.end !== snapshot.end ||
+        fragment.timeDomain !== snapshot.timeDomain))
   )
     return 'timing-changed';
   return 'current';

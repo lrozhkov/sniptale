@@ -5,6 +5,23 @@ import { createArchiveMemorySink } from './test-support';
 import { createArchiveWriter } from './writer';
 
 describe('archive transfer', () => {
+  it('writes a local stream without fabricated ZIP entry metadata', async () => {
+    const output = createArchiveMemorySink();
+    const writer = createArchiveWriter(output.sink);
+    await writer.addSource('history.bin', {
+      size: 7,
+      pipeTo: (sink, signal) =>
+        new Blob(['history']).stream().pipeTo(sink, signal ? { signal } : {}),
+    });
+    await writer.close();
+    const reader = await openArchiveReader(output.blob());
+    try {
+      expect(await reader.entry('history.bin')?.text()).toBe('history');
+    } finally {
+      await reader.close();
+    }
+  });
+
   it('writes ZIP64 entries and reads them with strict CRC validation', async () => {
     const output = createArchiveMemorySink();
     const writer = createArchiveWriter(output.sink);

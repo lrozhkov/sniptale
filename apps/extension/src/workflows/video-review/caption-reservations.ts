@@ -1,3 +1,4 @@
+import { unionQuickEditRects } from '../../features/video/composition/motion/spatial-geometry';
 import { REVIEW_KEY_VIEWPORT_WIDTH } from '../../features/video/project/action-feedback/key-animation';
 import { measureKeystroke } from '../../features/video/composition/draw/effects/keystrokes';
 import { resolveVideoMediaShadowParams } from '../../features/video/composition/canvas/media-shadow';
@@ -17,16 +18,6 @@ import type { PreviewScene } from './preview-scene';
 import { measureReviewComment } from './render-comments';
 
 type Rect = Pick<ReviewCaptionReservation, 'x' | 'y' | 'width' | 'height'>;
-const union = (rects: readonly Rect[]): Rect => {
-  const x = Math.min(...rects.map((rect) => rect.x));
-  const y = Math.min(...rects.map((rect) => rect.y));
-  return {
-    x,
-    y,
-    width: Math.max(...rects.map((rect) => rect.x + rect.width)) - x,
-    height: Math.max(...rects.map((rect) => rect.y + rect.height)) - y,
-  };
-};
 
 function projectSourceInterval(start: number, end: number, segments: readonly ReviewTimeSegment[]) {
   return segments.flatMap((segment) => {
@@ -177,7 +168,7 @@ function reserveCaptionWebcam(
       const bleed = shadow
         ? Math.ceil(shadow.blur + Math.max(Math.abs(shadow.offsetX), Math.abs(shadow.offsetY)) + 2)
         : 0;
-      const box = union(boxes);
+      const box = unionQuickEditRects(boxes);
       for (const range of projectSourceInterval(start, end, segments))
         add(
           {
@@ -264,7 +255,7 @@ function measureCaptionCommentEnvelope(
       },
     ];
   });
-  return union(boxes);
+  return unionQuickEditRects(boxes);
 }
 
 function reserveCaptionComments(

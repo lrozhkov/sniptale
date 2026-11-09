@@ -1,6 +1,6 @@
 import { DetailList, DetailItem } from '../shared/panel';
 import { useLayoutEffect, useState } from 'react';
-import { ArrowRightLeft, LogIn, LogOut, LocateFixed } from 'lucide-react';
+import { ArrowRightLeft, LocateFixed } from 'lucide-react';
 import { InspectorActionButton } from '../shared/actions';
 import type { CompositionJoinSettings } from '../../../../../features/video/project/scene/composition-join';
 import { parseVideoProjectCompositionJoins } from '../../../../../features/video/project/scene/joins';
@@ -66,7 +66,6 @@ export function SceneJoinFields(props: {
               key={boundary.id}
               level="group"
               label={asset?.name ?? translate('videoEditor.sidebar.originalAudioMissingSource')}
-              icon={clip ? (boundary.edge === 'end' ? LogIn : LogOut) : ArrowRightLeft}
               preferenceId={`scene.compositionJoins.${boundary.id}`}
               initiallyOpen
             >

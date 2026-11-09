@@ -4,6 +4,7 @@
   "activeDocuments": [
     "docs/architecture/code-organization.md",
     "docs/architecture/i18n-architecture.md",
+    "docs/architecture/native-app-integration.md",
     "docs/architecture/parser-architecture.md",
     "docs/architecture/persistence-contracts.md",
     "docs/architecture/platform-patterns-and-tradeoffs.md",
@@ -51,6 +52,7 @@
     "docs/tooling/ci-cd.md",
     "docs/tooling/code-quality.md",
     "docs/tooling/operator-handbook.md",
+    "docs/tooling/preview-performance.md",
     "docs/tooling/repo-root-inventory.md",
     "docs/tooling/web-snapshot-smoke.md",
     "docs/tooling/webdav-e2e.md",
@@ -70,6 +72,7 @@
     "CONTRIBUTING.md",
     "README.md",
     "tooling/design-reference/README.md",
+    "tooling/simplify-lab/README.md",
     "tooling/test/e2e/live/README.md"
   ],
   "skillDocuments": [],

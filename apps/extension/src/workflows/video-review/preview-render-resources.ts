@@ -1,4 +1,8 @@
 import type {
+  GpuPreviewRenderer,
+  GpuPreviewPresentationSurface,
+} from '../../features/video/composition/canvas/gpu-preview';
+import type {
   RenderCanvasLease,
   RenderResources,
 } from '../../features/video/composition/canvas/render-resources';
@@ -9,7 +13,32 @@ interface ResourceLimits {
   createCanvas?: () => HTMLCanvasElement;
 }
 
+/** Exclusive nonfront/inflight lease; release only after presentation work and frontend ownership end. */
+export interface PreviewGpuCanvasLease {
+  canvas: HTMLCanvasElement;
+  surface: GpuPreviewPresentationSurface;
+  release(): void;
+}
+
+/** Acquires a distinct canvas bound to the supplied backend until the lease is released. */
+export type PreviewGpuCanvasFactory = (
+  size: { width: number; height: number },
+  renderer: GpuPreviewRenderer
+) => PreviewGpuCanvasLease;
+
+interface GpuSurface {
+  kind: 'gpu';
+  canvas: HTMLCanvasElement;
+  surface: GpuPreviewPresentationSurface;
+  renderer: GpuPreviewRenderer;
+  width: number;
+  height: number;
+  bytes: number;
+  active: boolean;
+}
+
 interface Surface {
+  kind: '2d';
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
   width: number;
@@ -72,7 +101,7 @@ function clearBacking(canvas: HTMLCanvasElement): void {
 }
 
 class PreviewRenderResources implements RenderResources {
-  private surfaces: Surface[] = [];
+  private surfaces: (Surface | GpuSurface)[] = [];
   private reservations = new Set<number>();
   private nextReservation = 0;
   private managedBytes = 0;
@@ -106,6 +135,15 @@ class PreviewRenderResources implements RenderResources {
     ) {
       throw new PreviewRenderResourceError();
     }
+    // GPU destination bytes belong to external reservations; retirement gives their actual credit.
+    for (const surface of [...this.surfaces]) {
+      if (
+        this.managedBytes <= next.maximumManagedBytes &&
+        this.surfaces.length <= next.maximumCanvases
+      )
+        break;
+      if (surface.kind === 'gpu' && !surface.active) this.remove(surface);
+    }
     const idle = this.surfaces.filter((surface) => !surface.active);
     const liveBytes = this.managedBytes - idle.reduce((total, surface) => total + surface.bytes, 0);
     const liveCanvases = this.surfaces.length - idle.length;
@@ -127,14 +165,25 @@ class PreviewRenderResources implements RenderResources {
     };
   }
 
-  private remove(surface: Surface): void {
+  private remove(surface: Surface | GpuSurface): void {
     this.surfaces = this.surfaces.filter((candidate) => candidate !== surface);
     this.managedBytes -= surface.bytes;
-    clearBacking(surface.canvas);
+    if (surface.kind === 'gpu') {
+      try {
+        surface.surface.dispose();
+      } finally {
+        surface.canvas.remove();
+      }
+    } else clearBacking(surface.canvas);
   }
 
   private admit(bytes: number, canvases: number): void {
-    if (this.disposed || !positiveInteger(bytes) || bytes > this.limits.maximumManagedBytes) {
+    if (
+      this.disposed ||
+      !Number.isSafeInteger(bytes) ||
+      bytes < 0 ||
+      bytes > this.limits.maximumManagedBytes
+    ) {
       throw new PreviewRenderResourceError();
     }
     const fits = () =>
@@ -177,7 +226,8 @@ class PreviewRenderResources implements RenderResources {
     if (this.disposed) throw new PreviewRenderResourceError();
     const optionsKey = contextKey(options);
     const reusable = this.surfaces.find(
-      (surface) =>
+      (surface): surface is Surface =>
+        surface.kind === '2d' &&
         !surface.active &&
         surface.width === size.width &&
         surface.height === size.height &&
@@ -214,7 +264,15 @@ class PreviewRenderResources implements RenderResources {
       if (!context || canvas.width !== size.width || canvas.height !== size.height) {
         throw new PreviewRenderResourceError();
       }
-      const surface: Surface = { canvas, context, ...size, optionsKey, bytes, active: true };
+      const surface: Surface = {
+        kind: '2d',
+        canvas,
+        context,
+        ...size,
+        optionsKey,
+        bytes,
+        active: true,
+      };
       this.surfaces.push(surface);
       this.retain(bytes);
       return this.lease(surface);
@@ -224,8 +282,85 @@ class PreviewRenderResources implements RenderResources {
     }
   }
 
+  presentationCanvas(
+    size: { width: number; height: number },
+    renderer: GpuPreviewRenderer
+  ): PreviewGpuCanvasLease {
+    surfaceBytes(size.width, size.height);
+    if (this.disposed || !renderer.createSurface) throw new PreviewRenderResourceError();
+    for (const surface of [...this.surfaces])
+      if (surface.kind === 'gpu' && !surface.active && surface.renderer !== renderer)
+        this.remove(surface);
+    const reusable = this.surfaces.find(
+      (surface): surface is GpuSurface =>
+        surface.kind === 'gpu' &&
+        !surface.active &&
+        surface.renderer === renderer &&
+        surface.width === size.width &&
+        surface.height === size.height
+    );
+    if (reusable) return this.gpuLease(reusable);
+    const backendSurfaces = () =>
+      this.surfaces.filter((surface) => surface.kind === 'gpu' && surface.renderer === renderer);
+    for (const surface of backendSurfaces()) {
+      if (backendSurfaces().length < 3) break;
+      if (!surface.active) this.remove(surface);
+    }
+    if (backendSurfaces().length >= 3) throw new PreviewRenderResourceError();
+    this.admit(0, 1);
+    const canvas = this.limits.createCanvas?.() ?? document.createElement('canvas');
+    let presentation: GpuPreviewPresentationSurface | undefined;
+    try {
+      canvas.width = 0;
+      canvas.height = size.height;
+      canvas.width = size.width;
+      if (canvas.width !== size.width || canvas.height !== size.height)
+        throw new PreviewRenderResourceError();
+      presentation = renderer.createSurface(canvas, { offscreen: true });
+      const surface: GpuSurface = {
+        kind: 'gpu',
+        canvas,
+        surface: presentation,
+        renderer,
+        ...size,
+        bytes: 0,
+        active: true,
+      };
+      this.surfaces.push(surface);
+      this.retain(0);
+      return this.gpuLease(surface);
+    } catch (error) {
+      try {
+        presentation?.dispose();
+      } finally {
+        canvas.remove();
+      }
+      throw error;
+    }
+  }
+
+  private gpuLease(surface: GpuSurface): PreviewGpuCanvasLease {
+    surface.active = true;
+    let released = false;
+    return {
+      canvas: surface.canvas,
+      surface: surface.surface,
+      release: () => {
+        if (released) return;
+        released = true;
+        try {
+          surface.surface.releaseImage?.();
+        } finally {
+          surface.active = false;
+          if (this.disposed) this.remove(surface);
+        }
+      },
+    };
+  }
+
   bytes(role: string, count: number): { release(): void } {
     void role;
+    if (!positiveInteger(count)) throw new PreviewRenderResourceError();
     this.admit(count, 0);
     const id = this.nextReservation++;
     this.reservations.add(id);
@@ -240,9 +375,13 @@ class PreviewRenderResources implements RenderResources {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const surface of [...this.surfaces]) this.remove(surface);
-    this.reservations.clear();
-    this.managedBytes = 0;
+    const deferredGpu = this.surfaces.some((surface) => surface.kind === 'gpu' && surface.active);
+    for (const surface of [...this.surfaces])
+      if (surface.kind !== 'gpu' || !surface.active) this.remove(surface);
+    if (!deferredGpu) {
+      this.reservations.clear();
+      this.managedBytes = 0;
+    }
   }
 }
 

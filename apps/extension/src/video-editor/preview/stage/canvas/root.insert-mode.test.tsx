@@ -215,3 +215,44 @@ it('cancels pending video insert sessions when Escape is pressed', () => {
   expect(props.onAddShapeOverlay).not.toHaveBeenCalled();
   expect(props.onUpdateClipTransform).not.toHaveBeenCalled();
 });
+
+it('keeps the media canvas mounted but blocks editing until the paused camera is current', () => {
+  const props = createProps({
+    cameraInteractionEnabled: false,
+    selectionOverlay: <button data-ui="test.pending-selection" />,
+    targetOverlay: <button data-ui="test.pending-target" />,
+  });
+  const stage = renderRoot(props);
+  act(() => stage.focus());
+  expect(container!.querySelector('[data-preview-stage-canvas]')).not.toBeNull();
+  expect(container!.querySelector('[data-ui="test.pending-selection"]')).toBeNull();
+  expect(container!.querySelector('[data-ui="test.pending-target"]')).toBeNull();
+  act(() => {
+    stage.dispatchEvent(pointerEvent('pointerdown', 20, 10));
+    stage.dispatchEvent(pointerEvent('pointermove', 220, 110));
+    stage.dispatchEvent(pointerEvent('pointerup', 220, 110));
+  });
+  expect(props.onAddShapeOverlay).not.toHaveBeenCalled();
+  expect(props.beginInteraction).not.toHaveBeenCalled();
+  expect(props.onClearActiveInsertKind).not.toHaveBeenCalled();
+  renderRoot({ ...props, cameraInteractionEnabled: true });
+  act(() => {
+    stage.dispatchEvent(pointerEvent('pointerdown', 20, 10));
+    stage.dispatchEvent(pointerEvent('pointermove', 220, 110));
+    stage.dispatchEvent(pointerEvent('pointerup', 220, 110));
+  });
+  expect(props.onAddShapeOverlay).toHaveBeenCalledOnce();
+});
+
+it('preserves an active insertion when its own editor snapshot changes', () => {
+  const props = createProps({ cameraInteractionEnabled: true });
+  const stage = renderRoot(props);
+  act(() => stage.dispatchEvent(pointerEvent('pointerdown', 20, 10)));
+  renderRoot({ ...props, project: { ...props.project, updatedAt: props.project.updatedAt + 1 } });
+  act(() => {
+    stage.dispatchEvent(pointerEvent('pointermove', 220, 110));
+    stage.dispatchEvent(pointerEvent('pointerup', 220, 110));
+  });
+  expect(props.onAddShapeOverlay).toHaveBeenCalledOnce();
+  expect(props.onUpdateClipTransform).toHaveBeenCalledOnce();
+});

@@ -4,6 +4,8 @@ import type {
 } from './types';
 import {
   applyCropGuideSelection,
+  constrainEditorCropResize,
+  getEditorFreeCanvasBounds,
   clampEditorFreeCanvasSelectionPosition,
   createCropSelectionFromRect,
   isEditorCropGuide,
@@ -26,7 +28,7 @@ export function syncCropGuideInteraction(
     return false;
   }
 
-  const rawSelection = createCropSelectionFromRect(target);
+  let rawSelection = createCropSelectionFromRect(target);
   const size = bindings.getCanvasDocumentSize();
   const canvas = bindings.getCanvas();
   const zoom = canvas?.getZoom() ?? 1;
@@ -39,6 +41,37 @@ export function syncCropGuideInteraction(
     });
   }
   const insets = getEditorCanvasWorkspaceInsets(canvas, size);
+  const { canvasCropAspectRatio: ratio, canvasCropMode: mode } = useEditorStore.getState();
+  const transform = canvas?._currentTransform;
+  if (interaction === 'scale' && ratio && transform) {
+    const fraction = (value: typeof transform.originX | typeof transform.originY) =>
+      typeof value === 'number'
+        ? value
+        : value === 'center'
+          ? 0.5
+          : value === 'right' || value === 'bottom'
+            ? 1
+            : 0;
+    const bounds =
+      mode === 'expand'
+        ? getEditorFreeCanvasBounds(size, zoom, insets)
+        : { left: 0, top: 0, right: size.width, bottom: size.height };
+    rawSelection = constrainEditorCropResize(
+      rawSelection,
+      ratio,
+      {
+        x: fraction(transform.originX),
+        y: fraction(transform.originY),
+        axis:
+          transform.corner === 'ml' || transform.corner === 'mr'
+            ? 'x'
+            : transform.corner === 'mt' || transform.corner === 'mb'
+              ? 'y'
+              : 'both',
+      },
+      bounds
+    );
+  }
   const selection =
     useEditorStore.getState().canvasCropMode === 'expand'
       ? interaction === 'move'

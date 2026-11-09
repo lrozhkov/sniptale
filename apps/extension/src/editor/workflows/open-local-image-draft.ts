@@ -1,3 +1,4 @@
+import { flushEditorDocumentForExit } from '../document/file-actions/checkpoint-exit';
 import { openEditorImageFromFile } from '../document/file-actions';
 import type { EditorDocumentOpenPort } from '../document/file-actions/ports';
 import { beginEditorPageLocalDraft } from '../document/page-session';
@@ -7,7 +8,12 @@ import type { EditorDocument } from '../../features/editor/document/types';
 interface LocalImageDraftController extends EditorDocumentOpenPort {
   autosaveService: Pick<
     EditorSessionAutosaveService,
-    'activate' | 'flushAutosave' | 'saveNow' | 'beginHydration' | 'persistSnapshot'
+    | 'activate'
+    | 'flushAutosave'
+    | 'prepareCheckpointExit'
+    | 'saveNow'
+    | 'beginHydration'
+    | 'persistSnapshot'
   > | null;
   exportDocument(): EditorDocument;
   isDocumentReadyForExport(): boolean;
@@ -33,7 +39,9 @@ export function openLocalImageAsEditorDraft(
         throw new Error('Image autosave is unavailable.');
       }
       if (controller.isDocumentReadyForExport()) {
-        await autosaveService.flushAutosave(() => controller.exportDocument());
+        await flushEditorDocumentForExit(autosaveService, () => controller.exportDocument());
+        if (controller.autosaveService !== autosaveService)
+          throw new Error('Editor document changed during exit.');
       }
     },
     onOpened: async (saveInitial) => {

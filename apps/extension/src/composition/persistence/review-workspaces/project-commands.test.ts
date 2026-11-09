@@ -1,3 +1,8 @@
+import { deferCheckpointInTransaction } from '../sync-capture/checkpoints';
+import { parseMediaLibraryEntry } from '../media-library/read-guards';
+import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
+import { parseSyncCaptureRecord } from '../sync-capture/guards';
+import { captureRootKey, pendingCheckpointKey } from '../sync-capture/contracts';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createReviewWorkspaceStoreFixture, fixtureWorkspaceValue } from './store.test-support';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
@@ -29,7 +34,10 @@ vi.mock('../assets', async (original) => ({
   ...(await original<typeof import('../assets')>()),
   completePhysicalDeleteOperation: mocks.complete,
 }));
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 const id = 'recording:beta-v1-recording';
 let fixture: ReturnType<typeof createReviewWorkspaceStoreFixture>;
 let fail = false;
@@ -259,4 +267,125 @@ it('refuses project purge without native session coordination in the extension',
   const before = structuredClone(fixture.rows);
   await expect(deleteVideoWorkspaceProject(id, 1)).rejects.toMatchObject({ code: 'conflict' });
   expect(fixture.rows).toEqual(before);
+});
+
+it('defers Review rename but immediately captures Trash and restore with matching pending revisions', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(10);
+  const captureStore = fixture.rows.get('sync_capture')!;
+  captureStore.set('profile', {
+    version: 1,
+    kind: 'profile',
+    key: 'profile',
+    enabled: true,
+    createdAt: 1,
+    spaceId: 'review-lifecycle',
+    connectionGeneration: 1,
+    checkpointIntervalMs: 300000,
+  });
+  const ref = structuredClone(betaV1Fixture.records.asset_refs[0]);
+  fixture.rows.get('asset_refs')!.set(ref.assetId, ref);
+  const owner = structuredClone(betaV1Fixture.records.asset_owners[0]);
+  fixture.rows
+    .get('asset_owners')!
+    .set(JSON.stringify([owner.ownerKind, owner.ownerId, owner.role]), owner);
+  const retained = structuredClone(fixture.rows);
+  await renameVideoWorkspaceProject(id, 1, 'Latest rename');
+  const rootKey = captureRootKey('review-lifecycle', 'video-review', id);
+  const key = pendingCheckpointKey(rootKey);
+  // Transactions replace the fixture maps; read fresh authority after each operation.
+  const getPending = () => parseSyncCaptureRecord(fixture.rows.get('sync_capture')!.get(key));
+  const firstPending = getPending();
+  expect(firstPending).toMatchObject({ kind: 'pending-checkpoint', rootId: id });
+  expect(parseVideoWorkspace(fixtureWorkspaceValue(fixture.rows, id))).toMatchObject({
+    revision: 2,
+    project: { name: 'Latest rename' },
+  });
+  expect(
+    [...fixture.rows.get('sync_capture')!.values()]
+      .map(parseSyncCaptureRecord)
+      .filter((row) => row?.kind === 'sync-operation')
+  ).toHaveLength(0);
+  const beforeRefusal = structuredClone(fixture.rows);
+  fail = true;
+  await expect(
+    moveStoredItemsToTrash([{ kind: 'quick-edit-project', id, expectedRevision: 2 }], 100)
+  ).rejects.toThrow();
+  expect(fixture.rows).toEqual(beforeRefusal);
+  fail = false;
+  await moveStoredItemsToTrash([{ kind: 'quick-edit-project', id, expectedRevision: 2 }], 100);
+  expect(getPending()).toBeNull();
+  const reviewCaptures = () =>
+    [...fixture.rows.get('sync_capture')!.values()]
+      .map(parseSyncCaptureRecord)
+      .filter((row) => row?.kind === 'sync-operation' && row.rootKind === 'video-review');
+  expect(reviewCaptures()).toHaveLength(1);
+  expect(reviewCaptures()[0]).toMatchObject({
+    generation: 1,
+    change: {
+      kind: 'video-review',
+      rows: {
+        review: {
+          workspace: {
+            revision: 3,
+            project: { name: 'Latest rename', lifecycle: { trashedAt: 100 } },
+          },
+        },
+      },
+    },
+  });
+  if (!firstPending || firstPending.kind !== 'pending-checkpoint')
+    throw new Error('Missing pending revision');
+  fixture.rows.get('sync_capture')!.set(key, { ...firstPending, revision: crypto.randomUUID() });
+  const sourceBefore = [...fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .find((row) => row?.kind === 'sync-operation' && row.rootKind === 'media');
+  if (!sourceBefore || sourceBefore.kind !== 'sync-operation')
+    throw new Error('Missing unpublished review source');
+  const media = parseMediaLibraryEntry(fixture.rows.get('media_library')!.get(id));
+  if (!media) throw new Error('Missing native review source');
+  const editedSource = { ...media, tags: ['edited-before-restore'] };
+  fixture.rows.get('media_library')!.set(id, editedSource);
+  retained.get('media_library')!.set(id, editedSource);
+  const pendingSource = fixture.database.transaction(['sync_capture'], 'readwrite');
+  await deferCheckpointInTransaction(pendingSource, { rootKind: 'media', rootId: id }, 100);
+  await pendingSource.done;
+  await restoreStoredItemsFromTrash([{ kind: 'quick-edit-project', id, expectedRevision: 3 }], 200);
+  expect(getPending()).toBeNull();
+  expect(reviewCaptures()).toHaveLength(2);
+  expect(reviewCaptures()[1]).toMatchObject({
+    generation: 2,
+    change: {
+      kind: 'video-review',
+      rows: { review: { workspace: { revision: 4, project: { lifecycle: { updatedAt: 200 } } } } },
+    },
+  });
+  const sourceAfter = [...fixture.rows.get('sync_capture')!.values()]
+    .map(parseSyncCaptureRecord)
+    .find(
+      (row) =>
+        row?.kind === 'sync-operation' &&
+        row.rootKind === 'media' &&
+        row.generation === sourceBefore.generation + 1
+    );
+  expect(sourceAfter).toMatchObject({
+    basis: [sourceBefore.operationId],
+    change: { rows: { media: { tags: ['edited-before-restore'] } } },
+  });
+  expect(fixture.rows.get('sync_capture')!.get(sourceBefore.key)).toEqual(sourceBefore);
+  expect(
+    fixture.rows
+      .get('sync_capture')!
+      .has(pendingCheckpointKey(captureRootKey('review-lifecycle', 'media', id)))
+  ).toBe(false);
+  const restored = parseVideoWorkspace(fixtureWorkspaceValue(fixture.rows, id));
+  if (!restored) throw new Error('Expected restored review');
+  expect(restored.project?.lifecycle).not.toHaveProperty('trashedAt');
+  for (const store of [
+    'media_library',
+    'recordings',
+    'video_workspace_history',
+    'video_workspace_drafts',
+    'asset_refs',
+  ])
+    expect(fixture.rows.get(store)).toEqual(retained.get(store));
 });

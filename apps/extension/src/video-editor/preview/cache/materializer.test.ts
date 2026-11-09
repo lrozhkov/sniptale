@@ -1,4 +1,10 @@
 // @vitest-environment jsdom
+import type { GpuPreviewTargetFactory } from '../../../features/video/composition/canvas/preview-presentation';
+import * as nativeGpu from '../stage/scene/gpu-preview';
+import { createVideoEditorEffectPreparationExecutor } from '../../runtime/effect-runtime';
+import type { PreviewScenePresentation } from '../stage/scene/types';
+import type { GpuPreviewRenderer } from '../../../features/video/composition/canvas/gpu-preview';
+import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 import { drawVideoProjectSceneEdges } from '../../../features/video/composition/canvas/scene-edges';
 import { createImageClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 
@@ -11,13 +17,16 @@ import {
   VideoMediaFitMode,
   VideoProjectClipType,
   type VideoProjectVideoClip,
+  type VideoProject,
 } from '../../../features/video/project/types';
 
 type PreviewSceneInput = Parameters<
   typeof import('../stage/scene/render-preview').renderPreviewScene
 >[0];
 const renderPreviewScene = vi.hoisted(() =>
-  vi.fn<(args: PreviewSceneInput) => Promise<void | false>>(async () => {})
+  vi.fn<(args: PreviewSceneInput) => Promise<void | false | PreviewScenePresentation>>(
+    async () => {}
+  )
 );
 const cut = vi.hoisted(() => ({
   create: vi.fn(),
@@ -36,7 +45,25 @@ vi.mock('../../../features/video/composition/canvas/spatial-renderer', () => ({
   createReviewSpatialRenderer: spatial.create,
 }));
 
-vi.mock('../stage/scene/render-preview', () => ({ renderPreviewScene }));
+vi.mock('../stage/scene/render-preview', async () => {
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  return {
+    renderPreviewScene: async (
+      input: Parameters<typeof import('../stage/scene/render-preview').renderPreviewScene>[0]
+    ) => {
+      const result = await renderPreviewScene(input);
+      return result === false
+        ? false
+        : (result ?? {
+            camera:
+              input.cameraOverride ??
+              resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+            time: input.currentTime,
+          });
+    },
+  };
+});
 
 import { createVideoPreviewFrameMaterializer } from './materializer';
 
@@ -153,9 +180,8 @@ it('materializes a paused video when an intra-frame seek completes without a see
     project,
     rasterSize: { height: 360, width: 640 },
   });
-  expect(document.querySelector('video')?.isConnected).toBe(true);
-
   const pending = materializer.renderFrame(1 / project.fps, new AbortController().signal);
+  expect(document.querySelector('video')?.isConnected).toBe(true);
   await vi.advanceTimersByTimeAsync(2_000);
 
   await expect(pending).resolves.toBe(materializer.canvas);
@@ -251,12 +277,13 @@ it('reuses the decoded source and media element for camera-only redraws', async 
     assetUrls: { 'asset-1': 'blob:source' },
     rasterSize: { width: 480, height: 270 },
   });
-  const video = document.querySelector('video')!;
-  const seek = vi.spyOn(video, 'currentTime', 'set');
   const signal = new AbortController().signal;
   const first = materializer.renderFrame(0.25, signal);
   await vi.advanceTimersByTimeAsync(120);
   await first;
+  const video = document.querySelector('video')!;
+  expect(video.currentTime).toBe(0.25);
+  const seek = vi.spyOn(video, 'currentTime', 'set');
   const cameraOverride = {
     scale: 0.5,
     focusPoint: { x: 960, y: 540 },
@@ -268,7 +295,7 @@ it('reuses the decoded source and media element for camera-only redraws', async 
     viewportHeight: 2160,
   };
   await materializer.renderFrame(0.25, signal, cameraOverride);
-  expect(seek).toHaveBeenCalledTimes(1);
+  expect(seek).not.toHaveBeenCalled();
   expect(document.querySelectorAll('video')).toHaveLength(1);
   expect(renderPreviewScene).toHaveBeenLastCalledWith(expect.objectContaining({ cameraOverride }));
   materializer.dispose();
@@ -326,6 +353,7 @@ it('owns lazy reusable GPU and staging resources and ignores stale context-loss 
   expect(renderers[1]!.dispose).toHaveBeenCalledOnce();
   expect(staging.width).toBe(0);
   expect(staging.height).toBe(0);
+  expect(spatial.create.mock.calls[0]?.[1]).toBeDefined();
 });
 
 it('refuses delayed resource factories after abort or disposal without creating GPU or effects', async () => {
@@ -838,4 +866,492 @@ it('refuses snapshot replacement until an active frame settles', async () => {
   await rendering;
   expect(f.owner.updateProject({ ...f.project, backgroundColor: '#00ff00' })).toBe(true);
   f.owner.dispose();
+});
+
+it('passes prepared recording facts to the scene and clears their reader with the materializer', async () => {
+  const eventsOwner = await import('../../../workflows/video-review/recording-events');
+  const { attachRecordingEventGroups, recordingEventProjectActions } =
+    await import('../../../features/video/project/recording-events/project-facts');
+  const clear = vi.fn();
+  const project = createEmptyVideoProject('Events frame');
+  project.duration = 1;
+  const descriptor = {
+    format: 'recording-events-v1' as const,
+    formatVersion: 1 as const,
+    algorithm: 'lossless-v1' as const,
+    encoding: 'json-utf8-v1' as const,
+    eventStreamId: 'a'.repeat(32),
+    state: 'complete' as const,
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalBytes: 1000,
+    streamSha256: 'b'.repeat(64),
+  };
+  project.actionFeedback = [
+    {
+      recordingId: 'source',
+      sourceInstanceId: 'instance',
+      events: descriptor,
+      settings: [],
+      signals: [],
+    },
+  ];
+  const prepared = attachRecordingEventGroups(project, { start: 0, end: 1 }, [
+    {
+      recordingId: 'source',
+      sourceInstanceId: 'instance',
+      eventStreamId: 'a'.repeat(32),
+      descriptor,
+      writerGeneration: 'generation',
+      signals: [],
+      cadence: new Map(),
+      actions: [
+        {
+          id: 'captured',
+          kind: 'KEY',
+          label: 'Ctrl+S',
+          data: {},
+          point: null,
+          capturedDuration: 0,
+          anchor: {
+            kind: 'recording-source',
+            recordingId: 'source',
+            sourceInstanceId: 'instance',
+            sourceEventId: 'key',
+            sourceTime: 0,
+          },
+        },
+      ],
+    },
+  ]);
+  const prepare = vi.fn(async () => prepared);
+  vi.spyOn(eventsOwner, 'createRecordingEventsRenderer').mockReturnValue({ prepare, clear });
+  const materializer = createVideoPreviewFrameMaterializer({
+    ownerDocument: document,
+    project,
+    assetUrls: {},
+    rasterSize: { height: 360, width: 640 },
+  });
+  await materializer.renderFrame(0.1, new AbortController().signal);
+  expect(prepare).toHaveBeenCalledWith(project, { start: 0.1, end: 0.1 }, expect.any(AbortSignal));
+  const sceneProject = renderPreviewScene.mock.calls.at(-1)?.[0].project;
+  expect(
+    sceneProject && recordingEventProjectActions(sceneProject).map((event) => event.id)
+  ).toEqual(['captured']);
+  expect(JSON.stringify(sceneProject)).toBe(JSON.stringify(project));
+  materializer.dispose();
+  expect(clear).toHaveBeenCalledOnce();
+});
+
+it('fails an exact frame when recording history cannot be prepared', async () => {
+  const eventsOwner = await import('../../../workflows/video-review/recording-events');
+  const error = new Error('Recording history is unavailable');
+  vi.spyOn(eventsOwner, 'createRecordingEventsRenderer').mockReturnValue({
+    prepare: vi.fn(async () => {
+      throw error;
+    }),
+    clear: vi.fn(),
+  });
+  const project = createEmptyVideoProject('Unavailable history');
+  project.duration = 1;
+  const materializer = createVideoPreviewFrameMaterializer({
+    ownerDocument: document,
+    project,
+    assetUrls: {},
+    rasterSize: { height: 360, width: 640 },
+  });
+  await expect(materializer.renderFrame(0.1, new AbortController().signal)).rejects.toBe(error);
+  expect(renderPreviewScene).not.toHaveBeenCalled();
+  materializer.dispose();
+});
+
+it('returns the prepared camera beside pixels while the canvas-only API uses the same operation', async () => {
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  const project = { ...createEmptyVideoProject('Materialized pose', 8, 4), duration: 2 };
+  const camera = { ...resolveVideoCompositionFrame(project, 1).camera, scale: 2.4, viewportX: 123 };
+  const owner = createVideoPreviewFrameMaterializer({
+    project,
+    assetUrls: {},
+    ownerDocument: document,
+    rasterSize: { width: 8, height: 4 },
+  });
+  try {
+    const result = await owner.renderFrameWithPresentation(1, new AbortController().signal, camera);
+    expect(result.canvas).toBe(owner.canvas);
+    expect(result.presentation).toEqual({ camera, time: 1 });
+    expect(result.presentation.camera).toBe(camera);
+    await expect(owner.renderFrame(1, new AbortController().signal, camera)).resolves.toBe(
+      owner.canvas
+    );
+  } finally {
+    owner.dispose();
+  }
+});
+
+function uiOutputFixture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 480;
+  canvas.height = 270;
+  const release = vi.fn();
+  const acquire = vi.fn<GpuPreviewTargetFactory>(() => ({
+    canvas,
+    release,
+    surface: { canvas, present: vi.fn(async () => {}), dispose: vi.fn() },
+  }));
+  const backend: GpuPreviewRenderer = {
+    allocatedBytes: 0,
+    render: vi.fn<GpuPreviewRenderer['render']>(),
+    dispose: vi.fn(),
+  };
+  return { canvas, release, acquire, backend };
+}
+
+it('opts in only one final materialized UI frame and returns its exact camera/output receipt', async () => {
+  const owner = resourceFixture();
+  const ui = uiOutputFixture();
+  const { resolveVideoCompositionFrame } =
+    await import('../../../features/video/composition/timeline/frame');
+  const project = createEmptyVideoProject('Prepared direct camera', 320, 180);
+  const camera = { ...resolveVideoCompositionFrame(project, 0).camera, scale: 2, viewportX: 12 };
+  const presentation: PreviewScenePresentation = {
+    camera,
+    time: 0.25,
+    renderer: { backend: 'gpu' },
+    output: { canvas: ui.canvas, release: ui.release },
+  };
+  renderPreviewScene.mockImplementationOnce(async (input) => {
+    expect(input.acquireGpuOutput).toBe(ui.acquire);
+    expect(input.deferFrameEvent).toBe(true);
+    expect(input.cameraOverride).toBe(camera);
+    expect(input.acquireGpuOutput?.({ width: 480, height: 270 }, ui.backend).canvas).toBe(
+      ui.canvas
+    );
+    return presentation;
+  });
+  try {
+    const value = await owner.renderFrameWithPresentation(
+      0.25,
+      new AbortController().signal,
+      camera,
+      ui.acquire
+    );
+    expect(value.canvas).toBe(ui.canvas);
+    expect(value.presentation).toBe(presentation);
+    expect(owner.canvas).not.toBe(ui.canvas);
+    expect(owner.canvas.getContext('2d')).not.toBeNull();
+    expect(ui.release).not.toHaveBeenCalled();
+    renderPreviewScene.mockImplementationOnce(async () => {});
+    expect(await owner.renderFrame(0.5, new AbortController().signal, camera)).toBe(owner.canvas);
+    expect(renderPreviewScene.mock.lastCall![0].acquireGpuOutput).toBeUndefined();
+    expect(renderPreviewScene.mock.lastCall![0].deferFrameEvent).toBeUndefined();
+    value.presentation.output?.release();
+    expect(ui.release).toHaveBeenCalledOnce();
+  } finally {
+    owner.dispose();
+  }
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'releases a completed direct receipt when post-render %s prevents handoff',
+  async (reason) => {
+    const owner = resourceFixture();
+    const ui = uiOutputFixture();
+    const entered = Promise.withResolvers<void>(),
+      fence = Promise.withResolvers<void>();
+    const controller = new AbortController();
+    renderPreviewScene.mockImplementationOnce(async (input) => {
+      entered.resolve();
+      await fence.promise;
+      return {
+        camera: resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+        time: input.currentTime,
+        output: { canvas: ui.canvas, release: ui.release },
+      };
+    });
+    const pending = owner.renderFrameWithPresentation(
+      0.25,
+      controller.signal,
+      undefined,
+      ui.acquire
+    );
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    await entered.promise;
+    if (reason === 'abort') controller.abort();
+    else owner.dispose();
+    expect(ui.release).not.toHaveBeenCalled();
+    fence.resolve();
+    await rejected;
+    expect(ui.release).toHaveBeenCalledOnce();
+    owner.dispose();
+  }
+);
+
+it.each(['dissolve', 'fade-black'] as const)(
+  'keeps private %s samples separate from the frontend during GPU absence',
+  async (kind) => {
+    const f = compositionFixture(kind);
+    const ui = uiOutputFixture();
+    try {
+      await f.owner.renderFrameWithPresentation(
+        0.1,
+        new AbortController().signal,
+        undefined,
+        ui.acquire
+      );
+      expect(renderPreviewScene.mock.lastCall![0].acquireGpuOutput).toBe(ui.acquire);
+      renderPreviewScene.mockClear();
+      const mixed = await f.owner.renderFrameWithPresentation(
+        1,
+        new AbortController().signal,
+        undefined,
+        ui.acquire
+      );
+      expect(mixed.canvas).toBe(f.owner.canvas);
+      expect(mixed.presentation.output).toBeUndefined();
+      expect(renderPreviewScene.mock.calls.length).toBeGreaterThan(kind === 'dissolve' ? 1 : 0);
+      expect(renderPreviewScene.mock.calls.some(([input]) => !!input.acquireGpuOutput)).toBe(true);
+      expect(
+        renderPreviewScene.mock.calls.every(
+          ([input]) =>
+            input.acquireGpuOutput !== ui.acquire &&
+            input.deferFrameEvent === (input.acquireGpuOutput ? true : undefined)
+        )
+      ).toBe(true);
+      expect(ui.acquire).not.toHaveBeenCalled();
+    } finally {
+      f.owner.dispose();
+    }
+  }
+);
+
+it('forwards final UI output for windowed decoding while retaining the existing sample lifetime', async () => {
+  mockDelayedSeekVideo();
+  const project = createEmptyVideoProject('Direct windowed preview');
+  const clip = createVideoClip(project.tracks[0]!.id);
+  clip.duration = 1.2;
+  clip.playbackWindow = { offset: 0, holdAt: 1 };
+  project.clips = [clip];
+  const decoded = new Map([[clip.id, { sourceWidth: 16, sourceHeight: 16, draw: vi.fn() }]]);
+  cut.sample.mockResolvedValueOnce({ media: decoded, release: cut.release });
+  const owner = createVideoPreviewFrameMaterializer({
+    project,
+    assetUrls: { 'asset-1': 'blob:held' },
+    ownerDocument: document,
+    rasterSize: { width: 16, height: 9 },
+  });
+  const ui = uiOutputFixture();
+  renderPreviewScene.mockImplementationOnce(async (input) => {
+    expect(input.decodedVideoFrames).toBe(decoded);
+    expect(input.acquireGpuOutput).toBe(ui.acquire);
+    expect(cut.release).not.toHaveBeenCalled();
+    return {
+      camera: resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+      time: input.currentTime,
+      output: { canvas: ui.canvas, release: ui.release },
+    };
+  });
+  try {
+    const value = await owner.renderFrameWithPresentation(
+      1.1,
+      new AbortController().signal,
+      undefined,
+      ui.acquire
+    );
+    expect(value.canvas).toBe(ui.canvas);
+    expect(cut.release).toHaveBeenCalledOnce();
+    expect(ui.release).not.toHaveBeenCalled();
+    value.presentation.output?.release();
+  } finally {
+    owner.dispose();
+  }
+});
+
+it('returns the separate 2D fallback unchanged when an opted-in final frame has no GPU output', async () => {
+  const owner = resourceFixture();
+  const ui = uiOutputFixture();
+  renderPreviewScene.mockImplementationOnce(async (input) => ({
+    camera: resolveVideoCompositionFrame(input.project, input.currentTime).camera,
+    time: input.currentTime,
+    renderer: { backend: 'legacy', fallback: 'unavailable' },
+  }));
+  try {
+    const value = await owner.renderFrameWithPresentation(
+      0.25,
+      new AbortController().signal,
+      undefined,
+      ui.acquire
+    );
+    expect(value.canvas).toBe(owner.canvas);
+    expect(value.canvas.getContext('2d')).not.toBeNull();
+    expect(value.presentation.output).toBeUndefined();
+    expect(value.presentation.renderer).toEqual({ backend: 'legacy', fallback: 'unavailable' });
+    expect(ui.acquire).not.toHaveBeenCalled();
+  } finally {
+    owner.dispose();
+  }
+});
+
+it('prepares project-sized camera geometry before bounded events and cursor frames', async () => {
+  const cursorOwner = await import('../../../workflows/video-review/cursor-trajectory');
+  const eventsOwner = await import('../../../workflows/video-review/recording-events');
+  const {
+    attachPreparedProjectCamera,
+    projectCameraInputSignature,
+    projectCameraOutputKey,
+    preparedProjectCamera,
+  } = await import('../../../features/video/composition/motion/prepared-project-camera');
+  const demand = await import('../../../features/video/composition/motion/camera-interval');
+  vi.spyOn(demand, 'hasCursorFollowingCameraAt').mockReturnValue(true);
+  const project = createEmptyVideoProject('Stable camera', 800, 600);
+  project.duration = 1;
+  const bundle = {
+    signature: projectCameraInputSignature(project),
+    output: projectCameraOutputKey(project),
+    cameras: [],
+    orientations: [],
+    conflicts: [],
+  };
+  const prepared = attachPreparedProjectCamera(project, bundle);
+  const order: string[] = [];
+  const camera = vi.fn(async (source: VideoProject) => {
+    order.push('camera');
+    return source === project ? prepared : source;
+  });
+  const frame = vi.fn(async (source: VideoProject) => {
+    order.push('frame');
+    return source;
+  });
+  const clear = vi.fn();
+  vi.spyOn(cursorOwner, 'createRecordingCursorTrajectoryRenderer').mockReturnValue({
+    prepareCamera: camera,
+    prepare: frame,
+    clear,
+  });
+  const events = vi.fn(async (source: VideoProject) => {
+    order.push('events');
+    return { ...source };
+  });
+  vi.spyOn(eventsOwner, 'createRecordingEventsRenderer').mockReturnValue({
+    prepare: events,
+    clear: vi.fn(),
+  });
+  const materializer = createVideoPreviewFrameMaterializer({
+    ownerDocument: document,
+    project,
+    assetUrls: {},
+    rasterSize: { width: 480, height: 360 },
+  });
+  const signal = new AbortController().signal;
+  await materializer.renderFrame(0.1, signal);
+  await materializer.renderFrame(0.2, signal);
+  expect(order).toEqual(['camera', 'events', 'frame', 'camera', 'events', 'frame']);
+  expect(camera).toHaveBeenCalledWith(project, undefined, signal);
+  expect(events.mock.calls[0]?.[0]).toBe(prepared);
+  expect(preparedProjectCamera(renderPreviewScene.mock.calls.at(-1)![0].project)).toBe(bundle);
+  materializer.dispose();
+  expect(clear).toHaveBeenCalledOnce();
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'rejects %s during camera preparation before bounded history or scene work',
+  async (operation) => {
+    const cursorOwner = await import('../../../workflows/video-review/cursor-trajectory');
+    const eventsOwner = await import('../../../workflows/video-review/recording-events');
+    const demand = await import('../../../features/video/composition/motion/camera-interval');
+    vi.spyOn(demand, 'hasCursorFollowingCameraAt').mockReturnValue(true);
+    const project = createEmptyVideoProject('Pending camera');
+    project.duration = 1;
+    const gate = Promise.withResolvers<typeof project>();
+    const clear = vi.fn();
+    vi.spyOn(cursorOwner, 'createRecordingCursorTrajectoryRenderer').mockReturnValue({
+      prepareCamera: vi.fn(() => gate.promise),
+      prepare: vi.fn(async (source: VideoProject) => source),
+      clear,
+    });
+    const events = vi.fn(async (source: VideoProject) => source);
+    vi.spyOn(eventsOwner, 'createRecordingEventsRenderer').mockReturnValue({
+      prepare: events,
+      clear: vi.fn(),
+    });
+    const materializer = createVideoPreviewFrameMaterializer({
+      ownerDocument: document,
+      project,
+      assetUrls: {},
+      rasterSize: { width: 480, height: 360 },
+    });
+    const controller = new AbortController();
+    const frame = materializer.renderFrame(0.1, controller.signal);
+    if (operation === 'abort') controller.abort();
+    else materializer.dispose();
+    gate.resolve(project);
+    await expect(frame).rejects.toMatchObject({ name: 'AbortError' });
+    expect(events).not.toHaveBeenCalled();
+    expect(renderPreviewScene).not.toHaveBeenCalled();
+    if (operation === 'abort') materializer.dispose();
+    expect(clear).toHaveBeenCalledOnce();
+  }
+);
+
+it('does not wait for irrelevant camera preparation on an ordinary materialized frame', async () => {
+  const cursorOwner = await import('../../../workflows/video-review/cursor-trajectory');
+  const camera = vi.fn(() => new Promise<VideoProject>(() => {}));
+  vi.spyOn(cursorOwner, 'createRecordingCursorTrajectoryRenderer').mockReturnValue({
+    prepareCamera: camera,
+    prepare: vi.fn(async (source: VideoProject) => source),
+    clear: vi.fn(),
+  });
+  const project = createEmptyVideoProject('Ordinary frame');
+  project.duration = 1;
+  const materializer = createVideoPreviewFrameMaterializer({
+    ownerDocument: document,
+    project,
+    assetUrls: {},
+    rasterSize: { width: 480, height: 360 },
+  });
+  await materializer.renderFrame(0.1, new AbortController().signal);
+  expect(camera).not.toHaveBeenCalled();
+  expect(renderPreviewScene).toHaveBeenCalledOnce();
+  materializer.dispose();
+});
+
+it('forwards the admitted original project to its own GPU provider across derived render projects', async () => {
+  const gpu = { acceptsNativeFrames: true, render: vi.fn(async () => false), dispose: vi.fn() };
+  const createGpu = vi.spyOn(nativeGpu, 'createNativeGpuPreviewRenderer').mockReturnValue(gpu);
+  const project = createEmptyVideoProject('Advisory materializer', 320, 180);
+  project.duration = 3;
+  const context = { project, signal: new AbortController().signal };
+  const latestProject = { ...project, fps: 24 };
+  const preparation = { context, project: latestProject, time: 1 };
+  const owner = createVideoPreviewFrameMaterializer({
+    project,
+    ownerDocument: document,
+    assetUrls: {},
+    rasterSize: { width: 320, height: 180 },
+  });
+  try {
+    await owner.renderFrameWithPresentation(
+      1,
+      new AbortController().signal,
+      undefined,
+      undefined,
+      preparation
+    );
+    expect(createGpu).toHaveBeenCalledWith(undefined, {
+      maximumPresentationSurfaces: 5,
+      maximumPresentationBytes: 256 * 1024 * 1024,
+      createPreparationExecutor: createVideoEditorEffectPreparationExecutor,
+    });
+    expect(renderPreviewScene).toHaveBeenLastCalledWith(
+      expect.objectContaining({ gpuPreview: gpu, effectPreparation: preparation })
+    );
+    expect(renderPreviewScene.mock.lastCall![0].effectPreparation!.project).toBe(latestProject);
+    expect(renderPreviewScene.mock.lastCall![0].effectPreparation!.context.project).toBe(project);
+    await owner.renderFrameWithPresentation(1.1, new AbortController().signal);
+    expect(renderPreviewScene.mock.lastCall![0]).not.toHaveProperty('effectPreparation');
+  } finally {
+    owner.dispose();
+    createGpu.mockRestore();
+  }
 });

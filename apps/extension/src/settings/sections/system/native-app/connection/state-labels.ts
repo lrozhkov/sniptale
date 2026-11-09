@@ -2,6 +2,9 @@ import type { NativeAppConnectionState } from '../../../../../contracts/native-a
 import type { TranslationKey } from '../../../../../platform/i18n/types';
 
 const connectionStateLabels = {
+  reconnecting: 'settings.nativeApp.connectionStateReconnecting',
+  'trust-required': 'settings.nativeApp.connectionStateTrustRequired',
+  'selection-required': 'settings.nativeApp.connectionStateSelectionRequired',
   'app-upgrade-required': 'settings.nativeApp.connectionStateAppUpgradeRequired',
   connected: 'settings.nativeApp.connectionStateConnected',
   'controlled-by-other-profile': 'settings.nativeApp.connectionStateControlledByOtherProfile',

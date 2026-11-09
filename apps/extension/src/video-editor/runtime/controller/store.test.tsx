@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -6,6 +7,8 @@ import { afterEach, beforeEach, expect, it } from 'vitest';
 import { useVideoEditorStore } from '../../state/store';
 import {
   getCurrentVideoEditorCurrentTime,
+  subscribeVideoEditorProjectHistory,
+  subscribeVideoEditorPlaybackTime,
   getCurrentVideoEditorExportStateSnapshot,
   getCurrentVideoEditorSelectedClipId,
   useVideoEditorAnnotationEditingPort,
@@ -328,3 +331,35 @@ function useAssertSelectorsRequireAProjection() {
 }
 
 void useAssertSelectorsRequireAProjection;
+
+it('publishes a history lease synchronously before the authored project changes', () => {
+  const project = createEmptyVideoProject('Before gesture');
+  useVideoEditorStore.getState().setProject(project, null);
+  const observed: { lease: symbol | null; name: string | undefined }[] = [];
+  const unsubscribe = subscribeVideoEditorProjectHistory((snapshot) => {
+    observed.push({ lease: snapshot.lease, name: useVideoEditorStore.getState().project?.name });
+  });
+  const lease = useVideoEditorStore.getState().beginProjectHistoryTransaction();
+  expect(lease).not.toBeNull();
+  expect(observed.at(-1)).toEqual({ lease, name: 'Before gesture' });
+  useVideoEditorStore.getState().renameProject('During gesture');
+  expect(observed).toHaveLength(2);
+  useVideoEditorStore.getState().endProjectHistoryTransaction(lease!);
+  expect(observed.at(-1)).toEqual({ lease: null, name: 'During gesture' });
+  unsubscribe();
+});
+
+it('notifies live time consumers only for changed snapshots and stops after unsubscribe', () => {
+  const before = getCurrentVideoEditorCurrentTime();
+  const observed: number[] = [];
+  const unsubscribe = subscribeVideoEditorPlaybackTime(() => {
+    observed.push(getCurrentVideoEditorCurrentTime());
+  });
+  useVideoEditorStore.setState({ currentTime: before + 1 });
+  useVideoEditorStore.setState({ currentTime: before + 1, isPlaying: true });
+  useVideoEditorStore.setState({ currentTime: before + 2 });
+  expect(observed).toEqual([before + 1, before + 2]);
+  unsubscribe();
+  useVideoEditorStore.setState({ currentTime: before + 3 });
+  expect(observed).toHaveLength(2);
+});

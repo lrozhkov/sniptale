@@ -14,6 +14,7 @@ import {
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   PROJECT_EXPORTS_STORE,
   ASSET_REFS_STORE,
   ASSET_OWNERS_STORE,
@@ -44,6 +45,7 @@ const PROJECT_STORES = [
   RECORDING_TELEMETRY_STORE,
   STORE_NAME,
   SYNC_CAPTURE_STORE,
+  SYNC_OUTBOX_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   ASSET_REFS_STORE,
@@ -73,7 +75,8 @@ export async function writeVideoWorkspaceProject(
   id: string,
   expectedRevision: number,
   project: VideoWorkspaceProject,
-  now: number
+  now: number,
+  options: { checkpoint?: 'defer' | 'freeze' | 'lifecycle' } = {}
 ): Promise<void> {
   const { storage, workspace } = await readStoredVideoWorkspaceProject(tx, id);
   if (workspace.revision !== expectedRevision) throw new VideoWorkspaceError('conflict');
@@ -98,7 +101,7 @@ export async function writeVideoWorkspaceProject(
     mode: 'cursor',
     usageReferenceKeys: withReviewWorkspaceUsage(next).usageReferenceKeys,
   });
-  await captureVideoReviewInTransaction(tx, id);
+  await captureVideoReviewInTransaction(tx, id, options);
 }
 
 /** Rename only the confirmed project; source metadata and authored history remain independent. */

@@ -1,6 +1,6 @@
 import { useWorkspacePreference } from './workspace-preferences';
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { startWindowPointerSession } from '../../interaction/pointer-session';
 import { useVideoEditorPreviewPreferences } from './preview-preferences';
@@ -62,29 +62,42 @@ export function useVideoEditorWorkspacePreviewState() {
     resizeCleanupRef.current = null;
     setPaneHeight(null);
   }, [setPaneHeight]);
-  const handleVerticalResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Home') {
+  const handleVerticalResizeKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (event.key === 'Home') {
+        event.preventDefault();
+        resetPaneHeight();
+        return;
+      }
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      const height = workspaceSplitRef.current?.getBoundingClientRect().height;
+      if (!height) return;
       event.preventDefault();
-      resetPaneHeight();
-      return;
-    }
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    const height = workspaceSplitRef.current?.getBoundingClientRect().height;
-    if (!height) return;
-    event.preventDefault();
-    const current = Math.min(height - 228, paneHeight ?? Math.round(height * 0.6));
-    setPaneHeight(
-      Math.max(220, Math.min(height - 228, current + (event.key === 'ArrowDown' ? 24 : -24)))
-    );
-  };
-  return {
-    resetPaneHeight,
-    handleVerticalResizeKeyDown,
-    handleStartVerticalResize,
-    paneHeight,
-    preferences,
-    workspaceSplitRef,
-    sourceViewerActive,
-    setSourceViewerActive,
-  };
+      const current = Math.min(height - 228, paneHeight ?? Math.round(height * 0.6));
+      setPaneHeight(
+        Math.max(220, Math.min(height - 228, current + (event.key === 'ArrowDown' ? 24 : -24)))
+      );
+    },
+    [paneHeight, resetPaneHeight, setPaneHeight]
+  );
+  return useMemo(
+    () => ({
+      resetPaneHeight,
+      handleVerticalResizeKeyDown,
+      handleStartVerticalResize,
+      paneHeight,
+      preferences,
+      workspaceSplitRef,
+      sourceViewerActive,
+      setSourceViewerActive,
+    }),
+    [
+      resetPaneHeight,
+      handleVerticalResizeKeyDown,
+      handleStartVerticalResize,
+      paneHeight,
+      preferences,
+      sourceViewerActive,
+    ]
+  );
 }

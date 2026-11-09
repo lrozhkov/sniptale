@@ -112,3 +112,94 @@ it('keeps full-header selection separate from mini actions and lane switches', a
     vi.unstubAllGlobals();
   }
 });
+
+it('selects an empty lane before its gesture without consuming controls, items or the surrounding gap', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.tracks.text = true;
+  const select = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <ReviewTrackControlsProvider
+          value={{
+            ui: advanced.ui,
+            configuring: false,
+            busy: false,
+            unavailable: {},
+            setEnabled: vi.fn(),
+            selectedTrack: 'source',
+            selectTrack: select,
+          }}
+        >
+          <ReviewTrackRow track="text" label="Text">
+            <div data-empty-lane>
+              <button>Existing control</button>
+              <div role="button">Existing fragment</div>
+            </div>
+          </ReviewTrackRow>
+          <div data-lane-gap />
+        </ReviewTrackControlsProvider>
+      )
+    );
+    const pointer = async (node: Element, button = 0) =>
+      act(async () => {
+        node.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button }));
+      });
+    await pointer(host.querySelector('[data-empty-lane]')!);
+    expect(select).toHaveBeenCalledExactlyOnceWith('text');
+    select.mockClear();
+    await pointer(host.querySelector('[data-empty-lane] button')!);
+    await pointer(host.querySelector('[role="button"]')!);
+    await pointer(host.querySelector('[data-lane-gap]')!);
+    await pointer(host.querySelector('[data-empty-lane]')!, 2);
+    expect(select).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('allows creation-track selection while its master is off in configuration mode', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.tracks.voiceover = false;
+  const select = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <ReviewTrackControlsProvider
+          value={{
+            ui: advanced.ui,
+            configuring: true,
+            busy: false,
+            unavailable: {},
+            setEnabled: vi.fn(),
+            selectedTrack: 'source',
+            selectTrack: select,
+            selectable: { voiceover: true },
+          }}
+        >
+          <ReviewTrackRow track="voiceover" label="Voiceover">
+            <div data-empty-lane />
+          </ReviewTrackRow>
+        </ReviewTrackControlsProvider>
+      )
+    );
+    const button = host.querySelector<HTMLButtonElement>('[data-review-track-select]')!;
+    expect(button.disabled).toBe(false);
+    await act(async () => button.click());
+    expect(select).toHaveBeenCalledExactlyOnceWith('voiceover');
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

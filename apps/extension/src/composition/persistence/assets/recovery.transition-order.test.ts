@@ -146,6 +146,7 @@ function createDatabase() {
     getAll: vi.fn(async () => []),
     objectStoreNames,
     transaction: vi.fn((storeName: string) => ({
+      store: { openCursor: vi.fn(async () => null) },
       objectStore: vi.fn(() => ({
         indexNames: EXPECTED_INDEXES[storeName as keyof typeof EXPECTED_INDEXES] ?? [],
         openCursor: vi.fn(async () => null),
@@ -271,6 +272,7 @@ async function importFreshModules() {
   const barrier = await import('../infrastructure/mutation-barrier');
   const core = await import('../infrastructure/indexed-db/core');
   const opfsStore = await import('./opfs-store');
+  vi.spyOn(opfsStore, 'prepareAssetReadyClaimIndex').mockResolvedValue(undefined);
   vi.spyOn(opfsStore, 'listReadyJournals').mockImplementation(mocks.listReadyJournals);
   vi.spyOn(opfsStore, 'deleteReadyJournal').mockImplementation(mocks.deleteReadyJournal);
   vi.spyOn(opfsStore, 'collectQuiescentWritingObjects').mockImplementation(mocks.collectQuiescent);
@@ -357,6 +359,8 @@ it('keeps the transition gate outermost across full startup publication recovery
     `${PERSISTENCE_LOCK}:shared`,
     `${TRANSITION_LOCK}:shared`,
     `${DURABLE_ASSET_LOCK}:exclusive`,
+    `${PERSISTENCE_LOCK}:shared`,
+    `${TRANSITION_LOCK}:shared`,
   ]);
 });
 

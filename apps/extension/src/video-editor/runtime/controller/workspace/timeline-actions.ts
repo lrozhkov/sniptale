@@ -1,3 +1,4 @@
+import { resolveRecordingActionOccurrences } from '../../../project/operations/recording-events-selection';
 import { resolveProjectCursorFocusPath } from '../../../../features/video/project/cursor-focus-path/projection';
 import {
   updateCursorFocusKey,
@@ -186,7 +187,11 @@ function deleteSelectedTimelineObject(
       selectedClipActions.deleteSelectedClip();
       return;
     case VideoEditorSelectionKind.ACTION_OCCURRENCE: {
-      const event = store.project?.actionEvents.find((item) => item.id === selection.eventId);
+      const event =
+        store.project &&
+        resolveRecordingActionOccurrences(store.project, selection.observedAction).find(
+          (item) => item.eventId === selection.eventId && item.clipId === selection.clipId
+        )?.event;
       if (event)
         store.updateActionEventDetails(event.id, {
           presentation: { ...event.presentation, enabled: false },

@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewPreviewInspector } from './preview-inspector';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
-import { galleryVideoReviewPreviewMessages } from '../../platform/i18n/messages/gallery/video-review-preview';
+import { getDictionary } from '../../platform/i18n';
 
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -52,7 +52,7 @@ it('shows current defaults and actual raster, commits local settings and offers 
     );
     expect(actual.closest('.sniptale-parameter-row')?.querySelector('[aria-haspopup]')).toBeNull();
     expect(host.textContent?.match(/gallery.videoReview.previewCurrent/g)).toHaveLength(2);
-    const select = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
+    const select = host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]')[1]!;
     act(() => select.click());
     const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((node) =>
       node.textContent?.includes('720p')
@@ -76,9 +76,11 @@ it('shows current defaults and actual raster, commits local settings and offers 
         await Promise.resolve();
       });
     };
-    await choose(1, '≤ 15 FPS');
+    await choose(0, 'editor.scene.previewRendererLegacy');
+    expect(onChange).toHaveBeenLastCalledWith({ renderer: 'legacy' });
+    await choose(2, '≤ 15 FPS');
     expect(onChange).toHaveBeenLastCalledWith({ frameRate: '15' });
-    await choose(2, 'gallery.videoReview.previewPausedDetailed');
+    await choose(3, 'gallery.videoReview.previewPausedDetailed');
     expect(onChange).toHaveBeenLastCalledWith({ pausedQuality: 'detailed' });
     act(() =>
       host
@@ -107,8 +109,17 @@ it('shows current defaults and actual raster, commits local settings and offers 
 });
 
 it('provides both shipped translations for each preview label', () => {
-  for (const message of Object.values(galleryVideoReviewPreviewMessages)) {
-    expect(message.ru.trim()).not.toBe('');
-    expect(message.en.trim()).not.toBe('');
+  for (const locale of ['en', 'ru'] as const) {
+    const messages = getDictionary(locale).gallery.videoReview;
+    for (const [key, message] of Object.entries(messages)) {
+      if (
+        key.startsWith('preview') ||
+        key.startsWith('recordingHistory') ||
+        key === 'recordingCursorArchived' ||
+        key.startsWith('workspaceColor')
+      ) {
+        expect(message.trim()).not.toBe('');
+      }
+    }
   }
 });

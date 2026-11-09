@@ -189,6 +189,13 @@ it('previews raster effect drafts immediately without committing transformations
 
   expect(props.resetLayerEffectPreview).toHaveBeenCalledWith('layer-1');
   expect(props.previewLayerEffect).toHaveBeenCalledTimes(1);
+  const transformations = container?.querySelector('[data-section="transformations"]');
+  expect(transformations?.querySelector('summary > svg.lucide-move')).toBeNull();
+  for (const command of ['flipHorizontal', 'flipVertical', 'rotateLeft', 'rotateRight']) {
+    expect(
+      transformations?.querySelector(`button[aria-label="editor.layerEffects.${command}"] svg`)
+    ).not.toBeNull();
+  }
 });
 
 it('cleans up the old layer preview when the selected layer changes', () => {

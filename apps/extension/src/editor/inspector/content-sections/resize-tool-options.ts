@@ -1,5 +1,4 @@
 import type React from 'react';
-import { translate } from '../../../platform/i18n';
 import type { CompactSelectOption } from '../../chrome/ui';
 
 type AspectFitSide = 'long' | 'short';
@@ -45,15 +44,8 @@ export function findPresetValue(draft: SizeDraft): string | null {
   );
 }
 
-export function buildSizePresetOptions(currentValue: string): CompactSelectOption<string>[] {
-  if (currentValue !== 'custom') {
-    return SIZE_PRESETS;
-  }
-
-  return [
-    { value: 'custom', label: translate('editor.compact.customSizePreset') },
-    ...SIZE_PRESETS,
-  ];
+export function buildSizePresetOptions(): CompactSelectOption<string>[] {
+  return SIZE_PRESETS;
 }
 
 export function applySizePreset(
@@ -74,17 +66,20 @@ export function findAspectRatioValue(draft: SizeDraft): string | null {
   );
 }
 
-export function buildAspectRatioOptions(currentValue: string): CompactSelectOption<string>[] {
-  if (currentValue !== 'custom') {
-    return ASPECT_RATIO_PRESETS;
-  }
-
-  return [
-    { value: 'custom', label: translate('editor.compact.customSizePreset') },
-    ...ASPECT_RATIO_PRESETS,
-  ];
+/** Uses the displayed preset ratio, or the current dimensions for a custom size. */
+export function resolveSizeDraftAspectRatio(draft: SizeDraft): number {
+  const value = findAspectRatioValue(draft);
+  return (
+    ASPECT_RATIO_PRESETS.find((preset) => preset.value === value)?.ratio ??
+    draft.width / Math.max(1, draft.height)
+  );
 }
 
+export function buildAspectRatioOptions(): CompactSelectOption<string>[] {
+  return ASPECT_RATIO_PRESETS;
+}
+
+/** Applies preset dimensions and returns its exact ratio, or null for an unknown preset. */
 export function applySelectedAspectRatio(
   setDraft: React.Dispatch<React.SetStateAction<SizeDraft>>,
   value: string,
@@ -101,7 +96,9 @@ export function applySelectedAspectRatio(
         height: Math.max(1, Math.round(draft.height * fit)),
       };
     });
+    return preset.ratio;
   }
+  return null;
 }
 
 export function applyCurrentAspectRatio(

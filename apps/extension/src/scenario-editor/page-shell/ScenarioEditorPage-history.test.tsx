@@ -6,6 +6,8 @@ import { createGuideProject, createGuideStep } from '../../features/scenario/pro
 
 const io = vi.hoisted(() => ({
   load: vi.fn(),
+  acquire: vi.fn(),
+  release: vi.fn(),
   previous: vi.fn(),
   asset: vi.fn(),
   create: vi.fn(),
@@ -16,6 +18,9 @@ const io = vi.hoisted(() => ({
   select: vi.fn(),
   mount: vi.fn(),
   list: vi.fn(),
+}));
+vi.mock('../../composition/persistence/sync-capture/checkpoint-publication', () => ({
+  acquireSyncCheckpointEdit: io.acquire,
 }));
 vi.mock('./library-browser', () => ({
   GuideLibraryBrowser: ({
@@ -75,6 +80,8 @@ function committedSnapshot(
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  io.release.mockResolvedValue(undefined);
+  io.acquire.mockResolvedValue({ release: io.release });
   io.previous.mockReturnValue([]);
   io.list.mockResolvedValue([]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -318,4 +325,29 @@ it('opens stored revisions in ordinary undo and autosaves against the current re
   });
   await click('Redo');
   expect(container.querySelector('input')?.value).toBe('Local guide');
+});
+
+it('protects actual page input across held pointer saves and completes without blur', async () => {
+  await render();
+  const field = container.querySelector('input[aria-label="Scenario"]')!;
+  const pointer = (kind: string) => {
+    const event = new Event(kind, { bubbles: true });
+    Object.defineProperty(event, 'pointerId', { value: 4 });
+    field.dispatchEvent(event);
+  };
+  act(() => pointer('pointerdown'));
+  await editField('input[aria-label="Scenario"]', 'Intermediate');
+  expect(io.acquire).toHaveBeenCalledOnce();
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledOnce();
+  expect(io.release).not.toHaveBeenCalled();
+  await editField('input[aria-label="Scenario"]', 'Completed');
+  await act(async () => {
+    pointer('pointerup');
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  expect(io.save).toHaveBeenCalledTimes(2);
+  expect(io.save.mock.calls.at(-1)![0].name).toBe('Completed');
+  expect(io.release).toHaveBeenCalledOnce();
+  expect(document.activeElement).toBe(field);
 });

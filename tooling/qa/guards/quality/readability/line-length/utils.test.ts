@@ -138,3 +138,39 @@ describe('collectLineLengthViolations file policies', () => {
     ]);
   });
 });
+
+describe('collectLineLengthViolations static import attributes', () => {
+  function attributedLine(length: number, prefix = 'import fixture from '): string {
+    const suffix = "' with { type: 'json' };";
+    return `${prefix}'${'x'.repeat(length - prefix.length - suffix.length - 1)}${suffix}`;
+  }
+
+  it('uses the existing module limit for attributed imports and exports', () => {
+    const lines = [
+      attributedLine(200),
+      attributedLine(200, 'export { default } from '),
+      attributedLine(200, '} from '),
+      attributedLine(201),
+    ];
+    expect(lines.map((line) => line.length)).toEqual([200, 200, 200, 201]);
+    expect(collectLineLengthViolations('tooling/example.ts', lines)).toEqual([
+      expect.objectContaining({ line: 4, message: expect.stringContaining('limit 200') }),
+    ]);
+  });
+
+  it('retains the ordinary limit for executable, malformed and non-import lines', () => {
+    const path = 'x'.repeat(130);
+    const lines = [
+      buildLongLine(120),
+      buildLongLine(121),
+      `const text = "import fixture from '${path}' with { type: 'json' };";`,
+      `import fixture from '${path}' with { type: getType() };`,
+      `import fixture from '${path}' with { type: 'json' }; execute();`,
+    ];
+    expect(collectLineLengthViolations('tooling/example.ts', lines)).toEqual([
+      ...[2, 3, 4, 5].map((line) =>
+        expect.objectContaining({ line, message: expect.stringContaining('limit 120') })
+      ),
+    ]);
+  });
+});

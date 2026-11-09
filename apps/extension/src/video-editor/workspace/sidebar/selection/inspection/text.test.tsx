@@ -542,22 +542,24 @@ function preparePhrasePlayback() {
 }
 
 it('prepares phrase playback at the projected start before advancing the real runtime clock', async () => {
-  const { ready, preview, frame } = preparePhrasePlayback();
-  click('gallery.videoReview.textPlayFromHere');
-  expect(useVideoEditorStore.getState().isPlaying).toBe(false);
-  frame();
-  expect(preview.prepare).toHaveBeenCalledWith(
-    expect.objectContaining({ reason: 'play', time: 3 })
-  );
-  expect(useVideoEditorStore.getState().isPlaying).toBe(false);
-  await act(async () => {
-    ready.resolve('live-ready');
-    await ready.promise;
-  });
-  expect(useVideoEditorStore.getState().isPlaying).toBe(true);
-  expect(useVideoEditorStore.getState().currentTime).toBe(3);
-  const now = vi.spyOn(performance, 'now').mockReturnValue(performance.now() + 500);
+  const start = performance.now();
+  const now = vi.spyOn(performance, 'now').mockReturnValue(start);
   try {
+    const { ready, preview, frame } = preparePhrasePlayback();
+    click('gallery.videoReview.textPlayFromHere');
+    expect(useVideoEditorStore.getState().isPlaying).toBe(false);
+    frame();
+    expect(preview.prepare).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'play', time: 3 })
+    );
+    expect(useVideoEditorStore.getState().isPlaying).toBe(false);
+    await act(async () => {
+      ready.resolve('live-ready');
+      await ready.promise;
+    });
+    expect(useVideoEditorStore.getState().isPlaying).toBe(true);
+    expect(useVideoEditorStore.getState().currentTime).toBe(3);
+    now.mockReturnValue(start + 500);
     frame();
     expect(useVideoEditorStore.getState().currentTime).toBeGreaterThan(3.4);
     expect(preview.present).toHaveBeenCalled();

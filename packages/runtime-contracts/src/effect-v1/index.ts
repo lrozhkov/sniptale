@@ -9,6 +9,7 @@ export { resolveEffectV1InputContract } from './model/inputs.js';
 export { normalizeEffectV1ToTemplate } from './model/normalization.js';
 export { EFFECT_V1_JSON_SCHEMA } from './model/schema.js';
 export { parseEffectV1Source, validateEffectV1Document } from './validation/index.js';
+export { EFFECT_V1_GRAPH_LIMITS } from './graph/command.js';
 export type {
   ControlDefinition,
   EffectClip,
@@ -64,3 +65,25 @@ export {
   updateEffectV1EditorRegion,
   type EffectV1RegionRect,
 } from './editor-region/geometry.js';
+
+export {
+  EFFECT_V1_CONTROL_GROUPS,
+  EFFECT_V1_CONTROL_ROOT_ICONS,
+  EFFECT_V1_CONTROL_UNITS,
+  EFFECT_V1_CONTROL_PRESENTATIONS,
+  EFFECT_V1_CONTROL_ICONS,
+  EFFECT_V1_CONTROL_GROUP_LIMIT,
+  EFFECT_V1_CONTROL_GROUP_DEPTH,
+  isEffectV1SemanticControlGroup,
+  resolveEffectV1ControlGroup,
+} from './model/control-presentation.js';
+export type {
+  EffectV1SemanticControlGroup,
+  EffectV1ControlUnit,
+  EffectV1ControlPresentation,
+  EffectV1ControlIcon,
+  EffectV1ControlGroup,
+} from './model/control-presentation.js';
+
+export { resolveEffectV1ControlGroupIcons } from './model/control-group-icons.js';
+export type { EffectV1ValidationOptions } from './validation/index.js';

@@ -32,7 +32,8 @@ vi.mock('../../../workflows/sync-transfer/retained-library', () => ({
     }
   },
   planRetainedLibrary: retained.plan,
-  prepareRetainedLibrary: retained.prepare,
+  prepareRetainedLibrary: vi.fn(),
+  prepareLibraryBackup: retained.prepare,
 }));
 
 const {
@@ -125,6 +126,7 @@ beforeEach(() => {
   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', false);
   retained.plan.mockReset();
   retained.prepare.mockReset();
+  retained.prepare.mockResolvedValue(false);
   exportMediaHubBackupMock.mockReset();
   importMediaHubBackupMock.mockReset();
   inspectLocalMediaHubBackupMock.mockReset();
@@ -672,7 +674,7 @@ it('defers full catalog materialization and native byte inspection until backup 
   vi.stubGlobal('__SNIPTALE_SECURITY_E2E__', true);
   const preparation = { missing: [{ rootId: 'remote' }], remoteBytesUpperBound: 4096 };
   retained.plan.mockResolvedValue(preparation);
-  retained.prepare.mockResolvedValue(undefined);
+  retained.prepare.mockResolvedValue(true);
   exportMediaHubBackupMock.mockResolvedValue(undefined);
   const { controller, getState } = createController();
   await createExportBackupAction(controller, runBusyAction)();
@@ -683,11 +685,13 @@ it('defers full catalog materialization and native byte inspection until backup 
   });
   expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
   expect(retained.prepare).not.toHaveBeenCalled();
-  await createConfirmExportBackupAction(controller)(
-    getState().storage.pendingExport!.options,
-    runBusyAction
+  const options = getState().storage.pendingExport!.options;
+  await createConfirmExportBackupAction(controller)(options, runBusyAction);
+  expect(retained.prepare).toHaveBeenCalledExactlyOnceWith(
+    options,
+    expect.any(AbortSignal),
+    undefined
   );
-  expect(retained.prepare).toHaveBeenCalledWith(preparation, expect.any(AbortSignal));
   expect(exportMediaHubBackupMock).toHaveBeenCalledOnce();
   expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
 });
@@ -705,4 +709,44 @@ it('does not write an incomplete full archive after retained-library preparation
   ).rejects.toThrow();
   expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
   expect(getState().storage.pendingExport).not.toBeNull();
+});
+
+it('keeps a connected selected backup modal metadata-only and sends final options once at Confirm', async () => {
+  const authorization = { connectionId: 'connection', generation: 1 };
+  retained.plan.mockResolvedValue({ missing: [], authorization });
+  let finish!: (value: boolean) => void;
+  retained.prepare.mockImplementationOnce(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const { controller, getState } = createController({
+    selectedItems: [createMediaItem({ entityId: 'one' }), createMediaItem({ entityId: 'two' })],
+  });
+  await createExportBackupAction(controller, runBusyAction)();
+  expect(retained.plan).toHaveBeenCalledExactlyOnceWith(getState().storage.pendingExport!.options);
+  expect(retained.plan.mock.calls[0]![0]).toMatchObject({
+    scope: 'selected',
+    selected: { mediaAssetIds: ['one', 'two'], scenarioProjectIds: [], videoProjectIds: [] },
+  });
+  expect(getState().storage.pendingExport?.summary).toBeNull();
+  expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
+  expect(retained.prepare).not.toHaveBeenCalled();
+  const final = { ...getState().storage.pendingExport!.options, includeTelemetry: false };
+  const confirm = createConfirmExportBackupAction(controller)(final, runBusyAction);
+  await Promise.resolve();
+  expect(retained.prepare).toHaveBeenCalledExactlyOnceWith(
+    final,
+    expect.any(AbortSignal),
+    authorization
+  );
+  expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
+  finish(true);
+  await confirm;
+  expect(exportMediaHubBackupMock).toHaveBeenCalledExactlyOnceWith(
+    final,
+    expect.objectContaining({ requirePreparedNative: true, signal: expect.any(AbortSignal) })
+  );
+  expect(inspectLocalMediaHubBackupMock).not.toHaveBeenCalled();
 });

@@ -12,6 +12,7 @@ export type EditorTool =
   | 'marker'
   | 'frame-annotation'
   | 'shape'
+  | 'simplify'
   | 'blur'
   | 'arrow'
   | 'text'
@@ -27,6 +28,7 @@ export type EditorObjectType =
   | 'marker'
   | 'frame-annotation'
   | 'shape'
+  | 'simplify'
   | 'blur'
   | 'arrow'
   | 'text'
@@ -49,6 +51,16 @@ type EditorBackgroundImageFit =
   | 'fit-height';
 type EditorFrameLayoutMode = 'expand-canvas' | 'fit-image';
 
+/** Reference source size and canvas extents before padding and the header.
+ * A crop can make canvas extents zero or negative. These are not bitmap dimensions.
+ */
+export interface EditorCompositionBase {
+  sourceWidth: number;
+  sourceHeight: number;
+  canvasWidth: number;
+  canvasHeight: number;
+}
+
 export interface BrowserFrameState extends Partial<
   Pick<WindowHeader, 'kind' | 'style' | 'theme' | 'faviconEnabled'>
 > {
@@ -60,6 +72,8 @@ export interface BrowserFrameState extends Partial<
   faviconSource?: WindowHeader['faviconSource'] | null;
   canvasMode: BrowserFrameCanvasMode;
   contentMode: BrowserFrameContentMode;
+  /** Legacy header-only baseline. New documents use EditorDocument.compositionBase. */
+  compositionBase?: EditorCompositionBase;
 }
 
 export interface EditorFrameSettings {
@@ -121,6 +135,7 @@ interface EditorDocumentVersion2 {
   sourceDisplayHeight: number;
   frame: EditorFrameSettings;
   browserFrame?: BrowserFrameState;
+  compositionBase?: EditorCompositionBase;
   canvasJson: string;
   richShapes?: EditorRichShapeDocumentObject[];
 }

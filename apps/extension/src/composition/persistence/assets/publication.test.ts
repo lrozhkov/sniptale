@@ -6,6 +6,7 @@ const {
   deleteReadyJournalMock,
   initDBMock,
   listReadyJournalsMock,
+  readPublicationClaimsMock,
   releaseTransitionsMock,
   writeReadyJournalMock,
 } = vi.hoisted(() => ({
@@ -14,6 +15,7 @@ const {
   deleteReadyJournalMock: vi.fn(),
   initDBMock: vi.fn(async () => undefined),
   listReadyJournalsMock: vi.fn(),
+  readPublicationClaimsMock: vi.fn(),
   releaseTransitionsMock: vi.fn(),
   writeReadyJournalMock: vi.fn(),
 }));
@@ -30,6 +32,7 @@ vi.mock('./opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./opfs-store')>()),
   deleteReadyJournal: deleteReadyJournalMock,
   listReadyJournals: listReadyJournalsMock,
+  readAssetReadyPublicationClaims: readPublicationClaimsMock,
   releaseAssetPublicationTransitions: releaseTransitionsMock,
   writeReadyJournal: writeReadyJournalMock,
 }));
@@ -45,11 +48,12 @@ import {
   SupersededAssetPublicationError,
   UnresolvedAssetPublicationError,
 } from './publication';
-import { recoverStandaloneAssetPublications } from './recovery';
-import type { AssetReadyJournal } from './contracts';
+import { recoverStandaloneAssetPublications, recoverSelectedAssetPublications } from './recovery';
+import type { AssetReadyJournal, AssetPublicationAdapter } from './contracts';
 import {
   isActivePersistenceMutationTransitionPermit,
   runWithPersistenceMutationTransition,
+  runWithPersistenceMutationTransitionRecovery,
   runWithPersistentDataErasureBarrier,
 } from '../infrastructure/mutation-barrier';
 
@@ -236,7 +240,7 @@ it('replays only standalone journals with a registered domain adapter', async ()
   ).resolves.toBe(1);
 
   expect(publish).toHaveBeenCalledOnce();
-  expect(publish).toHaveBeenCalledWith(standalone, expect.any(Object));
+  expect(publish).toHaveBeenCalledWith(standalone, expect.any(Object), expect.any(Object));
   expect(deleteReadyJournalMock).toHaveBeenCalledWith('journal-1');
   expect(deleteReadyJournalMock).not.toHaveBeenCalledWith('workflow');
 });
@@ -354,3 +358,131 @@ it('creates a ready claim inside its caller lifecycle permit without reacquiring
     expect(writeReadyJournalMock).toHaveBeenCalledWith(journal);
   });
 });
+
+it('replays only selected standalone publications and preserves unresolved workflow claims', async () => {
+  const journal = createJournal();
+  const deferred = createJournal({ journalId: 'deferred' });
+  const unresolved = createJournal({ journalId: 'unresolved' });
+  const superseded = createJournal({ journalId: 'superseded' });
+  const workflow = createJournal({ journalId: 'workflow', operationId: 'restore' });
+  const unsupported = createJournal({ journalId: 'unsupported', domain: 'other' });
+  readPublicationClaimsMock.mockResolvedValue({
+    valid: true,
+    pending: true,
+    journals: [journal, deferred, unresolved, superseded, workflow, unsupported],
+  });
+  const publish = vi.fn(async (value: AssetReadyJournal) => {
+    if (value === deferred) return 'defer' as const;
+    if (value === unresolved) throw new UnresolvedAssetPublicationError();
+    if (value === superseded) throw new SupersededAssetPublicationError();
+  });
+  const target = { id: 'recording:r', source: { kind: 'recording' as const, recordingId: 'r' } };
+  await expect(
+    recoverSelectedAssetPublications([{ domain: 'recording-assets', publish }], target)
+  ).resolves.toBe(2);
+  expect(readPublicationClaimsMock).toHaveBeenCalledWith(target, expect.any(Object));
+  expect(listReadyJournalsMock).not.toHaveBeenCalled();
+  expect(publish.mock.calls.map(([value]) => value.journalId)).toEqual([
+    'journal-1',
+    'deferred',
+    'unresolved',
+    'superseded',
+  ]);
+  expect(deleteReadyJournalMock.mock.calls.map(([id]) => id)).toEqual(['journal-1', 'superseded']);
+  expect(cancelPutMock).toHaveBeenCalledOnce();
+});
+
+it.each([
+  { valid: false, pending: false, journals: [] },
+  { valid: true, pending: true, journals: [] },
+])('refuses selected replay without complete bound evidence: %j', async (claims) => {
+  readPublicationClaimsMock.mockResolvedValue(claims);
+  const publish = vi.fn();
+  await expect(
+    recoverSelectedAssetPublications([{ domain: 'recording-assets', publish }], { id: 'missing' })
+  ).rejects.toMatchObject({ reason: 'pending-publication' });
+  expect(publish).not.toHaveBeenCalled();
+  expect(deleteReadyJournalMock).not.toHaveBeenCalled();
+  expect(listReadyJournalsMock).not.toHaveBeenCalled();
+});
+
+it('reuses both selected-replay permits while erasure is queued', async () => {
+  const { runWithDurableAssetLifecycleLock } = await import('../infrastructure/mutation-barrier');
+  readPublicationClaimsMock.mockResolvedValue({ valid: true, pending: false, journals: [] });
+  let release!: () => void;
+  let admitted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    admitted = resolve;
+  });
+  const proceed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const replay = runWithPersistenceMutationTransition((transitionPermit) =>
+    runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+      admitted();
+      await proceed;
+      const count = await recoverSelectedAssetPublications(
+        [],
+        { id: 'missing' },
+        { transitionPermit, lifecyclePermit }
+      );
+      expect(readPublicationClaimsMock).toHaveBeenCalledWith({ id: 'missing' }, lifecyclePermit);
+      return count;
+    })
+  );
+  await started;
+  const erase = vi.fn();
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await Promise.resolve();
+  expect(erase).not.toHaveBeenCalled();
+  release();
+  await expect(replay).resolves.toBe(0);
+  await erasure;
+  expect(erase).toHaveBeenCalledOnce();
+});
+
+it.each(['standalone', 'selected'] as const)(
+  'forwards active %s recovery permits to preparation when erasure is already queued',
+  async (mode) => {
+    const journal = createJournal();
+    listReadyJournalsMock.mockResolvedValue([journal]);
+    const admitted = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const childPublished = vi.fn(async () => undefined);
+    const adapter: AssetPublicationAdapter = {
+      domain: journal.domain,
+      async publish(_journal, lifecyclePermit, transitionPermit) {
+        expect(isActivePersistenceMutationTransitionPermit(transitionPermit)).toBe(true);
+        admitted.resolve();
+        await resume.promise;
+        await runWithPersistenceMutationTransitionRecovery(transitionPermit, async (active) => {
+          expect(active).toBe(transitionPermit);
+          await publishReadyJournalWithRetry(
+            createJournal({ journalId: 'prepared-child' }),
+            childPublished,
+            lifecyclePermit
+          );
+        });
+      },
+    };
+    readPublicationClaimsMock.mockResolvedValue({
+      valid: true,
+      pending: true,
+      journals: [journal],
+    });
+    const recovery =
+      mode === 'standalone'
+        ? recoverStandaloneAssetPublications([adapter])
+        : recoverSelectedAssetPublications([adapter], { id: 'selected' });
+    await admitted.promise;
+    const erase = vi.fn();
+    const erasure = runWithPersistentDataErasureBarrier(erase);
+    await Promise.resolve();
+    expect(erase).not.toHaveBeenCalled();
+    resume.resolve();
+    await expect(recovery).resolves.toBe(1);
+    await erasure;
+    expect(childPublished).toHaveBeenCalledOnce();
+    expect(erase).toHaveBeenCalledOnce();
+  }
+);

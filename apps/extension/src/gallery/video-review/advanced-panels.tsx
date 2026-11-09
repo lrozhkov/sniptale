@@ -36,9 +36,11 @@ import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
 type ReviewAdvancedPanelsProps = {
   advanced: QuickEditAdvancedState;
   cursorPath?: CursorFocusPath;
+  cursorAvailable?: boolean | undefined;
+  cursorPending?: boolean | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   /** Optional framing preview mounted inside the selected region inspector. */
-  zoomPreview?(region: QuickEditZoomRegion): ReactNode;
+  zoomPreview?(region: QuickEditZoomRegion, previewing?: boolean): ReactNode;
 };
 
 function applyZoomRegionPatch(
@@ -83,6 +85,8 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
           region={zoomRegion}
           cameraFollowDefaults={args.advanced.cameraFollowDefaults}
           cursorPath={args.cursorPath}
+          cursorAvailable={args.cursorAvailable}
+          cursorPending={args.cursorPending}
           spatialPreview={args.zoom.previewRegion(zoomRegion)}
           zoomConversionBlocked={!args.zoom.canConvertToZoom(zoomRegion)}
           onPreview={(patch) => args.zoom.preview(zoomRegion.id, patch)}
@@ -95,7 +99,7 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
                 part.sourceEnd > zoomRegion.sourceAnchor!.start
             )
           }
-          preview={args.zoomPreview?.(zoomRegion)}
+          preview={args.zoomPreview?.(zoomRegion, zoom.previewing)}
           onChange={applyZoomRegionPatch.bind(null, args, zoomRegion.id)}
           onReset={resetZoomRegion.bind(null, args, zoomRegion.id)}
           onDuplicate={() => args.zoom.duplicate(zoomRegion.id)}

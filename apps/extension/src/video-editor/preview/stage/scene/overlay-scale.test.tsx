@@ -100,9 +100,13 @@ function SceneHarness() {
 
 async function renderSceneHarness() {
   await act(async () => root?.render(<SceneHarness />));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -166,6 +170,7 @@ afterEach(() => {
     originalDivGetBoundingClientRectDescriptor
   );
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function restoreDescriptor(target: object, key: string, descriptor?: PropertyDescriptor) {
@@ -252,12 +257,28 @@ async function verifyFullscreenViewportMapping() {
 
   resolveVideoCompositionRenderPassesMock.mockReturnValue({
     overlayFrame: {
+      effectInputLayers: [],
+      effectRuntimePlans: [],
       actions: [],
       camera,
       cursor: { scale: 1, x: 60, y: 50 },
       visualLayers: [],
     },
-    visualPasses: [{ alpha: 1, frame: { camera, visualLayers: [] }, time: 0 }],
+    visualPasses: [
+      {
+        alpha: 1,
+        frame: {
+          actions: [],
+          camera,
+          cursor: null,
+          effectInputLayers: [],
+          effectRuntimePlans: [],
+          visualLayers: [],
+        },
+        time: 0,
+        transitionOverlays: [],
+      },
+    ],
   });
   mapCompositionPointThroughCameraMock.mockReturnValue({ x: 20, y: 50 });
   installFullscreenStageRect();
@@ -277,12 +298,28 @@ async function verifyOverlayScaleMapping() {
   const camera = createScaledCamera();
   resolveVideoCompositionRenderPassesMock.mockReturnValue({
     overlayFrame: {
+      effectInputLayers: [],
+      effectRuntimePlans: [],
       actions: [{ point: { x: 80, y: 90 } }],
       camera,
       cursor: { scale: 2, x: 60, y: 50 },
       visualLayers: [],
     },
-    visualPasses: [{ alpha: 1, frame: { camera, visualLayers: [] }, time: 0 }],
+    visualPasses: [
+      {
+        alpha: 1,
+        frame: {
+          actions: [],
+          camera,
+          cursor: null,
+          effectInputLayers: [],
+          effectRuntimePlans: [],
+          visualLayers: [],
+        },
+        time: 0,
+        transitionOverlays: [],
+      },
+    ],
   });
   mapCompositionPointThroughCameraMock
     .mockReturnValueOnce({ x: 36, y: 54 })

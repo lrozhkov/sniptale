@@ -1,3 +1,4 @@
+import { readCheckpointInTransaction } from './checkpoints';
 import { readAppliedCaptureReceipt } from './guards';
 import { assetResidencyCopyId } from '../assets/residency-records';
 import {
@@ -22,17 +23,23 @@ import { freezeVideoReviewInTransaction, digestCapturedVideoReviewRows } from '.
 import { parsePreparedVideoReviewReplicaRoot } from './prepared-review';
 import { parsePreparedVideoProjectReplicaRoot } from './prepared-project';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { readImageReplicaPredecessorInTransaction } from './image-snapshot';
+import { isImageCaptureSource } from './image-snapshot';
+import { readCompatibleImageReplicaPredecessorInTransaction } from './freeze';
 import type { IDBPTransaction } from 'idb';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   initDB,
   STORE_NAME,
   RECORDING_TELEMETRY_STORE,
+  RECORDING_CURSOR_TRAJECTORIES_STORE,
+  RECORDING_CURSOR_BLOCKS_STORE,
+  RECORDING_EVENTS_STORE,
+  NATIVE_TRANSFER_SESSIONS_STORE,
   RECORDING_RECOVERY_SESSIONS_STORE,
   RECORDING_RECOVERY_BLOCKS_STORE,
   SYNC_CAPTURE_STORE,
   MEDIA_LIBRARY_STORE,
+  PROJECT_EXPORT_INPUTS_STORE,
   PROJECT_ASSETS_STORE,
   PROJECT_EXPORTS_STORE,
   WEB_SNAPSHOTS_STORE,
@@ -356,15 +363,12 @@ async function deleteMediaRoot(
   if (current === undefined) return assertAbsentMediaRoot(tx, input.rootId, state);
   if (!state) refuse();
   const media = parseMediaLibraryEntry(current);
-  if (
-    media?.source.kind === 'screenshot' ||
-    (media?.source.kind === 'stored-asset' &&
-      (media.kind === 'image' || media.kind === 'screenshot'))
-  ) {
-    const image = await readImageReplicaPredecessorInTransaction(tx, input.rootId, state);
+  if (media && isImageCaptureSource(media)) {
+    const image = await readCompatibleImageReplicaPredecessorInTransaction(tx, input.rootId, state);
     if (
       state.nativeDigest !== image.digest ||
-      media.workspaceRevision !== input.expectedWorkspaceRevision
+      (media.workspaceRevision !== input.expectedWorkspaceRevision &&
+        !(image.legacyOriginalOnly && input.expectedWorkspaceRevision === null))
     )
       refuse();
     await assertStandaloneMediaSourceReplaceable(media, tx);
@@ -470,6 +474,7 @@ async function admitDeletion(
   const duplicate = await readDeletionReceipt(tx, input, identity);
   if (duplicate !== null) return { status: 'duplicate' as const, generation: duplicate };
   if (!profile.enabled || profile.connectionGeneration !== input.connectionGeneration) refuse();
+  if (await readCheckpointInTransaction(tx, input, input)) refuse();
   if (hasPendingPublication(input, journals)) refuse();
   const previous = await assertCausalState(tx, input, identity.rootKey);
   return { status: 'ready' as const, identity, previous };
@@ -532,11 +537,16 @@ async function commitDeletion(
     [
       STORE_NAME,
       RECORDING_TELEMETRY_STORE,
+      RECORDING_CURSOR_TRAJECTORIES_STORE,
+      RECORDING_CURSOR_BLOCKS_STORE,
+      RECORDING_EVENTS_STORE,
+      NATIVE_TRANSFER_SESSIONS_STORE,
       ...SCENARIO_CAPTURE_STORES,
       RECORDING_RECOVERY_SESSIONS_STORE,
       RECORDING_RECOVERY_BLOCKS_STORE,
       SYNC_CAPTURE_STORE,
       MEDIA_LIBRARY_STORE,
+      PROJECT_EXPORT_INPUTS_STORE,
       PROJECT_ASSETS_STORE,
       PROJECT_EXPORTS_STORE,
       WEB_SNAPSHOTS_STORE,

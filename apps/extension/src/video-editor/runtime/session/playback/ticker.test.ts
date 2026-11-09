@@ -32,3 +32,10 @@ it(
   'keeps advancing from the last seek-aligned session anchor',
   verifiesSyntheticPlaybackTimeAfterSeekRebase
 );
+
+it('holds the session start when a frame timestamp predates its performance clock anchor', () => {
+  const playbackRef = createPlaybackRef({ initialTime: 11.5, sessionStart: 11.5, startedAt: 1000 });
+  expect(resolvePlaybackTickTime(playbackRef, 984)).toBe(11.5);
+  expect(resolvePlaybackTickTime(playbackRef, 1000)).toBe(11.5);
+  expect(resolvePlaybackTickTime(playbackRef, 1017)).toBeCloseTo(11.517, 9);
+});

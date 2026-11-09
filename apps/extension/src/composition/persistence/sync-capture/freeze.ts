@@ -1,10 +1,15 @@
 import { resolveCapturedProjectAssetSource } from './project-snapshot';
-import { freezeImageInTransaction } from './image-snapshot';
+import {
+  freezeImageInTransaction,
+  readImageReplicaPredecessorInTransaction,
+} from './image-snapshot';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
 import { collectCapturedProjectRecordingIds } from './project-snapshot';
 import { parseRecordingEntry } from '../recordings/index.guards';
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 import { parseRecordingTelemetryEntry } from '../recordings/telemetry.guards';
+import { RECORDING_EVENTS_SNAPSHOT_ROLE } from '../recordings/recording-events/contracts';
+import { RECORDING_CURSOR_SNAPSHOT_ROLE } from '../recordings/cursor-trajectory/contracts';
 import { parseAssetOwner } from '../assets/guards';
 import { sameReviewVideoContainer } from '../../../features/video/review/validation';
 import { readWorkspaceStorage } from '../review-workspaces/storage';
@@ -53,6 +58,7 @@ import {
   MAX_CAPTURE_ROWS,
   type CapturedVideoProjectRows,
   type CapturedMediaRows,
+  type SyncCaptureRootState,
 } from './contracts';
 import {
   isSupportedCaptureProject,
@@ -101,6 +107,37 @@ export function digestCapturedMediaRows(rows: CapturedMediaRows): string {
   requireSupported(normalized !== null);
   const digest = sha256(new TextEncoder().encode(JSON.stringify(normalized)));
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Admit a pristine original-only legacy image without treating an unsynced workspace as published. */
+export async function readCompatibleImageReplicaPredecessorInTransaction(
+  tx: IDBPTransaction<unknown, string[], 'readonly' | 'readwrite'>,
+  mediaId: string,
+  state: SyncCaptureRootState
+) {
+  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  if (media?.source.kind !== 'project-asset' || state.nativeRevision !== undefined)
+    return {
+      ...(await readImageReplicaPredecessorInTransaction(tx, mediaId, state)),
+      legacyOriginalOnly: false,
+    };
+  const rows = await freezeImageInTransaction(tx, mediaId);
+  requireSupported(
+    !state.deleted &&
+      state.rootKind === 'media' &&
+      state.rootId === mediaId &&
+      rows.media.workspaceRevision === 0 &&
+      rows.workspace === null &&
+      rows.presentation === null
+  );
+  const original = parseCapturedMediaRows({
+    media: rows.media,
+    projectAsset: rows.projectAsset,
+    ref: rows.originalRef,
+  });
+  requireSupported(original !== null);
+  const digest = digestCapturedMediaRows(original);
+  return { rows, digest, unloadedCopy: null, legacyOriginalOnly: true };
 }
 
 /** Freeze one original-only Library source through the caller's transaction. */
@@ -172,6 +209,32 @@ export async function freezeMediaInTransaction(
       )
     );
     requireSupported(rawTelemetry === undefined || telemetry !== null);
+    for (const [snapshot, role] of [
+      [telemetry?.cursorTrajectorySnapshot, RECORDING_CURSOR_SNAPSHOT_ROLE],
+      [telemetry?.recordingEventsSnapshot, RECORDING_EVENTS_SNAPSHOT_ROLE],
+    ] as const) {
+      if (!snapshot) continue;
+      const snapshotRef = parseAssetRef(
+        await tx.objectStore(ASSET_REFS_STORE).get(snapshot.ref.assetId)
+      );
+      const snapshotOwner = parseAssetOwner(
+        await tx.objectStore(ASSET_OWNERS_STORE).get(['recording', recording.id, role])
+      );
+      requireSupported(
+        snapshotRef !== null &&
+          snapshotRef.assetId === snapshot.ref.assetId &&
+          snapshotRef.sha256 === snapshot.ref.sha256 &&
+          snapshotRef.size === snapshot.ref.size &&
+          snapshotRef.mimeType === snapshot.ref.mimeType &&
+          snapshotRef.location.objectKey === snapshot.ref.location.objectKey &&
+          snapshotRef.createdAt === snapshot.ref.createdAt &&
+          snapshotOwner !== null &&
+          snapshotOwner.assetId === snapshot.ref.assetId &&
+          snapshotOwner.ownerId === recording.id &&
+          snapshotOwner.ownerKind === 'recording' &&
+          snapshotOwner.role === role
+      );
+    }
     rows = parseCapturedMediaRows({ media, recording, ref, telemetry });
   } else {
     requireSupported(media.source.kind === 'project-asset');
@@ -487,6 +550,10 @@ class NativeProjectSnapshot {
         await this.retainRef(source.assetId, entry.size, entry.mimeType);
         break;
       case 'project-asset':
+        if (entry.kind === 'image' || entry.kind === 'screenshot') {
+          await freezeImageInTransaction(this.tx, id);
+          this.independentImages.add(id);
+        }
         await this.bindProjectAsset(entry, source.projectAssetId);
         break;
       case 'project-export':

@@ -1,3 +1,5 @@
+import type { CursorTrajectoryDescriptor } from '../../features/video/project/cursor-trajectory/types';
+import type { RecordingEventsDescriptor } from '../../features/video/project/recording-events/types';
 import type {
   NativeCaptureMode,
   NativeRecordingMode,
@@ -53,7 +55,14 @@ export interface AppScreenshotCommitMessage {
   captureId: string;
 }
 
+export interface NativeDurableMediaReceipt {
+  durable: true;
+  sha256: string;
+  totalBytes: number;
+}
+
 export interface ExtensionScreenshotAckMessage {
+  receipt: NativeDurableMediaReceipt;
   type: 'extension.screenshot.ack';
   protocolVersion: number;
   controllerLeaseId: string;
@@ -103,6 +112,8 @@ export interface AppRecordingProgressMessage {
 
 export interface AppRecordingStoppedMessage {
   type: 'app.recording.stopped';
+  cursorTrajectory?: CursorTrajectoryDescriptor;
+  recordingEvents?: RecordingEventsDescriptor;
   protocolVersion: number;
   controllerLeaseId: string;
   recordingId: string;
@@ -140,6 +151,7 @@ export interface AppRecordingChunkMessage {
 }
 
 export interface ExtensionRecordingAckMessage {
+  receipt: NativeDurableMediaReceipt;
   type: 'extension.recording.ack';
   protocolVersion: number;
   controllerLeaseId: string;

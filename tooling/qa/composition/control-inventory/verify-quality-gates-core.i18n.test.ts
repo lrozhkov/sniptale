@@ -2,6 +2,24 @@ import { expect, it } from 'vitest';
 
 import { createTempRoot, writeFile } from '../../test-support/test-helpers';
 
+it('excludes only the pinned unused capability labels and still checks authored neighbors', async () => {
+  const root = createTempRoot('verify-i18n-pinned-capabilities-');
+  const pinned =
+    'apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js';
+  const neighbor = pinned.replace('runtimeCapabilities.js', 'capabilities.ts');
+  const authored = 'apps/extension/src/features/example/runtimeCapabilities.js';
+  for (const file of [pinned, neighbor, authored])
+    writeFile(root, file, "export const capability = { label: 'CPU optimized' };\n");
+
+  const verifier = await import('../../guards/product-contracts/verify-i18n.mjs');
+
+  expect(verifier.collectFileFailures(pinned, { root })).toEqual([]);
+  for (const file of [neighbor, authored])
+    expect(verifier.collectFileFailures(file, { root })).toEqual([
+      `${file}:1 contains raw label property "CPU optimized"`,
+    ]);
+});
+
 it('flags raw JSX text in live product files and allows translated copy', async () => {
   const root = createTempRoot('verify-i18n-jsx-');
   writeFile(

@@ -1,3 +1,8 @@
+import type {
+  PreviewSourceAcquireOptions,
+  PreviewSourceDemand,
+} from '../../../workflows/video/preview-source';
+import type { PreparedPreviewSourceLease } from '../../../workflows/video/preview-html-source';
 import type { VideoEditorMotionPreview } from '../../contracts/workspace';
 import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/patches';
 import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
@@ -26,6 +31,7 @@ import type { PreviewStageGuide } from './canvas/snap';
 import type { PreviewStageImportHandlers } from '../../contracts/insertion';
 import type {
   VideoEditorPreviewMode,
+  VideoPreviewRenderer,
   VideoEditorPreviewFrameRate,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
@@ -34,6 +40,17 @@ import type { VideoEditorPreviewRasterSize } from './sizing/raster';
 import type { VideoPreviewExactFrameCache } from '../cache/exact-frame-cache';
 import type { PreparedCachedVideoPreview } from '../cache/types';
 import type { VideoEditorPreviewStatus } from '../../contracts/preview-runtime';
+/** One immutable Native request context borrows the mounted source provider. */
+export interface NativePreviewSourceRuntime {
+  readonly selected: boolean;
+  acquire(
+    demands: readonly PreviewSourceDemand[],
+    signal: AbortSignal,
+    options?: PreviewSourceAcquireOptions
+  ): Promise<PreparedPreviewSourceLease | null>;
+  prepare(time: number, signal: AbortSignal): Promise<'ready' | 'retry'>;
+}
+
 export type PreviewStageInteractionMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 export type VideoPreviewCanvasInsertKind = 'arrow' | 'line' | 'shape' | 'text';
 export type PreviewStageAudioBankClip = VideoProjectAudioClip | VideoProjectVideoClip;
@@ -60,7 +77,11 @@ export type PreviewStageInteractionHandler = (
 export type PreviewStageVideoRefs = React.MutableRefObject<Record<string, HTMLVideoElement | null>>;
 export type PreviewStageAudioRefs = React.MutableRefObject<Record<string, HTMLAudioElement | null>>;
 
-export type PreviewEffectRuntimeSource = 'audio' | 'visual';
+export type PreviewEffectRuntimeSource =
+  | 'audio'
+  | 'visual'
+  | 'recording-history'
+  | 'camera-history';
 
 export interface PreviewEffectRuntimeFeedback {
   failed: boolean;
@@ -71,6 +92,14 @@ export interface PreviewEffectRuntimeFeedback {
 }
 
 export interface PreviewStageCanvasProps {
+  /** Mounted source authority; exact samples do not depend on hidden video readiness. */
+  sourceRuntime?: NativePreviewSourceRuntime;
+  /** Admission uses the requested clock time, including requests between React commits. */
+  canRenderCursorFrame?: ((time: number) => boolean) | undefined;
+  /** Borrows the mounted renderer's playback request until its cleanup runs. */
+  registerPlaybackRequest?: ((request: (time: number) => void) => () => void) | undefined;
+  /** Published only for an accepted completed scene job. */
+  onCameraPresented?: ((camera: VideoCompositionCameraState, time: number) => void) | undefined;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
   activeClips: VideoProjectClip[];
   audioBankClips: PreviewStageAudioBankClip[];
@@ -78,6 +107,8 @@ export interface PreviewStageCanvasProps {
   assetUrls: Record<string, string>;
   beginInteraction: PreviewStageInteractionHandler;
   camera: VideoCompositionCameraState;
+  /** A pending paused frame keeps media loading but blocks camera-relative editing. */
+  cameraInteractionEnabled?: boolean | undefined;
   cachedVideo: PreparedCachedVideoPreview | null;
   currentTime: number;
   effectRuntimeFeedback: PreviewEffectRuntimeFeedback;
@@ -115,10 +146,12 @@ export interface PreviewStageCanvasProps {
   placementMode: VideoEditorPlacementMode | null;
   previewRasterSize: VideoEditorPreviewRasterSize;
   previewMode: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer | undefined;
   previewCacheBypass: boolean;
   previewExactFrameCache: VideoPreviewExactFrameCache;
   renderGenerationRef?: React.MutableRefObject<number>;
   project: VideoProject;
+  effectPreparationProject?: VideoProject | undefined;
   selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedClip: VideoProjectClip | null;
   selectedClipId: string | null;
@@ -152,6 +185,7 @@ export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
   onEnableCursorTrack: () => void;
   onImport: PreviewStageImportHandlers;
   onPreviewModeChange: (mode: VideoEditorPreviewMode) => void;
+  onPreviewRendererChange?: ((renderer: VideoPreviewRenderer) => void) | undefined;
   onPreviewPreferencesRetry: () => void;
   onPreviewFrameRateChange?: ((frameRate: VideoEditorPreviewFrameRate) => void) | undefined;
   onPreviewRasterPresetChange: (preset: VideoEditorPreviewRasterPreset) => void;
@@ -160,6 +194,7 @@ export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
   onSelectScene: () => void;
   onTogglePlay: () => void;
   previewMode: VideoEditorPreviewMode;
+  previewRenderer?: VideoPreviewRenderer | undefined;
   previewPreferencesSaveFailed: boolean;
   previewShowFrameRate?: boolean | undefined;
   onPreviewShowFrameRateChange?: ((value: boolean) => void) | undefined;

@@ -16,6 +16,36 @@ export type QuickEditHomography = readonly [
   number,
 ];
 
+/** Scale around the rectangle center in its existing coordinate units. */
+export function scaleQuickEditRectAboutCenter(
+  rect: QuickEditRect,
+  scale: number
+): QuickEditHomography {
+  return [
+    scale,
+    0,
+    (rect.x + rect.width / 2) * (1 - scale),
+    0,
+    scale,
+    (rect.y + rect.height / 2) * (1 - scale),
+    0,
+    0,
+    1,
+  ];
+}
+
+/** Union rectangle starts and ends without normalizing signed sizes or rounding. */
+export function unionQuickEditRects(rects: readonly QuickEditRect[]): QuickEditRect {
+  const x = Math.min(...rects.map((rect) => rect.x));
+  const y = Math.min(...rects.map((rect) => rect.y));
+  return {
+    x,
+    y,
+    width: Math.max(...rects.map((rect) => rect.x + rect.width)) - x,
+    height: Math.max(...rects.map((rect) => rect.y + rect.height)) - y,
+  };
+}
+
 /** Row-major rotation matrix, shared by geometry and the depth shader. */
 export function quickEditRotationMatrix([x, y, z, w]: SpatialQuaternion) {
   return [
@@ -111,4 +141,26 @@ export function multiplyQuickEditProjections(
     a[6] * b[1] + a[7] * b[4] + a[8] * b[7],
     a[6] * b[2] + a[7] * b[5] + a[8] * b[8],
   ];
+}
+
+/** Use the same reference and camera zoom frames for ordinary and sharp spatial captures. */
+export function resolveSpatialCameraRenderFrames(
+  camera: { viewportX: number; viewportY: number; scale: number },
+  base: QuickEditRect,
+  scale: number
+) {
+  return {
+    base: {
+      x: base.x * scale,
+      y: base.y * scale,
+      width: base.width * scale,
+      height: base.height * scale,
+    },
+    target: {
+      x: (base.x - camera.viewportX) * camera.scale * scale,
+      y: (base.y - camera.viewportY) * camera.scale * scale,
+      width: base.width * camera.scale * scale,
+      height: base.height * camera.scale * scale,
+    },
+  };
 }

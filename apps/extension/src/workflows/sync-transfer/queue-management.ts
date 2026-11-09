@@ -58,11 +58,23 @@ function commandInput(value: unknown): QueueManagementCommand {
 /** Manage native queue state only. Commands confer no transport or source-release authority. */
 export function createSyncQueueManagement(deps: QueueManagementDependencies = nativeDependencies) {
   return {
-    async read(cursor: unknown = null) {
+    async read(cursor: unknown = null, filter?: unknown) {
       const selectedCursor: unknown = structuredClone(cursor);
+      const selectedFilter: unknown = structuredClone(filter);
+      if (
+        selectedFilter !== undefined &&
+        selectedFilter !== 'all' &&
+        selectedFilter !== 'problems' &&
+        selectedFilter !== 'action-required'
+      )
+        throw new Error('Invalid sync queue filter.');
       const scope = await deps.enrollment();
       if (!scope) return { kind: 'unconfigured' as const };
-      const page = await deps.page(scope, { limit: 25, cursor: selectedCursor });
+      const page = await deps.page(scope, {
+        limit: 25,
+        cursor: selectedCursor,
+        ...(selectedFilter === undefined ? {} : { filter: selectedFilter }),
+      });
       return { kind: 'ready' as const, scope, ...page };
     },
     async command(value: unknown): Promise<

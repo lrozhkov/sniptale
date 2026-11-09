@@ -180,11 +180,36 @@ export function activeReviewPreviewScene(source: PreviewScene): PreviewScene {
   };
 }
 
-/** Camera motion refreshes captions but only spatial admission changes other prepared assets. */
+/** Camera poses and annotation geometry refresh the scene without replacing unchanged preparation. */
 export function reviewPreviewPreparationKey(
   scene: PreviewScene,
   dimensions: PreviewSceneDimensions,
   spatial: boolean
 ): string {
-  return JSON.stringify([{ ...scene, zoomRegions: [] }, dimensions, spatial], orderedSceneValue);
+  const annotationEffects = scene.annotationEffects;
+  return JSON.stringify(
+    [
+      {
+        ...scene,
+        zoomRegions: [],
+        ...(annotationEffects
+          ? {
+              annotationEffects: {
+                ...annotationEffects,
+                lane: {
+                  ...annotationEffects.lane,
+                  instances: annotationEffects.lane.instances.map(
+                    ({ transform: _transform, controls: _controls, anchors: _anchors, ...rest }) =>
+                      rest
+                  ),
+                },
+              },
+            }
+          : {}),
+      },
+      dimensions,
+      spatial,
+    ],
+    orderedSceneValue
+  );
 }

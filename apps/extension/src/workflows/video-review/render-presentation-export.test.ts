@@ -249,6 +249,7 @@ it('renders the complete rational sequence with explicit geometry and a partial 
   args.index.frameRate = 30000 / 1001;
   const result = await writeReviewPresentationFrames(args);
   const opened: ReviewPresentationRendererInput = io.open.mock.calls[0]![0];
+  expect(opened.renderer).toBe('legacy');
   expect([...opened.main.plannedCandidates!()]).toEqual(
     io.render.mock.calls.map(([frame]) => frame)
   );
@@ -494,10 +495,11 @@ it('renders a bounded late window with original mappings and rebased container a
   args.index.width = 1920;
   args.index.height = 1080;
   args.index.frameRate = 60;
-  const preview = endingPreview(args);
+  const preview = { ...endingPreview(args), renderer: 'gpu' as const };
   io.probe.mockResolvedValue({ audible: true, multichannel: false, codec: 'aac' });
   const receipt = await writeReviewPresentationFrames(args, preview);
   const opened: ReviewPresentationRendererInput = io.open.mock.calls[0]![0];
+  expect(opened.renderer).toBe('gpu');
   expect([...opened.main.plannedCandidates!()]).toEqual(
     io.render.mock.calls.map(([frame]) => frame)
   );
@@ -613,4 +615,9 @@ it('admits only the sparse probe candidates to the repeatable decoder schedule',
   expect(planned.length).toBeGreaterThan(0);
   expect(planned.length).toBeLessThanOrEqual(135);
   expect(io.media).not.toHaveBeenCalled();
+});
+
+it('keeps full presentation export on the existing legacy renderer', async () => {
+  await writeReviewPresentationFrames(fixture());
+  expect(io.open.mock.calls[0]![0].renderer).toBe('legacy');
 });

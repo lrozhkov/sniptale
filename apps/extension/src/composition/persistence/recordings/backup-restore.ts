@@ -1,4 +1,6 @@
+import { RECORDING_EVENTS_SNAPSHOT_ROLE } from './recording-events/contracts';
 import type { AssetOwner, AssetRef } from '../assets';
+import { RECORDING_CURSOR_SNAPSHOT_ROLE } from './cursor-trajectory/contracts';
 import type { RecordingTelemetryEntry, StoredRecordingEntry } from './contracts';
 
 interface PutStore<T> {
@@ -22,5 +24,20 @@ export async function putRecordingBackupRestore(args: {
     role: 'body',
   });
   await args.recordingStore.put(args.entry);
-  if (args.telemetry) await args.telemetryStore.put(args.telemetry);
+  if (args.telemetry) {
+    for (const [snapshot, role] of [
+      [args.telemetry.cursorTrajectorySnapshot, RECORDING_CURSOR_SNAPSHOT_ROLE],
+      [args.telemetry.recordingEventsSnapshot, RECORDING_EVENTS_SNAPSHOT_ROLE],
+    ] as const) {
+      if (!snapshot) continue;
+      await args.refStore.put(snapshot.ref);
+      await args.ownerStore.put({
+        assetId: snapshot.ref.assetId,
+        ownerId: args.entry.id,
+        ownerKind: 'recording',
+        role,
+      });
+    }
+    await args.telemetryStore.put(args.telemetry);
+  }
 }

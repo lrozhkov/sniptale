@@ -180,6 +180,9 @@
 }
 
 .sniptale-picker-root {
+  outline: 1px solid var(--sniptale-color-border-strong);
+  outline-offset: -1px;
+  box-shadow: var(--sniptale-shadow-floating-strong);
   font-family: var(--sniptale-font-interface);
   font-size: 13px;
   line-height: 18px;

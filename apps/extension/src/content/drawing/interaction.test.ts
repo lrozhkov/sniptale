@@ -186,9 +186,9 @@ it('uses canonical Shift add, Ctrl toggle, and empty-space marquee selection sta
     snapshot: session.getSnapshot(),
     timestamp: 0,
   });
-  expect(shift).toMatchObject({ draft: null, selection: ['one', 'two'] });
-
-  session.setSelection(shift.selection ?? []);
+  expect(shift.selection).toBeUndefined();
+  commitDrawingPointerDraft(session, shift.draft);
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['one', 'two']);
   const ctrl = beginDrawingPointer({
     modifiers: { ctrlKey: true, shiftKey: false },
     point: { x: 10, y: 10 },
@@ -642,3 +642,28 @@ it('creates and commits a drawing stroke without randomUUID on HTTP', () => {
     id: expect.stringMatching(/^drawing-[0-9a-f-]{36}$/u),
   });
 });
+
+for (const tool of ['simplify', 'blur'] as const)
+  it(`clears prior selection when starting a new ${tool} area without changing history`, () => {
+    const commit = vi.fn(() => true);
+    const session = createDrawingSession({ onDocumentCommit: commit });
+    session.commitObject({
+      id: 'previous',
+      kind: 'blur',
+      bounds: { x: 300, y: 200, width: 100, height: 80 },
+    });
+    session.setActiveTool(tool);
+    session.select('previous');
+    expect(session.getSnapshot().selectedObjectIds).toEqual(['previous']);
+    commit.mockClear();
+    const started = beginDrawingPointer({
+      point: { x: 20, y: 30 },
+      snapshot: session.getSnapshot(),
+      timestamp: 1,
+    });
+    expect(started.draft?.kind).toBe('create');
+    expect(started.selection).toEqual([]);
+    expect(commit).not.toHaveBeenCalled();
+    expect(session.getSnapshot().document.objects).toHaveLength(1);
+    session.dispose();
+  });

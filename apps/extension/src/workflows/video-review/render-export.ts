@@ -1,14 +1,15 @@
+import type { ReviewRecordingRenderSource } from './recording-render';
 import { ownReviewOutputCancellation } from './render-output-lifetime';
+import { readPreviewSourceLeadingSampleTime } from '../video/preview-source';
 import { paintReviewExportScene, type ReviewRenderScene } from './render-export-scene';
 import type { ReviewFrameExportInput } from './render-export-input';
-import { hasCameraPerspective as hasQuickEditPerspective } from '../../features/video/project/motion/spatial';
+import { quickEditRegionNeedsSpatialRenderer } from '../../features/video/review/advanced/spatial';
 import { writeReviewPresentationFrames } from './render-presentation-export';
 import type { createReviewPresentationMain } from './presentation-main';
 import type { WatermarkRenderer } from '../../features/video/composition/canvas/watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
-import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
-import { createReviewSpatialRenderer } from '../../features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from './spatial-render-session';
 import {
   createAdaptiveFrameWriter,
   createAdaptiveComparisonBudget,
@@ -60,6 +61,12 @@ import { retainedAudio, type ReviewPacketReceipt } from './packet-export';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import type { ReviewExportClipPlan } from './audio-render';
 import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
+import {
+  createReviewExportSampling,
+  prepareReviewExportSourceSampling,
+} from './export-source-sampling';
+import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
+import { selectReviewCutTransitionSource } from './cut-transition-frames';
 import type { prepareReviewFinalCaptions } from './render-captions';
 import { reviewExportPhase, cleanupReviewExportFailure } from './export-diagnostics';
 import { prepareReviewFrameDecorations, createReviewFrameOutput } from './render-export-setup';
@@ -93,12 +100,13 @@ export async function writeReviewFrames(
   let webcam: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null = null;
   let watermark: WatermarkRenderer | null = null;
   let main: Awaited<ReturnType<typeof createReviewPresentationMain>> | null = null;
+  const enhancement = createReviewExportSampling(args.renderSettings?.detailEnhancement);
   try {
     source = await reviewExportPhase(args.signal, 'decode', () =>
       openReviewRenderSource(args, input, preparation)
     );
     const decorations = await reviewExportPhase(args.signal, 'compose', () =>
-      prepareReviewFrameDecorations(args, preparation, source!)
+      prepareReviewFrameDecorations(args, preparation, source!, enhancement ?? undefined)
     );
     main = decorations.main;
     watermark = decorations.watermark;
@@ -152,7 +160,18 @@ export async function writeReviewFrames(
         ),
         args.signal
       );
-    const sourceTimeResolution = await source.video.getTimeResolution();
+    const sourceVideo = source.video;
+    const sourceTimeResolution = await sourceVideo.getTimeResolution();
+    const leadingSampleTime = main
+      ? undefined
+      : await reviewExportPhase(args.signal, 'decode', () =>
+          readPreviewSourceLeadingSampleTime(
+            sourceVideo,
+            args.index.duration,
+            args.signal,
+            sourceTimeResolution
+          )
+        );
     const timeTracking = createReviewRenderTimeTracking(
       {
         duration: receipt.resultDuration,
@@ -209,6 +228,7 @@ export async function writeReviewFrames(
       receipt.videoPackets += await reviewExportPhase(args.signal, 'compose', () =>
         renderRenderWindowFrames({
           window,
+          ...(enhancement ? { exportEnhancer: enhancement } : {}),
           adaptiveBudget,
           adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
           fps: preparation.fps,
@@ -216,6 +236,7 @@ export async function writeReviewFrames(
           zoomRegions: preparation.effective.zoomRegions,
           background: preparation.effective.background,
           keyCues: args.keyCues,
+          ...(args.recordingHistory ? { recordingHistory: args.recordingHistory } : {}),
           clickCues: args.clickCues,
           comments: args.comments ?? [],
           canvas: visual.canvas,
@@ -228,6 +249,7 @@ export async function writeReviewFrames(
           image: visual.image,
           frameSink,
           sourceTimeResolution,
+          ...(leadingSampleTime !== undefined ? { leadingSampleTime } : {}),
           transitions,
           transitionFrames,
           webcam,
@@ -252,6 +274,7 @@ export async function writeReviewFrames(
   } catch (error) {
     return await cleanupReviewExportFailure(error, () => outputLifetime?.cancel());
   } finally {
+    if (enhancement) await enhancement.dispose();
     args.onTimeEstimate?.(null);
     webcam?.dispose();
     watermark?.dispose();
@@ -495,6 +518,7 @@ export async function drainSegmentAudio(args: {
 /** One window's frames: draws the scene and encodes at the fps lattice; returns the count. */
 export async function renderRenderWindowFrames(
   args: ReviewRenderScene & {
+    recordingHistory?: ReviewRecordingRenderSource;
     keyCues?: readonly ReviewKeyCue[] | undefined;
     window: ReviewFrameWindow;
     adaptive?: boolean;
@@ -505,6 +529,7 @@ export async function renderRenderWindowFrames(
     context: CanvasRenderingContext2D;
     frameSink: Pick<VideoSampleSink, 'samplesAtTimestamps'>;
     sourceTimeResolution?: number;
+    leadingSampleTime?: number;
     transitions?: readonly ReviewCutTransitionPlan[];
     transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
     webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
@@ -514,6 +539,7 @@ export async function renderRenderWindowFrames(
     resultDuration: number;
     onProgress: ((fraction: number) => void) | undefined;
     signal: AbortSignal;
+    exportEnhancer?: ExportEnhancer;
   }
 ): Promise<number> {
   const { window, fps, canvas, context, videoOut, signal } = args;
@@ -536,17 +562,17 @@ export async function renderRenderWindowFrames(
   // Quantize lookups to that clock, but never sample a frame belonging to the next edit.
   const resolution = args.sourceTimeResolution ?? 1_000_000;
   const lastTick = (Math.ceil(window.segment.sourceEnd * resolution) - 1) / resolution;
-  const sampleTimes = window.sourceTimes.map((time) =>
-    Math.min(lastTick, Math.round(time * resolution) / resolution)
-  );
+  const sampleTimes = window.sourceTimes.map((time) => {
+    const lookup = Math.min(lastTick, Math.round(time * resolution) / resolution);
+    return args.leadingSampleTime !== undefined &&
+      lookup < args.leadingSampleTime &&
+      args.leadingSampleTime < window.segment.sourceEnd
+      ? args.leadingSampleTime
+      : lookup;
+  });
   const blurEnabled = hasQuickEditMotionBlur(args.zoomRegions);
-  const spatialRenderer = args.zoomRegions.some(
-    (r) =>
-      !r.dormant &&
-      quickEditFocusType(r) === 'zoom' &&
-      (hasQuickEditPerspective(r.perspective) || r.depthOfField?.enabled)
-  )
-    ? createReviewSpatialRenderer()
+  const spatialRenderer = args.zoomRegions.some(quickEditRegionNeedsSpatialRenderer)
+    ? createReviewSpatialSession()
     : undefined;
   let dissolve: HTMLCanvasElement | undefined;
   let frame = 0;
@@ -569,24 +595,67 @@ export async function renderRenderWindowFrames(
       try {
         signal.throwIfAborted();
         const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
-        const draw = (
+        const currentHistory = await args.recordingHistory?.read(
+          window.sourceTimes[frame] ?? window.segment.sourceStart,
+          timestamp + args.fragmentOffset,
+          { width: canvas.width, height: canvas.height, frameDuration: 1 / fps },
+          signal
+        );
+        const draw = async (
           context: CanvasRenderingContext2D,
           canvas: HTMLCanvasElement,
           sample: Pick<ReviewTransitionSample, 'draw'>,
           resultTime: number,
           sourceTime: number
-        ) =>
-          paintReviewExportScene({
-            scene: args,
-            context,
-            canvas,
-            sample,
-            resultTime,
+        ) => {
+          const history = await args.recordingHistory?.read(
             sourceTime,
-            spatialRenderer,
-            scratch,
-            blurEnabled,
-          });
+            resultTime,
+            { width: canvas.width, height: canvas.height, frameDuration: 1 / fps },
+            signal
+          );
+          const scene = history
+            ? {
+                ...args,
+                zoomRegions: history.effective.zoomRegions,
+                clickCues: history.clickCues,
+              }
+            : args;
+          const enhanced = args.exportEnhancer
+            ? await prepareReviewExportSourceSampling({
+                enhancer: args.exportEnhancer,
+                scene,
+                output: canvas,
+                sample,
+                sourceTime,
+                resultTime,
+                signal,
+              })
+            : null;
+          let paintSample = enhanced?.original ?? sample;
+          if (args.exportEnhancer && !enhanced) {
+            sample.draw(rasterContext, 0, 0, raster.width, raster.height);
+            paintSample = {
+              draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
+            };
+          }
+          try {
+            paintReviewExportScene({
+              scene,
+              context,
+              canvas,
+              sample: paintSample,
+              resultTime,
+              sourceTime,
+              spatialRenderer,
+              scratch,
+              blurEnabled,
+              ...(enhanced ? { exportSampling: enhanced } : {}),
+            });
+          } finally {
+            enhanced?.dispose();
+          }
+        };
         if (blend?.plan.type === 'dissolve') {
           const endpoints = await args.transitionFrames?.load(blend.plan);
           signal.throwIfAborted();
@@ -603,13 +672,13 @@ export async function renderRenderWindowFrames(
           dissolve.height = canvas.height;
           const dissolveContext = dissolve.getContext('2d');
           if (!dissolveContext) throw new Error('Canvas context is unavailable.');
-          paintReviewCutDissolve(
+          await paintReviewCutDissolve(
             context,
             { canvas: dissolve, context: dissolveContext },
             blend.incoming,
             (target, surface, side) => {
               const endpoint = sides[side];
-              draw(
+              return draw(
                 target,
                 surface,
                 { draw: endpoint.sample.draw.bind(endpoint.sample) },
@@ -620,21 +689,39 @@ export async function renderRenderWindowFrames(
             canvas
           );
         } else {
-          if (blend) {
+          if (blend && args.exportEnhancer) {
             const endpoints = await args.transitionFrames?.load(blend.plan);
             signal.throwIfAborted();
             if (!endpoints) throw new QuickEditExportUnavailable(['transition-frames']);
-            paintReviewCutTransition(rasterContext, raster, blend, endpoints, sample);
-          } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
-          draw(
-            context,
-            canvas,
-            {
-              draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
-            },
-            timestamp + args.fragmentOffset,
-            window.sourceTimes[frame] ?? window.segment.sourceStart
-          );
+            const original = selectReviewCutTransitionSource(blend, endpoints, sample);
+            await draw(
+              context,
+              canvas,
+              original,
+              timestamp + args.fragmentOffset,
+              original.timestamp
+            );
+          } else {
+            if (blend) {
+              const endpoints = await args.transitionFrames?.load(blend.plan);
+              signal.throwIfAborted();
+              if (!endpoints) throw new QuickEditExportUnavailable(['transition-frames']);
+              paintReviewCutTransition(rasterContext, raster, blend, endpoints, sample);
+            } else if (!args.exportEnhancer)
+              sample.draw(rasterContext, 0, 0, raster.width, raster.height);
+            await draw(
+              context,
+              canvas,
+              args.exportEnhancer
+                ? sample
+                : {
+                    draw: (target, x, y, width, height) =>
+                      target.drawImage(raster, x, y, width, height),
+                  },
+              timestamp + args.fragmentOffset,
+              window.sourceTimes[frame] ?? window.segment.sourceStart
+            );
+          }
         }
         if (webcamFrames) {
           const cameraFrame = await webcamFrames.next();
@@ -642,7 +729,12 @@ export async function renderRenderWindowFrames(
           if (cameraFrame.done) throw new QuickEditExportUnavailable(['asset-missing']);
           cameraFrame.value?.draw(context, canvas);
         }
-        drawReviewKeys(context, args.keyCues ?? [], timestamp + args.fragmentOffset, canvas);
+        drawReviewKeys(
+          context,
+          currentHistory?.keyCues ?? args.keyCues ?? [],
+          timestamp + args.fragmentOffset,
+          canvas
+        );
         args.watermark?.draw(context);
         args.captions?.draw(context, timestamp + args.fragmentOffset);
         paintReviewCutBlackout(context, canvas, blend);

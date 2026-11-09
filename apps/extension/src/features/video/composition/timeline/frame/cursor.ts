@@ -74,15 +74,32 @@ export function resolveCursorSample(
   sourceClipId?: string,
   options?: { includeSourceEnd?: boolean }
 ): VideoProjectCursorSample | null {
+  const sourceFallback = () => {
+    const groups = project.cursorTrack?.sourceObservations;
+    const active = project.clips.some(
+      (clip) =>
+        clip.type === 'VIDEO' &&
+        (!sourceClipId || clip.id === sourceClipId) &&
+        currentTime >= clip.startTime &&
+        (currentTime < clip.startTime + clip.duration ||
+          (options?.includeSourceEnd && currentTime === clip.startTime + clip.duration)) &&
+        groups?.some(
+          (group) => group.trajectory && group.sourceInstanceId === clip.sourceInstanceId
+        )
+    );
+    return active
+      ? (resolveProjectSourceCursorObservation(project, currentTime, sourceClipId, options) ?? null)
+      : null;
+  };
   const samples = project.cursorTrack?.samples ?? [];
   if (samples.length === 0) {
-    return null;
+    return sourceFallback();
   }
 
   const { previousSample, nextSample } = cursorSamplesAtTime(project, currentTime, sourceClipId);
 
   if (!previousSample) {
-    return null;
+    return sourceFallback();
   }
   if (previousSample.sourceAnchor) {
     const owner = project.clips.find(({ id }) => id === previousSample.sourceAnchor?.sourceClipId);
@@ -92,7 +109,7 @@ export function resolveCursorSample(
       currentTime > owner.startTime + owner.duration ||
       (currentTime === owner.startTime + owner.duration && !options?.includeSourceEnd)
     )
-      return null;
+      return sourceFallback();
   }
 
   if (project.cursorTrack?.captureMode === VideoCursorCaptureMode.EMBEDDED_FALLBACK) {

@@ -1,3 +1,4 @@
+import { createRetentionDatabaseFixture } from '../assets/retention-authority.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createPagePackageManifestFixture as createWebSnapshotManifest } from '../../../features/web-snapshot/manifest.test-support';
 
@@ -41,8 +42,8 @@ beforeEach(() => {
     },
   ]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (store: string) => {
+    effect(
+      createRetentionDatabaseFixture(async (store: string) => {
         if (store === 'asset_refs') return [createRef('asset-live'), createRef('asset-missing')];
         if (store === 'asset_owners') {
           return [
@@ -63,8 +64,8 @@ beforeEach(() => {
           ];
         }
         return [];
-      },
-    })
+      })
+    )
   );
 });
 
@@ -91,13 +92,13 @@ it.each([
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (requestedStore: string) => {
+    effect(
+      createRetentionDatabaseFixture(async (requestedStore: string) => {
         if (requestedStore === 'asset_refs') return [createRef('asset-domain')];
         if (requestedStore === store) return [row];
         return [];
-      },
-    })
+      })
+    )
   );
 
   const report = await auditDurableAssets();
@@ -112,8 +113,8 @@ it('audits package and screenshot ownership for a web snapshot independently', a
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (store: string) => {
+    effect(
+      createRetentionDatabaseFixture(async (store: string) => {
         if (store === 'asset_refs') {
           return [createRef('package-asset'), createRef('screenshot-asset')];
         }
@@ -129,8 +130,8 @@ it('audits package and screenshot ownership for a web snapshot independently', a
         }
         if (store === 'web_snapshots') return [createWebSnapshot()];
         return [];
-      },
-    })
+      })
+    )
   );
 
   const report = await auditDurableAssets();
@@ -149,8 +150,8 @@ it('reports only the missing owner when domains share an immutable asset', async
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (store: string) => {
+    effect(
+      createRetentionDatabaseFixture(async (store: string) => {
         if (store === 'asset_refs') return [createRef('asset-shared')];
         if (store === 'asset_owners') {
           return [
@@ -166,8 +167,8 @@ it('reports only the missing owner when domains share an immutable asset', async
         if (store === 'project_assets')
           return [createProjectAsset('project-shared', 'asset-shared')];
         return [];
-      },
-    })
+      })
+    )
   );
 
   const report = await auditDurableAssets();
@@ -201,7 +202,9 @@ it('protects a prepared Page Package output while its job journal is ready', asy
       },
     },
   ]);
-  mocks.runMutation.mockImplementation(async (effect) => effect({ getAll: async () => [] }));
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect(createRetentionDatabaseFixture(async () => []))
+  );
 
   await collectOrphanAssetObjects();
 
@@ -215,13 +218,13 @@ it('revalidates IDB authority after acquiring the object lock', async () => {
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) => {
     snapshotCount += 1;
-    return effect({
-      getAll: async (store: string) => {
+    return effect(
+      createRetentionDatabaseFixture(async (store: string) => {
         if (store === 'asset_refs' && snapshotCount > 1)
           return [createRef('published-during-collection')];
         return [];
-      },
-    });
+      })
+    );
   });
 
   await collectOrphanAssetObjects();
@@ -240,8 +243,8 @@ it('protects rollback bytes recorded by a replace operation during collector rev
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) => {
     snapshotCount += 1;
-    return effect({
-      getAll: async (store: string) => {
+    return effect(
+      createRetentionDatabaseFixture(async (store: string) => {
         if (store === 'asset_operations' && snapshotCount > 1) {
           return [
             {
@@ -256,8 +259,8 @@ it('protects rollback bytes recorded by a replace operation during collector rev
           ];
         }
         return [];
-      },
-    });
+      })
+    );
   });
 
   await collectOrphanAssetObjects();
@@ -271,9 +274,11 @@ it('fails closed when persisted asset authority cannot be parsed', async () => {
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (store: string) => (store === 'asset_refs' ? [{ invalid: true }] : []),
-    })
+    effect(
+      createRetentionDatabaseFixture(async (store: string) =>
+        store === 'asset_refs' ? [{ invalid: true }] : []
+      )
+    )
   );
 
   await expect(collectOrphanAssetObjects()).resolves.toMatchObject({ authorityValid: false });
@@ -293,8 +298,8 @@ it('reports embedded binary metadata across nested editor document values', asyn
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (store: string) => {
+    effect(
+      createRetentionDatabaseFixture(async (store: string) => {
         if (store === 'image_workspaces') {
           return [
             { document: { source: 'data:image/png;base64,AAAA' } },
@@ -303,8 +308,8 @@ it('reports embedded binary metadata across nested editor document values', asyn
           ];
         }
         return [];
-      },
-    })
+      })
+    )
   );
 
   const report = await auditDurableAssets();
@@ -318,15 +323,16 @@ it('reports embedded binary metadata across nested editor document values', asyn
   );
 });
 
-it('fails closed when operation and editor-document stores are not arrays', async () => {
+it('fails closed when operation and editor-document rows are invalid', async () => {
   mocks.objects.mockResolvedValue([]);
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (store: string) =>
-        store === 'asset_operations' || store === 'image_workspaces' ? { invalid: true } : [],
-    })
+    effect(
+      createRetentionDatabaseFixture(async (store: string) =>
+        store === 'asset_operations' || store === 'image_workspaces' ? [{ invalid: true }] : []
+      )
+    )
   );
 
   await expect(auditDurableAssets()).resolves.toMatchObject({ authorityValid: false });
@@ -432,16 +438,17 @@ it('recognizes immutable HTML catalogue bodies as their own required graph edge'
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (name: string) =>
+    effect(
+      createRetentionDatabaseFixture(async (name: string) =>
         name === 'asset_refs'
           ? [ref]
           : name === 'asset_owners'
             ? [owner]
             : name === 'scenario_exports'
               ? [row]
-              : [],
-    })
+              : []
+      )
+    )
   );
   const report = await auditDurableAssets();
   expect(report.authorityValid).toBe(true);
@@ -456,15 +463,15 @@ it.each(['owner', 'source'] as const)(
     mocks.journals.mockResolvedValue([]);
     mocks.writing.mockResolvedValue([]);
     mocks.runMutation.mockImplementation(async (callback) =>
-      callback({
-        getAll: async (store: string) => {
+      callback(
+        createRetentionDatabaseFixture(async (store: string) => {
           if (authority === 'owner' && store === 'asset_owners')
             return [{ assetId: 'retained', ownerId: 'r', ownerKind: 'recording', role: 'body' }];
           if (authority === 'source' && store === 'recordings')
             return [createRecording('r', 'retained')];
           return [];
-        },
-      })
+        })
+      )
     );
     await collectOrphanAssetObjects();
     expect(mocks.deleteObject).not.toHaveBeenCalled();
@@ -481,7 +488,11 @@ it('projects stored Library source ownership independently of project resources'
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (callback) =>
-    callback({ getAll: async (store: string) => (store === 'media_library' ? [material] : []) })
+    callback(
+      createRetentionDatabaseFixture(async (store: string) =>
+        store === 'media_library' ? [material] : []
+      )
+    )
   );
   const report = await collectOrphanAssetObjects();
   expect(report.objectsWithoutAuthority).toEqual([]);
@@ -519,8 +530,8 @@ it('preserves old objects named only by unresolved compensation records', async 
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
   mocks.runMutation.mockImplementation(async (effect) =>
-    effect({
-      getAll: async (store: string) =>
+    effect(
+      createRetentionDatabaseFixture(async (store: string) =>
         store === 'asset_operations'
           ? [
               {
@@ -541,8 +552,9 @@ it('preserves old objects named only by unresolved compensation records', async 
                 ],
               },
             ]
-          : [],
-    })
+          : []
+      )
+    )
   );
   await collectOrphanAssetObjects();
   expect(mocks.deleteObject).not.toHaveBeenCalled();

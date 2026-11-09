@@ -50,6 +50,11 @@ const MAX_RETAINED_KEYS = 500;
 const executedCommandKeys = new Map<string, CommandEntry>();
 
 const idempotencyPolicyByType = {
+  [VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS]: {
+    idempotent: false,
+    reason:
+      'The recording writer validates batch sequence and identical retries without retaining full history',
+  },
   [MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND]: {
     idempotent: false,
     reason:
@@ -74,6 +79,11 @@ const idempotencyPolicyByType = {
   [MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE]: {
     idempotent: false,
     reason: 'privacy erasure and verification are deliberately repeatable under the owner lock',
+  },
+  [MessageType.OFFSCREEN_SIMPLIFY_COMMAND]: {
+    idempotent: false,
+    reason:
+      'Disposable computation sessions validate their current identity; cancellation can be retried',
   },
   [MessageType.OFFSCREEN_QUICK_ACTION_HEADER]: {
     idempotent: false,

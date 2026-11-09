@@ -50,5 +50,9 @@ export function createViewerScreenshotCaptureAdapter(
   return {
     captureSelection: () => captureSelection(args.iframe, args.getFrames),
     captureViewport: (mode) => captureViewport(args.iframe, mode, args.getFrames),
+    getViewportBounds() {
+      const rect = resolveViewerIframe(args.iframe).getBoundingClientRect();
+      return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+    },
   };
 }

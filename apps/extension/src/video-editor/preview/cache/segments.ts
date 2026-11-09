@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import type { VideoProject } from '../../../features/video/project/types';
 import { createVideoPreviewSegmentRevision } from './revision';
 
@@ -12,7 +13,8 @@ export interface VideoPreviewCacheSegmentPlanEntry {
 
 export async function createVideoPreviewCacheSegmentPlan(
   project: VideoProject,
-  range: { endFrame: number; startFrame: number }
+  range: { endFrame: number; startFrame: number },
+  renderer: VideoPreviewRenderer = 'gpu'
 ): Promise<VideoPreviewCacheSegmentPlanEntry[]> {
   const framesPerSegment = Math.max(
     1,
@@ -33,7 +35,7 @@ export async function createVideoPreviewCacheSegmentPlan(
   return Promise.all(
     segments.map(async (segment) => ({
       ...segment,
-      fingerprint: await createVideoPreviewSegmentRevision(project, segment),
+      fingerprint: await createVideoPreviewSegmentRevision(project, segment, renderer),
     }))
   );
 }

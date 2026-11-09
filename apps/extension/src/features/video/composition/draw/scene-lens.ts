@@ -9,11 +9,13 @@ export function drawSceneLens(
   source: HTMLCanvasElement | OffscreenCanvas,
   bounds: Rect,
   lens: NonNullable<SceneSpotlightFrame['lens']>,
-  radius = 0
+  radius = 0,
+  sharpPaint?: (context: CanvasRenderingContext2D) => void
 ): void {
   if (lens.scale <= 1 || bounds.width <= 0 || bounds.height <= 0) return;
   if (lens.optics === 'flat') {
-    drawFlatLens(context, source, bounds, lens.scale);
+    if (sharpPaint) sharpPaint(context);
+    else drawFlatLens(context, source, bounds, lens.scale);
     return;
   }
   drawOpticalGlass(
@@ -33,7 +35,7 @@ export function drawSceneLens(
         bounds.width,
         bounds.height
       ),
-    () => drawFlatLens(context, source, bounds, lens.scale),
+    () => (sharpPaint ? sharpPaint(context) : drawFlatLens(context, source, bounds, lens.scale)),
     lens.edgeWidth
   );
 }

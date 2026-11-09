@@ -11,7 +11,7 @@ import { segmentVisualLayersByViewportLock } from '../../motion/layer-camera';
 import type { ReviewSpatialRenderer } from '../../canvas/spatial-renderer';
 import { shouldLockVisualLayerToViewport } from '../../motion/layer-camera';
 import type { VideoCompositionCameraState } from '../../types';
-import type { EffectRuntimeRenderedFrameMap } from '../runtime/types';
+import type { EffectRuntimeRenderedFrameMap, EffectRuntimeFramePlan } from '../runtime/types';
 import { acquireVideoCompositionBuffer } from '../../canvas/buffer-pool';
 import {
   createEffectRuntimeDrawState,
@@ -33,7 +33,24 @@ type BackgroundPainter = (
   dimensions: { width: number; height: number }
 ) => void;
 
+/** A normalized effect input; borrowed frames remain owned by the composition driver. */
+export interface EffectRuntimeInputComposition {
+  time?: number;
+  dimensions: { width: number; height: number };
+  renderDimensions: { width: number; height: number };
+  layers: readonly VideoCompositionVisualLayer[];
+  applyCamera: boolean;
+  camera?: VideoCompositionCameraState;
+  scene?: SourceSceneInput;
+  frames: EffectRuntimeRenderedFrameMap;
+}
+export type EffectRuntimeInputComposer = (
+  request: EffectRuntimeInputComposition
+) => Promise<ImageBitmap>;
+
 export function createEffectRuntimeInputMaterializer(args: {
+  mediaForPlan?: (plan: EffectRuntimeFramePlan) => ReadonlyMap<string, VideoCompositionMediaSource>;
+  composeInput?: EffectRuntimeInputComposer;
   drawBackground?: BackgroundPainter;
   scene?: SourceSceneInput;
   camera?: VideoCompositionCameraState;
@@ -58,12 +75,26 @@ export function createEffectRuntimeInputMaterializer(args: {
   return {
     materializeTargetSource: (plan, frames) =>
       materializeTargetSource(
-        { ...args, createBitmap, ownerDocument, resourceScope, frames: frames ?? new Map() },
+        {
+          ...args,
+          clipMediaElements: args.mediaForPlan?.(plan) ?? args.clipMediaElements,
+          createBitmap,
+          ownerDocument,
+          resourceScope,
+          frames: frames ?? new Map(),
+        },
         plan
       ),
     materializeTransitionInputs: (plan, frames) =>
       materializeTransitionInputs(
-        { ...args, createBitmap, ownerDocument, resourceScope, frames: frames ?? new Map() },
+        {
+          ...args,
+          clipMediaElements: args.mediaForPlan?.(plan) ?? args.clipMediaElements,
+          createBitmap,
+          ownerDocument,
+          resourceScope,
+          frames: frames ?? new Map(),
+        },
         plan
       ),
   };
@@ -148,6 +179,7 @@ async function materializeTransitionInputs(
 }
 
 async function drawIsolatedLayer(args: {
+  composeInput?: EffectRuntimeInputComposer;
   drawBackground?: BackgroundPainter;
   scene?: SourceSceneInput;
   frames: EffectRuntimeRenderedFrameMap;
@@ -163,6 +195,41 @@ async function drawIsolatedLayer(args: {
   renderDimensions: { height: number; width: number };
   resourceScope: EffectRuntimeFrameResourceScope;
 }): Promise<ImageBitmap> {
+  if (args.composeInput) {
+    const deferredBorder =
+      args.layer?.kind === 'video' &&
+      args.scene?.frame.sceneSpotlights?.some((mask) => mask.afterClipId === args.layer?.clipId);
+    const layers =
+      args.layers ??
+      (args.layer
+        ? [
+            deferredBorder && args.layer.kind === 'video'
+              ? { ...args.layer, borders: [] }
+              : args.layer,
+          ]
+        : []);
+    const bitmap = await args.composeInput({
+      dimensions: args.dimensions,
+      renderDimensions: args.renderDimensions,
+      layers,
+      applyCamera: args.layers !== undefined,
+      frames: args.frames,
+      ...(args.camera ? { camera: args.camera } : {}),
+      ...(args.scene ? { scene: args.scene } : {}),
+    });
+    try {
+      if (
+        bitmap.width !== args.renderDimensions.width ||
+        bitmap.height !== args.renderDimensions.height
+      )
+        fail();
+      args.resourceScope.retainBitmap(bitmap);
+    } catch (error) {
+      bitmap.close();
+      throw error;
+    }
+    return bitmap;
+  }
   const releaseCanvas = args.resourceScope.allocateCanvas(
     args.renderDimensions.width,
     args.renderDimensions.height

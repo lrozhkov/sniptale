@@ -735,3 +735,24 @@ it('dispatches STOP without waiting for a hanging content telemetry collection',
     })
   );
 });
+
+it('settles the independent event promise with the bound Stop acknowledgement', async () => {
+  const recordingEvents = {
+    format: 'recording-events-v1',
+    formatVersion: 1,
+    algorithm: 'lossless-v1',
+    encoding: 'json-utf8-v1',
+    eventStreamId: 'b'.repeat(32),
+    state: 'incomplete',
+    finalized: true,
+    totalBlocks: 1,
+    totalRecords: 3,
+    totalBytes: 512,
+    streamSha256: 'd'.repeat(64),
+  };
+  sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted', recordingEvents });
+  await expect(stopRecording()).resolves.toEqual({ result: 'accepted' });
+  const options = runStopSideEffectsMock.mock.calls.at(-1)?.[2];
+  expect(options).toBeDefined();
+  await expect(options.recordingEvents).resolves.toEqual(recordingEvents);
+});

@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.2` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `46` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `53` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -77,6 +77,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/library-lifecycle`
 - `apps/extension/src/composition/persistence/managed-preset-order`
 - `apps/extension/src/composition/persistence/media-library`
+- `apps/extension/src/composition/persistence/native-app-trust.test.ts`
+- `apps/extension/src/composition/persistence/native-app-trust.ts`
 - `apps/extension/src/composition/persistence/picker-preferences`
 - `apps/extension/src/composition/persistence/popup-export-preferences`
 - `apps/extension/src/composition/persistence/privacy-erasure`
@@ -90,6 +92,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/remote-connection`
 - `apps/extension/src/composition/persistence/review-workspaces`
 - `apps/extension/src/composition/persistence/scenario`
+- `apps/extension/src/composition/persistence/secret-protection`
 - `apps/extension/src/composition/persistence/settings`
 - `apps/extension/src/composition/persistence/settings-transfer`
 - `apps/extension/src/composition/persistence/step-badge-presets`
@@ -105,6 +108,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/voice-input`
 - `apps/extension/src/contracts/aggregate-promotion.ts`
 - `apps/extension/src/contracts/ai`
+- `apps/extension/src/contracts/design-review-session.ts`
 - `apps/extension/src/contracts/diagnostics.test.ts`
 - `apps/extension/src/contracts/diagnostics.ts`
 - `apps/extension/src/contracts/effect-runtime`
@@ -136,6 +140,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/features/prompt-templates`
 - `apps/extension/src/features/quick-actions-presets`
 - `apps/extension/src/features/scenario`
+- `apps/extension/src/features/simplify`
 - `apps/extension/src/features/tab-capabilities`
 - `apps/extension/src/features/video`
 - `apps/extension/src/features/viewport-presets`
@@ -144,6 +149,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/platform/i18n`
 - `apps/extension/src/platform/media-utils`
 - `apps/extension/src/platform/navigation`
+- `apps/extension/src/platform/network`
 - `apps/extension/src/platform/runtime-messaging`
 - `apps/extension/src/platform/security-e2e-control`
 - `apps/extension/src/ui/action-audio`
@@ -151,6 +157,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/audio`
 - `apps/extension/src/ui/background-thumbnails`
 - `apps/extension/src/ui/callout-background-settings`
+- `apps/extension/src/ui/camera-composition-controls.test.tsx`
+- `apps/extension/src/ui/camera-composition-controls.tsx`
 - `apps/extension/src/ui/camera-follow-segment-controls.test.tsx`
 - `apps/extension/src/ui/camera-follow-segment-controls.tsx`
 - `apps/extension/src/ui/color-selector`
@@ -169,6 +177,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/effect-catalog-preview.test.tsx`
 - `apps/extension/src/ui/effect-catalog-preview.tsx`
 - `apps/extension/src/ui/effect-catalog.css`
+- `apps/extension/src/ui/effect-control-presentation`
 - `apps/extension/src/ui/focus-appearance`
 - `apps/extension/src/ui/glass-select`
 - `apps/extension/src/ui/gradient-preset-grid`
@@ -217,6 +226,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/scenario-capture-edit`
 - `apps/extension/src/workflows/scenario-narration`
 - `apps/extension/src/workflows/settings-transfer`
+- `apps/extension/src/workflows/simplify`
 - `apps/extension/src/workflows/sync-transfer`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`
@@ -309,6 +319,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities.ts`
 - `apps/extension/src/background/runtime/tab-mode-router/router.ts`
 - `apps/extension/src/background/scenario/router/index.ts`
+- `apps/extension/src/background/simplify/route.ts`
 - `apps/extension/src/background/sync-connection/product-route.ts`
 - `apps/extension/src/background/sync-connection/route.ts`
 - `apps/extension/src/background/voice-input/route.ts`

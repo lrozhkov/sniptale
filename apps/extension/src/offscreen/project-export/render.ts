@@ -5,6 +5,7 @@ import {
 } from '../../features/video/project/export/time-calibration';
 import { createExportTimeEstimator } from '../../features/video/project/export/time-estimate';
 import { planProjectExportTime } from '../../features/video/project/export/time-estimate-plan';
+import { createProjectExportSourceSampling } from './renderer/source-sampling';
 import { preloadClipVideos } from './media';
 import { finalizeExport } from './persistence';
 import { type LoadedImagesMap } from './renderer';
@@ -66,6 +67,7 @@ function createProjectExportTiming(
   const codecs = { AVC: 'avc', HEVC: 'hevc', VP8: 'vp8', VP9: 'vp9' } as const;
   const profile = createExportTimeProfile({
     editor: 'project',
+    detailEnhancement: settings.detailEnhancement,
     route: 'render',
     container: settings.format === VideoExportFormat.MP4 ? 'mp4' : 'webm',
     codec: codecs[codec],
@@ -129,12 +131,30 @@ export async function renderCompositeExport(
 
   const timing = createProjectExportTiming(project, settings, abortController.signal);
   job.timeEstimator = timing.estimator;
-  const outputBlob =
-    settings.format === VideoExportFormat.MP4
-      ? await renderCompositeToMp4(job, project, settings, loadedImages, canvas, context)
-      : await renderCompositeToWebm(job, project, settings, loadedImages, context, canvas);
+  const sampling = createProjectExportSourceSampling({
+    project,
+    settings,
+    sourceUrl: (clip) => {
+      const physicalClip = project.clips.find(
+        (candidate) => candidate.type === 'VIDEO' && candidate.assetId === clip.assetId
+      );
+      if (!physicalClip) return undefined;
+      const media = job.clipMediaElements.get(physicalClip.id);
+      return media?.currentSrc || media?.src;
+    },
+  });
+  job.sourceSampling = sampling;
+  try {
+    const outputBlob =
+      settings.format === VideoExportFormat.MP4
+        ? await renderCompositeToMp4(job, project, settings, loadedImages, canvas, context)
+        : await renderCompositeToWebm(job, project, settings, loadedImages, context, canvas);
 
-  assertExportNotCancelled(job);
-  timing.finish();
-  await finalizeCompletedExport(job, sourceProject ?? project, settings, outputBlob);
+    assertExportNotCancelled(job);
+    timing.finish();
+    await finalizeCompletedExport(job, sourceProject ?? project, settings, outputBlob);
+  } finally {
+    await sampling?.dispose();
+    if (sampling) delete job.sourceSampling;
+  }
 }

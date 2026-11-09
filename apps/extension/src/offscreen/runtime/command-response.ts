@@ -1,3 +1,4 @@
+import { isSimplifyCompletion } from '../../contracts/messaging/contracts/runtime/actions/simplify';
 import { isQuickActionHeaderRaster } from '../../contracts/messaging/contracts/runtime-message/quick-action-appearance.types';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -5,6 +6,8 @@ import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/vide
 import type { HandledOffscreenRuntimeMessageType } from './message-types';
 import { buildProjectExportCommandSuccessResponse } from './project-export-response';
 import { isRecordingPointTransform } from '../../features/video/project/validation/recording-telemetry';
+import { isRecordingEventsDescriptor } from '../../features/video/project/recording-events/records';
+import { isCursorTrajectoryDescriptor } from '../../features/video/project/cursor-trajectory/records';
 
 type OffscreenCommandSuccessResponse = Record<string, unknown> & { success: true };
 
@@ -175,6 +178,38 @@ function buildDesktopFrameResponse(result: unknown): OffscreenCommandSuccessResp
 function buildStopRecordingResponse(result: unknown): OffscreenCommandSuccessResponse {
   const type = VideoMessageType.OFFSCREEN_STOP_RECORDING;
   if (
+    typeof result === 'object' &&
+    result !== null &&
+    !Array.isArray(result) &&
+    ('cursorTrajectory' in result || 'recordingEvents' in result)
+  ) {
+    if (
+      !isRecordWithExactKeys(result, [
+        'result',
+        ...('cursorTrajectory' in result ? ['cursorTrajectory'] : []),
+        ...('recordingEvents' in result ? ['recordingEvents'] : []),
+        ...('recordingPointTransform' in result ? ['recordingPointTransform'] : []),
+      ]) ||
+      !('result' in result) ||
+      result['result'] !== 'stopped' ||
+      ('cursorTrajectory' in result && !isCursorTrajectoryDescriptor(result['cursorTrajectory'])) ||
+      ('recordingEvents' in result && !isRecordingEventsDescriptor(result['recordingEvents'])) ||
+      ('recordingPointTransform' in result &&
+        result['recordingPointTransform'] !== null &&
+        !isRecordingPointTransform(result['recordingPointTransform']))
+    )
+      return invalidCompletion(type);
+    return {
+      result: 'accepted',
+      success: true,
+      ...('cursorTrajectory' in result ? { cursorTrajectory: result['cursorTrajectory'] } : {}),
+      ...('recordingEvents' in result ? { recordingEvents: result['recordingEvents'] } : {}),
+      ...('recordingPointTransform' in result
+        ? { recordingPointTransform: result['recordingPointTransform'] }
+        : {}),
+    };
+  }
+  if (
     isRecordWithExactKeys(result, ['result', 'recordingPointTransform']) &&
     result['result'] === 'stopped' &&
     (result['recordingPointTransform'] === null ||
@@ -233,6 +268,9 @@ export function buildOffscreenCommandResponse(
     case MessageType.OFFSCREEN_PREPARE_DESKTOP_FRAME:
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
       return buildAcceptedScalarResponse(type, result);
+    case MessageType.OFFSCREEN_SIMPLIFY_COMMAND:
+      if (!isSimplifyCompletion(result)) return invalidCompletion(type);
+      return { success: true, ...result };
     case MessageType.OFFSCREEN_QUICK_ACTION_HEADER:
       if (
         !isRecordWithExactKeys(result, ['dataUrl']) ||
@@ -251,6 +289,7 @@ export function buildOffscreenCommandResponse(
     case VideoMessageType.OFFSCREEN_PAUSE_RECORDING:
     case VideoMessageType.OFFSCREEN_RESUME_RECORDING:
     case VideoMessageType.OFFSCREEN_UPDATE_SETTINGS:
+    case VideoMessageType.OFFSCREEN_RECORDING_OBSERVATIONS:
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_CLOSE:
     case VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_SWITCH:
       return buildAcceptedVoidResponse(type, result);

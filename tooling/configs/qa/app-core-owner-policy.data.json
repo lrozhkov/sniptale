@@ -46,7 +46,8 @@
     "apps/extension/src/background/storage/page-access",
     "apps/extension/src/background/storage/scenario",
     "apps/extension/src/background/storage/video",
-    "apps/extension/src/composition/persistence/background-presets"
+    "apps/extension/src/composition/persistence/background-presets",
+    "apps/extension/src/composition/persistence/secret-protection"
   ],
   "forbiddenOwnerEdges": [
     [
@@ -62,6 +63,8 @@
     "apps/extension/src/features/highlighter/contracts/index.ts",
     "apps/extension/src/features/highlighter/style/public.ts",
     "apps/extension/src/features/highlighter/surface-style/surface-css.ts",
+    "apps/extension/src/features/simplify/raster.ts",
+    "apps/extension/src/features/simplify/settings.ts",
     "apps/extension/src/features/video/project/public.ts"
   ],
   "sameConcernPersistenceEdges": [

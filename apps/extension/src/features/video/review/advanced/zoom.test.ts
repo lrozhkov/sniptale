@@ -32,6 +32,7 @@ describe('createQuickEditZoomRegion', () => {
       id: 'zoom-1',
       start: 3,
       end: 5,
+      cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.6 },
       transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
       enter: { type: 'ease-in-out', duration: 0.3 },
       exit: { type: 'ease-in-out', duration: 0.3 },

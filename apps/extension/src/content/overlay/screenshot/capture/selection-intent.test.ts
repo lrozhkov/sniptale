@@ -56,6 +56,7 @@ vi.mock('../persistence', async (importOriginal) => ({
 }));
 
 import { runSelectionScreenshot } from './selection';
+import { pageCapturePreferences } from '../../../application/capture-preferences';
 import type { ScreenshotControllerRuntime } from '../types';
 import type { SelectionModeActivationOptions } from '../../../selection/selection-mode/types';
 
@@ -119,6 +120,34 @@ afterEach(() => {
 });
 
 describe('selection screenshot confirmation intent', () => {
+  it('initializes quick-action preferences before editing and preserves the menu override', async () => {
+    const runtime = createRuntime();
+    runtime.quickActionOverlayRef = {
+      current: {
+        transactionId: 'tx',
+        afterCapture: 'copy',
+        exitAfterCapture: true,
+        imageFormat: 'webp',
+        imageQuality: 61,
+      },
+    };
+    enableSelectionModeDeferredIfCurrentMock.mockImplementationOnce(async () => {
+      expect(pageCapturePreferences.read('selection')).toMatchObject({
+        imageFormat: 'webp',
+        imageQuality: 61,
+      });
+      pageCapturePreferences.update('selection', { imageFormat: 'jpeg', imageQuality: 37 });
+      return { x: 10, y: 20, width: 100, height: 80 };
+    });
+    const capture = runSelectionScreenshot(runtime, { showSuccessToast: false });
+    await vi.advanceTimersByTimeAsync(500);
+    await capture;
+    expect(pageCapturePreferences.read('selection')).toMatchObject({
+      imageFormat: 'jpeg',
+      imageQuality: 37,
+    });
+  });
+
   it('composites only the confirmed crop snapshot before cropping without an input event', async () => {
     const snapshot = {
       objects: [],

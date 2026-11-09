@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
   syncSet: vi.fn(),
   loadSettings: vi.fn(),
 }));
-vi.mock('../infrastructure/browser-storage', () => ({
+vi.mock('../infrastructure/browser-storage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/browser-storage')>()),
   browserStorage: {
     local: { get: mocks.localGet, set: mocks.localSet, remove: mocks.localRemove },
     sync: { get: async () => ({}), set: mocks.syncSet, remove: vi.fn() },

@@ -1,10 +1,25 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createExportTimeHistory, EXPORT_TIME_HISTORY_KEY } from './index';
+import { createExportTimeProfile } from '../../../features/video/project/export/time-calibration';
 import { installPersistenceLockManagerForTests } from '../infrastructure/mutation-barrier';
 
 afterEach(() => installPersistenceLockManagerForTests(null));
 
 const profile = 'project-render-mp4-avc-p8-f30-qHIGH-c1';
+const enhancedProfiles = (['bicubic-sharpen', 'clark-x2'] as const).map((detailEnhancement) =>
+  createExportTimeProfile({
+    editor: 'project',
+    route: 'render',
+    container: 'mp4',
+    codec: 'avc',
+    width: 1920,
+    height: 1080,
+    fps: 30,
+    quality: 'HIGH',
+    complexity: 1,
+    detailEnhancement,
+  })
+);
 const time = 100 * 24 * 60 * 60 * 1000;
 function fixture(value: unknown = undefined) {
   let stored = value;
@@ -64,6 +79,16 @@ it.each([
   profile.replace('p8', 'p257'),
   profile.replace('f30', 'f241'),
   profile.replace('c1', 'c17'),
+  ...[
+    '-eoff',
+    '-e',
+    '-ebicubic',
+    '-eclark',
+    '-eclark-x3',
+    '-eCLARK-X2',
+    '-eclark-x2-extra',
+    '-eclark-x2-ebicubic-sharpen',
+  ].map((suffix) => profile + suffix),
 ])('refuses unbounded or identifying profile %s', async (invalid) => {
   const f = fixture();
   await f.history.record(invalid, [1], f.signal);
@@ -78,23 +103,26 @@ it('ignores empty, multiple and invalid ratio results', async () => {
   expect(f.get).not.toHaveBeenCalled();
 });
 
-it('ignores cancellation before and during history reads and writes', async () => {
-  const f = fixture({ version: 1, rows: [{ profile, at: time, ratio: 1 }] });
-  f.get.mockImplementationOnce(async () => {
-    f.controller.abort();
-    return { [EXPORT_TIME_HISTORY_KEY]: { version: 1, rows: [{ profile, at: time, ratio: 1 }] } };
-  });
-  expect(await f.history.read(profile, f.signal)).toEqual([]);
-  await f.history.record(profile, [1], f.signal);
-  expect(f.set).not.toHaveBeenCalled();
-  const write = fixture();
-  write.get.mockImplementationOnce(async () => {
-    write.controller.abort();
-    return { [EXPORT_TIME_HISTORY_KEY]: undefined };
-  });
-  await write.history.record(profile, [1], write.signal);
-  expect(write.set).not.toHaveBeenCalled();
-});
+it.each([profile, ...enhancedProfiles])(
+  'ignores cancellation before and during history reads and writes for %s',
+  async (profile) => {
+    const f = fixture({ version: 1, rows: [{ profile, at: time, ratio: 1 }] });
+    f.get.mockImplementationOnce(async () => {
+      f.controller.abort();
+      return { [EXPORT_TIME_HISTORY_KEY]: { version: 1, rows: [{ profile, at: time, ratio: 1 }] } };
+    });
+    expect(await f.history.read(profile, f.signal)).toEqual([]);
+    await f.history.record(profile, [1], f.signal);
+    expect(f.set).not.toHaveBeenCalled();
+    const write = fixture();
+    write.get.mockImplementationOnce(async () => {
+      write.controller.abort();
+      return { [EXPORT_TIME_HISTORY_KEY]: undefined };
+    });
+    await write.history.record(profile, [1], write.signal);
+    expect(write.set).not.toHaveBeenCalled();
+  }
+);
 
 it('fails softly when storage or lock coordination is unavailable', async () => {
   const f = fixture();
@@ -110,35 +138,45 @@ it('fails softly when storage or lock coordination is unavailable', async () => 
   expect(f.get).not.toHaveBeenCalled();
 });
 
-it('reloads within the lock and drops a competing advisory write rather than queueing it', async () => {
-  installPersistenceLockManagerForTests({
-    request: async (_name, _options, operation) => operation({}),
-  });
-  const f = fixture();
-  let locked = false;
-  let release!: () => void;
-  const waiting = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  const owner = createExportTimeHistory({
-    browserStorage: { local: { get: f.get, set: f.set, remove: vi.fn(), isAvailable: () => true } },
-    now: () => time,
-    withLock: async (operation) => {
-      if (locked) return;
-      locked = true;
-      await waiting;
-      await operation();
-      locked = false;
-    },
-  });
-  const first = owner.record(profile, [1.2], f.signal);
-  await vi.waitFor(() => expect(locked).toBe(true));
-  const second = owner.record(profile, [1.4], f.signal);
-  release();
-  await Promise.all([first, second]);
-  expect(f.set).toHaveBeenCalledTimes(1);
-  expect(await owner.read(profile, f.signal)).toEqual([1.2]);
-});
+it.each([profile, ...enhancedProfiles])(
+  'reloads within the lock and drops a competing advisory write rather than queueing it for %s',
+  async (profile) => {
+    installPersistenceLockManagerForTests({
+      request: async (_name, _options, operation) => operation({}),
+    });
+    const f = fixture();
+    let locked = false;
+    let entered!: () => void;
+    const admitted = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let release!: () => void;
+    const waiting = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const owner = createExportTimeHistory({
+      browserStorage: {
+        local: { get: f.get, set: f.set, remove: vi.fn(), isAvailable: () => true },
+      },
+      now: () => time,
+      withLock: async (operation) => {
+        if (locked) return;
+        locked = true;
+        entered();
+        await waiting;
+        await operation();
+        locked = false;
+      },
+    });
+    const first = owner.record(profile, [1.2], f.signal);
+    await admitted;
+    const second = owner.record(profile, [1.4], f.signal);
+    release();
+    await Promise.all([first, second]);
+    expect(f.set).toHaveBeenCalledTimes(1);
+    expect(await owner.read(profile, f.signal)).toEqual([1.2]);
+  }
+);
 
 it('drops retention-expired rows on the next successful write and removes unknown fields', async () => {
   const f = fixture({
@@ -152,3 +190,27 @@ it('drops retention-expired rows on the next successful write and removes unknow
   expect(await f.history.read(profile, f.signal)).toEqual([1.5, 2]);
   expect(JSON.stringify(f.set.mock.calls[0])).not.toContain('not retained');
 });
+
+it('persists exact generated enhancement profiles and isolates both from legacy observations', async () => {
+  const f = fixture();
+  expect(enhancedProfiles).toEqual([`${profile}-ebicubic-sharpen`, `${profile}-eclark-x2`]);
+  await f.history.record(profile, [1], f.signal);
+  await f.history.record(enhancedProfiles[0]!, [1.5], f.signal);
+  await f.history.record(enhancedProfiles[1]!, [2], f.signal);
+  expect(await f.history.read(profile, f.signal)).toEqual([1]);
+  expect(await f.history.read(enhancedProfiles[0]!, f.signal)).toEqual([1.5]);
+  expect(await f.history.read(enhancedProfiles[1]!, f.signal)).toEqual([2]);
+});
+
+it.each(enhancedProfiles)(
+  'retries an enhanced observation after storage refusal without retaining the failed measurement for %s',
+  async (profile) => {
+    const f = fixture();
+    f.get.mockRejectedValueOnce(new Error('Storage unavailable'));
+    await f.history.record(profile, [1.5], f.signal);
+    expect(f.set).not.toHaveBeenCalled();
+    await f.history.record(profile, [2], f.signal);
+    expect(await f.history.read(profile, f.signal)).toEqual([2]);
+    expect(f.set).toHaveBeenCalledOnce();
+  }
+);

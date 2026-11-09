@@ -5,7 +5,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Duplex } from 'node:stream';
+import { Transform, type Duplex } from 'node:stream';
 import { promisify } from 'node:util';
 
 type Fault = {
@@ -69,6 +69,13 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
     mkcolStatuses: [] as { key: string; status: number }[],
     gets: 0,
     getKeys: [] as string[],
+    getBodies: [] as {
+      key: string;
+      status: number | null;
+      receivedBytes: number;
+      forwardedBytes: number;
+      complete: boolean;
+    }[],
     propfinds: 0,
     sinkBytes: 0,
     putBodies: [] as { key: string; bytes: number; sha256: string; complete: boolean }[],
@@ -140,6 +147,16 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
         counts.gets++;
         counts.getKeys.push(key);
       }
+      const getBody: (typeof counts.getBodies)[number] | null =
+        incoming.method === 'GET'
+          ? { key, status: null, receivedBytes: 0, forwardedBytes: 0, complete: false }
+          : null;
+      if (getBody) {
+        counts.getBodies.push(getBody);
+        downstream.once('finish', () => {
+          getBody.complete = true;
+        });
+      }
       if (incoming.method === 'PROPFIND') counts.propfinds++;
       const fault =
         armed && armed.method === incoming.method && (armed.key === key || armed.key === '*')
@@ -149,10 +166,12 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
       if (fault?.kind === 'status' || fault?.kind === 'redirect') {
         markReached();
         if (fault.kind === 'redirect') {
+          if (getBody) getBody.status = 307;
           downstream.writeHead(307, { location: '/__dav_redirect_sink' }).end();
         } else {
           if (incoming.method === 'MKCOL')
             counts.mkcolStatuses.push({ key, status: fault.status ?? 503 });
+          if (getBody) getBody.status = fault.status ?? 503;
           downstream.writeHead(fault.status ?? 503).end();
         }
         incoming.resume();
@@ -194,10 +213,33 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
         if (!downstream.writableFinished) cancel();
       });
       outgoing.on('error', () => {
-        if (!downstream.headersSent && !downstream.destroyed) downstream.writeHead(502).end();
-        else downstream.destroy();
+        if (!downstream.headersSent && !downstream.destroyed) {
+          if (getBody) getBody.status = 502;
+          downstream.writeHead(502).end();
+        } else downstream.destroy();
       });
       outgoing.on('response', (response) => {
+        if (getBody) {
+          getBody.status = response.statusCode ?? 502;
+          response.on('data', (chunk: Buffer) => {
+            getBody.receivedBytes += chunk.length;
+          });
+        }
+        const forward = () => {
+          if (!getBody) {
+            response.pipe(downstream);
+            return;
+          }
+          const meter = new Transform({
+            transform(chunk: Buffer, _encoding, callback) {
+              getBody.forwardedBytes += chunk.length;
+              callback(null, chunk);
+            },
+          });
+          response.once('error', () => meter.destroy());
+          downstream.once('close', () => meter.destroy());
+          response.pipe(meter).pipe(downstream);
+        };
         if (incoming.method === 'MKCOL')
           counts.mkcolStatuses.push({ key, status: response.statusCode ?? 502 });
         response.on('error', () => {
@@ -216,7 +258,7 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
             if (release === resume) release = undefined;
             if (downstream.destroyed || response.destroyed) return;
             downstream.writeHead(response.statusCode ?? 502, response.rawHeaders);
-            response.pipe(downstream);
+            forward();
           };
           release = resume;
           markReached();
@@ -229,16 +271,18 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
             response.pause();
             // Withhold bytes even when the real server returns its complete XML in one chunk.
             const split = Math.max(1, Math.floor(chunk.length / 2));
+            if (getBody) getBody.forwardedBytes += split;
             downstream.write(chunk.subarray(0, split));
             const remainder = chunk.subarray(split);
             const resume = () => {
               if (release === resume) release = undefined;
               if (downstream.destroyed) return;
+              if (getBody) getBody.forwardedBytes += remainder.length;
               downstream.write(remainder);
               // A complete one-chunk response can end while its saved remainder is held.
               if (response.readableEnded) downstream.end();
               else if (response.destroyed) downstream.destroy();
-              else response.pipe(downstream);
+              else forward();
             };
             release = resume;
             markReached();
@@ -251,7 +295,7 @@ export async function startWebdavLabProxy(upstreamRoot: string) {
           });
         } else {
           downstream.writeHead(response.statusCode ?? 502, response.rawHeaders);
-          response.pipe(downstream);
+          forward();
         }
       });
       if (fault?.kind === 'hold') {

@@ -43,6 +43,28 @@ function styledFixture() {
   return input;
 }
 
+it('transfers enabled or disabled background motion through Native hydration', () => {
+  for (const enabled of [true, false]) {
+    const input = styledFixture();
+    const motion = { mode: 'waves' as const, speed: 35, intensity: 80 };
+    input.document.advancedContent.background = {
+      ...input.document.advancedContent.background,
+      motion,
+    };
+    if (!enabled)
+      input.document.advancedContent.background = updateQuickEditBackground(
+        input.document.advancedContent.background,
+        { enabled: false }
+      );
+    const result = planReviewProjectConversion(input);
+    if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+    expect(result.project.sceneBackground?.motion).toEqual(motion);
+    expect(
+      hydrateVideoProject(JSON.parse(JSON.stringify(result.project)))?.sceneBackground?.motion
+    ).toEqual(motion);
+  }
+});
+
 it('keeps the Gallery decorated scene through cuts speed and Native reopen', () => {
   const input = styledFixture();
   input.document.edits.push({

@@ -7,6 +7,7 @@ import { createVideoProjectMotionRegion } from '../../../../features/video/proje
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,
+  resolveQuickEditLensArea,
 } from '../../../../features/video/project/scene/focus-appearance';
 import {
   createProject,
@@ -383,5 +384,47 @@ it('does not normalize a rectangular authored circle during a no-op click', () =
   render();
   pointer(body(), 'pointerdown', 100, 50);
   pointer(window, 'pointerup', 100, 50);
+  expect(commit).not.toHaveBeenCalled();
+});
+
+it('preserves circular lens diameter when a pointer move overshoots both window edges', () => {
+  useSpotlight();
+  params.selectedMotionRegion!.spotlight = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify',
+    lensShape: 'circle',
+  };
+  render();
+  const before = JSON.stringify(params.project);
+  pointer(body(), 'pointerdown', 100, 50);
+  pointer(window, 'pointermove', 400, 200);
+  const draft = preview.mock.lastCall?.[0].edit.settings.area;
+  expect(Math.max(draft.width, draft.height)).toBe(0.5);
+  const resolved = resolveQuickEditLensArea(
+    { ...params.selectedMotionRegion!.spotlight!, area: draft },
+    { width: 200, height: 100 }
+  );
+  expect(resolved.width * 200).toBe(50);
+  expect(resolved.height * 100).toBe(50);
+  expect(resolved.x + resolved.width).toBe(1);
+  expect(resolved.y + resolved.height).toBe(1);
+  pointer(window, 'pointerup', 400, 200);
+  expect(commit.mock.lastCall?.[1].focusEdit.settings.area).toEqual(draft);
+  expect(JSON.stringify(params.project)).toBe(before);
+});
+
+it('does not move an edge-docked circle outside its window through keyboard nudges', () => {
+  useSpotlight();
+  params.selectedMotionRegion!.spotlight = {
+    ...createQuickEditSpotlight(),
+    effect: 'magnify',
+    lensShape: 'circle',
+    area: { x: 0.75, y: 0.5, width: 0.25, height: 0.5 },
+  };
+  render();
+  for (const key of ['ArrowRight', 'ArrowDown'])
+    act(() =>
+      body().dispatchEvent(new KeyboardEvent('keydown', { key, shiftKey: true, bubbles: true }))
+    );
   expect(commit).not.toHaveBeenCalled();
 });

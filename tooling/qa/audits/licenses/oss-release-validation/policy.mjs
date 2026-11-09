@@ -9,6 +9,7 @@ import {
   sha256,
 } from '../../../../release/policy/oss-release-policy.mjs';
 import { isNonEmptyString, validatePolicyEntries } from './policy-schema.mjs';
+import { normalizeBundledAssetNotices } from '../../../../release/dependency-legal/output.mjs';
 
 export function sameStringSet(left, right) {
   return JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
@@ -89,6 +90,15 @@ export function validateLegalFiles(root, policy) {
   if (dependencyManifest && dependencyManifest.schemaVersion !== 1) {
     errors.push('dependency legal manifest has an invalid schema');
   }
+  let bundledLegalPaths;
+  try {
+    bundledLegalPaths = normalizeBundledAssetNotices(policy.dependencyLegal.bundledAssets).flatMap(
+      (asset) => [asset.licensePath, asset.noticePath, asset.provenancePath]
+    );
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+    return errors;
+  }
   const expectedLegalPaths = new Set([
     ...REQUIRED_RELEASE_LEGAL_PATHS.map(releaseLegalArchivePath),
     ...(policy.bundledAssets.some((asset) => asset.id === 'golos-text')
@@ -96,6 +106,7 @@ export function validateLegalFiles(root, policy) {
       : []),
     policy.dependencyLegal.manifestPath,
     ...dependencyArchivePaths,
+    ...bundledLegalPaths,
   ]);
   if (!sameStringSet(archivePaths, expectedLegalPaths)) {
     errors.push('release legal payload must contain the complete canonical file set');

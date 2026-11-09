@@ -1,0 +1,832 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed",
+  "recordingId": "recording-events-fixture",
+  "eventStreamId": "abcdef0123456789abcdef0123456789",
+  "limits": {
+    "maxBlockRecords": 512,
+    "maxBlockBytes": 65536,
+    "maxPendingBlocks": 2,
+    "maxManifestEntries": 32,
+    "maxChunkRawBytes": 32768
+  },
+  "blocks": [
+    {
+      "value": {
+        "formatVersion": 1,
+        "recordingId": "recording-events-fixture",
+        "eventStreamId": "abcdef0123456789abcdef0123456789",
+        "sequence": 0,
+        "startTimeUs": 0,
+        "endTimeUs": 160000,
+        "records": [
+          {
+            "kind": "segment",
+            "recordSeq": 0,
+            "segmentId": 0,
+            "activeTimeUs": 0,
+            "clock": {
+              "source": "windows-message-time",
+              "timestampQuantumUs": 1000,
+              "resolutionBoundUs": null,
+              "mappingUncertaintyUs": null
+            },
+            "reason": "start"
+          },
+          {
+            "kind": "action",
+            "recordSeq": 1,
+            "segmentId": 0,
+            "activeTimeUs": 0,
+            "action": {
+              "id": "key-1",
+              "kind": "KEY",
+              "timeUs": 0,
+              "durationUs": 0,
+              "point": null,
+              "label": "Ctrl+S",
+              "data": {
+                "downTimeUs": 0,
+                "upTimeUs": null,
+                "pressDurationUs": null,
+                "lastObservedTimeUs": 0,
+                "repeatCount": 0,
+                "completion": "observed",
+                "groupId": "key-group-1",
+                "continuationOf": null,
+                "keyboardAttackId": "attack-key-1",
+                "keyboardOnsetTimeUs": 0,
+                "ctrlKey": true,
+                "altKey": false,
+                "shiftKey": false,
+                "metaKey": false
+              },
+              "preset": "NONE"
+            }
+          },
+          {
+            "kind": "keyboard-repeat-block",
+            "recordSeq": 2,
+            "segmentId": 0,
+            "activeTimeUs": 30000,
+            "ownerKind": "action",
+            "ownerId": "key-1",
+            "phase": "repeat",
+            "cadence": {
+              "version": 1,
+              "id": "repeat-1",
+              "startTimeUs": 10000,
+              "quantumUs": 1,
+              "count": 3,
+              "encoding": "delta-us",
+              "ticks": [
+                0,
+                10000,
+                10000
+              ]
+            }
+          },
+          {
+            "kind": "action-update",
+            "recordSeq": 3,
+            "segmentId": 0,
+            "activeTimeUs": 40000,
+            "actionId": "key-1",
+            "revision": 1,
+            "data": {
+              "upTimeUs": 40000,
+              "pressDurationUs": 40000,
+              "lastObservedTimeUs": 40000,
+              "repeatCount": 3,
+              "completion": "released"
+            }
+          },
+          {
+            "kind": "signal",
+            "recordSeq": 4,
+            "segmentId": 0,
+            "activeTimeUs": 70000,
+            "signal": {
+              "id": "typing-1",
+              "kind": "typing",
+              "startTimeUs": 50000,
+              "endTimeUs": 70000,
+              "point": null,
+              "data": {
+                "eventCount": 3,
+                "activity": "keyboard",
+                "privacy": "normal",
+                "groupId": "typing-group-1",
+                "continuationOf": null
+              }
+            }
+          },
+          {
+            "kind": "keyboard-repeat-block",
+            "recordSeq": 5,
+            "segmentId": 0,
+            "activeTimeUs": 70000,
+            "ownerKind": "signal",
+            "ownerId": "typing-1",
+            "phase": "onset",
+            "cadence": {
+              "version": 1,
+              "id": "onsets-1",
+              "startTimeUs": 50000,
+              "quantumUs": 1,
+              "count": 3,
+              "encoding": "rle-us",
+              "ticks": [
+                0,
+                1,
+                10000,
+                2
+              ]
+            }
+          },
+          {
+            "kind": "action",
+            "recordSeq": 6,
+            "segmentId": 0,
+            "activeTimeUs": 100000,
+            "action": {
+              "id": "click-1",
+              "kind": "CLICK",
+              "timeUs": 100000,
+              "durationUs": 0,
+              "point": {
+                "x": 0.25,
+                "y": 0.75
+              },
+              "label": "Click",
+              "data": {
+                "button": 0,
+                "gestureId": null,
+                "completion": "observed",
+                "downTimeUs": null,
+                "upTimeUs": null,
+                "pressDurationUs": null,
+                "lastObservedTimeUs": 100000,
+                "clickCount": 1,
+                "gestureType": "click",
+                "semanticEndTimeUs": null,
+                "dragStartTimeUs": null,
+                "pointerCancelled": null,
+                "dropObserved": null,
+                "upPoint": null,
+                "ctrlKey": false,
+                "altKey": false,
+                "shiftKey": false,
+                "metaKey": false
+              },
+              "preset": "NONE"
+            }
+          },
+          {
+            "kind": "action",
+            "recordSeq": 7,
+            "segmentId": 0,
+            "activeTimeUs": 120000,
+            "action": {
+              "id": "scroll-1",
+              "kind": "SCROLL",
+              "timeUs": 120000,
+              "durationUs": 0,
+              "point": {
+                "x": 0.5,
+                "y": 0.3333333333333333
+              },
+              "label": "Scroll",
+              "data": {
+                "deltaX": -2.5,
+                "deltaY": 120.25,
+                "deltaMode": 0,
+                "eventType": "wheel",
+                "deltaZ": 1.75,
+                "scrollX": null,
+                "scrollY": null,
+                "ctrlKey": true,
+                "altKey": false,
+                "shiftKey": false,
+                "metaKey": false
+              },
+              "preset": "NONE"
+            }
+          },
+          {
+            "kind": "signal",
+            "recordSeq": 8,
+            "segmentId": 0,
+            "activeTimeUs": 150000,
+            "signal": {
+              "id": "warning-1",
+              "kind": "static-frame",
+              "startTimeUs": 150000,
+              "endTimeUs": 150000,
+              "point": null,
+              "data": {
+                "source": "keyboard-hook",
+                "code": "events-dropped",
+                "severity": "warning"
+              }
+            }
+          },
+          {
+            "kind": "gap",
+            "recordSeq": 9,
+            "segmentId": 0,
+            "activeTimeUs": 150000,
+            "source": "keyboard",
+            "fromTimeUs": 150000,
+            "toTimeUs": 160000,
+            "firstLostSourceSeq": 62,
+            "lastLostSourceSeq": 64,
+            "lostCount": 3,
+            "reason": "input-overflow"
+          }
+        ]
+      },
+      "utf8": "{\"formatVersion\":1,\"recordingId\":\"recording-events-fixture\",\"eventStreamId\":\"abcdef0123456789abcdef0123456789\",\"sequence\":0,\"startTimeUs\":0,\"endTimeUs\":160000,\"records\":[{\"kind\":\"segment\",\"recordSeq\":0,\"segmentId\":0,\"activeTimeUs\":0,\"clock\":{\"source\":\"windows-message-time\",\"timestampQuantumUs\":1000,\"resolutionBoundUs\":null,\"mappingUncertaintyUs\":null},\"reason\":\"start\"},{\"kind\":\"action\",\"recordSeq\":1,\"segmentId\":0,\"activeTimeUs\":0,\"action\":{\"id\":\"key-1\",\"kind\":\"KEY\",\"timeUs\":0,\"durationUs\":0,\"point\":null,\"label\":\"Ctrl+S\",\"data\":{\"downTimeUs\":0,\"upTimeUs\":null,\"pressDurationUs\":null,\"lastObservedTimeUs\":0,\"repeatCount\":0,\"completion\":\"observed\",\"groupId\":\"key-group-1\",\"continuationOf\":null,\"keyboardAttackId\":\"attack-key-1\",\"keyboardOnsetTimeUs\":0,\"ctrlKey\":true,\"altKey\":false,\"shiftKey\":false,\"metaKey\":false},\"preset\":\"NONE\"}},{\"kind\":\"keyboard-repeat-block\",\"recordSeq\":2,\"segmentId\":0,\"activeTimeUs\":30000,\"ownerKind\":\"action\",\"ownerId\":\"key-1\",\"phase\":\"repeat\",\"cadence\":{\"version\":1,\"id\":\"repeat-1\",\"startTimeUs\":10000,\"quantumUs\":1,\"count\":3,\"encoding\":\"delta-us\",\"ticks\":[0,10000,10000]}},{\"kind\":\"action-update\",\"recordSeq\":3,\"segmentId\":0,\"activeTimeUs\":40000,\"actionId\":\"key-1\",\"revision\":1,\"data\":{\"upTimeUs\":40000,\"pressDurationUs\":40000,\"lastObservedTimeUs\":40000,\"repeatCount\":3,\"completion\":\"released\"}},{\"kind\":\"signal\",\"recordSeq\":4,\"segmentId\":0,\"activeTimeUs\":70000,\"signal\":{\"id\":\"typing-1\",\"kind\":\"typing\",\"startTimeUs\":50000,\"endTimeUs\":70000,\"point\":null,\"data\":{\"eventCount\":3,\"activity\":\"keyboard\",\"privacy\":\"normal\",\"groupId\":\"typing-group-1\",\"continuationOf\":null}}},{\"kind\":\"keyboard-repeat-block\",\"recordSeq\":5,\"segmentId\":0,\"activeTimeUs\":70000,\"ownerKind\":\"signal\",\"ownerId\":\"typing-1\",\"phase\":\"onset\",\"cadence\":{\"version\":1,\"id\":\"onsets-1\",\"startTimeUs\":50000,\"quantumUs\":1,\"count\":3,\"encoding\":\"rle-us\",\"ticks\":[0,1,10000,2]}},{\"kind\":\"action\",\"recordSeq\":6,\"segmentId\":0,\"activeTimeUs\":100000,\"action\":{\"id\":\"click-1\",\"kind\":\"CLICK\",\"timeUs\":100000,\"durationUs\":0,\"point\":{\"x\":0.25,\"y\":0.75},\"label\":\"Click\",\"data\":{\"button\":0,\"gestureId\":null,\"completion\":\"observed\",\"downTimeUs\":null,\"upTimeUs\":null,\"pressDurationUs\":null,\"lastObservedTimeUs\":100000,\"clickCount\":1,\"gestureType\":\"click\",\"semanticEndTimeUs\":null,\"dragStartTimeUs\":null,\"pointerCancelled\":null,\"dropObserved\":null,\"upPoint\":null,\"ctrlKey\":false,\"altKey\":false,\"shiftKey\":false,\"metaKey\":false},\"preset\":\"NONE\"}},{\"kind\":\"action\",\"recordSeq\":7,\"segmentId\":0,\"activeTimeUs\":120000,\"action\":{\"id\":\"scroll-1\",\"kind\":\"SCROLL\",\"timeUs\":120000,\"durationUs\":0,\"point\":{\"x\":0.5,\"y\":0.3333333333333333},\"label\":\"Scroll\",\"data\":{\"deltaX\":-2.5,\"deltaY\":120.25,\"deltaMode\":0,\"eventType\":\"wheel\",\"deltaZ\":1.75,\"scrollX\":null,\"scrollY\":null,\"ctrlKey\":true,\"altKey\":false,\"shiftKey\":false,\"metaKey\":false},\"preset\":\"NONE\"}},{\"kind\":\"signal\",\"recordSeq\":8,\"segmentId\":0,\"activeTimeUs\":150000,\"signal\":{\"id\":\"warning-1\",\"kind\":\"static-frame\",\"startTimeUs\":150000,\"endTimeUs\":150000,\"point\":null,\"data\":{\"source\":\"keyboard-hook\",\"code\":\"events-dropped\",\"severity\":\"warning\"}}},{\"kind\":\"gap\",\"recordSeq\":9,\"segmentId\":0,\"activeTimeUs\":150000,\"source\":\"keyboard\",\"fromTimeUs\":150000,\"toTimeUs\":160000,\"firstLostSourceSeq\":62,\"lastLostSourceSeq\":64,\"lostCount\":3,\"reason\":\"input-overflow\"}]}",
+      "blockSha256": "14337beb2af7d6f214776129475404db606dd3128f731be9672d87d4e92e825d"
+    },
+    {
+      "value": {
+        "formatVersion": 1,
+        "recordingId": "recording-events-fixture",
+        "eventStreamId": "abcdef0123456789abcdef0123456789",
+        "sequence": 1,
+        "startTimeUs": 160000,
+        "endTimeUs": 170000,
+        "records": [
+          {
+            "kind": "segment",
+            "recordSeq": 10,
+            "segmentId": 1,
+            "activeTimeUs": 160000,
+            "clock": {
+              "source": "windows-message-time",
+              "timestampQuantumUs": 1000,
+              "resolutionBoundUs": null,
+              "mappingUncertaintyUs": null
+            },
+            "reason": "after-gap"
+          },
+          {
+            "kind": "boundary",
+            "recordSeq": 11,
+            "segmentId": 1,
+            "activeTimeUs": 170000,
+            "reason": "pause"
+          }
+        ]
+      },
+      "utf8": "{\"formatVersion\":1,\"recordingId\":\"recording-events-fixture\",\"eventStreamId\":\"abcdef0123456789abcdef0123456789\",\"sequence\":1,\"startTimeUs\":160000,\"endTimeUs\":170000,\"records\":[{\"kind\":\"segment\",\"recordSeq\":10,\"segmentId\":1,\"activeTimeUs\":160000,\"clock\":{\"source\":\"windows-message-time\",\"timestampQuantumUs\":1000,\"resolutionBoundUs\":null,\"mappingUncertaintyUs\":null},\"reason\":\"after-gap\"},{\"kind\":\"boundary\",\"recordSeq\":11,\"segmentId\":1,\"activeTimeUs\":170000,\"reason\":\"pause\"}]}",
+      "blockSha256": "b469bcdf170df8372203e27ad0129ca40ad0fe3dfba83848945587bd3d469845"
+    },
+    {
+      "value": {
+        "formatVersion": 1,
+        "recordingId": "recording-events-fixture",
+        "eventStreamId": "abcdef0123456789abcdef0123456789",
+        "sequence": 2,
+        "startTimeUs": 170000,
+        "endTimeUs": 900000,
+        "records": [
+          {
+            "kind": "segment",
+            "recordSeq": 12,
+            "segmentId": 2,
+            "activeTimeUs": 170000,
+            "clock": {
+              "source": "windows-message-time",
+              "timestampQuantumUs": 1000,
+              "resolutionBoundUs": null,
+              "mappingUncertaintyUs": null
+            },
+            "reason": "resume"
+          },
+          {
+            "kind": "action",
+            "recordSeq": 13,
+            "segmentId": 2,
+            "activeTimeUs": 180000,
+            "action": {
+              "id": "key-f5",
+              "kind": "KEY",
+              "timeUs": 180000,
+              "durationUs": 0,
+              "point": null,
+              "label": "F5",
+              "data": {
+                "downTimeUs": 180000,
+                "upTimeUs": null,
+                "pressDurationUs": null,
+                "lastObservedTimeUs": 180000,
+                "repeatCount": 0,
+                "completion": "observed",
+                "groupId": "key-group-f5",
+                "continuationOf": null,
+                "keyboardAttackId": "attack-key-f5",
+                "keyboardOnsetTimeUs": 180000,
+                "ctrlKey": false,
+                "altKey": false,
+                "shiftKey": false,
+                "metaKey": false
+              },
+              "preset": "NONE"
+            }
+          },
+          {
+            "kind": "action-update",
+            "recordSeq": 14,
+            "segmentId": 2,
+            "activeTimeUs": 900000,
+            "actionId": "key-f5",
+            "revision": 1,
+            "data": {
+              "upTimeUs": null,
+              "pressDurationUs": null,
+              "lastObservedTimeUs": 180000,
+              "repeatCount": 0,
+              "completion": "lost"
+            }
+          },
+          {
+            "kind": "signal",
+            "recordSeq": 15,
+            "segmentId": 2,
+            "activeTimeUs": 900000,
+            "signal": {
+              "id": "protected-public-stop",
+              "kind": "typing",
+              "startTimeUs": 0,
+              "endTimeUs": 1000000,
+              "point": null,
+              "data": {
+                "eventCount": null,
+                "activity": "keyboard",
+                "privacy": "protected",
+                "groupId": null,
+                "continuationOf": null
+              }
+            }
+          },
+          {
+            "kind": "signal",
+            "recordSeq": 16,
+            "segmentId": 2,
+            "activeTimeUs": 250000,
+            "signal": {
+              "id": "unknown-aggregate-70000",
+              "kind": "typing",
+              "startTimeUs": 180001,
+              "endTimeUs": 250000,
+              "point": null,
+              "data": {
+                "eventCount": 70000,
+                "activity": "keyboard",
+                "privacy": "unknown",
+                "groupId": "anonymous-group-70000",
+                "continuationOf": null
+              }
+            }
+          },
+          {
+            "kind": "boundary",
+            "recordSeq": 17,
+            "segmentId": 2,
+            "activeTimeUs": 900000,
+            "reason": "stop"
+          }
+        ]
+      },
+      "utf8": "{\"formatVersion\":1,\"recordingId\":\"recording-events-fixture\",\"eventStreamId\":\"abcdef0123456789abcdef0123456789\",\"sequence\":2,\"startTimeUs\":170000,\"endTimeUs\":900000,\"records\":[{\"kind\":\"segment\",\"recordSeq\":12,\"segmentId\":2,\"activeTimeUs\":170000,\"clock\":{\"source\":\"windows-message-time\",\"timestampQuantumUs\":1000,\"resolutionBoundUs\":null,\"mappingUncertaintyUs\":null},\"reason\":\"resume\"},{\"kind\":\"action\",\"recordSeq\":13,\"segmentId\":2,\"activeTimeUs\":180000,\"action\":{\"id\":\"key-f5\",\"kind\":\"KEY\",\"timeUs\":180000,\"durationUs\":0,\"point\":null,\"label\":\"F5\",\"data\":{\"downTimeUs\":180000,\"upTimeUs\":null,\"pressDurationUs\":null,\"lastObservedTimeUs\":180000,\"repeatCount\":0,\"completion\":\"observed\",\"groupId\":\"key-group-f5\",\"continuationOf\":null,\"keyboardAttackId\":\"attack-key-f5\",\"keyboardOnsetTimeUs\":180000,\"ctrlKey\":false,\"altKey\":false,\"shiftKey\":false,\"metaKey\":false},\"preset\":\"NONE\"}},{\"kind\":\"action-update\",\"recordSeq\":14,\"segmentId\":2,\"activeTimeUs\":900000,\"actionId\":\"key-f5\",\"revision\":1,\"data\":{\"upTimeUs\":null,\"pressDurationUs\":null,\"lastObservedTimeUs\":180000,\"repeatCount\":0,\"completion\":\"lost\"}},{\"kind\":\"signal\",\"recordSeq\":15,\"segmentId\":2,\"activeTimeUs\":900000,\"signal\":{\"id\":\"protected-public-stop\",\"kind\":\"typing\",\"startTimeUs\":0,\"endTimeUs\":1000000,\"point\":null,\"data\":{\"eventCount\":null,\"activity\":\"keyboard\",\"privacy\":\"protected\",\"groupId\":null,\"continuationOf\":null}}},{\"kind\":\"signal\",\"recordSeq\":16,\"segmentId\":2,\"activeTimeUs\":250000,\"signal\":{\"id\":\"unknown-aggregate-70000\",\"kind\":\"typing\",\"startTimeUs\":180001,\"endTimeUs\":250000,\"point\":null,\"data\":{\"eventCount\":70000,\"activity\":\"keyboard\",\"privacy\":\"unknown\",\"groupId\":\"anonymous-group-70000\",\"continuationOf\":null}}},{\"kind\":\"boundary\",\"recordSeq\":17,\"segmentId\":2,\"activeTimeUs\":900000,\"reason\":\"stop\"}]}",
+      "blockSha256": "164349132e989483c0d8104e95e9572eb33f38a261693be9565f205e9e5db60f"
+    }
+  ],
+  "descriptor": {
+    "format": "recording-events-v1",
+    "formatVersion": 1,
+    "algorithm": "lossless-v1",
+    "encoding": "json-utf8-v1",
+    "eventStreamId": "abcdef0123456789abcdef0123456789",
+    "state": "incomplete",
+    "finalized": true,
+    "totalBlocks": 3,
+    "totalRecords": 18,
+    "totalBytes": 5528,
+    "streamSha256": "f5e2d14b54e7c81b7ef5d43116e3f79878f1706ac70de0435b56878b32392387"
+  },
+  "receipt": {
+    "format": "recording-events-v1",
+    "state": "incomplete",
+    "totalBlocks": 3,
+    "totalRecords": 18,
+    "totalBytes": 5528,
+    "streamSha256": "f5e2d14b54e7c81b7ef5d43116e3f79878f1706ac70de0435b56878b32392387",
+    "version": 1,
+    "durable": true
+  },
+  "manifest": [
+    {
+      "sequence": 0,
+      "startTimeUs": 0,
+      "endTimeUs": 160000,
+      "recordCount": 10,
+      "byteLength": 3280,
+      "blockSha256": "14337beb2af7d6f214776129475404db606dd3128f731be9672d87d4e92e825d",
+      "prefixSha256": "c8858a4117d4897d5fe21c8f28da2202617adc3a2ef2b7e1d3db52cefbb9e596"
+    },
+    {
+      "sequence": 1,
+      "startTimeUs": 160000,
+      "endTimeUs": 170000,
+      "recordCount": 2,
+      "byteLength": 476,
+      "blockSha256": "b469bcdf170df8372203e27ad0129ca40ad0fe3dfba83848945587bd3d469845",
+      "prefixSha256": "94aba9b83d2cab2386fdee2253ab398ce42dcf7cfd1eb9954b3418c1d7543aee"
+    },
+    {
+      "sequence": 2,
+      "startTimeUs": 170000,
+      "endTimeUs": 900000,
+      "recordCount": 6,
+      "byteLength": 1772,
+      "blockSha256": "164349132e989483c0d8104e95e9572eb33f38a261693be9565f205e9e5db60f",
+      "prefixSha256": "f5e2d14b54e7c81b7ef5d43116e3f79878f1706ac70de0435b56878b32392387"
+    }
+  ],
+  "emptyStreamSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "generators": [
+    {
+      "id": "keyboard-actions-above-old-limit",
+      "kind": "safe-key-actions",
+      "count": 5000,
+      "stepUs": 1000,
+      "label": "F5",
+      "expectedActions": 5000,
+      "expectedDropped": 0
+    },
+    {
+      "id": "signals-above-old-limit",
+      "kind": "accepted-static-signals",
+      "count": 1025,
+      "stepUs": 1000,
+      "expectedSignals": 1025,
+      "expectedDropped": 0
+    },
+    {
+      "id": "long-hold-repeat-blocks",
+      "kind": "command-hold",
+      "label": "Ctrl+F5",
+      "repeatCount": 70000,
+      "repeatStepUs": 10000,
+      "cadenceBlockCount": 137,
+      "maxObservationsPerCadence": 512,
+      "lastCadenceCount": 368,
+      "expectedDuplicateOnsets": 0,
+      "stopAfterLastInputUs": 60000000
+    },
+    {
+      "id": "anonymous-onsets-no-saturation",
+      "kind": "anonymous-typing",
+      "eventCount": 70000,
+      "stepUs": 1000,
+      "fragmentSize": 512,
+      "expectedFragments": 137,
+      "lastFragmentCount": 368,
+      "expectedTextFields": 0
+    },
+    {
+      "id": "protected-input",
+      "kind": "protected-typing",
+      "expectedTextFields": 0,
+      "expectedDomTargets": 0,
+      "expectedCadenceBlocks": 0,
+      "inputEventCount": 70000,
+      "expectedExactCounts": 0,
+      "expectedPerKeyOwnerIds": 0,
+      "expectedFineTimestamps": 0
+    },
+    {
+      "id": "native-onsets-and-delivered-repeats",
+      "kind": "source-key-transitions",
+      "facts": [
+        {
+          "phase": "down",
+          "timeUs": 1000
+        },
+        {
+          "phase": "repeat",
+          "timeUs": 2000
+        },
+        {
+          "phase": "repeat",
+          "timeUs": 3000
+        },
+        {
+          "phase": "up",
+          "timeUs": 4000
+        },
+        {
+          "phase": "down",
+          "timeUs": 5000
+        },
+        {
+          "phase": "up",
+          "timeUs": 6000
+        }
+      ],
+      "expectedOnsets": 2,
+      "expectedRepeats": 2,
+      "expectedCadenceTimesUs": [
+        1000,
+        2000,
+        3000,
+        5000
+      ],
+      "expectedDuplicateOnsets": 0,
+      "deriveCadenceFromCount": false
+    },
+    {
+      "id": "native-unknown-aggregate-count-preserved",
+      "kind": "anonymous-typing",
+      "privacy": "unknown",
+      "eventCount": 70000,
+      "stepUs": 1000,
+      "fragmentSize": 65535,
+      "expectedFragments": 2,
+      "lastFragmentCount": 4465,
+      "expectedTotalEventCount": 70000,
+      "expectedFirstInputUs": 0,
+      "expectedLastInputUs": 69999000,
+      "expectedCadenceBlocks": 0,
+      "expectedPerKeyOwnerIds": 0,
+      "expectedTextFields": 0,
+      "expectedDomTargets": 0
+    }
+  ],
+  "lifecycleCases": [
+    {
+      "id": "stop-after-silence",
+      "lastInputUs": 180000,
+      "stopUs": 900000,
+      "expectedLastObservedTimeUs": 180000,
+      "expectedUpTimeUs": null,
+      "expectedPressDurationUs": null
+    },
+    {
+      "id": "stop-during-pause",
+      "pauseActiveTimeUs": 170000,
+      "stopActiveTimeUs": 170000,
+      "expectedResumeRecords": 0,
+      "expectedState": "complete"
+    },
+    {
+      "id": "loss-is-not-pruned",
+      "acceptedBeforeGap": 5000,
+      "acceptedAfterGap": 5000,
+      "expectedGapRecords": 1,
+      "expectedState": "incomplete"
+    },
+    {
+      "id": "delayed-producer-join-before-pause",
+      "acceptedFacts": [
+        {
+          "producer": "keyboard",
+          "sourceTimeUs": 1000,
+          "deliveredOrder": 1
+        },
+        {
+          "producer": "signal",
+          "sourceTimeUs": 3000,
+          "deliveredOrder": 2
+        },
+        {
+          "producer": "keyboard",
+          "sourceTimeUs": 2000,
+          "deliveredOrder": 3
+        }
+      ],
+      "pauseTimeUs": 4000,
+      "expectedEnvelopeTimesUs": [
+        1000,
+        3000,
+        2000,
+        4000
+      ],
+      "expectedRecordSeqOrder": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expectedBlockStartTimeUs": 1000,
+      "expectedBlockEndTimeUs": 4000,
+      "expectedReassignedFacts": 0,
+      "expectedDroppedFacts": 0,
+      "expectedSealedHistoryRewrites": 0
+    }
+  ],
+  "failureCases": [
+    {
+      "id": "writer-queue-refusal",
+      "committedPrefixBlocks": 20,
+      "expectedState": "incomplete",
+      "rewriteEarlierBlocks": false
+    },
+    {
+      "id": "storage-refusal-before-final-journal",
+      "committedPrefixBlocks": 20,
+      "journalFinalized": false,
+      "expectedRecoveryState": "incomplete",
+      "deleteCommittedPrefix": false
+    },
+    {
+      "id": "late-append-after-delete",
+      "oldGeneration": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "newGeneration": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expectedAppend": "rejected",
+      "recreateErasedState": false
+    },
+    {
+      "id": "restore-new-generation",
+      "preserveOriginalBytes": true,
+      "preserveSourceIds": true,
+      "acceptOldGenerationAppend": false
+    }
+  ],
+  "negativeMutations": [
+    {
+      "id": "dom-target-is-forbidden",
+      "recordSeq": 6,
+      "path": "action.data.targetId",
+      "value": "forbidden-target"
+    },
+    {
+      "id": "typed-value-is-forbidden",
+      "recordSeq": 4,
+      "path": "signal.data.value",
+      "value": "typed-canary"
+    },
+    {
+      "id": "unsafe-key-label",
+      "recordSeq": 1,
+      "path": "action.label",
+      "value": "secret typed text"
+    },
+    {
+      "id": "growing-repeat-history",
+      "recordSeq": 1,
+      "path": "action.keyboardRepeats",
+      "value": []
+    },
+    {
+      "id": "unknown-record-family",
+      "recordSeq": 0,
+      "path": "kind",
+      "value": "text"
+    },
+    {
+      "id": "counter-unrepresentable",
+      "recordSeq": 4,
+      "path": "signal.data.eventCount",
+      "value": 9007199254740992
+    },
+    {
+      "id": "lost-keyup-cannot-be-stop",
+      "recordSeq": 14,
+      "path": "data.lastObservedTimeUs",
+      "value": 900000
+    },
+    {
+      "id": "negative-repeat-delta",
+      "recordSeq": 2,
+      "path": "cadence.ticks",
+      "value": [
+        0,
+        -1,
+        10000
+      ]
+    },
+    {
+      "id": "cadence-count-mismatch",
+      "recordSeq": 2,
+      "path": "cadence.count",
+      "value": 4
+    },
+    {
+      "id": "out-of-order-revision",
+      "recordSeq": 14,
+      "path": "revision",
+      "value": 0
+    },
+    {
+      "id": "conflicting-duplicate-block",
+      "blockSequence": 0,
+      "mutation": "change one record byte without replacement permission"
+    },
+    {
+      "id": "unknown-or-oversize-record",
+      "maxBlockBytes": 65536,
+      "expected": "explicit incomplete, retained prefix"
+    },
+    {
+      "id": "protected-count-is-forbidden",
+      "privacyVector": 0,
+      "path": "signal.data.eventCount",
+      "value": 2
+    },
+    {
+      "id": "protected-envelope-time-is-private",
+      "privacyVector": 0,
+      "path": "activeTimeUs",
+      "value": 234567
+    },
+    {
+      "id": "protected-fine-end-is-forbidden",
+      "privacyVector": 0,
+      "path": "signal.endTimeUs",
+      "value": 234567
+    },
+    {
+      "id": "protected-cadence-is-forbidden",
+      "privacyVector": 0,
+      "mutation": "append a keyboard-repeat-block owned by protected-bucket-0"
+    },
+    {
+      "id": "scroll-position-is-not-wheel",
+      "recordSeq": 7,
+      "path": "action.data.eventType",
+      "value": "scroll"
+    },
+    {
+      "id": "unknown-warning-source",
+      "recordSeq": 8,
+      "path": "signal.data.source",
+      "value": "arbitrary-private-source"
+    },
+    {
+      "id": "unknown-anonymous-per-key-cadence-is-forbidden",
+      "generator": "native-unknown-aggregate-count-preserved",
+      "mutation": "append per-key cadence or keyboardAttackId to an unknown anonymous aggregate"
+    },
+    {
+      "id": "fractional-near-safe-max-count",
+      "sourceBlock": 2,
+      "replaceToken": {
+        "from": "\"eventCount\":70000",
+        "to": "\"eventCount\":9007199254740990.9"
+      }
+    },
+    {
+      "id": "exponent-time-is-forbidden",
+      "sourceBlock": 2,
+      "replaceToken": {
+        "from": "\"activeTimeUs\":250000",
+        "to": "\"activeTimeUs\":25e4"
+      }
+    },
+    {
+      "id": "negative-zero-count-is-forbidden",
+      "sourceBlock": 2,
+      "replaceToken": {
+        "from": "\"eventCount\":70000",
+        "to": "\"eventCount\":-0"
+      }
+    }
+  ],
+  "privacyVectors": [
+    {
+      "id": "coarse-protected-input",
+      "privateDriverTimesUs": [
+        112233,
+        234567
+      ],
+      "publicEmissionBoundaryUs": 1000000,
+      "record": {
+        "kind": "signal",
+        "recordSeq": 0,
+        "segmentId": 0,
+        "activeTimeUs": 1000000,
+        "signal": {
+          "id": "protected-bucket-0",
+          "kind": "typing",
+          "startTimeUs": 0,
+          "endTimeUs": 1000000,
+          "point": null,
+          "data": {
+            "eventCount": null,
+            "activity": "input",
+            "privacy": "protected",
+            "groupId": null,
+            "continuationOf": null
+          }
+        }
+      },
+      "expectedExactCounts": 0,
+      "expectedCadenceBlocks": 0,
+      "expectedFineTimestamps": 0
+    }
+  ]
+}

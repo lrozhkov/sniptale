@@ -24,8 +24,8 @@ function createBrowserFrameSyncAction(
       return;
     }
     const next = { ...useEditorStore.getState().browserFrame, ...draft };
-    args.setBrowserFrame(next);
     if (enabled === true || next.enabled) await controller.applyBrowserFrame(next);
+    else args.setBrowserFrame(next);
   };
 }
 
@@ -103,8 +103,8 @@ export function useEditorInspectorSidebarActions(args: SidebarActionArgs, hasIma
   };
   const editorActions = {
     copyRenderedImageDisabledReason: null,
-    onApplyFrame: () => {
-      controller.applyFrameSettings(args.frameDraft);
+    onApplyFrame: async () => {
+      await controller.applyFrameSettings(args.frameDraft);
       useEditorStore.getState().setFreshImageBackgroundPending(false);
     },
     onCopyRenderedImage: async (options?: EditorRenderedImageOptions) => {

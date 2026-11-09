@@ -185,11 +185,11 @@ describe('extension page settings helpers', () => {
     browserTabsQueryMock.mockResolvedValueOnce([{ id: 7, windowId: 9 }]);
     const { openSettingsPage } = await import('./index');
 
-    await openSettingsPage({ route: { section: 'native-app', view: 'commands' } });
+    await openSettingsPage({ route: { section: 'native-app', view: 'connection' } });
 
     expect(browserTabsUpdateMock).toHaveBeenCalledWith(7, {
       active: true,
-      url: 'chrome-extension://test/apps/extension/src/settings/index.html?section=native-app&view=commands',
+      url: 'chrome-extension://test/apps/extension/src/settings/index.html?section=native-app&view=connection',
     });
     expect(browserWindowsUpdateMock).toHaveBeenCalledWith(9, { focused: true });
     expect(browserTabsCreateMock).not.toHaveBeenCalled();
@@ -572,3 +572,41 @@ it('does not send fresh recording tokens to a lookalike companion path', async (
   expect(browserTabsUpdateMock).not.toHaveBeenCalled();
   expect(browserWindowsCreateMock).toHaveBeenCalledOnce();
 });
+
+it('admits only the canonical popup sender URL with no query or hash', async () => {
+  const { isCanonicalPopupSenderUrl } = await import('./sender-url');
+  const popup = `${EXTENSION_URL_ROOT}/popup/index.html`;
+  expect(isCanonicalPopupSenderUrl(popup)).toBe(true);
+  for (const url of [
+    undefined,
+    '',
+    'invalid',
+    `${popup}?`,
+    `${popup}#`,
+    `${popup}?x=1`,
+    `${popup}#x`,
+    `${popup}/`,
+    popup.replace('test/', 'foreign/'),
+    popup.replace('chrome-extension:', 'https:'),
+    popup.replace('/popup/', '/settings/'),
+    popup.replace('/popup/', '/%70opup/'),
+    popup.replace('/popup/', '/x/../popup/'),
+  ]) {
+    expect(isCanonicalPopupSenderUrl(url)).toBe(false);
+  }
+});
+
+it.each(['all', 'problems', 'action-required'] as const)(
+  'opens the %s queue filter through existing Settings tab reuse',
+  async (queueFilter) => {
+    browserTabsQueryMock.mockResolvedValueOnce([{ id: 77, windowId: 8 }]);
+    const { openSettingsPage } = await import('./index');
+    await openSettingsPage({ route: { section: 'saving', view: 'queue', queueFilter } });
+    expect(browserTabsUpdateMock).toHaveBeenCalledExactlyOnceWith(77, {
+      active: true,
+      url: `${SETTINGS_PAGE_URL}?section=saving&view=queue&queueFilter=${queueFilter}`,
+    });
+    expect(browserWindowsUpdateMock).toHaveBeenCalledExactlyOnceWith(8, { focused: true });
+    expect(browserTabsCreateMock).not.toHaveBeenCalled();
+  }
+);

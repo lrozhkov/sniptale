@@ -1,324 +1,274 @@
 // @vitest-environment jsdom
-
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-
-import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type { NativeAppRuntimeStatus } from '../../../../contracts/native-app/runtime';
+import { NativeAppSection } from '.';
 
-const mocks = vi.hoisted(() => ({
-  containsPermission: vi.fn(),
-  loadVideoSettings: vi.fn(),
-  mutateVideoSettings: vi.fn(),
-  requestPermission: vi.fn(),
-  sendRuntimeMessage: vi.fn(),
-}));
-
+const mocks = vi.hoisted(() => ({ contains: vi.fn(), request: vi.fn(), send: vi.fn() }));
 vi.mock('@sniptale/platform/browser/permissions', () => ({
   browserPermissions: {
-    contains: mocks.containsPermission,
-    request: mocks.requestPermission,
+    contains: mocks.contains,
+    request: mocks.request,
     subscribeToAdded: () => vi.fn(),
     subscribeToRemoved: () => vi.fn(),
   },
 }));
-
-vi.mock('../../../../composition/persistence/capture-settings', async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import('../../../../composition/persistence/capture-settings')
-  >()),
-  loadVideoSettings: mocks.loadVideoSettings,
-  mutateVideoSettings: mocks.mutateVideoSettings,
-}));
-
 vi.mock('../../../runtime/messaging', () => ({
-  settingsRuntimeMessagingTransport: { sendRuntimeMessage: mocks.sendRuntimeMessage },
+  settingsRuntimeMessagingTransport: { sendRuntimeMessage: mocks.send },
 }));
-
-import { NativeAppSection } from '.';
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  mocks.loadVideoSettings.mockResolvedValue(DEFAULT_VIDEO_SETTINGS);
-  mocks.containsPermission.mockResolvedValue(true);
-  mocks.requestPermission.mockResolvedValue(true);
-  mocks.mutateVideoSettings.mockImplementation(async (mutation) =>
-    mutation(DEFAULT_VIDEO_SETTINGS)
-  );
-  mocks.sendRuntimeMessage.mockResolvedValue({
-    settings: DEFAULT_VIDEO_SETTINGS.native,
-    status: createStatus(),
-    success: true,
-  });
-});
-
-afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
-  root = null;
-  container?.remove();
-  container = null;
-  vi.unstubAllGlobals();
-  vi.clearAllMocks();
-});
-
-async function renderSection(
-  view: 'capture' | 'commands' | 'connection' | 'telemetry' = 'connection'
-) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  await act(async () => {
-    root?.render(<NativeAppSection view={view} />);
-  });
-  await act(async () => {
-    await Promise.resolve();
-  });
-}
-
-function changeNumber(input: HTMLInputElement | undefined, value: string): void {
-  if (!input) {
-    return;
-  }
-  input.value = value;
-  input.dispatchEvent(new Event('change', { bubbles: true }));
-}
-
-it('renders native app status and saves changed native settings', async () => {
-  await renderSection();
-
-  expect(container?.textContent).toContain('Другой профиль');
-  expect(container?.textContent).toContain('Сейчас управляется');
-  expect(container?.textContent).toContain('Не удалось выполнить действие приложения Sniptale.');
-  expect(container?.textContent).toContain('Некоторые возможности приложения сейчас недоступны.');
-  expect(container?.textContent).not.toContain('Needs attention');
-  expect(container?.textContent).toContain('Windows 11');
-  expect(container?.textContent).toContain('Программное');
-  expect(container?.textContent).not.toContain('force-software');
-  expect(container?.textContent).toContain('3840x2160');
-  expect(container?.textContent).not.toContain('Сохранено');
-
-  await renderSection('capture');
-
-  const switches = [
-    ...(container?.querySelectorAll<HTMLButtonElement>('button[role="switch"]') ?? []),
-  ];
-  await act(async () => {
-    switches[0]?.click();
-  });
-  const numbers = [
-    ...(container?.querySelectorAll<HTMLInputElement>('input[type="number"]') ?? []),
-  ];
-  await act(async () => {
-    changeNumber(numbers[0], '12');
-    changeNumber(numbers[0], '');
-    changeNumber(numbers[1], '120');
-    for (const toggle of switches.slice(1).filter((item) => !item.disabled)) {
-      toggle.click();
-    }
-  });
-  const mutation = mocks.mutateVideoSettings.mock.calls[0]?.[0];
-  expect(mutation).toEqual(expect.any(Function));
-  expect(mutation?.(DEFAULT_VIDEO_SETTINGS)).toEqual(
-    expect.objectContaining({
-      native: expect.objectContaining({ screenshots: { includeCursor: false } }),
-    })
-  );
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
-    expect.objectContaining({ operation: 'sync-settings' })
-  );
-});
-
-it('sends native runtime actions from the status panel', async () => {
-  await renderSection();
-
-  const button = [...(container?.querySelectorAll('button') ?? [])].find((item) =>
-    item.textContent?.includes('Проверить подключение')
-  );
-  await act(async () => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
-
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
-    expect.objectContaining({ operation: 'reconnect' })
-  );
-});
-
-it('hides native tabs and actions until optional access is granted', async () => {
-  mocks.containsPermission.mockResolvedValueOnce(false);
-  await renderSection('telemetry');
-
-  expect(container?.textContent).toContain('Разрешите доступ к приложению Sniptale');
-  expect(container?.textContent).not.toContain('Данные действий');
-  expect(container?.querySelector('[role="tablist"]')).toBeNull();
-  expect(mocks.sendRuntimeMessage).not.toHaveBeenCalled();
-
-  const allowButton = [...(container?.querySelectorAll('button') ?? [])].find((item) =>
-    item.textContent?.includes('Разрешить доступ')
-  );
-  await act(async () => {
-    allowButton?.click();
-    await Promise.resolve();
-  });
-
-  expect(mocks.requestPermission).toHaveBeenCalledWith({ permissions: ['nativeMessaging'] });
-  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
-    expect.objectContaining({ operation: 'reconnect' })
-  );
-});
-
-it('passes runtime capabilities into native app settings controls', async () => {
-  await renderSection('commands');
-
-  const regionRecording = container?.querySelector<HTMLButtonElement>(
-    'button[aria-label="Запись области: Горячая клавиша"]'
-  );
-
-  expect(regionRecording?.disabled).toBe(true);
-  expect(container?.textContent).toContain('Недоступно в подключенном приложении');
-});
-
-it('keeps settings controls available before native capabilities are known', async () => {
-  mocks.sendRuntimeMessage.mockResolvedValueOnce({
-    settings: DEFAULT_VIDEO_SETTINGS.native,
-    status: createStatus({ capabilities: null }),
-    success: true,
-  });
-
-  await renderSection('commands');
-
-  const regionRecording = container?.querySelector<HTMLButtonElement>(
-    'button[aria-label="Запись области: Горячая клавиша"]'
-  );
-
-  expect(regionRecording?.disabled).toBe(false);
-});
-
-it('shows a translated load error when native state loading fails', async () => {
-  mocks.loadVideoSettings.mockRejectedValueOnce(new Error('load failed'));
-
-  await renderSection();
-
-  expect(container?.textContent).toContain('Не удалось загрузить состояние приложения Sniptale.');
-  expect(container?.textContent).not.toContain('load failed');
-});
-
-it('normalizes stale background runtime errors into user-facing copy', async () => {
-  mocks.sendRuntimeMessage.mockResolvedValueOnce({
-    error: 'Unknown message type',
-    success: false,
-  });
-
-  await renderSection();
-
-  expect(container?.textContent).toContain('Фоновая часть расширения ещё не обновилась.');
-  expect(container?.textContent).not.toContain('Unknown message type');
-});
-
-it('normalizes native host status errors into user-facing copy', async () => {
-  mocks.sendRuntimeMessage.mockResolvedValueOnce({
-    settings: DEFAULT_VIDEO_SETTINGS.native,
-    status: createStatus({
-      connectionState: 'missing-host',
-      error: {
-        code: 'unknown',
-        message: 'Specified native messaging host not found.',
-        recoverable: true,
-      },
-    }),
-    success: true,
-  });
-
-  await renderSection();
-
-  expect(container?.textContent).toMatch(/Нет подключения[\s\S]*Приложение Sniptale не найдено/);
-  expect(container?.textContent).not.toContain('Specified native messaging host not found.');
-  expect(container?.textContent).not.toContain('Host не найден');
-});
-
-function createStatus(patch: Partial<NativeAppRuntimeStatus> = {}): NativeAppRuntimeStatus {
+let root: Root;
+let container: HTMLDivElement;
+function status(
+  connectionState: NativeAppRuntimeStatus['connectionState'] = 'connected'
+): NativeAppRuntimeStatus {
   return {
+    appIdentity: { clientId: 'a'.repeat(64), trustVersion: 1 },
     appStatus: null,
-    connectionState: 'controlled-by-other-profile',
+    capabilities: null,
+    connectionState,
     controllerLease: null,
-    capabilities: createCapabilities(),
-    effectiveSettings: createEffectiveSettings(),
-    error: { code: 'unknown', message: 'Needs attention', recoverable: true },
+    effectiveSettings: null,
+    error: null,
     hostName: 'com.sniptale.native_host',
-    install: createInstall(),
+    install: null,
     lastHeartbeatAt: null,
     lastOperationError: null,
-    platform: { arch: 'x64', kind: 'windows', version: '11' },
+    platform: null,
     settingsRevision: null,
     trayActions: null,
-    warnings: [{ code: 'unsupported-capability', field: 'storage', message: 'Needs attention' }],
-    ...patch,
-  };
-}
-
-function createCapabilities(): NativeAppRuntimeStatus['capabilities'] {
-  return {
-    audio: {
-      microphoneDevices: [],
-      supportsMicrophone: true,
-      supportsMixedAudio: true,
-      supportsSystemAudio: true,
-      unavailableReasons: [],
-    },
-    capture: {
-      screenshotModes: ['screen'],
-      supportsFreezeRegionSelection: true,
-      videoModes: ['screen'],
-    },
-    codecs: {
-      audio: ['aac'],
-      containers: ['mp4'],
-      hardwareEncoderAvailable: true,
-      unavailableReasons: [],
-      video: ['h264'],
-    },
-    limits: {
-      maxChunkBytes: 524_288,
-      maxFps: 60,
-      maxHeight: 2160,
-      maxRecordingBytes: 1_000_000,
-      maxScreenshotBytes: 100_000,
-      maxWidth: 3840,
-    },
-  };
-}
-
-function createEffectiveSettings(): NativeAppRuntimeStatus['effectiveSettings'] {
-  const native = DEFAULT_VIDEO_SETTINGS.native as NonNullable<typeof DEFAULT_VIDEO_SETTINGS.native>;
-  return {
-    ...native,
-    video: {
-      ...native.video,
-      codec: { ...native.video.codec, hardwareAcceleration: 'force-software' },
-    },
     warnings: [],
   };
 }
-
-function createInstall(): NativeAppRuntimeStatus['install'] {
-  return {
-    appCacheSchemaVersion: 1,
-    appVersion: '0.1.0',
-    autostart: { enabled: true, method: 'windows-hkcu-run', supported: true },
-    installerVersion: '0.1.0',
-    nativeHostManifestVersion: '0.1.0',
-    packageIntegrity: 'valid',
-    platform: { arch: 'x64', kind: 'windows', version: '11' },
-    rollbackProtected: true,
-    signedBinary: true,
-    updateChannel: 'stable',
-  };
+function response(state: NativeAppRuntimeStatus['connectionState']) {
+  return { success: true, status: status(state) };
 }
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  mocks.contains.mockResolvedValue(true);
+  mocks.request.mockResolvedValue(true);
+  mocks.send.mockResolvedValue(response('connected'));
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+});
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+  vi.useRealTimers();
+  vi.clearAllMocks();
+  vi.unstubAllGlobals();
+});
+async function render(view = 'connection') {
+  await act(async () => {
+    root.render(<NativeAppSection view={view} />);
+  });
+}
+function button(label: string) {
+  return [...container.querySelectorAll('button')].find((node) =>
+    node.textContent?.includes(label)
+  );
+}
+async function click(label: string) {
+  const target = button(label);
+  expect(target).toBeDefined();
+  await act(async () => {
+    target?.click();
+  });
+}
+
+it('exposes connection only and explains Desktop ownership for retired deep links', async () => {
+  await render('capture');
+  expect(container.querySelector('[role="tab"]')).toBeNull();
+  expect(container.querySelector('[role="switch"]')).toBeNull();
+  expect(container.querySelector('input')).toBeNull();
+  expect(button('Применить настройки')).toBeUndefined();
+  expect(button('Сделать этот браузер активным')).toBeUndefined();
+  expect(container.textContent).toContain('настраиваются в Desktop');
+  expect(button('Проверить подключение')).toBeDefined();
+});
+
+it('binds explicit consent to the displayed Desktop installation identity', async () => {
+  mocks.send.mockResolvedValue(response('trust-required'));
+  await render();
+  expect(container.textContent).toContain('a'.repeat(64));
+  await click('Доверять приложению');
+  expect(mocks.send).toHaveBeenCalledWith(
+    expect.objectContaining({ operation: 'trust-client', clientId: 'a'.repeat(64) })
+  );
+});
+
+it('permits explicit revocation without exposing Desktop settings', async () => {
+  await render();
+  await click('Отозвать доверие');
+  expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ operation: 'forget-client' }));
+});
+
+it('requires optional native access before connection actions', async () => {
+  mocks.contains.mockResolvedValue(false);
+  await render();
+  expect(button('Проверить подключение')).toBeUndefined();
+  await click('Разрешить доступ');
+  expect(mocks.request).toHaveBeenCalledWith({ permissions: ['nativeMessaging'] });
+  expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ operation: 'reconnect' }));
+});
+
+it('keeps connection actions hidden until the initial permission query settles', async () => {
+  const permission = deferred<boolean>();
+  mocks.contains.mockReturnValue(permission.promise);
+  await render();
+  expect(button('Проверить подключение')).toBeUndefined();
+  await act(async () => {
+    permission.resolve(true);
+  });
+  expect(button('Проверить подключение')).toBeDefined();
+});
+
+it('shows connection deadline feedback and the recovery action', async () => {
+  mocks.send.mockResolvedValue({
+    success: true,
+    status: {
+      ...status('error'),
+      error: { code: 'unknown', message: 'Native app handshake timed out', recoverable: true },
+    },
+  });
+  await render();
+  expect(container.textContent).toContain('Desktop не ответил');
+  expect(button('Проверить подключение')).toBeDefined();
+});
+
+it('observes connection changes while Settings stays open', async () => {
+  vi.useFakeTimers();
+  await render();
+  mocks.send.mockResolvedValue(response('missing-host'));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  expect(container.textContent).toContain('Нет подключения');
+});
+
+it('does not apply an older status observation after a newer action', async () => {
+  vi.useFakeTimers();
+  await render();
+  const pending = deferred<ReturnType<typeof response>>();
+  mocks.send.mockReturnValueOnce(pending.promise);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  mocks.send.mockResolvedValueOnce(response('missing-host'));
+  await click('Проверить подключение');
+  await act(async () => {
+    pending.resolve(response('connected'));
+  });
+  expect(container.textContent).toContain('Нет подключения');
+});
+
+it('does not apply an older action failure after a newer action', async () => {
+  await render();
+  const pending = deferred<ReturnType<typeof response>>();
+  mocks.send.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(response('missing-host'));
+  await click('Проверить подключение');
+  await click('Проверить подключение');
+  await act(async () => {
+    pending.reject(new Error('stale failure'));
+  });
+  expect(container.textContent).toContain('Нет подключения');
+  expect(container.textContent).not.toContain('Не удалось выполнить действие');
+});
+
+it('shows a translated error after a current action failure', async () => {
+  vi.useFakeTimers();
+  await render();
+  mocks.send.mockRejectedValueOnce(new Error('failed'));
+  await click('Проверить подключение');
+  expect(container.textContent).toContain('Не удалось выполнить действие приложения Sniptale.');
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  expect(container.textContent).toContain('Не удалось выполнить действие приложения Sniptale.');
+});
+
+it('keeps the connection permission gate after explicit denial', async () => {
+  mocks.contains.mockResolvedValue(false);
+  mocks.request.mockResolvedValue(false);
+  await render();
+  await click('Разрешить доступ');
+  expect(button('Проверить подключение')).toBeUndefined();
+  expect(container.textContent).toContain('Доступ к приложению Sniptale не был разрешён.');
+});
+
+it('shows a recoverable initial load error when the runtime query fails', async () => {
+  mocks.send.mockRejectedValueOnce(new Error('runtime unavailable'));
+  await render();
+  expect(container.textContent).toContain('Не удалось загрузить состояние приложения Sniptale.');
+});
+
+it('preserves the last status when a status observation has no snapshot', async () => {
+  vi.useFakeTimers();
+  mocks.send.mockResolvedValueOnce(response('missing-host'));
+  await render();
+  mocks.send.mockResolvedValueOnce({ success: true });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  expect(container.textContent).toContain('Нет подключения');
+});
+
+it('does not overlap status observations while the runtime is slow', async () => {
+  vi.useFakeTimers();
+  await render();
+  const pending = deferred<ReturnType<typeof response>>();
+  mocks.send.mockReturnValueOnce(pending.promise);
+  const count = mocks.send.mock.calls.length;
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3000);
+  });
+  expect(mocks.send).toHaveBeenCalledTimes(count + 1);
+  await act(async () => {
+    pending.resolve(response('connected'));
+  });
+});
+
+it('does not query native status while optional access is absent', async () => {
+  vi.useFakeTimers();
+  mocks.contains.mockResolvedValue(false);
+  await render();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
+  expect(mocks.send).not.toHaveBeenCalled();
+});
+
+it('shows status observation failures and recovers on the next observation', async () => {
+  vi.useFakeTimers();
+  await render();
+  mocks.send.mockResolvedValueOnce({ success: false, error: 'runtime query failed' });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  expect(container.textContent).toContain('Не удалось выполнить действие приложения Sniptale.');
+  mocks.send.mockRejectedValueOnce(new Error('port unavailable'));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
+  expect(button('Проверить подключение')).toBeDefined();
+});
+
+it('checks a disconnected host without a previously observed installation identity', async () => {
+  mocks.send.mockResolvedValue({
+    success: true,
+    status: { ...status('missing-host'), appIdentity: null },
+  });
+  await render();
+  await click('Проверить подключение');
+  expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ operation: 'reconnect' }));
+});

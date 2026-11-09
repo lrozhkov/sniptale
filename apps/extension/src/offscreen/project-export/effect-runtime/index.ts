@@ -1,3 +1,4 @@
+import type { ProjectExportSourceSampling } from '../renderer/source-sampling';
 import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import {
   renderEffectRuntimeComposition,
@@ -13,7 +14,10 @@ import { createEffectRuntimeSandboxExecutor } from '../../../workflows/video/eff
 import type { LoadedImagesMap } from '../renderer';
 
 export interface RenderOffscreenProjectEffectFramesInput {
+  sourceSampling?: ProjectExportSourceSampling;
+  sourceSamplingFallback?: 'first' | 'last';
   compositionIndex?: VideoCompositionTimelineIndex;
+  renderPasses?: ReturnType<typeof resolveVideoCompositionRenderPasses>;
   clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>;
   currentTime: number;
   loadedImages: LoadedImagesMap;
@@ -41,11 +45,13 @@ export function createOffscreenProjectEffectRuntime(
     },
     async renderProjectFrames(projectArgs) {
       if (!projectArgs.project.effectInstances?.some(({ enabled }) => enabled)) return undefined;
-      const renderPasses = resolveVideoCompositionRenderPasses(
-        projectArgs.project,
-        projectArgs.currentTime,
-        projectArgs.compositionIndex ? { timelineIndex: projectArgs.compositionIndex } : undefined
-      );
+      const renderPasses =
+        projectArgs.renderPasses ??
+        resolveVideoCompositionRenderPasses(
+          projectArgs.project,
+          projectArgs.currentTime,
+          projectArgs.compositionIndex ? { timelineIndex: projectArgs.compositionIndex } : undefined
+        );
       if (!hasEffectRuntimePlans(renderPasses)) return undefined;
       executor ??= createEffectRuntimeSandboxExecutor({
         ...((projectArgs.ownerDocument ?? args.ownerDocument)
@@ -58,6 +64,24 @@ export function createOffscreenProjectEffectRuntime(
         ...(projectArgs.signal ? { signal: projectArgs.signal } : {}),
         clipMediaElements: projectArgs.clipMediaElements,
         executor,
+        ...(projectArgs.sourceSampling
+          ? {
+              prepareSourcePass: (frame, time) =>
+                projectArgs.sourceSampling!.prepare({
+                  frame,
+                  time,
+                  ...(projectArgs.sourceSamplingFallback
+                    ? { fallback: projectArgs.sourceSamplingFallback }
+                    : {}),
+                  sceneTime: projectArgs.currentTime,
+                  lensFrame: renderPasses.overlayFrame,
+                  project: projectArgs.project,
+                  media: projectArgs.clipMediaElements,
+                  images: projectArgs.loadedImages,
+                  ...(projectArgs.signal ? { signal: projectArgs.signal } : {}),
+                }),
+            }
+          : {}),
         imageBank: projectArgs.loadedImages,
         overlayFrame: renderPasses.overlayFrame,
         overlayTime: projectArgs.currentTime,

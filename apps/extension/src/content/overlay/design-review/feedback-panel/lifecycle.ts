@@ -12,19 +12,24 @@ export function useFeedbackPanelLifecycle(args: {
   filterRootRef: RefObject<HTMLDivElement | null>;
   filterTriggerRef: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
+  searchOpen: boolean;
+  onSearchClose: () => void;
   onFilterOpenChange: (open: boolean) => void;
   open: boolean;
 }) {
   const { filterOpen, filterRootRef, filterTriggerRef, onClose, onFilterOpenChange, open } = args;
+  const { searchOpen, onSearchClose } = args;
   const closePanel = useCallback(() => {
     onFilterOpenChange(false);
+    onSearchClose();
     onClose();
     focusPanelToggle();
-  }, [onClose, onFilterOpenChange]);
+  }, [onClose, onFilterOpenChange, onSearchClose]);
 
   useEffect(() => {
     if (!open) {
       onFilterOpenChange(false);
+      if (searchOpen) onSearchClose();
       return;
     }
 
@@ -48,6 +53,8 @@ export function useFeedbackPanelLifecycle(args: {
       event.stopImmediatePropagation();
       if (filterOpen) {
         closeFilter(true);
+      } else if (searchOpen) {
+        onSearchClose();
       } else {
         closePanel();
       }
@@ -61,7 +68,16 @@ export function useFeedbackPanelLifecycle(args: {
       document.removeEventListener('focusin', handleFocusIn, true);
       window.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [closePanel, filterOpen, filterRootRef, filterTriggerRef, onFilterOpenChange, open]);
+  }, [
+    closePanel,
+    filterOpen,
+    filterRootRef,
+    filterTriggerRef,
+    onFilterOpenChange,
+    onSearchClose,
+    open,
+    searchOpen,
+  ]);
 
   return { closePanel };
 }

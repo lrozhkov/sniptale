@@ -134,7 +134,7 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
   await expectSuccessfulResponse(sendResponse);
 
   expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
-  expect(resolveModelConfigMock).toHaveBeenCalledWith('model-1');
+  expect(resolveModelConfigMock).toHaveBeenCalledWith('model-1', undefined, undefined);
   expect(loadScenarioEditorSystemPromptMock).toHaveBeenCalledTimes(1);
   expect(requestMultimodalChatCompletionMock).toHaveBeenCalledWith({
     apiKey: 'secret-key',
@@ -211,7 +211,7 @@ it('prefers an explicit model id over the stored default model selection', async
 
   await expectSuccessfulResponse(sendResponse);
   expect(loadDefaultModelIdMock).not.toHaveBeenCalled();
-  expect(resolveModelConfigMock).toHaveBeenCalledWith('model-explicit');
+  expect(resolveModelConfigMock).toHaveBeenCalledWith('model-explicit', undefined, undefined);
 });
 
 it('refuses missing explicit identity despite a stored global default', async () => {

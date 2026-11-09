@@ -54,6 +54,8 @@ export async function applyEditorControllerCropSelection(
     logCropApplyStart(context.logCrop, crop, context.canvasDocumentSize);
     await runEditorCropSelection({
       canvas: context.canvas,
+      frame: useEditorStore.getState().frame,
+      browserFrame: useEditorStore.getState().browserFrame,
       crop,
       rebuildFrameDecorations: context.rebuildFrameDecorations,
       setCanvasDocumentSize: context.setCanvasDocumentSize,

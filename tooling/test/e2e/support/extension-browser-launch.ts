@@ -20,10 +20,14 @@ type LaunchedBrowser = {
 
 type LaunchExtensionBrowserOptions = {
   viewport?: ViewportSize;
+  /** Native popup sizing uses the headless display, independently of the CSS page viewport. */
+  headlessScreen?: ViewportSize;
   extensionBuildDir?: string;
   userDataDir?: string;
   fakeMediaDevices?: boolean;
   showScrollbars?: boolean;
+  /** Enables native document restoration only for explicit lifecycle proof. */
+  enableBackForwardCache?: boolean;
   autoGrantMediaPermissions?: boolean;
   ignoreHTTPSErrors?: boolean;
   windowCaptureTitle?: string;
@@ -51,6 +55,9 @@ function resolveExtensionPath(extensionBuildDir?: string): string {
 function getChromiumLaunchArgs(options: LaunchExtensionBrowserOptions): string[] {
   return [
     '--no-sandbox',
+    ...(options.headlessScreen
+      ? [`--screen-info={${options.headlessScreen.width}x${options.headlessScreen.height}}`]
+      : []),
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-search-engine-choice-screen',
@@ -133,6 +140,7 @@ export async function launchExtensionBrowser(
       headless: process.env.PLAYWRIGHT_HEADLESS !== '0',
       ignoreDefaultArgs: [
         '--disable-extensions',
+        ...(options.enableBackForwardCache ? ['--disable-back-forward-cache'] : []),
         ...(options.showScrollbars ? ['--hide-scrollbars'] : []),
       ],
     });

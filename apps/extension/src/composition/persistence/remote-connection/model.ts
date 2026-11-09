@@ -23,6 +23,20 @@ export interface SyncWorkspaceSource {
   kind: 'allocation' | 'join';
   identity: SyncConnectionIdentity;
 }
+/** Binary objects remain remote until an admitted selected operation needs them. */
+export type SyncStoragePolicy = { version: 1; mode: 'on-demand' };
+
+/** Accept only the supported closed storage policy and detach the caller value. */
+export function parseSyncStoragePolicy(value: unknown): SyncStoragePolicy | null {
+  if (
+    !isRecord(value) ||
+    !connectionExact(value, ['version', 'mode']) ||
+    value['version'] !== 1 ||
+    value['mode'] !== 'on-demand'
+  )
+    return null;
+  return { version: 1, mode: 'on-demand' };
+}
 export interface SyncConnectionMetadata {
   version: 1;
   kind: 'sync-connection';
@@ -33,6 +47,8 @@ export interface SyncConnectionMetadata {
   updateNonce: string | null;
   credentialId: string | null;
   workspace?: SyncWorkspaceIdentity;
+  storagePolicy?: SyncStoragePolicy;
+  pausedBeforeAuthUpdate?: true;
 }
 export type SyncConnectionAuthentication =
   | { kind: 'basic'; username: string; password: string }
@@ -175,12 +191,20 @@ export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata 
       'updateNonce',
       'credentialId',
       ...(Object.hasOwn(value, 'workspace') ? ['workspace'] : []),
+      ...(Object.hasOwn(value, 'storagePolicy') ? ['storagePolicy'] : []),
+      ...(Object.hasOwn(value, 'pausedBeforeAuthUpdate') ? ['pausedBeforeAuthUpdate'] : []),
     ]) ||
     value['version'] !== 1 ||
     value['kind'] !== 'sync-connection' ||
     value['key'] !== 'connection'
   )
     return null;
+  const storagePolicy = parseSyncStoragePolicy(
+    Object.hasOwn(value, 'storagePolicy')
+      ? value['storagePolicy']
+      : { version: 1, mode: 'on-demand' }
+  );
+  if (!storagePolicy) return null;
   let workspace: SyncWorkspaceIdentity | null = null;
   if (Object.hasOwn(value, 'workspace')) {
     try {
@@ -205,7 +229,11 @@ export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata 
   )
     return null;
   if (phase === 'updating-auth') {
-    if (updateNonce === null) return null;
+    if (
+      updateNonce === null ||
+      (Object.hasOwn(value, 'pausedBeforeAuthUpdate') && value['pausedBeforeAuthUpdate'] !== true)
+    )
+      return null;
     return {
       version: 1,
       kind: 'sync-connection',
@@ -215,10 +243,19 @@ export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata 
       phase,
       updateNonce,
       credentialId,
+      storagePolicy,
+      ...(value['pausedBeforeAuthUpdate'] === true
+        ? { pausedBeforeAuthUpdate: true as const }
+        : {}),
       ...(workspace ? { workspace } : {}),
     };
   }
-  if ((phase !== 'active' && phase !== 'paused') || updateNonce !== null || credentialId === null)
+  if (
+    (phase !== 'active' && phase !== 'paused') ||
+    updateNonce !== null ||
+    credentialId === null ||
+    Object.hasOwn(value, 'pausedBeforeAuthUpdate')
+  )
     return null;
   return {
     version: 1,
@@ -229,6 +266,7 @@ export function parseConnectionMetadata(value: unknown): SyncConnectionMetadata 
     phase,
     updateNonce,
     credentialId,
+    storagePolicy,
     ...(workspace ? { workspace } : {}),
   };
 }

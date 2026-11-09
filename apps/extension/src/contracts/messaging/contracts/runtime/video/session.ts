@@ -2,6 +2,8 @@ import {
   isRecordingClockTiming,
   isRecordingFrameClockBinding,
 } from '../../../../video/recording-frame-clock';
+import { isRecordingEventObservationPacket } from '../../../../video/event-observations';
+import { isRecordingCursorObservationPacket } from '../../../../video/cursor-observations';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
   createGuardParser,
@@ -152,6 +154,30 @@ const isRecordingProgressCandidate = createMessageGuard<
   required: { recordingId: isNonEmptyString },
   optional: { duration: isNumber, microphoneActivity: isVideoMicrophoneActivity },
 });
+
+function isRecordingObservationsRequest(
+  value: unknown
+): value is RuntimeRequestByType[typeof VideoMessageType.RECORDING_OBSERVATIONS] {
+  const guard = createMessageGuard<
+    typeof VideoMessageType.RECORDING_OBSERVATIONS,
+    RuntimeRequestByType[typeof VideoMessageType.RECORDING_OBSERVATIONS]
+  >({
+    type: VideoMessageType.RECORDING_OBSERVATIONS,
+    required: { recordingId: isNonEmptyString },
+    optional: {
+      telemetry: isRecordingTelemetrySnapshot,
+      cursorPacket: isRecordingCursorObservationPacket,
+      eventPacket: isRecordingEventObservationPacket,
+    },
+  });
+  if (!guard(value) || !isRecord(value)) return false;
+  const { telemetry, cursorPacket, eventPacket } = value;
+  if ([telemetry, cursorPacket, eventPacket].filter((item) => item !== undefined).length !== 1)
+    return false;
+  if (telemetry !== undefined) return isRecord(telemetry) && Array.isArray(telemetry['signals']);
+  const packet = cursorPacket ?? eventPacket;
+  return packet !== undefined && packet.recordingId === value['recordingId'];
+}
 
 export const runtimeVideoSessionMessageContracts = {
   [VideoMessageType.COUNTDOWN_CAMERA_OFFER]: {
@@ -387,16 +413,7 @@ export const runtimeVideoSessionMessageContracts = {
   [VideoMessageType.RECORDING_OBSERVATIONS]: {
     parseRequest: createGuardParser(
       'runtime RECORDING_OBSERVATIONS message',
-      createMessageGuard({
-        type: VideoMessageType.RECORDING_OBSERVATIONS,
-        required: {
-          recordingId: isNonEmptyString,
-          telemetry: (value) =>
-            isRecord(value) &&
-            Array.isArray(value['signals']) &&
-            isRecordingTelemetrySnapshot(value),
-        },
-      })
+      isRecordingObservationsRequest
     ),
     parseResponse: createGuardParser(
       'runtime RECORDING_OBSERVATIONS response',

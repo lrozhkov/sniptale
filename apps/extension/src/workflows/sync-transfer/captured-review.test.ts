@@ -1,3 +1,8 @@
+import {
+  assetResidencyCopyId,
+  type AssetResidencyCopy,
+} from '../../composition/persistence/assets/residency-records';
+import { hashSyncText } from './wire-record';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createArchivePathAllocator,
@@ -20,7 +25,8 @@ import { createQuickEditWebcam } from '../../features/video/review/advanced/webc
 import { buildMediaRootInventory } from '../media-hub-backup/v6/inventory/media';
 import { createMediaHubBackupExportOptions } from '../media-hub-backup/v6/options';
 import { parsePortableMediaMetadata } from '../media-hub-backup/v6/root-codecs/media';
-import { encodeCapturedVideoReviewRoot } from './captured-review';
+import { encodeCapturedVideoReviewRoot, frozenReviewDatabase } from './captured-review';
+import { parseCapturedMediaRows } from '../../composition/persistence/sync-capture/media-snapshot';
 import { preparePortableReplica, parsePortableSyncRoot } from './prepared-root';
 import { nestedMediaReviewFixture } from '../media-hub-backup/v6/root-publication/media.review-assets.test-support';
 import { createCleanupWebSnapshotRecord } from '../media-hub/cleanup.test-support';
@@ -353,6 +359,35 @@ it('round trips frozen saved snapshot metadata with both native asset bindings',
   );
   expect(payload.input.rows.webSnapshot.manifest).toEqual(webSnapshot.manifest);
   expect(io.liveRead).not.toHaveBeenCalled();
+  io.read.mockClear();
+  await expect(
+    encodeCapturedPortableRoot(captured, new Map([[ref.assetId, verifiedDeferredCopy(ref)]]))
+  ).rejects.toThrow('Deferred');
+  expect(io.read).not.toHaveBeenCalled();
+  const screenshotCopy = verifiedDeferredCopy(screenshotRef);
+  io.read.mockImplementation(async (candidate: AssetRef, filename: string) => {
+    if (candidate.assetId === screenshotRef.assetId)
+      throw new Error('Screenshot must stay unloaded.');
+    return new File([new Uint8Array(candidate.size)], filename, { type: candidate.mimeType });
+  });
+  const retainedScreenshot = await encodeCapturedPortableRoot(
+    captured,
+    new Map([[screenshotRef.assetId, screenshotCopy]])
+  );
+  expect(retainedScreenshot.retainedObjects).toEqual([
+    {
+      objectId: metadata.webSnapshot!.screenshotObjectId,
+      remoteKey: screenshotCopy.remote.key,
+      sha256: screenshotCopy.remote.sha256,
+    },
+  ]);
+  expect(
+    retainedScreenshot.objects.find((object) => object.ref.objectId === metadata.originalObjectId)
+      ?.blob
+  ).toBeInstanceOf(Blob);
+  expect(
+    io.read.mock.calls.every(([candidate]) => candidate.assetId !== screenshotRef.assetId)
+  ).toBe(true);
 });
 
 it.each([false, true])(
@@ -593,3 +628,188 @@ it.each([false, true])(
     expect(io.liveRead).not.toHaveBeenCalled();
   }
 );
+
+function verifiedDeferredCopy(ref: AssetRef, index = 0): AssetResidencyCopy {
+  return {
+    version: 1,
+    kind: 'copy',
+    id: assetResidencyCopyId({ kind: 'opfs', ref }),
+    revision: 1,
+    operationId: 'accepted-copy',
+    phase: 'unloaded',
+    lastUsedAt: 1,
+    target: { kind: 'opfs', ref },
+    remote: {
+      binding: {
+        provider: 'webdav',
+        rootUrl: 'https://dav.test/root/',
+        accountId: 'user',
+        spaceId: 'space',
+        connectionGeneration: 1,
+        profileCreatedAt: 1,
+      },
+      key: `Files/${hashSyncText('space')}/00000000-0000-0000-0000-000000000001/native-${index}/original-${index}.bin`,
+      sha256: ref.sha256 ?? String(index % 10).repeat(64),
+    },
+  };
+}
+
+it('retains every recursively owned Review resource without reading originals or sidecar bodies', async () => {
+  const { rows } = nestedMediaReviewFixture(true);
+  const refs = [rows.source.ref, ...rows.refs];
+  const copies = new Map(refs.map((ref, index) => [ref.assetId, verifiedDeferredCopy(ref, index)]));
+  io.read.mockRejectedValue(new Error('Unloaded Review resource must not be read.'));
+  const encoded = await encodeCapturedVideoReviewRoot(rows, copies);
+  expect(encoded.objects).toEqual([]);
+  expect(encoded.retainedObjects).toHaveLength(refs.length);
+  expect(encoded.bindings.map(({ ref }) => ref.assetId)).toEqual(refs.map((ref) => ref.assetId));
+  expect(encoded.envelope.descriptor.objectCount).toBe(refs.length);
+  expect(io.read).not.toHaveBeenCalled();
+  expect(io.liveRead).not.toHaveBeenCalled();
+});
+
+it('retains a plain native media original through the root encoder without reading bytes', async () => {
+  const rows = reviewRows();
+  const ref = rows.source.ref;
+  const value = createNativeCapture({
+    version: 1,
+    kind: 'sync-operation',
+    key: 'plain',
+    createdAt: 1,
+    spaceId: 'space',
+    connectionGeneration: 1,
+    rootKind: 'media',
+    rootId: rows.source.media.id,
+    rootKey: captureRootKey('space', 'media', rows.source.media.id),
+    generation: 1,
+    operationId: 'plain',
+    basis: [],
+    origin: 'local-edit',
+    publicationId: null,
+    change: { kind: 'media', rows: rows.source },
+  });
+  const copy = verifiedDeferredCopy(ref);
+  io.read.mockRejectedValue(new Error('Unloaded media must not be read.'));
+  const encoded = await encodeCapturedPortableRoot(value, new Map([[ref.assetId, copy]]));
+  const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+  expect(encoded.retainedObjects).toEqual([
+    { objectId: metadata.originalObjectId, remoteKey: copy.remote.key, sha256: copy.remote.sha256 },
+  ]);
+  expect(encoded.objects).toEqual([]);
+  expect(encoded.bindings).toEqual([{ objectId: metadata.originalObjectId, ref }]);
+  expect(encoded.envelope.objects[0]?.filename).toBe('original-0.bin');
+  expect(io.read).not.toHaveBeenCalled();
+  expect(io.liveRead).not.toHaveBeenCalled();
+});
+
+it('rejects a foreign Review copied ref before reading any native source', async () => {
+  const rows = reviewRows();
+  const foreign = { ...rows.source.ref, assetId: 'foreign' };
+  await expect(
+    encodeCapturedVideoReviewRoot(rows, new Map([[foreign.assetId, verifiedDeferredCopy(foreign)]]))
+  ).rejects.toThrow('Deferred');
+  expect(io.read).not.toHaveBeenCalled();
+});
+
+function legacyImageSource() {
+  const projectAsset = createProjectAssetEntry({
+    id: 'legacy-image',
+    assetId: 'legacy-original',
+    mimeType: 'image/png',
+    size: 3,
+  });
+  const media = {
+    ...buildProjectAssetMediaEntry(projectAsset),
+    workspaceRevision: 0,
+    imageContentState: 'original' as const,
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 1 },
+  };
+  const source = parseCapturedMediaRows({ media, projectAsset, ref: assetRef(projectAsset) });
+  if (!source) throw new Error('Canonical legacy image source is unavailable.');
+  return source;
+}
+it(
+  'encodes a canonical legacy original Image source without fabricating or reading ' +
+    'authored workspace metadata',
+  async () => {
+    const source = legacyImageSource();
+    const db = frozenReviewDatabase({
+      source,
+      assets: [],
+      refs: [],
+      media: [],
+      privateReviews: [],
+    });
+    await expect(db.get('image_workspaces', source.media.id)).resolves.toBeUndefined();
+    await expect(
+      db.get('aggregate_presentations', ['image', source.media.id])
+    ).resolves.toBeUndefined();
+    const capture = createNativeCapture({
+      version: 1,
+      kind: 'sync-operation',
+      key: 'legacy-image-capture',
+      createdAt: 1,
+      spaceId: 'space',
+      connectionGeneration: 1,
+      rootKind: 'media',
+      rootId: source.media.id,
+      rootKey: captureRootKey('space', 'media', source.media.id),
+      generation: 1,
+      operationId: 'legacy-image-operation',
+      basis: [],
+      origin: 'local-edit',
+      publicationId: null,
+      change: { kind: 'media', rows: source },
+    });
+    const encoded = await encodeCapturedPortableRoot(capture);
+    const parsed = await parsePortableSyncRoot(encoded.envelope);
+    expect(parsed.kind).toBe('media');
+    const metadata = parsePortableMediaMetadata(encoded.envelope.metadata);
+    expect(metadata.workspace).toBeUndefined();
+    expect(metadata.presentation).toBeUndefined();
+    expect(metadata.projectAsset?.id).toBe('legacy-image');
+    expect(encoded.bindings).toEqual([{ objectId: metadata.originalObjectId, ref: source.ref }]);
+    expect(io.liveRead).not.toHaveBeenCalled();
+  }
+);
+it.each([
+  'foreign-workspace',
+  'foreign-presentation',
+  'wrong-kind',
+  'edited',
+  'revision',
+  'foreign-ref',
+] as const)('refuses unsupported legacy Image metadata lookup: %s', async (mode) => {
+  const source = legacyImageSource();
+  const ref = { ...source.ref, ...(mode === 'foreign-ref' ? { assetId: 'foreign-ref' } : {}) };
+  const changed = {
+    ...source,
+    ref,
+    media: {
+      ...source.media,
+      ...(mode === 'edited' ? { imageContentState: 'edited' as const } : {}),
+      ...(mode === 'revision' ? { workspaceRevision: 1 } : {}),
+    },
+  };
+  const db = frozenReviewDatabase({
+    source: changed,
+    assets: [],
+    refs: [],
+    media: [],
+    privateReviews: [],
+  });
+  const store =
+    mode === 'foreign-presentation' || mode === 'wrong-kind'
+      ? 'aggregate_presentations'
+      : 'image_workspaces';
+  const key =
+    mode === 'foreign-presentation'
+      ? ['image', 'foreign']
+      : mode === 'wrong-kind'
+        ? ['video-project', source.media.id]
+        : mode === 'foreign-workspace'
+          ? 'foreign'
+          : source.media.id;
+  await expect(db.get(store, key)).rejects.toThrow('unsupported');
+  expect(io.liveRead).not.toHaveBeenCalled();
+});

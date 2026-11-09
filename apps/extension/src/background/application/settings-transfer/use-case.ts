@@ -1,3 +1,4 @@
+import { withSecretProtectionWriter } from '../../../composition/persistence/secret-protection/service';
 import { createOutputFilename } from '../../../workflows/file-naming/index';
 import { initDB } from '../../../composition/persistence/infrastructure/indexed-db/core';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
@@ -106,60 +107,63 @@ async function commitSettingsTransfer(
   }
   const imported = parseSettingsTransferDomains(transferPackage.domains);
   await initDB();
-  return runWithExclusivePersistenceMutationPermit(async (permit) => {
-    const current = await readSettingsTransferSnapshot(permit);
-    const currentDomains = parseSettingsTransferDomains(current.domains);
-    if (
-      message.strategy === 'exact-restore' &&
-      (transferPackage.exportKind !== 'backup' ||
-        !isCompleteSettingsTransferBackup({ imported, current: currentDomains }))
-    ) {
-      throw new Error('Exact restore requires a complete backup and destructive confirmation');
-    }
-    const currentFingerprint = await fingerprintSettingsTransferDomains(currentDomains);
-    if (currentFingerprint !== message.fingerprint) throw new SettingsTransferStalePlanError();
-    const tree = buildSettingsTransferTree(
-      collectSettingsTransferDynamicItems(imported, current.locale),
-      collectSettingsTransferDependencies(imported)
-    );
-    const allIds = tree.flatMap(flattenTreeIds);
-    const selectedNodeIds = message.selectedNodeIds.length > 0 ? message.selectedNodeIds : allIds;
-    const selected =
-      message.strategy === 'exact-restore'
-        ? buildExactRestoreDomainsBySelection({
-            current: currentDomains,
-            imported,
-            selectedNodeIds,
-            tree,
-          })
-        : filterSettingsTransferDomainsBySelection({
-            domains: imported,
-            selectedNodeIds,
-            tree,
-          });
-    const plan = planSettingsTransfer({
-      current: currentDomains,
-      imported: selected,
-      strategy: message.strategy,
-      decisions: message.decisions,
-    });
-    const affectedDomains = Object.fromEntries(
-      Object.keys(selected).map((domainId) => [domainId, plan.domains[domainId]!])
-    );
-    assertDurableSettingsTransferCatalogs(affectedDomains);
-    const validatedDomains = parseSettingsTransferDomains(affectedDomains);
-    await applySettingsTransferDomains({
-      domains: validatedDomains,
-      summary: plan.summary,
-      permit,
-    });
-    return {
-      ...plan.summary,
-      status: 'committed' as const,
-      strategy: message.strategy,
-      appliedNodeIds: message.selectedNodeIds.length > 0 ? [...message.selectedNodeIds] : allIds,
-    };
-  });
+  return withSecretProtectionWriter((admissionPermit) =>
+    runWithExclusivePersistenceMutationPermit(async (permit) => {
+      const current = await readSettingsTransferSnapshot(permit);
+      const currentDomains = parseSettingsTransferDomains(current.domains);
+      if (
+        message.strategy === 'exact-restore' &&
+        (transferPackage.exportKind !== 'backup' ||
+          !isCompleteSettingsTransferBackup({ imported, current: currentDomains }))
+      ) {
+        throw new Error('Exact restore requires a complete backup and destructive confirmation');
+      }
+      const currentFingerprint = await fingerprintSettingsTransferDomains(currentDomains);
+      if (currentFingerprint !== message.fingerprint) throw new SettingsTransferStalePlanError();
+      const tree = buildSettingsTransferTree(
+        collectSettingsTransferDynamicItems(imported, current.locale),
+        collectSettingsTransferDependencies(imported)
+      );
+      const allIds = tree.flatMap(flattenTreeIds);
+      const selectedNodeIds = message.selectedNodeIds.length > 0 ? message.selectedNodeIds : allIds;
+      const selected =
+        message.strategy === 'exact-restore'
+          ? buildExactRestoreDomainsBySelection({
+              current: currentDomains,
+              imported,
+              selectedNodeIds,
+              tree,
+            })
+          : filterSettingsTransferDomainsBySelection({
+              domains: imported,
+              selectedNodeIds,
+              tree,
+            });
+      const plan = planSettingsTransfer({
+        current: currentDomains,
+        imported: selected,
+        strategy: message.strategy,
+        decisions: message.decisions,
+      });
+      const affectedDomains = Object.fromEntries(
+        Object.keys(selected).map((domainId) => [domainId, plan.domains[domainId]!])
+      );
+      assertDurableSettingsTransferCatalogs(affectedDomains);
+      const validatedDomains = parseSettingsTransferDomains(affectedDomains);
+      await applySettingsTransferDomains({
+        domains: validatedDomains,
+        summary: plan.summary,
+        permit,
+        admissionPermit,
+      });
+      return {
+        ...plan.summary,
+        status: 'committed' as const,
+        strategy: message.strategy,
+        appliedNodeIds: message.selectedNodeIds.length > 0 ? [...message.selectedNodeIds] : allIds,
+      };
+    })
+  );
 }
 
 function flattenTreeIds(node: SettingsTransferTreeNode): string[] {

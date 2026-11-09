@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   browserStorage: {
     canObserveChanges: vi.fn(),
     local: { get: vi.fn(), isAvailable: vi.fn(), remove: vi.fn(), set: vi.fn() },
+    session: { get: vi.fn(), isAvailable: vi.fn(), remove: vi.fn(), set: vi.fn() },
     subscribeToChanges: vi.fn(),
   },
   connectNative: vi.fn(),
@@ -28,6 +29,7 @@ it('keeps provided native runtime service dependencies', async () => {
   const storage = {
     canObserveChanges: vi.fn(),
     local: { get: vi.fn(), isAvailable: vi.fn(), remove: vi.fn(), set: vi.fn() },
+    session: { get: vi.fn(), isAvailable: vi.fn(), remove: vi.fn(), set: vi.fn() },
     subscribeToChanges: vi.fn(),
   };
   const { resolveNativeRuntimeServiceDeps } = await import('./service-default-deps');

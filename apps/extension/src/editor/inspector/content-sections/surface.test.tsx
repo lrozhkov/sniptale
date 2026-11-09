@@ -68,7 +68,6 @@ it('renders the layer-effects surface branch with effect props', () => {
     renderEditorInspectorContentSurfaceSections({
       ...props,
       browserCanvasModeOptions: [],
-      browserContentModeOptions: [],
       clampGridSize: (value: number) => value,
       fontOptions: [],
       frameBackgroundImageFitOptions: [],
@@ -107,7 +106,6 @@ it('routes workspace-like inspectors away from the tools branch', () => {
     renderEditorInspectorContentSurfaceSections({
       ...props,
       browserCanvasModeOptions: [],
-      browserContentModeOptions: [],
       clampGridSize: (value: number) => value,
       fontOptions: [],
       frameBackgroundImageFitOptions: [],
@@ -152,7 +150,6 @@ it('routes browser-frame and tool inspectors through their dedicated content bra
     renderEditorInspectorContentSurfaceSections({
       ...props,
       browserCanvasModeOptions: [],
-      browserContentModeOptions: [],
       clampGridSize: (value: number) => value,
       fontOptions: [],
       frameBackgroundImageFitOptions: [],
@@ -183,7 +180,6 @@ it('routes browser-frame and tool inspectors through their dedicated content bra
     renderEditorInspectorContentSurfaceSections({
       ...props,
       browserCanvasModeOptions: [],
-      browserContentModeOptions: [],
       clampGridSize: (value: number) => value,
       fontOptions: [],
       frameBackgroundImageFitOptions: [],

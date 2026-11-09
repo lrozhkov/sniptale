@@ -1,3 +1,7 @@
+import * as recordingAudio from './recording-action-audio';
+import { createVideoProjectFromRecording } from '../../features/video/project/factories/creation';
+import eventsFixture from '../../features/video/project/recording-events/fixtures.json';
+import { isRecordingEventsDescriptor } from '../../features/video/project/recording-events/records';
 import { expect, it, vi } from 'vitest';
 import { createReviewExportFixture as fixture } from './export-lifecycle.test-support';
 import { exportReviewedVideo, buildReviewExportClipPlan } from './export-lifecycle';
@@ -376,3 +380,72 @@ it('exports linked source attenuation even when no manual source ranges exist', 
     })
   );
 });
+
+it.each(['success', 'failure'] as const)(
+  'owns global archive audio through export %s without building lifetime cues',
+  async (outcome) => {
+    if (!isRecordingEventsDescriptor(eventsFixture.descriptor)) throw new Error('Invalid fixture.');
+    const { args, deps } = fixture();
+    const original = await deps.loadVideoReviewSource();
+    args.snapshot.workspace.advanced.ui.mode = 'advanced';
+    args.snapshot.workspace.advanced.actionAudio = [
+      {
+        ref: { kind: 'action', id: 'click' },
+        enabled: true,
+        presetId: 'mouse-classic-v1',
+        volume: 0.35,
+        offset: 0,
+      },
+    ];
+    const historyProject = createVideoProjectFromRecording({
+      ...original.source,
+      recordingId: eventsFixture.recordingId,
+      filename: 'source.webm',
+      recordingEvents: eventsFixture.descriptor,
+    });
+    deps.loadVideoReviewSource.mockResolvedValue({ ...original, historyProject });
+    const source = {
+      duration: 4,
+      admit: vi.fn(async () => ({
+        maxVoices: 1,
+        busGain: 0.25,
+        sampleIds: ['mouse-click-v1' as const],
+        firstCueTime: 1,
+      })),
+      readWindow: vi.fn(async () => ({ duration: 4, descriptors: [] })),
+      dispose: vi.fn(),
+    };
+    const create = vi
+      .spyOn(recordingAudio, 'createReviewRecordingActionAudioSource')
+      .mockReturnValue(source);
+    const samples = { read: vi.fn(async () => nativeActionBuffer()), dispose: vi.fn() };
+    const write = vi.fn(
+      async (_input: Parameters<typeof import('./packet-export').writeReviewPackets>[0]) =>
+        deps.writeReviewPackets()
+    );
+    if (outcome === 'failure')
+      deps.writeReviewPackets.mockRejectedValueOnce(new Error('packet-failure'));
+    try {
+      const result = exportReviewedVideo(args, {
+        ...deps,
+        writeReviewPackets: write,
+        createActionSource: () => samples,
+      });
+      if (outcome === 'success') await result;
+      else await expect(result).rejects.toThrow('packet-failure');
+      expect(source.admit).toHaveBeenCalledOnce();
+      expect(source.readWindow).not.toHaveBeenCalled();
+      const output = write.mock.calls[0]![0].exportAudio!;
+      expect(output.action).toBeUndefined();
+      expect(output.recordingAction).toMatchObject({ source, busGain: 0.25, offset: 0 });
+      expect(output.entries).toEqual([]);
+      expect(source.dispose).toHaveBeenCalledOnce();
+      expect(samples.dispose).toHaveBeenCalledOnce();
+      expect(create.mock.calls[0]![0].edits).toEqual([
+        expect.objectContaining({ kind: 'cut', start: 2, end: 4 }),
+      ]);
+    } finally {
+      create.mockRestore();
+    }
+  }
+);

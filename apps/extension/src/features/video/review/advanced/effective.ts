@@ -121,6 +121,7 @@ type CursorFactsInput = {
 interface CursorRegionCache {
   key: string;
   facts: ReviewCursorFacts | null | undefined;
+  paths: ReturnType<typeof createCursorPaths>;
   project(region: QuickEditZoomRegion): QuickEditZoomRegion;
 }
 const cursorRegions = new WeakMap<
@@ -191,18 +192,44 @@ function resolveCursorRegions(
     path: state.cursorFocusPath,
     timeMap: state.audio.voiceoverSegments,
     source: cursorFacts?.source,
-    background: advanced ? state.background : undefined,
+    background: advanced
+      ? {
+          enabled: state.background.enabled,
+          zoomBehavior: state.background.zoomBehavior,
+          ...(state.background.enabled
+            ? {
+                padding: state.background.layout.padding,
+                cornerRadius: state.background.layout.cornerRadius,
+              }
+            : {}),
+        }
+      : undefined,
     canvas: advanced ? state.canvas : undefined,
-    header: advanced ? state.windowHeader : undefined,
+    header:
+      advanced && state.windowHeader
+        ? cursorFacts
+          ? windowHeaderGeometry(state.windowHeader, cursorFacts.source)
+          : { kind: state.windowHeader.kind, style: state.windowHeader.style }
+        : undefined,
   });
+  // Camera contexts consume geometry only. Visible paint and header content use the current state.
   // Immutable source facts survive unrelated settings snapshots; the signature owns invalidation.
   const owner = cursorFacts?.facts ?? state;
   const cached = cursorRegions.get(owner) ?? [];
   const previous = cached.find((entry) => entry.key === key && entry.facts === cursorFacts?.facts);
-  const project =
-    previous?.project ?? createCursorRegionProjection(state, cursorFacts, needsCursor);
+  const pathKey = JSON.stringify({
+    needsCursor,
+    source: cursorFacts?.source,
+    segments: state.cursorFocusPath?.segments,
+  });
+  const paths =
+    previous?.paths ??
+    cached.find((entry) => entry.paths.key === pathKey && entry.facts === cursorFacts?.facts)
+      ?.paths ??
+    createCursorPaths(state, cursorFacts, needsCursor, pathKey);
+  const project = previous?.project ?? createCursorRegionProjection(state, cursorFacts, paths);
   if (!previous) {
-    cached.push({ key, facts: cursorFacts?.facts, project });
+    cached.push({ key, facts: cursorFacts?.facts, paths, project });
     if (cached.length > 4) cached.shift();
     cursorRegions.set(owner, cached);
   }
@@ -212,14 +239,13 @@ function resolveCursorRegions(
   ).map(project);
 }
 
-/** A neighboring overlay edit does not replace native facts or unchanged camera plan receivers. */
-function createCursorRegionProjection(
+/** Source-clock observations do not depend on scene geometry, policy or the edit clock. */
+function createCursorPaths(
   state: QuickEditAdvancedState,
   cursorFacts: CursorFactsInput | undefined,
-  needsCursor: boolean
-): CursorRegionCache['project'] {
-  const advanced = state.ui.mode === 'advanced';
-
+  needsCursor: boolean,
+  key: string
+) {
   const cursorPath = needsCursor
     ? cursorFacts
       ? resolveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, state.cursorFocusPath)
@@ -229,6 +255,20 @@ function createCursorRegionProjection(
     cursorFacts && cursorPath
       ? deriveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, true)
       : undefined;
+  return { key, cursorPath, observed };
+}
+
+/** A neighboring overlay edit does not replace native facts or unchanged camera plan receivers. */
+function createCursorRegionProjection(
+  state: QuickEditAdvancedState,
+  cursorFacts: CursorFactsInput | undefined,
+  { cursorPath: retainedPath, observed }: ReturnType<typeof createCursorPaths>
+): CursorRegionCache['project'] {
+  const advanced = state.ui.mode === 'advanced';
+  const cursorPath =
+    retainedPath && state.cursorFocusPath
+      ? { ...state.cursorFocusPath, segments: retainedPath.segments }
+      : retainedPath;
   const projected = new Map<string, QuickEditZoomRegion>();
   return (input) => {
     const signature = JSON.stringify(input);

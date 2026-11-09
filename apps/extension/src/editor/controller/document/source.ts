@@ -13,13 +13,22 @@ export function syncSourceStateFromObject(
     return source;
   }
 
+  const displayWidth = object.getScaledWidth();
+  const displayHeight = object.getScaledHeight();
+  const base = source.compositionBase;
+  const resized =
+    Math.abs(displayWidth - source.displayWidth) > 0.001 ||
+    Math.abs(displayHeight - source.displayHeight) > 0.001;
   return {
     ...source,
     id: object.sniptaleId ?? source.id,
     left: object.left ?? source.left,
     top: object.top ?? source.top,
-    displayWidth: object.getScaledWidth(),
-    displayHeight: object.getScaledHeight(),
+    displayWidth,
+    displayHeight,
+    ...(base && resized
+      ? { compositionBase: { ...base, sourceWidth: displayWidth, sourceHeight: displayHeight } }
+      : {}),
     visible: object.visible !== false,
     locked: Boolean(object.sniptaleLocked),
   };

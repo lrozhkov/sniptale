@@ -1,3 +1,4 @@
+import { getSimplifyCallerKey } from '../../../simplify/route';
 import { parseSyncProductRequest } from '../../../../contracts/messaging/contracts/runtime/sync-product';
 import { isSyncProductSenderAllowed } from '../../../sync-connection/product-route';
 import type { AISecretUnlockMessage } from '../../../../contracts/messaging/ai-secret-unlock';
@@ -66,6 +67,8 @@ export const backgroundOwnedAuthorizationBindings = {
   'annotation-fork-session': authorizeAnnotationForkSessionRoute,
   'content-action-capability-issuance': authorizeContentActionCapabilityIssuance,
   'content-runtime-wakeup': authorizeContentRuntimeWakeupRoute,
+  simplify: (request) =>
+    getSimplifyCallerKey(request.sender) ? AUTHORIZED : reject('Unauthorized simplify sender'),
   'frame-annotation-raster': authorizeFrameAnnotationRasterRoute,
   'llm-content-processing': authorizeContentLlmRoute,
   'llm-scenario-editor-processing': authorizeScenarioEditorLlmRoute,
@@ -242,7 +245,11 @@ function authorizeSyncConnectionOriginPermission(
   routeEntry: BackgroundOwnedRouteInventoryEntry
 ): IpcAuthorizationResult {
   if (request.sender.tab || !hasOffscreenRuntimeCapability(request.sender)) {
-    return reject('Sync origin permission query refused');
+    return reject(
+      request.message.type === MessageType.SYNC_CONNECTION_CREDENTIAL
+        ? 'Sync credential query refused'
+        : 'Sync origin permission query refused'
+    );
   }
   return authorize(
     createBackgroundOwnedRoutePreauthorization({

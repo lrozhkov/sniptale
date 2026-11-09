@@ -1,5 +1,7 @@
 import { SCHEMA_CONTRACTS_STORE } from '../core.stores.ts';
 import { SUPPORTED_BETA_DATABASE_FIXTURES, type BetaDatabaseFixtureContract } from './index';
+import { nativeAppV47Fixture } from './native-app-v47';
+import { nativeAppV48Fixture } from './native-app-v48';
 
 type SupportedSourceDatabaseInspection =
   | { databaseVersion: number; status: 'ready' }
@@ -66,22 +68,32 @@ function parseSourceContracts(value: unknown): ReadonlyMap<string, number> | nul
 
 export async function inspectSupportedSourceDatabase(
   db: SourceInspectionDatabase,
-  fixtures: readonly BetaDatabaseFixtureContract[] = SUPPORTED_BETA_DATABASE_FIXTURES
+  fixtures: readonly BetaDatabaseFixtureContract[] = [
+    ...SUPPORTED_BETA_DATABASE_FIXTURES,
+    nativeAppV47Fixture,
+    nativeAppV48Fixture,
+  ]
 ): Promise<SupportedSourceDatabaseInspection | null> {
-  const fixture = fixtures.find(({ databaseVersion }) => databaseVersion === db.version);
-  if (!fixture) return null;
-  if (!storesMatchFixture(db, fixture)) {
+  const candidates = fixtures.filter(({ databaseVersion }) => databaseVersion === db.version);
+  if (candidates.length === 0) return null;
+  const storeCandidates = candidates.filter((fixture) => storesMatchFixture(db, fixture));
+  if (storeCandidates.length === 0) {
     return { databaseVersion: db.version, reason: 'stores', status: 'corrupt' };
   }
-  if (!indexesMatchFixture(db, fixture)) {
+  const indexedCandidates = storeCandidates.filter((fixture) => indexesMatchFixture(db, fixture));
+  if (indexedCandidates.length === 0) {
     return { databaseVersion: db.version, reason: 'indexes', status: 'corrupt' };
   }
   const contracts = parseSourceContracts(await db.getAll(SCHEMA_CONTRACTS_STORE));
-  if (!contracts || contracts.size !== Object.keys(fixture.domainVersions).length) {
+  if (!contracts) {
     return { databaseVersion: db.version, reason: 'domain-contracts', status: 'corrupt' };
   }
-  const contractsMatch = Object.entries(fixture.domainVersions).every(
-    ([domainId, schemaVersion]) => contracts.get(domainId) === schemaVersion
+  const contractsMatch = indexedCandidates.some(
+    (fixture) =>
+      contracts.size === Object.keys(fixture.domainVersions).length &&
+      Object.entries(fixture.domainVersions).every(
+        ([domainId, schemaVersion]) => contracts.get(domainId) === schemaVersion
+      )
   );
   return contractsMatch
     ? { databaseVersion: db.version, status: 'ready' }

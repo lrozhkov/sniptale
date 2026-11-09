@@ -19,21 +19,12 @@ export interface PreparedPreviewSceneCanvas {
 
 function syncCanvasResolution(
   canvas: HTMLCanvasElement,
-  bounds: PreviewSceneBounds,
-  rasterSize?: VideoEditorPreviewRasterSize
-): number {
-  const dpr = rasterSize
-    ? rasterSize.width / Math.max(1, bounds.width)
-    : window.devicePixelRatio || 1;
-  const nextWidth = rasterSize?.width ?? Math.max(1, Math.round(bounds.width * dpr));
-  const nextHeight = rasterSize?.height ?? Math.max(1, Math.round(bounds.height * dpr));
-
-  if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
-    canvas.width = nextWidth;
-    canvas.height = nextHeight;
+  backing: { width: number; height: number }
+): void {
+  if (canvas.width !== backing.width || canvas.height !== backing.height) {
+    canvas.width = backing.width;
+    canvas.height = backing.height;
   }
-
-  return dpr;
 }
 
 /** Measures the existing preview viewport without changing the presented canvas. */
@@ -72,6 +63,33 @@ function resolvePreviewSceneMetrics(
   );
 }
 
+/** Resolves the existing CSS viewport and backing math without selecting a canvas context. */
+export function resolvePreviewSceneCanvasLayout(params: {
+  canvas: HTMLCanvasElement;
+  project: VideoProject;
+  stage: HTMLDivElement | null;
+  previewRasterSize?: VideoEditorPreviewRasterSize;
+  viewportCanvas?: HTMLCanvasElement;
+}) {
+  const { bounds, viewport } = resolvePreviewSceneMetrics(
+    params.viewportCanvas ?? params.canvas,
+    params.project,
+    params.stage
+  );
+  const dpr = params.previewRasterSize
+    ? params.previewRasterSize.width / Math.max(1, bounds.width)
+    : window.devicePixelRatio || 1;
+  return {
+    bounds,
+    viewport,
+    dpr,
+    backing: {
+      width: params.previewRasterSize?.width ?? Math.max(1, Math.round(bounds.width * dpr)),
+      height: params.previewRasterSize?.height ?? Math.max(1, Math.round(bounds.height * dpr)),
+    },
+  };
+}
+
 export function resolvePreviewEffectRuntimeRasterScale(params: {
   canvas: HTMLCanvasElement;
   previewRasterSize?: VideoEditorPreviewRasterSize;
@@ -105,17 +123,21 @@ function resolvePreviewSceneContext(
   rasterSize?: VideoEditorPreviewRasterSize,
   viewportCanvas?: HTMLCanvasElement
 ) {
+  const layout = resolvePreviewSceneCanvasLayout({
+    canvas,
+    project,
+    stage,
+    ...(rasterSize ? { previewRasterSize: rasterSize } : {}),
+    ...(viewportCanvas ? { viewportCanvas } : {}),
+  });
   const context = canvas.getContext('2d');
-  const { bounds, viewport } = resolvePreviewSceneMetrics(viewportCanvas ?? canvas, project, stage);
-  if (!context) {
-    return null;
-  }
-
+  if (!context) return null;
+  syncCanvasResolution(canvas, layout.backing);
   return {
-    bounds,
+    bounds: layout.bounds,
     context,
-    dpr: syncCanvasResolution(canvas, bounds, rasterSize),
-    viewport,
+    dpr: layout.dpr,
+    viewport: layout.viewport,
   };
 }
 
@@ -228,7 +250,8 @@ export function beginPreviewCameraPass(
 /** Publishes a finished transaction canvas after asynchronous preparation succeeds. */
 export function publishCompletedPreviewFrame(
   presented: HTMLCanvasElement,
-  staging: HTMLCanvasElement
+  staging: HTMLCanvasElement,
+  notify = true
 ): void {
   const context = presented.getContext('2d');
   if (!context) throw new Error('Preview frame context is unavailable.');
@@ -248,7 +271,7 @@ export function publishCompletedPreviewFrame(
   } finally {
     context.restore();
   }
-  presented.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
+  if (notify) presented.dispatchEvent(new Event('sniptale-preview-frame', { bubbles: true }));
 }
 
 type CompletedCompositionPresentation = Pick<
@@ -259,6 +282,7 @@ type CompletedCompositionPresentation = Pick<
   currentTime: number;
   stagingCanvas?: () => HTMLCanvasElement;
   signal?: AbortSignal;
+  deferFrameEvent?: boolean;
 };
 
 /** Uses the canonical contained viewport to select the completed-composition sample size. */
@@ -313,7 +337,7 @@ export function publishPreviewCompositionFrame(
       prepared.context.restore();
     }
     input.signal?.throwIfAborted();
-    publishCompletedPreviewFrame(input.canvas, staging);
+    publishCompletedPreviewFrame(input.canvas, staging, !input.deferFrameEvent);
   } finally {
     if (owned) {
       staging.width = 0;

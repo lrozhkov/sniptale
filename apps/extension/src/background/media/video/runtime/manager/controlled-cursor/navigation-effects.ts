@@ -70,7 +70,7 @@ export async function suspendControlledCursorEffects(
   if (!isControlledCursorEffectActive(binding)) return;
   setControlledCursorAutoPaused(binding.shouldResume);
   try {
-    const telemetry = await disableControlledCursorCapture(binding.tabId);
+    const telemetry = await disableControlledCursorCapture(binding.tabId, 'observation');
     if (isControlledCursorEffectActive(binding)) appendControlledCursorTelemetry(telemetry);
   } catch (error) {
     logger.warn('Failed to flush controlled cursor telemetry before navigation', error);

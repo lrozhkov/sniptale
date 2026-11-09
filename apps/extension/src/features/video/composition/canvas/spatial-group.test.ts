@@ -172,3 +172,22 @@ it('does not allocate or publish a source plane with singular affine placement',
   expect(renderer.surface).not.toHaveBeenCalled();
   expect(context.drawImage).not.toHaveBeenCalled();
 });
+
+it('retains higher source density without changing projection or logical window coordinates', () => {
+  const { args, renderer, sourceContext, paint } = setup();
+  drawSpatialCameraGroup({ ...args, sourceRasterScale: 2 });
+  expect(renderer.surface.mock.calls).toEqual([
+    ['exposure', 400, 225],
+    ['plane', 2008, 1208],
+  ]);
+  expect(sourceContext.setTransform).toHaveBeenCalledWith(4, 0, 0, 4, 0, 0);
+  expect(paint).toHaveBeenCalledWith(sourceContext, 0.5);
+  expect(renderer.draw).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      sourceRect: { x: -11, y: -6, width: 502, height: 302 },
+      base: { x: 40, y: 45, width: 280, height: 135 },
+      target: { x: 30, y: 65, width: 560, height: 270 },
+    })
+  );
+});

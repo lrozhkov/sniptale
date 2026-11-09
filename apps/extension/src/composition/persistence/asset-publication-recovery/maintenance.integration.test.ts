@@ -1,3 +1,8 @@
+import { collectReadyJournalAssetIds } from '../assets/retention-claims';
+import {
+  createRetentionDatabaseFixture,
+  createTargetAssetDatabaseFixture,
+} from '../assets/retention-authority.test-support';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AssetReadyJournal, PhysicalDeleteAssetOperation } from '../assets/contracts';
 import type { PersistenceLockManager } from '../infrastructure/mutation-barrier';
@@ -6,6 +11,8 @@ import type { PersistenceLockManager } from '../infrastructure/mutation-barrier'
 // durable intent creation and physical-delete completion are the production participants.
 const storage = vi.hoisted(() => ({
   reads: 0,
+  beforeReadPage: vi.fn(),
+  pointRequests: vi.fn(),
   readStores: new Set<string>(),
   rows: new Map<string, unknown[]>(),
   intents: new Map<string, PhysicalDeleteAssetOperation>(),
@@ -17,27 +24,38 @@ const storage = vi.hoisted(() => ({
 }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
-  initDB: async () => ({
-    getAllKeys: async (store: string) =>
-      (storage.rows.get(store) ?? []).map((row) =>
-        typeof row === 'object' && row !== null && 'assetId' in row ? row.assetId : ''
-      ),
-    getAll: async (store: string) => {
+  initDB: async () => {
+    const readRows = async (store: string) => {
       storage.reads += 1;
       storage.readStores.add(store);
       return store === 'asset_operations'
         ? [...storage.intents.values(), ...(storage.rows.get(store) ?? [])]
         : (storage.rows.get(store) ?? []);
-    },
-    put: async (store: string, operation: PhysicalDeleteAssetOperation) => {
-      if (store !== 'asset_operations') throw new Error('Unexpected test write');
-      storage.intents.set(operation.operationId, operation);
-    },
-    delete: async (store: string, id: string) => {
-      if (store !== 'asset_operations') throw new Error('Unexpected test deletion');
-      storage.intents.delete(id);
-    },
-  }),
+    };
+    const database = createRetentionDatabaseFixture(readRows);
+    const target = createTargetAssetDatabaseFixture(readRows);
+    target.requests.mockImplementation((store: string, index: string, key: IDBValidKey) => {
+      storage.pointRequests(store, index, key);
+      storage.beforeReadPage(store, index, key);
+    });
+    database.pages.mockImplementation(storage.beforeReadPage);
+    return {
+      ...database,
+      transaction: target.transaction,
+      getAllKeys: async (store: string) =>
+        (storage.rows.get(store) ?? []).map((row) =>
+          typeof row === 'object' && row !== null && 'assetId' in row ? row.assetId : ''
+        ),
+      put: async (store: string, operation: PhysicalDeleteAssetOperation) => {
+        if (store !== 'asset_operations') throw new Error('Unexpected test write');
+        storage.intents.set(operation.operationId, operation);
+      },
+      delete: async (store: string, id: string) => {
+        if (store !== 'asset_operations') throw new Error('Unexpected test deletion');
+        storage.intents.delete(id);
+      },
+    };
+  },
 }));
 vi.mock('../assets/opfs-store', async (original) => ({
   ...(await original<typeof import('../assets/opfs-store')>()),
@@ -47,6 +65,13 @@ vi.mock('../assets/opfs-store', async (original) => ({
   },
   listWritingAssetIds: async () => [...storage.writing],
   listReadyJournals: async () => storage.journals,
+  readAssetReadyClaims: async () => ({
+    valid: true,
+    journals: storage.journals,
+    assetIds: new Set(storage.journals.flatMap(collectReadyJournalAssetIds)),
+  }),
+  readWritingAssetIds: async (ids: Iterable<string>) =>
+    [...ids].filter((id) => storage.writing.has(id)),
   deleteAssetObject: storage.deleteObject,
 }));
 import { collectOrphanAssetObjectsDuringIdle } from './audit';
@@ -226,12 +251,31 @@ it('does no full document scan when all objects already have refs', async () => 
   expect(storage.deleteObject).not.toHaveBeenCalled();
 });
 
-it('validates one graph for a batch of orphan objects instead of once per object', async () => {
+it('validates one selected native snapshot for a batch of orphan objects', async () => {
   for (let i = 0; i < 12; i++) storage.objects.add(`orphan-${i}`);
   await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
   expect(storage.objects.size).toBe(0);
   expect(storage.readStores.has('sync_capture')).toBe(true);
   expect(storage.reads).toBe(storage.readStores.size);
+  expect(storage.pointRequests).toHaveBeenCalledTimes(193);
+  const historyRequests = storage.pointRequests.mock.calls.filter(
+    (call) => call[1] === 'snapshotAssetId'
+  );
+  expect(historyRequests).toHaveLength(24);
+  expect(historyRequests).toEqual(
+    expect.arrayContaining(
+      Array.from({ length: 12 }, (_, i) =>
+        ['recording_cursor_trajectories', 'recording_events'].map((store) => [
+          store,
+          'snapshotAssetId',
+          `orphan-${i}`,
+        ])
+      ).flat()
+    )
+  );
+  expect(
+    storage.pointRequests.mock.calls.filter((call) => call[1] === 'get').map((call) => call[2])
+  ).toEqual(Array.from({ length: 12 }, (_, i) => `orphan-${i}`));
 });
 
 it('cancels during cooperative validation without committing deletion intent', async () => {
@@ -244,10 +288,12 @@ it('cancels during cooperative validation without committing deletion intent', a
     }))
   );
   const controller = new AbortController();
-  const work = collectOrphanAssetObjectsDuringIdle(controller.signal);
-  await vi.waitFor(() => expect(storage.reads).toBeGreaterThanOrEqual(4));
-  controller.abort();
-  await expect(work).rejects.toMatchObject({ name: 'AbortError' });
+  storage.beforeReadPage.mockImplementation((store: string) => {
+    if (store === 'recordings') controller.abort();
+  });
+  await expect(collectOrphanAssetObjectsDuringIdle(controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
   expect(storage.deleteObject).not.toHaveBeenCalled();
   expect(storage.intents.size).toBe(0);
 });

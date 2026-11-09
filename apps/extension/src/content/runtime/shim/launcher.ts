@@ -2,7 +2,8 @@ import { createElement as createLucideElement } from 'lucide';
 import { getQuickActionIconNode } from '../../../features/quick-actions-presets/icons';
 import { isTrustedDomEvent } from '../../platform/trusted-events';
 import { PAGE_CORNERS, type PageCorner } from '../../../contracts/page-launch';
-import { pageLauncherMessages } from '../../../platform/i18n/messages/content/page-launcher';
+import { readContentShimTranslation } from '../../../platform/i18n/content-shim';
+import type { TranslationDictionary } from '../../../platform/i18n/types';
 import {
   installCornerGroupDrag,
   type CornerGroupDragState,
@@ -139,8 +140,11 @@ class ShimLauncherView {
     this.elements.shadow.append(this.error);
     this.render();
   }
-  private label(key: keyof typeof pageLauncherMessages) {
-    return pageLauncherMessages[key][this.options.presentation.locale];
+  private label(key: keyof TranslationDictionary['content']['pageLauncher']) {
+    return readContentShimTranslation(
+      this.options.presentation.locale,
+      `content.pageLauncher.${key}`
+    );
   }
   private closeMenu(restoreFocus = false) {
     this.menu?.remove();

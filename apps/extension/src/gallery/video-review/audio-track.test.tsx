@@ -31,7 +31,6 @@ const onOriginal = vi.fn((_patch: Partial<QuickEditOriginalAudio>) => undefined)
 const onImportFile = vi.fn(
   (_file: File, _lane: 'voiceover' | 'music', _timelineTime?: number) => undefined
 );
-const onRecordVoiceover = vi.fn();
 const onSelect = vi.fn((_id: string | null) => undefined);
 
 const clip = (id: string, timelineStart: number, duration: number): QuickEditAudioClip => ({
@@ -43,15 +42,7 @@ beforeEach(() => {
   host = document.createElement('div');
   document.body.appendChild(host);
   root = createRoot(host);
-  for (const mock of [
-    onMoveClip,
-    onTrimClip,
-    onOriginal,
-    onImportFile,
-    onSelect,
-    onRecordVoiceover,
-  ])
-    mock.mockClear();
+  for (const mock of [onMoveClip, onTrimClip, onOriginal, onImportFile, onSelect]) mock.mockClear();
 });
 
 afterEach(async () => {
@@ -74,8 +65,7 @@ const renderTrack = (
   assets?: Parameters<typeof ReviewAudioTrack>[0]['assets'],
   projection?: Parameters<typeof ReviewAudioTrack>[0]['projection'],
   waveforms?: Parameters<typeof ReviewAudioTrack>[0]['waveforms'],
-  beforeAction?: Parameters<typeof ReviewAudioTrack>[0]['beforeAction'],
-  onOpenMusic?: Parameters<typeof ReviewAudioTrack>[0]['onOpenMusic']
+  beforeAction?: Parameters<typeof ReviewAudioTrack>[0]['beforeAction']
 ) => {
   act(() => {
     root.render(
@@ -88,7 +78,6 @@ const renderTrack = (
       >
         <ReviewAudioTrack
           beforeAction={beforeAction}
-          onOpenMusic={onOpenMusic}
           projection={projection}
           waveforms={waveforms}
           assets={assets}
@@ -103,7 +92,6 @@ const renderTrack = (
           onTrimClip={onTrimClip}
           onOriginal={onOriginal}
           onImportFile={onImportFile}
-          onRecordVoiceover={onRecordVoiceover}
         />
       </ReviewTimelineResizeGuide>
     );
@@ -766,43 +754,6 @@ it.each(['voiceover', 'music'] as const)(
   }
 );
 
-it('opens the shared audio picker for the captured lane after note admission', async () => {
-  const openMusic = vi.fn();
-  let admit!: () => void;
-  renderTrack(
-    undefined,
-    false,
-    [],
-    true,
-    undefined,
-    undefined,
-    undefined,
-    (action) => {
-      admit = action;
-    },
-    openMusic
-  );
-  const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-  const pickFile = vi.spyOn(fileInput, 'click');
-  const music = host.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.musicLibrary"]'
-  )!;
-  act(() => music.click());
-  expect(openMusic).not.toHaveBeenCalled();
-  expect(pickFile).not.toHaveBeenCalled();
-  act(() => admit());
-  expect(openMusic).toHaveBeenCalledExactlyOnceWith(music, 'music');
-  const voiceover = host.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.audioImport"]'
-  )!;
-  act(() => voiceover.click());
-  expect(openMusic).toHaveBeenCalledTimes(1);
-  act(() => admit());
-  expect(openMusic).toHaveBeenLastCalledWith(voiceover, 'voiceover');
-  expect(pickFile).not.toHaveBeenCalled();
-  expect(fileInput.accept).toBe('audio/*');
-});
-
 it('projects loop magnets to the audio axis and excludes a removed source boundary', () => {
   const advanced = createQuickEditAdvancedState();
   const snap = reviewAudioSnapTimes({
@@ -813,4 +764,39 @@ it('projects loop magnets to the audio axis and excludes a removed source bounda
     toOutputTime: (time) => (time === 3 ? null : time / 2),
   });
   expect(snap).toEqual([4]);
+});
+
+it('reuses music waveform samples across unchanged owner rerenders but refreshes a changed source', () => {
+  let reads = 0;
+  const peaks = new Proxy(new Array<number>(1000).fill(0.5), {
+    get(target, key, receiver) {
+      if (typeof key === 'string' && /^\d+$/.test(key)) reads++;
+      return Reflect.get(target, key, receiver);
+    },
+  });
+  const waveform = { duration: 10, peaks };
+  const waves = new Map([['asset:1', waveform]]);
+  const projection = createTrackProjection(10, [
+    { id: 'cut', kind: 'cut', start: 3, end: 4, requestedStart: 3, requestedEnd: 4 },
+  ]);
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [],
+    music: [clip('music', 0, 8)],
+  };
+  renderTrack(audio, false, [], true, undefined, projection, waves);
+  const initial = reads;
+  expect(initial).toBeGreaterThan(0);
+  renderTrack(audio, false, [], true, undefined, projection, waves);
+  expect(reads).toBe(initial);
+  const changed = new Map([['asset:1', { duration: 10, peaks: [0, 1, 0, 1] }]]);
+  const before = host
+    .querySelector('[data-audio-id="music"] [data-ui="gallery.videoReview.waveform"] path')!
+    .getAttribute('d');
+  renderTrack(audio, false, [], true, undefined, projection, changed);
+  expect(
+    host
+      .querySelector('[data-audio-id="music"] [data-ui="gallery.videoReview.waveform"] path')!
+      .getAttribute('d')
+  ).not.toBe(before);
 });

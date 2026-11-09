@@ -1,4 +1,5 @@
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
+import { enableGpuPreviewProof, observeEffectGpuPlans } from '../support/gpu-preview-proof';
 import { normalizeVideoProjectCursorSkin } from '../../../../apps/extension/src/features/video/project/cursor';
 import { resolveProjectCursorCameraPlan } from '../../../../apps/extension/src/features/video/composition/motion/project-follow';
 import { resolveVideoCompositionCamera } from '../../../../apps/extension/src/features/video/composition/motion';
@@ -38,6 +39,8 @@ import {
   VideoMessageType,
 } from '../extension-critical.helpers';
 
+enableGpuPreviewProof();
+
 const svg =
   '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#22d3ee"/></svg>';
 
@@ -57,6 +60,7 @@ async function openFixture(
     crossfade?: boolean;
     effectTransition?: boolean;
     sourceFx?: 'clip' | 'track' | 'video-group';
+    sourceFxChain?: boolean;
   } = {}
 ) {
   const bytes = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
@@ -207,7 +211,11 @@ async function openFixture(
       ...image,
       id: 'crossfade-trailing',
       startTime: 0.4,
-      transform: { ...image.transform, opacity: 1 },
+      transform: {
+        ...image.transform,
+        opacity: 1,
+        width: options.effectTransition ? 20 : image.transform.width,
+      },
     };
     project.clips.push(trailing);
     project.transitions = [
@@ -323,6 +331,14 @@ async function openFixture(
         playbackRate: document.duration / (options.effectTransition ? 0.4 : image.duration),
       },
     ];
+    if (options.sourceFxChain) {
+      const first = project.effectInstances[0]!;
+      project.effectInstances.push({
+        ...first,
+        id: 'second-source-effect',
+        controls: { ...first.controls },
+      });
+    }
   }
   if (options.sourceActionFocus) {
     if (!video.sourceInstanceId) throw new Error('Missing source action identity');
@@ -493,6 +509,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
   }, info) => {
     test.setTimeout(180000);
     await page.setViewportSize({ ...viewport.size });
+    const completedEffectPlans = await observeEffectGpuPlans(page);
     const locale = index === 0 ? 'en' : 'ru',
       theme = index === 0 ? 'dark' : 'light';
     await page.emulateMedia({ colorScheme: theme });
@@ -501,7 +518,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     try {
-      await openFixture(page, host.origin, locale, theme);
+      await openFixture(page, host.origin, locale, theme, { sourceFx: 'clip' });
       await page
         .locator('[data-timeline-effect-segment="spatial-camera"]')
         .getByRole('button', {
@@ -511,7 +528,24 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         .click();
       const owner = page.locator('[data-ui="video-editor.framing-preview"]');
       await expect(owner).toBeVisible();
-      const canvas = owner.locator('canvas');
+      const canvas = owner.locator('[data-preview-inspector-canvas]');
+      const expectGpuOutput = async () => {
+        await expect(canvas).toHaveCount(1);
+        await expect
+          .poll(() =>
+            canvas.evaluate((node: HTMLCanvasElement) => {
+              try {
+                return node.getContext('2d') === null;
+              } catch (error) {
+                if (error instanceof DOMException && error.name === 'InvalidStateError')
+                  return true;
+                throw error;
+              }
+            })
+          )
+          .toBe(true);
+        await expect(page.locator('[data-preview-stage-canvas]')).toHaveCount(1);
+      };
       const categories = page.locator('[data-ui="video-editor.inspector.categories"]');
       const rail = categories.locator(':scope > nav');
       const content = categories.locator(':scope > div');
@@ -527,17 +561,27 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       };
       const sample = () =>
         canvas.evaluate((node: HTMLCanvasElement) => {
-          const context = node.getContext('2d')!;
-          return [220, 280].map((x) =>
-            Array.from(
-              context.getImageData(
-                Math.round((x * node.width) / 320),
-                Math.round((90 * node.height) / 180),
-                1,
-                1
-              ).data
-            )
-          );
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          const readbackContext = readback.getContext('2d')!;
+          try {
+            readbackContext.drawImage(node, 0, 0);
+            const context = readbackContext;
+            return [220, 280].map((x) =>
+              Array.from(
+                context.getImageData(
+                  Math.round((x * node.width) / 320),
+                  Math.round((90 * node.height) / 180),
+                  1,
+                  1
+                ).data
+              )
+            );
+          } finally {
+            readback.width = 0;
+            readback.height = 0;
+          }
         });
       const cyan = [18, 52, 86].map((value, i) => value + 0.61 * ([34, 211, 238][i]! - value));
       const before = await readNativeVideoProject(page);
@@ -550,6 +594,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           { timeout: 30000 }
         )
         .toBeLessThan(3);
+      await expectGpuOutput();
       await chooseInspectorValue(
         page,
         owner,
@@ -580,6 +625,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
             name: label('videoEditor.sidebar.framingPreviewLabel'),
             exact: true,
           });
+      await expectGpuOutput();
       await checkInspectorPaintedFont(page, modeTarget, 'spatial-framing-result');
       await exposeFrame();
       await page.screenshot({
@@ -601,6 +647,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           { timeout: 30000 }
         )
         .toBeLessThan(3);
+      await expectGpuOutput();
       expect(await readNativeVideoProject(page)).toEqual(before);
       await expect(
         owner.getByText(label('videoEditor.sidebar.framingPreviewHint'), { exact: true })
@@ -616,6 +663,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
         )
       ).toBe(true);
+      expect(completedEffectPlans()).toBeGreaterThan(0);
       expect(errors).toEqual([]);
     } finally {
       host.server.closeAllConnections();
@@ -647,21 +695,31 @@ test('materialized DOF framing keeps the selected camera focus and sharp cursor'
       translate('videoEditor.sidebar.framingResultView', 'en')
     );
     const sample = () =>
-      owner.locator('canvas').evaluate((node: HTMLCanvasElement) => {
-        const context = node.getContext('2d')!;
-        return [
-          [257, 90],
-          [232, 134],
-        ].map(([x, y]) =>
-          Array.from(
-            context.getImageData(
-              Math.round((x! * node.width) / 320),
-              Math.round((y! * node.height) / 180),
-              1,
-              1
-            ).data
-          )
-        );
+      owner.locator('[data-preview-inspector-canvas]').evaluate((node: HTMLCanvasElement) => {
+        const readback = document.createElement('canvas');
+        readback.width = node.width;
+        readback.height = node.height;
+        const readbackContext = readback.getContext('2d')!;
+        try {
+          readbackContext.drawImage(node, 0, 0);
+          const context = readbackContext;
+          return [
+            [257, 90],
+            [232, 134],
+          ].map(([x, y]) =>
+            Array.from(
+              context.getImageData(
+                Math.round((x! * node.width) / 320),
+                Math.round((y! * node.height) / 180),
+                1,
+                1
+              ).data
+            )
+          );
+        } finally {
+          readback.width = 0;
+          readback.height = 0;
+        }
       });
     // Functional pixel proof; the two viewport cases above own the bounded UI inspection.
     await expect.poll(async () => (await sample())[1]![1], { timeout: 30000 }).toBeGreaterThan(240);
@@ -689,21 +747,31 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(canvas).toBeVisible();
       const sample = () =>
         canvas.evaluate((node: HTMLCanvasElement) => {
-          const context = node.getContext('2d')!;
-          // The scene canvas uses a contained project viewport, centered in its backing store.
-          const scale = Math.min(node.width / 320, node.height / 180);
-          const offsetX = (node.width - 320 * scale) / 2;
-          const offsetY = (node.height - 180 * scale) / 2;
-          return [220, 280].map((x) =>
-            Array.from(
-              context.getImageData(
-                Math.round(offsetX + x * scale),
-                Math.round(offsetY + 90 * scale),
-                1,
-                1
-              ).data
-            )
-          );
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          const readbackContext = readback.getContext('2d')!;
+          try {
+            readbackContext.drawImage(node, 0, 0);
+            const context = readbackContext;
+            // The scene canvas uses a contained project viewport, centered in its backing store.
+            const scale = Math.min(node.width / 320, node.height / 180);
+            const offsetX = (node.width - 320 * scale) / 2;
+            const offsetY = (node.height - 180 * scale) / 2;
+            return [220, 280].map((x) =>
+              Array.from(
+                context.getImageData(
+                  Math.round(offsetX + x * scale),
+                  Math.round(offsetY + 90 * scale),
+                  1,
+                  1
+                ).data
+              )
+            );
+          } finally {
+            readback.width = 0;
+            readback.height = 0;
+          }
         });
       const expected = [
         [18, 52, 86].map((v, i) => v + 0.61 * ([34, 211, 238][i]! - v)),
@@ -813,20 +881,30 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const canvas = page.locator('[data-preview-stage-canvas]');
       const sample = () =>
         canvas.evaluate((node: HTMLCanvasElement) => {
-          const scale = Math.min(node.width / 320, node.height / 180);
-          const ox = (node.width - 320 * scale) / 2,
-            oy = (node.height - 180 * scale) / 2;
-          const context = node.getContext('2d')!;
-          return [
-            [232, 134],
-            [250, 40],
-            [257, 90],
-          ].map(([x, y]) =>
-            Array.from(
-              context.getImageData(Math.round(ox + x! * scale), Math.round(oy + y! * scale), 1, 1)
-                .data
-            )
-          );
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          const readbackContext = readback.getContext('2d')!;
+          try {
+            readbackContext.drawImage(node, 0, 0);
+            const scale = Math.min(node.width / 320, node.height / 180);
+            const ox = (node.width - 320 * scale) / 2,
+              oy = (node.height - 180 * scale) / 2;
+            const context = readbackContext;
+            return [
+              [232, 134],
+              [250, 40],
+              [257, 90],
+            ].map(([x, y]) =>
+              Array.from(
+                context.getImageData(Math.round(ox + x! * scale), Math.round(oy + y! * scale), 1, 1)
+                  .data
+              )
+            );
+          } finally {
+            readback.width = 0;
+            readback.height = 0;
+          }
         });
       await expect
         .poll(async () => (await sample())[0]![1], { timeout: 30000 })
@@ -869,6 +947,19 @@ for (const overlays of [false, true])
         // Exercise the acute arrow outline in native MP4 as well as the DOT in WebM.
         if (overlays && format === 'MP4' && project.cursorTrack)
           project.cursorTrack.skin.preset = 'ARROW';
+        await expect
+          .poll(() =>
+            page.locator('[data-preview-stage-canvas]').evaluate((node: HTMLCanvasElement) => {
+              try {
+                return node.getContext('2d') === null;
+              } catch (error) {
+                if (error instanceof DOMException && error.name === 'InvalidStateError')
+                  return true;
+                throw error;
+              }
+            })
+          )
+          .toBe(true);
         await page.goto(`${host.origin}${OFFSCREEN_HARNESS_PATH}`);
         await page.locator('[data-ui="offscreen.harness.root"][data-state="ready"]').waitFor();
         const jobId = `camera-spatial-${format}`;
@@ -1101,23 +1192,45 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       const canvas = page.locator('[data-preview-stage-canvas]');
       const pixels = () =>
         canvas.evaluate(async (node: HTMLCanvasElement) => {
-          const pixels = node.getContext('2d')!.getImageData(0, 0, node.width, node.height).data;
-          const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(pixels));
-          return Array.from(new Uint8Array(hash), (byte) =>
-            byte.toString(16).padStart(2, '0')
-          ).join('');
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          const readbackContext = readback.getContext('2d')!;
+          try {
+            readbackContext.drawImage(node, 0, 0);
+            const pixels = readbackContext.getImageData(0, 0, node.width, node.height).data;
+            const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(pixels));
+            return Array.from(new Uint8Array(hash), (byte) =>
+              byte.toString(16).padStart(2, '0')
+            ).join('');
+          } finally {
+            readback.width = 0;
+            readback.height = 0;
+          }
         });
       // An independent projected landmark establishes that the source frame is ready.
       await expect
         .poll(() =>
           canvas.evaluate((node: HTMLCanvasElement) => {
-            const scale = Math.min(node.width / 320, node.height / 180);
-            const ox = (node.width - 320 * scale) / 2,
-              oy = (node.height - 180 * scale) / 2;
-            return node
-              .getContext('2d')!
-              .getImageData(Math.round(ox + 220 * scale), Math.round(oy + 100 * scale), 1, 1)
-              .data[1]!;
+            const readback = document.createElement('canvas');
+            readback.width = node.width;
+            readback.height = node.height;
+            const readbackContext = readback.getContext('2d')!;
+            try {
+              readbackContext.drawImage(node, 0, 0);
+              const scale = Math.min(node.width / 320, node.height / 180);
+              const ox = (node.width - 320 * scale) / 2,
+                oy = (node.height - 180 * scale) / 2;
+              return readbackContext.getImageData(
+                Math.round(ox + 220 * scale),
+                Math.round(oy + 100 * scale),
+                1,
+                1
+              ).data[1]!;
+            } finally {
+              readback.width = 0;
+              readback.height = 0;
+            }
           })
         )
         .toBeGreaterThan(100);
@@ -1388,13 +1501,24 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       await expect(thumbnail.locator('[data-video-editor-local-navigation]')).toBeEnabled();
       const hashCanvas = (selector: string) =>
         page.locator(selector).evaluate(async (node: HTMLCanvasElement) => {
-          const pixels = node.getContext('2d')!.getImageData(0, 0, node.width, node.height).data;
-          const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(pixels));
-          return Array.from(new Uint8Array(hash), (byte) =>
-            byte.toString(16).padStart(2, '0')
-          ).join('');
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          const readbackContext = readback.getContext('2d')!;
+          try {
+            readbackContext.drawImage(node, 0, 0);
+            const pixels = readbackContext.getImageData(0, 0, node.width, node.height).data;
+            const hash = await crypto.subtle.digest('SHA-256', new Uint8Array(pixels));
+            return Array.from(new Uint8Array(hash), (byte) =>
+              byte.toString(16).padStart(2, '0')
+            ).join('');
+          } finally {
+            readback.width = 0;
+            readback.height = 0;
+          }
         });
-      const thumbSelector = '[data-ui="video-editor.framing-preview"] canvas';
+      const thumbSelector =
+        '[data-ui="video-editor.framing-preview"] [data-preview-inspector-canvas]';
       const mainBefore = await hashCanvas('[data-preview-stage-canvas]'),
         thumbBefore = await hashCanvas(thumbSelector);
       const tilt = all
@@ -1649,12 +1773,22 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       const canvas = page.locator('[data-preview-stage-canvas]');
       const sample = () =>
         canvas.evaluate((node: HTMLCanvasElement, point) => {
-          const scale = Math.min(node.width / 320, node.height / 180);
-          const x = (node.width - 320 * scale) / 2 + point.x * scale;
-          const y = (node.height - 180 * scale) / 2 + point.y * scale;
-          return Array.from(
-            node.getContext('2d')!.getImageData(Math.round(x), Math.round(y), 1, 1).data
-          );
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          const readbackContext = readback.getContext('2d')!;
+          try {
+            readbackContext.drawImage(node, 0, 0);
+            const scale = Math.min(node.width / 320, node.height / 180);
+            const x = (node.width - 320 * scale) / 2 + point.x * scale;
+            const y = (node.height - 180 * scale) / 2 + point.y * scale;
+            return Array.from(
+              readbackContext.getImageData(Math.round(x), Math.round(y), 1, 1).data
+            );
+          } finally {
+            readback.width = 0;
+            readback.height = 0;
+          }
         }, expected);
       for (const reopened of [false, true]) {
         if (reopened) await page.reload();
@@ -1678,18 +1812,23 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   });
 }
 
-for (const scope of ['clip', 'track', 'video-group'] as const) {
+for (const scope of ['clip', 'track', 'video-group', 'chain'] as const) {
   for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(`source actions remain sharp after ${scope} FX and perspective DOF ${viewport.size.width}`, async ({
       page,
     }, info) => {
       test.setTimeout(180000);
       await page.setViewportSize({ ...viewport.size });
+      const completedEffectPlans = await observeEffectGpuPlans(page);
       const host = await startHostServer();
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
       try {
-        await openFixture(page, host.origin, 'en', 'dark', { overlays: true, sourceFx: scope });
+        await openFixture(page, host.origin, 'en', 'dark', {
+          overlays: true,
+          sourceFx: scope === 'chain' ? 'clip' : scope,
+          sourceFxChain: scope === 'chain',
+        });
         const before = await readNativeVideoProject(page);
         const angle = (35 * Math.PI) / 180;
         const sourceX = 70,
@@ -1702,21 +1841,29 @@ for (const scope of ['clip', 'track', 'video-group'] as const) {
         const canvas = page.locator('[data-preview-stage-canvas]');
         const sample = () =>
           canvas.evaluate((node: HTMLCanvasElement, positions) => {
-            const scale = Math.min(node.width / 320, node.height / 180),
-              ox = (node.width - 320 * scale) / 2,
-              oy = (node.height - 180 * scale) / 2;
-            return positions.map((point) =>
-              Array.from(
-                node
-                  .getContext('2d')!
-                  .getImageData(
+            const readback = document.createElement('canvas');
+            readback.width = node.width;
+            readback.height = node.height;
+            const readbackContext = readback.getContext('2d')!;
+            try {
+              readbackContext.drawImage(node, 0, 0);
+              const scale = Math.min(node.width / 320, node.height / 180),
+                ox = (node.width - 320 * scale) / 2,
+                oy = (node.height - 180 * scale) / 2;
+              return positions.map((point) =>
+                Array.from(
+                  readbackContext.getImageData(
                     Math.round(ox + point.x * scale),
                     Math.round(oy + point.y * scale),
                     1,
                     1
                   ).data
-              )
-            );
+                )
+              );
+            } finally {
+              readback.width = 0;
+              readback.height = 0;
+            }
           }, points);
         for (const reopened of [false, true]) {
           if (reopened) await page.reload();
@@ -1745,6 +1892,7 @@ for (const scope of ['clip', 'track', 'video-group'] as const) {
         );
         await page.screenshot({ path: info.outputPath('source-action-fx.png'), fullPage: false });
         expect(errors).toEqual([]);
+        expect(completedEffectPlans()).toBeGreaterThan(0);
       } finally {
         host.server.closeAllConnections();
         await new Promise<void>((resolve) => host.server.close(() => resolve()));
@@ -1761,6 +1909,7 @@ for (const effectTransition of [false, true])
       async ({ page }, info) => {
         test.setTimeout(180000);
         await page.setViewportSize({ ...viewport.size });
+        const completedEffectPlans = effectTransition ? await observeEffectGpuPlans(page) : null;
         const host = await startHostServer();
         const errors: string[] = [];
         page.on('pageerror', (error) => errors.push(error.message));
@@ -1772,24 +1921,32 @@ for (const effectTransition of [false, true])
           const canvas = page.locator('[data-preview-stage-canvas]');
           const sample = () =>
             canvas.evaluate((node: HTMLCanvasElement) => {
-              const scale = Math.min(node.width / 320, node.height / 180);
-              return Array.from(
-                node
-                  .getContext('2d')!
-                  .getImageData(
+              const readback = document.createElement('canvas');
+              readback.width = node.width;
+              readback.height = node.height;
+              const readbackContext = readback.getContext('2d')!;
+              try {
+                readbackContext.drawImage(node, 0, 0);
+                const scale = Math.min(node.width / 320, node.height / 180);
+                return Array.from(
+                  readbackContext.getImageData(
                     Math.round((node.width - 320 * scale) / 2 + 220 * scale),
                     Math.round((node.height - 180 * scale) / 2 + 100 * scale),
                     1,
                     1
                   ).data
-              );
+                );
+              } finally {
+                readback.width = 0;
+                readback.height = 0;
+              }
             });
           const proof = [];
           let frame = 0;
           for (const [time, alpha] of [
             [0.2, effectTransition ? 1 : 0.2],
-            [0.6, effectTransition ? 1 : 0.55],
-            [1, 1],
+            [0.6, effectTransition ? 0.5 : 0.55],
+            [1, effectTransition ? 0 : 1],
           ] as const) {
             const target = Math.round(time * before.fps);
             while (frame < target) {
@@ -1799,7 +1956,11 @@ for (const effectTransition of [false, true])
             await expect
               .poll(async () => Number(await slider.getAttribute('aria-valuenow')))
               .toBeCloseTo(time, 7);
+            // The narrow trailing window excludes this point. Its midpoint requires a completed effect frame.
+            if (effectTransition && time === 0.6 && completedEffectPlans)
+              await expect.poll(completedEffectPlans).toBeGreaterThan(0);
             // Independent source-over: midpoint alpha=.1+.5*(1-.1)=.55.
+            // EffectV1 sees only the leading window here: midpoint alpha=.5*1+.5*0=.5.
             const expected = [18, 52, 86].map(
               (channel, i) => channel + alpha * ([34, 211, 238][i]! - channel)
             );
@@ -1820,6 +1981,7 @@ for (const effectTransition of [false, true])
             path: info.outputPath('ordinary-transition.png'),
             fullPage: false,
           });
+          if (completedEffectPlans) expect(completedEffectPlans()).toBeGreaterThan(0);
           expect(errors).toEqual([]);
         } finally {
           host.server.closeAllConnections();
@@ -1831,8 +1993,8 @@ for (const effectTransition of [false, true])
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   test(
-    `lost spatial WebGL context retains the completed frame and retries through the existing ` +
-      `UI ${viewport.size.width}`,
+    `GPU loss selects fallback and lost spatial WebGL retains the frame and retries UI ` +
+      `${viewport.size.width}`,
     async ({ page }, info) => {
       test.setTimeout(180000);
       await page.setViewportSize({ ...viewport.size });
@@ -1840,6 +2002,17 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         if (window !== window.top) return;
         const contexts: WebGLRenderingContext[] = [];
         Reflect.set(window, '__sniptaleTestSpatialContexts', contexts);
+        const devices: GPUDevice[] = [];
+        Reflect.set(window, '__sniptaleTestPreviewGpuDevices', devices);
+        const requestDevice = GPUAdapter.prototype.requestDevice;
+        GPUAdapter.prototype.requestDevice = async function (
+          this: GPUAdapter,
+          ...args: Parameters<GPUAdapter['requestDevice']>
+        ) {
+          const device = await requestDevice.apply(this, args);
+          devices.push(device);
+          return device;
+        };
         const original = HTMLCanvasElement.prototype.getContext;
         Reflect.set(
           HTMLCanvasElement.prototype,
@@ -1861,17 +2034,25 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         const canvas = page.locator('[data-preview-stage-canvas]');
         const sample = () =>
           canvas.evaluate((node: HTMLCanvasElement) => {
-            const scale = Math.min(node.width / 320, node.height / 180);
-            return Array.from(
-              node
-                .getContext('2d')!
-                .getImageData(
+            const readback = document.createElement('canvas');
+            readback.width = node.width;
+            readback.height = node.height;
+            const readbackContext = readback.getContext('2d')!;
+            try {
+              readbackContext.drawImage(node, 0, 0);
+              const scale = Math.min(node.width / 320, node.height / 180);
+              return Array.from(
+                readbackContext.getImageData(
                   Math.round((node.width - 320 * scale) / 2 + 220 * scale),
                   Math.round((node.height - 180 * scale) / 2 + 90 * scale),
                   1,
                   1
                 ).data
-            );
+              );
+            } finally {
+              readback.width = 0;
+              readback.height = 0;
+            }
           });
         const expected = [18, 52, 86].map(
           (channel, i) => channel + 0.61 * ([34, 211, 238][i]! - channel)
@@ -1881,6 +2062,32 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           return Math.max(...expected.map((channel, i) => Math.abs(channel - pixel[i]!)));
         };
         await expect.poll(correctFrame).toBeLessThan(3);
+        const destroyedDevices = await page.evaluate(async () => {
+          const captured: unknown = Reflect.get(window, '__sniptaleTestPreviewGpuDevices');
+          if (!Array.isArray(captured)) throw new Error('Missing captured preview GPU devices');
+          const devices = captured.filter(
+            (value): value is GPUDevice => value instanceof GPUDevice
+          );
+          if (!devices.length) throw new Error('Missing live preview GPU device');
+          const lost = devices.map((device) => device.lost);
+          for (const device of devices) device.destroy();
+          await Promise.all(lost);
+          return devices.length;
+        });
+        expect(destroyedDevices).toBeGreaterThan(0);
+        await page.locator('[data-ui="video-editor.timeline.playhead-handle"]').press('ArrowRight');
+        await expect
+          .poll(() =>
+            page.evaluate(() => {
+              const contexts: unknown = Reflect.get(window, '__sniptaleTestSpatialContexts');
+              return Array.isArray(contexts) ? contexts.length : 0;
+            })
+          )
+          .toBeGreaterThan(0);
+        await expect.poll(correctFrame).toBeLessThan(3);
+        expect(await readNativeVideoProject(page)).toEqual(before);
+        const failure = page.locator('[data-ui="video.preview.effect-runtime-error"]');
+        await expect(failure).toBeHidden();
         const completed = await canvas.evaluate((node: HTMLCanvasElement) => node.toDataURL());
         const contextCount = await page.evaluate(async () => {
           const contexts: unknown = Reflect.get(window, '__sniptaleTestSpatialContexts');
@@ -1898,7 +2105,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
           });
           return contexts.length;
         });
-        const failure = page.locator('[data-ui="video.preview.effect-runtime-error"]');
+        expect(contextCount).toBeGreaterThan(0);
         await expect(failure).toBeVisible();
         expect(await canvas.evaluate((node: HTMLCanvasElement) => node.toDataURL())).toBe(
           completed
@@ -1913,11 +2120,16 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         await expect
           .poll(() =>
             page.evaluate(() => {
-              const contexts: unknown = Reflect.get(window, '__sniptaleTestSpatialContexts');
-              return Array.isArray(contexts) ? contexts.length : 0;
+              const devices: unknown = Reflect.get(window, '__sniptaleTestPreviewGpuDevices');
+              return Array.isArray(devices) ? devices.length : 0;
             })
           )
-          .toBeGreaterThan(contextCount);
+          .toBeGreaterThan(destroyedDevices);
+        const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+        for (let step = 0; step < 12; step++) await playhead.press('ArrowRight');
+        await expect
+          .poll(() => canvas.evaluate((node: HTMLCanvasElement) => node.toDataURL()))
+          .not.toBe(completed);
         await expect.poll(correctFrame).toBeLessThan(3);
         expect(await readNativeVideoProject(page)).toEqual(before);
         await page.screenshot({
@@ -2037,7 +2249,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         })
         .click();
       const focus = page.getByRole('group', {
-        name: label('videoEditor.sidebar.motionFocusLabel'),
+        name: label('editor.scene.cameraManualPlacement'),
         exact: true,
       });
       if (await focus.count()) {
@@ -2049,7 +2261,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         await manual.scrollIntoViewIfNeeded();
       } else {
         const manual = page.getByRole('button', {
-          name: label('videoEditor.sidebar.motionFocusLabel'),
+          name: label('editor.scene.cameraManualPlacement'),
           exact: true,
         });
         await expect(manual).toContainText(label('videoEditor.sidebar.motionFocusManual'));
@@ -2158,12 +2370,22 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       };
       const sample = () =>
         page.locator('[data-preview-stage-canvas]').evaluate((node: HTMLCanvasElement, point) => {
-          const scale = Math.min(node.width / 400, node.height / 400);
-          const x = (node.width - 400 * scale) / 2 + point.x * scale;
-          const y = (node.height - 400 * scale) / 2 + point.y * scale;
-          return Array.from(
-            node.getContext('2d')!.getImageData(Math.round(x), Math.round(y), 1, 1).data
-          );
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          const readbackContext = readback.getContext('2d')!;
+          try {
+            readbackContext.drawImage(node, 0, 0);
+            const scale = Math.min(node.width / 400, node.height / 400);
+            const x = (node.width - 400 * scale) / 2 + point.x * scale;
+            const y = (node.height - 400 * scale) / 2 + point.y * scale;
+            return Array.from(
+              readbackContext.getImageData(Math.round(x), Math.round(y), 1, 1).data
+            );
+          } finally {
+            readback.width = 0;
+            readback.height = 0;
+          }
         }, expected);
       await expect.poll(async () => (await sample())[1]).toBeGreaterThan(240);
       const pixel = await sample();
@@ -2243,6 +2465,12 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
         fullPage: false,
       });
       const settings = page.locator('[data-ui="cameraFollow.settings"]');
+      const details = settings.locator('xpath=ancestor::details[1]');
+      const openDetails = async () => {
+        if (!(await details.evaluate((node: HTMLDetailsElement) => node.open)))
+          await details.locator(':scope > summary').click();
+      };
+      await openDetails();
       const fine = settings.locator('details').first();
       if (!(await fine.evaluate((node: HTMLDetailsElement) => node.open)))
         await fine.locator('summary').click();
@@ -2280,6 +2508,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       expect(await readNativeVideoProject(page)).toEqual(restored);
       await select();
       await expect(warning).toHaveCount(0);
+      await openDetails();
       if (!(await fine.evaluate((node: HTMLDetailsElement) => node.open)))
         await fine.locator('summary').click();
       const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
@@ -2477,17 +2706,25 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
       };
       const sample = () =>
         page.locator('[data-preview-stage-canvas]').evaluate((node: HTMLCanvasElement, point) => {
-          const scale = Math.min(node.width / 400, node.height / 400);
-          return Array.from(
-            node
-              .getContext('2d')!
-              .getImageData(
+          const readback = document.createElement('canvas');
+          readback.width = node.width;
+          readback.height = node.height;
+          const readbackContext = readback.getContext('2d')!;
+          try {
+            readbackContext.drawImage(node, 0, 0);
+            const scale = Math.min(node.width / 400, node.height / 400);
+            return Array.from(
+              readbackContext.getImageData(
                 Math.round((node.width - 400 * scale) / 2 + point.x * scale),
                 Math.round((node.height - 400 * scale) / 2 + point.y * scale),
                 1,
                 1
               ).data
-          );
+            );
+          } finally {
+            readback.width = 0;
+            readback.height = 0;
+          }
         }, expected);
       await expect.poll(async () => (await sample())[1]).toBeGreaterThan(240);
       const pixel = await sample();

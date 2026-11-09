@@ -21,7 +21,7 @@ export function parseEffectPresetPreferences(
   source: string,
   input: unknown
 ): EffectPresetPreferences | null {
-  const document = parseEffectV1Source(source).document;
+  const document = parseEffectV1Source(source, { presentationPolicy: 'retained' }).document;
   const stored = parseStoredEffectPresetPreferences(input);
   if (
     !document ||

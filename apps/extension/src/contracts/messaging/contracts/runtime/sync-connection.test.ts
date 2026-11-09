@@ -491,3 +491,141 @@ it.each([inspect, permission])(
     ).toBeNull();
   }
 );
+
+it('parses the private credential lease without admitting extra secret fields', () => {
+  const credentialLease = {
+    leaseId: id,
+    workerEpoch: id,
+    protectionEpoch: 0,
+    offscreenStartupId: id,
+    executorId: id,
+    authorization,
+    credentialId: id,
+  };
+  const request = { type: MessageType.SYNC_CONNECTION_CREDENTIAL, requestId: id, credentialLease };
+  expect(parseSyncConnectionRuntimeMessage(request)).toEqual(request);
+  expect(parseSyncConnectionRuntimeMessage({ ...request, password: 'private' })).toBeNull();
+  expect(
+    parseSyncConnectionRuntimeMessage({
+      ...request,
+      credentialLease: { ...credentialLease, password: 'private' },
+    })
+  ).toBeNull();
+  expect(
+    parseSyncConnectionRuntimeMessage({
+      ...request,
+      credentialLease: { ...credentialLease, protectionEpoch: -1 },
+    })
+  ).toBeNull();
+  expect(parseSyncConnectionRuntimeMessage({ ...start, credentialLease })).toEqual({
+    ...start,
+    credentialLease,
+  });
+});
+
+it('preserves the fixed locked credential and permission responses', () => {
+  expect(
+    runtimeSyncConnectionMessageContracts[MessageType.SYNC_CONNECTION_CREDENTIAL].parseResponse({
+      success: false,
+      error: 'secrets-locked',
+    })
+  ).toEqual({ success: false, error: 'secrets-locked' });
+  expect(
+    runtimeSyncConnectionMessageContracts[
+      MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION
+    ].parseResponse({ success: true, allowed: false, reason: 'secrets-locked' })
+  ).toEqual({ success: true, allowed: false, reason: 'secrets-locked' });
+  expect(() =>
+    runtimeSyncConnectionMessageContracts[
+      MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION
+    ].parseResponse({ success: true, allowed: true, reason: 'secrets-locked' })
+  ).toThrow();
+});
+
+it('admits only the fixed security lock stop reason', () => {
+  expect(parseSyncConnectionRuntimeMessage({ ...stop, reason: 'secrets-locked' })).toEqual({
+    ...stop,
+    reason: 'secrets-locked',
+  });
+  expect(
+    parseSyncConnectionRuntimeMessage({ ...stop, reason: 'arbitrary server text' })
+  ).toBeNull();
+});
+
+it('restricts offscreen discovery to JOIN without introducing a new command', () => {
+  const discover = {
+    ...workspaceStart,
+    source: { kind: 'join', identity: authorization },
+    operation: 'discover',
+  };
+  expect(parseSyncConnectionRuntimeMessage(discover)).toEqual(discover);
+  expect(
+    parseSyncConnectionRuntimeMessage({ ...workspaceStart, operation: 'discover' })
+  ).toBeNull();
+  expect(parseSyncConnectionRuntimeMessage({ ...discover, operation: 'prepare' })).toBeNull();
+  expect(parseSyncConnectionRuntimeMessage({ ...discover, expected: null })).toBeNull();
+});
+it('uses the same closed discovered projection in executor snapshots', () => {
+  const discovery = {
+    source: { kind: 'join', identity: authorization },
+    scope: 'exact',
+    complete: true,
+    candidates: [
+      { prefix: '', identity: { spaceId: id, bootstrapId: id, fingerprint: 'a'.repeat(64) } },
+    ],
+    issues: [],
+  };
+  const discovered = { ...workspace, sourceKind: 'join', state: 'discovered', discovery };
+  const input = { ...snapshot, binding: null, jobs: [], workspace: discovered };
+  expect(parseSyncExecutorSnapshot(input)).toEqual(input);
+  for (const invalid of [
+    { ...discovered, discovery: undefined },
+    { ...discovered, state: 'ready' },
+    { ...discovered, sourceKind: 'allocation' },
+    { ...discovered, selectionRevision: 2 },
+    { ...discovered, discovery: { ...discovery, credentials: 'private' } },
+  ]) {
+    expect(parseSyncExecutorSnapshot({ ...input, workspace: invalid })).toBeNull();
+  }
+});
+
+it('admits the saved HTML job kind through the shared executor snapshot parser without target authority', () => {
+  const product = {
+    requestId: id,
+    kind: 'scenario-export-prepare',
+    state: 'running',
+    failureCode: null,
+  };
+  const input = { ...snapshot, binding: null, jobs: [], workspace: null, products: [product] };
+  expect(parseSyncExecutorSnapshot(input)).toEqual(input);
+  for (const extra of [
+    { projectId: 'project' },
+    { exportId: 'artifact' },
+    { credentialId: id },
+    { remoteKey: 'object' },
+  ]) {
+    expect(
+      parseSyncExecutorSnapshot({ ...input, products: [{ ...product, ...extra }] })
+    ).toBeNull();
+  }
+});
+
+it('projects Library backup jobs without exposing their selected IDs or native authority', () => {
+  const product = {
+    requestId: id,
+    kind: 'library-backup-prepare',
+    state: 'running',
+    failureCode: null,
+  };
+  const input = { ...snapshot, binding: null, jobs: [], workspace: null, products: [product] };
+  expect(parseSyncExecutorSnapshot(input)).toEqual(input);
+  for (const extra of [
+    { expected: { incarnation: id, revision: 1 } },
+    { options: {} },
+    { rootUrl: 'https://foreign/' },
+    { downloadAllowance: {} },
+  ])
+    expect(
+      parseSyncExecutorSnapshot({ ...input, products: [{ ...product, ...extra }] })
+    ).toBeNull();
+});

@@ -34,7 +34,10 @@ vi.mock('../../workflows/open-local-image-draft', () => ({
 vi.mock('../../state/useEditorStore', () => ({
   useEditorStore: { getState: () => ({ setImageData: mocks.setImageData }) },
 }));
-vi.mock('../../../platform/i18n', () => ({ translate: (key: string) => key }));
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
+  translate: (key: string) => key,
+}));
 vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
   buildEditorUrl: vi.fn(() => '/editor'),
 }));
@@ -88,7 +91,7 @@ it('creates a 1280×720 image through the existing durable draft workflow', asyn
   expect(runOpen).toHaveBeenCalledOnce();
 });
 
-it('opens a selected image file and reports a deleted recent image without losing actions', async () => {
+it('lists library and temporary images and reports a deleted recent image without losing actions', async () => {
   mocks.list.mockResolvedValue([
     {
       id: 'image',
@@ -109,13 +112,17 @@ it('opens a selected image file and reports a deleted recent image without losin
   ]);
   await render();
   expect(container.textContent).toContain('Recent.png');
-  expect(container.textContent).not.toContain('Draft.png');
+  expect(container.textContent).toContain('Draft.png');
   const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
   const file = new File(['image'], 'chosen.png', { type: 'image/png' });
   Object.defineProperty(input, 'files', { configurable: true, value: [file] });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
   expect(mocks.openFile).toHaveBeenCalledWith(services.controller, file, mocks.setImageData);
-  await act(async () => actions()[2]?.click());
+  await act(async () =>
+    actions()
+      .find((button) => button.textContent?.includes('Recent.png'))
+      ?.click()
+  );
   expect(container.textContent).toContain('shared.editorStart.openFailed');
   expect(actions()[0]?.disabled).toBe(false);
 });
@@ -177,7 +184,7 @@ it('uses the current full-resolution presentation rather than an obsolete acquis
   expect(vi.mocked(URL.createObjectURL).mock.calls[0]?.[0]).toBe(current);
 });
 
-it('uses source pixels only for an original-only image and never for a stale edited presentation', async () => {
+it('keeps source pixels as a fallback while the current edited presentation is unavailable', async () => {
   recentImage(0);
   const original = new Blob(['original']);
   mocks.blob.mockResolvedValue(original);
@@ -187,8 +194,8 @@ it('uses source pixels only for an original-only image and never for a stale edi
   mocks.presentation.mockResolvedValue({ presentationRevision: 2, thumbnailBlob: original });
   vi.mocked(URL.createObjectURL).mockClear();
   await act(async () => window.dispatchEvent(new Event('focus')));
-  expect(URL.createObjectURL).not.toHaveBeenCalled();
-  expect(container.querySelector('section img')).toBeNull();
+  expect(vi.mocked(URL.createObjectURL).mock.calls[0]?.[0]).toBe(original);
+  expect(container.querySelector('section img')?.getAttribute('src')).toBe('blob:preview');
 });
 
 it('rejects a preview when the root revision changes during its read', async () => {

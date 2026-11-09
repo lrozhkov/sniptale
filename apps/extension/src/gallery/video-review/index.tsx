@@ -1,3 +1,4 @@
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { setGalleryQuickEditUrl, clearGalleryQuickEditUrl } from '../platform/browser-driver';
 import { useReviewWorkspaceColor } from './workspace-color';
 import {
@@ -18,7 +19,10 @@ import { ReviewEditorPresentationDialog } from './presentation-preview-dialog';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import { resolveOverlayComments } from '../../features/video/review/comments';
 import { ReviewPreviewInspector } from './preview-inspector';
-import { useReviewPreviewPreferences } from './use-preview-preferences';
+import {
+  ReviewPreviewRendererContext,
+  useReviewPreviewPreferences,
+} from './use-preview-preferences';
 import { useReviewMusicImport } from './music-import';
 import { AudioLibraryPicker } from '../../composition/audio-library/picker';
 import { ReviewPanelResizeHandle, useReviewPanelLayout } from './panel-layout';
@@ -116,6 +120,15 @@ function useEditorPresentationPreview(
   return usePresentationPreview(previewInput, preferences, () => state.video.current?.pause());
 }
 
+/** Keep text visibility on the same caption writer as the scene inspector. */
+function reviewTimelineTextCommands(state: ReturnType<typeof useReviewEditorState>) {
+  return {
+    text: state.text,
+    onToggleCaptions: () =>
+      state.setCaptions({ ...state.text.captions, enabled: !state.text.captions.enabled }),
+  };
+}
+
 /** Localize prepared window choices without adding scene/export policy to the workspace shell. */
 function ReviewEditor({
   resource,
@@ -127,6 +140,9 @@ function ReviewEditor({
   const state = useReviewEditorState(resource);
   const editorReady = !state.advanced.ui.modeSelectionPending;
   const previewPreferences = useReviewPreviewPreferences();
+  const [previewRendererStatus, setPreviewRendererStatus] = useState<PreviewRendererStatus | null>(
+    null
+  );
   const [previewRaster, setPreviewRaster] = useState<{ width: number; height: number } | null>(
     null
   );
@@ -164,7 +180,7 @@ function ReviewEditor({
     );
   }
   return (
-    <>
+    <ReviewPreviewRendererContext.Provider value={previewPreferences.preferences.renderer}>
       <ReviewEditorPresentationDialog preview={joinPreview} />
       <div
         data-ui="gallery.videoReview.workspaceScroll"
@@ -185,6 +201,7 @@ function ReviewEditor({
               onOpenPreviewSettings={navigation.openPreview}
               previewPreferences={previewPreferences.preferences}
               onPreviewRaster={setPreviewRaster}
+              onPreviewRendererStatus={setPreviewRendererStatus}
               resource={resource}
               state={state}
               sceneActive={navigation.shown === 'scene'}
@@ -206,6 +223,7 @@ function ReviewEditor({
                 preferences={previewPreferences.preferences}
                 status={previewPreferences.status}
                 actualRaster={previewRaster}
+                rendererStatus={previewRendererStatus}
                 onChange={previewPreferences.change}
                 onReset={() => {
                   previewPreferences.reset();
@@ -239,11 +257,13 @@ function ReviewEditor({
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              onHistoryRange={state.setHistoryRange}
+              cursorArchiveAvailable={state.cursorArchiveAvailable}
               annotationEffects={state.annotationEffects}
               annotationToolCancellation={state.annotationToolCancellation}
               effectSnapshots={state.snapshot.snapshot.workspace.effectSnapshots ?? []}
               annotationSourceId={state.snapshot.snapshot.workspace.sourceAssetId}
-              text={state.text}
+              {...reviewTimelineTextCommands(state)}
               {...reviewTimelineInspectorCommands({
                 video: state.video,
                 select: state.setActiveSelection,
@@ -316,7 +336,7 @@ function ReviewEditor({
         </div>
       </div>
       {music.drawer && <AudioLibraryPicker {...music.drawer} />}
-    </>
+    </ReviewPreviewRendererContext.Provider>
   );
 }
 

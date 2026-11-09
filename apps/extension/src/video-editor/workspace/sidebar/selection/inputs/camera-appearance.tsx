@@ -1,7 +1,11 @@
 import { SegmentedRow, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import { isCameraShadowDirection } from '../../../../../features/video/project/camera/shadow-direction';
 import { cameraSplitPanels } from '../../../../../features/video/project/camera/split';
-import { getMediaClipSourceTime } from '../../../../../features/video/project/timeline/rate';
+import {
+  getVideoClipSourceTime,
+  getClipPlaybackOffset,
+  getSourceTimedClipProjectDuration,
+} from '../../../../../features/video/project/timeline/rate';
 import { useContext } from 'react';
 import { Scan, RotateCcw, Layers2, Compass, Focus, ArrowRightToLine } from 'lucide-react';
 import { InspectorActionButton } from '../shared/actions';
@@ -203,6 +207,17 @@ function renderCameraCropControls(props: {
     ? { width: panel.width * props.project.width, height: panel.height * props.project.height }
     : (position?.transform ?? props.clip.transform);
   const disabled = props.disabled;
+  const offset = props.clip.cameraTiming?.offsetSeconds ?? 0;
+  const rangeStart = props.clip.sourceStart - offset;
+  const rangeEnd = props.clip.sourceStart + props.clip.sourceDuration - offset;
+  const contentTime = getClipPlaybackOffset(props.clip, props.currentTime);
+  const holdAt = props.clip.playbackWindow?.holdAt;
+  const effectiveTime = holdAt === undefined ? contentTime : Math.min(contentTime, holdAt);
+  const atRetainedEnd = effectiveTime >= getSourceTimedClipProjectDuration(props.clip);
+  const sourceTime = Math.max(
+    0,
+    atRetainedEnd ? rangeEnd : getVideoClipSourceTime(props.clip, props.currentTime)
+  );
   const changeCrop = (crop: CameraCrop) =>
     props.onEdit?.(props.clip.id, {
       kind: 'crop',
@@ -216,7 +231,10 @@ function renderCameraCropControls(props: {
       <CameraCropPreview
         key={`${props.clip.id}:${position?.id ?? 'initial'}`}
         url={props.url}
-        sourceTime={Math.max(0, getMediaClipSourceTime(props.clip, props.currentTime))}
+        sourceTime={sourceTime}
+        rangeStart={rangeStart}
+        rangeEnd={rangeEnd}
+        {...(atRetainedEnd ? { endpoint: 'retained-end' as const } : {})}
         width={transform.width}
         height={transform.height}
         appearance={split ? { ...value, shape: 'rounded', roundness: 0 } : value}

@@ -69,6 +69,7 @@ it('keeps connection-level operation failures as runtime errors', () => {
 function createStatus(): NativeAppRuntimeStatus {
   const hello = createNativeHello();
   return {
+    appIdentity: null,
     appStatus: null,
     capabilities: hello.capabilities,
     connectionState: 'connected',
@@ -95,7 +96,7 @@ function createOperationFailed(
     occurredAtEpochMs: 1,
     operation: 'screenshot',
     phase: 'capture',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.operation.failed',
     ...patch,
   };

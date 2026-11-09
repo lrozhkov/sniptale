@@ -336,3 +336,15 @@ it('cancels a captured voiceover library read when the project changes', async (
   expect(io.binding).not.toHaveBeenCalled();
   expect(commit).not.toHaveBeenCalled();
 });
+
+it('bounds an imported voiceover to the captured source selection', async () => {
+  state.playbackRange = { start: 3, end: 5 };
+  await open('voiceover');
+  state.playbackRange = { start: 7, end: 9 };
+  await act(async () => api.drawer!.onSelect('voice'));
+  expect(content.audio.voiceover).toHaveLength(1);
+  expect(content.audio.voiceover[0]).toMatchObject({ timelineStart: 3, duration: 2 });
+  expect(content.audio.voiceover[0]!.sourceAnchor?.[0]?.start).toBe(3);
+  expect(commit).toHaveBeenCalledOnce();
+  expect(io.publish).toHaveBeenCalledOnce();
+});

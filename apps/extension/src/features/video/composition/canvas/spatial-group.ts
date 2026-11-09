@@ -1,7 +1,10 @@
 import type { CameraSpatialRect } from '../../project/motion/spatial';
 import type { VideoCompositionCameraState } from '../types';
 import { motionCameraProjection, motionCameraPlaneTransform } from '../motion/spatial';
-import { invertQuickEditProjection } from '../motion/spatial-geometry';
+import {
+  invertQuickEditProjection,
+  resolveSpatialCameraRenderFrames,
+} from '../motion/spatial-geometry';
 import type { ReviewSpatialRenderer } from './spatial-renderer';
 
 /** Capture one contiguous scene group without applying an affine viewport clip first. */
@@ -12,6 +15,8 @@ export function drawSpatialCameraGroup(args: {
   output: { width: number; height: number };
   paint(context: CanvasRenderingContext2D, rasterScale: number): void;
   rasterScale: number;
+  /** Source pixels per scene unit; projection remains in rasterScale output coordinates. */
+  sourceRasterScale?: number;
   renderer: ReviewSpatialRenderer;
   sharp?: boolean;
   sourceRect: CameraSpatialRect;
@@ -46,17 +51,32 @@ export function drawSpatialCameraGroup(args: {
   const plane = motionCameraPlaneTransform(args.camera, scale);
   const planeInverse = plane ? invertQuickEditProjection(plane) : null;
   if (plane && !planeInverse) throw new Error('Perspective reference is unavailable.');
-  args.renderer.validateSizes(sourceRect, args.output);
+  const density = (args.sourceRasterScale ?? scale) / scale;
+  if (!Number.isFinite(density) || density <= 0)
+    throw new Error('Perspective source bounds are unavailable.');
+  const physical = {
+    ...sourceRect,
+    width: Math.ceil(sourceRect.width * density),
+    height: Math.ceil(sourceRect.height * density),
+  };
+  args.renderer.validateSizes(physical, args.output);
   // Both hardware checks precede allocation and painting. The session owns and reuses these named surfaces.
   const output = args.renderer.surface('exposure', args.output.width, args.output.height);
   const source = args.renderer.surface(
     args.sharp ? 'overlay' : 'plane',
-    sourceRect.width,
-    sourceRect.height
+    physical.width,
+    physical.height
   );
   source.context.save();
   try {
-    source.context.setTransform(1, 0, 0, 1, 0, 0);
+    source.context.setTransform(
+      physical.width / sourceRect.width,
+      0,
+      0,
+      physical.height / sourceRect.height,
+      0,
+      0
+    );
     source.context.globalAlpha = 1;
     source.context.globalCompositeOperation = 'source-over';
     source.context.filter = 'none';
@@ -65,23 +85,11 @@ export function drawSpatialCameraGroup(args: {
   } finally {
     source.context.restore();
   }
-  const base = spatial.reference;
   args.renderer.draw(output.context, {
     source: source.canvas,
     sourceRect,
     output: args.output,
-    base: {
-      x: base.x * scale,
-      y: base.y * scale,
-      width: base.width * scale,
-      height: base.height * scale,
-    },
-    target: {
-      x: (base.x - args.camera.viewportX) * args.camera.scale * scale,
-      y: (base.y - args.camera.viewportY) * args.camera.scale * scale,
-      width: base.width * args.camera.scale * scale,
-      height: base.height * args.camera.scale * scale,
-    },
+    ...resolveSpatialCameraRenderFrames(args.camera, spatial.reference, scale),
     frame: spatial,
     projection,
     ...(planeInverse ? { planeInverse } : {}),

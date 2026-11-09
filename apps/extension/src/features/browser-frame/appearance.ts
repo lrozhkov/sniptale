@@ -185,17 +185,17 @@ function composeBrowserChrome(
     captionColor = dark ? '#a1a5ad' : '#84888c',
     disabledColor = dark ? '#666a72' : '#b8bcc3';
   let s = '';
-  let tx = os === 'mac' ? 88 : 40,
+  let tx = os === 'mac' ? 124 : 40,
     tw = Math.min(233, w - tx - (os === 'win' ? 180 : 80));
   s +=
     `<rect width="${w}" height="${h}" fill="${top}"/><path d="M${tx - 10} 40Q${tx} 40 ${tx} ` +
     `30V14Q${tx} 6 ${tx + 8} 6H${tx + tw - 8}Q${tx + tw} 6 ${tx + tw} 14V30Q${tx + tw} 40 ` +
     `${tx + tw + 10} 40H${w}V${h}H0V40Z" fill="${base}"/>`;
   s += controls(os, w, os === 'win' ? 17 : 20, captionColor, dark);
-  if (os !== 'mac')
-    s +=
-      `<rect x="5" y="6" width="28" height="28" rx="8" fill="${base}"/>` +
-      icon('chevron', 19, 20, iconColor);
+  const tabSearchX = os === 'mac' ? 80 : 5;
+  s +=
+    `<rect x="${tabSearchX}" y="6" width="28" height="28" rx="8" fill="${base}"/>` +
+    icon('chevron', tabSearchX + 14, 20, iconColor);
   s +=
     favicon(tx + 14, 12, fg, header) +
     clipHeaderLabel(

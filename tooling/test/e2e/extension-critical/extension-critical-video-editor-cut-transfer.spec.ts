@@ -193,6 +193,37 @@ for (const variant of [
           await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(
             index + 1
           );
+          if (variant.imageEdges) {
+            // Pointer placement creates the interval; exact fields establish the intended output ticks.
+            for (const [key, value] of [
+              ['rangeStart', start],
+              ['rangeEnd', end],
+            ] as const) {
+              const field = dialog.getByRole('textbox', {
+                name: label(`gallery.videoReview.${key}`),
+                exact: true,
+              });
+              // Commit a distinct visible value before returning to an exact half-tick boundary.
+              for (const authored of [value + (key === 'rangeStart' ? 0.01 : -0.01), value]) {
+                await field.fill(String(authored));
+                await field.press('Enter');
+                await expect
+                  .poll(async () => {
+                    const workspace = await readNativeReviewWorkspace(
+                      page,
+                      'recording:beta-v1-recording'
+                    );
+                    const cut = workspace
+                      ? inspectVideoWorkspace(workspace).document?.edits.find(
+                          (edit) => edit.kind === 'cut'
+                        )
+                      : undefined;
+                    return key === 'rangeStart' ? cut?.start : cut?.end;
+                  })
+                  .toBe(authored);
+              }
+            }
+          }
           const fields = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
           await expect(fields).toBeAttached();
           const section = fields.locator('xpath=ancestor::details[1]');

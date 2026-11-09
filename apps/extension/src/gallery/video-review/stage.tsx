@@ -1,3 +1,8 @@
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
+import {
+  reviewPresentedStageProjection,
+  type ReviewPresentedGeometry,
+} from '../../workflows/video-review/gpu-preview-geometry';
 import { ReviewSceneVideo, ReviewRegionOverlay } from './stage-video';
 import { ReviewCursorPathOverlay } from './cursor-path-overlay';
 import {
@@ -47,7 +52,7 @@ import {
   type ReviewStageFocusPicker,
 } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { projectVideoRegion } from '../../features/video/review/geometry';
 import type {
   CanvasComment,
@@ -95,8 +100,11 @@ type ReviewStageProps = {
     | {
         preferences: QuickPreviewPreferences;
         playing: boolean;
+        onPresentationActive?: (sourceIdentity: string, active: boolean) => void;
+        onPresentedTime?: (sourceIdentity: string, sourceTime: number) => void;
         interacting?: boolean;
         sourceToResult(time: number): number | null;
+        onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
       }
@@ -132,7 +140,9 @@ type ReviewStageProps = {
 /** Keep native header geometry and pointer inversion aligned with the authored scene. */
 function useStageInteractionGeometry(
   props: Pick<ReviewStageProps, 'source' | 'scene' | 'drawing' | 'region' | 'onRegion' | 'video'>,
-  geometry: Pick<ReturnType<typeof useReviewStageGeometry>, 'sceneLayout' | 'content'>
+  geometry: Pick<ReturnType<typeof useReviewStageGeometry>, 'sceneLayout' | 'content'>,
+  presented?: ReviewPresentedGeometry | null,
+  output?: { width: number; height: number }
 ) {
   const { sceneLayout, content } = geometry;
   // Match the SVG viewport to the fitted header allocation, including its rounded toolbar rows.
@@ -159,9 +169,15 @@ function useStageInteractionGeometry(
     ? computeQuickEditSpatialWindow(sceneLayout, props.scene?.background ?? { enabled: false })
     : null;
   const projection =
-    sceneLayout?.spatial && window
-      ? quickEditPlaneProjection(window, window, sceneLayout.spatial)
-      : undefined;
+    sceneLayout?.spatial && presented && output
+      ? reviewPresentedStageProjection(presented, output)
+      : sceneLayout?.spatial && window
+        ? quickEditPlaneProjection(window, window, sceneLayout.spatial)
+        : undefined;
+  const windowProjection =
+    sceneLayout?.spatial && presented && output
+      ? reviewPresentedStageProjection(presented, output, 'window')
+      : projection;
   const plane = useReviewDrawingPlane({
     crop: sceneLayout?.sourceCrop,
     inverseProjection: projection
@@ -178,13 +194,51 @@ function useStageInteractionGeometry(
     : props.region
       ? projectVideoRegion(props.region, content)
       : null;
-  return { header, motion, projection, plane, projected };
+  return { header, motion, projection, windowProjection, plane, projected };
 }
 
 /** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
 export function ReviewStage(props: ReviewStageProps) {
   const host = useRef<HTMLDivElement>(null);
   const publication = useRef<HTMLDivElement>(null);
+  const [receipt, setReceipt] = useState<{
+    source: string;
+    geometry: ReviewPresentedGeometry | null;
+  } | null>(null);
+  const onPresentedTime = props.preview?.onPresentedTime;
+  const receiveGeometry = useCallback(
+    (geometry: ReviewPresentedGeometry | null, sourceTime?: number, sourceIdentity?: string) => {
+      if (sourceIdentity !== undefined && sourceIdentity !== props.url) return;
+      setReceipt((previous) =>
+        previous?.source === props.url && previous.geometry === geometry
+          ? previous
+          : { source: props.url, geometry }
+      );
+      if (geometry && sourceTime !== undefined) onPresentedTime?.(props.url, sourceTime);
+    },
+    [props.url, onPresentedTime]
+  );
+  const presented = receipt?.source === props.url ? receipt.geometry : null;
+  const representedProps =
+    presented && props.scene
+      ? {
+          ...props,
+          scene: {
+            ...props.scene,
+            ...presented.scene,
+            camera: presented.camera,
+            ...(props.scene.focus
+              ? {
+                  focus: {
+                    ...props.scene.focus,
+                    regions: presented.scene.zoomRegions,
+                    time: presented.resultTime,
+                  },
+                }
+              : {}),
+          },
+        }
+      : props;
   const [cutRaster, setCutRaster] = useState<ReviewCutPreviewRaster>({
     active: false,
     frame: null,
@@ -200,19 +254,26 @@ export function ReviewStage(props: ReviewStageProps) {
     spotlight,
     borders,
     overlayClip,
-  } = useReviewStageGeometry(props, host);
+  } = useReviewStageGeometry(representedProps, host, presented);
   useAnnotationGeometryReport(props, annotationGeometry);
   const { presentation, beginInteraction } = useStagePresentation(
     props,
     publication,
     watermarkOutput,
-    size
+    size,
+    receiveGeometry
   );
   const manual = presentation.active && presentation.status.actualRaster !== null;
-  const { header, motion, projection, plane, projected } = useStageInteractionGeometry(props, {
-    sceneLayout,
-    content,
-  });
+  const { header, motion, projection, windowProjection, plane, projected } =
+    useStageInteractionGeometry(
+      representedProps,
+      {
+        sceneLayout,
+        content,
+      },
+      presented,
+      size
+    );
   return (
     <div
       ref={host}
@@ -245,7 +306,7 @@ export function ReviewStage(props: ReviewStageProps) {
         onPointerCancel={plane.onPointerCancel}
       >
         <ReviewStageFrame
-          props={props}
+          props={representedProps}
           geometry={{ sceneLayout, size, backgroundPaint, spotlight, overlayClip }}
           manual={manual}
           header={header}
@@ -268,9 +329,10 @@ export function ReviewStage(props: ReviewStageProps) {
           headerImage={header.image}
           onCommentPreview={presentation.onCommentPreview}
           getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
-          props={props}
+          props={representedProps}
           geometry={{ size, sceneLayout, zoomLayout, borders, overlayClip }}
           projection={projection}
+          windowProjection={windowProjection}
           projected={projected}
         />
         <ReviewStageComments
@@ -478,6 +540,7 @@ function ReviewStageContent({
   props,
   geometry,
   projection,
+  windowProjection,
   projected,
 }: {
   manual: boolean;
@@ -492,6 +555,7 @@ function ReviewStageContent({
   projection:
     | import('../../features/video/composition/motion/spatial-geometry').QuickEditHomography
     | undefined;
+  windowProjection: ReturnType<typeof useStageInteractionGeometry>['projection'];
   projected: ReturnType<typeof projectVideoRegion> | null;
 }) {
   const { size, sceneLayout, zoomLayout, borders, overlayClip } = geometry;
@@ -499,104 +563,122 @@ function ReviewStageContent({
     sceneLayout && props.scene && overlayClip
       ? resolveReviewClickRaster(sceneLayout, props.scene.background, overlayClip)
       : undefined;
-  return (
-    <div
-      className="pointer-events-none absolute inset-0"
-      style={
-        projection
-          ? { transformOrigin: '0 0', transform: quickEditProjectionCss(projection) }
-          : undefined
-      }
-    >
-      {sceneLayout?.spatial && projected ? (
-        <ReviewRegionOverlay
-          drawing={props.drawing}
-          projected={projected}
-          offset={{ x: 0, y: 0 }}
-        />
-      ) : null}
-      {!manual ? <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} /> : null}
-      {!manual ? (
-        <ReviewClickOverlay
-          getFrame={getFrame}
-          cues={props.clickCues}
-          time={props.scene?.focus?.time ?? 0}
-          output={size}
-          video={clickRaster?.video}
-          sourceWidth={props.source.width}
-          headerImage={headerImage}
-          window={clickRaster?.window}
-          clip={clickRaster?.clip}
-          transform={clickRaster?.transform}
-        />
-      ) : null}
-      <ReviewStageComments
-        comments={props.comments}
-        attachment="content"
-        visualMode={manual ? 'handles' : undefined}
-        onPreviewPosition={onCommentPreview}
-        clip={projection || sceneLayout?.sourceCrop ? overlayClip : undefined}
-        projection={projection}
+  const windowFocus = !!props.zoom && !props.zoom.region.spotlight && !props.zoom.region.border;
+  const focus =
+    props.zoom && zoomLayout ? (
+      <ReviewStageFocusControl
+        scene={props.scene ? { ...props.scene, source: props.source } : undefined}
+        projection={windowFocus ? windowProjection : projection}
+        key={props.zoom.region.id}
+        focus={props.zoom}
+        behindTargets={!!props.focusPicker}
+        layout={zoomLayout}
         output={size}
-        source={props.source}
-        layout={sceneLayout}
       />
-      {props.focusPicker && sceneLayout ? (
-        <ReviewStageFocusTargets
-          picker={props.focusPicker}
-          clip={overlayClip}
-          output={size}
-          selectedId={props.zoom?.region.id}
-          video={computeQuickEditSourceWindowTransform(sceneLayout)}
-        />
-      ) : null}
-      {props.cursorPath && sceneLayout && !projection ? (
-        <div
-          className="pointer-events-none absolute"
-          style={{
-            left: sceneLayout.videoTransform.x,
-            top: sceneLayout.videoTransform.y,
-            width: sceneLayout.videoTransform.width,
-            height: sceneLayout.videoTransform.height,
-            clipPath: sceneLayout.sourceCrop
-              ? `inset(${[
-                  sceneLayout.sourceCrop.y,
-                  1 - sceneLayout.sourceCrop.x - sceneLayout.sourceCrop.width,
-                  1 - sceneLayout.sourceCrop.y - sceneLayout.sourceCrop.height,
-                  sceneLayout.sourceCrop.x,
-                ]
-                  .map((value) => `${value * 100}%`)
-                  .join(' ')})`
-              : undefined,
-          }}
-        >
-          <ReviewCursorPathOverlay
-            {...props.cursorPath}
-            width={props.source.width}
-            height={props.source.height}
-            displayWidth={sceneLayout.videoTransform.width}
-            bounds={{
-              left: -sceneLayout.videoTransform.x / sceneLayout.videoTransform.width,
-              top: -sceneLayout.videoTransform.y / sceneLayout.videoTransform.height,
-              right: (size.width - sceneLayout.videoTransform.x) / sceneLayout.videoTransform.width,
-              bottom:
-                (size.height - sceneLayout.videoTransform.y) / sceneLayout.videoTransform.height,
-            }}
+    ) : null;
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={
+          projection
+            ? { transformOrigin: '0 0', transform: quickEditProjectionCss(projection) }
+            : undefined
+        }
+      >
+        {sceneLayout?.spatial && projected ? (
+          <ReviewRegionOverlay
+            drawing={props.drawing}
+            projected={projected}
+            offset={{ x: 0, y: 0 }}
           />
+        ) : null}
+        {!manual ? <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} /> : null}
+        {!manual ? (
+          <ReviewClickOverlay
+            getFrame={getFrame}
+            cues={props.clickCues}
+            time={props.scene?.focus?.time ?? 0}
+            output={size}
+            video={clickRaster?.video}
+            sourceWidth={props.source.width}
+            headerImage={headerImage}
+            window={clickRaster?.window}
+            clip={clickRaster?.clip}
+            transform={clickRaster?.transform}
+          />
+        ) : null}
+        <ReviewStageComments
+          comments={props.comments}
+          attachment="content"
+          visualMode={manual ? 'handles' : undefined}
+          onPreviewPosition={onCommentPreview}
+          clip={projection || sceneLayout?.sourceCrop ? overlayClip : undefined}
+          projection={projection}
+          output={size}
+          source={props.source}
+          layout={sceneLayout}
+        />
+        {props.focusPicker && sceneLayout ? (
+          <ReviewStageFocusTargets
+            picker={props.focusPicker}
+            clip={overlayClip}
+            output={size}
+            selectedId={props.zoom?.region.id}
+            video={computeQuickEditSourceWindowTransform(sceneLayout)}
+          />
+        ) : null}
+        {props.cursorPath && sceneLayout && !projection ? (
+          <div
+            className="pointer-events-none absolute"
+            style={{
+              left: sceneLayout.videoTransform.x,
+              top: sceneLayout.videoTransform.y,
+              width: sceneLayout.videoTransform.width,
+              height: sceneLayout.videoTransform.height,
+              clipPath: sceneLayout.sourceCrop
+                ? `inset(${[
+                    sceneLayout.sourceCrop.y,
+                    1 - sceneLayout.sourceCrop.x - sceneLayout.sourceCrop.width,
+                    1 - sceneLayout.sourceCrop.y - sceneLayout.sourceCrop.height,
+                    sceneLayout.sourceCrop.x,
+                  ]
+                    .map((value) => `${value * 100}%`)
+                    .join(' ')})`
+                : undefined,
+            }}
+          >
+            <ReviewCursorPathOverlay
+              {...props.cursorPath}
+              width={props.source.width}
+              height={props.source.height}
+              displayWidth={sceneLayout.videoTransform.width}
+              bounds={{
+                left: -sceneLayout.videoTransform.x / sceneLayout.videoTransform.width,
+                top: -sceneLayout.videoTransform.y / sceneLayout.videoTransform.height,
+                right:
+                  (size.width - sceneLayout.videoTransform.x) / sceneLayout.videoTransform.width,
+                bottom:
+                  (size.height - sceneLayout.videoTransform.y) / sceneLayout.videoTransform.height,
+              }}
+            />
+          </div>
+        ) : null}
+        {windowFocus ? null : focus}
+      </div>
+      {windowFocus ? (
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={
+            windowProjection
+              ? { transformOrigin: '0 0', transform: quickEditProjectionCss(windowProjection) }
+              : undefined
+          }
+        >
+          {focus}
         </div>
       ) : null}
-      {props.zoom && zoomLayout ? (
-        <ReviewStageFocusControl
-          scene={props.scene ? { ...props.scene, source: props.source } : undefined}
-          projection={projection}
-          key={props.zoom.region.id}
-          focus={props.zoom}
-          behindTargets={!!props.focusPicker}
-          layout={zoomLayout}
-          output={size}
-        />
-      ) : null}
-    </div>
+    </>
   );
 }
 
@@ -644,6 +726,12 @@ function reviewBackgroundPlaneProps(props: ReviewStageProps) {
       ? computeQuickEditSceneSize({ ...props.scene, source: props.source })
       : props.source,
     imageUrl: props.backgroundImageUrl,
+    currentTime: props.scene?.focus?.time ?? 0,
+    playing: props.preview?.playing,
+    getCurrentTime: () =>
+      props.preview?.sourceToResult(props.video.current?.currentTime ?? 0) ??
+      props.scene?.focus?.time ??
+      0,
   };
 }
 

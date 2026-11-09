@@ -7,6 +7,11 @@ import { createEmptyVideoProject } from '../../../../features/video/project/fact
 import { DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS } from '../../../persistence/track-panel';
 import { buildTimelineTrackLayoutModel } from './layout';
 import { ProjectTimelineTrackList } from './list';
+import { getTrackIcon } from './lane-icons';
+vi.mock('./lane-icons', async (original) => {
+  const actual = await original<typeof import('./lane-icons')>();
+  return { ...actual, getTrackIcon: vi.fn(actual.getTrackIcon) };
+});
 import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import {
   VideoProjectActionEventKind,
@@ -14,15 +19,31 @@ import {
   VideoProjectTrackRole,
 } from '../../../../features/video/project/types';
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
-  translate: (key: string) => key,
-}));
+const localeState = vi.hoisted(() => ({ value: 'en', listeners: new Set<() => void>() }));
+vi.mock('../../../../platform/i18n', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../platform/i18n')>();
+  const { useSyncExternalStore } = await import('react');
+  return {
+    ...actual,
+    translate: (key: string) => key,
+    useAppLocale: () =>
+      useSyncExternalStore(
+        (listener) => {
+          localeState.listeners.add(listener);
+          return () => {
+            localeState.listeners.delete(listener);
+          };
+        },
+        () => localeState.value
+      ),
+  };
+});
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 beforeEach(() => {
+  localeState.value = 'en';
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -426,4 +447,75 @@ it('keeps auto processing out of the history track header', () => {
   const project = createEmptyVideoProject('History');
   renderTrackList(project, { showTelemetryLane: true, compactRows: true, hideTrackNames: true });
   expect(document.querySelector('[data-ui="video-editor.auto.open"]')).toBeNull();
+});
+
+it('reuses static rail icons across callback replacement and applies latest committed handlers and flags', () => {
+  const project = createEmptyVideoProject('Static rail');
+  const prefs = createTrackPanelPrefs({ compactRows: false, hideTrackNames: false });
+  const input: React.ComponentProps<typeof ProjectTimelineTrackList> = {
+    project,
+    tracks: project.tracks,
+    trackPanelPrefs: prefs,
+    canShowTelemetryLane: false,
+    cursorLaneVisible: false,
+    showTelemetryLane: false,
+    selectedTrackId: null,
+    trackLayoutModel: buildTimelineTrackLayoutModel({
+      project,
+      tracks: project.tracks,
+      trackHeightByTrackId: {},
+    }),
+    trackListRef: { current: null },
+    onAddTrack: vi.fn(),
+    onClearUtilityLane: vi.fn(),
+    onScroll: vi.fn(),
+    onSelectTrack: vi.fn(),
+    onToggleTrackLock: vi.fn(),
+    onToggleTrackVisibility: vi.fn(),
+    onToggleUtilityLaneLock: vi.fn(),
+    onToggleUtilityLaneVisibility: vi.fn(),
+  };
+  act(() => root?.render(<ProjectTimelineTrackList {...input} />));
+  vi.mocked(getTrackIcon).mockClear();
+  const second = vi.fn();
+  const compact = vi.fn();
+  act(() =>
+    root?.render(
+      <ProjectTimelineTrackList
+        {...input}
+        onSelectTrack={second}
+        trackPanelPrefs={{ ...prefs, setCompactRows: compact }}
+      />
+    )
+  );
+  expect(getTrackIcon).not.toHaveBeenCalled();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.track-select"]')
+      ?.click()
+  );
+  expect(second).toHaveBeenCalledExactlyOnceWith(project.tracks[0]!.id);
+  expect(input.onSelectTrack).not.toHaveBeenCalled();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.compact-tracks"]')
+      ?.click()
+  );
+  expect(compact).toHaveBeenCalledExactlyOnceWith(true);
+  expect(prefs.setCompactRows).not.toHaveBeenCalled();
+  act(() => {
+    localeState.value = 'ru';
+    localeState.listeners.forEach((listener) => listener());
+  });
+  expect(getTrackIcon).toHaveBeenCalled();
+  vi.mocked(getTrackIcon).mockClear();
+  act(() =>
+    root?.render(<ProjectTimelineTrackList {...input} selectedTrackId={project.tracks[0]!.id} />)
+  );
+  expect(getTrackIcon).toHaveBeenCalled();
+  expect(
+    container
+      ?.querySelector('[data-ui="video-editor.timeline.track-select"]')
+      ?.getAttribute('aria-pressed')
+  ).toBe('true');
 });

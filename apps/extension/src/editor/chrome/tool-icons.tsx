@@ -1,4 +1,5 @@
 import React from 'react';
+import { SimplifyIcon } from '../../ui/drawing-tools/simplify-icon';
 import { translate } from '../../platform/i18n';
 import {
   ArrowRight,
@@ -27,6 +28,7 @@ const TOOL_LABEL_KEYS = {
   marker: 'editor.tools.highlighter',
   'frame-annotation': 'editor.tools.frameAnnotation',
   shape: 'editor.tools.shape',
+  simplify: 'editor.tools.simplify',
   blur: 'editor.tools.blur',
   arrow: 'editor.tools.arrow',
   text: 'editor.tools.text',
@@ -41,6 +43,7 @@ const TOOL_ICON_COMPONENTS = {
   marker: Highlighter,
   'frame-annotation': SquareDashed,
   shape: Shapes,
+  simplify: SimplifyIcon,
   blur: Droplet,
   arrow: ArrowRight,
   text: Type,
@@ -57,6 +60,7 @@ const OBJECT_TYPE_TO_TOOL = {
   marker: 'marker',
   'frame-annotation': 'frame-annotation',
   shape: 'shape',
+  simplify: 'simplify',
   blur: 'blur',
   arrow: 'arrow',
   text: 'text',
@@ -98,6 +102,7 @@ export const TOOL_ORDER: EditorTool[] = [
   'marker',
   'frame-annotation',
   'shape',
+  'simplify',
   'blur',
   'text',
   'arrow',
@@ -113,6 +118,7 @@ export function getToolLabel(tool: EditorTool): string {
 
 export const TOOL_ICONS: Record<EditorTool, React.ReactNode> = {
   arrow: renderToolIcon('arrow'),
+  simplify: renderToolIcon('simplify'),
   blur: renderToolIcon('blur'),
   crop: renderToolIcon('crop'),
   marker: renderToolIcon('marker'),

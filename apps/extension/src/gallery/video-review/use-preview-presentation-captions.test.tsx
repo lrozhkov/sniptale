@@ -69,6 +69,7 @@ const assets = {
 };
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   time = 0;
   nextTick = 0;
@@ -135,14 +136,16 @@ beforeEach(() => {
     releases.push(release);
     return {
       canvas,
+      outputKind: 'canvas2d',
       context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
       release,
       generation: frame.generation,
     };
   });
   io.factory.mockImplementation(() => ({
+    maximumInFlight: () => 1,
     prepare: io.prepare,
-    render: io.render,
+    renderPresentation: io.render,
     dispose: io.dispose,
   }));
   io.bytes.mockImplementation(() => ({ release: vi.fn() }));
@@ -153,6 +156,7 @@ afterEach(async () => {
   host.remove();
   vi.restoreAllMocks();
   vi.resetAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 function Harness() {
@@ -168,6 +172,7 @@ const step = async (value: number) => {
     const callbacks = [...ticks.values()];
     ticks.clear();
     callbacks.forEach((callback) => callback(time));
+    await vi.runOnlyPendingTimersAsync();
     await Promise.resolve();
     await Promise.resolve();
   });

@@ -1,3 +1,13 @@
+import type { ReadyPublicationTarget } from './ready-media-claims';
+import {
+  beginReadyClaimPublication,
+  finishReadyClaimPublication,
+  prepareReadyClaimIndex,
+  readTargetReadyClaims,
+  readTargetReadyMediaClaims,
+  removeReadyJournalClaims,
+} from './ready-claim-index';
+import { collectReadyJournalAssetIds } from './retention-claims';
 // policyStateIds: video-recording-control-lease, persistent-data-erasure-lease - active
 // recording writers hold exclusive object locks, and privacy erasure invalidates their local state.
 import type {
@@ -10,6 +20,8 @@ import type {
 import { parseAssetReadyJournal } from './guards';
 import {
   acquirePersistenceMutationTransition,
+  runWithDurableAssetLifecycleLock,
+  type DurableAssetLifecyclePermit,
   isActivePersistenceMutationTransitionPermit,
   type PersistenceMutationTransitionLease,
   type PersistenceMutationTransitionPermit,
@@ -20,6 +32,7 @@ export const LEGACY_RECORDING_STAGING_DIRECTORY_NAME = 'sniptale-recording-stagi
 const OBJECTS_DIRECTORY_NAME = 'objects';
 const WRITING_DIRECTORY_NAME = 'writing';
 const READY_DIRECTORY_NAME = 'ready';
+const ROOT_ABSENCE_PROBE_ENTRY_LIMIT = 64;
 
 export interface AssetOpfsOptions {
   createId?: () => string;
@@ -147,12 +160,29 @@ async function removeIfPresent(
   }
 }
 
+async function confirmsAbsentAssetRoot(origin: FileSystemDirectoryHandle): Promise<boolean> {
+  let count = 0;
+  try {
+    for await (const [name] of origin.entries()) {
+      if (name === ASSET_ROOT_DIRECTORY_NAME || ++count >= ROOT_ABSENCE_PROBE_ENTRY_LIMIT)
+        return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function getAssetRoot(options: AssetOpfsOptions, create: boolean) {
   const origin = await (options.getOriginRoot ?? defaultGetOriginRoot)();
   try {
     return await origin.getDirectoryHandle(ASSET_ROOT_DIRECTORY_NAME, { create });
   } catch (error) {
     if (!create && readErrorName(error) === 'NotFoundError') return null;
+    // Edge workers can report AbortError for a missing directory. Only a complete
+    // bounded name scan can establish absence; existing entries and IO errors still fail.
+    if (!create && readErrorName(error) === 'AbortError' && (await confirmsAbsentAssetRoot(origin)))
+      return null;
     throw error;
   }
 }
@@ -454,10 +484,14 @@ export async function writeReadyJournal(
   journal: AssetReadyJournal,
   options: AssetOpfsOptions = {}
 ): Promise<void> {
-  const ready = await getAssetDirectory(options, READY_DIRECTORY_NAME, true);
-  if (!ready) throw new Error('Unable to create asset ready directory.');
+  const previousReady = await getAssetDirectory(options, READY_DIRECTORY_NAME, false);
+  const ready = previousReady ?? (await getAssetDirectory(options, READY_DIRECTORY_NAME, true));
+  const root = await getAssetRoot(options, true);
+  if (!ready || !root) throw new Error('Unable to create asset ready directory.');
+  const complete = await beginReadyClaimPublication(root, journal, previousReady === null);
   await writeTextFile(ready, journal.journalId, JSON.stringify(journal));
-  journal.assetRefs.forEach((ref) => readyProtectedAssetIds.add(ref.assetId));
+  if (complete) await finishReadyClaimPublication(root);
+  collectReadyJournalAssetIds(journal).forEach((id) => readyProtectedAssetIds.add(id));
   const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
   if (writing) {
     await Promise.all(
@@ -475,6 +509,76 @@ export async function deleteReadyJournal(
 ): Promise<void> {
   const ready = await getAssetDirectory(options, READY_DIRECTORY_NAME, false);
   if (ready) await removeIfPresent(ready, journalId);
+  const root = await getAssetRoot(options, false);
+  if (root) await removeReadyJournalClaims(root, journalId);
+}
+
+/** Explicit global recovery owns legacy ready-index preparation. */
+export function prepareAssetReadyClaimIndex(
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  options: AssetOpfsOptions = {}
+): Promise<void> {
+  return runWithDurableAssetLifecycleLock(async () => {
+    const root = await getAssetRoot(options, true);
+    if (!root) throw new Error('Asset root is unavailable.');
+    await prepareReadyClaimIndex(
+      root,
+      await getAssetDirectory(options, READY_DIRECTORY_NAME, false)
+    );
+  }, lifecyclePermit);
+}
+
+/** Candidate admission reads no global journal list and keeps the caller's lifecycle hold. */
+export function readAssetReadyClaims(
+  assetIds: Iterable<string>,
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  options: AssetOpfsOptions = {}
+) {
+  return runWithDurableAssetLifecycleLock(async () => {
+    const root = await getAssetRoot(options, false);
+    if (!root) return { valid: true, assetIds: new Set<string>(), journals: [] };
+    return readTargetReadyClaims(
+      root,
+      await getAssetDirectory(options, READY_DIRECTORY_NAME, false),
+      assetIds
+    );
+  }, lifecyclePermit);
+}
+
+/** Logical source admission reads only selected aliases under the caller's lifecycle hold. */
+export function readAssetReadyPublicationClaims(
+  target: ReadyPublicationTarget,
+  lifecyclePermit?: DurableAssetLifecyclePermit,
+  options: AssetOpfsOptions = {}
+) {
+  return runWithDurableAssetLifecycleLock(async () => {
+    const root = await getAssetRoot(options, false);
+    if (!root) return { valid: true, pending: false, journals: [] };
+    return readTargetReadyMediaClaims(
+      root,
+      await getAssetDirectory(options, READY_DIRECTORY_NAME, false),
+      target
+    );
+  }, lifecyclePermit);
+}
+
+/** Current writing protection is a point lookup for each selected immutable object. */
+export async function readWritingAssetIds(
+  assetIds: Iterable<string>,
+  options: AssetOpfsOptions = {}
+): Promise<string[]> {
+  const directory = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
+  if (!directory) return [];
+  const retained: string[] = [];
+  for (const assetId of new Set(assetIds)) {
+    try {
+      await directory.getFileHandle(assetId);
+      retained.push(assetId);
+    } catch (error) {
+      if (readErrorName(error) !== 'NotFoundError') throw error;
+    }
+  }
+  return retained;
 }
 
 export async function listReadyJournals(
@@ -531,6 +635,26 @@ export async function runWithAssetObjectLockIfAvailable<T>(
     if (locked) result = await operation();
   });
   return result;
+}
+
+/**
+ * Retires writing markers after the caller commits durable native, journal, or prepared claims.
+ * Busy writers keep their markers for retry. This operation releases no leases or asset bytes.
+ */
+export async function settleAssetWritingMarkers(
+  assetIds: readonly string[],
+  options: AssetOpfsOptions = {}
+): Promise<void> {
+  if (assetIds.length === 0) return;
+  const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
+  if (!writing) return;
+  for (const assetId of assetIds) {
+    await runWithAssetObjectLockIfAvailable(
+      assetId,
+      () => removeIfPresent(writing, assetId),
+      options
+    );
+  }
 }
 
 export async function listAssetObjectIds(options: AssetOpfsOptions = {}): Promise<string[]> {
@@ -608,9 +732,35 @@ export async function discardPreparedAsset(
   }
 }
 
+/**
+ * With a lifecycle permit, reuse one ready-claim snapshot for this cleanup pass.
+ * Without a permit, read current ready claims for each available writing marker.
+ */
 export async function collectQuiescentWritingObjects(
   options: AssetOpfsOptions = {},
-  isRetained: (assetId: string) => Promise<boolean> = async () => false
+  isRetained: (assetId: string) => Promise<boolean | null> = async () => false,
+  lifecyclePermit?: DurableAssetLifecyclePermit
+): Promise<number> {
+  const readReadyAssetIds = async () =>
+    new Set(
+      (await listReadyJournals(options)).flatMap((journal) =>
+        journal.assetRefs.map((ref) => ref.assetId)
+      )
+    );
+  if (!lifecyclePermit) return collectWritingObjects(options, isRetained, readReadyAssetIds);
+  return runWithDurableAssetLifecycleLock(() => {
+    let readyAssetIds: ReturnType<typeof readReadyAssetIds> | undefined;
+    return collectWritingObjects(options, isRetained, () => {
+      readyAssetIds ??= readReadyAssetIds();
+      return readyAssetIds;
+    });
+  }, lifecyclePermit);
+}
+
+async function collectWritingObjects(
+  options: AssetOpfsOptions,
+  isRetained: (assetId: string) => Promise<boolean | null>,
+  readReadyAssetIds: () => Promise<ReadonlySet<string>>
 ): Promise<number> {
   const writing = await getAssetDirectory(options, WRITING_DIRECTORY_NAME, false);
   if (!writing) return 0;
@@ -630,17 +780,18 @@ export async function collectQuiescentWritingObjects(
         if (readErrorName(error) === 'NotFoundError') return;
         throw error;
       }
-      const readyAssetIds = new Set(
-        (await listReadyJournals(options)).flatMap((journal) =>
-          journal.assetRefs.map((ref) => ref.assetId)
-        )
-      );
+      const readyAssetIds = await readReadyAssetIds();
       if (readyAssetIds.has(assetId)) {
         await removeIfPresent(writing, assetId);
         return;
       }
       // Marker unlink can fail after a ready journal commits; native claims remain authoritative.
-      if (await isRetained(assetId)) return;
+      const retained = await isRetained(assetId);
+      if (retained === null) return;
+      if (retained) {
+        await removeIfPresent(writing, assetId);
+        return;
+      }
       await deleteAssetObject(assetId, options);
       await removeIfPresent(writing, assetId);
       removed += 1;

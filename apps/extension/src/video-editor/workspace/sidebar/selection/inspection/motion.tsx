@@ -1,3 +1,4 @@
+import { Crosshair } from 'lucide-react';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { isCameraMotionRegion } from '../../../../../features/video/project/motion/normalization';
 import {
@@ -27,6 +28,7 @@ import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
 import { resolveMotionConnectionSource } from '../../../../../features/video/project/motion';
 import { getTemporalEasingOptions } from '../effect-controls/options';
+import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
 
 export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const selection = props.selection;
@@ -82,6 +84,8 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
     return <SelectionEmptyState />;
   }
   const isLocked = getVideoProjectUtilityLanes(props.project).camera.locked;
+  const manualCamera =
+    isCameraMotionRegion(motionRegion) && motionRegion.focusMode !== VideoMotionFocusMode.CURSOR;
 
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
@@ -123,7 +127,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'perspective',
-            visible: isCameraMotionRegion(motionRegion),
+            visible: manualCamera,
             semantic: 'perspective' as const,
             label: translate('gallery.videoReview.perspective'),
             content: (
@@ -134,7 +138,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'depth',
-            visible: isCameraMotionRegion(motionRegion),
+            visible: manualCamera,
             semantic: 'depth' as const,
             label: translate('gallery.videoReview.depthOfField'),
             content: (
@@ -145,9 +149,9 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'spatial-reference',
+            icon: Crosshair,
             visible:
-              isCameraMotionRegion(motionRegion) &&
-              motionRegion.sourceBinding?.coordinateSpace !== 'source-window',
+              manualCamera && motionRegion.sourceBinding?.coordinateSpace !== 'source-window',
             semantic: 'framing' as const,
             label: translate('videoEditor.sidebar.inspectorGroupSpatialReference'),
             content: (

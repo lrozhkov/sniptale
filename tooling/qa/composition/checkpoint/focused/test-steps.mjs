@@ -1,4 +1,8 @@
 import fs from 'node:fs';
+import {
+  resolveMappedCoverageOwnerTests,
+  collectFocusedCoverageOwnerMappingViolations,
+} from '../../../proof/focused-coverage/focused-coverage-owner-map.mjs';
 
 import { recordSuccessfulUnitTestPlan } from '../../../proof/unit/unit-test-cache.mjs';
 import { createProcessStep, createSkippedStep } from '../focused-qa-results.mjs';
@@ -179,13 +183,27 @@ async function createRunnableFocusedSteps({
   ];
 }
 
-export async function runFocusedUnitTests(
+async function runCodeFocusedUnitTests(
   { codeFiles, newFiles = [], targetFiles },
-  { focusedScopeOverride, maxWorkers, pool, runUnitTestsImpl } = {}
+  { focusedScopeOverride, maxWorkers, pool, runUnitTestsImpl, dataTestFiles = [] } = {}
 ) {
-  const directTestFiles = collectFocusedDiffTestFiles(targetFiles);
+  const directTestFiles = [
+    ...new Set([...collectFocusedDiffTestFiles(targetFiles), ...dataTestFiles]),
+  ].sort();
   if (codeFiles.length === 0) {
-    return createNoCodeFocusedSteps();
+    if (dataTestFiles.length === 0) return createNoCodeFocusedSteps();
+    return [
+      await runDirectTestsWithoutCoverage({
+        directTestFiles,
+        maxWorkers,
+        pool,
+        runUnitTestsImpl,
+        targetFiles,
+      }),
+      timeSyncStep(() =>
+        createSkippedStep('Test coverage', 'skipped: catalog data has no code coverage target')
+      ),
+    ];
   }
 
   const behavioralCodeFiles = filterImportOnlyDiffFiles(codeFiles);
@@ -231,5 +249,34 @@ export async function runFocusedUnitTests(
     pool,
     runUnitTestsImpl,
     targetFiles,
+  });
+}
+
+export async function runFocusedUnitTests(context, options = {}) {
+  const catalogFiles = context.targetFiles.filter((file) =>
+    /^apps\/extension\/src\/platform\/i18n\/catalogs\/[^/]+\.json$/u.test(file)
+  );
+  if (catalogFiles.length === 0) return runCodeFocusedUnitTests(context, options);
+  const mappedTests = [
+    ...new Set(catalogFiles.flatMap((file) => resolveMappedCoverageOwnerTests(file))),
+  ];
+  const violations = collectFocusedCoverageOwnerMappingViolations();
+  if (mappedTests.length === 0 || violations.length > 0) {
+    return [
+      timeSyncStep(() =>
+        createProcessStep('Unit tests', {
+          status: 1,
+          stdout: '',
+          stderr:
+            mappedTests.length === 0
+              ? 'Catalog data has no proof owner'
+              : JSON.stringify(violations),
+        })
+      ),
+    ];
+  }
+  return runCodeFocusedUnitTests(context, {
+    ...options,
+    dataTestFiles: mappedTests.filter(isProductQaFile),
   });
 }

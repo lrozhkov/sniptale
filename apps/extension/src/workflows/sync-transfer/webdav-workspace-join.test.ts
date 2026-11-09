@@ -173,6 +173,14 @@ function fixture() {
       if (!clientOptions) throw new Error('client not created');
       return clientOptions;
     },
+    discover(identity: unknown = initialIdentity) {
+      return createWebdavWorkspaceJoin({
+        identity,
+        authentication: authentication(),
+        hasOriginPermission: permission,
+        operation: 'discover',
+      });
+    },
     workflow(auth: unknown = authentication(), identity: unknown = initialIdentity) {
       return createWebdavWorkspaceJoin({
         identity,
@@ -334,9 +342,14 @@ it('close before run revokes its lifetime and never starts transport', async () 
   expect(f.state()).toBeNull();
 });
 
-it.each([false, true])(
-  'active close drains issued bodies when native revocation fails=%s',
-  async (fail) => {
+it.each([
+  { fail: false, discover: false },
+  { fail: true, discover: false },
+  { fail: false, discover: true },
+  { fail: true, discover: true },
+])(
+  'active close drains issued bodies for discovery=$discover when native revocation fails=$fail',
+  async ({ fail, discover }) => {
     const f = fixture();
     const issued = deferred<void>();
     const cancelling = deferred<void>();
@@ -353,7 +366,7 @@ it.each([false, true])(
       );
     });
     if (fail) native.revoke.mockRejectedValueOnce(new Error('private native failure'));
-    const workflow = f.workflow();
+    const workflow = discover ? f.discover() : f.workflow();
     const running = expect(workflow.run()).rejects.toMatchObject({ code: 'cancelled' });
     await issued.promise;
     const closing = workflow.close();
@@ -374,26 +387,29 @@ it.each([false, true])(
   }
 );
 
-it('refuses successful closure and readiness after body cancellation fails', async () => {
-  const f = fixture();
-  const issued = deferred<void>();
-  f.response.mockImplementationOnce(async () => {
-    issued.resolve();
-    return new Response(
-      new ReadableStream<Uint8Array>({
-        cancel() {
-          throw new Error('private body failure');
-        },
-      })
-    );
-  });
-  const workflow = f.workflow();
-  const running = expect(workflow.run()).rejects.toMatchObject({ code: 'containment-failed' });
-  await issued.promise;
-  await expect(workflow.close()).rejects.toMatchObject({ code: 'containment-failed' });
-  await running;
-  expect(native.complete).not.toHaveBeenCalled();
-});
+it.each([false, true])(
+  'refuses successful closure and readiness after body cancellation fails discovery=%s',
+  async (discover) => {
+    const f = fixture();
+    const issued = deferred<void>();
+    f.response.mockImplementationOnce(async () => {
+      issued.resolve();
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          cancel() {
+            throw new Error('private body failure');
+          },
+        })
+      );
+    });
+    const workflow = discover ? f.discover() : f.workflow();
+    const running = expect(workflow.run()).rejects.toMatchObject({ code: 'containment-failed' });
+    await issued.promise;
+    await expect(workflow.close()).rejects.toMatchObject({ code: 'containment-failed' });
+    await running;
+    expect(native.complete).not.toHaveBeenCalled();
+  }
+);
 
 it('revokes a ready revision when close races the final native completion result', async () => {
   const f = fixture();
@@ -464,3 +480,173 @@ it('contains active IO while refusing to revoke a replacement lifetime', async (
   expect(f.state()).toEqual(replacement);
   expect(native.complete).not.toHaveBeenCalled();
 });
+
+it(
+  'discovers an exact workspace with the advanced checking source and no native ' +
+    'readiness or original reads',
+  async () => {
+    const f = fixture();
+    f.files.set('Files/private/original.png', new Blob(['original']));
+    const discovery = f.discover();
+    const result = await discovery.run();
+    expect(result).toEqual({
+      operation: 'discover',
+      source: { kind: 'join', identity: { incarnation, revision: 2 } },
+      discovery: {
+        scope: 'exact',
+        complete: true,
+        candidates: [{ prefix: '', identity: marker.identity }],
+        issues: [],
+      },
+    });
+    expect(f.state()?.phase).toBe('checking');
+    expect(f.readKeys).toEqual([SYNC_WORKSPACE_MARKER_KEY]);
+    expect(native.complete).not.toHaveBeenCalled();
+    expect(f.write).not.toHaveBeenCalled();
+    await discovery.close();
+    expect(native.revoke).not.toHaveBeenCalled();
+    expect(JSON.stringify(result)).not.toContain('private-password');
+  }
+);
+
+it('discovers only immediate child markers and preserves an empty result without creation', async () => {
+  const f = fixture();
+  f.files.delete(SYNC_WORKSPACE_MARKER_KEY);
+  const empty = await f.discover().run();
+  expect(empty.discovery).toEqual({
+    scope: 'children',
+    complete: true,
+    candidates: [],
+    issues: [],
+  });
+  const current = f.state()!;
+  f.files.set('one/' + SYNC_WORKSPACE_MARKER_KEY, new Blob([marker.text]));
+  f.files.set('two/' + SYNC_WORKSPACE_MARKER_KEY, new Blob([marker.text]));
+  f.files.set('one/Files/original.png', new Blob(['original']));
+  const factory = vi.mocked(createWebdavRemoteStore).getMockImplementation()!;
+  vi.mocked(createWebdavRemoteStore).mockImplementationOnce(async (options, signal) => {
+    const remote = await factory(options, signal);
+    remote.list = async () => ({ objects: [], prefixes: ['one/', 'two/'], nextCursor: null });
+    return remote;
+  });
+  const result = await f.discover(current.identity).run();
+  expect(result.discovery.candidates.map((candidate) => candidate.prefix)).toEqual([
+    'one/',
+    'two/',
+  ]);
+  expect(f.readKeys).toEqual([
+    'one/' + SYNC_WORKSPACE_MARKER_KEY,
+    'two/' + SYNC_WORKSPACE_MARKER_KEY,
+  ]);
+  expect(native.complete).not.toHaveBeenCalled();
+  expect(f.write).not.toHaveBeenCalled();
+});
+
+it('refuses discovery for an already selected workspace before replacing its expected identity', async () => {
+  const f = fixture();
+  const selected = f.state()!;
+  selected.expected = marker.identity;
+  f.replace(selected);
+  await expect(f.discover().run()).rejects.toMatchObject({ code: 'join-refused' });
+  expect(native.begin).not.toHaveBeenCalled();
+  expect(createWebdavRemoteStore).not.toHaveBeenCalled();
+});
+
+it.each(['erase', 'recreate', 'revision', 'permission'] as const)(
+  'refuses discovery after %s during final permission wait',
+  async (change) => {
+    const f = fixture();
+    const entered = deferred<void>();
+    const held = deferred<void>();
+    let checks = 0;
+    f.permission.mockImplementation(async () => {
+      if (++checks === 4) {
+        entered.resolve();
+        await held.promise;
+        return change !== 'permission';
+      }
+      return true;
+    });
+    const result = expect(f.discover().run()).rejects.toMatchObject({
+      code: change === 'permission' ? 'access-denied' : 'join-refused',
+    });
+    await entered.promise;
+    const replacement = f.state()!;
+    if (change === 'recreate')
+      replacement.identity.incarnation = '50000000-0000-4000-8000-000000000005';
+    if (change === 'revision') replacement.identity.revision++;
+    if (change !== 'permission') f.replace(change === 'erase' ? null : replacement);
+    held.resolve();
+    await result;
+    expect(native.complete).not.toHaveBeenCalled();
+  }
+);
+
+it('cancels discovery during the final permission wait without publishing a late observation', async () => {
+  const f = fixture();
+  const entered = deferred<void>();
+  const held = deferred<void>();
+  let checks = 0;
+  f.permission.mockImplementation(async () => {
+    if (++checks === 4) {
+      entered.resolve();
+      await held.promise;
+    }
+    return true;
+  });
+  const discovery = f.discover();
+  const running = expect(discovery.run()).rejects.toMatchObject({ code: 'cancelled' });
+  await entered.promise;
+  const closed = discovery.close();
+  held.resolve();
+  await closed;
+  await running;
+  expect(native.revoke).toHaveBeenCalledExactlyOnceWith(incarnation);
+  expect(native.complete).not.toHaveBeenCalled();
+});
+
+it.each(['malformed', 'unsupported', 'denied', 'bootstrap'] as const)(
+  'retains incomplete discovery for %s without preparing or reading originals',
+  async (condition) => {
+    const f = fixture();
+    if (condition === 'malformed') f.files.set(SYNC_WORKSPACE_MARKER_KEY, new Blob(['{}']));
+    if (condition === 'unsupported')
+      f.files.set(
+        SYNC_WORKSPACE_MARKER_KEY,
+        new Blob([marker.text.replace('"version":1', '"version":2')])
+      );
+    if (condition === 'denied')
+      f.response.mockRejectedValueOnce(new SyncRemoteError('access-denied'));
+    if (condition === 'bootstrap') {
+      f.files.delete(SYNC_WORKSPACE_MARKER_KEY);
+      const factory = vi.mocked(createWebdavRemoteStore).getMockImplementation()!;
+      vi.mocked(createWebdavRemoteStore).mockImplementationOnce(async (options, signal) => {
+        const remote = await factory(options, signal);
+        remote.list = async () => ({ objects: [], prefixes: ['.sniptale/'], nextCursor: null });
+        return remote;
+      });
+    }
+    const workflow = f.discover();
+    const result = await workflow.run();
+    expect(result.discovery.complete).toBe(false);
+    expect(result.discovery.candidates).toEqual([]);
+    expect(result.discovery.issues).toEqual([
+      {
+        prefix: '',
+        code:
+          condition === 'malformed'
+            ? 'invalid-marker'
+            : condition === 'unsupported'
+              ? 'unsupported-format'
+              : condition === 'denied'
+                ? 'access-denied'
+                : 'bootstrap-incomplete',
+      },
+    ]);
+    await workflow.close();
+    expect(native.complete).not.toHaveBeenCalled();
+    expect(native.revoke).not.toHaveBeenCalled();
+    expect(f.write).not.toHaveBeenCalled();
+    expect(f.readKeys.every((key) => key === SYNC_WORKSPACE_MARKER_KEY)).toBe(true);
+  }
+);

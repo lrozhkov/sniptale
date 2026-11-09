@@ -1,68 +1,19 @@
+import { rowReferenceKey } from '../infrastructure/indexed-db/row-index-contract';
+import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { describe, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
-import { createGuideProject } from '../../../features/scenario/project/factories';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import type { MediaThumbnailEntry } from '../media-library/contracts';
-import type {
-  ScenarioExportEntry,
-  ScenarioProjectEntry,
-  StoredScenarioStepEditorDocumentEntry,
-} from './contracts';
+import type { ScenarioExportEntry, StoredScenarioStepEditorDocumentEntry } from './contracts';
+import { putScenarioProjectBackupRestore } from './backup-restore';
 import {
-  putScenarioProjectBackupRestore,
-  type ScenarioBackupRestoreStores,
-} from './backup-restore';
-
-function store(get: (key: IDBValidKey) => unknown = () => undefined) {
-  return { delete: vi.fn(), get: vi.fn(async (key) => get(key)), put: vi.fn() };
-}
-
-function indexStore() {
-  return { ...store(), index: vi.fn(() => ({ getAll: vi.fn(async () => []) })) };
-}
-
-function stores(): ScenarioBackupRestoreStores {
-  return {
-    assets: indexStore(),
-    exports: indexStore(),
-    operations: store(),
-    owners: { ...store(), index: vi.fn(() => ({ count: vi.fn(async () => 0) })) },
-    presentations: store(),
-    projects: store(),
-    refs: store(),
-    stepDocuments: indexStore(),
-    thumbnails: store(),
-  } satisfies ScenarioBackupRestoreStores;
-}
-
-function projectEntry(id = 'project'): ScenarioProjectEntry {
-  const project = { ...createGuideProject('Scenario'), id };
-  return {
-    createdAt: project.createdAt,
-    id,
-    project,
-    updatedAt: project.updatedAt,
-    workspaceRevision: 1,
-  };
-}
-
-const operation = () => ({
-  assetIds: [],
-  createdAt: 1,
-  kind: 'physical-delete' as const,
-  operationId: 'delete',
-  status: 'pending' as const,
-  updatedAt: 1,
-});
-const ref = {
-  assetId: 'local',
-  createdAt: 1,
-  location: { kind: 'opfs' as const, objectKey: 'objects/local' },
-  mimeType: 'image/png',
-  sha256: null,
-  size: 1,
-};
+  stores,
+  projectEntry,
+  operation,
+  ref,
+  restoreTransaction,
+} from './backup-restore.test-support';
 
 describe('scenario project backup restore adapter', () => {
   it('closes an imported field group while preserving the restored content and saved versions', async () => {
@@ -590,25 +541,6 @@ it('publishes a restored HTML body edge and queues only the replaced catalogue b
   expect(target.exports.put).toHaveBeenCalledWith(restored);
 });
 
-function restoreTransaction(target: ScenarioBackupRestoreStores) {
-  const graph = { get: async () => undefined, getAll: async () => [], put: async () => undefined };
-  const stores = {
-    scenario_assets: target.assets,
-    scenario_exports: target.exports,
-    scenario_projects: target.projects,
-    scenario_step_editor_documents: target.stepDocuments,
-    asset_owners: target.owners,
-    asset_refs: target.refs,
-    media_library: graph,
-    recordings: graph,
-    project_assets: graph,
-    video_projects: graph,
-  };
-  return { objectStore: (name: keyof typeof stores) => stores[name] } as unknown as Parameters<
-    typeof putScenarioProjectBackupRestore
-  >[0]['tx'];
-}
-
 it.each(['document', 'asset', 'export'] as const)(
   'refuses malformed existing %s before replacing the scenario',
   async (kind) => {
@@ -758,3 +690,77 @@ it('pins a restored scenario source only after accepting its parent', async () =
       );
   }
 });
+
+it.each(['exact', 'child', 'ref', 'owner'] as const)(
+  'uses child-only indexed admission and checks the %s replacement binding',
+  async (binding) => {
+    const target = stores();
+    const current = {
+      id: 'child',
+      projectId: 'project',
+      assetId: ref.assetId,
+      galleryAssetId: 'frozen-origin',
+      mimeType: ref.mimeType,
+      size: ref.size,
+      width: 1,
+      height: 1,
+      createdAt: 1,
+    };
+    target.projects.get = vi.fn(async () => projectEntry());
+    target.assets.get = vi.fn(async () => current);
+    target.assets.index = vi.fn(() => ({ getAll: vi.fn(async () => [current]) }));
+    target.refs.get = vi.fn(async () => ref);
+    target.owners.get = vi.fn(async () => ({
+      ownerKind: 'scenario-asset',
+      ownerId: binding === 'owner' ? 'other-child' : current.id,
+      role: 'body',
+      assetId: current.assetId,
+    }));
+    const video = createVideoProjectEntryWithMediaClip();
+    video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: current.id };
+    const rootOnly = {
+      ...video,
+      id: 'root-only',
+      project: {
+        ...video.project,
+        id: 'root-only',
+        name: 123,
+        assets: [],
+        source: { kind: 'scenario', scenarioProjectId: 'project' },
+      },
+    };
+    const queries = vi.fn();
+    const result = putScenarioProjectBackupRestore({
+      operation: operation(),
+      strategy: 'replace',
+      preserveVideoProjectSources: true,
+      stores: target,
+      tx: restoreTransaction(target, [rootOnly, video], queries),
+      root: {
+        entry: projectEntry(),
+        exports: [],
+        exportThumbnails: [],
+        stepDocuments: [],
+        assets: [
+          {
+            entry: { ...current, ...(binding === 'child' ? { width: 2 } : {}) },
+            ref: { ...ref, ...(binding === 'ref' ? { sha256: 'a'.repeat(64) } : {}) },
+          },
+        ],
+      },
+    });
+    if (binding === 'exact') {
+      await expect(result).resolves.toEqual({ conflicted: true, imported: true });
+      expect(target.assets.delete).not.toHaveBeenCalled();
+      expect(target.owners.delete).not.toHaveBeenCalled();
+    } else {
+      await expect(result).rejects.toThrow(
+        'Scenario replacement would change a required video project source'
+      );
+      expect(target.projects.delete).not.toHaveBeenCalled();
+      expect(target.assets.delete).not.toHaveBeenCalled();
+    }
+    expect(queries).toHaveBeenCalledWith(rowReferenceKey('scenario-asset', current.id));
+    expect(queries).not.toHaveBeenCalledWith(rowReferenceKey('scenario-project', 'project'));
+  }
+);

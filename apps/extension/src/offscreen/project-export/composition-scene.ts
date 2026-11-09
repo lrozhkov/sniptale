@@ -1,9 +1,13 @@
+import { resolveVideoCompositionRenderPasses } from '../../features/video/composition/timeline/render';
+import { hasCursorFollowingCameraAt } from '../../features/video/composition/motion/camera-interval';
 import { disposeEffectRuntimeComposition } from '../../features/video/composition/effect-runtime';
 import type { VideoCompositionTimelineIndex } from '../../features/video/composition/timeline/frame/index';
 import { resolveProjectExportRange } from '../../features/video/project/export/range';
 import type { VideoProject } from '../../features/video/project/types/model';
 import type { VideoProjectExportSettings } from '../../features/video/project/types/export';
 import { createVideoProjectCaptionRenderer } from '../../workflows/video-review/project-captions';
+import { createRecordingCursorTrajectoryRenderer } from '../../workflows/video-review/cursor-trajectory';
+import { createRecordingEventsRenderer } from '../../workflows/video-review/recording-events';
 import {
   renderOffscreenProjectEffectFrames,
   type OffscreenProjectEffectRuntime,
@@ -18,9 +22,16 @@ export interface ProjectCompositionSceneInput {
   context: CanvasRenderingContext2D;
   currentTime: number;
   captionSampleTime?: number;
+  sourceSamplingFallback?: 'first' | 'last';
   job: Pick<
     ExportJobState,
-    'cancelled' | 'cameraSpatialRenderer' | 'captionRenderer' | 'watermarkRenderer'
+    | 'sourceSampling'
+    | 'cancelled'
+    | 'cameraSpatialRenderer'
+    | 'captionRenderer'
+    | 'watermarkRenderer'
+    | 'cursorTrajectoryRenderer'
+    | 'recordingEventsRenderer'
   >;
   loadedImages: LoadedImagesMap;
   clipMediaElements: Parameters<typeof drawProjectFrame>[5];
@@ -42,6 +53,27 @@ export async function renderProjectCompositionScene(
     if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
   };
   assertLive();
+  let renderProject = project;
+  if (hasCursorFollowingCameraAt(project, currentTime)) {
+    job.cursorTrajectoryRenderer ??= createRecordingCursorTrajectoryRenderer();
+    renderProject = await job.cursorTrajectoryRenderer.prepareCamera(project, settings, signal);
+    assertLive();
+  }
+  if (project.actionFeedback?.some((group) => group.events)) {
+    job.recordingEventsRenderer ??= createRecordingEventsRenderer();
+    renderProject = await job.recordingEventsRenderer.prepare(
+      renderProject,
+      { start: currentTime, end: currentTime },
+      signal
+    );
+    assertLive();
+  }
+  if (project.cursorTrack?.sourceObservations?.some((group) => group.trajectory))
+    job.cursorTrajectoryRenderer ??= createRecordingCursorTrajectoryRenderer();
+  renderProject = project.cursorTrack?.sourceObservations?.some((group) => group.trajectory)
+    ? await job.cursorTrajectoryRenderer!.prepare(renderProject, currentTime)
+    : renderProject;
+  assertLive();
   job.captionRenderer ??= createVideoProjectCaptionRenderer();
   const captions = await job.captionRenderer.prepare(project, settings, signal);
   captions.assertExportable(
@@ -59,30 +91,52 @@ export async function renderProjectCompositionScene(
     (typeof HTMLCanvasElement !== 'undefined' && context.canvas instanceof HTMLCanvasElement
       ? context.canvas.ownerDocument
       : undefined);
+  const renderPasses = job.sourceSampling?.managesSources
+    ? resolveVideoCompositionRenderPasses(renderProject, currentTime, {
+        includeSubtitles: settings.burnInSubtitles === true,
+        cameraViewport: {
+          width: settings.width,
+          height: settings.height,
+          ...(settings.resolution ? { resolution: settings.resolution } : {}),
+        },
+        ...(args.compositionIndex ? { timelineIndex: args.compositionIndex } : {}),
+      })
+    : undefined;
   const frameArgs = {
+    ...(renderPasses ? { renderPasses } : {}),
     ...(args.compositionIndex ? { compositionIndex: args.compositionIndex } : {}),
     clipMediaElements: args.clipMediaElements,
     currentTime,
+    ...(args.sourceSamplingFallback ? { sourceSamplingFallback: args.sourceSamplingFallback } : {}),
     loadedImages: args.loadedImages,
     ...(ownerDocument ? { ownerDocument } : {}),
-    project,
+    project: renderProject,
     ...(signal ? { signal } : {}),
     spatialRenderer: () => getProjectExportSpatialRenderer(job, signal),
+    ...(job.sourceSampling ? { sourceSampling: job.sourceSampling } : {}),
   };
-  const frames = await (args.effectRuntime
-    ? args.effectRuntime.renderProjectFrames(frameArgs)
-    : renderOffscreenProjectEffectFrames(frameArgs));
+  let frames: Awaited<ReturnType<typeof renderOffscreenProjectEffectFrames>>;
   try {
+    frames = await (args.effectRuntime
+      ? args.effectRuntime.renderProjectFrames(frameArgs)
+      : renderOffscreenProjectEffectFrames(frameArgs));
     assertLive();
     await drawProjectFrame(
       context,
-      project,
+      renderProject,
       settings,
       currentTime,
       args.loadedImages,
       args.clipMediaElements,
       {
+        ...(renderPasses ? { renderPasses } : {}),
         spatialRenderer: frameArgs.spatialRenderer,
+        ...(args.sourceSamplingFallback
+          ? { sourceSamplingFallback: args.sourceSamplingFallback }
+          : {}),
+        ...(job.sourceSampling
+          ? { sourceSampling: job.sourceSampling, ...(signal ? { signal } : {}) }
+          : {}),
         ...(args.compositionIndex ? { compositionIndex: args.compositionIndex } : {}),
         ...(frames ? { effectRuntimeFrames: frames } : {}),
         ...(args.backgroundCache ? { backgroundCache: args.backgroundCache } : {}),
@@ -93,5 +147,6 @@ export async function renderProjectCompositionScene(
     watermark?.draw(context);
   } finally {
     disposeEffectRuntimeComposition(frames);
+    job.sourceSampling?.releasePass();
   }
 }

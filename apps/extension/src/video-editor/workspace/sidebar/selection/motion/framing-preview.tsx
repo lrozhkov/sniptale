@@ -1,6 +1,7 @@
+import { useCursorTrajectoryProject } from '../../../../preview/stage/runtime/cursor-trajectory';
 import { OptionButtonsField } from '../shared/option-buttons';
 import { InspectorActionButton } from '../shared/actions';
-import { useContext, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import {
   VideoMotionFocusMode,
@@ -8,10 +9,8 @@ import {
 } from '../../../../../features/video/project/types';
 import type { resolveCameraViewportFrame } from '../../../../../features/video/composition/motion/viewport';
 import { RuntimePreviewContext } from '../../../../runtime/controller/composition/contexts';
-import { isVideoProjectUtilityLaneVisible } from '../../../../../features/video/project/utility-lanes';
-import { resolveProjectCursorCameraPlan } from '../../../../../features/video/composition/motion/project-follow';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import { useFramingFrame } from './framing-preview-frame';
+import { resolveFramingRenderCamera, useFramingFrame } from './framing-preview-frame';
 import { useFramingInteraction, type FramingPreviewProps } from './framing-preview-interaction';
 
 export function MotionFramingPreview(props: {
@@ -48,16 +47,34 @@ export function MotionFramingPreview(props: {
 }
 
 export function FramingPreviewSurface(props: FramingPreviewProps) {
+  const time = Math.min(props.project.duration, props.region.startTime + props.region.duration / 2);
+  const preparation = useCursorTrajectoryProject(props.project, time);
+  const { project, cameraFailed, retryCamera } = preparation;
+  const cameraReady = preparation.canRender(time);
+  const renderProps = { ...props, project };
   const following = props.region.focusMode === VideoMotionFocusMode.CURSOR;
-  const plan =
-    following && isVideoProjectUtilityLaneVisible(props.project, 'camera')
-      ? resolveProjectCursorCameraPlan(props.project, props.region)
-      : null;
   const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { areaPoints, camera, viewport, left, top, width, height, handlers } =
-    useFramingInteraction(props, overview);
-  const { ready, failed, reload } = useFramingFrame(props, canvasRef, camera);
+  const gpuHostRef = useRef<HTMLDivElement>(null);
+  const {
+    ready,
+    visible,
+    failed,
+    reload,
+    viewport: cursorViewport,
+    plan,
+    nominalScale,
+    update,
+  } = useFramingFrame(renderProps, canvasRef, gpuHostRef, cameraReady);
+  const interaction = useFramingInteraction(renderProps, overview, cursorViewport);
+  const { areaPoints, viewport, left, top, width, height, handlers } = interaction;
+  const camera = resolveFramingRenderCamera(renderProps, overview, interaction, cursorViewport);
+  const cameraKey = JSON.stringify(camera);
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
+  useEffect(() => {
+    if (cameraReady) update(cameraRef.current, overview);
+  }, [cameraKey, overview, update, cameraReady]);
 
   return (
     <div className="space-y-2" data-ui="video-editor.framing-preview">
@@ -65,7 +82,7 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
         <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('videoEditor.app.exportCameraConflict')}
         </p>
-      ) : plan?.status === 'ready' && plan.targetScale < props.region.scale ? (
+      ) : plan?.status === 'ready' && plan.targetScale < (nominalScale ?? props.region.scale) ? (
         <p role="status" className="text-xs">
           {translate('videoEditor.sidebar.cameraExpansionApplied')}
         </p>
@@ -83,7 +100,7 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
         type="button"
         data-video-editor-local-navigation="true"
         aria-label={translate('videoEditor.sidebar.framingPreviewLabel')}
-        disabled={!ready}
+        disabled={!ready || !cameraReady}
         className={`relative block w-full overflow-hidden rounded-md border
 border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-muted)]
 touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-default`}
@@ -92,16 +109,24 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
       >
         <FramingOverlays
           canvasRef={canvasRef}
-          ready={ready}
-          failed={failed}
+          gpuHostRef={gpuHostRef}
+          visible={visible}
+          ready={ready && cameraReady}
+          failed={failed || cameraFailed}
           areaPoints={overview ? areaPoints : null}
           showOutline={overview}
           viewport={viewport}
           world={{ left, top, width, height }}
         />
       </button>
-      {failed ? (
-        <InspectorActionButton compact onClick={reload}>
+      {failed || cameraFailed ? (
+        <InspectorActionButton
+          compact
+          onClick={() => {
+            if (cameraFailed) retryCamera();
+            if (failed) reload();
+          }}
+        >
           {translate('common.actions.retry')}
         </InspectorActionButton>
       ) : null}
@@ -111,6 +136,8 @@ touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-defaul
 
 function FramingOverlays({
   canvasRef,
+  gpuHostRef,
+  visible,
   ready,
   failed,
   areaPoints,
@@ -119,6 +146,8 @@ function FramingOverlays({
   showOutline,
 }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  gpuHostRef: React.RefObject<HTMLDivElement | null>;
+  visible: boolean;
   ready: boolean;
   failed: boolean;
   areaPoints: ReturnType<typeof useFramingInteraction>['areaPoints'];
@@ -134,11 +163,16 @@ function FramingOverlays({
         aria-hidden="true"
         className="absolute pointer-events-none"
         style={{
-          visibility: ready ? 'visible' : 'hidden',
+          visibility: visible ? 'visible' : 'hidden',
           inset: 0,
           width: '100%',
           height: '100%',
         }}
+      />
+      <div
+        ref={gpuHostRef}
+        data-ui="video-editor.framing-preview.gpu-host"
+        className="pointer-events-none absolute inset-0 h-full w-full"
       />
       {ready && areaPoints ? (
         <>

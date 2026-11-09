@@ -1,3 +1,4 @@
+import { DetailEnhancementField } from '../../../ui/video-export/detail-enhancement-field';
 import { resolveVideoExportDimensions } from '../../../features/video/project/export/output-dimensions';
 import { FileVideo, SlidersHorizontal } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
@@ -294,6 +295,10 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
           value={settings.quality}
           onChange={(quality) => onChange({ quality })}
           options={[...getExportQualityOptions()]}
+        />
+        <DetailEnhancementField
+          value={settings.detailEnhancement}
+          onChange={(detailEnhancement) => onChange({ detailEnhancement })}
         />
         <div title={translate('videoEditor.exportDialog.frameRateAdaptiveHint')}>
           <SegmentedRow<'constant' | 'adaptive'>

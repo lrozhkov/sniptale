@@ -9,7 +9,7 @@ import {
   resolvePreviewRenderAllocation,
   type PreviewRenderAllocationInput,
 } from '../../../../apps/extension/src/workflows/video-review/preview-render-allocation';
-import { createReviewSpatialRenderer } from '../../../../apps/extension/src/features/video/composition/canvas/spatial-renderer';
+import { createReviewSpatialSession } from '../../../../apps/extension/src/workflows/video-review/spatial-render-session';
 import { drawReviewWebcam } from '../../../../apps/extension/src/workflows/video-review/render-webcam';
 import { quickEditMotionBlurCameras } from '../../../../apps/extension/src/features/video/review/advanced/motion-blur';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../apps/extension/src/features/video/project/camera/appearance';
@@ -33,6 +33,12 @@ import {
   evaluateQuickEditCameraAtTime,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 import { createCanvasComment } from '../../../../apps/extension/src/features/video/review/comments';
+import { evaluateReviewClicks } from '../../../../apps/extension/src/features/video/review/click-animation';
+import {
+  planReviewPresentationSequence,
+  presentationColorOpacity,
+} from '../../../../apps/extension/src/features/video/review/presentation-sequence';
+import { createNeutralPresentationSettings } from '../../../../apps/extension/src/features/video/review/advanced/presentation';
 
 import { REVIEW_CLICK_DEFAULT } from '../../../../apps/extension/src/features/video/review/advanced/click-animation';
 import { REVIEW_KEY_DEFAULT } from '../../../../apps/extension/src/features/video/project/action-feedback/key-animation';
@@ -283,7 +289,7 @@ async function reference(
         },
       }
     : scene.background;
-  const spatial = layout.spatial ? createReviewSpatialRenderer() : undefined;
+  const spatial = layout.spatial ? createReviewSpatialSession() : undefined;
   const textOwner = owner();
   const signal = new AbortController().signal;
   const header = scene.windowHeader
@@ -449,6 +455,21 @@ function compare(actual: HTMLCanvasElement, expected: HTMLCanvasElement) {
     let different = false;
     for (let channel = 0; channel < 4; channel++) {
       const difference = Math.abs(a[i + channel]! - e[i + channel]!);
+      maxDifference = Math.max(maxDifference, difference);
+      different ||= difference !== 0;
+    }
+    if (different) differentPixels++;
+  }
+  return { maxDifference, differentPixels };
+}
+
+function comparePixels(actual: ImageData, expected: ImageData) {
+  let maxDifference = 0,
+    differentPixels = 0;
+  for (let i = 0; i < actual.data.length; i += 4) {
+    let different = false;
+    for (let channel = 0; channel < 4; channel++) {
+      const difference = Math.abs(actual.data[i + channel]! - expected.data[i + channel]!);
       maxDifference = Math.max(maxDifference, difference);
       different ||= difference !== 0;
     }
@@ -733,4 +754,495 @@ async function advancedCases(source: ReturnType<typeof samples>) {
     });
   }
   return results;
+}
+
+const queueSize = { width: 840, height: 472 };
+const queueTimes = [0.15, 1.25] as const;
+
+function queueFixture(): Scene {
+  const scene = fixture();
+  scene.source = queueSize;
+  scene.background = {
+    enabled: true,
+    type: 'image',
+    assetId: 'queue-background',
+    imageFit: 'cover',
+    motion: { mode: 'drift', speed: 100, intensity: 100 },
+    layout: { padding: 40, cornerRadius: 12 },
+    zoomBehavior: 'window',
+  };
+  scene.zoomRegions = [
+    ...scene.zoomRegions,
+    {
+      id: 'queue-spatial',
+      start: 0,
+      end: 1.5,
+      transform: { scale: 1.35, centerX: 0.58, centerY: 0.43 },
+      enter: { type: 'linear', duration: 1.5 },
+      exit: { type: 'none', duration: 0 },
+      perspective: { enabled: true, rotateX: 12, rotateY: -18, rotateZ: 5, strength: 0.7 },
+    },
+  ];
+  scene.clicks = queueTimes.map((at, index) => ({
+    settings: { ...REVIEW_CLICK_DEFAULT, effect: 'magnify', radius: 42, magnification: 1.8 },
+    point: { x: index ? 0.7 : 0.3, y: index ? 0.7 : 0.4 },
+    anchor: at - (index ? 0.15 : 0.05),
+    start: at - 0.1,
+    end: at + 0.4,
+  }));
+  const settings = createNeutralPresentationSettings();
+  settings.fadeIn = { ...settings.fadeIn, enabled: true, duration: 0.4 };
+  settings.fadeOut = { ...settings.fadeOut, enabled: true, duration: 0.4 };
+  const plan = planReviewPresentationSequence({
+    settings,
+    mainDuration: 1.5,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 60, denominator: 1 },
+  });
+  if (!plan.ok) throw new Error('Queue fixture presentation is invalid');
+  scene.outerFadePlan = plan.plan;
+  return scene;
+}
+
+function queueLedger(
+  scene: Scene,
+  sourceBytes: number,
+  outputKind: () => 'canvas2d' | 'gpu-surface' = () => 'canvas2d'
+) {
+  const ledger = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
+  const budgets: { maximumManagedBytes: number; maximumCanvases: number }[] = [];
+  let canvasLeases = 0,
+    byteLeases = 0,
+    publication2DAllocations = 0;
+  const resources: RenderResources = {
+    canvas(role, bounds, options) {
+      const lease = ledger.canvas(role, bounds, options);
+      if (role === 'preview-publication') publication2DAllocations++;
+      canvasLeases++;
+      let live = true;
+      return {
+        ...lease,
+        release() {
+          if (!live) return;
+          live = false;
+          canvasLeases--;
+          lease.release();
+        },
+      };
+    },
+    bytes(role, count) {
+      const lease = ledger.bytes(role, count);
+      byteLeases++;
+      let live = true;
+      return {
+        release() {
+          if (!live) return;
+          live = false;
+          byteLeases--;
+          lease.release();
+        },
+      };
+    },
+  };
+  const layout = computeQuickEditSceneLayout({
+    source: queueSize,
+    output: queueSize,
+    background: scene.background,
+    windowHeader: scene.windowHeader,
+    camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+  });
+  let assets: PreviewRenderAllocationInput['assets'] = {
+    backgroundBitmap: queueSize,
+    headerBitmap: {
+      width: Math.max(1, Math.ceil(layout.windowRect.width)),
+      height: Math.max(1, Math.ceil(layout.videoRect.y - layout.windowRect.y)),
+    },
+    watermark: null,
+    previousWatermarkCache: null,
+  };
+  return {
+    resources,
+    ledger,
+    budgets,
+    state: () => ({ canvasLeases, byteLeases, publication2DAllocations, ...ledger.counters }),
+    prepared(value: { allocationAssets: PreviewRenderAllocationInput['assets'] }) {
+      assets = value.allocationAssets;
+    },
+    allocation: {
+      describe() {
+        return resolvePreviewRenderAllocation({
+          scene,
+          dimensions: { canonical: queueSize, backing: queueSize },
+          maximumInFlight: 2,
+          outputKind: outputKind(),
+          sourceTime: queueTimes[0],
+          resultTime: queueTimes[0],
+          // Both caller-owned native frames remain retained throughout the comparison.
+          sourceAllocationBytes: sourceBytes,
+          sourceBacking: queueSize,
+          camera: { retainedBytes: null, activeBytes: null },
+          transitionBytes: null,
+          previousFront: null,
+          assets,
+        });
+      },
+      replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }) {
+        ledger.replaceLimits(limits);
+        budgets.push({ ...limits });
+      },
+    },
+  };
+}
+
+/** Compares one prepared production GPU queue with its own sequential full-image references. */
+export async function probeGpuQueue() {
+  return runGpuQueue();
+}
+
+/** Quality-only proof: full-raster GPU image readback must match compositor capture after paint. */
+export async function probeGpuDirectQueue(capture: () => Promise<ImageData>) {
+  return runGpuQueue(capture);
+}
+
+async function runGpuQueue(capture?: () => Promise<ImageData>) {
+  type Renderer = ReturnType<typeof createReviewPreviewRenderer>;
+  type Completed =
+    | Awaited<ReturnType<Renderer['render']>>
+    | Awaited<ReturnType<Renderer['renderPresentation']>>;
+  const nativeFrames: VideoFrame[] = [],
+    sourceReservations: { release(): void }[] = [],
+    completed = new Set<Completed>(),
+    rasters = new Set<HTMLCanvasElement>();
+  const references: ImageData[] = [],
+    renderFacts: {
+      source: number;
+      result: number;
+      represented: number;
+      gpu: boolean;
+      cameraScale: number;
+      spatial: boolean;
+      direct: boolean;
+    }[] = [];
+  const featureStates: { time: number; lensScale: number; lensX: number; fadeOpacity: number }[] =
+    [];
+  let outputKind: 'canvas2d' | 'gpu-surface' = 'canvas2d';
+  let outputLeases = 0,
+    hiddenBeforePresent = 0,
+    sourceHoldsBeforePresent = 0,
+    publication2DAllocationsBeforeDirect = 0,
+    direct2DPublications = 0,
+    ringSurfaces = 0;
+  const host = capture ? document.createElement('div') : null;
+  if (host) {
+    host.style.cssText =
+      'position:fixed;left:0;top:0;width:840px;height:472px;background:black;z-index:2147483647';
+    document.body.append(host);
+  }
+  let managed: ReturnType<typeof queueLedger> | null = null;
+  let renderer: Renderer | null = null;
+  let prepared: Awaited<ReturnType<Renderer['prepare']>> | null = null;
+  let pending: Promise<Completed>[] = [];
+  let stage = 0,
+    code = 'OK',
+    activeRequests = 0,
+    peakRequests = 0,
+    peakCompleted = 0,
+    borrowedSources = 0,
+    renderFailures = 0,
+    cleanupErrors = 0,
+    closedSources = 0,
+    backgroundReads = 0;
+  const parity: ReturnType<typeof comparePixels>[] = [];
+  const readbackParity: ReturnType<typeof comparePixels>[] = [];
+  let referencesDifferentPixels = 0,
+    distinctOutputs = false,
+    sourcesStillOpen = false;
+  let watermarkBounds = { x: 0, y: 0, width: 0, height: 0 };
+  let beforeDispose: ReturnType<ReturnType<typeof queueLedger>['state']> | null = null;
+  try {
+    stage = 1;
+    for (const [index, at] of queueTimes.entries()) {
+      const surface = canvas(queueSize),
+        context = surface.getContext('2d')!;
+      rasters.add(surface);
+      context.fillStyle = index ? '#a84327' : '#215e57';
+      context.fillRect(0, 0, surface.width, surface.height);
+      for (let x = 0; x < surface.width; x += 17) {
+        context.fillStyle = x % 2 ? '#f5e384' : '#648eca';
+        context.fillRect(x, 0, 7, surface.height);
+      }
+      nativeFrames.push(new VideoFrame(surface, { timestamp: Math.round(at * 1_000_000) }));
+      surface.width = surface.height = 0;
+      rasters.delete(surface);
+    }
+    const background = canvas(queueSize);
+    rasters.add(background);
+    const paint = background.getContext('2d')!;
+    paint.fillStyle = '#184c96';
+    paint.fillRect(0, 0, background.width, background.height);
+    paint.fillStyle = '#f1a634';
+    paint.fillRect(40, 30, 350, 260);
+    const image = await new Promise<Blob>((resolve, reject) =>
+      background.toBlob((blob) =>
+        blob ? resolve(blob) : reject(new Error('Queue image unavailable'))
+      )
+    );
+    background.width = background.height = 0;
+    rasters.delete(background);
+    const scene = queueFixture();
+    for (const at of queueTimes) {
+      const click = evaluateReviewClicks(scene.clicks, at).find((value) => value.lens);
+      featureStates.push({
+        time: at,
+        lensScale: click?.lens?.scale ?? 0,
+        lensX: click?.point.x ?? 0,
+        fadeOpacity: presentationColorOpacity(scene.outerFadePlan!, Math.round(at * 1_000_000)),
+      });
+    }
+    managed = queueLedger(
+      scene,
+      nativeFrames.reduce((sum, frame) => sum + frame.allocationSize(), 0),
+      () => outputKind
+    );
+    renderer = createReviewPreviewRenderer({
+      maximumInFlight: 2,
+      renderer: 'gpu',
+      resources: managed.resources,
+      allocation: managed.allocation,
+      readAsset: async (id) => {
+        if (id !== 'queue-background') return null;
+        backgroundReads++;
+        return image;
+      },
+    });
+    stage = 2;
+    prepared = await renderer.prepare(
+      scene,
+      { canonical: queueSize, backing: queueSize },
+      new AbortController().signal
+    );
+    managed.prepared(prepared);
+    watermarkBounds = prepared.watermarkBounds;
+    for (const frame of nativeFrames)
+      sourceReservations.push(
+        managed.resources.bytes('queue-probe-source', frame.allocationSize())
+      );
+    const frames: Frame[] = nativeFrames.map((native, index) => ({
+      generation: 1,
+      sourceTime: queueTimes[index]!,
+      resultTime: queueTimes[index]!,
+      source: {
+        timestamp: native.timestamp / 1_000_000,
+        backing: queueSize,
+        videoFrame() {
+          borrowedSources++;
+          return native;
+        },
+        draw: (context, x, y, width, height) => context.drawImage(native, x, y, width, height),
+      },
+    }));
+    const acquireOutput: Parameters<Renderer['renderPresentation']>[3] = (bounds, backend) => {
+      if (!host || !managed) throw new Error('Direct output host is unavailable');
+      const lease = managed.ledger.presentationCanvas(bounds, backend);
+      lease.canvas.style.cssText =
+        'position:absolute;left:0;top:0;width:840px;height:472px;opacity:0';
+      host.append(lease.canvas);
+      if (lease.canvas.isConnected && lease.canvas.style.opacity === '0') hiddenBeforePresent++;
+      if (nativeFrames.every((frame) => frame.allocationSize() > 0)) sourceHoldsBeforePresent++;
+      outputLeases++;
+      let released = false;
+      return {
+        ...lease,
+        release() {
+          if (released) return;
+          released = true;
+          outputLeases--;
+          lease.release();
+        },
+      };
+    };
+    const render = (frame: Frame, direct = false) => {
+      activeRequests++;
+      peakRequests = Math.max(peakRequests, activeRequests);
+      const rendering = direct
+        ? renderer!.renderPresentation(
+            prepared!,
+            frame,
+            new AbortController().signal,
+            acquireOutput
+          )
+        : renderer!.render(prepared!, frame);
+      return rendering
+        .then(
+          (value) => {
+            completed.add(value);
+            peakCompleted = Math.max(peakCompleted, completed.size);
+            renderFacts.push({
+              source: value.sourceTime,
+              result: value.resultTime,
+              represented: value.representedMediaTime,
+              gpu: value.renderer.backend === 'gpu',
+              cameraScale: value.geometry?.camera.scale ?? 0,
+              spatial: value.geometry?.camera.spatial !== undefined,
+              direct: value.outputKind === 'gpu-surface',
+            });
+            return value;
+          },
+          (failure: unknown) => {
+            renderFailures++;
+            throw failure;
+          }
+        )
+        .finally(() => activeRequests--);
+    };
+    const show = async (value: Completed) => {
+      if (!host) return;
+      if (value.canvas.parentElement !== host) host.append(value.canvas);
+      value.canvas.style.cssText =
+        'position:absolute;left:0;top:0;width:840px;height:472px;opacity:1';
+      for (const child of host.children)
+        if (child instanceof HTMLCanvasElement && child !== value.canvas) child.style.opacity = '0';
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      );
+    };
+    const pixels = async (value: Completed) => {
+      if (value.canvas.width !== queueSize.width || value.canvas.height !== queueSize.height)
+        throw new Error('Queue output dimensions changed');
+      if (capture) {
+        await show(value);
+        const snapshot = await capture();
+        if (value.outputKind === 'gpu-surface') {
+          const scratch = canvas(queueSize);
+          try {
+            const context = scratch.getContext('2d', { alpha: false });
+            if (!context) throw new Error('GPU image readback context is unavailable');
+            context.fillStyle = '#000';
+            context.fillRect(0, 0, queueSize.width, queueSize.height);
+            context.drawImage(value.canvas, 0, 0);
+            readbackParity.push(
+              comparePixels(context.getImageData(0, 0, queueSize.width, queueSize.height), snapshot)
+            );
+          } finally {
+            scratch.width = scratch.height = 0;
+          }
+        }
+        return snapshot;
+      }
+      if (value.outputKind !== 'canvas2d') throw new Error('Queue bitmap context is unavailable');
+      return value.context.getImageData(0, 0, queueSize.width, queueSize.height);
+    };
+    stage = 3;
+    for (const frame of frames) {
+      pending = [render(frame)];
+      const value = await pending[0]!;
+      references.push(await pixels(value));
+      value.release();
+      completed.delete(value);
+    }
+    referencesDifferentPixels = comparePixels(references[0]!, references[1]!).differentPixels;
+    stage = 4;
+    let front: Completed | null = null;
+    if (capture) {
+      outputKind = 'gpu-surface';
+      publication2DAllocationsBeforeDirect = managed.state().publication2DAllocations;
+      pending = [render(frames[0]!, true)];
+      front = await pending[0]!;
+      await show(front);
+    }
+    pending = frames.map((frame) => render(frame, !!capture));
+    const results = await Promise.all(pending);
+    distinctOutputs = results[0]!.canvas !== results[1]!.canvas;
+    if (front) {
+      ringSurfaces = new Set([front.canvas, ...results.map((value) => value.canvas)]).size;
+      direct2DPublications =
+        managed.state().publication2DAllocations - publication2DAllocationsBeforeDirect;
+    }
+    for (const [index, value] of results.entries())
+      parity.push(comparePixels(await pixels(value), references[index]!));
+    sourcesStillOpen = nativeFrames.every((frame) => frame.allocationSize() > 0);
+  } catch {
+    code = 'E_GPU_QUEUE_PROOF';
+  } finally {
+    await Promise.allSettled(pending);
+    for (const value of completed) {
+      try {
+        value.release();
+      } catch {
+        cleanupErrors++;
+      }
+    }
+    completed.clear();
+    for (const reservation of sourceReservations) {
+      try {
+        reservation.release();
+      } catch {
+        cleanupErrors++;
+      }
+    }
+    for (const frame of nativeFrames) {
+      try {
+        frame.close();
+        closedSources++;
+      } catch {
+        cleanupErrors++;
+      }
+    }
+    for (const raster of rasters) {
+      raster.width = raster.height = 0;
+    }
+    rasters.clear();
+    try {
+      prepared?.release();
+    } catch {
+      cleanupErrors++;
+    }
+    try {
+      renderer?.dispose();
+    } catch {
+      cleanupErrors++;
+    }
+    beforeDispose = managed?.state() ?? null;
+    try {
+      managed?.ledger.dispose();
+    } catch {
+      cleanupErrors++;
+    }
+    host?.remove();
+  }
+  return {
+    code,
+    directProof: !!capture,
+    outputLeases,
+    hiddenBeforePresent,
+    sourceHoldsBeforePresent,
+    direct2DPublications,
+    ringSurfaces,
+    stage,
+    size: queueSize,
+    timestamps: [...queueTimes],
+    renderFacts,
+    parity,
+    readbackParity,
+    featureStates,
+    referencesDifferentPixels,
+    distinctOutputs,
+    peakRequests,
+    peakCompleted,
+    borrowedSources,
+    ownedSourceFrames: nativeFrames.length,
+    closedSources,
+    sourcesStillOpen,
+    referenceImageBytes: references.reduce((sum, image) => sum + image.data.byteLength, 0),
+    backgroundReads,
+    watermarkBounds,
+    renderFailures,
+    cleanupErrors,
+    activeRequests,
+    outstandingCompleted: completed.size,
+    beforeDispose,
+    resources: managed?.state() ?? null,
+    budgets: managed?.budgets ?? [],
+  };
 }

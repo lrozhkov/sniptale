@@ -25,6 +25,7 @@ export interface VideoEditorTypingSpanTarget {
   sourceInstanceId: string;
   signalId: string;
   clipId: string;
+  observedSignal?: import('../recording-events').VideoEditorRecordingSignalObservation;
 }
 
 export interface VideoEditorTypingCompressionRequest extends VideoEditorTypingSpanTarget {

@@ -4,9 +4,12 @@ import { readFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { seedReviewVideo } from '../support/quick-editor-media-fixture';
+import { persistedFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
+
+enableGpuPreviewProof();
 
 type Message = Parameters<typeof translate>[0];
 const variants = [
@@ -469,3 +472,168 @@ for (const variant of variants) {
     }
   });
 }
+
+test.describe('GPU viewport fade coverage', () => {
+  for (const viewport of [
+    { width: 1280, height: 560 },
+    { width: 1920, height: 900 },
+  ])
+    test(`plain and 3D fades cover the complete live canvas ${viewport.width}`, async ({
+      page,
+    }, info) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize(viewport);
+      const host = await startHostServer();
+      const label = (key: Message) => translate(key, 'en');
+      const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
+      const button = (key: Message) =>
+        review.getByRole('button', { name: label(key), exact: true });
+      try {
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
+        });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedReviewVideo(page, 'review-vp8-opus.webm', {
+          width: 160,
+          height: 90,
+          duration: 12,
+        });
+        await page.reload();
+        await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+        await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+        await button('gallery.videoReview.advancedEditing').click();
+        await review
+          .locator('[data-ui="gallery.videoReview.inspector"]')
+          .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+          .click();
+        const fields = review.locator('[data-ui="gallery.videoReview.presentationInspector"]');
+        for (const edge of ['intro', 'outro'] as const) {
+          const fieldLabel =
+            edge === 'intro'
+              ? 'gallery.videoReview.presentationIntro'
+              : 'gallery.videoReview.presentationOutro';
+          const owner = fields.locator(`section[aria-label="${label(fieldLabel)}"]`);
+          await owner
+            .getByRole('button', {
+              name: label(
+                edge === 'intro'
+                  ? 'gallery.videoReview.presentationFadeIn'
+                  : 'gallery.videoReview.presentationFadeOut'
+              ),
+              exact: true,
+            })
+            .click();
+          await expect(fields).toHaveAttribute('aria-busy', 'false');
+          const duration = owner.getByRole('textbox', {
+            name: label('gallery.videoReview.presentationDuration'),
+            exact: true,
+          });
+          await duration.fill('0.6');
+          await duration.press('Enter');
+          await expect(fields).toHaveAttribute('aria-busy', 'false');
+        }
+        const video = review.locator('[data-ui="gallery.videoReview.stage"] video').first();
+        const canvas = review.locator(
+          '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+        );
+        const seek = async (time: number) => {
+          await video.evaluate(async (node: HTMLVideoElement, time) => {
+            node.pause();
+            if (Math.abs(node.currentTime - time) < 1e-6) return;
+            await new Promise<void>((resolve) => {
+              node.addEventListener('seeked', () => resolve(), { once: true });
+              node.currentTime = time;
+            });
+          }, time);
+        };
+        const pixels = () =>
+          canvas.evaluate((node: HTMLCanvasElement) => {
+            const bytes = node.getContext('2d')!.getImageData(0, 0, node.width, node.height).data;
+            let maxRGB = 0,
+              minAlpha = 255;
+            for (let index = 0; index < bytes.length; index += 4) {
+              maxRGB = Math.max(maxRGB, bytes[index]!, bytes[index + 1]!, bytes[index + 2]!);
+              minAlpha = Math.min(minAlpha, bytes[index + 3]!);
+            }
+            return { maxRGB, minAlpha, width: node.width, height: node.height };
+          });
+        const proof = [];
+        for (const pose of ['plain', '3D'] as const) {
+          if (pose === '3D') {
+            await seek(0);
+            await review
+              .locator('[data-review-header-track="zoom"] [data-review-track-select]')
+              .click();
+            const ruler = review.locator('[data-ui="gallery.videoReview.ruler"]');
+            await ruler.scrollIntoViewIfNeeded();
+            const box = (await ruler.boundingBox())!;
+            await page.mouse.move(box.x + 0.1, box.y + 15);
+            await page.mouse.down();
+            await page.mouse.move(box.x + box.width - 0.1, box.y + 15, { steps: 8 });
+            await page.mouse.up();
+            const focus = review.locator(
+              '[data-ui="gallery.videoReview.editingTools"] button:has(svg.lucide-focus)'
+            );
+            await focus.click();
+            await expect(review.locator('[data-zoom-edge="start"]')).toHaveCount(1);
+            await review.locator('[data-ui="gallery.videoReview.loopSummary"] button').click();
+            if ((await focus.getAttribute('aria-pressed')) === 'true') await focus.click();
+            await review
+              .locator('[data-ui="gallery.videoReview.spatialTools"]')
+              .getByRole('button', {
+                name: label('gallery.videoReview.spatialToolTilt'),
+                exact: true,
+              })
+              .click();
+            const exact = async (key: Message, value: string) => {
+              const field = review.getByRole('textbox', { name: label(key), exact: true });
+              await field.fill(value);
+              await field.press('Enter');
+            };
+            await exact('gallery.videoReview.perspectiveX', '25');
+            await exact('gallery.videoReview.perspectiveY', '-30');
+            await expect
+              .poll(async () => (await persistedFocus(page))?.perspective?.rotateY)
+              .toBe(-30);
+            await seek(6);
+            await expect(canvas).toBeVisible();
+            const geometry = await persistedFocus(page);
+            const size = await pixels();
+            await exact('gallery.videoReview.perspectiveX', '35');
+            await expect
+              .poll(async () => (await persistedFocus(page))?.perspective?.rotateX)
+              .toBe(35);
+            await button('gallery.videoReview.undo').click();
+            await expect.poll(() => persistedFocus(page)).toEqual(geometry);
+            await expect
+              .poll(async () => {
+                const value = await pixels();
+                return { width: value.width, height: value.height };
+              })
+              .toEqual({ width: size.width, height: size.height });
+          }
+          for (const edge of ['start', 'end'] as const) {
+            const duration = await video.evaluate((node: HTMLVideoElement) => node.duration);
+            await seek(edge === 'start' ? 0 : duration);
+            await expect(canvas).toBeVisible();
+            await expect.poll(pixels).toMatchObject({ maxRGB: 0, minAlpha: 255 });
+            proof.push({ pose, edge, ...(await pixels()) });
+          }
+          await seek(6);
+          await expect.poll(async () => (await pixels()).maxRGB).toBeGreaterThan(32);
+        }
+        await info.attach('whole-viewport-fade.json', {
+          body: JSON.stringify(proof, null, 2),
+          contentType: 'application/json',
+        });
+        await page.screenshot({
+          path: info.outputPath('viewport-fade-nonfaded3D-edit.png'),
+          fullPage: false,
+        });
+      } finally {
+        await new Promise<void>((resolve) => host.server.close(() => resolve()));
+      }
+    });
+});

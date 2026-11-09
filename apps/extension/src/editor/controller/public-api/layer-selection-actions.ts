@@ -64,18 +64,25 @@ export function reorderEditorControllerLayer(
 export function selectEditorControllerLayer(
   controller: EditorControllerPublicApiAdapter,
   id: string,
-  options: { additive?: boolean; focusViewport?: boolean; range?: boolean; toggle?: boolean } = {}
+  options: {
+    additive?: boolean;
+    focusViewport?: boolean;
+    preserveActiveTool?: boolean;
+    range?: boolean;
+    toggle?: boolean;
+  } = {}
 ): void {
+  const { preserveActiveTool, ...selectionOptions } = options;
   const selected = selectEditorLayerById({
     canvas: controller.canvas,
     id,
     selectionOptions: {
-      ...options,
+      ...selectionOptions,
       anchorId: controller.lastLayerSelectionAnchorId,
     },
     ...createLayerSelectionBindings(controller),
   });
   if (!selected) return;
-  controller.switchToSelectTool();
+  if (!preserveActiveTool) controller.switchToSelectTool();
   controller.setLastLayerSelectionAnchorId(id);
 }

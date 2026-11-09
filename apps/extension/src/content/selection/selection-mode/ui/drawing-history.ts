@@ -2,7 +2,7 @@ import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import {
   createDrawingSession,
   type DrawingDocumentCommit,
-  type DrawingDocumentV1,
+  type DrawingDocument,
 } from '../../../../features/drawing/public';
 
 export interface CropDrawingHistory {
@@ -13,8 +13,8 @@ export interface CropDrawingHistory {
 }
 
 export function createCropDrawingHistory() {
-  const empty: DrawingDocumentV1 = { version: 1, objects: [] };
-  const snapshots = new SnapshotHistory(empty);
+  const empty: DrawingDocument = { version: 1, objects: [] };
+  const snapshots = new SnapshotHistory<DrawingDocument>(empty);
   const listeners = new Set<() => void>();
   let replay: DrawingDocumentCommit['replay'] | null = null;
   let disposed = false;

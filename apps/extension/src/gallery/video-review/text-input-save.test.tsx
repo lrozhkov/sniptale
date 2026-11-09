@@ -9,6 +9,10 @@ import {
   createReviewTextDocument,
 } from '../../features/video/review/text-document';
 import { parseReviewOperation } from '../../features/video/review/validation';
+import {
+  parseVideoWorkspace,
+  parseVideoWorkspaceDraft,
+} from '../../composition/persistence/review-workspaces/parser';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { useReviewText } from './use-review-text';
@@ -25,6 +29,8 @@ let writer: ReturnType<typeof useReviewAdvanced>;
 let editor: ReturnType<typeof useReviewText>;
 
 function setup(autosave = true) {
+  const checkpointRelease = vi.fn(async () => undefined);
+  const checkpointAcquire = vi.fn(async () => ({ release: checkpointRelease }));
   const advanced = createQuickEditAdvancedState();
   const added = addReviewTextFragment(createReviewTextDocument(), {
     id: 'phrase',
@@ -90,10 +96,30 @@ function setup(autosave = true) {
     }
   );
   const session = createVideoReviewSession(stored, {
+    acquireSyncCheckpointEdit: checkpointAcquire,
     commitVideoWorkspace: commit,
     saveVideoWorkspaceTyping: commit,
     readVideoWorkspace: vi.fn(async () => structuredClone(stored)),
-    saveVideoWorkspaceSnapshot: vi.fn(),
+    saveVideoWorkspaceSnapshot: vi.fn(
+      async (
+        args: Parameters<
+          NonNullable<Parameters<typeof createVideoReviewSession>[1]>['saveVideoWorkspaceSnapshot']
+        >[0]
+      ) => {
+        const workspace = parseVideoWorkspace(args.workspace);
+        if (!workspace) throw new Error('Invalid fixture workspace.');
+        const draft =
+          args.draft === null
+            ? null
+            : parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
+        if (args.draft !== null && !draft) throw new Error('Invalid fixture draft.');
+        stored = {
+          workspace: { ...workspace, revision: stored.workspace.revision + 1 },
+          draft,
+        };
+        return structuredClone(stored);
+      }
+    ),
     saveVideoWorkspaceDraft: vi.fn(),
     saveVideoWorkspaceAdvanced: vi.fn(),
     moveVideoWorkspaceHistory: vi.fn(),
@@ -124,7 +150,7 @@ function setup(autosave = true) {
     );
   }
   act(() => root.render(<Harness />));
-  return { session, commit };
+  return { session, commit, checkpointRelease, checkpointAcquire };
 }
 
 it.each(['blur', 'Enter'])('closes the real phrase field group on %s', async (boundary) => {
@@ -263,7 +289,7 @@ it('keeps two sealed edits separate when neither has reached its first capture',
 });
 
 it('max-wait publication preserves the open field group through continuous input', async () => {
-  const { session, commit } = setup();
+  const { session, commit, checkpointRelease } = setup();
   for (let index = 0; index < 12; index++) {
     type(`Continuous ${index}`);
     await act(async () => vi.advanceTimersByTimeAsync(500));
@@ -275,6 +301,9 @@ it('max-wait publication preserves the open field group through continuous input
   expect(session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe(
     'Continuous 11'
   );
+  expect(checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => writer.endTyping());
+  expect(checkpointRelease).toHaveBeenCalledOnce();
 });
 
 it.each([true, false])(
@@ -356,4 +385,136 @@ it('does not drain new typing early when an older automatic write acknowledges',
     text: 'Latest typing',
     showInVideo: false,
   });
+});
+
+it('holds publication admission across actual typing idle acknowledgements until blur', async () => {
+  const f = setup();
+  const field = host.querySelector('textarea')!;
+  act(() => field.focus());
+  type('Intermediate');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(f.commit).toHaveBeenCalledOnce();
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  type('Latest');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(f.commit).toHaveBeenCalledTimes(2);
+  expect(f.checkpointAcquire).toHaveBeenCalledOnce();
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => field.blur());
+  expect(f.checkpointRelease).toHaveBeenCalledOnce();
+});
+
+it('keeps a released phrase action protected through its latest native acknowledgement', async () => {
+  const f = setup();
+  const field = host.querySelector('textarea')!;
+  act(() => field.focus());
+  type('Intermediate');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  const implementation = f.commit.getMockImplementation()!;
+  let acknowledge!: () => void;
+  f.commit.mockImplementationOnce(async (args) => {
+    await new Promise<void>((done) => {
+      acknowledge = done;
+    });
+    return implementation(args);
+  });
+  type('Latest');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  act(() => field.blur());
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => {
+    acknowledge();
+  });
+  expect(f.checkpointRelease).toHaveBeenCalledOnce();
+});
+
+it('retains publication admission after blur when the final typing write fails until retry', async () => {
+  const f = setup();
+  const field = host.querySelector('textarea')!;
+  act(() => field.focus());
+  type('Intermediate');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  f.commit.mockRejectedValueOnce(new Error('Quota'));
+  type('Latest');
+  act(() => field.blur());
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => writer.retry());
+  expect(f.checkpointRelease).toHaveBeenCalledOnce();
+  expect(editor.document.fragments[0]?.text).toBe('Latest');
+});
+
+it('holds the next typing action when an older released action acknowledges', async () => {
+  const f = setup();
+  const field = host.querySelector('textarea')!;
+  act(() => field.focus());
+  const implementation = f.commit.getMockImplementation()!;
+  let acknowledge!: () => void;
+  f.commit.mockImplementationOnce(async (args) => {
+    await new Promise<void>((done) => {
+      acknowledge = done;
+    });
+    return implementation(args);
+  });
+  type('First');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  act(() => field.blur());
+  type('Second');
+  await act(async () => {
+    acknowledge();
+  });
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(f.commit).toHaveBeenCalledTimes(2);
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => writer.endTyping());
+  expect(f.checkpointRelease).toHaveBeenCalledOnce();
+});
+
+it('retains an intermediate native typing save after disabling autosave until explicit Save', async () => {
+  const f = setup();
+  const field = host.querySelector('textarea')!;
+  act(() => field.focus());
+  type('Intermediate');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  act(() => f.session.setAutosaveEnabled(false));
+  type('Latest');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  await act(async () => writer.endTyping());
+  expect(f.commit).toHaveBeenCalledOnce();
+  expect(f.session.getSnapshot().dirty).toBe(true);
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => f.session.saveBuffered());
+  expect(f.session.getSnapshot().dirty).toBe(false);
+  expect(f.checkpointRelease).toHaveBeenCalledOnce();
+});
+
+it('releases a completed local-only typing action without a native intermediate write', async () => {
+  const f = setup(false);
+  type('Only buffered');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(f.commit).not.toHaveBeenCalled();
+  await act(async () => writer.endTyping());
+  expect(f.checkpointRelease).toHaveBeenCalledOnce();
+  expect(f.session.getSnapshot().dirty).toBe(true);
+});
+
+it('keeps actual typing editable after failed admission and reacquires for its latest retry', async () => {
+  const f = setup();
+  f.checkpointAcquire.mockRejectedValueOnce(new Error('Lock unavailable'));
+  type('First');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(f.commit).not.toHaveBeenCalled();
+  expect(f.session.getSnapshot().error).toBe('storage');
+  type('Latest');
+  await act(async () => vi.advanceTimersByTimeAsync(1000));
+  expect(f.commit).toHaveBeenCalledOnce();
+  expect(f.checkpointAcquire).toHaveBeenCalledTimes(2);
+  expect(f.session.getSnapshot().error).toBeNull();
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => writer.endTyping());
+  expect(f.checkpointRelease).not.toHaveBeenCalled();
+  await act(async () => writer.retry());
+  expect(f.session.getSnapshot().document.advancedContent.text?.fragments[0]?.text).toBe('Latest');
+  expect(f.checkpointRelease).toHaveBeenCalledOnce();
 });

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createDefaultSimplifySettings } from '../../../features/simplify/settings';
 
 import {
   ActiveSelection,
@@ -515,4 +516,69 @@ it('replaces staged preview metadata when committing through the document serial
   writeEditorDrawingObject(object, committed);
   expect(readEditorDrawingObject(object)).toEqual(committed);
   expect(JSON.parse(object.sniptaleDrawingJson!)).toEqual({ version: 1, object: committed });
+});
+
+it('scales text font metadata only for coordinated scene layout', () => {
+  const object = createEditorDrawingFabricObject(
+    {
+      kind: 'text',
+      id: 'scene-text',
+      bounds: { x: 10, y: 20, width: 120, height: 34 },
+      fontSize: 24,
+      color: '#000000',
+      backgroundColor: null,
+      text: 'Scene text',
+    },
+    1
+  );
+  object.set({ scaleX: 0.9, scaleY: 0.9, left: 19, top: 38 });
+  const drawing = synchronizeEditorDrawingObjectFromFabric(object, {
+    x: 10,
+    y: 20,
+    scaleX: 0.9,
+    scaleY: 0.9,
+  });
+  expect(drawing).toMatchObject({
+    kind: 'text',
+    fontSize: 21.6,
+    bounds: { x: 19, y: 38, width: 108 },
+  });
+});
+
+it('retains a valid Simplify result when its source and region move together', () => {
+  const object = new Rect({
+    originX: 'left',
+    originY: 'top',
+    left: 20,
+    top: 40,
+    width: 100,
+    height: 50,
+    scaleX: 0.5,
+    scaleY: 0.5,
+    strokeWidth: 0,
+  });
+  stageEditorDrawingObject(object, {
+    kind: 'simplify',
+    id: 'simplify-scene',
+    bounds: { x: 20, y: 40, width: 100, height: 50 },
+    settings: createDefaultSimplifySettings(),
+    source: {
+      dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      width: 100,
+      height: 50,
+      bounds: { x: 10, y: 20, width: 200, height: 100 },
+    },
+    sourceDirty: false,
+  });
+  const drawing = synchronizeEditorDrawingObjectFromFabric(object, {
+    x: 10,
+    y: 20,
+    scaleX: 0.5,
+    scaleY: 0.5,
+  });
+  expect(drawing).toMatchObject({
+    sourceDirty: false,
+    bounds: { x: 20, y: 40, width: 50, height: 25 },
+    source: { bounds: { x: 15, y: 30, width: 100, height: 50 } },
+  });
 });

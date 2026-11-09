@@ -1,7 +1,8 @@
+import { parseNativeHistoryInboundMessage } from './parser-attachments';
 // policyStateIds: [] - native parser routing uses static message type tables only.
 import { fail, ok, type ParseResult } from './parser-shared';
 import { isAppHello } from './parser-platform';
-import { isControllerLease, isPong, isSettingsAccepted } from './parser-status';
+import { isControllerLease, isPong, isSettingsAccepted, isConnectionClosed } from './parser-status';
 import { isCommandAccepted, isOpenSettingsRequest, isTrayActionRequest } from './parser-control';
 import {
   isOperationFailed,
@@ -32,7 +33,17 @@ import type {
   NativeAppInboundMessage,
 } from './types';
 
+const historyMessageTypes = new Set<unknown>([
+  'app.recording.attachment.manifest',
+  'app.recording.attachment.chunk',
+  'app.recording.attachment.available',
+  'app.recording.events.manifest',
+  'app.recording.events.chunk',
+  'app.recording.events.available',
+]);
+
 const statusMessageTypes = new Set([
+  'app.connection.closed',
   'app.hello',
   'app.controller.lease',
   'app.settings.accepted',
@@ -48,6 +59,10 @@ function validateStatusMessageByType(
   value: Record<string, unknown>
 ): ParseResult<NativeAppInboundMessage> {
   switch (value['type']) {
+    case 'app.connection.closed':
+      return isConnectionClosed(value)
+        ? ok(value)
+        : fail('malformed-message', 'Invalid app.connection.closed');
     case 'app.hello':
       return isAppHello(value)
         ? ok(value as unknown as AppHelloMessage)
@@ -135,6 +150,7 @@ export function validateMessageByType(
   value: Record<string, unknown>
 ): ParseResult<NativeAppInboundMessage> {
   const type = value['type'];
+  if (historyMessageTypes.has(type)) return parseNativeHistoryInboundMessage(value);
   if (statusMessageTypes.has(type as string)) {
     return validateStatusMessageByType(value);
   }

@@ -117,7 +117,12 @@ function tick(milliseconds = 16) {
   frames.clear();
   pending.forEach((callback) => callback(now));
 }
-function setup(frameCallbacks = true, frameDuration = 1 / 30) {
+type PlaybackOptions = Parameters<typeof createReviewWebcamPlayback>[0];
+function setup(
+  frameCallbacks = true,
+  frameDuration = 1 / 30,
+  evidence: Pick<PlaybackOptions, 'registerAlignment' | 'onFrame'> = {}
+) {
   const main = media();
   const camera = media(frameCallbacks);
   const settings = createQuickEditWebcam(
@@ -135,10 +140,77 @@ function setup(frameCallbacks = true, frameDuration = 1 / 30) {
     settings: () => settings,
     paint,
     failed,
+    ...evidence,
   });
   cleanups.push(stop);
   return { main, camera, settings, paint, failed, stop };
 }
+
+it('aligns a rounded packet physically without changing the logical main clock', () => {
+  const registration = vi.fn<NonNullable<PlaybackOptions['registerAlignment']>>();
+  const f = setup(true, 1 / 60, { registerAlignment: registration });
+  f.main.state.time = 0.1;
+  f.camera.state.time = 0.1;
+  f.camera.decode(0.1);
+  registration.mock.lastCall![0]!({ time: 0.1, seekTime: 0.100001, offsetSeconds: 0 });
+  tick();
+  expect(f.camera.seeks).toEqual([0.100001]);
+  expect(f.main.state.time).toBe(0.1);
+  f.camera.decode(0.100001);
+  f.camera.seeked();
+  tick();
+  tick();
+  expect(f.camera.seeks).toEqual([0.100001]);
+});
+
+it('wakes a packet-verified VFR hold without requiring legacy tolerance readiness or seeking again', () => {
+  const registration = vi.fn<NonNullable<PlaybackOptions['registerAlignment']>>();
+  const evidence = vi.fn();
+  const f = setup(true, 1 / 60, { registerAlignment: registration, onFrame: evidence });
+  f.main.state.time = 1.02;
+  registration.mock.lastCall![0]!({ time: 1.02, seekTime: 1.02, offsetSeconds: 0 });
+  tick();
+  f.camera.decode(0.9);
+  f.camera.seeked();
+  tick();
+  tick();
+  expect(f.camera.seeks).toEqual([1.02]);
+  expect(f.paint).toHaveBeenLastCalledWith(null);
+  expect(evidence).toHaveBeenCalledTimes(2);
+});
+
+it('keeps an active alignment and then admits only the latest pending mapped request', () => {
+  const registration = vi.fn<NonNullable<PlaybackOptions['registerAlignment']>>();
+  const f = setup(true, 1 / 60, { registerAlignment: registration });
+  f.main.state.time = 1;
+  tick();
+  const align = registration.mock.lastCall![0]!;
+  f.main.state.time = 1.2;
+  align({ time: 1.2, seekTime: 1.2, offsetSeconds: 0 });
+  tick();
+  f.main.state.time = 1.4;
+  align({ time: 1.4, seekTime: 1.400001, offsetSeconds: 0 });
+  tick();
+  expect(f.camera.seeks).toEqual([1]);
+  f.camera.decode(1);
+  f.camera.seeked();
+  tick();
+  expect(f.camera.seeks).toEqual([1, 1.400001]);
+});
+
+it.each(['seek', 'offset'] as const)(
+  'discards a queued alignment after source %s changes',
+  (kind) => {
+    const registration = vi.fn<NonNullable<PlaybackOptions['registerAlignment']>>();
+    const f = setup(true, 1 / 60, { registerAlignment: registration });
+    registration.mock.lastCall![0]!({ time: 1, seekTime: 1.000001, offsetSeconds: 0 });
+    f.main.state.time = 2;
+    if (kind === 'seek') f.main.node.dispatchEvent(new Event('seeking'));
+    else f.settings.offsetSeconds = 0.5;
+    tick();
+    expect(f.camera.seeks).toEqual([kind === 'seek' ? 2 : 1.5]);
+  }
+);
 
 it.each([10, Infinity])(
   'uses inspected duration at offset coverage boundaries with native duration %s',

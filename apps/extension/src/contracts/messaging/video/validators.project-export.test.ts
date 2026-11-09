@@ -134,3 +134,20 @@ it('admits a selected timeline range only with both valid bounds', () => {
     isVideoProjectExportSettings({ ...settings, rangeStartSeconds: 1, rangeEndSeconds: 3 })
   ).toBe(true);
 });
+
+it.each([undefined, 'off', 'bicubic-sharpen', 'clark-x2'])(
+  'accepts detail mode %s through the IPC settings guard',
+  (detailEnhancement) => {
+    expect(isVideoProjectExportSettings({ ...createExportSettings(), detailEnhancement })).toBe(
+      true
+    );
+  }
+);
+it.each([null, 0, {}, 'unknown'])(
+  'rejects invalid detail mode %s through the IPC settings guard',
+  (detailEnhancement) => {
+    expect(isVideoProjectExportSettings({ ...createExportSettings(), detailEnhancement })).toBe(
+      false
+    );
+  }
+);

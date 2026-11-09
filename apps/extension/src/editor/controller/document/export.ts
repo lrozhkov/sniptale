@@ -52,6 +52,9 @@ export function buildEditorCanvasDocument(options: {
     sourceDisplayHeight: options.source.displayHeight,
     frame: normalizeEditorFrameSettings(options.frame),
     browserFrame,
+    ...(options.source.compositionBase
+      ? { compositionBase: { ...options.source.compositionBase } }
+      : {}),
     canvasJson: serializeCanvasObjects(options.canvas),
     richShapes: collectRichShapeDocumentObjects(options.canvas),
   };

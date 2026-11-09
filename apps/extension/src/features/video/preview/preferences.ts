@@ -1,3 +1,12 @@
+export const VIDEO_PREVIEW_RENDERERS = ['gpu', 'legacy'] as const;
+export type VideoPreviewRenderer = (typeof VIDEO_PREVIEW_RENDERERS)[number];
+
+/** Observed completed preview output; absence of GPU does not identify a browser setting. */
+export interface PreviewRendererStatus {
+  backend: VideoPreviewRenderer;
+  fallback?: 'unavailable' | 'device-failed';
+}
+
 export const VIDEO_EDITOR_PREVIEW_MODES = ['live', 'cache'] as const;
 export const VIDEO_EDITOR_PREVIEW_RASTER_PRESETS = [
   '360p',

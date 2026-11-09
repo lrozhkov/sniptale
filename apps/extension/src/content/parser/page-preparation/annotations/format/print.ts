@@ -158,7 +158,7 @@ function renderReportRecord(
   section.dataset['annotationId'] = String(record.annotationId);
   const heading = node('h2');
   heading.append(
-    node('span', `${index + 1}.`, 'item-number'),
+    node('span', `${record.markerNumber ?? index + 1}.`, 'item-number'),
     node('span', record.evidence.targetText.slice(0, 100) || record.evidence.targetSelector)
   );
   section.append(heading);
@@ -227,10 +227,35 @@ export function renderReviewPrintReport(
   doc.head.replaceChildren(style);
   doc.title = title;
   const content = node('main');
-  snapshot.domRecords.forEach((record, index) =>
-    content.append(renderReportRecord(node, record, index, options))
-  );
-  snapshot.frameOrders.forEach((frame) => content.append(renderReportFrame(node, frame)));
+  const pages = new Set([
+    ...snapshot.domRecords.map((record) => record.evidence.pageUrl),
+    ...snapshot.frameOrders.map((frame) => frame.pageUrl),
+  ]);
+  if (pages.size > 1) {
+    let itemIndex = 0;
+    for (const pageUrl of pages) {
+      const page = node('section', '', 'page-group');
+      page.dataset['pageUrl'] = pageUrl;
+      const source = snapshot.domRecords.find((record) => record.evidence.pageUrl === pageUrl);
+      page.append(
+        node('h2', source?.evidence.fileLabel || pageUrl),
+        node('p', pageUrl, 'metadata')
+      );
+      snapshot.domRecords.forEach((record) => {
+        if (record.evidence.pageUrl === pageUrl)
+          page.append(renderReportRecord(node, record, itemIndex++, options));
+      });
+      snapshot.frameOrders.forEach((frame) => {
+        if (frame.pageUrl === pageUrl) page.append(renderReportFrame(node, frame));
+      });
+      content.append(page);
+    }
+  } else {
+    snapshot.domRecords.forEach((record, index) =>
+      content.append(renderReportRecord(node, record, index, options))
+    );
+    snapshot.frameOrders.forEach((frame) => content.append(renderReportFrame(node, frame)));
+  }
   if (!snapshot.domRecords.length && !snapshot.frameOrders.length)
     content.append(node('p', translate('content.designReview.reportEmpty')));
   doc.body.replaceChildren(

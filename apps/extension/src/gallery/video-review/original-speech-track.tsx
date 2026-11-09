@@ -1,7 +1,12 @@
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
-import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
+import {
+  reviewTrackMetrics,
+  ReviewTrackRow,
+  ReviewTrackCuts,
+  ReviewTrackVisibilityButton,
+} from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
-import { Captions, List, Plus } from 'lucide-react';
+import { Captions, ClosedCaption } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { ReviewTextFragment } from '../../features/video/review/text-document';
 import { packReviewTextRows } from '../../features/video/review/text-projection';
@@ -10,11 +15,10 @@ import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions'
 import { useReviewDragEscape } from './timeline-drag';
 import { translate } from '../../platform/i18n';
 import {
-  ReviewButton,
   reviewTimeLabel,
   reviewTimelineItemTone,
   reviewTimelineResizeHandleClassName,
-  reviewTextButtonClassName,
+  reviewTrackStatusButtonClassName,
 } from './controls';
 
 /** Independent text shares track rows, source-axis gestures and the existing inspector. */
@@ -25,7 +29,7 @@ type TextTrackProps = {
   compact?: boolean | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   onSelect(id: string): void;
-  onOpenDocument(): void;
+  onToggleCaptions?: (() => void) | undefined;
 };
 
 export function ReviewTextTrack(props: TextTrackProps) {
@@ -49,24 +53,18 @@ export function ReviewTextTrack(props: TextTrackProps) {
       label={translate('gallery.videoReview.textTrack')}
       icon={<Captions size={14} aria-hidden />}
       controls={
-        <>
-          <ReviewButton
-            label={translate('gallery.videoReview.textTrackOpen')}
-            className={`${reviewTextButtonClassName} !w-7 !min-h-7 !h-7 !px-0`}
-            disabled={props.busy}
-            onClick={props.onOpenDocument}
-          >
-            <List size={14} />
-          </ReviewButton>
-          <ReviewButton
-            label={translate('gallery.videoReview.textFragmentAdd')}
-            className={`${reviewTextButtonClassName} !w-7 !min-h-7 !h-7 !px-0`}
-            disabled={props.busy || props.editor.projection.resultDuration <= 0}
-            onClick={() => props.editor.add()}
-          >
-            <Plus size={14} />
-          </ReviewButton>
-        </>
+        <ReviewTrackVisibilityButton
+          track="text"
+          label={translate('gallery.videoReview.captionsEnabled')}
+          aria-pressed={props.editor.captions.enabled}
+          className={`${reviewTrackStatusButtonClassName} !w-7 !min-h-7 !h-7 !px-0`}
+          disabled={props.busy || !props.onToggleCaptions}
+          onClick={() =>
+            (props.beforeAction ?? ((action) => action()))(() => props.onToggleCaptions?.())
+          }
+        >
+          <ClosedCaption size={14} aria-hidden />
+        </ReviewTrackVisibilityButton>
       }
     >
       <div
@@ -222,6 +220,7 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
           ? Math.min(limit, Math.max(base.start + 0.01, base.end + delta))
           : base.end;
     const next = { ...base, start, end };
+    delete next.sourceAnchor;
     previewRef.current = next;
     setPreview(next);
   };

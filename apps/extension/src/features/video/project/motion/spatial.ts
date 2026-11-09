@@ -21,6 +21,45 @@ export function resolveCameraWindowWeight(
   return behavior === 'content' || !spatial ? 'content' : 'spatial';
 }
 
+/** Explicit cursor composition; omission preserves previously authored camera behavior. */
+export interface CursorCompositionSettings {
+  mode: 'off' | 'orbit' | 'left' | 'right';
+  amount: number;
+  smoothness: number;
+}
+
+/** Cursor composition keeps one focal strength across renderer and interval proof. */
+export const CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH = 1;
+
+export const DEFAULT_CURSOR_COMPOSITION: CursorCompositionSettings = {
+  mode: 'orbit',
+  amount: 0.5,
+  smoothness: 0.6,
+};
+
+/** Admit complete settings at workspace, history, and import boundaries. */
+export function parseCursorCompositionSettings(
+  value: unknown
+): CursorCompositionSettings | null | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    (value['mode'] !== 'off' &&
+      value['mode'] !== 'orbit' &&
+      value['mode'] !== 'left' &&
+      value['mode'] !== 'right') ||
+    !bounded(value['amount'], 0, 1) ||
+    !bounded(value['smoothness'], 0, 1)
+  )
+    return null;
+  return { mode: value['mode'], amount: value['amount'], smoothness: value['smoothness'] };
+}
+
+/** Determine disposable spatial admission without changing saved manual angles. */
+export function hasCursorComposition(value: CursorCompositionSettings | undefined): boolean {
+  return value !== undefined && value.mode !== 'off' && value.amount > 0;
+}
+
 export interface CameraPerspective {
   enabled: boolean;
   rotateX: number;
@@ -59,6 +98,7 @@ export interface CameraSpatialRect {
 
 /** Authored settings only; clocks and scene coordinates belong to each editor. */
 export interface CameraSpatialSettings {
+  cursorComposition?: CursorCompositionSettings;
   perspective?: CameraPerspective;
   depthOfField?: CameraDepthOfField;
 }
@@ -136,6 +176,34 @@ export function parseCameraDepth(value: unknown): CameraDepthOfField | null | un
   };
 }
 
+/** Add disposable cursor angles to authored angles without changing the saved settings. */
+export function cameraPerspectiveWithCursor(
+  settings: CameraSpatialSettings,
+  offset: { x: number; y: number }
+): CameraSpatialSettings {
+  if (!settings.cursorComposition) return settings;
+  const { perspective: _manualPerspective, depthOfField: _manualDepth, ...retained } = settings;
+  if (!hasCursorComposition(settings.cursorComposition)) return retained;
+  return {
+    ...retained,
+    perspective: {
+      ...DEFAULT_CAMERA_PERSPECTIVE,
+      enabled: true,
+      rotateX: offset.x,
+      rotateY: offset.y,
+      rotateZ:
+        ((settings.cursorComposition.mode === 'left'
+          ? -2
+          : settings.cursorComposition.mode === 'right'
+            ? 2
+            : 0) *
+          settings.cursorComposition.amount) /
+        0.5,
+      strength: CURSOR_COMPOSITION_PERSPECTIVE_STRENGTH,
+    },
+  };
+}
+
 function rotation(value: CameraPerspective | undefined): SpatialQuaternion {
   if (!value?.enabled) return identityRotation;
   const [x, y, z] = [value.rotateX, value.rotateY, value.rotateZ].map((v) => (v * Math.PI) / 360);
@@ -172,15 +240,23 @@ function interpolateRotation(
   });
 }
 
+function activeSpatialPerspective(settings: CameraSpatialSettings | null, cursor = false) {
+  const perspective = settings?.perspective;
+  if (cursor && perspective?.enabled) return perspective;
+  return hasCameraPerspective(perspective) ? perspective : undefined;
+}
+
 /** Absolute targets blend once; a disabled endpoint contributes identity and zero blur. */
 export function interpolateCameraSpatial(
   from: CameraSpatialSettings | null,
   to: CameraSpatialSettings,
-  progress: number
+  progress: number,
+  cursor?: { from: boolean; to: boolean; progress?: number }
 ): CameraSpatialFrame {
-  const a = hasCameraPerspective(from?.perspective) ? from.perspective : undefined,
-    b = hasCameraPerspective(to.perspective) ? to.perspective : undefined;
+  const a = activeSpatialPerspective(from, cursor?.from);
+  const b = activeSpatialPerspective(to, cursor?.to);
   const t = Math.max(0, Math.min(1, progress));
+  const spatialT = cursor?.progress === undefined ? t : Math.max(0, Math.min(1, cursor.progress));
   const start = a?.enabled ? a.strength : 0;
   const end = b?.enabled ? b.strength : 0;
   const focus: { settings: CameraDepthOfField; weight: number }[] = [];
@@ -208,9 +284,9 @@ export function interpolateCameraSpatial(
     });
   }
   return {
-    rotation: interpolateRotation(a, b, t),
-    perspective: start + (end - start) * t,
-    windowMotion: (a?.enabled ? 1 - t : 0) + (b?.enabled ? t : 0),
+    rotation: interpolateRotation(a, b, spatialT),
+    perspective: start + (end - start) * spatialT,
+    windowMotion: (a?.enabled ? 1 - spatialT : 0) + (b?.enabled ? spatialT : 0),
     lockBackground: !!(a?.enabled || b?.enabled),
     focus,
   };
@@ -220,7 +296,24 @@ export function interpolateCameraSpatial(
 export interface MotionSpatialSettings extends CameraSpatialSettings {
   spatialReference?: CameraSpatialRect;
 }
+/** Normalize the authored spatial subset without introducing defaults into legacy regions. */
+export function normalizeMotionSpatialSettings(
+  settings: MotionSpatialSettings
+): MotionSpatialSettings {
+  const cursorComposition = parseCursorCompositionSettings(settings.cursorComposition);
+  const perspective = parseCameraPerspective(settings.perspective);
+  const depthOfField = parseCameraDepth(settings.depthOfField);
+  const spatialReference = parseMotionSpatialReference(settings.spatialReference);
+  return {
+    ...(cursorComposition ? { cursorComposition } : {}),
+    ...(perspective ? { perspective } : {}),
+    ...(depthOfField ? { depthOfField } : {}),
+    ...(spatialReference ? { spatialReference } : {}),
+  };
+}
+
 export type MotionSpatialEdit =
+  | ({ kind: 'cursor-composition' } & Partial<CursorCompositionSettings>)
   | ({ kind: 'perspective' } & Partial<CameraPerspective>)
   | ({ kind: 'depth' } & Partial<CameraDepthOfField>)
   | ({ kind: 'reference'; reset?: boolean } & Partial<CameraSpatialRect>);
@@ -250,6 +343,22 @@ export function editMotionSpatialSettings(
 ): MotionSpatialSettings | null {
   if (!isRecord(edit)) return null;
   const { kind, reset, ...fields } = edit;
+  if (kind === 'cursor-composition') {
+    if (reset !== undefined) return null;
+    const next = parseCursorCompositionSettings({
+      ...DEFAULT_CURSOR_COMPOSITION,
+      ...settings.cursorComposition,
+      ...fields,
+    });
+    if (!next) return null;
+    const previous = settings.cursorComposition;
+    return previous &&
+      previous.mode === next.mode &&
+      previous.amount === next.amount &&
+      previous.smoothness === next.smoothness
+      ? settings
+      : { ...settings, cursorComposition: next };
+  }
   if (kind === 'perspective') {
     const keys = ['enabled', 'rotateX', 'rotateY', 'rotateZ', 'strength'] as const;
     if (reset !== undefined || !keys.some((key) => key in fields)) return null;

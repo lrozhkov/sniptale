@@ -83,7 +83,7 @@ function createFrame() {
 
 function createBrowserFrame() {
   return {
-    canvasMode: 'resize-canvas',
+    canvasMode: 'resize',
     contentMode: 'push-down',
     enabled: false,
     title: '',
@@ -97,19 +97,21 @@ beforeEach(() => {
   mocks.resolveEditorSceneLayoutMock.mockReturnValue({
     canvas: { height: 260, width: 420 },
     source: { height: 100, left: 40, top: 60, width: 200 },
+    content: { height: 100, left: 40, top: 60, width: 200 },
+    header: { left: 40, top: 50, width: 200, height: 10 },
   });
 });
 
 function expectBrowserHeaderOffsetShift(browserHeader: ReturnType<typeof createBrowserHeader>) {
   expect(browserHeader.set).toHaveBeenCalledWith(
     expect.objectContaining({
-      left: 48,
-      top: 52,
+      left: 40,
+      top: 50,
     })
   );
 }
 
-it('keeps manual browser-header offsets while resetting width on source-size changes', () => {
+it('attaches the browser header to the resolved source after an explicit source resize', () => {
   const browserHeader = createBrowserHeader();
 
   relayoutEditorScene(
@@ -129,7 +131,7 @@ it('keeps manual browser-header offsets while resetting width on source-size cha
   );
 });
 
-it('keeps the existing browser-header scale when only the source position changes', () => {
+it('keeps header geometry attached to the background-composed source', () => {
   const browserHeader = createBrowserHeader();
 
   relayoutEditorScene(
@@ -140,12 +142,8 @@ it('keeps the existing browser-header scale when only the source position change
     createBrowserFrame() as never
   );
 
-  expectBrowserHeaderOffsetShift(browserHeader);
   expect(browserHeader.set).toHaveBeenCalledWith(
-    expect.objectContaining({
-      scaleX: 1,
-      scaleY: 1,
-    })
+    expect.objectContaining({ left: 40, top: 60, scaleX: 200 / 160, scaleY: expect.any(Number) })
   );
 });
 

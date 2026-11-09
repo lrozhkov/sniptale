@@ -345,3 +345,99 @@ it('refuses an illegal boundary without clamping it or lowering its shared scale
   });
   expect(plan).toMatchObject({ status: 'conflict', reason: 'pose', time: 0 });
 });
+
+it('continuously centers a slow cursor sweep even when the complete sweep fits one working zone', () => {
+  const frames = Array.from({ length: 101 }, (_, index) => ({
+    time: index / 10,
+    x: 0.4 + index / 1000,
+    y: 0.5,
+    segmentId: 'work',
+  }));
+  const plan = planWorkingZoneCamera({
+    frames,
+    start: 0,
+    end: 10,
+    targetScale: 2,
+    policy,
+    geometry,
+    tracking: 'continuous',
+  });
+  expect(plan.status).toBe('ready');
+  expect(
+    evaluateWorkingZoneCamera(plan, 8).x - evaluateWorkingZoneCamera(plan, 2).x
+  ).toBeGreaterThan(80);
+  for (const time of [2, 4, 6, 8]) {
+    const desired = geometry.preferredPan(
+      { x: 0.4 + time / 100, y: 0.5, time, segmentId: 'work' },
+      2
+    );
+    expect(Math.abs(evaluateWorkingZoneCamera(plan, time).x - desired.x)).toBeLessThan(10);
+  }
+});
+
+it('continuous following preserves refusal and permitted expansion for an impossible pointer jump', () => {
+  const frames = [
+    { time: 0, x: 0.1, y: 0.5, actual: { x: 0, y: 0.5 }, segmentId: 'one' },
+    { time: 0.01, x: 0.9, y: 0.5, actual: { x: 1, y: 0.5 }, segmentId: 'one' },
+  ];
+  const input = {
+    frames,
+    start: 0,
+    end: 0.01,
+    targetScale: 4,
+    geometry,
+    tracking: 'continuous' as const,
+  };
+  expect(
+    planWorkingZoneCamera({
+      ...input,
+      policy: { ...policy, settings: { ...policy.settings, allowExpansion: false } },
+    }).status
+  ).toBe('conflict');
+  expect(planWorkingZoneCamera({ ...input, policy })).toMatchObject({
+    status: 'ready',
+    targetScale: 1,
+  });
+});
+
+it('continuous tracking preserves imposed boundary position and its first two derivatives', () => {
+  const incoming = {
+    pan: { x: 300, y: 300 },
+    velocity: { x: 5, y: 0 },
+    acceleration: { x: 2, y: 0 },
+  };
+  const outgoing = {
+    pan: { x: 600, y: 300 },
+    velocity: { x: 5, y: 0 },
+    acceleration: { x: -2, y: 0 },
+  };
+  const plan = planWorkingZoneCamera({
+    frames: [0, 5, 10].map((time) => ({ time, x: 0.4 + time / 100, y: 0.5, segmentId: 'one' })),
+    start: 0,
+    end: 10,
+    targetScale: 2,
+    policy,
+    geometry,
+    incoming,
+    outgoing,
+    tracking: 'continuous',
+  });
+  expect(plan.status).toBe('ready');
+  if (plan.status !== 'ready') return;
+  for (const [span, time, boundary] of [
+    [plan.spans[0]!, 0, incoming],
+    [plan.spans.at(-1)!, 10, outgoing],
+  ] as const) {
+    expect(span.kind).toBe('transition');
+    if (span.kind !== 'transition') continue;
+    expect(evaluateWorkingZoneCamera(plan, time).x).toBeCloseTo(boundary.pan.x, 8);
+    expect(evaluateCameraTrajectoryDerivative(span.trajectory, time, 1).x).toBeCloseTo(
+      boundary.velocity.x,
+      8
+    );
+    expect(evaluateCameraTrajectoryDerivative(span.trajectory, time, 2).x).toBeCloseTo(
+      boundary.acceleration.x,
+      8
+    );
+  }
+});

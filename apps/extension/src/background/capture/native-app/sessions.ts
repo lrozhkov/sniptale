@@ -78,6 +78,8 @@ export function createRecordingSession(
         : {}),
       sourceMode: started?.metadata.sourceMode ?? 'screen',
       telemetry: message.telemetry,
+      ...(message.cursorTrajectory ? { cursorTrajectory: message.cursorTrajectory } : {}),
+      ...(message.recordingEvents ? { recordingEvents: message.recordingEvents } : {}),
       ...(started?.metadata.timebase ? { timebase: started.metadata.timebase } : {}),
       width: message.width,
     },
@@ -136,7 +138,7 @@ export function createRecordingCompleteSession(
     receivedBytes: 0,
     receivedChunkIndexes: [],
     sha256: session.sha256,
-    totalBytes: 0,
+    totalBytes: session.totalBytes,
     updatedAt: now,
   };
 }

@@ -130,3 +130,12 @@ it('reports an incomplete history after a successful native detach', async () =>
   expect(io.detach).toHaveBeenCalledExactlyOnceWith(plan.authorization);
   expect(io.reading).toBe(false);
 });
+
+it('retains broad all-retained preparation for local-only including draft and Trash roots', async () => {
+  const retained = [...roots, { rootKind: 'scenario-project', rootId: 'temporary-draft' }];
+  io.roots.mockResolvedValueOnce(retained);
+  await switchLibraryToLocalOnly(plan);
+  expect(io.prepare).toHaveBeenCalledExactlyOnceWith(plan, undefined);
+  expect(io.native.mock.calls.map(([root]) => root)).toEqual(retained);
+  expect(io.detach).toHaveBeenCalledExactlyOnceWith(plan.authorization);
+});

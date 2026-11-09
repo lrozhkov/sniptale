@@ -11,6 +11,57 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+it('paints animated backgrounds at programme time and cancels the playback callback on unmount', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let callback: FrameRequestCallback | undefined;
+  const cancel = vi.fn();
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn((next: FrameRequestCallback) => {
+      callback = next;
+      return 7;
+    })
+  );
+  vi.stubGlobal('cancelAnimationFrame', cancel);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    {} as CanvasRenderingContext2D
+  );
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  let programmeTime = 3;
+  await act(async () =>
+    root.render(
+      <ReviewBackgroundBlurPreview
+        background={{
+          enabled: true,
+          type: 'image',
+          assetId: 'a',
+          imageFit: 'cover',
+          layout: { padding: 40, cornerRadius: 12 },
+          motion: { mode: 'waves', speed: 50, intensity: 75 },
+        }}
+        imageUrl={undefined}
+        width={1280}
+        height={720}
+        playing
+        getCurrentTime={() => programmeTime}
+      />
+    )
+  );
+  expect(drawReviewBackgroundPaint).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({ currentTime: 3 })
+  );
+  programmeTime = 9;
+  await act(async () => callback?.(999999));
+  expect(drawReviewBackgroundPaint).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({ currentTime: 9 })
+  );
+  await act(async () => root.unmount());
+  expect(cancel).toHaveBeenCalledWith(7);
+});
 it('retains the decoded image during blur edits and cancels old URL loads', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const images: HTMLImageElement[] = [];

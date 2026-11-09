@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewZoomEditor, useReviewZoomPreview, withReviewFocusType } from './zoom-editor';
+import { useSpatialGesture } from './spatial-gesture';
 import type {
   QuickEditZoomRegion,
   QuickEditZoomState,
@@ -69,6 +70,56 @@ it('shares a disposable framing draft without writing history and rejects stale 
   act(() => editor.change('a', { centerX: 0.8 }));
   expect(setZoom).toHaveBeenCalledOnce();
   expect(apply(setZoom, zoom).regions[0]!.transform.centerX).toBe(0.8);
+});
+
+it('marks the real zoom preview draft before a spatial interaction can seek without changing history', () => {
+  const authored = region('a', 0, 2);
+  const zoom = { enabled: true, regions: [authored] };
+  const setZoom = vi.fn();
+  const admittedAtSeek: boolean[] = [];
+  function Harness() {
+    const editor = useReviewZoomEditor({ setZoom, zoom, timelineDuration: 10, selection: 'a' });
+    const preview = useReviewZoomPreview(editor);
+    const bounds = useRef<HTMLButtonElement>(null);
+    const gesture = useSpatialGesture({
+      region: authored,
+      revision: editor.revision(authored),
+      tool: 'tilt',
+      axis: 'both',
+      enabled: true,
+      bounds,
+      geometry: null,
+      output: { width: 200, height: 100 },
+      onPreview: (patch) => editor.preview('a', patch),
+      onCommit: (revision, patch) => editor.changeAtRevision('a', revision, patch),
+      onInteract: () => admittedAtSeek.push(editor.previewChanges.read() !== null),
+    });
+    return <button ref={bounds} {...gesture.bind('tilt')} data-previewing={preview.previewing} />;
+  }
+  act(() => root.render(<Harness />));
+  const button = host.querySelector('button')!;
+  vi.spyOn(button, 'getBoundingClientRect').mockReturnValue({
+    left: 0,
+    top: 0,
+    width: 200,
+    height: 100,
+  } as DOMRect);
+  button.setPointerCapture = vi.fn();
+  button.hasPointerCapture = () => false;
+  const pointer = (type: string) => {
+    const event = new MouseEvent(type, { bubbles: true, button: 0, clientX: 100, clientY: 50 });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    act(() => button.dispatchEvent(event));
+  };
+  pointer('pointerdown');
+  expect(admittedAtSeek).toEqual([true]);
+  expect(button.dataset['previewing']).toBe('true');
+  expect(zoom.regions[0]).toBe(authored);
+  expect(authored.perspective).toBeUndefined();
+  expect(setZoom).not.toHaveBeenCalled();
+  pointer('pointerup');
+  expect(button.dataset['previewing']).toBe('false');
+  expect(setZoom).not.toHaveBeenCalled();
 });
 
 it('admits a spatial commit against latest state rather than the render that queued it', () => {

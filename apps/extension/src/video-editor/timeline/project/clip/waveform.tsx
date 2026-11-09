@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import type { AudioClipWaveformProps } from '../types';
 import { buildAudioClipWaveformPath } from '../canvas/render-data';
 
@@ -99,6 +100,10 @@ export function AudioClipWaveform({
   muted,
 }: AudioClipWaveformProps) {
   const envelopePath = buildEnvelopePath(envelopeStart, envelopeEnd);
+  const waveformPath = useMemo(
+    () => (peaks.length ? buildAudioClipWaveformPath(peaks) : ''),
+    [peaks]
+  );
   if (peaks.length === 0) {
     return (
       <EmptyAudioClipWaveform
@@ -108,8 +113,6 @@ export function AudioClipWaveform({
       />
     );
   }
-
-  const waveformPath = buildAudioClipWaveformPath(peaks);
 
   return (
     <div className="relative h-full w-full">

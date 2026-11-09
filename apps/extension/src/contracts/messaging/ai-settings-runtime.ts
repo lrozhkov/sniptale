@@ -56,6 +56,7 @@ export type AISecretProtectionStatusPayload = {
   isEnabled: boolean;
   isUnlocked: boolean;
   mode: 'transparent' | 'passphrase';
+  participants?: { ai: boolean; webdav: boolean } | undefined;
 };
 
 export type AISettingsPageRuntimeDataPayload = {
@@ -171,8 +172,12 @@ export type AiSettingsMutationMessage =
       | 'reset-voice-input-correction-prompt'
     >
   | (AiSettingsMutationBase<'save-chrome-ai-enabled'> & { enabled: boolean })
-  | (AiSettingsMutationBase<'enable-secret-passphrase-protection'> & { passphrase: string })
+  | (AiSettingsMutationBase<'enable-secret-passphrase-protection'> & {
+      passphrase?: string | undefined;
+      participant?: 'ai' | 'webdav' | undefined;
+    })
   | (AiSettingsMutationBase<'disable-secret-passphrase-protection'> & {
+      participant?: 'ai' | 'webdav' | undefined;
       passphrase?: string | undefined;
     })
   | (AiSettingsMutationBase<'unlock-secret-passphrase-protection'> & { passphrase: string })

@@ -1,0 +1,90 @@
+import { rejectPlanarMedia } from './planar-surfaces.mjs';
+import {
+  detectSurfaces,
+  alignMediaSurfaceRows,
+  alignMediaSurfaceSides,
+} from './media-surfaces.mjs';
+import { detectGraphics, darkComponents, detectSmallImageGroups } from './media-components.mjs';
+import { detectLightProductSurfaces, detectClippedFramedImages } from './media-frames.mjs';
+import { detectIllustrationIslands } from './media-illustrations.mjs';
+import { detectLocalTexturedObjects, detectCompound } from './media-texture.mjs';
+
+export function detectMedia(image, measure, sourceRows = [], scratch = null) {
+  const queue =
+    scratch && scratch.length >= image.width * image.height
+      ? scratch
+      : new Int32Array(image.width * image.height);
+  const proposals = detectSurfaces(image),
+    surfaces = measure ? rejectPlanarMedia(image, proposals, measure, sourceRows) : proposals,
+    graphics = detectGraphics(image, queue);
+  alignMediaSurfaceRows(image, surfaces);
+  alignMediaSurfaceSides(image, surfaces);
+  // A texture proposal cannot cut an independently connected graphic into pieces.
+  // Enclosing surfaces retain ownership; contained and crossing surfaces yield.
+  const contains = (a, b) =>
+    a.x <= b.x && a.y <= b.y && a.x + a.w >= b.x + b.w && a.y + a.h >= b.y + b.h;
+  const ownedSurfaces = surfaces.filter(
+    (s) =>
+      !graphics.some(
+        (g) =>
+          g.x < s.x + s.w &&
+          g.x + g.w > s.x &&
+          g.y < s.y + s.h &&
+          g.y + g.h > s.y &&
+          !contains(s, g)
+      )
+  );
+  const existing = [
+    ...ownedSurfaces,
+    ...graphics.filter(
+      (g) =>
+        !ownedSurfaces.some(
+          (s) => g.x < s.x + s.w && g.x + g.w > s.x && g.y < s.y + s.h && g.y + g.h > s.y
+        )
+    ),
+  ];
+  const rasterComponents = darkComponents(image, queue);
+  const islands = detectIllustrationIslands(image, existing, rasterComponents);
+  const complete = existing.filter(
+    (s) =>
+      !islands.some(
+        (p) => s.x >= p.x && s.y >= p.y && s.x + s.w <= p.x + p.w && s.y + s.h <= p.y + p.h
+      )
+  );
+  const products = detectLightProductSurfaces(image, queue).filter(
+    (p) =>
+      !complete.some((s) => {
+        const iw = Math.max(0, Math.min(p.x + p.w, s.x + s.w) - Math.max(p.x, s.x)),
+          ih = Math.max(0, Math.min(p.y + p.h, s.y + s.h) - Math.max(p.y, s.y));
+        return iw * ih > Math.min(p.w * p.h, s.w * s.h) * 0.3;
+      })
+  );
+  const framed = detectClippedFramedImages(image).filter(
+    (p) =>
+      ![...complete, ...islands, ...products].some((s) => {
+        const iw = Math.max(0, Math.min(p.x + p.w, s.x + s.w) - Math.max(p.x, s.x));
+        const ih = Math.max(0, Math.min(p.y + p.h, s.y + s.h) - Math.max(p.y, s.y));
+        return iw * ih > Math.min(p.w * p.h, s.w * s.h) * 0.3 && !contains(p, s);
+      })
+  );
+  const small = detectSmallImageGroups(image, rasterComponents).filter(
+    (p) =>
+      ![...complete, ...islands, ...products, ...framed].some(
+        (s) => p.x < s.x + s.w && p.x + p.w > s.x && p.y < s.y + s.h && p.y + p.h > s.y
+      )
+  );
+  // A supported complete frame owns its contained partial texture proposals.
+  const established = [
+    ...[...complete, ...islands, ...products].filter((s) => !framed.some((p) => contains(p, s))),
+    ...framed,
+    ...small,
+  ];
+  const local = detectLocalTexturedObjects(image, queue).filter(
+    (p) =>
+      !established.some(
+        (s) => p.x < s.x + s.w && p.x + p.w > s.x && p.y < s.y + s.h && p.y + p.h > s.y
+      )
+  );
+  const compound = detectCompound(image, [...established, ...local], queue);
+  return [...established, ...local, ...compound];
+}

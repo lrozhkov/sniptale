@@ -12,7 +12,13 @@ export type NativeMediaMessage = Extract<
       | 'app.screenshot.chunk'
       | 'app.screenshot.commit'
       | 'app.recording.stopped'
-      | 'app.recording.chunk';
+      | 'app.recording.chunk'
+      | 'app.recording.attachment.manifest'
+      | 'app.recording.attachment.chunk'
+      | 'app.recording.attachment.available'
+      | 'app.recording.events.manifest'
+      | 'app.recording.events.chunk'
+      | 'app.recording.events.available';
   }
 >;
 
@@ -32,6 +38,14 @@ export function dispatchNativeMediaMessage(args: {
   }
 
   switch (message.type) {
+    case 'app.recording.attachment.manifest':
+    case 'app.recording.attachment.chunk':
+    case 'app.recording.attachment.available':
+    case 'app.recording.events.manifest':
+    case 'app.recording.events.chunk':
+    case 'app.recording.events.available':
+      postResponses(ingestion.handleHistory(message));
+      return;
     case 'app.screenshot.start':
       postResponses(ingestion.handleScreenshotStart(message));
       return;

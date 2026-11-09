@@ -11,6 +11,11 @@ import { reserveRecordingBegin, cancelRecordingBegin } from './start/gate';
 import { sendRuntimeMessageBestEffort } from '../runtime-messaging/best-effort';
 import { createRuntimeMessagingTransport } from '../../platform/runtime-messaging';
 import { recordingContext, type RecordingStopOutcome } from './context';
+import { createBrowserRecordingEventsWriter } from './recording-events/writer';
+import { createRecordingEventsStore } from '../../composition/persistence/recordings/recording-events/store';
+import { createBrowserCursorTrajectoryWriter } from './cursor-trajectory/writer';
+import { createRecordingCursorTrajectoryStore } from '../../composition/persistence/recordings/cursor-trajectory/store';
+import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import { cleanupResources } from './start/cleanup';
 import { startRecording as startRecordingImpl } from './start/index';
 import { RecordingStartCleanupConfirmedError } from './start/error-reporting';
@@ -50,6 +55,47 @@ let pendingRecordingStop: Promise<RecordingStopOutcome> | null = null;
 let activeRecordingBinding: RecordingSourceBinding | null = null;
 let terminalRecording: { binding: RecordingSourceBinding; outcome: RecordingStopOutcome } | null =
   null;
+let cursorTrajectory: {
+  binding: RecordingSourceBinding;
+  writer: Awaited<ReturnType<typeof createBrowserCursorTrajectoryWriter>>;
+} | null = null;
+
+type EventsWriter = Awaited<ReturnType<typeof createBrowserRecordingEventsWriter>>;
+let recordingEvents: {
+  binding: RecordingSourceBinding;
+  writer: Promise<EventsWriter> | null;
+  create(): Promise<EventsWriter>;
+} | null = null;
+
+/** Accepts only the current recording's browser document after background authorization. */
+export async function appendRecordingEventObservations(
+  binding: RecordingSourceBinding,
+  packet: unknown,
+  nativeDocumentId: string
+): Promise<void> {
+  assertActiveRecordingBinding(binding);
+  const source = recordingEvents;
+  if (!source || !matchesRecordingFrameClockBinding(binding, source.binding))
+    throw new Error('Event recording source is unavailable');
+  source.writer ??= source.create();
+  const writer = await source.writer;
+  if (!matchesActiveRecordingBinding(binding) || recordingEvents !== source) {
+    await writer.discard();
+    throw new Error('Event recording binding is unavailable');
+  }
+  await writer.append(packet, nativeDocumentId);
+}
+
+export async function appendRecordingCursorObservations(
+  binding: RecordingSourceBinding,
+  packet: unknown,
+  nativeDocumentId: string
+): Promise<void> {
+  assertActiveRecordingBinding(binding);
+  if (!cursorTrajectory || !matchesRecordingFrameClockBinding(binding, cursorTrajectory.binding))
+    throw new Error('Cursor recording source is unavailable');
+  await cursorTrajectory.writer.append(packet, nativeDocumentId);
+}
 let pendingDataPreparation: {
   binding: RecordingSourceBinding;
   abort: AbortController;
@@ -157,7 +203,47 @@ async function startRecordingAfterPendingPublication(
         runtimeMessaging
       );
     } else {
-      await startRecordingImpl(params, runtimeMessaging);
+      await startRecordingImpl(params, runtimeMessaging, async (width, height, observation) => {
+        if (!matchesActiveRecordingBinding(binding)) return;
+        recordingEvents = {
+          binding: { ...binding },
+          writer: null,
+          create: () =>
+            createBrowserRecordingEventsWriter({
+              recordingId: params.recordingId,
+              eventStreamId: crypto.randomUUID().replaceAll('-', ''),
+              width,
+              height,
+              store: createRecordingEventsStore({
+                database: () => initDB(),
+                mintGeneration: () => crypto.randomUUID(),
+              }),
+              pointTransform: () =>
+                observation.stable && observation.sawFrame ? observation.transform : null,
+            }),
+        };
+        try {
+          const writer = await createBrowserCursorTrajectoryWriter({
+            recordingId: params.recordingId,
+            trajectoryId: crypto.randomUUID().replaceAll('-', ''),
+            width,
+            height,
+            store: createRecordingCursorTrajectoryStore({
+              database: () => initDB(),
+              mintGeneration: () => crypto.randomUUID(),
+            }),
+            pointTransform: () =>
+              observation.stable && observation.sawFrame ? observation.transform : null,
+          });
+          if (!matchesActiveRecordingBinding(binding)) {
+            await writer.discard();
+            return;
+          }
+          cursorTrajectory = { binding: { ...binding }, writer };
+        } catch {
+          logger.warn('Cursor trajectory initialization failed');
+        }
+      });
     }
     if (
       !pendingRecordingStop &&
@@ -436,7 +522,53 @@ export function stopRecording(
     return pendingRecordingStop;
   }
 
+  const stoppedWhilePaused = recordingContext.artifactSession?.state === 'paused';
   const work = stopRecordingOnce(discard)
+    .then(async (outcome): Promise<RecordingStopOutcome> => {
+      const cursor = cursorTrajectory;
+      if (cursor && matchesRecordingFrameClockBinding(cursor.binding, binding)) {
+        try {
+          if (discard) await cursor.writer.discard();
+          else {
+            const descriptor = await cursor.writer.finish({
+              waitForSourceStop: outcome.result === 'stopped',
+              stoppedWhilePaused,
+            });
+            if (outcome.result === 'stopped')
+              outcome = { ...outcome, cursorTrajectory: descriptor };
+          }
+          if (cursorTrajectory === cursor) cursorTrajectory = null;
+        } catch (error) {
+          if (discard) throw error;
+          logger.warn('Cursor trajectory finalization failed; stored prefix retained');
+        }
+      }
+      const events = recordingEvents;
+      if (events && matchesRecordingFrameClockBinding(events.binding, binding)) {
+        try {
+          if (events.writer) {
+            const writer = await events.writer;
+            if (discard) await writer.discard();
+            else {
+              const descriptor = await writer.finish({
+                waitForSourceStop: outcome.result === 'stopped',
+                stoppedWhilePaused,
+              });
+              if (outcome.result === 'stopped')
+                outcome = { ...outcome, recordingEvents: descriptor };
+            }
+          }
+        } catch (error) {
+          if (discard) throw error;
+          logger.warn('Event finalization failed; stored prefix retained');
+        } finally {
+          if (recordingEvents === events) recordingEvents = null;
+        }
+      }
+      if (outcome.result === 'stopped' || !hasActiveRecordingSession())
+        activeRecordingBinding = null;
+      return outcome;
+    })
     .catch((error: unknown): RecordingStopOutcome => {
       if (error instanceof PostRecordPublicationError) throw error;
       return { result: 'terminal-failure', error: 'Recording cleanup failed.' };
@@ -460,7 +592,6 @@ async function stopRecordingOnce(discard: boolean): Promise<RecordingStopOutcome
   cancelPendingMultiSourceRecordingStart();
   let outcome = await stopActiveRecording(discard, true);
   if (!pendingStart) {
-    if (outcome.result === 'stopped') activeRecordingBinding = null;
     return outcome;
   }
 
@@ -473,9 +604,6 @@ async function stopRecordingOnce(discard: boolean): Promise<RecordingStopOutcome
     };
   }
   outcome = await stopActiveRecording(discard, true);
-  if (outcome.result === 'stopped' || !hasActiveRecordingSession()) {
-    activeRecordingBinding = null;
-  }
   return outcome;
 }
 

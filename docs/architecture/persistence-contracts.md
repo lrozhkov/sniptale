@@ -256,13 +256,21 @@ Derived document keys include current and retained history/recovery references a
 
 Native indexes remove entries atomically on removal.
 
-Version 9 adds the indexes without rewriting project documents during versionchange. Gallery cooperatively backfills legacy document keys after rendering in bounded key batches, acquiring a mutation permit only for each current-row rewrite. The marker `indexed:v1` and indexed counts identify incomplete coverage. The inspector reports unavailable until completion, never a false empty list. Selected-material queries read only matching identity aliases and documents.
+Version 9 adds the indexes without rewriting project documents during versionchange. Gallery cooperatively backfills legacy document keys after rendering in bounded key batches, acquiring a mutation permit only for each current-row rewrite. The marker `indexed:v2` and indexed counts identify incomplete coverage. The inspector reports unavailable until completion, never a false empty list. Selected-material queries read only matching identity aliases and documents.
 
-This advisory index never authorizes deletion, retention or source release.
+These advisory usage indexes never authorize deletion, retention or source release.
 
 An accepted external source cannot remain temporary. Montage, scenario and quick-edit commits promote referenced Library origins and recording mirrors in the consuming transaction. This includes retained history/recovery references and admitted ready sources. Preparing or rejecting an attachment does not promote it. Opening a standalone editor sidecar alone does not constitute an external use.
 
-Project documents and resource children own links. `media-library/dependencies.ts` derives the same identity projection for warnings, confirmed purge, automatic retention and private-source release. No cached counter or persisted reverse index authorizes deletion. Admit newly added locators against their source rows in the consuming transaction. This includes frozen scenario origins and quick-edit current, history and recovery references.
+Project documents and resource children own links. `media-library/dependencies.ts` derives the same identity projection for warnings, confirmed purge, automatic retention and private-source release. No cached counter or independent relationship table authorizes deletion. Native row indexes select source records within the destructive transaction. Admit newly added locators against their source rows in the consuming transaction. This includes frozen scenario origins and quick-edit current, history and recovery references.
+
+Physical version 48 adds `retentionReferenceKeys` to each store that can retain an asset or a media identity. Each source row stores these private keys in `__sniptaleRetentionIndexV1`. The admitted database adapter derives these keys on every native source write. It removes imported key values before derivation. The read adapter removes only that reserved field from portable documents.
+
+Versionchange populates every existing row before it publishes the new schema. Unknown reference envelopes receive explicit keys that prevent affected destructive operations. Selected-source queries use exact identity keys and include unknown evidence. Scenario locators include parent origins and child identities. Parent removal selects both. Child replacement selects only the affected children. They do not enumerate unrelated source documents or count complete stores. Explicit migration, inventory and recovery can enumerate stores. Recording recovery removal uses the native `recoveryId` index for related session headers.
+
+A native index can prove absence only with the admitted schema and complete coverage of canonical writers. The destructive owner admits source hits and immutable bindings in its own transaction. A failed migration preserves the previous schema and source rows. A failed source write cannot commit a separate index update.
+
+The workspace owner admits heads with their own history in the same transaction. A direct history write remains unknown until a head write admits its complete snapshot. An orphan history row retains its unknown marker. Valid head admission clears markers from its retained history, including rows from earlier transactions. History removal invalidates its head until the next admitted head write. The adapter preserves native request order, transaction completion and rollback.
 
 Quick-edit attachment before publication may use a matching standalone ready journal sampled under the existing lifecycle lock before the transaction.
 
@@ -282,9 +290,19 @@ Publication intent is explicit. Source writers own ready journals, expected-sour
 
 Ordinary immutable-source replacement protects external consumers.
 
+Ready claims use `ready-claims-v1` under the existing OPFS asset root. Asset aliases retain outer refs and nested shared document refs. Logical aliases select media identities, source identities and export owners. A manifest retains the union of all physical and logical claims made by its journal. Capability `3` covers both claim types and owner selection. Earlier capability values cannot prove absence. Publication removes `complete` before it writes manifests, aliases and the ready journal. Publication restores `complete` only after those writes finish.
+
+If prior coverage is unknown, explicit startup recovery must establish completeness. The first publication can establish completeness when both the ready directory and prior claim index were absent. Only `NotFoundError` establishes that absence. Candidate lookup refuses incomplete coverage without a global rebuild. The caller holds the existing lifecycle permit through admission and byte removal.
+
+Explicit preparation refuses malformed nonempty journals, manifests and identity bindings. Zero-byte handles retain the existing uncommitted-file meaning. Preparation includes orphan manifests and publishes `complete` last. An alias without a ready journal still retains its asset and logical identity. Preparation gives legacy orphan manifests an unknown logical claim. Cleanup removes the journal first and the manifest after all aliases. Failed cleanup preserves remaining aliases and the manifest for retry.
+
+Source deletion replays only selected journals. Parent deletion selects related export owners and current private sources. It refreshes the selection after replay and revalidates private identities in the deletion transaction. Missing Library rows still require media-ID admission. Mutation transition and lifecycle permits cover replay, logical removal and physical completion. Deferred, unresolved and workflow-owned journals retain their claims.
+
 Compound parent/child writes, byte ownership, sidecars, revisions and journal checkpoints commit together. A logical exception after a successful IndexedDB request must abort and drain the transaction. Physical I/O follows commit and cannot roll it back. Failed deletion retains durable intent for retry.
 
-`assets/retention-authority.ts` provides the read-only source/document ownership projection shared by physical replay and orphan audit. Before I/O, the physical owner rechecks actual/projected owners, ready document/resource claims and unresolved rollback receipts under the lifecycle lock with an explicit reusable permit. Missing refs/owners do not remove retained metadata claims. Inconsistent or invalid authority preserves bytes and intent. Known adopted objects remain.
+`assets/retention-index-projection.ts` defines ownership claims for source documents. `assets/retention-index.ts` reads claims for selected asset IDs. `assets/retention-authority.ts` enumerates claims for explicit audits.
+
+Before I/O, the physical owner rechecks actual/projected owners, ready document/resource claims and unresolved rollback receipts under the lifecycle lock with an explicit reusable permit. Missing refs/owners do not remove retained metadata claims. Inconsistent or invalid authority preserves bytes and intent. Known adopted objects remain.
 
 Pre-ready discard and quiescent writing cleanup stay in the object adapter. Post-ready cancellation uses durable intent.
 
@@ -798,6 +816,14 @@ The first accepted encoding wins. Every caller uses the returned accepted value.
 
 A refused preparation preserves the native snapshot and claims. Repeated preparation returns accepted bytes without reading a newer live source. Reads perform no writes. Preparation does not authorize source release.
 
+After durable preparation commits, its claims protect accepted transport files. The workflow releases only its own new writer leases. It then removes obsolete writing markers under available object locks. Repeated preparation can settle markers without releasing leases on borrowed native files. A failed marker removal preserves accepted files and claims for retry.
+
+Portable object descriptors use base MIME types. Native metadata can retain codec or charset parameters. A verified receiving boundary restores those parameters from typed metadata when it creates native references. Borrowed references retain their exact admitted identity.
+
+Descriptor comparisons use the base type. Native row and reference comparisons retain their exact type. A different base type, size or digest still refuses admission.
+
+Startup recovery removes obsolete writing markers when valid durable claims retain their files. Unresolved or inconsistent retention evidence preserves both markers and bytes. An active writer retains its marker. This maintenance preserves retained files.
+
 ## Durable physical dispatch attempts
 
 The sync persistence owner stores immutable attempt identities, digests, remote manifest keys and object mappings in sync_outbox. Attempts contain no portable or manifest text. The dispatcher reconstructs exact manifest text in memory from the accepted preparation and canonical wire encoder.
@@ -905,6 +931,10 @@ Eligible pin removal and the intent for physical removal commit in one transacti
 Physical failure retains the durable intent for existing recovery. Concurrent edits, replacement enrollment or changed immutable bindings refuse delayed release. Unknown prototype records make destructive retention authority invalid and preserve bytes.
 
 This command releases only native bytes without local owners. Remote-only residency for an active media or project owner requires the later hydration contract. This stage does not remove current project files or add remote garbage collection.
+
+Automatic sync retries retirement through its existing connection and request lifetime before catalog refresh. Each pass scans at most 64 native keys and selects at most two published operations with potentially ownerless pinned files. Canonical native references exclude operations with no eligible transport candidates. Discovery grants no deletion authority. Existing release admission checks current retention again.
+
+The advisory cursor advances past failed or protected candidates and wraps at the end. A replacement connection resets the cursor. Runtime restart begins traversal again. The cursor does not promise progress across repeated runtime restarts. No new queue, store, index or network command owns this maintenance.
 
 ## Native sync connection authorization
 
@@ -1101,3 +1131,59 @@ The ready journal contains JSON metadata and exact immutable file references. Ef
 The transaction repeats profile, causal, dependency and native revision checks. It publishes project rows, private sources, sidecars and the receipt atomically. A failed transaction preserves the predecessor and permits an exact retry. A matching completed receipt permits replay without staging files or another native revision.
 
 Outgoing preparation reuses existing file references for originals and saved exports. It stages only portable objects without a native file binding. Prepared claims retain those temporary files until publication or recovery permits release. This change adds no store, queue, journal domain or transfer platform. Production activation and safe unload remain separate release gates.
+
+## Cursor trajectory blocks
+
+Physical database version 52 adds `recording_cursor_trajectories` and `recording_cursor_blocks`. The recordings domain uses contract version 5. The additive 51→52 migration preserves existing history stores or creates empty stores. It preserves released rows, media files and immutable objects.
+
+The recordings owner appends canonical `cursor-trajectory-v1` blocks. Each block contains at most 512 records and 65536 bytes. Manifest pages contain at most 32 entries. The owner does not retain the complete trajectory in memory.
+
+One transaction publishes each block and its updated head. An identical retry preserves the original block. A conflicting duplicate fails without replacement. A failed transaction preserves the committed prefix.
+
+The owner issues a private writer generation. Retirement retains a tombstone and deletes the owned blocks in one transaction. Retirement can precede the first writer. A delayed begin or append cannot recreate the retired trajectory.
+
+Explicit restore requires retirement and issues a new writer generation. Restore can retain the original recording and trajectory identifiers. Previous writer generations cannot append after restore. Global erasure includes both stores through the database registry.
+
+The local recording key can change during restore. Canonical blocks retain their source recording identifier and original bytes.
+
+Finalization reads the contiguous prefix through a bounded cursor. It checks block hashes, prefix hashes, canonical bytes, geometry and complete stream counts. It then compares the head revision before commit. Concurrent changes require a retry. Finalization failure preserves the blocks.
+
+A finalized head cannot accept another block. Identical append and finalization retries remain idempotent. Read operations do not repair or change data. Media receipt and trajectory receipt remain separate contracts.
+
+Montage schema 49 admits a finalized trajectory descriptor in a source observation group. The group retains its recording and source instance identifiers. Its inline samples array must be empty. Earlier declared schemas refuse the descriptor. A mutation retains schema 49 after descriptor removal.
+
+Legacy groups continue to materialize their inline source observations. Descriptor groups retain source facts in the recordings stores. Hydration and source edits do not expand the complete trajectory or replace source-bound authored cursor keys. Authored keys keep the existing manual item budget.
+
+## Recording event blocks
+
+Physical database version 53 adds `recording_events`. The recordings domain uses contract version 6. The additive 52→53 migration preserves an existing history store or creates an empty store. It preserves previous rows and immutable files.
+
+Earlier native-app branch databases used physical versions 47 and 48 for cursor and event history. Integration preserves these stores and their rows. The 51→52 migration supplies missing deletion-reference indexes. It advances the logical contracts of their registered owners without changing stored row formats. Both history head stores receive a `snapshotAssetId` index for selected physical-retention checks.
+
+The compound key contains `recordingId`, `eventStreamId`, `kind` and `entryId`. Row kinds separate stream heads, original blocks and derived event facts. The `kind` index permits compact head reads without loading historical blocks. The `timeBuckets` index uses multiple entries for event intervals.
+
+Event intervals can overlap or arrive after newer timestamps. The interval index uses exact dyadic ranges in nonnegative safe integer microseconds. One interval requires at most 106 ranges. One time query requires at most 54 index ranges. The first matching range identifies one result without an accumulated set of event identifiers.
+
+Original block bytes remain the source authority. The interval index does not replace, sort or reduce recorded history. Runtime publication and capability activation require the event writer and its consumer proof.
+
+Source-wide retirement also writes a compact `root-fence` row. The row prevents a delayed begin with an unknown stream identifier from recreating deleted history. Default begin never adopts an existing writer generation. Explicit restore remains the admitted operation for identity reuse.
+
+## Recovery of history publication
+
+Before immutable history file preparation, the recordings owner writes a prepare intent in the existing `recording-cursor-snapshot` journal domain. The intent contains compact telemetry, source generations and the expected metadata hash. It contains no file claims. The transition gate covers intent creation, preparation and publication. Cold database admission precedes that gate.
+
+Preparation failure preserves the intent, original blocks and video. Cleanup deletes only copies from the failed preparation attempt. Recovery checks source generations and the metadata hash before another attempt. Deletion or replacement makes the old intent superseded.
+
+Successful preparation creates the existing ready journal with verified file references. The existing transaction publishes metadata, file owners, source links and the frozen capture together. The owner deletes the prepare intent after publication. A crash can leave both journals. Metadata and generation checks prevent duplicate publication or replacement of newer facts.
+
+Recovery passes its active transition and lifecycle permits to the preparation owner. The OPFS writer reuses that transition permit. A queued erasure cannot cause preparation to wait behind its own outer transition gate.
+
+## Review text placement during video edits
+
+New Cut and Speed operations record `preserveTextAnchors`. Historical operations without this flag retain their recorded behavior.
+
+Advanced schema27 admits optional `sourceAnchor` on result-domain text fragments. Native duration, complete source spans, and native word offsets use the existing voiceover timing rules. Video edits derive current result intervals without changing text revisions or accepted voice snapshots. Cuts retain hidden intervals for later recovery. Explicit text moves, trims, splits, and merges establish new placement from the current intervals.
+
+The text document owns these anchors. Descriptive provenance owns no timing authority or audio lease. Malformed anchors reject the operation without partial publication. Preview, captions, and subtitle export use the same projection. Gallery-to-Montage conversion retains current slices as ordinary Native text and retains fully excluded text with a zero result limit.
+
+Physical database47 and mediaLibrary32 admit this contract through a metadata-only46→47 migration. The migration preserves existing workspaces, history, recovery, and immutable objects. Earlier applications refuse the newer database before writing. Reading older supported projects does not create anchors or write a migration.

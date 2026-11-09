@@ -23,7 +23,12 @@ export const tabVideoControlledCursorContracts = {
       createMessageGuard({
         type: VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE,
         required: { recordingId: isString },
-        optional: { offsetSeconds: isNumber, frameClock: isOptionalRecordingFrameClockAnchor },
+        optional: {
+          offsetSeconds: isNumber,
+          frameClock: isOptionalRecordingFrameClockAnchor,
+          cursorTrajectoryMode: (value) => value === 'blocks',
+          recordingEventsMode: (value) => value === 'blocks',
+        },
       })
     ),
     parseResponse: createGuardParser(
@@ -34,7 +39,14 @@ export const tabVideoControlledCursorContracts = {
   [VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE]: {
     parseRequest: createGuardParser(
       'tab DISABLE_CONTROLLED_CURSOR_CAPTURE message',
-      createMessageGuard({ type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE })
+      createMessageGuard({
+        type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
+        optional: {
+          cursorTrajectoryMode: (value) => value === 'blocks',
+          recordingEventsMode: (value) => value === 'blocks',
+          boundaryReason: (value) => value === 'stop' || value === 'observation',
+        },
+      })
     ),
     parseResponse: createGuardParser(
       'tab DISABLE_CONTROLLED_CURSOR_CAPTURE response',

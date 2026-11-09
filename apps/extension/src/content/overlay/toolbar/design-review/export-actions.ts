@@ -3,8 +3,15 @@ import { writeBrowserClipboardText } from '@sniptale/platform/browser/clipboard'
 import { isBrowserAnnotationsExportText } from '@sniptale/runtime-contracts/export';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { isClipboardTextWithinLimit } from '@sniptale/runtime-contracts/validation/text';
-import { captureBrowserAnnotationsExportText } from '../../../parser/page-preparation/annotations/format';
-import { createDesignReviewReportExporter } from '../../../application/design-review-report';
+import {
+  captureBrowserAnnotationsExportText,
+  formatBrowserAnnotationSnapshot,
+} from '../../../parser/page-preparation/annotations/format';
+import {
+  createDesignReviewReportExporter,
+  type DesignReviewReportSnapshot,
+} from '../../../application/design-review-report';
+import { finalizeDesignReviewCommentDraft } from '../../design-review/session/comment-draft-finalization';
 import { browserAnnotationSession } from '../../../parser/page-preparation/annotations';
 import { printReviewReport } from '../../../parser/page-preparation/annotations/format/print';
 import { flushPendingPageStyleHistory } from '../../design-review/runtime/actions';
@@ -29,12 +36,13 @@ export type ToolbarAnnotationExportAction =
   | 'export-page';
 
 async function copyBrowserAnnotations(
-  contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined
+  contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined,
+  artifact?: string
 ): Promise<void> {
   if (contentIntentSource?.kind !== 'trusted-content-event') {
     throw new Error('A trusted user event is required to copy browser annotations.');
   }
-  const text = captureBrowserAnnotationsExportText();
+  const text = artifact ?? captureBrowserAnnotationsExportText();
   if (!isClipboardTextWithinLimit(text)) {
     throw new Error('Browser annotations exceed the clipboard text limit.');
   }
@@ -42,9 +50,10 @@ async function copyBrowserAnnotations(
 }
 
 async function downloadBrowserAnnotations(
-  contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined
+  contentIntentSource: ContentPrivilegedActionIntentSource | null | undefined,
+  artifact?: string
 ): Promise<void> {
-  const text = captureBrowserAnnotationsExportText();
+  const text = artifact ?? captureBrowserAnnotationsExportText();
   if (!isBrowserAnnotationsExportText(text)) {
     throw new Error('Browser annotations exceed the direct-download limit.');
   }
@@ -75,8 +84,38 @@ async function openPopupExport(
 
 export function executeToolbarAnnotationExportAction(
   action: ToolbarAnnotationExportAction,
-  contentIntentSource?: ContentPrivilegedActionIntentSource | null
+  contentIntentSource?: ContentPrivilegedActionIntentSource | null,
+  captureSnapshot?: () => DesignReviewReportSnapshot
 ): Promise<void> {
+  if (captureSnapshot && (action === 'copy' || action === 'download' || action === 'pdf')) {
+    if (contentIntentSource?.kind !== 'trusted-content-event')
+      return Promise.reject(
+        new Error('A trusted user event is required to export the review session.')
+      );
+    try {
+      finalizeDesignReviewCommentDraft();
+      flushPendingPageStyleHistory();
+      const aggregate = structuredClone(captureSnapshot());
+      if (action === 'copy')
+        return copyBrowserAnnotations(
+          contentIntentSource,
+          formatBrowserAnnotationSnapshot(aggregate.snapshot)
+        );
+      if (action === 'download')
+        return downloadBrowserAnnotations(
+          contentIntentSource,
+          formatBrowserAnnotationSnapshot(aggregate.snapshot)
+        );
+      return createDesignReviewReportExporter({
+        annotations: browserAnnotationSession,
+        services: getContentRuntimeServices,
+        print: printReviewReport,
+        captureSnapshot: () => aggregate,
+      })(translate('content.toolbar.annotationExportPdfTitle'), contentIntentSource);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
   if (action === 'pdf') {
     if (contentIntentSource?.kind !== 'trusted-content-event')
       return Promise.reject(new Error('A trusted user event is required to print the report.'));

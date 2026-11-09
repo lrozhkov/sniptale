@@ -17,57 +17,61 @@
       "id": "curve",
       "kind": "number",
       "label": {
-        "ru": "Плавность (%)",
-        "en": "Easing (%)"
+        "ru": "Плавность",
+        "en": "Easing"
       },
       "defaultValue": 85,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "animation",
-      "order": 0
+      "order": 0,
+      "unit": "percent"
     },
     {
       "id": "strength",
       "kind": "number",
       "label": {
-        "ru": "Приближение (%)",
-        "en": "Zoom (%)"
+        "ru": "Приближение",
+        "en": "Zoom"
       },
       "defaultValue": 12,
       "min": 0,
       "max": 30,
       "step": 1,
       "group": "processing",
-      "order": 1
+      "order": 1,
+      "unit": "percent"
     },
     {
       "id": "focusX",
       "kind": "number",
       "label": {
-        "ru": "Центр X (%)",
-        "en": "Focus X (%)"
+        "ru": "Центр X",
+        "en": "Focus X"
       },
       "defaultValue": 50,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "geometry",
-      "order": 2
+      "order": 2,
+      "unit": "percent"
     },
     {
       "id": "focusY",
       "kind": "number",
       "label": {
-        "ru": "Центр Y (%)",
-        "en": "Focus Y (%)"
+        "ru": "Центр Y",
+        "en": "Focus Y"
       },
       "defaultValue": 50,
       "min": 0,
       "max": 100,
       "step": 1,
       "group": "geometry",
-      "order": 3
+      "order": 3,
+      "unit": "percent"
     }
   ],
   "layers": [],

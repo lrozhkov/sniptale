@@ -1,3 +1,4 @@
+import { readArchiveRootObjectSource } from '../media-hub-backup/v6/object-source.test-support';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createMediaLibraryEntry,
@@ -407,7 +408,7 @@ it('rebinds a later portable private source without overwriting the predecessor 
   expect(second.input.root.entry.project.clips).toEqual(first.input.root.entry.project.clips);
 });
 
-it.each(['video/webm', 'image/png'])(
+it.each(['video/webm', 'video/webm;codecs=vp8', 'image/png'])(
   'round-trips an independent %s created export through the existing backup codec',
   async (mimeType) => {
     const original = { ...ref('export-bytes'), mimeType };
@@ -435,7 +436,9 @@ it.each(['video/webm', 'image/png'])(
     };
     const encoded = await encodeCapturedPortableRoot(capture({ kind: 'media', rows }));
     expect(encoded.objects).toHaveLength(1);
-    expect(encoded.objects[0]?.blob.type).toBe(mimeType);
+    expect(encoded.objects[0] && (await readArchiveRootObjectSource(encoded.objects[0])).type).toBe(
+      mimeType
+    );
     const prepared = await preparePortableReplica({
       envelope: encoded.envelope,
       verifiedObjects: new Map(encoded.bindings.map((binding) => [binding.objectId, binding.ref])),

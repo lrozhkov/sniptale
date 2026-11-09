@@ -331,3 +331,51 @@ it('keeps an in-flight batch alive across unrelated project and equivalent URL-m
     'clip-1': { kind: 'video', frames: [{ url: 'blob:ready', sourceStart: 2, sourceEnd: 6 }] },
   });
 });
+
+it('cancels a suspended batch, retains accepted frames and resumes only missing source slots', async () => {
+  vi.stubGlobal('requestIdleCallback', vi.fn());
+  const project = createProjectWithVisualClip(VideoProjectAssetType.VIDEO, { duration: 30 });
+  const expanded = createTrimmedProject(project, { sourceDuration: 26 });
+  let finish!: (frames: readonly TimelineVideoFrameLoadResult[]) => void;
+  const loader = vi.fn<TimelineVideoFrameLoader>().mockImplementation(resolveLoadedFrames);
+  const onPreviewsChange = vi.fn();
+  const props = {
+    project,
+    assetUrls: { 'asset-video': 'blob:video' },
+    loadVideoFrames: loader,
+    onPreviewsChange,
+  };
+  await renderHarness(props);
+  expect(loader).toHaveBeenCalledOnce();
+  loader.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  await renderHarness({ ...props, project: expanded });
+  const pending = loader.mock.calls[1]![0];
+  expect(pending.samples.map((sample) => sample.sourceTime)).toEqual([12, 24]);
+  await renderHarness({ ...props, project: expanded, suspended: true });
+  expect(pending.signal?.aborted).toBe(true);
+  expect(loader).toHaveBeenCalledTimes(2);
+  await act(async () => finish([createLoadedFrame(pending, 0, 'blob:late')]));
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:late');
+  expect(URL.revokeObjectURL).not.toHaveBeenCalledWith('blob:frame-2');
+  expect(onPreviewsChange).toHaveBeenLastCalledWith({
+    'clip-1': { kind: 'video', frames: [{ url: 'blob:frame-2', sourceStart: 2, sourceEnd: 12 }] },
+  });
+  await renderHarness({ ...props, project: expanded, suspended: false });
+  expect(loader).toHaveBeenCalledTimes(3);
+  expect(loader.mock.calls[2]![0].samples.map((sample) => sample.sourceTime)).toEqual([12, 24]);
+  expect(onPreviewsChange).toHaveBeenLastCalledWith({
+    'clip-1': {
+      kind: 'video',
+      frames: [
+        { url: 'blob:frame-2', sourceStart: 2, sourceEnd: 12 },
+        { url: 'blob:frame-12', sourceStart: 12, sourceEnd: 24 },
+        { url: 'blob:frame-24', sourceStart: 24, sourceEnd: 28 },
+      ],
+    },
+  });
+});

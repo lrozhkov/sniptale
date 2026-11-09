@@ -387,3 +387,202 @@ it('keeps bytes of an already committed copy during journal replay', async () =>
   expect(mocks.deleteAssetObject).not.toHaveBeenCalled();
   expect(mocks.runMutation).not.toHaveBeenCalled();
 });
+
+async function importedFirstSaveFixture() {
+  const { createReviewWorkspaceStoreFixture } =
+    await import('../review-workspaces/store.test-support');
+  const { createMediaLibraryEntry, createProjectAssetEntry } =
+    await import('../projects/index.test-support');
+  let fail = false;
+  const fixture = createReviewWorkspaceStoreFixture((name) => fail && name === 'image_workspaces');
+  const table = (name: string) => fixture.rows.get(name)!;
+  const ref = {
+    assetId: 'imported-original',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'objects/imported-original' },
+    mimeType: 'image/png',
+    size: 8,
+    sha256: null,
+  };
+  const child = createProjectAssetEntry({
+    id: 'imported-child',
+    assetId: ref.assetId,
+    mimeType: ref.mimeType,
+    size: ref.size,
+  });
+  const media = createMediaLibraryEntry({
+    id: `project-asset:${child.id}`,
+    source: { kind: 'project-asset', projectAssetId: child.id },
+    workspaceRevision: 0,
+    imageContentState: 'original',
+    size: ref.size,
+    mimeType: ref.mimeType,
+    lifecycle: createLibraryLifecycle('library', 1),
+  });
+  table('media_library').set(media.id, media);
+  table('project_assets').set(child.id, child);
+  table('asset_refs').set(ref.assetId, ref);
+  const ownerKey = JSON.stringify(['project-asset', child.id, 'body']);
+  const owner = {
+    ownerKind: 'project-asset',
+    ownerId: child.id,
+    role: 'body',
+    assetId: ref.assetId,
+  };
+  table('asset_owners').set(ownerKey, owner);
+  mocks.initDB.mockResolvedValue(fixture.database);
+  mocks.runMutation.mockImplementation(async (effect) => effect(fixture.database));
+  const document = createEditorDocumentFixture();
+  document.sourceImageData = 'data:image/png;base64,b3JpZ2luYWw=';
+  return {
+    ...fixture,
+    table,
+    ref,
+    child,
+    media,
+    owner,
+    ownerKey,
+    document,
+    fail: () => {
+      fail = true;
+    },
+    allow: () => {
+      fail = false;
+    },
+    input: { aggregateId: media.id, expectedRevision: 0, document, requireExistingRoot: true },
+  };
+}
+
+it('reuses the imported original on the first native workspace save without a runtime reuse map', async () => {
+  const f = await importedFirstSaveFixture();
+  const saved = await commitImageWorkspace(f.input);
+  expect(saved.documentAssetsByRuntimeUrl.get(f.document.sourceImageData)).toEqual(f.ref);
+  expect(mocks.assetSequence).toBe(0);
+  expect(f.table('asset_refs').size).toBe(1);
+  expect(f.table('project_assets').get(f.child.id)).toEqual(f.child);
+  expect(f.table('asset_owners').get(f.ownerKey)).toEqual(f.owner);
+  expect(f.table('image_workspaces').get(f.media.id)).toMatchObject({
+    document: { sourceImage: { assetId: f.ref.assetId } },
+  });
+  const journal = await mocks.createJournal.mock.results[0]!.value;
+  expect(journal.assetRefs).toEqual([]);
+  expect(mocks.releaseProtection).toHaveBeenCalledWith([]);
+  expect(mocks.deleteAssetObject).not.toHaveBeenCalled();
+});
+
+it.each(['child', 'ref', 'owner', 'delete', 'recreate'] as const)(
+  'refuses a delayed imported original reuse after controlled %s without changing replacement rows',
+  async (change) => {
+    const f = await importedFirstSaveFixture();
+    let replaced = structuredClone(f.rows);
+    mocks.createJournal.mockImplementationOnce(async (args) => {
+      if (change === 'child')
+        f.table('project_assets').set(f.child.id, { ...f.child, createdAt: f.child.createdAt + 1 });
+      if (change === 'ref')
+        f.table('asset_refs').set(f.ref.assetId, {
+          ...f.ref,
+          location: { kind: 'opfs', objectKey: 'objects/replaced-original' },
+        });
+      if (change === 'owner')
+        f.table('asset_owners').set(f.ownerKey, { ...f.owner, assetId: 'replacement-original' });
+      if (change === 'delete') f.table('media_library').delete(f.media.id);
+      if (change === 'recreate')
+        f.table('media_library').set(f.media.id, { ...f.media, createdAt: f.media.createdAt + 1 });
+      replaced = structuredClone(f.rows);
+      return { ...args, createdAt: 1, journalId: 'controlled-original-race' };
+    });
+    await expect(commitImageWorkspace(f.input)).rejects.toThrow();
+    expect(f.rows).toEqual(replaced);
+    expect(mocks.assetSequence).toBe(0);
+    expect(mocks.deleteAssetObject).not.toHaveBeenCalled();
+  }
+);
+
+it(
+  'keeps the imported original through failed workspace ownership publication and ' +
+    'replays the same journal',
+  async () => {
+    const f = await importedFirstSaveFixture();
+    const before = structuredClone(f.rows);
+    f.fail();
+    await expect(commitImageWorkspace(f.input)).rejects.toThrow();
+    expect(f.rows).toEqual(before);
+    expect(mocks.assetSequence).toBe(0);
+    const journal = await mocks.createJournal.mock.results[0]!.value;
+    expect(journal.assetRefs).toEqual([]);
+    f.allow();
+    await imageWorkspacePublicationAdapter.publish(journal);
+    expect(f.table('project_assets').get(f.child.id)).toEqual(f.child);
+    expect(f.table('asset_owners').get(f.ownerKey)).toEqual(f.owner);
+    expect(f.table('asset_refs').size).toBe(1);
+    const accepted = structuredClone(f.rows);
+    await imageWorkspacePublicationAdapter.publish(journal);
+    expect(f.rows).toEqual(accepted);
+    expect(mocks.deleteAssetObject).not.toHaveBeenCalled();
+  }
+);
+
+it('stages changed source pixels instead of reusing the imported original by identity alone', async () => {
+  const f = await importedFirstSaveFixture();
+  f.document.sourceImageData = 'data:image/png;base64,Y2hhbmdlISE=';
+  const saved = await commitImageWorkspace(f.input);
+  expect(mocks.assetSequence).toBe(1);
+  expect(saved.documentAssetsByRuntimeUrl.get(f.document.sourceImageData)?.assetId).toBe(
+    'staged-1'
+  );
+  expect(f.table('project_assets').get(f.child.id)).toEqual(f.child);
+  expect(f.table('asset_refs').get(f.ref.assetId)).toEqual(f.ref);
+  expect(f.table('asset_owners').get(f.ownerKey)).toEqual(f.owner);
+  expect(f.table('asset_refs').size).toBe(2);
+});
+
+it('shares an imported original with its Montage borrower while staging only a new background', async () => {
+  const f = await importedFirstSaveFixture();
+  const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
+  const borrower = createVideoProjectEntryWithMediaClip({ id: 'borrowed-imported-image' });
+  borrower.project.assets[0]!.source = { kind: 'library-asset', mediaId: f.media.id };
+  f.table('video_projects').set(borrower.id, borrower);
+  f.document.frame.backgroundImageData = 'data:image/png;base64,YmFja2dyb3VuZA==';
+  const saved = await commitImageWorkspace(f.input);
+  expect(saved.documentAssetsByRuntimeUrl.get(f.document.sourceImageData)).toEqual(f.ref);
+  expect(f.table('video_projects').get(borrower.id)).toEqual(borrower);
+  expect(f.table('project_assets').get(f.child.id)).toEqual(f.child);
+  expect(f.table('asset_owners').get(f.ownerKey)).toEqual(f.owner);
+  expect(f.table('asset_refs').size).toBe(2);
+  const journal = await mocks.createJournal.mock.results[0]!.value;
+  expect(journal.assetRefs.map((ref: { assetId: string }) => ref.assetId)).toEqual(['staged-1']);
+  expect(mocks.assetSequence).toBe(1);
+  expect(mocks.releaseProtection).toHaveBeenCalledWith(['staged-1']);
+  expect(mocks.deleteAssetObject).not.toHaveBeenCalled();
+});
+
+it('refuses a delayed parallel first Image writer after the competing native save commits', async () => {
+  const f = await importedFirstSaveFixture();
+  let entered!: () => void;
+  let release!: () => void;
+  const reached = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  mocks.createJournal.mockImplementationOnce(async (args) => {
+    entered();
+    await gate;
+    return { ...args, createdAt: 1, journalId: 'delayed-first-original' };
+  });
+  const delayed = commitImageWorkspace(f.input);
+  await reached;
+  const winner = await commitImageWorkspace({
+    ...f.input,
+    document: { ...f.document, frame: { ...f.document.frame, paddingLeft: 10 } },
+  });
+  expect(winner.revision).toBe(1);
+  const accepted = structuredClone(f.rows);
+  release();
+  await expect(delayed).rejects.toThrow();
+  expect(f.rows).toEqual(accepted);
+  expect(f.table('project_assets').get(f.child.id)).toEqual(f.child);
+  expect(mocks.assetSequence).toBe(0);
+  expect(mocks.deleteAssetObject).not.toHaveBeenCalled();
+});

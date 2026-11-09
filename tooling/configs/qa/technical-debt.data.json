@@ -342,26 +342,27 @@
       "targetAction": "Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification."
     },
     {
-      "id": "accepted.scc.content-crop-drawing-controls",
+      "id": "accepted.scc.content-review-selection-composition",
       "classification": "accepted-architecture",
-      "owner": "content-selection-overlay",
-      "risk": "A broad SCC allowance could conceal new controller back-dependencies or module and authority cycles. Only the exact two reviewed owner edges are accepted.",
-      "reason": "Allowed composition: overlay composes selection workflows. Crop selection UI reuses toolbar drawing controls through ToolbarDrawingControlsOwner and borrows floating menu geometry. These exact two owner edges have no module cycle and introduce no second mode, persistence, or runtime authority.",
-      "removalCondition": "Remove when either exact owner edge disappears. Reassess added owner edges, module cycles, or changed interaction and state authority before retaining this composition.",
-      "reviewBy": "2027-09-01",
+      "owner": "content-review-selection-overlay",
+      "risk": "A broad component allowance could hide new dependency or authority cycles. This record accepts only these exact three owners and six edges.",
+      "reason": "Allowed composition: Application workflows compose review projection, finalization and selection mode. Overlay and selection UI consume those workflows; crop selection reuses overlay drawing controls. These exact six owner edges have no module cycle and retain the existing session, navigation-lock and persistence authorities.",
+      "removalCondition": "Remove when any exact edge disappears. Reassess added owner edges, module cycles, or changed workflow and state authority before retaining this composition.",
+      "reviewBy": "2027-02-09",
       "source": {
         "kind": "scc",
-        "key": "content-crop-drawing-controls"
+        "key": "content-review-selection-composition"
       },
       "scope": {
-        "edgeDigest": "34e380f5de3ff8a51bfde355d1b6ff3781b9acaea18604ade604cb159e5793f6",
-        "id": "content-crop-drawing-controls",
+        "edgeDigest": "074f12e37e8718ff2f9d284a30d2d41d1e32e12b0cace6ad632af9c0507ff961",
+        "id": "content-review-selection-composition",
         "owners": [
+          "apps/extension/src/content/application",
           "apps/extension/src/content/overlay",
           "apps/extension/src/content/selection"
         ]
       },
-      "targetAction": "Keep the shared crop drawing controls and caller-owned interaction contract. Remove or review the decision when these edges or their authority change."
+      "targetAction": "Keep workflow composition and selection interaction ownership explicit. Recheck the exact graph when these edges or their authority change."
     },
     {
       "id": "noise.codeql.catalog-refresh-flight-identity",
@@ -1475,6 +1476,27 @@
         "rule": "generic-api-key"
       },
       "targetAction": "Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings."
+    },
+    {
+      "id": "noise.codeql.simplify-private-worker-message",
+      "classification": "tool-noise",
+      "owner": "offscreen-simplify",
+      "risk": "A Window origin comparison would reject valid dedicated-worker port delivery. A broader allowance could hide a future public message ingress.",
+      "reason": "Offscreen constructs and privately retains the bundled dedicated Worker. Its implicit entangled MessagePort receives only creator-handle messages, not Window postMessage traffic. Port delivery leaves origin empty. Worker tests prove valid empty-origin delivery and reject malformed or external image commands before decoding; the native product Worker flow verifies the bundled runtime. The receiver retains exact command and session validation.",
+      "removalCondition": "Remove when CodeQL models dedicated-worker ports, this exact finding disappears, or transport changes to a public Window or shared-worker receiver. Reassess any creator-handle exposure or command authority change.",
+      "reviewBy": "2027-02-09",
+      "source": {
+        "kind": "codeql",
+        "key": "js/missing-origin-check:apps/extension/src/offscreen/simplify/worker.ts:84:e65d1c1a7aa488d07068360b4cdc86b0507ec4765282d446566b4c68c80b781b:69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1"
+      },
+      "scope": {
+        "contentHash": "e65d1c1a7aa488d07068360b4cdc86b0507ec4765282d446566b4c68c80b781b",
+        "file": "apps/extension/src/offscreen/simplify/worker.ts",
+        "line": 84,
+        "messageHash": "69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1",
+        "rule": "js/missing-origin-check"
+      },
+      "targetAction": "Keep only this exact reviewed private-worker finding. Recheck scope and source evidence on any drift."
     }
   ]
 }

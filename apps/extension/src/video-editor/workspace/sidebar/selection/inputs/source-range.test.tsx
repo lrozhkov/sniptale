@@ -3,7 +3,10 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { setup } from '../../../../project/state/insertion/material.test-support';
-import { resetVideoEditorProjectHistory } from '../../../../project/history';
+import {
+  resetVideoEditorProjectHistory,
+  undoVideoEditorProjectHistory,
+} from '../../../../project/history';
 import { isSourceTimedClip } from '../../../../project/operations/source-timed-clips';
 import { InspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { ClipSourceRangeControls } from './source-range';
@@ -86,7 +89,12 @@ it.each([
       expect(clip.duration).toBe(duration);
       expect(h.inputs()[index]!.value).toBe(value);
       expect(h.store.getState().projectHistory.past).toHaveLength(1);
-      expect(h.store.getState().projectHistory.past[0]!.project.clips).toEqual(before.clips);
+      expect(
+        undoVideoEditorProjectHistory(
+          h.store.getState().projectHistory,
+          h.store.getState().project!
+        )
+      ).toMatchObject({ status: 'applied', project: { clips: before.clips } });
     } finally {
       h.dispose();
     }
@@ -228,7 +236,9 @@ it('shows the empty physical source range and restores a retained subframe with 
     });
     expect(h.inputs().map((input) => input.value)).toEqual(['1', '1.005']);
     expect(h.store.getState().projectHistory.past).toHaveLength(1);
-    expect(h.store.getState().projectHistory.past[0]!.project.clips).toEqual(before.clips);
+    expect(
+      undoVideoEditorProjectHistory(h.store.getState().projectHistory, h.store.getState().project!)
+    ).toMatchObject({ status: 'applied', project: { clips: before.clips } });
   } finally {
     h.dispose();
   }

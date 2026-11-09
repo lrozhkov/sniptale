@@ -5,6 +5,7 @@ import {
   normalizeRecordingSignals,
   deriveLongRecordingTypingSignals,
 } from './recording-actions';
+import { isRecordingTelemetrySignal } from './validation/recording-telemetry';
 
 const typing = (id: string, startTime: number, endTime: number): RecordingTelemetrySignal => ({
   id,
@@ -49,7 +50,7 @@ it('never joins input across a capture pause or includes nontext changes', () =>
   expect(deriveLongRecordingTypingSignals([first, second, checkbox])).toEqual([first, second]);
 });
 
-it('suppresses sub-500ms same-target repeats but retains distinct and unknown targets', () => {
+it('retains independent same-target clicks as well as distinct and unknown targets', () => {
   const input = [
     click('a', 0),
     click('b', 0.499),
@@ -59,17 +60,19 @@ it('suppresses sub-500ms same-target repeats but retains distinct and unknown ta
     { ...click('f', 0.8), data: {} },
   ];
   const result = normalizeRecordingActions(input);
-  expect(result.map((e) => e.id)).toEqual(['a', 'c', 'd', 'e', 'f']);
+  expect(result.map((e) => e.id)).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
   expect(normalizeRecordingActions(result)).toEqual(result);
 });
 
-it('retains a double-click as one captured action with its click count', () => {
+it('retains both captured presses and original click counts for a double-click', () => {
   const result = normalizeRecordingActions([
     click('a', 1),
     { ...click('b', 1.2), data: { targetId: 'button', clickCount: 2 } },
   ]);
-  expect(result).toHaveLength(1);
-  expect(result[0]).toMatchObject({ id: 'a', data: { clickCount: 2 } });
+  expect(result).toHaveLength(2);
+  expect(result[0]).toMatchObject({ id: 'a', data: { targetId: 'button' } });
+  expect(result[0]!.data).not.toHaveProperty('clickCount');
+  expect(result[1]).toMatchObject({ id: 'b', data: { clickCount: 2 } });
 });
 
 it('drops sub-500ms fragments before grouping, including bridges between real inputs', () => {
@@ -100,4 +103,35 @@ it('retains short raw inputs and independent observed gestures while keeping lon
   ];
   expect(normalizeRecordingActions(actions)).toEqual(actions);
   expect(deriveLongRecordingTypingSignals(inputs)).toEqual([]);
+});
+
+it('preserves every independently identified raw click beyond 2048 events regardless of target or spacing', () => {
+  const actions = Array.from({ length: 3000 }, (_, index) =>
+    click(`independent-${index}`, index / 1000)
+  );
+  const normalized = normalizeRecordingActions(actions.toReversed());
+  expect(normalized).toHaveLength(3000);
+  expect(normalized.every((action, index) => action === actions[index])).toBe(true);
+  expect(actions).toHaveLength(3000);
+});
+
+it('retains all accepted raw control signals and warnings beyond 512 entries', () => {
+  const signals: RecordingTelemetrySignal[] = Array.from({ length: 700 }, (_, index) => ({
+    id: `raw-${index}`,
+    kind: index % 2 ? 'static-frame' : 'typing',
+    startTime: index,
+    endTime: index,
+    point: null,
+    data:
+      index % 2
+        ? { source: 'recording-events', code: 'source-unavailable', severity: 'warning' }
+        : { targetType: 'checkbox', eventCount: 1 },
+  }));
+  expect(signals.every(isRecordingTelemetrySignal)).toBe(true);
+  const normalized = normalizeRecordingSignals(signals.toReversed());
+  expect(normalized).toHaveLength(700);
+  expect(normalized.every((signal, index) => signal === signals[index])).toBe(true);
+  expect(
+    deriveLongRecordingTypingSignals(signals).filter((signal) => signal.kind === 'typing')
+  ).toEqual([]);
 });

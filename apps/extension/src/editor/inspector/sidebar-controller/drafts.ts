@@ -12,6 +12,7 @@ import type {
 } from '../../../features/editor/document/types';
 import { normalizeEditorFrameSettings } from '../../../features/editor/document/constants';
 import { useEditorStore } from '../../state/useEditorStore';
+import { resolveSizeDraftAspectRatio } from '../content-sections/resize-tool-options';
 import type { EditorPresetStorageState } from '../../../features/editor/document/presets';
 
 function createSizeDraft(width: number | null | undefined, height: number | null | undefined) {
@@ -110,9 +111,19 @@ function useImageCanvasDraftState(args: {
   );
   const [imageSizeLocked, setImageSizeLocked] = useState(true);
   const [canvasSizeLocked, setCanvasSizeLocked] = useState(false);
+  const resizeInspectorActive = args.inspector === 'canvas-size' || args.inspector === 'image-size';
+  useEffect(() => {
+    const store = useEditorStore.getState();
+    if (!canvasSizeLocked) {
+      if (store.canvasCropAspectRatio) store.setCanvasCropAspectRatio(null);
+    } else if (store.canvasCropAspectRatio === null || !resizeInspectorActive) {
+      const ratio = resolveSizeDraftAspectRatio(canvasSizeDraft);
+      if (store.canvasCropAspectRatio !== ratio) store.setCanvasCropAspectRatio(ratio);
+    }
+  }, [canvasSizeLocked, canvasSizeDraft, resizeInspectorActive]);
+
   const cropSelectionHeight = args.cropSelection?.height;
   const cropSelectionWidth = args.cropSelection?.width;
-  const resizeInspectorActive = args.inspector === 'canvas-size' || args.inspector === 'image-size';
 
   useAuthoritativeImageCanvasDraftSync({
     canvasHeight: args.canvasHeight,

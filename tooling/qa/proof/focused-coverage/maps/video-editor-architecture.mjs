@@ -1,3 +1,5 @@
+import { VIDEO_PREVIEW_GPU_OWNER_MAPPINGS } from './video-preview-gpu.mjs';
+
 const CONTROLLER_CONTRACT_FILES = [
   'apps/extension/src/video-editor/runtime/controller/contracts/header.ts',
   'apps/extension/src/video-editor/runtime/controller/contracts/insertion.ts',
@@ -39,7 +41,187 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
   ],
 }));
 
+const spatialResourceMappings = [
+  'apps/extension/src/features/video/composition/canvas/spatial-renderer.ts',
+  'apps/extension/src/workflows/video-review/preview-render-allocation.ts',
+  'apps/extension/src/workflows/video-review/spatial-render-session.ts',
+  'apps/extension/src/workflows/video-review/spatial-render-allocation.ts',
+].map((productionFile) => ({
+  owner: 'review-spatial-resource-admission',
+  productionFile,
+  reason:
+    'Spatial admission serves managed GPU storage and its preview, framing, and export consumers.',
+  testFiles: [
+    'apps/extension/src/features/video/composition/canvas/spatial-renderer.test.ts',
+    'apps/extension/src/workflows/video-review/spatial-render-session.test.ts',
+    'apps/extension/src/workflows/video-review/preview-render-allocation.test.ts',
+    'apps/extension/src/workflows/video-review/preview-render-resources.test.ts',
+    'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+    'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+    'apps/extension/src/offscreen/project-export/runtime.test.ts',
+    'apps/extension/src/gallery/video-review/motion-blur-recovery.test.tsx',
+    'apps/extension/src/workflows/video-review/render-export.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview-performance.test.ts',
+    'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
+    'apps/extension/src/workflows/video-review/render-preview.cache-admission.test.ts',
+  ],
+}));
+
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
+  ...VIDEO_PREVIEW_GPU_OWNER_MAPPINGS,
+  {
+    owner: 'native-materialized-frame-publication',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/scene/joins.ts',
+    reason:
+      'Materialized output ownership crosses the stage adapter, scheduler, presenter and viewport geometry.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/scene/joins.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/scene/render-scheduler.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/canvas.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/runtime/index.test.tsx',
+      'apps/extension/src/features/video/composition/canvas/preview-presentation.test.ts',
+    ],
+  },
+  {
+    owner: 'review-presentation-source-snapshot',
+    productionFile: 'apps/extension/src/workflows/video-review/presentation-media.ts',
+    allowCrossOwner: true,
+    reason:
+      'The additive source snapshot serves Gallery while existing Canvas leases retain export semantics.',
+    testFiles: [
+      'apps/extension/src/workflows/video-review/presentation-media.test.ts',
+      'apps/extension/src/workflows/video-review/presentation-render.test.ts',
+      'apps/extension/src/workflows/video-review/render-presentation-export.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-paint.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-presentation-media-paint',
+    productionFile: 'apps/extension/src/gallery/video-review/presentation-media-paint.ts',
+    reason:
+      'The controlled queue and mounted inspector prove detached source and completed output ownership.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/presentation-media-paint.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'gallery-presentation-media-preview',
+    productionFile: 'apps/extension/src/gallery/video-review/presentation-media-preview.tsx',
+    reason:
+      'Mounted source readiness, local seek and authoring consumers preserve inspector transactions.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/presentation-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-presentation.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-bookend-preview-gpu',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/bookend-preview-gpu.ts',
+    allowCrossOwner: true,
+    reason:
+      'The borrowed media GPU producer is exercised through its own lifetime and both Native frontend adapters.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/bookend-preview-gpu.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/presentation-media-paint.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-bookend-preview-frame-queue',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.ts',
+    reason:
+      'The source snapshot and latest frame queue share controlled capture and mounted readiness proof.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-bookend-preview-source-and-recipe',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.tsx',
+    reason:
+      'Native mini-preview source identity and recipe drafts are exercised through mounted and authoring proof.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preset.test.tsx',
+    ],
+  },
+  {
+    owner: 'native-asset-source-preview-identity',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/asset-urls.ts',
+    allowCrossOwner: true,
+    reason:
+      'The canonical asset source identity serves existing URL owners and the disposable bookend inspector.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/asset-urls.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/asset-urls.sync-replica.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'shared-camera-crop-gpu',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/camera-crop-gpu.ts',
+    allowCrossOwner: true,
+    reason: 'Both editors consume the shared source capture and completed crop output lifetime.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/camera-crop-gpu.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-crop-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-crop-paint.test.ts',
+    ],
+  },
+  {
+    owner: 'shared-gpu-preview-presentation',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/preview-presentation.ts',
+    allowCrossOwner: true,
+    reason:
+      'Both editors publish completed GPU outputs and retire stale destinations through one frontend owner.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/preview-presentation.test.ts',
+      'apps/extension/src/video-editor/preview/stage/scene/render.test.tsx',
+      'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-crop-preview.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-crop-paint.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-paint.test.ts',
+      'apps/extension/src/gallery/video-review/presentation-media-preview.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-editor-framing-preview-frame',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview-frame.ts',
+    reason:
+      'The framing surface tests exercise renderer selection, cancellation and completed frame publication.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx',
+    ],
+  },
+  ...spatialResourceMappings,
+  {
+    owner: 'video-editor-project-state-admission',
+    productionFile: 'apps/extension/src/video-editor/state/project-actions.ts',
+    reason:
+      'Project admission serves scene updates, source-range commands and saved revision synchronization.',
+    testFiles: [
+      'apps/extension/src/video-editor/state/project-actions.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/source-range-history.test.ts',
+      'apps/extension/src/video-editor/runtime/session/auto-save.test.tsx',
+    ],
+  },
   {
     owner: 'shared-scene-plane-projection',
     productionFile:
@@ -527,14 +709,26 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     owner: 'video-editor-preview-cache-runtime',
     productionPrefix: 'apps/extension/src/video-editor/preview/cache/',
     reason:
-      'Preview revision, exact-frame LRU, materialization, and fragmented AVC preparation have focused cache proof.',
+      'Preview media lifetime, frame readiness, cache generation, and framing consumers have focused proof.',
     testFiles: [
+      'apps/extension/src/video-editor/preview/cache/build-exact.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-gpu.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-gpu-joins.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer-gpu-outputs.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.images.test.ts',
+      'apps/extension/src/video-editor/preview/cache/materializer.videos.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-lifecycle.test.ts',
+      'apps/extension/src/video-editor/preview/cache/runtime-resume.test.ts',
+      'apps/extension/src/video-editor/preview/cache/strategy.test.ts',
       'apps/extension/src/video-editor/preview/cache/encode.test.ts',
       'apps/extension/src/video-editor/preview/cache/exact-frame-cache.test.ts',
       'apps/extension/src/video-editor/preview/cache/render.test.ts',
       'apps/extension/src/video-editor/preview/cache/revision.test.ts',
       'apps/extension/src/video-editor/preview/cache/runtime.test.ts',
       'apps/extension/src/video-editor/preview/cache/segments.test.ts',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview-interaction.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/framing-preview.test.tsx',
     ],
   },
   {

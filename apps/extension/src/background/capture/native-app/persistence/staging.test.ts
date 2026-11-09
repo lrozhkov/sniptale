@@ -1,25 +1,34 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import '../../../../composition/persistence/infrastructure/indexed-db/fake-indexed-db.test-support';
+import { openDB, deleteDB, type IDBPDatabase } from 'idb';
+import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import {
+  DB_VERSION,
+  NATIVE_TRANSFER_SESSIONS_STORE as SESSIONS,
+  NATIVE_TRANSFER_CHUNKS_STORE as CHUNKS,
+} from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
+import { handleDatabaseUpgrade } from '../../../../composition/persistence/infrastructure/indexed-db/upgrade/core';
+import { installPersistenceLockManagerForTests } from '../../../../composition/persistence/infrastructure/mutation-barrier';
 
 import type { NativeTransferChunkEntry, NativeTransferSessionEntry } from './contracts';
 
-const stores = vi.hoisted(() => ({
-  chunks: new Map<string, NativeTransferChunkEntry>(),
-  sessions: new Map<string, NativeTransferSessionEntry>(),
+let database: IDBPDatabase;
+let databaseName: string;
+vi.mock('../../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<
+    typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
+  >()),
+  initDB: async () => database,
 }));
-
-vi.mock(
-  '../../../../composition/persistence/infrastructure/indexed-db/core',
-  async (importOriginal) => ({
-    ...(await importOriginal<
-      typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
-    >()),
-    initDB: vi.fn(async () => createDb()),
-  })
-);
-
-beforeEach(() => {
-  stores.chunks.clear();
-  stores.sessions.clear();
+beforeEach(async () => {
+  installPersistenceLockManagerForTests({ request: async (_name, _options, work) => work({}) });
+  databaseName = `native-staging-${crypto.randomUUID()}`;
+  database = await openDB(databaseName, DB_VERSION, { upgrade: handleDatabaseUpgrade });
+});
+afterEach(async () => {
+  vi.restoreAllMocks();
+  database.close();
+  await deleteDB(databaseName);
+  installPersistenceLockManagerForTests(null);
 });
 
 it('persists and lists native transfer sessions and chunks', async () => {
@@ -41,29 +50,29 @@ it('persists and lists native transfer sessions and chunks', async () => {
 
 it('deletes transfers and cleans up stale sessions', async () => {
   const staging = await import('./staging');
-  stores.sessions.set('fresh', createSession({ expiresAt: 200, id: 'fresh' }));
-  stores.sessions.set('stale', createSession({ expiresAt: 50, id: 'stale' }));
-  stores.chunks.set('stale:0', createChunk({ sessionId: 'stale' }));
+  await database.put(SESSIONS, createSession({ expiresAt: 200, id: 'fresh' }));
+  await database.put(SESSIONS, createSession({ expiresAt: 50, id: 'stale' }));
+  await database.put(CHUNKS, createChunk({ sessionId: 'stale' }));
 
   await expect(staging.cleanupStaleNativeTransferSessions(100)).resolves.toEqual(['stale']);
-  expect(stores.sessions.has('fresh')).toBe(true);
-  expect(stores.sessions.has('stale')).toBe(false);
-  expect(stores.chunks.has('stale:0')).toBe(false);
+  expect(await database.get(SESSIONS, 'fresh')).toBeDefined();
+  expect(await database.get(SESSIONS, 'stale')).toBeUndefined();
+  expect(await database.get(CHUNKS, ['stale', 0])).toBeUndefined();
 
   await staging.deleteNativeTransferSession('fresh');
-  expect(stores.sessions.has('fresh')).toBe(false);
+  expect(await database.get(SESSIONS, 'fresh')).toBeUndefined();
 });
 
 it('atomically replaces completed transfers with a tombstone and deletes chunks', async () => {
   const staging = await import('./staging');
   const complete = createSession({ kind: 'recording-complete', totalBytes: 0 });
-  stores.sessions.set('transfer-1', createSession({ kind: 'recording' }));
-  stores.chunks.set('transfer-1:0', createChunk());
+  await database.put(SESSIONS, createSession({ kind: 'recording' }));
+  await database.put(CHUNKS, createChunk());
 
   await staging.completeNativeTransferSession(complete);
 
-  expect(stores.sessions.get('transfer-1')).toEqual(complete);
-  expect(stores.chunks.has('transfer-1:0')).toBe(false);
+  expect(await database.get(SESSIONS, 'transfer-1')).toEqual(complete);
+  expect(await database.get(CHUNKS, ['transfer-1', 0])).toBeUndefined();
 });
 
 function createSession(
@@ -101,59 +110,32 @@ function createChunk(patch: Partial<NativeTransferChunkEntry> = {}): NativeTrans
   };
 }
 
-function createDb() {
-  return {
-    get: vi.fn(async (_store: string, id: string) => stores.sessions.get(id)),
-    getAll: vi.fn(async () => [...stores.sessions.values()]),
-    getAllFromIndex: vi.fn(async (_store: string, _index: string, sessionId: string) =>
-      [...stores.chunks.values()].filter((chunk) => chunk.sessionId === sessionId)
-    ),
-    put: vi.fn(async (_store: string, entry: NativeTransferSessionEntry) => {
-      stores.sessions.set(entry.id, entry);
-    }),
-    transaction: vi.fn(() => createTransaction()),
-  };
-}
-
-function createTransaction() {
-  return {
-    done: Promise.resolve(),
-    objectStore: (storeName: string) => createObjectStore(storeName),
-  };
-}
-
-function createObjectStore(storeName: string) {
-  return {
-    delete: vi.fn(async (key: IDBValidKey) => {
-      deleteStoreEntry(storeName, key);
-    }),
-    index: vi.fn(() => ({
-      getAllKeys: vi.fn(async (sessionId: string) =>
-        [...stores.chunks.values()]
-          .filter((chunk) => chunk.sessionId === sessionId)
-          .map((chunk) => [chunk.sessionId, chunk.chunkIndex])
-      ),
-    })),
-    put: vi.fn(async (entry: NativeTransferChunkEntry | NativeTransferSessionEntry) => {
-      putStoreEntry(entry);
-    }),
-  };
-}
-
-function putStoreEntry(entry: NativeTransferChunkEntry | NativeTransferSessionEntry): void {
-  if ('chunkIndex' in entry) {
-    stores.chunks.set(`${entry.sessionId}:${entry.chunkIndex}`, entry);
-    return;
-  }
-  stores.sessions.set(entry.id, entry);
-}
-
-function deleteStoreEntry(storeName: string, key: IDBValidKey): void {
-  if (storeName === 'native_transfer_sessions' && typeof key === 'string') {
-    stores.sessions.delete(key);
-    return;
-  }
-  if (Array.isArray(key)) {
-    stores.chunks.delete(`${key[0]}:${key[1]}`);
-  }
-}
+it('retains malformed history authority for recovery instead of expiring it silently', async () => {
+  const { cleanupStaleNativeTransferSessions } = await import('./staging');
+  const parent = createSession({
+    kind: 'recording-complete',
+    id: 'invalid-history',
+    expiresAt: 50,
+    metadata: { width: 640, height: 360, openEditor: false, history: { unexpected: true } },
+  });
+  await database.put(SESSIONS, parent);
+  expect(await cleanupStaleNativeTransferSessions(100)).toEqual([]);
+  expect(await database.get(SESSIONS, parent.id)).toEqual(parent);
+});
+it('rolls back the parent deletion if removal of its staged chunks fails', async () => {
+  const { cleanupStaleNativeTransferSessions } = await import('./staging');
+  const parent = createSession({ expiresAt: 50 });
+  await database.put(SESSIONS, parent);
+  await database.put(CHUNKS, createChunk());
+  const originalDelete = IDBObjectStore.prototype.delete;
+  vi.spyOn(IDBObjectStore.prototype, 'delete').mockImplementation(function (
+    this: IDBObjectStore,
+    query
+  ) {
+    if (this.name === CHUNKS) throw new Error('chunk-delete-failed');
+    return originalDelete.call(this, query);
+  });
+  await expect(cleanupStaleNativeTransferSessions(100)).rejects.toThrow('chunk-delete-failed');
+  expect(await database.get(SESSIONS, parent.id)).toEqual(parent);
+  expect(await database.get(CHUNKS, [parent.id, 0])).toBeDefined();
+});

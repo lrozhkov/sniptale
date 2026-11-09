@@ -174,7 +174,8 @@ function parseAsset(raw: unknown): ReviewAnnotationEffectAsset | null {
 export function readReviewAnnotationEffectDocument(source: string): EffectV1Document | null {
   try {
     const result = validateEffectV1Document(
-      parseBoundedEffectJson(new TextEncoder().encode(source))
+      parseBoundedEffectJson(new TextEncoder().encode(source)),
+      { presentationPolicy: 'retained' }
     );
     const document = result.document;
     if (
@@ -379,16 +380,19 @@ export async function verifyReviewAnnotationEffectSnapshot(
   // External SVG bytes receive the same script/URL admission as embedded Effect V1 SVG.
   if (
     svgSources.size &&
-    !validateEffectV1Document({
-      ...document,
-      assets: document.assets.map((asset) => {
-        const svgText = svgSources.get(asset.id);
-        const retained = snapshot.assets.find((value) => value.id === asset.id);
-        return svgText !== undefined && retained
-          ? { ...asset, svgText, byteLength: retained.byteLength, sha256: retained.sha256 }
-          : asset;
-      }),
-    }).ok
+    !validateEffectV1Document(
+      {
+        ...document,
+        assets: document.assets.map((asset) => {
+          const svgText = svgSources.get(asset.id);
+          const retained = snapshot.assets.find((value) => value.id === asset.id);
+          return svgText !== undefined && retained
+            ? { ...asset, svgText, byteLength: retained.byteLength, sha256: retained.sha256 }
+            : asset;
+        }),
+      },
+      { presentationPolicy: 'retained' }
+    ).ok
   )
     throw new ReviewAnnotationEffectUnavailableError('resource-integrity');
   signal.throwIfAborted();

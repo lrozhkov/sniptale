@@ -170,8 +170,14 @@ it('renders the solid color branch and forwards color updates', async () => {
   ).toHaveLength(1);
 
   const colors = container!.querySelector('[data-ui="editor.frame.paint-presets"]')!;
+  expect(colors.querySelectorAll('[data-ui="shared.ui.backgroundThumbnails.group"]')).toHaveLength(
+    0
+  );
   expect(
-    Array.from(colors.querySelectorAll('button'), (button) => button.title).slice(0, 2)
+    Array.from(colors.querySelectorAll('button'))
+      .filter((button) => button.style.backgroundColor)
+      .map((button) => button.title)
+      .slice(0, 2)
   ).toEqual(['#111111', '#eeeeee']);
   await act(async () => colors.querySelector('button')!.click());
   expect(applyFramePatch).toHaveBeenCalledWith({
@@ -193,7 +199,10 @@ it('renders the solid color branch and forwards color updates', async () => {
     )?.click();
   });
 
-  expect(previewFramePatch).not.toHaveBeenCalled();
+  expect(previewFramePatch).toHaveBeenCalledWith({
+    backgroundColor: '#111111ff',
+    backgroundMode: 'color',
+  });
   expect(applyFramePatch).toHaveBeenCalledWith({
     backgroundColor: '#222222ff',
     backgroundMode: 'color',
@@ -305,26 +314,17 @@ it('renders the image branch and forwards image mode updates', async () => {
     />
   );
 
-  expect(container?.querySelector('[data-testid="select-field"]')).not.toBeNull();
-
-  await act(async () => {
-    (container?.querySelectorAll('button')[0] as HTMLButtonElement | undefined)?.click();
-    Array.from(container!.querySelectorAll('button'))
-      .find((button) => button.textContent === translate('editor.scene.clearImage'))
-      ?.click();
-    (
-      container?.querySelector('[data-testid="select-field"] button') as
-        | HTMLButtonElement
-        | undefined
-    )?.click();
-  });
-
-  expect(container?.querySelector('input[type="file"]')).not.toBeNull();
-  expect(onClearBackgroundImage).toHaveBeenCalledTimes(1);
-  expect(applyFramePatch).toHaveBeenCalledWith({ backgroundImageFit: 'cover' });
+  expect(container?.querySelector('[data-testid="select-field"]')).toBeNull();
+  expect(container?.querySelector('img')).toBeNull();
+  expect(
+    Array.from(container!.querySelectorAll('button')).some(
+      (button) => button.textContent === translate('editor.scene.clearImage')
+    )
+  ).toBe(false);
+  expect(onClearBackgroundImage).not.toHaveBeenCalled();
 });
 
-it('offers image acquisition before fit controls, then reveals fit after picking an image', async () => {
+it('keeps image acquisition separate from Advanced fit controls', async () => {
   const props = {
     applyFramePatch: vi.fn(),
     frameBackgroundImageFitOptions: [{ value: 'cover' as const, label: 'Cover' }],
@@ -342,10 +342,10 @@ it('offers image acquisition before fit controls, then reveals fit after picking
       frameDraft={{ ...props.frameDraft, backgroundImageData: 'data:image/png;base64,abc' }}
     />
   );
-  expect(container?.querySelector('[data-testid="select-field"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="select-field"]')).toBeNull();
 });
 
-it('previews the selected background resource and removes its preview when cleared', async () => {
+it('does not duplicate the selected background in an image preview', async () => {
   const props = {
     applyFramePatch: vi.fn(),
     frameBackgroundImageFitOptions: [{ value: 'cover' as const, label: 'Cover' }],
@@ -358,10 +358,7 @@ it('previews the selected background resource and removes its preview when clear
     onPickBackgroundImage: vi.fn(),
   };
   await renderUi(<EditorInspectorFrameBackgroundImageEditor {...props} />);
-  expect(container?.querySelector('img')?.getAttribute('src')).toBe(
-    props.frameDraft.backgroundImageData
-  );
-  expect(container?.querySelector('img')?.getAttribute('alt')).toBeTruthy();
+  expect(container?.querySelector('img')).toBeNull();
   await renderUi(
     <EditorInspectorFrameBackgroundImageEditor
       {...props}

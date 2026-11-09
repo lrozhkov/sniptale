@@ -9,6 +9,43 @@ import { MAX_ROOT_METADATA_BYTES } from './contracts';
 import { assertMetadataJson } from './codec';
 import { parseBackupRootEnvelope } from './shared-object-envelope';
 import { decodeBackupMetadata } from './metadata-transport';
+import type { MediaHubBackupRootInventoryItem } from './contracts';
+
+it.each(['library-folders-v2', 'library-folders-v3'] as const)(
+  'exports exact streamed object bytes through %s',
+  async (layout) => {
+    const item = root('immutable cursor block');
+    const payload = await item.load();
+    const open = vi.fn(async () => ({
+      size: 22,
+      pipeTo: (sink: WritableStream<Uint8Array>, signal?: AbortSignal) =>
+        new Blob(['immutable cursor block']).stream().pipeTo(sink, signal ? { signal } : {}),
+    }));
+    const lazy: MediaHubBackupRootInventoryItem = {
+      ...item,
+      load: async () => ({
+        ...payload,
+        objects: payload.objects.map((object) => ({ ref: object.ref, open })),
+      }),
+    };
+    const plan = buildMediaHubBackupExportPlanV6({
+      layout,
+      roots: [lazy],
+      privacy: { includeSourceMetadata: true, includeTelemetry: true, includeWebSnapshots: false },
+    });
+    const output = createArchiveMemorySink();
+    await exportMediaHubBackupV6({ plan, sink: output.sink });
+    const archive = await openArchiveReader(output.blob());
+    try {
+      const entry = archive.entry('Screenshots/capture.png');
+      if (!entry) throw new Error('Missing immutable block.');
+      expect(await entry.text()).toBe('immutable cursor block');
+    } finally {
+      await archive.close();
+    }
+    expect(open).toHaveBeenCalled();
+  }
+);
 
 const favicon =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';

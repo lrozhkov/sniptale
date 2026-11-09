@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { createSha256Digest } from '@sniptale/platform/security/digest';
 
@@ -243,19 +244,30 @@ function projectVideoPreviewSegmentRenderState(
   };
 }
 
-export function createVideoPreviewRenderIdentity(project: VideoProject): string {
-  return JSON.stringify(canonicalize(projectVideoPreviewRenderState(project)));
+export function createVideoPreviewRenderIdentity(
+  project: VideoProject,
+  renderer: VideoPreviewRenderer = 'gpu'
+): string {
+  return JSON.stringify(
+    canonicalize({ renderer, project: projectVideoPreviewRenderState(project) })
+  );
 }
 
-export async function createVideoPreviewRenderRevision(project: VideoProject): Promise<string> {
-  return createSha256Digest(createVideoPreviewRenderIdentity(project));
+export async function createVideoPreviewRenderRevision(
+  project: VideoProject,
+  renderer: VideoPreviewRenderer = 'gpu'
+): Promise<string> {
+  return createSha256Digest(createVideoPreviewRenderIdentity(project, renderer));
 }
 
 export async function createVideoPreviewSegmentRevision(
   project: VideoProject,
-  range: VideoPreviewSegmentRange
+  range: VideoPreviewSegmentRange,
+  renderer: VideoPreviewRenderer = 'gpu'
 ): Promise<string> {
   return createSha256Digest(
-    JSON.stringify(canonicalize(projectVideoPreviewSegmentRenderState(project, range)))
+    JSON.stringify(
+      canonicalize({ renderer, project: projectVideoPreviewSegmentRenderState(project, range) })
+    )
   );
 }

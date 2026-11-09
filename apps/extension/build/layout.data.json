@@ -9,6 +9,7 @@
     "apps/extension/build/injected-build-shim-guard.ts",
     "apps/extension/build/injected-build-support.ts",
     "apps/extension/build/injected-build.ts",
+    "apps/extension/build/i18n-catalogs.ts",
     "apps/extension/build/layout.data.json",
     "apps/extension/build/layout.ts",
     "apps/extension/build/extension-html-inputs.ts",

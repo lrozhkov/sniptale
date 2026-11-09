@@ -8,6 +8,8 @@ import {
 } from './use-preview-presentation';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import { createCanvasComment } from '../../features/video/review/comments';
+import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
+import { reviewPresentedGeometry } from '../../workflows/video-review/gpu-preview-geometry';
 
 const io = vi.hoisted(() => ({
   factory: vi.fn(),
@@ -76,6 +78,7 @@ const assets = {
 };
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   time = 0;
   nextTick = 0;
@@ -145,11 +148,13 @@ beforeEach(() => {
       context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
       release,
       generation: frame.generation,
+      sourceTime: frame.sourceTime,
     };
   });
   io.factory.mockImplementation(() => ({
+    maximumInFlight: () => 2,
     prepare: io.prepare,
-    render: io.render,
+    renderPresentation: io.render,
     dispose: io.dispose,
   }));
   io.bytes.mockImplementation(() => ({ release: vi.fn() }));
@@ -160,6 +165,7 @@ afterEach(async () => {
   host.remove();
   vi.restoreAllMocks();
   vi.resetAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 function Harness() {
@@ -176,6 +182,7 @@ const step = async (value: number) => {
     const callbacks = [...ticks.values()];
     ticks.clear();
     callbacks.forEach((callback) => callback(time));
+    await vi.runOnlyPendingTimersAsync();
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -250,6 +257,7 @@ it('replaces the retained canvas only when the completed frame needs a different
       context: { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), drawImage: vi.fn() },
       release,
       generation: frame.generation,
+      sourceTime: frame.sourceTime,
     };
   });
   props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
@@ -257,6 +265,8 @@ it('replaces the retained canvas only when the completed frame needs a different
   await step(50);
   expect(props.host.current!.querySelector('canvas[data-preview-front="true"]')).not.toBe(front);
   expect(result.status.actualRaster).toEqual({ width: 1280, height: 720 });
+  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(1);
+  expect(front?.parentElement).toBeNull();
   expect(releases[0]).toHaveBeenCalledOnce();
   expect(releases[1]).not.toHaveBeenCalled();
 });
@@ -326,52 +336,280 @@ it('paints manual FPS at native readout cadence while reporting frames and failu
   expect(statistics.mock.calls.at(-1)![0].phase).toBe('failed');
 });
 
-it('publishes through a bounded reusable pair without front pixel copies or warm DOM replacement', async () => {
-  const pair = [document.createElement('canvas'), document.createElement('canvas')];
-  for (const canvas of pair) {
-    canvas.width = 720;
-    canvas.height = 360;
+it.each([2, 3])(
+  'publishes through %i reusable buffers without front pixel copies or warm DOM replacement',
+  async (bufferCount) => {
+    const pool = Array.from({ length: bufferCount }, () => document.createElement('canvas'));
+    for (const canvas of pool) {
+      canvas.width = 720;
+      canvas.height = 360;
+    }
+    const contexts = pool.map(() => ({
+      save: vi.fn(),
+      restore: vi.fn(),
+      setTransform: vi.fn(),
+      drawImage: vi.fn(),
+    }));
+    let index = 0;
+    io.render.mockImplementation((_prepared, frame) => {
+      const slot = index++ % bufferCount;
+      const release = vi.fn();
+      releases.push(release);
+      return {
+        canvas: pool[slot]!,
+        context: contexts[slot]!,
+        release,
+        generation: frame.generation,
+      };
+    });
+    await render();
+    await step(0);
+    for (let count = 1; count < bufferCount; count++) {
+      props = {
+        ...props,
+        pausedSourceTime: count + 1,
+        pausedResultTime: count + 0.75,
+        seekRevision: count,
+      };
+      await render();
+      await step(count * 50);
+    }
+    expect(contexts[0]!.drawImage).not.toHaveBeenCalled();
+    expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(bufferCount);
+    const mutations: MutationRecord[] = [];
+    const observer = new MutationObserver((records) => mutations.push(...records));
+    observer.observe(props.host.current!, { childList: true });
+    for (let count = bufferCount; count < bufferCount + 4; count++) {
+      props = {
+        ...props,
+        pausedSourceTime: count + 1,
+        pausedResultTime: count + 0.75,
+        seekRevision: count,
+      };
+      await render();
+      await step(count * 50);
+      expect([...props.host.current!.querySelectorAll('canvas')]).toEqual(pool);
+      expect(
+        props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')
+      ).toHaveLength(1);
+    }
+    expect([...mutations, ...observer.takeRecords()]).toHaveLength(0);
+    observer.disconnect();
+    for (const context of contexts) expect(context.drawImage).not.toHaveBeenCalled();
+    for (const release of releases.slice(0, -1)) expect(release).toHaveBeenCalledOnce();
+    expect(releases.at(-1)).not.toHaveBeenCalled();
+    props = { ...props, visible: false };
+    await render();
+    expect(props.host.current!.children).toHaveLength(0);
+    for (const release of releases) expect(release).toHaveBeenCalledOnce();
   }
-  const contexts = pair.map(() => ({
-    save: vi.fn(),
-    restore: vi.fn(),
-    setTransform: vi.fn(),
-    drawImage: vi.fn(),
-  }));
-  let index = 0;
-  io.render.mockImplementation((_prepared, frame) => {
-    const slot = index++ % 2;
-    const release = vi.fn();
-    releases.push(release);
-    return { canvas: pair[slot]!, context: contexts[slot]!, release, generation: frame.generation };
-  });
+);
+
+it('bounds retained publication nodes when the renderer replaces its reusable surfaces', async () => {
   await render();
-  await step(0);
-  props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75, seekRevision: 1 };
-  await render();
-  await step(50);
-  expect(contexts[0]!.drawImage).not.toHaveBeenCalled();
-  expect(props.host.current!.querySelectorAll('canvas')).toHaveLength(2);
-  const mutations: MutationRecord[] = [];
-  const observer = new MutationObserver((records) => mutations.push(...records));
-  observer.observe(props.host.current!, { childList: true });
-  for (let count = 2; count < 5; count++) {
+  for (let count = 0; count < 7; count++) {
     props = {
       ...props,
-      pausedSourceTime: count + 1,
-      pausedResultTime: count + 0.75,
-      seekRevision: count,
+      pausedSourceTime: count + 2,
+      pausedResultTime: count + 1.75,
+      seekRevision: count + 1,
     };
     await render();
     await step(count * 50);
-    expect([...props.host.current!.querySelectorAll('canvas')]).toEqual(pair);
+    expect(props.host.current!.children.length).toBeLessThanOrEqual(3);
     expect(props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')).toHaveLength(
       1
     );
   }
-  expect([...mutations, ...observer.takeRecords()]).toHaveLength(0);
-  observer.disconnect();
-  for (const context of contexts) expect(context.drawImage).not.toHaveBeenCalled();
+  expect(props.host.current!.children).toHaveLength(3);
   for (const release of releases.slice(0, -1)) expect(release).toHaveBeenCalledOnce();
   expect(releases.at(-1)).not.toHaveBeenCalled();
+});
+
+it('owns the playing clock before capture and releases it on pending, fallback and teardown', async () => {
+  const active = vi.fn();
+  const geometry = vi.fn();
+  props = { ...props, playing: true, onPresentationActive: active, onGeometry: geometry };
+  await render();
+  expect(active).toHaveBeenLastCalledWith('source', true);
+  expect(io.render).not.toHaveBeenCalled();
+  await step(0);
+  expect(geometry).toHaveBeenLastCalledWith(null, 1.234567, 'source');
+  expect(active).toHaveBeenLastCalledWith('source', false); // The legacy raster has no GPU geometry receipt.
+  const before = active.mock.calls.length;
+  await render();
+  await step(40);
+  expect(active.mock.calls.length).toBe(before);
+  props = { ...props, sourceToResult: () => null };
+  await render();
+  act(() => props.video.current!.dispatchEvent(new Event('seeking')));
+  await step(80);
+  expect(active).toHaveBeenLastCalledWith('source', false);
+  props = { ...props, visible: false };
+  await render();
+  expect(active).toHaveBeenLastCalledWith('source', false);
+});
+
+it('keeps the Standard follow/orbit receipt and source clock with the completed front frame', async () => {
+  const active = vi.fn();
+  const report = vi.fn();
+  props = {
+    ...props,
+    playing: true,
+    onPresentationActive: active,
+    onGeometry: report,
+    preferences: { ...props.preferences, renderer: 'legacy' },
+    scene: {
+      ...props.scene,
+      zoomRegions: [
+        {
+          ...createQuickEditZoomRegion({ id: 'follow', at: 0, duration: 4, endMax: 4 }),
+          transform: { scale: 2.5, centerX: 0.5, centerY: 0.5 },
+          enter: { type: 'none', duration: 0 },
+          exit: { type: 'none', duration: 0 },
+          followCursor: true,
+          cursorComposition: { mode: 'orbit', amount: 0.5, smoothness: 0.5 },
+          cursorFocus: {
+            path: {
+              version: 1,
+              mode: 'follow',
+              gapPolicy: 'hold',
+              smoothing: 0.5,
+              sensitivity: 0.5,
+              segments: [
+                {
+                  id: 'path',
+                  binding: { kind: 'project' },
+                  start: 0,
+                  end: 4,
+                  keys: [
+                    { id: 'a', time: 0, x: 0.2, y: 0.4, anchor: 'manual', interpolation: 'smooth' },
+                    { id: 'b', time: 4, x: 0.8, y: 0.4, anchor: 'manual', interpolation: 'smooth' },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      ],
+    },
+  };
+  const draw = io.render.getMockImplementation()!;
+  const receipts: ReturnType<typeof reviewPresentedGeometry>[] = [];
+  io.render.mockImplementation((prepared, frame) => {
+    const geometry = reviewPresentedGeometry(
+      props.scene,
+      { canonical: props.canonical, backing: { width: 720, height: 360 } },
+      frame.resultTime
+    );
+    receipts.push(geometry);
+    return { ...draw(prepared, frame), geometry, renderer: { backend: 'legacy' } };
+  });
+  await render();
+  await step(0);
+  expect(report).toHaveBeenLastCalledWith(receipts[0], 1.234567, 'source');
+  expect(receipts[0]?.scene.zoomRegions[0]?.cursorFocus).toBeDefined();
+  expect(receipts[0]?.camera.spatial?.rotation).not.toEqual([0, 0, 0, 1]);
+  expect(active.mock.calls).toEqual([['source', true]]);
+  props.video.current!.currentTime = 2;
+  await step(40);
+  expect(report).toHaveBeenLastCalledWith(receipts.at(-1), 2, 'source');
+  expect(receipts.at(-1)?.camera.centerX).not.toBe(receipts[0]?.camera.centerX);
+  expect(active.mock.calls).toEqual([['source', true]]);
+  expect(props.host.current!.querySelectorAll('canvas[data-preview-front="true"]')).toHaveLength(1);
+  props = { ...props, visible: false };
+  await render();
+  expect(active).toHaveBeenLastCalledWith('source', false);
+});
+
+it('keeps one active clock registration while playing rerenders and GPU receipts advance', async () => {
+  const active = vi.fn();
+  const draw = io.render.getMockImplementation()!;
+  io.render.mockImplementation((...args: unknown[]) => ({
+    ...draw(...args),
+    geometry: { resultTime: 1 },
+  }));
+  props = { ...props, playing: true, onPresentationActive: active };
+  await render();
+  await step(0);
+  expect(active.mock.calls).toEqual([['source', true]]);
+  props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75 };
+  props.video.current!.currentTime = 2;
+  await render();
+  await step(40);
+  expect(io.render.mock.calls.length).toBeGreaterThan(1);
+  expect(active.mock.calls).toEqual([['source', true]]);
+  props = { ...props, visible: false };
+  await render();
+  expect(active.mock.calls).toEqual([
+    ['source', true],
+    ['source', false],
+  ]);
+});
+
+it('uses prepared playing RAF admission but keeps retry, visibility and latest scenes after paint', async () => {
+  props = { ...props, playing: true };
+  const frameOnly = async (value: number) => {
+    time = value;
+    await act(async () => {
+      const callbacks = [...ticks.values()];
+      ticks.clear();
+      callbacks.forEach((callback) => callback(time));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  };
+  const tasks = () =>
+    act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+  await render();
+  await frameOnly(0);
+  expect(io.render).not.toHaveBeenCalled();
+  await tasks();
+  expect(io.render).toHaveBeenCalledOnce();
+  await frameOnly(40);
+  expect(io.render).toHaveBeenCalledTimes(2);
+  act(() => result.retry());
+  await frameOnly(80);
+  expect(io.render).toHaveBeenCalledTimes(2);
+  await tasks();
+  expect(io.render).toHaveBeenCalledTimes(3);
+  props = { ...props, visible: false };
+  await render();
+  expect(ticks.size).toBe(0);
+  props = {
+    ...props,
+    visible: true,
+    scene: {
+      ...props.scene,
+      comments: props.scene.comments.map((comment) => ({
+        ...comment,
+        resolvedText: 'latest scene',
+      })),
+    },
+  };
+  await render();
+  await frameOnly(120);
+  expect(io.render).toHaveBeenCalledTimes(3);
+  await tasks();
+  expect(io.render).toHaveBeenCalledTimes(4);
+  expect(io.prepare.mock.lastCall![0].comments[0].resolvedText).toBe('latest scene');
+});
+
+it('keeps the GPU session when a scene enters or leaves overlap eligibility', async () => {
+  await render();
+  await step(0);
+  expect(io.factory).toHaveBeenCalledOnce();
+  expect(io.factory.mock.calls[0]![0]).toMatchObject({ maximumInFlight: 2 });
+  const comments = props.scene.comments;
+  props = { ...props, scene: { ...props.scene, comments: [] } };
+  await render();
+  await step(40);
+  expect(io.factory).toHaveBeenCalledOnce();
+  props = { ...props, scene: { ...props.scene, comments } };
+  await render();
+  await step(80);
+  expect(io.factory).toHaveBeenCalledOnce();
 });

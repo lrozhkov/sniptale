@@ -5,6 +5,7 @@ import {
 } from '../timeline/rate';
 import {
   patchReviewKeys,
+  patchReviewKeyDefaults,
   REVIEW_KEY_DEFAULT,
   type ReviewKeyStyle,
   type ReviewKeyAnimation,
@@ -26,6 +27,7 @@ export function patchVideoProjectActionFeedback(
   project: VideoProject,
   identity: Pick<VideoProjectActionFeedback, 'recordingId' | 'sourceInstanceId'>,
   patch: {
+    actionOverrides?: VideoProjectActionFeedback['actionOverrides'];
     settings?: ReviewActionAudioSetting[];
     gestureStyles?: ReviewClickAnimation[];
     keyStyles?: ReviewKeyAnimation[];
@@ -219,7 +221,9 @@ export function getVideoProjectKeyStyle(
       item.recordingId === anchor.recordingId && item.sourceInstanceId === anchor.sourceInstanceId
   );
   return group
-    ? (group.keyStyles?.find((style) => style.id === anchor.sourceEventId) ?? REVIEW_KEY_DEFAULT)
+    ? (group.keyStyles?.find((style) => style.id === anchor.sourceEventId) ??
+        group.keyDefaults ??
+        REVIEW_KEY_DEFAULT)
     : null;
 }
 
@@ -227,32 +231,41 @@ export function getVideoProjectKeyStyle(
 interface VideoProjectKeyFeedbackTarget {
   recordingId: string;
   sourceInstanceId: string;
-  sourceEventId: string;
+  sourceEventId: string | null;
 }
 
 /** Only existing captured commands with an admitted feedback group can receive caption patches. */
 export function getVideoProjectKeyFeedbackTargets(
   project: VideoProject
 ): VideoProjectKeyFeedbackTarget[] {
-  const groups = new Set(
-    (project.actionFeedback ?? []).map((group) =>
-      JSON.stringify([group.recordingId, group.sourceInstanceId])
-    )
+  const legacy = new Set(
+    (project.actionFeedback ?? [])
+      .filter((group) => !group.events)
+      .map((group) => JSON.stringify([group.recordingId, group.sourceInstanceId]))
   );
-  return project.actionEvents.flatMap((event) => {
-    const anchor = event.anchor;
-    return event.kind === 'KEY' &&
-      anchor.kind === 'recording-source' &&
-      groups.has(JSON.stringify([anchor.recordingId, anchor.sourceInstanceId]))
-      ? [
-          {
-            recordingId: anchor.recordingId,
-            sourceInstanceId: anchor.sourceInstanceId,
-            sourceEventId: anchor.sourceEventId,
-          },
-        ]
-      : [];
-  });
+  return [
+    ...(project.actionFeedback ?? [])
+      .filter((group) => group.events && group.events.totalBlocks > 0)
+      .map((group) => ({
+        recordingId: group.recordingId,
+        sourceInstanceId: group.sourceInstanceId,
+        sourceEventId: null,
+      })),
+    ...project.actionEvents.flatMap((event) => {
+      const anchor = event.anchor;
+      return event.kind === 'KEY' &&
+        anchor.kind === 'recording-source' &&
+        legacy.has(JSON.stringify([anchor.recordingId, anchor.sourceInstanceId]))
+        ? [
+            {
+              recordingId: anchor.recordingId,
+              sourceInstanceId: anchor.sourceInstanceId,
+              sourceEventId: anchor.sourceEventId,
+            },
+          ]
+        : [];
+    }),
+  ];
 }
 
 /** Batch caption patches retain current values and validate the complete feedback only once. */
@@ -269,24 +282,61 @@ export function patchVideoProjectKeyFeedback(
     )
   );
   const selected = new Map<string, Set<string>>();
+  const defaults = new Set<string>();
   for (const target of targets) {
-    if (
+    const key = JSON.stringify([target.recordingId, target.sourceInstanceId]);
+    const group = project.actionFeedback.find(
+      (group) =>
+        group.recordingId === target.recordingId &&
+        group.sourceInstanceId === target.sourceInstanceId
+    );
+    if (group?.events) {
+      if (target.sourceEventId === null) {
+        defaults.add(key);
+        continue;
+      }
+      if (!/^[A-Za-z0-9._:-]{1,128}$/.test(target.sourceEventId)) continue;
+    } else if (
       !admitted.has(
         JSON.stringify([target.recordingId, target.sourceInstanceId, target.sourceEventId])
       )
     )
       continue;
-    const key = JSON.stringify([target.recordingId, target.sourceInstanceId]);
+    if (target.sourceEventId === null) continue;
     const ids = selected.get(key) ?? new Set<string>();
     ids.add(target.sourceEventId);
     selected.set(key, ids);
   }
   let changed = false;
   const groups = project.actionFeedback.map((group) => {
-    const ids = selected.get(JSON.stringify([group.recordingId, group.sourceInstanceId]));
+    const key = JSON.stringify([group.recordingId, group.sourceInstanceId]);
+    if (defaults.has(key)) {
+      if (patch === null) {
+        if (group.keyDefaults === undefined && !group.keyStyles?.length) return group;
+        changed = true;
+        const { keyDefaults: _defaults, keyStyles: _styles, ...rest } = group;
+        return rest;
+      }
+      const keyDefaults = patchReviewKeyDefaults(group.keyDefaults, patch);
+      const keyStyles = group.keyStyles?.length
+        ? patchReviewKeys(
+            group.keyStyles,
+            group.keyStyles.map((style) => style.id),
+            patch
+          )
+        : group.keyStyles;
+      const next = { ...group, keyDefaults, ...(keyStyles ? { keyStyles } : {}) };
+      if (JSON.stringify(next) !== JSON.stringify(group)) changed = true;
+      return next;
+    }
+    const ids = selected.get(key);
     if (!ids || (patch === null && !group.keyStyles?.some((style) => ids.has(style.id))))
       return group;
-    const keyStyles = patchReviewKeys(group.keyStyles ?? [], [...ids], patch);
+    const current = [...(group.keyStyles ?? [])];
+    if (patch && group.keyDefaults)
+      for (const id of ids)
+        if (!current.some((style) => style.id === id)) current.push({ ...group.keyDefaults, id });
+    const keyStyles = patchReviewKeys(current, [...ids], patch);
     if (JSON.stringify(keyStyles) === JSON.stringify(group.keyStyles ?? [])) return group;
     changed = true;
     return { ...group, keyStyles };

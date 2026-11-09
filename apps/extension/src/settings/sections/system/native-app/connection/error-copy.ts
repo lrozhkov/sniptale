@@ -9,6 +9,15 @@ export function normalizeNativeAppError(
     return translate(fallbackKey);
   }
   const normalized = message.trim().toLowerCase();
+  if (normalized === 'unsupported native app protocol version') {
+    return translate('settings.nativeApp.incompatibleProtocolHelp');
+  }
+  if (normalized === 'native app reconnect attempts exhausted') {
+    return translate('settings.nativeApp.reconnectExhausted');
+  }
+  if (normalized === 'native app handshake timed out') {
+    return translate('settings.nativeApp.handshakeTimeout');
+  }
   if (normalized === 'unknown message type') {
     return translate('settings.nativeApp.backgroundRefreshRequired');
   }

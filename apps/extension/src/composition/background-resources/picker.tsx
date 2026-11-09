@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { CommandPressScope, useCommandPress } from '@sniptale/ui/control-language/press';
 import { useInspectorLayout } from '../../ui/compact-inspector-controls/layout';
-import { FolderOpen, Library, LoaderCircle } from 'lucide-react';
+import { FolderOpen, Library } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { BackgroundThumbnails } from '../../ui/background-thumbnails';
 import {
@@ -81,7 +81,7 @@ export function BackgroundImagePicker(props: {
       {props.showPresets !== false && (
         <BackgroundThumbnails
           label={translate('settings.editor.backgrounds.title')}
-          disabled={isBusy}
+          pending={isBusy}
           items={catalog.presets
             .filter((item) => item.enabled && item.available)
             .map((item) => ({
@@ -90,7 +90,12 @@ export function BackgroundImagePicker(props: {
               active: item.id === selected,
               loading: isBusy && item.id === pendingId,
               content: item.url ? (
-                <img src={item.url} alt="" className="h-full w-full object-cover" />
+                <img
+                  src={item.url}
+                  alt=""
+                  draggable={false}
+                  className="h-full w-full object-cover"
+                />
               ) : item.mediaId ? (
                 <BackgroundLibraryThumbnail mediaId={item.mediaId} />
               ) : undefined,
@@ -121,7 +126,6 @@ export function BackgroundImagePicker(props: {
       />
       <BackgroundAcquisitionCommands
         busy={isBusy}
-        uploading={isBusy && pendingId === undefined}
         onUpload={() => input.current?.click()}
         onLibrary={() => setLibrary(true)}
       />
@@ -149,7 +153,6 @@ export function BackgroundImagePicker(props: {
 
 function BackgroundAcquisitionCommands(props: {
   busy: boolean;
-  uploading: boolean;
   onUpload(): void;
   onLibrary(): void;
 }) {
@@ -158,33 +161,30 @@ function BackgroundAcquisitionCommands(props: {
   const uploadPress = useCommandPress({
     enabled: scoped,
     disabled: props.busy,
-    onClick: props.onUpload,
+    onClick: () => {
+      if (!props.busy) props.onUpload();
+    },
   });
   const libraryPress = useCommandPress({
     enabled: scoped,
     disabled: props.busy,
-    onClick: props.onLibrary,
+    onClick: () => {
+      if (!props.busy) props.onLibrary();
+    },
   });
   return (
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]!' : ''}`}
-        disabled={props.busy}
+        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]! border-0!' : ''}`}
         {...uploadPress.props}
+        aria-disabled={props.busy}
+        aria-busy={props.busy}
         data-command-press={scoped ? '' : undefined}
         data-pressing={uploadPress.pressed ? 'true' : undefined}
       >
         <span className={scoped ? 'sniptale-command-content' : 'contents'}>
-          {props.uploading ? (
-            <LoaderCircle
-              size={14}
-              className="shrink-0 animate-spin motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-          ) : (
-            <FolderOpen size={14} className="shrink-0" aria-hidden="true" />
-          )}
+          <FolderOpen size={14} className="shrink-0" aria-hidden="true" />
           <span className="min-w-0 whitespace-normal">
             {translate('settings.editor.backgrounds.upload')}
           </span>
@@ -192,9 +192,10 @@ function BackgroundAcquisitionCommands(props: {
       </button>
       <button
         type="button"
-        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]!' : ''}`}
-        disabled={props.busy}
+        className={`${backgroundActionClassName} grow ${inspector ? 'text-[13px]! border-0!' : ''}`}
         {...libraryPress.props}
+        aria-disabled={props.busy}
+        aria-busy={props.busy}
         data-command-press={scoped ? '' : undefined}
         data-pressing={libraryPress.pressed ? 'true' : undefined}
       >

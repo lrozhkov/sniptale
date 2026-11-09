@@ -1,0 +1,2046 @@
+{
+  "schemaVersion": 1,
+  "format": "cursor-trajectory-v1",
+  "algorithm": "sed-window-v1",
+  "encoding": "json-ascii-int-v1",
+  "window": {
+    "maxDurationUs": 250000,
+    "maxInputObservations": 512
+  },
+  "epsilon": {
+    "numerator": 199,
+    "denominator": 100,
+    "coordinateScale": 256
+  },
+  "cases": [
+    {
+      "id": "constant-speed",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "start"
+          ],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 1280,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 100000,
+          "xQ8": 2560,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "stop"
+          ],
+          "relatedObservationSeq": null
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "sed-is-not-perpendicular-distance",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "start"
+          ],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 1000,
+          "xQ8": 2560,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 100000,
+          "xQ8": 2816,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "stop"
+          ],
+          "relatedObservationSeq": null
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "q8-below-inner-threshold",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "start"
+          ],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 1280,
+          "yQ8": 509,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 100000,
+          "xQ8": 2560,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "stop"
+          ],
+          "relatedObservationSeq": null
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "q8-above-inner-threshold",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "start"
+          ],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 1280,
+          "yQ8": 510,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 100000,
+          "xQ8": 2560,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "stop"
+          ],
+          "relatedObservationSeq": null
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "id": "equal-error-keeps-smaller-observation-seq",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "start"
+          ],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 25000,
+          "xQ8": 640,
+          "yQ8": 768,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 50000,
+          "xQ8": 1280,
+          "yQ8": 768,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 3,
+          "activeTimeUs": 100000,
+          "xQ8": 2560,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "stop"
+          ],
+          "relatedObservationSeq": null
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        3
+      ]
+    },
+    {
+      "id": "click-retains-exact-neighbors",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "start"
+          ],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 20000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 40000,
+          "xQ8": 512,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "before-button"
+          ],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 3,
+          "activeTimeUs": 60000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "click",
+          "button": "left",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 4,
+          "activeTimeUs": 80000,
+          "xQ8": 1024,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "after-button"
+          ],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 5,
+          "activeTimeUs": 100000,
+          "xQ8": 1280,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [],
+          "relatedObservationSeq": null
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 6,
+          "activeTimeUs": 120000,
+          "xQ8": 1536,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "anchors": [
+            "stop"
+          ],
+          "relatedObservationSeq": null
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        2,
+        3,
+        4,
+        6
+      ]
+    },
+    {
+      "id": "down-up-linked-click",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "start"
+          ]
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 20000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "down",
+          "button": "left",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 70000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "up",
+          "button": "left",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 3,
+          "activeTimeUs": 80000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "click",
+          "button": "left",
+          "relatedObservationSeq": 2,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 4,
+          "activeTimeUs": 100000,
+          "xQ8": 1024,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "stop"
+          ]
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "expectedPresentationMarkers": [
+        {
+          "kind": "raw-click",
+          "observationSeq": 3,
+          "activeTimeUs": 80000,
+          "xQ8": 768,
+          "yQ8": 0
+        }
+      ]
+    },
+    {
+      "id": "down-up-without-raw-click",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "start"
+          ]
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 20000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "down",
+          "button": "left",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 80000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "up",
+          "button": "left",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 3,
+          "activeTimeUs": 100000,
+          "xQ8": 1024,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "stop"
+          ]
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "expectedPresentationMarkers": [
+        {
+          "kind": "derived-pair",
+          "downObservationSeq": 1,
+          "upObservationSeq": 2,
+          "activeTimeUs": 80000,
+          "xQ8": 768,
+          "yQ8": 0
+        }
+      ]
+    },
+    {
+      "id": "unpaired-raw-click",
+      "width": 1280,
+      "height": 800,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "start"
+          ]
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 512,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "click",
+          "button": "left",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 100000,
+          "xQ8": 1024,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "stop"
+          ]
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2
+      ],
+      "expectedPresentationMarkers": [
+        {
+          "kind": "raw-click",
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 512,
+          "yQ8": 0
+        }
+      ]
+    },
+    {
+      "id": "u32-geometry-exact-large-products-below",
+      "width": 4294967295,
+      "height": 4294967295,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "start"
+          ]
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 125000,
+          "xQ8": 549755813759,
+          "yQ8": 549755814268,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 250000,
+          "xQ8": 1099511627518,
+          "yQ8": 1099511627518,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "stop"
+          ]
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "u32-geometry-exact-large-products-above",
+      "width": 4294967295,
+      "height": 4294967295,
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "start"
+          ]
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 125000,
+          "xQ8": 549755813759,
+          "yQ8": 549755814269,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 250000,
+          "xQ8": 1099511627518,
+          "yQ8": 1099511627518,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "stop"
+          ]
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2
+      ]
+    }
+  ],
+  "canonicalVectors": [
+    {
+      "id": "one-block-constant-speed",
+      "value": {
+        "formatVersion": 1,
+        "recordingId": "recording-fixture",
+        "trajectoryId": "0123456789abcdef0123456789abcdef",
+        "sequence": 0,
+        "startTimeUs": 0,
+        "endTimeUs": 100000,
+        "records": [
+          {
+            "kind": "segment",
+            "segmentId": 0,
+            "activeTimeUs": 0,
+            "width": 1280,
+            "height": 800,
+            "clock": {
+              "source": "dom-event-time",
+              "timestampQuantumUs": 1000,
+              "resolutionBoundUs": 1000,
+              "mappingUncertaintyUs": 0
+            },
+            "reason": "start"
+          },
+          {
+            "kind": "sample",
+            "segmentId": 0,
+            "observationSeq": 0,
+            "activeTimeUs": 0,
+            "xQ8": 0,
+            "yQ8": 0,
+            "visible": true,
+            "observed": true,
+            "event": "move",
+            "button": "none",
+            "anchors": [
+              "start"
+            ],
+            "relatedObservationSeq": null
+          },
+          {
+            "kind": "sample",
+            "segmentId": 0,
+            "observationSeq": 2,
+            "activeTimeUs": 100000,
+            "xQ8": 2560,
+            "yQ8": 0,
+            "visible": true,
+            "observed": true,
+            "event": "move",
+            "button": "none",
+            "anchors": [
+              "stop"
+            ],
+            "relatedObservationSeq": null
+          },
+          {
+            "kind": "boundary",
+            "segmentId": 0,
+            "activeTimeUs": 100000,
+            "reason": "stop"
+          }
+        ]
+      },
+      "utf8": "{\"endTimeUs\":100000,\"formatVersion\":1,\"recordingId\":\"recording-fixture\",\"records\":[{\"activeTimeUs\":0,\"clock\":{\"mappingUncertaintyUs\":0,\"resolutionBoundUs\":1000,\"source\":\"dom-event-time\",\"timestampQuantumUs\":1000},\"height\":800,\"kind\":\"segment\",\"reason\":\"start\",\"segmentId\":0,\"width\":1280},{\"activeTimeUs\":0,\"anchors\":[\"start\"],\"button\":\"none\",\"event\":\"move\",\"kind\":\"sample\",\"observationSeq\":0,\"observed\":true,\"relatedObservationSeq\":null,\"segmentId\":0,\"visible\":true,\"xQ8\":0,\"yQ8\":0},{\"activeTimeUs\":100000,\"anchors\":[\"stop\"],\"button\":\"none\",\"event\":\"move\",\"kind\":\"sample\",\"observationSeq\":2,\"observed\":true,\"relatedObservationSeq\":null,\"segmentId\":0,\"visible\":true,\"xQ8\":2560,\"yQ8\":0},{\"activeTimeUs\":100000,\"kind\":\"boundary\",\"reason\":\"stop\",\"segmentId\":0}],\"sequence\":0,\"startTimeUs\":0,\"trajectoryId\":\"0123456789abcdef0123456789abcdef\"}",
+      "bytes": 837,
+      "blockSha256": "a39ae0729f35d23dfe27dc53fa8578469956d976cd9206ed7deea9822bf35794",
+      "lengthPrefixHex": "45030000",
+      "streamSha256": "40061cdce3d70669d4925dac00082e64712777357946c5ce0e1af66fa8eb7359"
+    },
+    {
+      "id": "empty-stream",
+      "bytes": 0,
+      "streamSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "longTrace": {
+    "generator": "alternating-q8-v1",
+    "durationUs": 3600000000,
+    "stepUs": 10000,
+    "observationCount": 360001,
+    "width": 1280,
+    "height": 800,
+    "xQ8": 25600,
+    "baseYQ8": 25600,
+    "oddYOffsetQ8": 1024,
+    "event": "move",
+    "button": "none",
+    "minimumRetainedSamples": 4097,
+    "formula": "For i from 0 through 360000: observationSeq=i; activeTimeUs=i*stepUs; xQ8=xQ8; yQ8=baseYQ8+(i%2)*oddYOffsetQ8. Mark first/last as start/stop. No capture sampling rate is implied.",
+    "partition": "source-driven; no timer flush; carry counts toward 512; close before span would exceed 250000us; finalize explicitly",
+    "recordingId": "recording-hour-fixture",
+    "trajectoryId": "fedcba9876543210fedcba9876543210",
+    "clockQuantumUs": 10000,
+    "firstAnchor": "start",
+    "lastAnchor": "stop",
+    "segmentReason": "start",
+    "finalBoundary": "stop",
+    "expected": {
+      "totalBlocks": 1155,
+      "totalRecords": 360003,
+      "totalSamples": 360001,
+      "totalBytes": 75588979,
+      "streamSha256": "27f79ea802bc324c9632f33c54534f68fea9f5f78b49afd2981604480937b8fb",
+      "firstBlock": {
+        "sequence": 0,
+        "startTimeUs": 0,
+        "endTimeUs": 3190000,
+        "recordCount": 321,
+        "sampleCount": 320,
+        "byteLength": 65439,
+        "blockSha256": "3f4c2d21dcc65842680d6cfcfd570a628b54262e59094851c9452a9deebb5f53",
+        "prefixSha256": "64c0c6df89a38991e74d4c44f09363d77f04fe75334d07f98cd456692f5f1845"
+      },
+      "lastBlock": {
+        "sequence": 1154,
+        "startTimeUs": 3599510000,
+        "endTimeUs": 3600000000,
+        "recordCount": 51,
+        "sampleCount": 50,
+        "byteLength": 10766,
+        "blockSha256": "37c5611597991b41def25372382839386dc09cfd0c513a8ee7111fd261951828",
+        "prefixSha256": "27f79ea802bc324c9632f33c54534f68fea9f5f78b49afd2981604480937b8fb"
+      },
+      "firstManifestEntries": [
+        {
+          "sequence": 0,
+          "startTimeUs": 0,
+          "endTimeUs": 3190000,
+          "recordCount": 321,
+          "sampleCount": 320,
+          "byteLength": 65439,
+          "blockSha256": "3f4c2d21dcc65842680d6cfcfd570a628b54262e59094851c9452a9deebb5f53",
+          "prefixSha256": "64c0c6df89a38991e74d4c44f09363d77f04fe75334d07f98cd456692f5f1845"
+        },
+        {
+          "sequence": 1,
+          "startTimeUs": 3200000,
+          "endTimeUs": 6390000,
+          "recordCount": 320,
+          "sampleCount": 320,
+          "byteLength": 65455,
+          "blockSha256": "da41bcd6a1f4860e247bbdd4d6feb3679e2dc28a2c9549ef1d86d0f055d50521",
+          "prefixSha256": "5d3deddba1f962f0e9b9690f2fe08d217967b9753f3675a3de20bd0dc42988a1"
+        },
+        {
+          "sequence": 2,
+          "startTimeUs": 6400000,
+          "endTimeUs": 9590000,
+          "recordCount": 320,
+          "sampleCount": 320,
+          "byteLength": 65455,
+          "blockSha256": "79369f5d231fa1ee1e4c9b42a65b61fbb0031a0a2f0d05199f7e0fda3d44b8d5",
+          "prefixSha256": "a7825526d5b9fc6fa725366643b19fea18790e00f7885fe9b2baefdc5099b113"
+        }
+      ]
+    },
+    "retentionReason": "Every skipped alternating 4px interior observation exceeds 1.99px SED; all observations are retained. This expectation is independent of a production simplifier."
+  },
+  "pauseProjection": {
+    "sourceStartUs": 0,
+    "pauseIntervalsUs": [
+      [
+        200000,
+        1200000
+      ]
+    ],
+    "observations": [
+      {
+        "sourceTimeUs": 100000,
+        "expectedActiveTimeUs": 100000
+      },
+      {
+        "sourceTimeUs": 1300000,
+        "expectedActiveTimeUs": 300000
+      }
+    ],
+    "stopSourceUs": 1400000,
+    "expectedStopActiveTimeUs": 400000
+  },
+  "partitionCases": [
+    {
+      "id": "span-before-exceed",
+      "activeTimesUs": [
+        0,
+        250000,
+        250001
+      ],
+      "expectedWindowObservationSeq": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ]
+      ],
+      "finalize": true
+    },
+    {
+      "id": "silence-does-not-expand-carry-window",
+      "activeTimesUs": [
+        0,
+        100,
+        1000000
+      ],
+      "expectedWindowObservationSeq": [
+        [
+          0,
+          1
+        ],
+        [
+          2
+        ]
+      ],
+      "finalize": true
+    },
+    {
+      "id": "count-closes-after-512-including-carry",
+      "generator": {
+        "count": 513,
+        "startTimeUs": 0,
+        "stepUs": 1,
+        "xQ8Step": 1
+      },
+      "expectedWindows": [
+        {
+          "firstObservationSeq": 0,
+          "lastObservationSeq": 511,
+          "workingObservations": 512
+        },
+        {
+          "firstObservationSeq": 511,
+          "lastObservationSeq": 512,
+          "workingObservations": 2
+        }
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        511,
+        512
+      ],
+      "finalize": true
+    },
+    {
+      "id": "carry-changes-retained-selection",
+      "activeTimesUs": [
+        0,
+        250000,
+        250001,
+        250002
+      ],
+      "xQ8": [
+        0,
+        0,
+        256,
+        512
+      ],
+      "yQ8": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedWindowObservationSeq": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2,
+          3
+        ]
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        3
+      ],
+      "finalize": true
+    }
+  ],
+  "normalizationCases": [
+    {
+      "id": "equal-time-different-position",
+      "input": [
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 2,
+          "activeTimeUs": 50000,
+          "xQ8": 512,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 3,
+          "activeTimeUs": 100000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        }
+      ],
+      "expectedSegmentObservationSeq": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "expectedBoundaryReasons": [
+        "zero-time-discontinuity"
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "pause-and-resume-remain-separate-at-equal-active-time",
+      "records": [
+        {
+          "kind": "segment",
+          "segmentId": 0,
+          "activeTimeUs": 0,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "start"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 0,
+          "activeTimeUs": 60000,
+          "reason": "pause"
+        },
+        {
+          "kind": "segment",
+          "segmentId": 1,
+          "activeTimeUs": 60000,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "resume"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 2,
+          "activeTimeUs": 60000,
+          "xQ8": 512,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 3,
+          "activeTimeUs": 100000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 1,
+          "activeTimeUs": 100000,
+          "reason": "stop"
+        }
+      ],
+      "expectedSegmentObservationSeq": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "unobserved-points-do-not-become-origin",
+      "records": [
+        {
+          "kind": "segment",
+          "segmentId": 0,
+          "activeTimeUs": 0,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "start"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 20000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 0,
+          "activeTimeUs": 30000,
+          "reason": "observation"
+        },
+        {
+          "kind": "segment",
+          "segmentId": 1,
+          "activeTimeUs": 30000,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "observation"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 2,
+          "activeTimeUs": 30000,
+          "xQ8": null,
+          "yQ8": null,
+          "visible": false,
+          "observed": false,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 1,
+          "activeTimeUs": 40000,
+          "reason": "observation"
+        },
+        {
+          "kind": "segment",
+          "segmentId": 2,
+          "activeTimeUs": 40000,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "observation"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 2,
+          "observationSeq": 3,
+          "activeTimeUs": 40000,
+          "xQ8": 512,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 2,
+          "observationSeq": 4,
+          "activeTimeUs": 50000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 2,
+          "activeTimeUs": 50000,
+          "reason": "stop"
+        }
+      ],
+      "expectedSegmentObservationSeq": [
+        [
+          0,
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3,
+          4
+        ]
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "expectedUnavailableIntervalsUs": [
+        [
+          30000,
+          40000
+        ]
+      ]
+    },
+    {
+      "id": "geometry-change-prevents-cross-segment-interpolation",
+      "records": [
+        {
+          "kind": "segment",
+          "segmentId": 0,
+          "activeTimeUs": 0,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "start"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 0,
+          "activeTimeUs": 60000,
+          "reason": "geometry"
+        },
+        {
+          "kind": "segment",
+          "segmentId": 1,
+          "activeTimeUs": 60000,
+          "width": 640,
+          "height": 400,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "geometry"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 2,
+          "activeTimeUs": 60000,
+          "xQ8": 512,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 3,
+          "activeTimeUs": 100000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 1,
+          "activeTimeUs": 100000,
+          "reason": "stop"
+        }
+      ],
+      "expectedSegmentObservationSeq": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          3
+        ]
+      ],
+      "expectedFrameGeometries": [
+        [
+          1280,
+          800
+        ],
+        [
+          640,
+          400
+        ]
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "lost-input-gap-is-incomplete",
+      "records": [
+        {
+          "kind": "segment",
+          "segmentId": 0,
+          "activeTimeUs": 0,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "start"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 50000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "gap",
+          "segmentId": 0,
+          "fromTimeUs": 60000,
+          "toTimeUs": 90000,
+          "firstLostObservationSeq": 2,
+          "lastLostObservationSeq": 4,
+          "reason": "input-overflow"
+        },
+        {
+          "kind": "segment",
+          "segmentId": 1,
+          "activeTimeUs": 90000,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": null,
+            "resolutionBoundUs": null,
+            "mappingUncertaintyUs": null
+          },
+          "reason": "after-gap"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 5,
+          "activeTimeUs": 90000,
+          "xQ8": 512,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 6,
+          "activeTimeUs": 100000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 1,
+          "activeTimeUs": 100000,
+          "reason": "stop"
+        }
+      ],
+      "expectedSegmentObservationSeq": [
+        [
+          0,
+          1
+        ],
+        [
+          5,
+          6
+        ]
+      ],
+      "expectedRetainedObservationSeq": [
+        0,
+        1,
+        5,
+        6
+      ],
+      "expectedUnavailableIntervalsUs": [
+        [
+          60000,
+          90000
+        ]
+      ],
+      "expectedFinalState": "incomplete"
+    }
+  ],
+  "packing": {
+    "maxRecords": 512,
+    "maxCanonicalBytes": 65536,
+    "rule": "greedy-maximal-prefix",
+    "sealAfterKinds": [
+      "boundary",
+      "gap"
+    ],
+    "finalizeSealsRemainder": true,
+    "timerSeals": false,
+    "windowCloseSeals": false,
+    "singleOversizeRecord": "typed-failure-incomplete"
+  },
+  "packingCases": [
+    {
+      "id": "lifecycle-seals-early",
+      "recordingId": "recording-packing-fixture",
+      "trajectoryId": "123456789abcdef0123456789abcdef0",
+      "records": [
+        {
+          "kind": "segment",
+          "segmentId": 0,
+          "activeTimeUs": 0,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": 1000,
+            "resolutionBoundUs": 1000,
+            "mappingUncertaintyUs": 0
+          },
+          "reason": "start"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 0,
+          "activeTimeUs": 0,
+          "xQ8": 0,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "start"
+          ]
+        },
+        {
+          "kind": "sample",
+          "segmentId": 0,
+          "observationSeq": 1,
+          "activeTimeUs": 20000,
+          "xQ8": 256,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 0,
+          "activeTimeUs": 25000,
+          "reason": "pause"
+        },
+        {
+          "kind": "segment",
+          "segmentId": 1,
+          "activeTimeUs": 25000,
+          "width": 1280,
+          "height": 800,
+          "clock": {
+            "source": "dom-event-time",
+            "timestampQuantumUs": 1000,
+            "resolutionBoundUs": 1000,
+            "mappingUncertaintyUs": 0
+          },
+          "reason": "resume"
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 2,
+          "activeTimeUs": 25000,
+          "xQ8": 512,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": []
+        },
+        {
+          "kind": "sample",
+          "segmentId": 1,
+          "observationSeq": 3,
+          "activeTimeUs": 50000,
+          "xQ8": 768,
+          "yQ8": 0,
+          "visible": true,
+          "observed": true,
+          "event": "move",
+          "button": "none",
+          "relatedObservationSeq": null,
+          "anchors": [
+            "stop"
+          ]
+        },
+        {
+          "kind": "boundary",
+          "segmentId": 1,
+          "activeTimeUs": 50000,
+          "reason": "stop"
+        }
+      ],
+      "expected": {
+        "totalBlocks": 2,
+        "totalRecords": 8,
+        "totalSamples": 4,
+        "totalBytes": 1685,
+        "streamSha256": "34d85dde0569bfc970f28748396d93f5d4f8d815d58b0a9e6e62a3f85a71b79c",
+        "firstBlock": {
+          "sequence": 0,
+          "startTimeUs": 0,
+          "endTimeUs": 25000,
+          "recordCount": 4,
+          "sampleCount": 2,
+          "byteLength": 836,
+          "blockSha256": "a0bda9d987a8697a30196d0ffdaf475bdf22619624f629a993bc898ea6bf0e41",
+          "prefixSha256": "55f3a9d5e02710e935d753f8e6de2957cfb6a27ce1dd1d18763fa3eb5d0a9964"
+        },
+        "lastBlock": {
+          "sequence": 1,
+          "startTimeUs": 25000,
+          "endTimeUs": 50000,
+          "recordCount": 4,
+          "sampleCount": 2,
+          "byteLength": 849,
+          "blockSha256": "ea25960a7033c4663d47a3fb4af2a3cf1f1ac69b9afb20b065c489af1d2b83d8",
+          "prefixSha256": "34d85dde0569bfc970f28748396d93f5d4f8d815d58b0a9e6e62a3f85a71b79c"
+        },
+        "firstManifestEntries": [
+          {
+            "sequence": 0,
+            "startTimeUs": 0,
+            "endTimeUs": 25000,
+            "recordCount": 4,
+            "sampleCount": 2,
+            "byteLength": 836,
+            "blockSha256": "a0bda9d987a8697a30196d0ffdaf475bdf22619624f629a993bc898ea6bf0e41",
+            "prefixSha256": "55f3a9d5e02710e935d753f8e6de2957cfb6a27ce1dd1d18763fa3eb5d0a9964"
+          },
+          {
+            "sequence": 1,
+            "startTimeUs": 25000,
+            "endTimeUs": 50000,
+            "recordCount": 4,
+            "sampleCount": 2,
+            "byteLength": 849,
+            "blockSha256": "ea25960a7033c4663d47a3fb4af2a3cf1f1ac69b9afb20b065c489af1d2b83d8",
+            "prefixSha256": "34d85dde0569bfc970f28748396d93f5d4f8d815d58b0a9e6e62a3f85a71b79c"
+          }
+        ]
+      }
+    },
+    {
+      "id": "canonical-byte-boundary",
+      "recordingId": "recording-byte-fixture",
+      "trajectoryId": "223456789abcdef0123456789abcdef0",
+      "generator": {
+        "kind": "alternating-q8-v1",
+        "observationCount": 400,
+        "stepUs": 1000,
+        "xQ8": 25600,
+        "baseYQ8": 25600,
+        "oddYOffsetQ8": 1024,
+        "clockQuantumUs": 1000,
+        "firstAnchor": "start",
+        "lastAnchor": "stop",
+        "segmentReason": "start",
+        "finalBoundary": "stop"
+      },
+      "expected": {
+        "totalBlocks": 2,
+        "totalRecords": 402,
+        "totalSamples": 400,
+        "totalBytes": 81608,
+        "streamSha256": "e4c91d01df9348fd56c6743edc54a67a4a36ea435fbd4aeefe3eeedfdd37415a",
+        "firstBlock": {
+          "sequence": 0,
+          "startTimeUs": 0,
+          "endTimeUs": 321000,
+          "recordCount": 323,
+          "sampleCount": 322,
+          "byteLength": 65523,
+          "blockSha256": "3de27cf9e970df0e32e27143a855bb1fb94c5d37f4e664a475400c3005fa01c4",
+          "prefixSha256": "4d49940c06194c1bad3f1cdd84d5716011031a73a0789a20e1521d097c7ec070"
+        },
+        "lastBlock": {
+          "sequence": 1,
+          "startTimeUs": 322000,
+          "endTimeUs": 399000,
+          "recordCount": 79,
+          "sampleCount": 78,
+          "byteLength": 16085,
+          "blockSha256": "96c5f0793281e45b57595c475f16ff224363ccbb0c3acad7f4249d8b79356532",
+          "prefixSha256": "e4c91d01df9348fd56c6743edc54a67a4a36ea435fbd4aeefe3eeedfdd37415a"
+        },
+        "firstManifestEntries": [
+          {
+            "sequence": 0,
+            "startTimeUs": 0,
+            "endTimeUs": 321000,
+            "recordCount": 323,
+            "sampleCount": 322,
+            "byteLength": 65523,
+            "blockSha256": "3de27cf9e970df0e32e27143a855bb1fb94c5d37f4e664a475400c3005fa01c4",
+            "prefixSha256": "4d49940c06194c1bad3f1cdd84d5716011031a73a0789a20e1521d097c7ec070"
+          },
+          {
+            "sequence": 1,
+            "startTimeUs": 322000,
+            "endTimeUs": 399000,
+            "recordCount": 79,
+            "sampleCount": 78,
+            "byteLength": 16085,
+            "blockSha256": "96c5f0793281e45b57595c475f16ff224363ccbb0c3acad7f4249d8b79356532",
+            "prefixSha256": "e4c91d01df9348fd56c6743edc54a67a4a36ea435fbd4aeefe3eeedfdd37415a"
+          }
+        ]
+      }
+    }
+  ],
+  "negativeCases": [
+    {
+      "id": "unobserved-nonnull-coordinates",
+      "base": "one-block-constant-speed",
+      "path": [
+        "records",
+        1,
+        "observed"
+      ],
+      "value": false,
+      "error": "invalid-coordinates"
+    },
+    {
+      "id": "one-null-coordinate",
+      "base": "one-block-constant-speed",
+      "path": [
+        "records",
+        1,
+        "xQ8"
+      ],
+      "value": null,
+      "error": "invalid-coordinates"
+    },
+    {
+      "id": "outside-frame-coordinate",
+      "base": "one-block-constant-speed",
+      "path": [
+        "records",
+        1,
+        "xQ8"
+      ],
+      "value": 327680,
+      "error": "invalid-coordinates"
+    },
+    {
+      "id": "zero-geometry",
+      "base": "one-block-constant-speed",
+      "path": [
+        "records",
+        0,
+        "width"
+      ],
+      "value": 0,
+      "error": "invalid-geometry"
+    },
+    {
+      "id": "noncanonical-trailing-space",
+      "base": "one-block-constant-speed",
+      "appendAscii": " ",
+      "error": "noncanonical-bytes"
+    }
+  ],
+  "negotiation": {
+    "extensionHello": {
+      "type": "extension.hello",
+      "protocolVersion": 2,
+      "settingsSchemaVersion": 1,
+      "connectionIntent": "user-requested",
+      "extensionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "extensionVersion": "0.5.2",
+      "minAppVersion": "0.1.0",
+      "supportedProtocolVersions": [
+        2
+      ],
+      "supportedSettingsSchemaVersions": [
+        1
+      ],
+      "capabilities": [
+        "desktop-settings-v1",
+        "durable-media-ack-v1",
+        "cursor-trajectory-v1"
+      ]
+    },
+    "appCapabilitiesAttachments": {
+      "cursorTrajectoryFormats": [
+        "cursor-trajectory-v1"
+      ],
+      "maxBlockBytes": 65536,
+      "maxBlockRecords": 512,
+      "maxChunkRawBytes": 32768,
+      "maxManifestEntries": 32
+    },
+    "legacyTelemetryWarning": {
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "devicePixelRatio": 1,
+        "scrollX": 0,
+        "scrollY": 0
+      },
+      "cursorTrack": null,
+      "actionEvents": [],
+      "signals": [
+        {
+          "id": "native-static-0",
+          "kind": "static-frame",
+          "startTime": 0,
+          "endTime": 0,
+          "point": null,
+          "data": {
+            "source": "cursor-trajectory",
+            "code": "format-unavailable",
+            "severity": "warning"
+          }
+        }
+      ]
+    }
+  }
+}

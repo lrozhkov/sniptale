@@ -186,6 +186,7 @@ export function EditorFloatingToolPropertiesRail({
     selection.selectedObjectType === 'marker' ||
     selection.selectedObjectType === 'shape' ||
     selection.selectedObjectType === 'arrow' ||
+    selection.selectedObjectType === 'simplify' ||
     selection.selectedObjectType === 'blur' ||
     selection.selectedObjectType === 'text'
       ? selection.selectedObjectType
@@ -195,6 +196,7 @@ export function EditorFloatingToolPropertiesRail({
     activeTool === 'marker' ||
     activeTool === 'shape' ||
     activeTool === 'arrow' ||
+    activeTool === 'simplify' ||
     activeTool === 'blur' ||
     activeTool === 'text'
       ? activeTool
@@ -245,6 +247,9 @@ export function EditorFloatingToolPropertiesRail({
           >
             {drawingOptionsTool ? (
               <EditorDrawingOptions
+                {...(selectedDrawingTool === 'simplify'
+                  ? { onRebuild: () => controller.applyActiveSettingsToSelection() }
+                  : {})}
                 onDirectionChange={() => controller.applyToolMode()}
                 onApplyToSelection={() => controller.applyActiveSettingsToSelection()}
                 onPreviewSelection={() => controller.previewActiveSettingsOnSelection()}

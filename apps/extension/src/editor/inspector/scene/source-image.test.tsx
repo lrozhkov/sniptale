@@ -28,8 +28,22 @@ vi.mock('../../chrome/ui', async (importOriginal) => ({
     onChange: (value: string) => void;
     onPreviewChange?: (value: string) => void;
     onPreviewReset?: (value: string) => void;
+    onOpenChange?: (open: boolean) => void;
   }) => (
     <>
+      <button type="button" data-testid="color-open" onClick={() => props.onOpenChange?.(true)}>
+        open
+      </button>
+      <button
+        type="button"
+        data-testid="alpha-preview"
+        onClick={() => props.onPreviewChange?.('#11223380')}
+      >
+        alpha
+      </button>
+      <button type="button" data-testid="alpha-apply" onClick={() => props.onChange('#11223380')}>
+        apply alpha
+      </button>
       <button
         type="button"
         data-testid="color"
@@ -63,6 +77,7 @@ vi.mock('./shared', async (importOriginal) => ({
     value: number;
     max: number;
     onChange: (value: number) => void;
+    onPreview?: (value: number) => void;
   }) => (
     <button
       type="button"
@@ -70,6 +85,7 @@ vi.mock('./shared', async (importOriginal) => ({
       aria-label={props.label}
       data-value={String(props.value)}
       data-max={String(props.max)}
+      onPointerMove={() => props.onPreview?.(50)}
       onClick={() => props.onChange(50)}
     >
       range
@@ -170,7 +186,7 @@ it('uses the native 0–100 shadow intensity without scaling it as fractional op
   );
   const shadow = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('[data-testid="range"]') ?? []
-  ).find((element) => element.getAttribute('aria-label') === translate('editor.scene.glowSize'));
+  ).find((element) => element.getAttribute('aria-label') === translate('editor.compact.size'));
   expect(shadow?.dataset['value']).toBe('35');
   expect(shadow?.dataset['max']).toBe('100');
   await act(async () => shadow?.click());
@@ -179,7 +195,7 @@ it('uses the native 0–100 shadow intensity without scaling it as fractional op
   );
 });
 
-it('shows shadow controls directly and keeps only border details collapsible', async () => {
+it('keeps shadow and border initially collapsed with current values', async () => {
   await renderUi(
     <EditorInspectorFrameSourceImageFields
       applyFramePatch={vi.fn()}
@@ -189,11 +205,12 @@ it('shows shadow controls directly and keeps only border details collapsible', a
   );
 
   const groups = Array.from(container?.querySelectorAll('details') ?? []);
-  expect(groups).toHaveLength(1);
+  expect(groups).toHaveLength(2);
   expect(groups.map((group) => group.querySelector('summary')?.textContent)).toEqual([
-    translate('editor.scene.borderAdvanced'),
+    `${translate('editor.scene.sourceShadow')} · 0%`,
+    `${translate('editor.scene.borderAdvanced')} · ${translate('editor.scene.borderNone')}`,
   ]);
-  expect(container?.textContent).not.toContain(translate('editor.scene.glowLabel'));
+  expect(groups.every((group) => !group.open)).toBe(true);
   expect(container?.querySelector('[data-testid="color"]')).not.toBeNull();
   expect(
     container?.querySelector('[aria-label="' + translate('editor.compact.shadowBlur') + '"]')
@@ -214,11 +231,13 @@ it('shows shadow controls directly and keeps only border details collapsible', a
 for (const colorIndex of [0, 1]) {
   it(`keeps source color ${colorIndex} previews and cancellation out of document commits`, async () => {
     const applyFramePatch = vi.fn();
+    const previewFramePatch = vi.fn();
     await renderUi(
       <EditorInspectorFrameSourceImageFields
         frameDraft={DEFAULT_EDITOR_FRAME_SETTINGS}
         recentColors={[]}
         applyFramePatch={applyFramePatch}
+        previewFramePatch={previewFramePatch}
       />
     );
     const click = (name: string) => {
@@ -229,10 +248,81 @@ for (const colorIndex of [0, 1]) {
       act(() => button?.click());
     };
     click('color-preview');
+    expect(previewFramePatch).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sourceImage: expect.objectContaining({
+          [colorIndex === 0 ? 'shadowColor' : 'strokeColor']: '#abcdef',
+        }),
+      })
+    );
     expect(applyFramePatch).not.toHaveBeenCalled();
     click('color-cancel');
+    expect(previewFramePatch).toHaveBeenCalledTimes(2);
     expect(applyFramePatch).not.toHaveBeenCalled();
     click('color');
     expect(applyFramePatch).toHaveBeenCalledTimes(1);
   });
 }
+
+it('routes all source sliders to live previews with native units and commits separately', async () => {
+  const applyFramePatch = vi.fn();
+  const previewFramePatch = vi.fn();
+  await renderUi(
+    <EditorInspectorFrameSourceImageFields
+      frameDraft={DEFAULT_EDITOR_FRAME_SETTINGS}
+      recentColors={[]}
+      applyFramePatch={applyFramePatch}
+      previewFramePatch={previewFramePatch}
+    />
+  );
+  const ranges = container!.querySelectorAll<HTMLButtonElement>('[data-testid="range"]');
+  expect(ranges).toHaveLength(3);
+  for (const range of ranges) {
+    act(() => range.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  }
+  expect(applyFramePatch).not.toHaveBeenCalled();
+  for (const patch of [{ radius: 50 }, { shadow: 50 }, { strokeWidth: 50 }]) {
+    expect(previewFramePatch).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceImage: expect.objectContaining(patch) })
+    );
+  }
+  for (const range of ranges) act(() => range.click());
+  expect(applyFramePatch).toHaveBeenCalledTimes(3);
+});
+
+it('edits border opacity in the picker and restores the exact legacy fields on Cancel', async () => {
+  const applyFramePatch = vi.fn();
+  const previewFramePatch = vi.fn();
+  const frame = {
+    ...DEFAULT_EDITOR_FRAME_SETTINGS,
+    sourceImage: { ...DEFAULT_EDITOR_IMAGE_SETTINGS, strokeColor: '#123456', strokeOpacity: 0.35 },
+  };
+  const props = { frameDraft: frame, recentColors: [], applyFramePatch, previewFramePatch };
+  await renderUi(<EditorInspectorFrameSourceImageFields {...props} />);
+  const border = () => container!.querySelector('[data-ui="editor.frame.source-border"]')!;
+  expect(border().querySelector('[data-testid="color"]')?.getAttribute('data-value')).toBe(
+    '#12345659'
+  );
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="color-open"]')!.click());
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="alpha-preview"]')!.click());
+  expect(previewFramePatch).toHaveBeenLastCalledWith({
+    sourceImage: expect.objectContaining({ strokeColor: '#112233', strokeOpacity: 128 / 255 }),
+  });
+  const preview = previewFramePatch.mock.calls.at(-1)![0].sourceImage;
+  await renderUi(
+    <EditorInspectorFrameSourceImageFields
+      {...props}
+      frameDraft={{ ...frame, sourceImage: preview }}
+    />
+  );
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="color-open"]')!.click());
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="color-cancel"]')!.click());
+  expect(previewFramePatch).toHaveBeenLastCalledWith({ sourceImage: frame.sourceImage });
+  expect(applyFramePatch).not.toHaveBeenCalled();
+  act(() => border().querySelector<HTMLButtonElement>('[data-testid="alpha-apply"]')!.click());
+  expect(applyFramePatch).toHaveBeenCalledOnce();
+  expect(applyFramePatch).toHaveBeenLastCalledWith({
+    sourceImage: expect.objectContaining({ strokeColor: '#112233', strokeOpacity: 128 / 255 }),
+  });
+  expect(border().querySelectorAll('[data-testid="range"]')).toHaveLength(1);
+});

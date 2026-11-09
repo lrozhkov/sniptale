@@ -6,12 +6,15 @@ import { translate } from '../../../../platform/i18n';
 import type {
   VideoEditorPreviewFrameRate,
   VideoEditorPreviewMode,
+  VideoPreviewRenderer,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
   VideoEditorPreviewStatus,
 } from '../../../contracts/preview-runtime';
 
 interface PreviewStageControlsProps {
+  renderer: VideoPreviewRenderer;
+  onRendererChange: (renderer: VideoPreviewRenderer) => void;
   frameRate?: VideoEditorPreviewFrameRate;
   onFrameRateChange?: (frameRate: VideoEditorPreviewFrameRate) => void;
   mode: VideoEditorPreviewMode;

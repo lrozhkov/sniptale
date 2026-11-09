@@ -15,10 +15,11 @@ export function hasValidVideoProjectCursorSourceObservations(project: VideoProje
         clip.type === 'VIDEO' && clip.sourceInstanceId === group.sourceInstanceId
     );
     if (!owners.length || new Set(owners.map((clip) => clip.assetId)).size !== 1) return false;
-    maximumProjected += owners.reduce(
-      (sum, clip) => sum + group.samples.length + 2 + (clip.playbackWindow ? 1 : 0),
-      0
-    );
+    if (!group.trajectory)
+      maximumProjected += owners.reduce(
+        (sum, clip) => sum + group.samples.length + 2 + (clip.playbackWindow ? 1 : 0),
+        0
+      );
     const asset = project.assets.find((item) => item.id === owners[0]!.assetId);
     const duration = asset?.metadata.duration;
     return (
@@ -37,6 +38,7 @@ export function hasValidVideoProjectCursorSourceObservations(project: VideoProje
       clip?.type === 'VIDEO' &&
       groups.some(
         (group) =>
+          !group.trajectory &&
           group.sourceInstanceId === clip.sourceInstanceId &&
           group.recordingId === sample.sourceAnchor?.recordingId
       );
@@ -114,12 +116,14 @@ export function materializeVideoProjectCursorSourceObservations(
     if (!clip) return false;
     return !groups.some(
       (group) =>
+        !group.trajectory &&
         group.recordingId === sample.sourceAnchor?.recordingId &&
         clip.type === 'VIDEO' &&
         clip.sourceInstanceId === group.sourceInstanceId
     );
   });
   for (const group of groups) {
+    if (group.trajectory) continue;
     for (const clip of project.clips) {
       if (
         clip.type !== 'VIDEO' ||

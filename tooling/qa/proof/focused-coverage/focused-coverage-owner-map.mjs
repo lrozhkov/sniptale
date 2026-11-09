@@ -17,6 +17,7 @@ function normalizeEntry(entry) {
     owner: entry.owner,
     productionFile: entry.productionFile ?? null,
     productionPrefix: entry.productionPrefix ?? null,
+    productionDataFiles: entry.productionDataFiles ?? null,
     reason: entry.reason,
     testFiles: entry.testFiles ?? [],
   };
@@ -36,6 +37,7 @@ function getRuntimeOwner(file) {
 function mappingMatchesFile(mapping, file) {
   return (
     mapping.productionFile === file ||
+    (Array.isArray(mapping.productionDataFiles) && mapping.productionDataFiles.includes(file)) ||
     (mapping.productionPrefix != null && file.startsWith(mapping.productionPrefix))
   );
 }
@@ -83,12 +85,17 @@ function validateMappingShape(mapping) {
       )
     );
   }
-  if (!mapping.productionFile && !mapping.productionPrefix) {
+  const targetKinds = [
+    mapping.productionFile,
+    mapping.productionPrefix,
+    mapping.productionDataFiles,
+  ].filter((target) => target != null).length;
+  if (targetKinds !== 1) {
     violations.push(
       createMappingViolation(
         'focused-coverage-owner-mapping-target',
         '<unknown>',
-        'Mapping requires productionFile or productionPrefix.'
+        'Mapping requires exactly one target: productionFile, productionPrefix, or productionDataFiles.'
       )
     );
   }
@@ -125,20 +132,23 @@ function validateMappingTests(mapping) {
 }
 
 function validateMappingRuntimeOwner(mapping) {
-  if (mapping.allowCrossOwner || mapping.productionPrefix == null) {
-    return [];
-  }
-
-  const productionOwner = getRuntimeOwner(mapping.productionPrefix);
-  return mapping.testFiles
-    .filter((testFile) => productionOwner != null && !testFile.startsWith(productionOwner))
-    .map((testFile) =>
-      createMappingViolation(
-        'focused-coverage-owner-mapping-cross-owner',
-        testFile,
-        `Mapped test crosses ${productionOwner} without allowCrossOwner.`
+  if (mapping.allowCrossOwner) return [];
+  const dataFiles = Array.isArray(mapping.productionDataFiles) ? mapping.productionDataFiles : [];
+  const targets = mapping.productionPrefix == null ? dataFiles : [mapping.productionPrefix];
+  const productionOwners = new Set(
+    targets.filter((file) => typeof file === 'string').map(getRuntimeOwner)
+  );
+  return [...productionOwners].flatMap((productionOwner) =>
+    mapping.testFiles
+      .filter((testFile) => productionOwner != null && !testFile.startsWith(productionOwner))
+      .map((testFile) =>
+        createMappingViolation(
+          'focused-coverage-owner-mapping-cross-owner',
+          testFile,
+          `Mapped test crosses ${productionOwner} without allowCrossOwner.`
+        )
       )
-    );
+  );
 }
 
 export function collectFocusedCoverageOwnerMappingViolations({
@@ -164,9 +174,15 @@ export function resolveMappedCoverageOwnerTests(
   );
   const exclusiveMappings = allMatchingMappings.filter((mapping) => mapping.exclusive);
   const exactExclusiveMappings = exclusiveMappings.filter(
-    (mapping) => mapping.productionFile === file
+    (mapping) =>
+      mapping.productionFile === file ||
+      (Array.isArray(mapping.productionDataFiles) && mapping.productionDataFiles.includes(file))
   );
-  const exactMappings = allMatchingMappings.filter((mapping) => mapping.productionFile === file);
+  const exactMappings = allMatchingMappings.filter(
+    (mapping) =>
+      mapping.productionFile === file ||
+      (Array.isArray(mapping.productionDataFiles) && mapping.productionDataFiles.includes(file))
+  );
   const matchingMappings =
     exactExclusiveMappings.length > 0
       ? exactExclusiveMappings

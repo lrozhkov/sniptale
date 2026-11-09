@@ -8,7 +8,8 @@ import { getEffectInsertionError } from '../../../../../features/video/project/e
 import { createTrackEffectDropHandlers } from './effect-drop';
 import { AudioGapRecordingAction, AudioRecordingZones } from '../../tracks/zones/audio-recording';
 import type { TimelineProjection } from '../../interaction-state/projection';
-import { useState } from 'react';
+import { memo, useState } from 'react';
+import { useAppLocale } from '../../../../../platform/i18n';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import type { TimelineClipPreviewMap } from '../../../../contracts/timeline-preview';
 import {
@@ -80,7 +81,10 @@ interface ProjectTimelineTrackLaneProps extends Omit<
   onSetDropTrackId: (trackId: string | null, clipId?: string | null) => void;
 }
 
-export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps) {
+export const ProjectTimelineTrackLanes = memo(function ProjectTimelineTrackLanes(
+  props: ProjectTimelineTrackLanesProps
+) {
+  useAppLocale();
   const { drag } = useEffectDocumentDrag();
   const globalOwner = resolveEffectOwner(props.project, { kind: 'video-group' });
   const canDropGlobal =
@@ -176,7 +180,7 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
       )}
     </>
   );
-}
+});
 
 function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
   const materials = useTrackMaterialDrop({

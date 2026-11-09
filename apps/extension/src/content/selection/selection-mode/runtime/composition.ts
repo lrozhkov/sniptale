@@ -110,6 +110,21 @@ function createSelectionCaptureOptions(): Pick<
   };
 }
 
+function mountSelectionDrawing(
+  session: SelectionModeSession,
+  options: Omit<Parameters<typeof createSelectionDrawingRuntime>[0], 'container' | 'frozenFrame'>
+): ReturnType<typeof createSelectionDrawingRuntime> | null {
+  if (session.frozenFrame)
+    mountFrozenSelectionFrame(session.dom.overlayContainer, session.frozenFrame);
+  const container = session.dom.overlayContainer;
+  if (!container) return null;
+  return createSelectionDrawingRuntime({
+    ...options,
+    container,
+    ...(session.frozenFrame ? { frozenFrame: session.frozenFrame } : {}),
+  });
+}
+
 export function createSelectionModeRuntime(args: SelectionModeRuntimeArgs): SelectionModeRuntime {
   let events: SelectionModeEvents;
   let handlers: SelectionModeHandlers;
@@ -219,18 +234,14 @@ export function createSelectionModeRuntime(args: SelectionModeRuntimeArgs): Sele
         createHoverElements: () => uiRuntime.createHoverElements(),
         createOverlayContainer: () => {
           uiRuntime.createOverlayContainer();
-          if (args.session.frozenFrame) {
-            mountFrozenSelectionFrame(args.session.dom.overlayContainer, args.session.frozenFrame);
-          }
-          const container = args.session.dom.overlayContainer;
-          if (container) {
+          const mounted = mountSelectionDrawing(args.session, {
+            initialDrawing: preparation.initialDrawing,
+            onModeChange: cropModePreferences.save,
+            onLayout: () => getEvents().updateFinalFrame(),
+          });
+          if (mounted) {
             publishDrawingSnapshot = options?.onDrawingSnapshot;
-            drawing = createSelectionDrawingRuntime({
-              container,
-              initialDrawing: preparation.initialDrawing,
-              onModeChange: cropModePreferences.save,
-              onLayout: () => getEvents().updateFinalFrame(),
-            });
+            drawing = mounted;
           }
         },
         enableCursor: () => enableSelectionModeCursor(args.session),

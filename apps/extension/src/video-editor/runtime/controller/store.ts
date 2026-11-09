@@ -330,6 +330,13 @@ export function getCurrentVideoEditorCurrentTime(): number {
   return useVideoEditorStore.getState().currentTime;
 }
 
+/** Notify visible time consumers without subscribing their containing inspector. */
+export function subscribeVideoEditorPlaybackTime(listener: () => void): () => void {
+  return useVideoEditorStore.subscribe((next, previous) => {
+    if (next.currentTime !== previous.currentTime) listener();
+  });
+}
+
 export function getCurrentVideoEditorSelectedClipId(): string | null {
   return resolveSelectedClipId(useVideoEditorStore.getState().selection);
 }
@@ -340,4 +347,20 @@ export function getCurrentVideoEditorExportStateSnapshot() {
 
 export function getCurrentVideoEditorExportJobId(): string | null {
   return useVideoEditorStore.getState().exportState.jobId;
+}
+
+/** Observe authored action boundaries synchronously, before the next project mutation. */
+export function subscribeVideoEditorProjectHistory(
+  listener: (snapshot: { projectId: string | null; lease: symbol | null }) => void
+): () => void {
+  const snapshot = (state: VideoEditorState) => ({
+    projectId: state.project?.id ?? null,
+    lease: state.projectHistory.transaction?.lease ?? null,
+  });
+  listener(snapshot(useVideoEditorStore.getState()));
+  return useVideoEditorStore.subscribe((state, previous) => {
+    const next = snapshot(state);
+    const before = snapshot(previous);
+    if (next.projectId !== before.projectId || next.lease !== before.lease) listener(next);
+  });
 }

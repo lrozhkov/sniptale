@@ -14,16 +14,18 @@ type PlaneDragProps = {
   onSelect(value: ReviewAnchor): void;
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
+  onTextRangeCommit?: ((range: Extract<ReviewAnchor, { kind: 'range' }>) => void) | undefined;
+  onTrackRangeCommit?: ((range: Extract<ReviewAnchor, { kind: 'range' }>) => void) | undefined;
   onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
   originalRangeTool?: boolean;
   sourceRangeTool?: boolean;
   sourceRangeKind?: 'cut' | 'speed' | undefined;
 };
 
-type PlaneCapability = 'source' | 'cut' | 'speed' | 'focus' | 'original' | 'seek';
+type PlaneCapability = 'source' | 'cut' | 'speed' | 'focus' | 'original' | 'text' | 'seek';
 
 interface PlaneDragState {
-  lane: 'source' | 'focus' | 'seek';
+  lane: 'source' | 'focus' | 'seek' | 'text' | 'track';
   capability: PlaneCapability;
   start: number;
   x: number;
@@ -110,7 +112,18 @@ export function reviewPlaneLane(
   originalEnabled: boolean,
   sourceEnabled = false,
   annotationEnabled = false
-): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' | 'gap' | 'ruler' | 'annotation' {
+):
+  | 'source'
+  | 'focus'
+  | 'seek'
+  | 'original'
+  | 'item'
+  | 'control'
+  | 'gap'
+  | 'ruler'
+  | 'annotation'
+  | 'text'
+  | 'track' {
   if (!(target instanceof Element)) return 'gap';
   if (target.closest('[data-ui="gallery.videoReview.ruler"]')) return 'ruler';
   if (focusEnabled && target.closest('[data-ui="gallery.videoReview.editBlock"]')) return 'seek';
@@ -120,12 +133,16 @@ export function reviewPlaneLane(
   if (target.closest('[data-dragging="true"]')) return 'item';
   const audio = target.closest('[data-ui="gallery.videoReview.audioLane"]');
   if (audio)
-    return originalEnabled && audio.hasAttribute('data-original-audio-lane') ? 'original' : 'seek';
+    return audio.hasAttribute('data-original-audio-lane')
+      ? originalEnabled
+        ? 'original'
+        : 'seek'
+      : 'track';
   if (target.closest('[data-ui="gallery.videoReview.zoomLane"]'))
     return focusEnabled ? 'focus' : 'seek';
   if (target.closest('[data-ui="gallery.videoReview.annotationEffectsLane"]'))
     return annotationEnabled ? 'annotation' : 'seek';
-  if (target.closest('[data-ui="gallery.videoReview.textTrack"]')) return 'seek';
+  if (target.closest('[data-ui="gallery.videoReview.textTrack"]')) return 'text';
   if (target.closest('[data-ui="gallery.videoReview.sourceLane"]'))
     return sourceEnabled && !focusEnabled && !originalEnabled ? 'source' : 'seek';
   return 'gap';
@@ -141,7 +158,11 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
     if (current.lane === 'focus') {
       props.onFocusRangePreview?.(null);
       props.onFocusRangeCommit?.(current.range);
-    } else props.onRangeCommit?.(current.range);
+    } else if (current.lane === 'text' && current.capability === 'text')
+      props.onTextRangeCommit?.(current.range);
+    else if (current.lane === 'text' || current.lane === 'track')
+      props.onTrackRangeCommit?.(current.range);
+    else props.onRangeCommit?.(current.range);
   };
   const restore = (current: PlaneDragState) => {
     current.cancelled = true;
@@ -151,13 +172,15 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
     props.onSeek(current.time, false);
     props.onSelect(current.selection);
   };
-  const capability: PlaneCapability = props.onFocusRangeCommit
-    ? 'focus'
-    : props.originalRangeTool
-      ? 'original'
-      : props.sourceRangeTool
-        ? (props.sourceRangeKind ?? 'source')
-        : 'seek';
+  const capability: PlaneCapability = props.onTextRangeCommit
+    ? 'text'
+    : props.onFocusRangeCommit
+      ? 'focus'
+      : props.originalRangeTool
+        ? 'original'
+        : props.sourceRangeTool
+          ? (props.sourceRangeKind ?? 'source')
+          : 'seek';
   const lifetime = useReviewPlaneDragLifetime({
     plane,
     drag,
@@ -166,7 +189,9 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
   });
   return {
     plane,
-    sourcePreview,
+    sourcePreview: drag.current?.lane === 'source' ? sourcePreview : null,
+    trackPreview:
+      drag.current?.lane === 'text' || drag.current?.lane === 'track' ? sourcePreview : null,
     activeLane: () => drag.current?.lane,
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0) return;

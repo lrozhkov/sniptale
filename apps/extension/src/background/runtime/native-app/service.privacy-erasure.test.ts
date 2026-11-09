@@ -55,8 +55,8 @@ it('disconnects and clears native authority before erasure cleanup continues', a
   });
   service.connect();
   port.emitMessage(createNativeHello());
+  await waitForNativePost(port, 'extension.controller.acquire');
   port.emitMessage(createNativeLease());
-  await waitForNativePost(port, 'extension.settings.sync');
 
   service.quiesceForPrivacyErasure();
   const postsBeforeStaleMessage = port.postMessage.mock.calls.length;
@@ -79,8 +79,8 @@ it('invalidates leases from before and during the erasure exclusion generation',
   });
   service.connect();
   port.emitMessage(createNativeHello());
+  await waitForNativePost(port, 'extension.controller.acquire');
   port.emitMessage(createNativeLease());
-  await waitForNativePost(port, 'extension.settings.sync');
 
   const exclusion = reserveNativeIngestionErasureExclusion();
   port.emitMessage(createTrayAction('old-lease'));
@@ -103,7 +103,7 @@ function createTrayAction(invocationId: string, controllerLeaseId = 'lease-1') {
     actionId: 'capture-screenshot-screen',
     controllerLeaseId,
     invocationId,
-    protocolVersion: 1,
+    protocolVersion: 2,
     requestedAtEpochMs: Date.now(),
     type: 'app.tray.actionRequested',
   } as const;

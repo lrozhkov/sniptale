@@ -8,6 +8,7 @@ import {
 
 it('preserves native compatibility defaults independently of full-editor defaults', () => {
   expect(DEFAULT_QUICK_PREVIEW_PREFERENCES).toEqual({
+    renderer: 'gpu',
     rasterPreset: 'current',
     frameRate: 'current',
     pausedQuality: 'same',

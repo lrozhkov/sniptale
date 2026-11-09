@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { createVideoProjectFromRecording } from '../../../../features/video/project/factories/creation';
+import { normalizeVideoProjectCursorSkin } from '../../../../features/video/project/cursor';
 import { VideoTrackKind } from '../../../../features/video/project/types';
 
 import { act } from 'react';
@@ -99,4 +101,49 @@ it('keeps local heights stable while the same tracks are reordered', async () =>
   await act(async () => root?.render(<Harness />));
   expect(latestPrefs?.prefs.trackHeightByTrackId[firstId]).toBe(2);
   expect(loadPrefsMock).toHaveBeenCalledOnce();
+});
+
+it('keeps archived cursor history visible with no inline samples and respects the row preference', async () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'recording',
+    filename: 'source.webm',
+    width: 640,
+    height: 360,
+    duration: 12,
+    mimeType: 'video/webm',
+    size: 100,
+  });
+  const clip = project.clips.find((clip) => clip.type === 'VIDEO');
+  if (!clip || clip.type !== 'VIDEO' || !clip.sourceInstanceId) throw new Error('Missing source.');
+  project.cursorTrack = {
+    captureMode: 'embedded-fallback',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [],
+    sourceObservations: [
+      {
+        recordingId: 'recording',
+        sourceInstanceId: clip.sourceInstanceId,
+        samples: [],
+        trajectory: {
+          format: 'cursor-trajectory-v1',
+          formatVersion: 1,
+          algorithm: 'sed-window-v1',
+          encoding: 'json-ascii-int-v1',
+          trajectoryId: 'a'.repeat(32),
+          state: 'complete',
+          finalized: true,
+          totalBlocks: 100,
+          totalRecords: 6002,
+          totalSamples: 6000,
+          totalBytes: 1000000,
+          streamSha256: 'b'.repeat(64),
+        },
+      },
+    ],
+  };
+  loadPrefsMock.mockResolvedValue(createLoadedPrefs({ collapsedTelemetryLaneVisible: true }));
+  await renderPrefsHarness(project);
+  expect(latestPrefs?.cursorLaneVisible).toBe(true);
+  act(() => latestPrefs?.setCollapsedCursorLaneVisible(false));
+  expect(latestPrefs?.cursorLaneVisible).toBe(false);
 });

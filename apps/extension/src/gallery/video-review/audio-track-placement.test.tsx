@@ -59,7 +59,6 @@ function renderVoiceover(
         onTrimClip={vi.fn()}
         onOriginal={vi.fn()}
         onImportFile={onImportFile}
-        onRecordVoiceover={vi.fn()}
       />
     )
   );

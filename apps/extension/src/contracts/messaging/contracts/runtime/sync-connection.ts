@@ -1,8 +1,11 @@
+export { parseSyncCredentialLease, parseSyncWorkspaceJobSnapshot } from './sync-product';
 import {
   parseSyncProductRequest,
+  parseSyncCredentialLease,
   parseSyncProductExecutorRequest,
   parseSyncProductResponse,
   parseSyncProductJob,
+  parseSyncWorkspaceJobSnapshot,
 } from './sync-product';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { MessageContractError } from '@sniptale/runtime-contracts/messaging/parsers/utils';
@@ -29,7 +32,6 @@ import type {
   SyncExecutorJobSnapshot,
   SyncExecutorSnapshot,
   SyncProductJobSnapshot,
-  SyncWorkspaceJobSnapshot,
 } from '../runtime-message/sync-connection.types';
 import type { PartialRuntimeRegistry } from '../runtime-message.registry';
 
@@ -79,48 +81,6 @@ function job(input: unknown): SyncExecutorJobSnapshot | null {
     runId: input['runId'],
   };
 }
-function workspace(input: unknown): SyncWorkspaceJobSnapshot | null {
-  if (
-    !isRecord(input) ||
-    !exact(input, [
-      'sourceKind',
-      'selectionIncarnation',
-      'selectionRevision',
-      'state',
-      'failureCode',
-      ...(Object.hasOwn(input, 'requestId') ? ['requestId'] : []),
-    ]) ||
-    !member(['allocation', 'join'] as const, input['sourceKind']) ||
-    !connectionUuid(input['selectionIncarnation']) ||
-    !positive(input['selectionRevision']) ||
-    !member(['running', 'ready', 'failed', 'interrupted'] as const, input['state']) ||
-    !(
-      input['failureCode'] === null ||
-      member(
-        [
-          'temporary',
-          'authentication',
-          'access-denied',
-          'storage-full',
-          'invalid-workspace',
-          'interrupted',
-          'internal',
-        ] as const,
-        input['failureCode']
-      )
-    )
-  )
-    return null;
-  if (input['requestId'] !== undefined && !connectionUuid(input['requestId'])) return null;
-  return {
-    ...(typeof input['requestId'] === 'string' ? { requestId: input['requestId'] } : {}),
-    sourceKind: input['sourceKind'],
-    selectionIncarnation: input['selectionIncarnation'],
-    selectionRevision: input['selectionRevision'],
-    state: input['state'],
-    failureCode: input['failureCode'],
-  };
-}
 /** Parse the complete disposable projection without admitting provider or source payloads. */
 export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot | null {
   if (
@@ -156,7 +116,8 @@ export function parseSyncExecutorSnapshot(input: unknown): SyncExecutorSnapshot 
   }
   const parsedBinding = input['binding'] === null ? null : binding(input['binding']);
   if (input['binding'] !== null && !parsedBinding) return null;
-  const parsedWorkspace = input['workspace'] === null ? null : workspace(input['workspace']);
+  const parsedWorkspace =
+    input['workspace'] === null ? null : parseSyncWorkspaceJobSnapshot(input['workspace']);
   if (input['workspace'] !== null && !parsedWorkspace) return null;
   const jobs: SyncExecutorJobSnapshot[] = [];
   const identities = new Set<string>();
@@ -198,6 +159,12 @@ export function parseSyncConnectionRuntimeMessage(
   if (input['type'] === MessageType.OFFSCREEN_SYNC_PRODUCT_COMMAND)
     return parseSyncProductExecutorRequest(input);
   const requestId = input['requestId'];
+  if (input['type'] === MessageType.SYNC_CONNECTION_CREDENTIAL) {
+    const credentialLease = parseSyncCredentialLease(input['credentialLease']);
+    return exact(input, ['type', 'requestId', 'credentialLease']) && credentialLease
+      ? { type: input['type'], requestId, credentialLease }
+      : null;
+  }
   if (input['type'] === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION) {
     if (
       !exact(input, ['type', 'requestId', 'sourceKind', 'selectionIncarnation', 'origin']) ||
@@ -216,6 +183,7 @@ export function parseSyncConnectionRuntimeMessage(
   }
   if (input['type'] === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION) {
     const authorization = parseSyncConnectionIdentity(input['authorization']);
+    const credentialLease = parseSyncCredentialLease(input['credentialLease']);
     if (
       !exact(input, [
         'type',
@@ -223,7 +191,9 @@ export function parseSyncConnectionRuntimeMessage(
         'authorization',
         'origin',
         ...(Object.hasOwn(input, 'advisory') ? ['advisory'] : []),
+        ...(Object.hasOwn(input, 'credentialLease') ? ['credentialLease'] : []),
       ]) ||
+      (Object.hasOwn(input, 'credentialLease') && !credentialLease) ||
       (Object.hasOwn(input, 'advisory') && input['advisory'] !== true) ||
       !authorization ||
       !canonicalOrigin(input['origin'])
@@ -233,6 +203,7 @@ export function parseSyncConnectionRuntimeMessage(
       type: input['type'],
       requestId,
       authorization,
+      ...(credentialLease ? { credentialLease } : {}),
       origin: input['origin'],
       ...(input['advisory'] === true ? { advisory: true } : {}),
     };
@@ -265,8 +236,22 @@ export function parseSyncConnectionRuntimeMessage(
   if (!connectionUuid(input['executorId']) || !positive(input['executorRevision'])) return null;
   const target = { executorId: input['executorId'], executorRevision: input['executorRevision'] };
   if (input['type'] === MessageType.OFFSCREEN_SYNC_STOP) {
-    if (!exact(input, [...envelope, 'executorId', 'executorRevision'])) return null;
-    return { type: input['type'], ...common, ...target };
+    if (
+      !exact(input, [
+        ...envelope,
+        'executorId',
+        'executorRevision',
+        ...(Object.hasOwn(input, 'reason') ? ['reason'] : []),
+      ]) ||
+      (Object.hasOwn(input, 'reason') && input['reason'] !== 'secrets-locked')
+    )
+      return null;
+    return {
+      type: input['type'],
+      ...common,
+      ...target,
+      ...(input['reason'] === 'secrets-locked' ? { reason: 'secrets-locked' } : {}),
+    };
   }
   if (input['type'] === MessageType.OFFSCREEN_SYNC_WORKSPACE_START) {
     const source = parseSyncWorkspaceSource(input['source']);
@@ -279,16 +264,33 @@ export function parseSyncConnectionRuntimeMessage(
       typeof username === 'string' ? username : ''
     );
     if (
-      !exact(input, [...envelope, 'executorId', 'executorRevision', 'source', 'authentication']) ||
+      !exact(input, [
+        ...envelope,
+        'executorId',
+        'executorRevision',
+        'source',
+        'authentication',
+        ...(Object.hasOwn(input, 'operation') ? ['operation'] : []),
+      ]) ||
+      (Object.hasOwn(input, 'operation') &&
+        (input['operation'] !== 'discover' || source?.kind !== 'join')) ||
       !source ||
       !authentication
     )
       return null;
-    return { type: input['type'], ...common, ...target, source, authentication };
+    return {
+      type: input['type'],
+      ...common,
+      ...target,
+      source,
+      authentication,
+      ...(input['operation'] === 'discover' ? { operation: 'discover' } : {}),
+    };
   }
   if (input['type'] === MessageType.OFFSCREEN_SYNC_START) {
     const scope = parseScope(input['scope']);
     const authorization = parseSyncConnectionIdentity(input['authorization']);
+    const credentialLease = parseSyncCredentialLease(input['credentialLease']);
     if (
       !exact(input, [
         ...envelope,
@@ -298,7 +300,9 @@ export function parseSyncConnectionRuntimeMessage(
         'authorization',
         'operationId',
         'expectedRevision',
+        ...(Object.hasOwn(input, 'credentialLease') ? ['credentialLease'] : []),
       ]) ||
+      (Object.hasOwn(input, 'credentialLease') && !credentialLease) ||
       !scope ||
       !authorization ||
       !queueIdentity(input['operationId']) ||
@@ -313,6 +317,7 @@ export function parseSyncConnectionRuntimeMessage(
       authorization,
       operationId: input['operationId'],
       expectedRevision: input['expectedRevision'],
+      ...(credentialLease ? { credentialLease } : {}),
     };
   }
   return null;
@@ -327,10 +332,14 @@ function response<T extends keyof RuntimeSyncConnectionResponseByType>(
   if (!isRecord(input)) return invalid();
   if (input['success'] === false) {
     const error =
-      type === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION ||
-      type === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION
-        ? 'Sync origin permission query refused'
-        : 'Sync executor command refused';
+      type === MessageType.SYNC_CONNECTION_CREDENTIAL
+        ? input['error'] === 'secrets-locked'
+          ? 'secrets-locked'
+          : 'Sync credential query refused'
+        : type === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION ||
+            type === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION
+          ? 'Sync origin permission query refused'
+          : 'Sync executor command refused';
     if (!exact(input, ['success', 'error']) || input['error'] !== error) return invalid();
     return { success: false, error };
   }
@@ -380,6 +389,24 @@ function acceptedExecutorResponse(value: Record<string, unknown>) {
     : null;
 }
 export const runtimeSyncConnectionMessageContracts = {
+  [MessageType.SYNC_CONNECTION_CREDENTIAL]: contract(
+    MessageType.SYNC_CONNECTION_CREDENTIAL,
+    (value) => {
+      const credentialLease = parseSyncCredentialLease(value['credentialLease']);
+      const raw = value['authentication'];
+      if (
+        !credentialLease ||
+        !isRecord(raw) ||
+        !exact(value, ['success', 'authentication', 'credentialLease'])
+      )
+        return null;
+      const authentication = parseConnectionAuthentication(
+        raw,
+        typeof raw['username'] === 'string' ? raw['username'] : ''
+      );
+      return authentication ? { success: true, authentication, credentialLease } : null;
+    }
+  ),
   [MessageType.SYNC_PRODUCT_COMMAND]: {
     parseRequest: (value: unknown) => parseSyncProductRequest(value) ?? invalid(),
     parseResponse: (value: unknown) => parseSyncProductResponse(value) ?? invalid(),
@@ -420,8 +447,15 @@ export const runtimeSyncConnectionMessageContracts = {
   [MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION]: contract(
     MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION,
     (value) =>
-      exact(value, ['success', 'allowed']) && typeof value['allowed'] === 'boolean'
-        ? { success: true, allowed: value['allowed'] }
+      exact(value, ['success', 'allowed', ...(Object.hasOwn(value, 'reason') ? ['reason'] : [])]) &&
+      typeof value['allowed'] === 'boolean' &&
+      (!Object.hasOwn(value, 'reason') ||
+        (value['allowed'] === false && value['reason'] === 'secrets-locked'))
+        ? {
+            success: true,
+            allowed: value['allowed'],
+            ...(value['reason'] === 'secrets-locked' ? { reason: 'secrets-locked' } : {}),
+          }
         : null
   ),
   [MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION]: contract(

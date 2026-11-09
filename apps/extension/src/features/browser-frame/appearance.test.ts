@@ -113,3 +113,30 @@ it('aligns the tab title baseline with the 20-unit favicon center', () => {
   const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
   expect(doc.querySelector('text')?.getAttribute('y')).toBe('24.75');
 });
+
+it.each(['light', 'dark'] as const)(
+  'places macOS tab search between traffic lights and the first tab (%s)',
+  (theme) => {
+    for (const width of [480, 931, 1920]) {
+      const svg = composeWindowHeaderSvg(
+        { ...DEFAULT_WINDOW_HEADER, style: 'macos', theme },
+        { width, height: 900 }
+      );
+      const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+      const chevron = doc.querySelector('path[d="M-3-1 0 2 3-1"]');
+      expect(chevron).not.toBeNull();
+      expect(chevron?.getAttribute('transform')).toBe('translate(94 20)');
+      const button = doc.querySelector('rect[x="80"][y="6"][width="28"][height="28"]');
+      expect(button).not.toBeNull();
+      expect(button?.getAttribute('fill')).toBe(theme === 'dark' ? '#35363a' : '#ffffff');
+      expect(chevron?.getAttribute('stroke')).toBe(theme === 'dark' ? '#b9bdc5' : '#5e6064');
+      expect(doc.querySelector('text')?.getAttribute('x')).toBe('162');
+      const lights = [...doc.querySelectorAll('circle[r="6"]')].slice(0, 3);
+      expect(lights.map((light) => Number(light.getAttribute('cx')))).toEqual([20, 40, 60]);
+      expect(60 + 6).toBeLessThan(80);
+      expect(80 + 28).toBeLessThan(124 - 10);
+      expect(doc.querySelector('path[transform="translate(378 20)"]')).not.toBeNull();
+      expect(378 + 4).toBeLessThan(width);
+    }
+  }
+);

@@ -1,11 +1,12 @@
+import { nativeSettingsFixture } from '../../../native-app/settings.test-support';
 import { expect, it } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { runtimeNativeAppMessageContracts } from './native-app';
 
 function createStatus() {
   return {
+    appIdentity: null,
     appStatus: null,
     capabilities: null,
     connectionState: 'connected',
@@ -35,7 +36,6 @@ function createStatus() {
 
 it('validates native app runtime status and settings response shapes', () => {
   const response = {
-    settings: DEFAULT_VIDEO_SETTINGS.native,
     status: createStatus(),
     success: true,
   };
@@ -66,7 +66,6 @@ it('validates native app runtime requests and full status responses', () => {
 
   expect(
     runtimeNativeAppMessageContracts[MessageType.NATIVE_APP_QUERY].parseResponse({
-      settings: DEFAULT_VIDEO_SETTINGS.native,
       status: createFullStatus(),
       success: true,
     })
@@ -116,7 +115,7 @@ function createInvalidLeaseStatus() {
     },
     controllerLeaseId: 'lease-1',
     expiresAtEpochMs: 1,
-    protocolVersion: 1,
+    protocolVersion: 2,
     status: 'accepted',
     type: 'app.controller.lease',
   };
@@ -130,8 +129,9 @@ function createFullStatus() {
     controllerLease: {
       ...createInvalidLeaseStatus(),
       status: 'granted',
+      selectionStatus: 'selected',
     },
-    effectiveSettings: { ...DEFAULT_VIDEO_SETTINGS.native, warnings: [] },
+    effectiveSettings: { ...nativeSettingsFixture, warnings: [] },
     error: { code: 'unknown', recoverable: true },
     lastHeartbeatAt: 1,
     trayActions: {
@@ -190,11 +190,11 @@ function createFullCapabilities() {
 
 function createInvalidEffectiveSettings() {
   return {
-    ...DEFAULT_VIDEO_SETTINGS.native,
+    ...nativeSettingsFixture,
     video: {
-      ...DEFAULT_VIDEO_SETTINGS.native?.video,
+      ...nativeSettingsFixture?.video,
       advanced: {
-        ...DEFAULT_VIDEO_SETTINGS.native?.video.advanced,
+        ...nativeSettingsFixture?.video.advanced,
         videoBitrateMbpsOverride: 120,
       },
     },

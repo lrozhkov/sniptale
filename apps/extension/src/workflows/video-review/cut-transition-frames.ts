@@ -6,8 +6,13 @@ import type {
 /** Decoded raster with its actual presentation timestamp; a seek request is not frame authority. */
 export interface ReviewTransitionSample {
   timestamp: number;
+  /** SDK orientation is separate from the owned VideoFrame clone. */
+  readonly rotation?: 0 | 90 | 180 | 270;
+  readonly flip?: boolean;
   /** Actual decoded payload accounting, available on native VideoSample instances. */
   allocationSize?(): number;
+  /** Returns an owned frame clone; the GPU consumer closes it after completion. */
+  toVideoFrame?(): VideoFrame;
   draw(
     context: CanvasRenderingContext2D,
     x: number,
@@ -153,7 +158,7 @@ export function createReviewTransitionFrames(sink: FrameSink, signal: AbortSigna
 export function reviewCutTransitionSides(
   blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>,
   frames: ReviewTransitionFrames,
-  moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw'>,
+  moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw' | 'toVideoFrame' | 'rotation' | 'flip'>,
   resultTime: number,
   resultOffset = 0
 ) {
@@ -233,12 +238,7 @@ export function paintReviewCutTransition(
   moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw'>
 ) {
   const before = blend.beforeSeam;
-  const range = before ? blend.plan.left : blend.plan.right;
-  const current = isReviewTransitionFrame(moving.timestamp, range)
-    ? moving
-    : before
-      ? frames.left
-      : frames.right;
+  const current = selectReviewCutTransitionSource(blend, frames, moving);
   const draw = (frame: Pick<ReviewTransitionSample, 'draw'>) =>
     frame.draw(context, 0, 0, size.width, size.height);
   context.save();
@@ -257,6 +257,22 @@ export function paintReviewCutTransition(
   } finally {
     context.restore();
   }
+}
+
+/** The retained endpoint, not the requested timestamp, owns the source pixels. */
+export function selectReviewCutTransitionSource<
+  T extends Pick<ReviewTransitionSample, 'timestamp' | 'draw'>,
+>(
+  blend: NonNullable<ReturnType<typeof reviewCutTransitionAt>>,
+  frames: ReviewTransitionFrames,
+  moving: T
+): T | ReviewTransitionSample {
+  const range = blend.beforeSeam ? blend.plan.left : blend.plan.right;
+  return isReviewTransitionFrame(moving.timestamp, range)
+    ? moving
+    : blend.beforeSeam
+      ? frames.left
+      : frames.right;
 }
 
 /** Apply after all scene layers so header, background and overlays share one fade. */

@@ -4,6 +4,7 @@ import { act } from 'react';
 import React from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createVideoClip } from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { VideoMotionOverlayZoomMode } from '../../../../features/video/project/types';
 
 const { drawCompositionVisualLayerMock, resolveVideoCompositionRenderPassesMock } = vi.hoisted(
@@ -108,12 +109,28 @@ function createRenderPass() {
 
   return {
     overlayFrame: {
+      effectInputLayers: [],
+      effectRuntimePlans: [],
       actions: [],
       camera,
       cursor: null,
       visualLayers: [],
     },
-    visualPasses: [{ alpha: 1, frame: { camera, visualLayers: [] }, time: 0 }],
+    visualPasses: [
+      {
+        alpha: 1,
+        frame: {
+          actions: [],
+          camera,
+          cursor: null,
+          effectInputLayers: [],
+          effectRuntimePlans: [],
+          visualLayers: [],
+        },
+        time: 0,
+        transitionOverlays: [],
+      },
+    ],
   };
 }
 
@@ -146,6 +163,9 @@ function SceneHarness() {
 
 async function renderSceneHarness() {
   await act(async () => root?.render(<SceneHarness />));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(20);
+  });
 }
 
 function restoreDescriptor(target: object, key: string, descriptor?: PropertyDescriptor) {
@@ -158,6 +178,7 @@ function restoreDescriptor(target: object, key: string, descriptor?: PropertyDes
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -222,11 +243,17 @@ afterEach(() => {
   );
   restoreDescriptor(HTMLCanvasElement.prototype, 'getContext', originalCanvasGetContextDescriptor);
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 function createLockedVisualLayers() {
   return [
-    { clipId: 'video-1', kind: 'video' },
+    {
+      clipId: 'video-1',
+      kind: 'video',
+      clip: createVideoClip({ id: 'video-1' }),
+      trackRole: 'MAIN',
+    },
     {
       clipId: 'annotation-1',
       kind: 'annotation',
@@ -241,6 +268,8 @@ function createLockedVisualLayers() {
 function setLockedAnnotationRenderPass() {
   const baseCamera = createRenderPass().overlayFrame.camera;
   const overlayFrame = {
+    effectInputLayers: [],
+    effectRuntimePlans: [],
     actions: [],
     camera: {
       ...baseCamera,

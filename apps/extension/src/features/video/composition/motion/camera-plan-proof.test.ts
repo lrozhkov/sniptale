@@ -219,3 +219,126 @@ describe('continuous camera admission', () => {
     expect(middle.x).toBeCloseTo(450);
   });
 });
+
+it('bounds geometry work for a dense pointer hull without dropping interior observations', () => {
+  let checks = 0;
+  const observations = Array.from({ length: 1025 }, (_, index) => ({
+    time: index / 1024,
+    segmentId: 'source',
+    actual: { x: 300 + (index % 7), y: 200 + (index % 11) },
+  }));
+  const native = {
+    ...geometry,
+    supportsObservationBounds: true,
+    clearanceBounds(input: Parameters<CameraProofGeometry['clearanceBounds']>[0]) {
+      checks++;
+      return geometry.clearanceBounds(input);
+    },
+  };
+  const input = {
+    spans: [hold],
+    observations,
+    geometry: native,
+    targetScale: 2,
+    preservePointer: true,
+    limits,
+  };
+  expect(proveCameraPlan(input)).toEqual({ status: 'proven' });
+  expect(checks).toBeLessThan(40);
+  const unsafe = observations.map((point, index) =>
+    index === 511 ? { ...point, actual: { x: 999, y: 200 } } : point
+  );
+  expect(proveCameraPlan({ ...input, observations: unsafe }).status).toBe('conflict');
+});
+
+it('retains detailed proof when a coarse observation envelope is inconclusive', () => {
+  const observations = Array.from({ length: 257 }, (_, index) => ({
+    time: index / 256,
+    segmentId: 'source',
+    actual: { x: 300 + index / 256, y: 200 },
+  }));
+  let detailed = 0;
+  const native = {
+    ...geometry,
+    supportsObservationBounds: true,
+    clearanceBounds(input: Parameters<CameraProofGeometry['clearanceBounds']>[0]) {
+      if (input.end - input.start > 1 / 256) return null;
+      detailed++;
+      return geometry.clearanceBounds(input);
+    },
+  };
+  expect(
+    proveCameraPlan({
+      spans: [hold],
+      observations,
+      geometry: native,
+      targetScale: 2,
+      preservePointer: true,
+      limits,
+    })
+  ).toEqual({ status: 'proven' });
+  expect(detailed).toBeGreaterThan(256);
+});
+
+it('includes bracketing samples when an observation block ends between timestamps', () => {
+  const observations = Array.from({ length: 257 }, (_, index) => ({
+    time: index / 256,
+    segmentId: 'source',
+    actual: { x: 300 + (index % 7) * 5, y: 200 + (index % 11) * 3 },
+  }));
+  let hulls = 0;
+  expect(
+    proveCameraPlan({
+      spans: [hold],
+      observations,
+      targetScale: 2,
+      preservePointer: true,
+      limits,
+      geometry: {
+        ...geometry,
+        supportsObservationBounds: true,
+        breaks: [0.12345, 0.76543],
+        clearanceBounds(input) {
+          if (input.actualIsBounds) {
+            hulls++;
+            const left = observations.findLast((p) => p.time <= input.start)!;
+            const right = observations.find((p) => p.time >= input.end)!;
+            expect(input.actual!.from.x).toBeLessThanOrEqual(
+              Math.min(left.actual.x, right.actual.x)
+            );
+            expect(input.actual!.to.x).toBeGreaterThanOrEqual(
+              Math.max(left.actual.x, right.actual.x)
+            );
+            expect(input.actual!.from.y).toBeLessThanOrEqual(
+              Math.min(left.actual.y, right.actual.y)
+            );
+            expect(input.actual!.to.y).toBeGreaterThanOrEqual(
+              Math.max(left.actual.y, right.actual.y)
+            );
+          }
+          return geometry.clearanceBounds(input);
+        },
+      },
+    })
+  ).toEqual({ status: 'proven' });
+  expect(hulls).toBeGreaterThan(0);
+});
+
+it('retains exact-point admission for a zero-duration span with dense observations', () => {
+  const observations = Array.from({ length: 129 }, (_, index) => ({
+    time: index / 128,
+    segmentId: 'source',
+    actual: { x: index === 64 ? 999 : 300, y: 200 },
+  }));
+  const input = {
+    spans: [{ ...hold, start: 0.5, end: 0.5 }],
+    observations,
+    targetScale: 2,
+    preservePointer: true,
+    limits,
+  };
+  expect(
+    proveCameraPlan({ ...input, geometry: { ...geometry, supportsObservationBounds: true } })
+  ).toEqual(proveCameraPlan({ ...input, geometry }));
+  expect(proveCameraPlan({ ...input, geometry }).status).toBe('conflict');
+});

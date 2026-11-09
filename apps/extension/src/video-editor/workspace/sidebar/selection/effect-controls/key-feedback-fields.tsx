@@ -28,6 +28,22 @@ type KeyFeedbackFieldsProps = {
 );
 
 function selectedKeyTargets(project: VideoProject, props: KeyFeedbackFieldsProps) {
+  if (
+    props.scope !== 'project' &&
+    project.actionFeedback?.some(
+      (group) =>
+        group.events &&
+        group.recordingId === props.recordingId &&
+        group.sourceInstanceId === props.sourceInstanceId
+    )
+  )
+    return [
+      {
+        recordingId: props.recordingId,
+        sourceInstanceId: props.sourceInstanceId,
+        sourceEventId: props.sourceEventId,
+      },
+    ];
   return getVideoProjectKeyFeedbackTargets(project).filter(
     (target) =>
       props.scope === 'project' ||
@@ -42,17 +58,27 @@ export function KeyFeedbackFields(props: KeyFeedbackFieldsProps) {
   const updateProject = useVideoEditorTimelineEditingPort((port) => port.updateProject);
   const targets = selectedKeyTargets(props.project, props);
   if (!targets.length) return null;
-  const styles = new Map(
-    (props.project.actionFeedback ?? []).flatMap((group) =>
-      (group.keyStyles ?? []).map(
-        (style) =>
-          [JSON.stringify([group.recordingId, group.sourceInstanceId, style.id]), style] as const
-      )
-    )
-  );
-  const selected = targets.map((target) =>
-    styles.get(JSON.stringify([target.recordingId, target.sourceInstanceId, target.sourceEventId]))
-  );
+  const groupFor = (target: (typeof targets)[number]) =>
+    props.project.actionFeedback?.find(
+      (group) =>
+        group.recordingId === target.recordingId &&
+        group.sourceInstanceId === target.sourceInstanceId
+    );
+  const selected = targets.flatMap((target) => {
+    const group = groupFor(target);
+    return target.sourceEventId === null
+      ? [group?.keyDefaults, ...(group?.keyStyles ?? [])]
+      : [
+          group?.keyStyles?.find((style) => style.id === target.sourceEventId) ??
+            group?.keyDefaults,
+        ];
+  });
+  const hasOverrides = targets.some((target) => {
+    const group = groupFor(target);
+    return target.sourceEventId === null
+      ? Boolean(group?.keyDefaults || group?.keyStyles?.length)
+      : group?.keyStyles?.some((style) => style.id === target.sourceEventId);
+  });
   const change = (patch: ReviewKeyPatch | null) => {
     if (props.disabled) return;
     updateProject((project) =>
@@ -80,7 +106,7 @@ export function KeyFeedbackFields(props: KeyFeedbackFieldsProps) {
           dataUi="video-editor.key.reset"
           aria-label={translate('gallery.videoReview.keyReset')}
           title={translate('gallery.videoReview.keyReset')}
-          disabled={props.disabled || !selected.some(Boolean)}
+          disabled={props.disabled || !hasOverrides}
           onClick={() => change(null)}
         >
           <RotateCcw size={14} aria-hidden="true" />

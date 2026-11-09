@@ -12,6 +12,8 @@ const shellMocks = vi.hoisted(() => ({
   enableNavigationLock: vi.fn(),
   sendRuntimeMessage: vi.fn(),
   showToast: vi.fn(),
+  reviewTool: 'comment' as 'comment' | 'navigate',
+  reviewListeners: new Set<() => void>(),
 }));
 
 vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
@@ -33,6 +35,14 @@ vi.mock('../../../selection/locker', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../selection/locker')>()),
   disableNavigationLock: shellMocks.disableNavigationLock,
   enableNavigationLock: shellMocks.enableNavigationLock,
+}));
+
+vi.mock('../../../selection/design-review', () => ({
+  getDesignReviewModeState: () => ({ tool: shellMocks.reviewTool }),
+  subscribeToDesignReviewMode: (listener: () => void) => {
+    shellMocks.reviewListeners.add(listener);
+    return () => shellMocks.reviewListeners.delete(listener);
+  },
 }));
 
 import { useToolbarButtonFocusBlur, useToolbarNavigationLock, useToolbarViewportStatus } from '.';
@@ -93,6 +103,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   installContentRuntimeMessagingMock(shellMocks.sendRuntimeMessage);
   vi.clearAllMocks();
+  shellMocks.reviewTool = 'comment';
 });
 
 afterEach(() => {
@@ -203,6 +214,37 @@ function registerManagedNavigationLockTests() {
     expect(getNavigationState().navigationLockEnabled).toBe(true);
     expect(getNavigationState().lockDisabled).toBe(true);
     expect(getNavigationState().lockTitle).toBe('content.toolbar.navigationLockManaged');
+  });
+
+  it('keeps restored Navigate unlocked when the review mode effect runs', async () => {
+    shellMocks.reviewTool = 'navigate';
+    await renderNavigationHarness({ designReviewMode: true });
+
+    expect(shellMocks.enableNavigationLock).not.toHaveBeenCalled();
+    expect(shellMocks.disableNavigationLock).toHaveBeenCalled();
+    expect(getNavigationState().navigationLockEnabled).toBe(false);
+  });
+
+  it('updates locking when review tools switch without changing review mode', async () => {
+    await renderNavigationHarness({ designReviewMode: true });
+    expect(getNavigationState().navigationLockEnabled).toBe(true);
+    shellMocks.enableNavigationLock.mockClear();
+    shellMocks.disableNavigationLock.mockClear();
+
+    act(() => {
+      shellMocks.reviewTool = 'navigate';
+      shellMocks.reviewListeners.forEach((listener) => listener());
+    });
+    expect(shellMocks.disableNavigationLock).toHaveBeenCalledTimes(1);
+    expect(shellMocks.enableNavigationLock).not.toHaveBeenCalled();
+    expect(getNavigationState().navigationLockEnabled).toBe(false);
+
+    act(() => {
+      shellMocks.reviewTool = 'comment';
+      shellMocks.reviewListeners.forEach((listener) => listener());
+    });
+    expect(shellMocks.enableNavigationLock).toHaveBeenCalledExactlyOnceWith(false);
+    expect(getNavigationState().navigationLockEnabled).toBe(true);
   });
 
   it('removes the navigation overlay while Drawing owns pointer input', async () => {

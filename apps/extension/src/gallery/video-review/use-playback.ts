@@ -5,7 +5,7 @@ import {
   type ReviewPlaybackRange,
 } from './playback-range';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { useReviewPlaybackRecovery } from './use-playback-recovery';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
@@ -29,6 +29,33 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const latest = useRef(props);
+  latest.current = props;
+  const publishTime = useCallback((value: number) => {
+    // Browser media clocks can round the terminal timestamp beyond the project endpoint.
+    if (Number.isFinite(value)) setTime(Math.max(0, Math.min(latest.current.duration, value)));
+  }, []);
+  const presentation = useRef<{ source: string; active: boolean } | null>(null);
+  const setPresentationActive = useCallback((source: string, active: boolean) => {
+    if (active) presentation.current = { source, active };
+    else if (presentation.current?.source === source) presentation.current.active = false;
+  }, []);
+  const onPresentedTime = useCallback(
+    (source: string, value: number) => {
+      const node = video.current;
+      if (
+        presentation.current?.source !== source ||
+        !presentation.current.active ||
+        !node ||
+        node.paused ||
+        node.error ||
+        !Number.isFinite(value)
+      )
+        return;
+      publishTime(value);
+    },
+    [publishTime]
+  );
   const [playbackRange, updateRange] = useState<ReviewPlaybackRange | null>(null);
   const rangeRef = useRef(playbackRange);
   const [seekRevision, reviseSeek] = useState(0);
@@ -37,8 +64,6 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
     rangeRef.current = range;
     updateRange(range);
   };
-  const latest = useRef(props);
-  latest.current = props;
   const recovery = useReviewPlaybackRecovery({
     video,
     time,
@@ -72,7 +97,15 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
       if (restoreSource) node.currentTime = next;
       applyReviewPlaybackSample(node, effective, value, latest.current);
     }
-    setTime(next);
+    if (
+      !applyEdits ||
+      restoreSource ||
+      !presentation.current?.active ||
+      !node ||
+      node.paused ||
+      node.error
+    )
+      publishTime(next);
     return next;
   };
   const audioSettingsKey = JSON.stringify([
@@ -99,7 +132,7 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   }, [audioSettingsKey, props.duration]);
   usePlaybackFrames(playing, video, tick);
   const seekSource = (value: number) => {
-    if (recovery.seek(value)) setTime(value);
+    if (recovery.seek(value)) publishTime(value);
     else if (video.current) video.current.currentTime = value;
     reviseSeek((revision) => revision + 1);
     synchronize(value, false);
@@ -111,6 +144,8 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
     time,
     playing,
     setPlaying,
+    setPresentationActive,
+    onPresentedTime,
     playbackRange,
     seekRevision,
     navigationRevision,
@@ -138,7 +173,10 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         reviseSeek((revision) => revision + 1);
         synchronize(start, true);
         void video.current.play().catch(() => props.onFailure());
-      } else setPlaying(false);
+      } else {
+        if (video.current) publishTime(video.current.currentTime);
+        setPlaying(false);
+      }
     },
     onTime: (value: number) => synchronize(value, playing),
     seek: (value: number, snap = true) => {
@@ -198,7 +236,15 @@ function usePlaybackFrames(
       if (node && !node.paused) tick.current(node.currentTime, true);
       frame = requestAnimationFrame(advance);
     };
+    const node = video.current;
+    const paused = () => {
+      if (node) tick.current(node.currentTime, false);
+    };
+    node?.addEventListener('pause', paused);
     frame = requestAnimationFrame(advance);
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      node?.removeEventListener('pause', paused);
+    };
   }, [playing, video, tick]);
 }

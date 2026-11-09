@@ -1,3 +1,4 @@
+import { reviewCursorSpatialSettings } from './cursor-focus-path';
 import { cameraTransitionProgress } from '../../project/motion/transitions';
 import { insetMediaCanvas } from '../../project/window-geometry';
 import { uncropMediaSourceRect } from '../../project/media-crop';
@@ -14,6 +15,10 @@ import {
   reviewCameraGapSignature,
 } from './camera-geometry';
 import { evaluateWorkingZoneCameraBoundary } from '../../composition/motion/follow-cursor';
+import {
+  evaluateWindowCameraLinkFit,
+  type WindowCameraLinkFit,
+} from '../../composition/motion/window-camera-geometry';
 import type {
   CameraBoundaryState,
   WorkingZoneCameraBoundaries,
@@ -21,11 +26,8 @@ import type {
 import type { WorkingZoneCameraGeometry } from '../../composition/motion/follow-cursor';
 import type { WorkingZoneCameraPlan } from '../../composition/motion/follow-cursor';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
-import { quickEditSpatialSpan } from './spatial';
-import {
-  interpolateCameraSpatial as interpolateQuickEditSpatial,
-  hasCameraPerspective as hasQuickEditPerspective,
-} from '../../project/motion/spatial';
+import { applyReviewCameraSpatial } from './spatial';
+import { hasCameraPerspective as hasQuickEditPerspective } from '../../project/motion/spatial';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
@@ -75,9 +77,12 @@ export type QuickEditCameraLinkPlan = {
   from: QuickEditCameraTransform;
   to: QuickEditCameraTransform;
   discontinuities: readonly { time: number; reason: 'nominal' }[];
+  /** Present only when every piece of the temporary expansion was proved. */
+  fit?: WindowCameraLinkFit;
 } & ({ status: 'ready' } | ({ status: 'conflict' } & QuickEditCameraConflict));
 
-function cameraPerspectiveValues(region: QuickEditZoomRegion) {
+function cameraPerspectiveValues(region: QuickEditZoomRegion, time = region.start) {
+  region = reviewCursorSpatialSettings(region, time);
   return hasQuickEditPerspective(region.perspective)
     ? [
         region.perspective!.rotateX,
@@ -101,7 +106,8 @@ function compatibleReviewCameraPhases(left: QuickEditZoomRegion, right: QuickEdi
     exit.duration === enter.duration;
   if ((!held && !matchedEase) || left.transform.scale !== right.transform.scale) return false;
   if (
-    JSON.stringify(cameraPerspectiveValues(left)) !== JSON.stringify(cameraPerspectiveValues(right))
+    JSON.stringify(cameraPerspectiveValues(left, left.end)) !==
+    JSON.stringify(cameraPerspectiveValues(right))
   )
     return false;
   return true;
@@ -229,15 +235,15 @@ export function resolveReviewCameraLinkPlan(
     from.scale !== to.scale ||
     a.x !== b.x ||
     a.y !== b.y ||
-    JSON.stringify(cameraPerspectiveValues(source)) !==
+    JSON.stringify(cameraPerspectiveValues(source, source.end)) !==
       JSON.stringify(cameraPerspectiveValues(target));
   const discontinuities = changed
     ? [source.end, target.start].map((time) => ({ time, reason: 'nominal' as const }))
     : [];
-  const conflict = reviewCameraLinkConflict(regions, source, target, scene);
+  const { conflict, fit } = reviewCameraLinkConflict(regions, source, target, scene);
   return conflict
     ? { status: 'conflict', ...conflict, from, to, discontinuities }
-    : { status: 'ready', from, to, discontinuities };
+    : { status: 'ready', from, to, discontinuities, ...(fit ? { fit } : {}) };
 }
 
 /** Inspect the same disposable plans used for drawing, retaining full topology for fragment admission. */
@@ -286,7 +292,7 @@ export function resolveReviewCameraConflicts(
 
 const linkProofs = new WeakMap<
   NonNullable<QuickEditZoomRegion['cursorFocus']>,
-  Map<string, QuickEditCameraConflict | null>
+  Map<string, { conflict: QuickEditCameraConflict | null; fit?: WindowCameraLinkFit }>
 >();
 
 function reviewCameraLinkEndpointFailure(
@@ -309,7 +315,7 @@ function reviewCameraLinkConflict(
   source: QuickEditZoomRegion,
   target: QuickEditZoomRegion,
   scene?: QuickEditCameraSceneInput
-): QuickEditCameraConflict | null {
+): { conflict: QuickEditCameraConflict | null; fit?: WindowCameraLinkFit } {
   // The outgoing link inherits its source policy; a manual source uses the following destination policy.
   const context = source.cursorFocus ?? target.cursorFocus;
   const input = scene ?? context?.scene;
@@ -323,9 +329,9 @@ function reviewCameraLinkConflict(
     reason,
     time,
   });
-  if (!context || !input) return conflict('unproven');
+  if (!context || !input) return { conflict: conflict('unproven') };
   const endpointFailure = reviewCameraLinkEndpointFailure(regions, source, target, input);
-  if (endpointFailure) return conflict(endpointFailure.reason, endpointFailure.time);
+  if (endpointFailure) return { conflict: conflict(endpointFailure.reason, endpointFailure.time) };
   const from = evaluateReviewSceneFollow(regions, source, source.end, source.transform, input);
   const to = evaluateReviewSceneFollow(regions, target, target.start, target.transform, input);
   const { output, layout, policy } = reviewCameraGeometryInputs(input, context);
@@ -335,7 +341,7 @@ function reviewCameraLinkConflict(
     cached = new Map();
     linkProofs.set(context, cached);
   }
-  if (cached.has(key)) return cached.get(key) ?? null;
+  if (cached.has(key)) return cached.get(key)!;
   const proof = proveReviewCameraGap({
     output,
     layout,
@@ -353,7 +359,10 @@ function reviewCameraLinkConflict(
       cursorFocus: context,
     }),
   });
-  const result = proof.status === 'conflict' ? conflict(proof.reason, proof.time) : null;
+  const result =
+    proof.status === 'conflict'
+      ? { conflict: conflict(proof.reason, proof.time) }
+      : { conflict: null, ...(proof.fit ? { fit: proof.fit } : {}) };
   cached.set(key, result);
   if (cached.size > 4) cached.delete(cached.keys().next().value ?? '');
   return result;
@@ -704,20 +713,19 @@ export function evaluateQuickEditCameraAtTime(
           scene
         )
       : QUICK_EDIT_IDENTITY_CAMERA);
-  const camera = interpolateCamera(from, target, sample.progress);
-  if (
-    quickEditSpatialSpan(regions, timelineTime) ||
-    sample.from?.depthOfField?.enabled ||
-    sample.to.depthOfField?.enabled
-  )
-    return {
-      ...camera,
-      spatial: {
-        ...interpolateQuickEditSpatial(sample.from, sample.to, sample.progress),
-        lockBackground: quickEditSpatialSpan(regions, timelineTime),
-      },
-    };
-  return camera;
+  const fitted =
+    linkPlan?.status === 'ready' && linkPlan.fit
+      ? evaluateWindowCameraLinkFit(linkPlan.fit, timelineTime)
+      : undefined;
+  const camera =
+    fitted && sample.progress > 0 && sample.progress < 1
+      ? {
+          scale: fitted.scale,
+          centerX: (fitted.pan.x / linkPlan!.fit!.window.width + 0.5) / fitted.scale,
+          centerY: (fitted.pan.y / linkPlan!.fit!.window.height + 0.5) / fitted.scale,
+        }
+      : interpolateCamera(from, target, sample.progress);
+  return applyReviewCameraSpatial(regions, timelineTime, sample, camera);
 }
 
 /** Shared camera bounds: following backgrounds and rounded video edges move together. */

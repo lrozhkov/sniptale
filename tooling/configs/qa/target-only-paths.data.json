@@ -317,7 +317,6 @@
     "apps/extension/src/package-renderer-sandbox/worker-sdk-runtime-bitmap.test.ts",
     "apps/extension/src/package-renderer-sandbox/worker-sdk-runtime.test.ts",
     "apps/extension/src/package-renderer-sandbox/worker.ts",
-    "apps/extension/src/platform/i18n/messages/video-editor/effects-library.packages.ts",
     "apps/extension/src/video-editor/contracts/commands/video-pack.ts",
     "apps/extension/src/video-editor/library/effects-dock/apply.test.ts",
     "apps/extension/src/video-editor/library/effects-dock/apply.ts",

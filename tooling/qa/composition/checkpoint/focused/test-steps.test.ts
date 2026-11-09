@@ -410,3 +410,57 @@ it.each([
     );
   }
 );
+
+it.each(['en', 'ru'])(
+  'runs mapped product proof for a %s JSON-only catalog change',
+  async (locale) => {
+    const root = createTempRoot('focused-catalog-proof-');
+    const catalog = `apps/extension/src/platform/i18n/catalogs/${locale}.json`;
+    const proof = 'apps/extension/src/platform/i18n/catalog-reader.test.ts';
+    writeFile(root, catalog, '{"save":"Save"}');
+    writeFile(root, proof, 'export {};');
+    const runUnitTestsImpl = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
+    const module = await importFresh<typeof import('./test-steps.mjs')>(
+      '../composition/checkpoint/focused/test-steps.mjs'
+    );
+    await withCwd(root, () =>
+      module.runFocusedUnitTests({ codeFiles: [], targetFiles: [catalog] }, { runUnitTestsImpl })
+    );
+    expect(runUnitTestsImpl).toHaveBeenCalledWith(
+      expect.objectContaining({
+        directFiles: expect.arrayContaining([proof]),
+        coverage: false,
+        suite: 'product',
+      })
+    );
+  }
+);
+
+it('keeps mapped catalog tests in a mixed diff and propagates their failure', async () => {
+  const module = await importFresh<typeof import('./test-steps.mjs')>(
+    '../composition/checkpoint/focused/test-steps.mjs'
+  );
+  const catalog = 'apps/extension/src/platform/i18n/catalogs/en.json';
+  const execute = vi.fn((_options: Record<string, unknown>) => ({
+    status: 1,
+    stdout: '',
+    stderr: 'catalog consumer failed',
+  }));
+  const steps = await module.runFocusedUnitTests(
+    {
+      codeFiles: ['apps/extension/src/platform/i18n/catalog-reader.ts'],
+      targetFiles: [catalog, 'apps/extension/src/platform/i18n/catalog-reader.ts'],
+    },
+    { runUnitTestsImpl: execute }
+  );
+  expect(execute).toHaveBeenCalledWith(
+    expect.objectContaining({
+      directFiles: expect.arrayContaining([
+        'apps/extension/src/platform/i18n/popup.test.ts',
+        'apps/extension/src/content/runtime/shim/launcher.test.ts',
+      ]),
+    })
+  );
+  expect(execute.mock.calls[0][0]).not.toHaveProperty('relatedFiles');
+  expect(steps[0].status).toBe('failed');
+});

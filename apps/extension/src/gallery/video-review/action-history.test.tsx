@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewActionHistory } from './action-history';
 import { ReviewClickOverlay } from './click-animation-overlay';
+import { REVIEW_KEY_DEFAULT } from '../../features/video/project/action-feedback/key-animation';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import { reviewActionAudioRefKey } from '../../features/video/review/advanced/action-audio';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -445,6 +446,7 @@ it('refreshes a paused lens when its target frame finishes decoding without a Re
     rect: vi.fn(),
     clip: vi.fn(),
     arc: vi.fn(),
+    moveTo: vi.fn(),
     stroke: vi.fn(),
     fill: vi.fn(),
     drawImage: vi.fn(),
@@ -521,7 +523,8 @@ it('configures recorded keys without pointer locations, separately from selected
               focusPoint: { x: 0.5, y: 0.5 },
             },
           ]}
-          animations={[]}
+          animations={[{ ...REVIEW_CLICK_DEFAULT, id: 'click', effect: 'ripple' }]}
+          keyAnimations={[{ ...REVIEW_KEY_DEFAULT, id: 'key', enabled: true }]}
           busy={false}
           onChange={onChange}
           onKeyChange={onKeyChange}
@@ -546,6 +549,18 @@ it('configures recorded keys without pointer locations, separately from selected
     );
     expect(host.textContent).toContain('gallery.videoReview.historyClicks');
     expect(host.textContent).toContain('gallery.videoReview.historyKeys');
+    const sectionIcon = (id: string) =>
+      host.querySelector(`[data-section="${id}"] > details > summary > svg:first-child`);
+    expect(sectionIcon('click:animation')?.classList.contains('lucide-mouse-pointer-2')).toBe(true);
+    expect(sectionIcon('key:display')?.classList.contains('lucide-keyboard')).toBe(true);
+    for (const group of ['appearance', 'timing', 'position', 'actions']) {
+      expect(sectionIcon(`click:${group}`)).not.toBeNull();
+      expect(sectionIcon(`key:${group}`)).toBeNull();
+    }
+    const icons = Array.from(
+      host.querySelectorAll('[data-section] > details > summary > svg:first-child')
+    ).map((icon) => icon.getAttribute('class'));
+    expect(new Set(icons).size).toBe(icons.length);
     const display = host.querySelector('[aria-label="gallery.videoReview.keyDisplay"]')!;
     act(() =>
       display.querySelector<HTMLButtonElement>('[title="gallery.videoReview.keyCaption"]')!.click()

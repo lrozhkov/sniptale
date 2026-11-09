@@ -44,3 +44,13 @@ export function isImageEditorSenderUrl(senderUrl: string | undefined): boolean {
 export function isGallerySenderUrl(senderUrl: string | undefined): boolean {
   return isOwnedExtensionPagePath(senderUrl, 'apps/extension/src/gallery/index.html');
 }
+
+/** Canonical popup document only; native sender provenance remains a background check. */
+export function isCanonicalPopupSenderUrl(senderUrl: string | undefined): boolean {
+  if (!senderUrl) return false;
+  try {
+    return senderUrl === runtimeInfo.getURL('apps/extension/src/popup/index.html');
+  } catch {
+    return false;
+  }
+}

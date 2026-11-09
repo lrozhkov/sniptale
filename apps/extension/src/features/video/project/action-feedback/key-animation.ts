@@ -28,6 +28,50 @@ export const REVIEW_KEY_DEFAULT: Readonly<ReviewKeyStyle> = {
   style: { ...getActionKeyStyle(), opacity: 1, background: '#18202ceb' },
 };
 
+function parseKeyStyleFields(value: Record<string, unknown>): ReviewKeyStyle | null {
+  if (
+    typeof value['enabled'] !== 'boolean' ||
+    !isBoundedNumber(value['before'], 0, 2) ||
+    !isBoundedNumber(value['after'], 0.05, 5) ||
+    !isBoundedNumber(value['offset'], -2, 2) ||
+    !isActionKeyStyle(value['style'])
+  )
+    return null;
+  return {
+    enabled: value['enabled'],
+    before: value['before'],
+    after: value['after'],
+    offset: value['offset'],
+    style: { ...value['style'] },
+  };
+}
+
+/** A source default has authored style fields and no captured event identity. */
+export function parseReviewKeyDefaults(raw: unknown): ReviewKeyStyle | undefined | null {
+  if (raw === undefined) return undefined;
+  if (
+    !isRecord(raw) ||
+    Object.keys(raw).some((key) => !['enabled', 'before', 'after', 'offset', 'style'].includes(key))
+  )
+    return null;
+  return parseKeyStyleFields(raw);
+}
+
+export function patchReviewKeyDefaults(
+  current: ReviewKeyStyle | undefined,
+  patch: ReviewKeyPatch
+): ReviewKeyStyle {
+  const value = {
+    ...REVIEW_KEY_DEFAULT,
+    ...current,
+    ...patch,
+    style: { ...REVIEW_KEY_DEFAULT.style, ...current?.style, ...patch.style },
+  };
+  const parsed = parseReviewKeyDefaults(value);
+  if (!parsed) throw new Error('Key presentation is invalid.');
+  return parsed;
+}
+
 /** Optional absence must survive legacy replay without manufacturing operations. */
 export function parseReviewKeyAnimations(raw: unknown): ReviewKeyAnimation[] | undefined | null {
   if (raw === undefined) return undefined;
@@ -40,23 +84,13 @@ export function parseReviewKeyAnimations(raw: unknown): ReviewKeyAnimation[] | u
       typeof value['id'] !== 'string' ||
       !value['id'].trim() ||
       value['id'].length > 256 ||
-      ids.has(value['id']) ||
-      typeof value['enabled'] !== 'boolean' ||
-      !isBoundedNumber(value['before'], 0, 2) ||
-      !isBoundedNumber(value['after'], 0.05, 5) ||
-      !isBoundedNumber(value['offset'], -2, 2) ||
-      !isActionKeyStyle(value['style'])
+      ids.has(value['id'])
     )
       return null;
+    const style = parseKeyStyleFields(value);
+    if (!style) return null;
     ids.add(value['id']);
-    result.push({
-      id: value['id'],
-      enabled: value['enabled'],
-      before: value['before'],
-      after: value['after'],
-      offset: value['offset'],
-      style: { ...value['style'] },
-    });
+    result.push({ id: value['id'], ...style });
   }
   return result.sort((a, b) => a.id.localeCompare(b.id));
 }

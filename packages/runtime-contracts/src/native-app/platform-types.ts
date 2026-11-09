@@ -68,7 +68,21 @@ export interface NativeMicrophoneDevice {
   available: boolean;
 }
 
+/** Limits for the bounded v1 Native attachment protocol. */
+export interface NativeHistoryAttachmentLimits {
+  maxBlockBytes: number;
+  maxBlockRecords: number;
+  maxChunkRawBytes: number;
+  maxManifestEntries: number;
+}
+
 export interface NativeAppCapabilities {
+  attachments?: NativeHistoryAttachmentLimits & {
+    cursorTrajectoryFormats: Array<'cursor-trajectory-v1'>;
+  };
+  eventAttachments?: NativeHistoryAttachmentLimits & {
+    recordingEventFormats: Array<'recording-events-v1'>;
+  };
   capture: {
     screenshotModes: NativeCaptureMode[];
     videoModes: NativeRecordingMode[];

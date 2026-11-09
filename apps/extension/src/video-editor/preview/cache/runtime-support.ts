@@ -1,3 +1,4 @@
+import type { VideoPreviewRenderer } from '../../../features/video/preview/preferences';
 import { createSha256Digest } from '@sniptale/platform/security/digest';
 
 import type {
@@ -17,7 +18,7 @@ import {
   createVideoPreviewExactFrameKey,
   type VideoPreviewExactFrameCache,
 } from './exact-frame-cache';
-import type { VideoPreviewFrameMaterializer } from './materializer';
+import type { VideoPreviewFrameMaterializer, MaterializedPreviewFrame } from './materializer';
 import type { VideoPreviewCacheSegmentPlanEntry } from './segments';
 import type { PreparedCachedVideoPreview } from './types';
 
@@ -34,6 +35,7 @@ export interface VideoPreviewCacheBuildParams {
   onProgress: (phase: VideoEditorPreviewPhase, completed: number, total: number) => void;
   ownerDocument: Document;
   playbackRange: VideoEditorPlaybackRange | null;
+  previewRenderer?: VideoPreviewRenderer;
   project: VideoProject;
   rasterSize: VideoEditorPreviewRasterSize;
   signal: AbortSignal;
@@ -66,12 +68,14 @@ export function resolveVideoPreviewFrameRange(
 }
 
 export async function createVideoPreviewStorageKey(params: {
+  previewRenderer?: VideoPreviewRenderer;
   project: VideoProject;
   range: VideoPreviewCacheFrameRange;
   rasterSize: VideoEditorPreviewRasterSize;
 }): Promise<string> {
   return createSha256Digest(
     JSON.stringify({
+      renderer: params.previewRenderer ?? 'gpu',
       fps: params.project.fps,
       height: params.rasterSize.height,
       projectId: params.project.id,
@@ -158,6 +162,7 @@ export function restoreMatchingSegments(
 export function isStoredVideoPreviewCompatible(
   record: VideoPreviewCacheRecord | null,
   params: {
+    previewRenderer?: VideoPreviewRenderer;
     project: VideoProject;
     range: VideoPreviewCacheFrameRange;
     rasterSize: VideoEditorPreviewRasterSize;
@@ -174,15 +179,28 @@ export function isStoredVideoPreviewCompatible(
   );
 }
 
+/** Consumes the completed frame output after snapshot capture settles, including failure. */
 export async function cacheExactVideoPreviewFrame(
   context: FreshVideoPreviewBuildContext,
   frameIndex: number,
-  canvas: HTMLCanvasElement
+  frame: MaterializedPreviewFrame
 ): Promise<boolean> {
-  if (typeof createImageBitmap !== 'function') return false;
-  const bitmap = await createImageBitmap(canvas);
-  const { params } = context;
-  return params.cache.set(createExactFrameKey(context, frameIndex), bitmap) === 'stored';
+  const output = frame.presentation.output;
+  try {
+    if (typeof createImageBitmap !== 'function') return false;
+    const bitmap = await createImageBitmap(output?.canvas ?? frame.canvas);
+    const { params } = context;
+    if (params.signal.aborted) {
+      bitmap.close();
+      throw new DOMException('Preview preparation was cancelled', 'AbortError');
+    }
+    return (
+      params.cache.set(createExactFrameKey(context, frameIndex), bitmap, frame.presentation) ===
+      'stored'
+    );
+  } finally {
+    output?.release();
+  }
 }
 
 export function reportVideoPreviewBuildProgress(

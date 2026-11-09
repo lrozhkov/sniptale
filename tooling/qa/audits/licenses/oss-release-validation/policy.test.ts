@@ -102,3 +102,80 @@ it('admits exact package-tag license sources and refuses mutable or incomplete i
     );
   }
 });
+
+it('includes exactly the reviewed model license, notice and provenance payloads', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'bundled-model-legal-inventory-'));
+  const manifestPath = 'THIRD_PARTY_DEPENDENCIES.json';
+  const asset = {
+    id: 'model',
+    name: 'Bundled model',
+    attribution: 'Model author',
+    license: 'Apache-2.0',
+    sourceUrl: 'https://example.test/model',
+    modifications: 'The runtime adds initialization cleanup.',
+    licensePath: 'vendor/model/LICENSE',
+    licenseSha256: sha256('fixture'),
+    noticePath: 'vendor/model/NOTICE.txt',
+    noticeSha256: sha256('fixture'),
+    provenancePath: 'vendor/model/identity.json',
+    provenanceSha256: sha256('fixture'),
+    artifacts: [
+      {
+        path: 'vendor/model/model.bin',
+        sha256: sha256('model'),
+        sourceUrl: 'https://example.test/model/model.bin',
+        sourceSha256: sha256('model'),
+      },
+    ],
+  };
+  const paths = [
+    ...REQUIRED_RELEASE_LEGAL_PATHS.map(releaseLegalArchivePath),
+    manifestPath,
+    asset.licensePath,
+    asset.noticePath,
+    asset.provenancePath,
+  ];
+  const files = paths.map((file) => {
+    const bytes =
+      file === manifestPath ? JSON.stringify({ schemaVersion: 1, entries: [] }) : 'fixture';
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), bytes);
+    return { source: file, archivePath: file, sha256: sha256(bytes) };
+  });
+  const policy = {
+    bundledAssets: [],
+    dependencyLegal: { manifestPath, bundledAssets: [asset] },
+    legalFiles: files,
+  };
+  const inventory = (value: typeof policy) =>
+    validateLegalFiles(root, value).filter((error: string) =>
+      error.includes('complete canonical file set')
+    );
+  try {
+    expect(inventory(policy)).toEqual([]);
+    expect(
+      validateLegalFiles(root, {
+        ...policy,
+        dependencyLegal: {
+          ...policy.dependencyLegal,
+          bundledAssets: [{ ...asset, licensePath: '../outside' }],
+        },
+      })
+    ).toContain('Bundled asset license path must be a relative repository path.');
+    for (const missing of [asset.licensePath, asset.noticePath, asset.provenancePath])
+      expect(
+        inventory({ ...policy, legalFiles: files.filter((file) => file.source !== missing) })
+      ).toHaveLength(2);
+    expect(
+      inventory({
+        ...policy,
+        legalFiles: [
+          ...files,
+          { source: 'unexpected', archivePath: 'unexpected', sha256: sha256('') },
+        ],
+      })
+    ).toHaveLength(2);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

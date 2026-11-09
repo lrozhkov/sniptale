@@ -211,9 +211,9 @@ export const SHARED_DESIGN_SYSTEM_POPUP_SHELL_REGISTRY: DesignSystemRegistryEntr
       'apps/extension/src/design-system/previews/popup-shell/footer/preview.tsx',
     ],
     descriptionRu:
-      'Собранный footer popup с номером версии и borderless matte utility actions справа.',
+      'Футер popup с настройками, GitHub, темой, языком и необязательной строкой состояния.',
     descriptionEn:
-      'Composed popup footer with the version label and borderless matte utility actions on the right.',
+      'Popup footer with Settings, GitHub, theme, language, and an optional status row.',
     variants: [
       variant(
         'default',
@@ -222,18 +222,25 @@ export const SHARED_DESIGN_SYSTEM_POPUP_SHELL_REGISTRY: DesignSystemRegistryEntr
         'Базовая footer-композиция для popup entry surfaces.',
         'Default footer composition for popup entry surfaces.',
         [
-          'Содержит блок версии продукта и три utility actions.',
-          'Открытие design system и settings не должно дублироваться в других footer-кнопках.',
+          'Сохраняет строку действий высотой 44px.',
+          'Отображение состояния не выполняет runtime-команды.',
         ],
-        [
-          'Contains the product version block and three utility actions.',
-          'Design-system and settings access should not be duplicated by other footer buttons.',
-        ]
+        ['Keeps the action row at 44px.', 'Status presentation does not run runtime commands.']
+      ),
+      variant(
+        'status',
+        'Со статусом',
+        'With status',
+        'Необязательное состояние над сохранённой строкой действий.',
+        'Optional status above the retained action row.',
+        ['Команды и получение статуса принадлежат product controller.'],
+        ['The product controller owns commands and status reads.']
       ),
     ],
     usageContexts: [
       usage('popup.home.footer', 'Popup > Главная > Footer', 'Popup > Home > Footer', [
-        'apps/extension/src/popup/shell/app/index.tsx',
+        'apps/extension/src/popup/shell/footer/index.tsx',
+        'apps/extension/src/popup/shell/menu/route.tsx',
       ]),
     ],
     status: 'active',

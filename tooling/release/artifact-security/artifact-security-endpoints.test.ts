@@ -2,7 +2,11 @@ import { expect, it } from 'vitest';
 import { getArtifactSourceSnapshot } from '../artifact-source/artifact-source-snapshot.mjs';
 import { hasForbiddenDevelopmentEndpoint } from './artifact-security-endpoints.mjs';
 import { getAIProviderDefinition } from '../../../apps/extension/src/contracts/settings/ai-provider';
-import { bundledOllamaFactory } from './artifact-security-ollama-factory.test-support';
+import {
+  bundledOllamaFactory,
+  bundledOllamaBindings,
+  renameOllamaBindings,
+} from './artifact-security-ollama-factory.test-support';
 
 const ollama = {
   label: 'Ollama',
@@ -34,6 +38,42 @@ it('admits the exact SDK factory but blocks code, URL and adjacent-use drift', (
   ).toBe(true);
   expect(forbidden(bundledOllamaFactory.replace('11434/api', '11434/dev'))).toBe(true);
   expect(forbidden(bundledOllamaFactory + 'fetch("http://127.0.0.1:11434/api");')).toBe(true);
+});
+
+it('retains SDK admission when the bundler renames its bindings', () => {
+  for (const prefix of ['renamed_', 'other_']) {
+    const renamed = renameOllamaBindings(bundledOllamaFactory, prefix);
+    expect(renamed).not.toBe(bundledOllamaFactory);
+    expect(forbidden(renamed)).toBe(false);
+  }
+});
+
+it('retains lexical shadowing but rejects changed capture and dependency roles', () => {
+  const path = 'url:({path:e})=>`${t}${e}`';
+  const renamedPath = bundledOllamaFactory.replace(
+    path,
+    'url:({path:requestPath})=>`${t}${requestPath}`'
+  );
+  expect(renamedPath).not.toBe(bundledOllamaFactory);
+  expect(forbidden(renamedPath)).toBe(false);
+  expect(
+    forbidden(bundledOllamaFactory.replace(path, 'url:({path:requestPath})=>`${t}${e}`'))
+  ).toBe(true);
+  const completion = bundledOllamaBindings.completion;
+  const embedding = bundledOllamaBindings.embedding;
+  const swap = bundledOllamaFactory
+    .replace(`new ${completion}(`, 'new __swap__(')
+    .replace(`new ${embedding}(`, `new ${completion}(`)
+    .replace('new __swap__(', `new ${embedding}(`);
+  expect(forbidden(swap)).toBe(true);
+  expect(forbidden(bundledOllamaFactory.replace(`new ${embedding}(`, `new ${completion}(`))).toBe(
+    true
+  );
+  expect(forbidden(bundledOllamaFactory.replace('async doEmbed(', 'async otherEmbed('))).toBe(true);
+  expect(forbidden(bundledOllamaFactory.replace('throw Error(', 'throw OtherError('))).toBe(true);
+  expect(forbidden(`const Error=customError;${bundledOllamaFactory}`)).toBe(true);
+  expect(forbidden(bundledOllamaFactory.replace('return s(e)', 'return i(e)'))).toBe(true);
+  expect(forbidden(bundledOllamaFactory.replace('bw(e.baseURL)', 'fetch(e.baseURL)'))).toBe(true);
 });
 
 it('admits minified template defaults but refuses interpolated defaults', () => {

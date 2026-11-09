@@ -1,5 +1,5 @@
 import { OptionButtonsField } from '../shared/option-buttons';
-import { NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { DraftNumericRow } from '../../../../../ui/compact-inspector-controls/numeric-preview';
 import { motionTransitionSettings } from '../../../../../features/video/project/motion/timing';
 import { InspectCameraFollowSettings } from '../inspection/cursor-path';
 import { resolveCameraFollowPolicy } from '../../../../../features/video/project/camera/cursor-policy';
@@ -22,7 +22,7 @@ import {
 } from './fields';
 import { ManualFocusFields } from './focus';
 import { DetailItem, DetailList } from '../shared/panel';
-import { SliderField } from '../shared/sliders';
+import { MotionCursorCompositionFields } from './spatial';
 
 export function MotionCameraFields(props: {
   motionRegion: VideoProjectMotionRegion;
@@ -30,6 +30,7 @@ export function MotionCameraFields(props: {
 }) {
   return (
     <div className="sniptale-parameter-stack grid grid-cols-1 gap-3">
+      <MotionFocusModeField motionRegion={props.motionRegion} panel={props.panel} />
       {props.motionRegion.sourceBinding ? (
         <OptionButtonsField<'scene' | 'window'>
           label={translate('videoEditor.sidebar.motionCoverage')}
@@ -53,28 +54,36 @@ export function MotionCameraFields(props: {
         <MotionFramingPreview {...props} />
       ) : null}
       <MotionScaleFields motionRegion={props.motionRegion} panel={props.panel} />
-      <MotionFocusModeField motionRegion={props.motionRegion} panel={props.panel} />
       {props.motionRegion.focusMode === VideoMotionFocusMode.CURSOR ? (
-        <InspectCameraFollowSettings
-          settings={
-            resolveCameraFollowPolicy({
-              legacySensitivity: resolveProjectCursorFocusPath(props.panel.project).sensitivity,
-              ...(props.panel.project.cameraFollowDefaults
-                ? { defaults: props.panel.project.cameraFollowDefaults }
-                : {}),
-              ...(props.motionRegion.cameraFollow
-                ? { override: props.motionRegion.cameraFollow }
-                : {}),
-            }).settings
-          }
-          legacySensitivity={resolveProjectCursorFocusPath(props.panel.project).sensitivity}
-          inherited={!props.motionRegion.cameraFollow}
-          onChange={(cameraFollow) =>
-            props.panel.onUpdateMotionRegion(props.motionRegion.id, {
-              cameraFollow: cameraFollow ?? null,
-            })
-          }
-        />
+        <>
+          <MotionCursorCompositionFields {...props} />
+          <InspectorDetails
+            preferenceId="motion:camera-follow-policy"
+            label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+          >
+            <InspectCameraFollowSettings
+              key={props.motionRegion.id}
+              settings={
+                resolveCameraFollowPolicy({
+                  legacySensitivity: resolveProjectCursorFocusPath(props.panel.project).sensitivity,
+                  ...(props.panel.project.cameraFollowDefaults
+                    ? { defaults: props.panel.project.cameraFollowDefaults }
+                    : {}),
+                  ...(props.motionRegion.cameraFollow
+                    ? { override: props.motionRegion.cameraFollow }
+                    : {}),
+                }).settings
+              }
+              legacySensitivity={resolveProjectCursorFocusPath(props.panel.project).sensitivity}
+              inherited={!props.motionRegion.cameraFollow}
+              onChange={(cameraFollow) =>
+                props.panel.onUpdateMotionRegion(props.motionRegion.id, {
+                  cameraFollow: cameraFollow ?? null,
+                })
+              }
+            />
+          </InspectorDetails>
+        </>
       ) : null}
       <MotionPlacementFields motionRegion={props.motionRegion} panel={props.panel} />
     </div>
@@ -168,16 +177,18 @@ function MotionScaleFields(props: {
   }
 
   return (
-    <SliderField
+    <DraftNumericRow
+      key={props.motionRegion.id}
       label={translate('videoEditor.sidebar.motionScaleLabel')}
-      value={props.motionRegion.scale}
-      min={0.1}
-      max={4}
-      step={0.05}
+      value={Math.round(props.motionRegion.scale * 100)}
+      min={10}
+      max={400}
+      step={5}
+      precision={0}
+      unit="%"
       onChange={(value) =>
-        props.panel.onUpdateMotionRegion(props.motionRegion.id, { scale: value })
+        props.panel.onUpdateMotionRegion(props.motionRegion.id, { scale: value / 100 })
       }
-      formatValue={(value) => `${Math.round(value * 100)}%`}
     />
   );
 }
@@ -188,7 +199,8 @@ function MotionDurationField(props: {
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <SliderField
+    <DraftNumericRow
+      key={props.motionRegionId}
       label={translate('videoEditor.sidebar.motionDurationLabel')}
       value={props.duration}
       min={0.1}
@@ -197,7 +209,8 @@ function MotionDurationField(props: {
       onChange={(value) =>
         props.panel.onUpdateMotionRegion(props.motionRegionId, { duration: value })
       }
-      formatValue={(value) => `${value.toFixed(2)} s`}
+      precision={2}
+      unit="s"
     />
   );
 }
@@ -245,9 +258,8 @@ function MotionZoomFields(props: {
             >
               <MotionBlurField {...props} phase={phase} />
               <MotionTransitionTypeField {...props} phase={phase} />
-              <NumericRow
-                appearance="plain"
-                focusAppearance="accent-box"
+              <DraftNumericRow
+                key={props.motionRegion.id}
                 label={translate('gallery.videoReview.zoomTransitionDuration')}
                 value={setting.duration}
                 min={0}
@@ -255,14 +267,9 @@ function MotionZoomFields(props: {
                 precision={2}
                 step={0.01}
                 unit="s"
-                scrub={{
-                  min: 0,
-                  max: Math.min(5, Math.max(0, duration - other.duration)),
-                  step: 0.01,
-                }}
+                scrubMax={Math.min(5, Math.max(0, duration - other.duration))}
                 disabled={setting.type === 'none'}
-                onPreviewValue={changeDuration}
-                onCommitValue={changeDuration}
+                onChange={changeDuration}
               />
             </fieldset>
           </InspectorDetails>

@@ -4,6 +4,7 @@ import {
 } from '../../../composition/persistence/image-workspaces';
 import { useEditorStore } from '../../state/useEditorStore';
 import {
+  retireAutosaveCheckpointEdit,
   cancelPendingAutosaveRequest,
   interruptImagePresentation,
   releaseAutosaveInteraction,
@@ -17,9 +18,11 @@ export function activateAutosaveContext(
   context: ActiveEditorSessionContext,
   options: { preserveHydratedDocument?: boolean; preserveMode?: boolean } = {}
 ): void {
+  state.lastCheckpointReceipt = null;
   cancelPendingAutosaveRequest(state);
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
+  retireAutosaveCheckpointEdit(state);
   state.presentationPending = false;
   state.presentationRetryAttempt = 0;
   if (!options.preserveHydratedDocument) {
@@ -61,20 +64,21 @@ export function updateAutosaveContext(
   };
 }
 
-export async function restoreAutosaveDraft(
-  state: EditorSessionAutosaveState,
-  aggregateId: string,
-  isCurrent: () => boolean = () => true
-): Promise<ImageWorkspaceEntry | undefined> {
-  const entry = await recoverAndGetImageWorkspace(aggregateId);
-  if (!entry) {
-    return undefined;
-  }
-  if (!isCurrent()) {
-    entry.releaseDocumentAssets?.();
-    return undefined;
-  }
+export type PreparedEditorSessionDocument = Pick<
+  ImageWorkspaceEntry,
+  | 'aggregateId'
+  | 'revision'
+  | 'sourceTitle'
+  | 'sourceUrl'
+  | 'releaseDocumentAssets'
+  | 'documentAssetsByRuntimeUrl'
+>;
 
+/** Transfers hydrated resource ownership after the loaded canvas has been admitted. */
+export function adoptPreparedAutosaveDocument(
+  state: EditorSessionAutosaveState,
+  entry: PreparedEditorSessionDocument
+): void {
   const renderPresentation = state.activeContext?.renderPresentation ?? null;
   activateAutosaveContext(
     state,
@@ -91,6 +95,23 @@ export async function restoreAutosaveDraft(
   state.releaseHydratedDocument = entry.releaseDocumentAssets ?? null;
   state.documentAssetsByRuntimeUrl = entry.documentAssetsByRuntimeUrl ?? new Map();
   setEditorSaveState('saved');
+}
+
+export async function restoreAutosaveDraft(
+  state: EditorSessionAutosaveState,
+  aggregateId: string,
+  isCurrent: () => boolean = () => true
+): Promise<ImageWorkspaceEntry | undefined> {
+  const entry = await recoverAndGetImageWorkspace(aggregateId);
+  if (!entry) {
+    return undefined;
+  }
+  if (!isCurrent()) {
+    entry.releaseDocumentAssets?.();
+    return undefined;
+  }
+
+  adoptPreparedAutosaveDocument(state, entry);
   return entry;
 }
 
@@ -100,9 +121,11 @@ export async function discardAutosaveDraft(
 ): Promise<void> {
   state.hydration = null;
   state.hydrationGeneration += 1;
+  state.lastCheckpointReceipt = null;
   cancelPendingAutosaveRequest(state);
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
+  retireAutosaveCheckpointEdit(state);
   state.presentationPending = false;
   state.presentationRetryAttempt = 0;
   state.releaseHydratedDocument?.();
@@ -121,11 +144,13 @@ export async function discardAutosaveDraft(
 }
 
 export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
+  state.lastCheckpointReceipt = null;
   state.hydration = null;
   state.hydrationGeneration += 1;
   state.coordinator?.dispose();
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
+  retireAutosaveCheckpointEdit(state);
   state.presentationPending = false;
   state.presentationRetryAttempt = 0;
   state.releaseHydratedDocument?.();

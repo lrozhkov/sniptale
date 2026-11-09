@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { buildReviewTimeMap } from '../timeline';
-import { projectReviewAnnotationEffect, sampleReviewAnnotationEffect } from './timing';
+import {
+  projectReviewAnnotationEffect,
+  sampleReviewAnnotationEffect,
+  resolveUpcomingReviewAnnotationEffectSlice,
+} from './timing';
 
 describe('annotation clock over the complete result video', () => {
   it('keeps phase across a removed middle interval and half-open slice boundaries', () => {
@@ -76,4 +80,30 @@ describe('annotation clock over the complete result video', () => {
     expect(sampleReviewAnnotationEffect(projection, 4, 6)).toBeNull();
     expect(() => sampleReviewAnnotationEffect(projection, Infinity, 2)).toThrow();
   });
+});
+
+it('selects the nearest enabled projected onset within one result second after cuts and speed', () => {
+  const segments = buildReviewTimeMap(12, [
+    { id: 'cut', kind: 'cut', start: 1, end: 3, requestedStart: 1, requestedEnd: 3 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 3,
+      end: 7,
+      requestedStart: 3,
+      requestedEnd: 7,
+      rate: 2,
+      audio: 'mute',
+    },
+  ]);
+  const instances = [
+    { id: 'later', enabled: true, order: 0, start: 5, end: 7 },
+    { id: 'disabled', enabled: false, order: 0, start: 3.5, end: 7 },
+    { id: 'nearest', enabled: true, order: 1, start: 4, end: 7 },
+  ];
+  expect(resolveUpcomingReviewAnnotationEffectSlice(instances, segments, 1)?.instance.id).toBe(
+    'nearest'
+  );
+  expect(resolveUpcomingReviewAnnotationEffectSlice(instances, segments, 0)).toBeNull();
+  expect(resolveUpcomingReviewAnnotationEffectSlice([], segments, 1)).toBeNull();
 });

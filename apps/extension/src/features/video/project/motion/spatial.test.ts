@@ -104,3 +104,27 @@ it('accepts only a positive normalized reference with the declared floating edge
     height: 1,
   });
 });
+
+it('fences cursor composition at schema fifty-one and retains it through hydration', () => {
+  const { project, region } = setup();
+  const cursorComposition = { mode: 'right' as const, amount: 0.65, smoothness: 0.8 };
+  const candidate = applyVideoProjectMutationPatch(project, {
+    motionRegions: [{ ...region, cursorComposition }],
+  });
+  expect(candidate.version).toBe(51);
+  expect(hydrateVideoProject(candidate).motionRegions?.[0]?.cursorComposition).toEqual(
+    cursorComposition
+  );
+  expect(
+    parseHydratableVideoProject(JSON.parse(JSON.stringify(candidate)))?.motionRegions?.[0]
+      ?.cursorComposition
+  ).toEqual(cursorComposition);
+  expect(isHydratableVideoProject({ ...candidate, version: 50 })).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...candidate,
+      motionRegions: [{ ...region, cursorComposition: { ...cursorComposition, amount: Infinity } }],
+    })
+  ).toBe(false);
+  expect(hydrateVideoProject(project).motionRegions?.[0]?.cursorComposition).toBeUndefined();
+});

@@ -1,4 +1,5 @@
 import { parseReviewAudioClip } from '../audio-clip-validation';
+import { parseSceneBackgroundMotion } from '../../project/scene/background-motion';
 import {
   parseQuickEditBorder,
   requiresExtendedBorderSchema,
@@ -16,6 +17,7 @@ import { parseQuickEditPresentationSettings } from './presentation';
 import { parseQuickEditWatermark } from '../../project/scene/watermark';
 import { parseReviewKeyAnimations } from '../../project/action-feedback/key-animation';
 import {
+  parseCursorCompositionSettings,
   parseCameraPerspective as parseQuickEditPerspective,
   parseCameraDepth as parseQuickEditDepth,
 } from '../../project/motion/spatial';
@@ -231,6 +233,8 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
       ? undefined
       : parseCameraFollowSettings(value['cameraFollow']);
   if (cameraFollow === null) return null;
+  const cursorComposition = parseCursorCompositionSettings(value['cursorComposition']);
+  if (cursorComposition === null) return null;
   const perspective = parseQuickEditPerspective(value['perspective']);
   const depthOfField = parseQuickEditDepth(value['depthOfField']);
   if (perspective === null || depthOfField === null) return null;
@@ -269,6 +273,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   return {
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
+    ...(cursorComposition ? { cursorComposition } : {}),
     ...(perspective ? { perspective } : {}),
     ...(depthOfField ? { depthOfField } : {}),
     ...(motionBlur ? { motionBlur } : {}),
@@ -341,6 +346,9 @@ function parseBackgroundLayout(value: unknown): QuickEditBackgroundLayout | null
 
 function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | null {
   if (!isRecord(value)) return null;
+  const animation =
+    value['motion'] === undefined ? undefined : parseSceneBackgroundMotion(value['motion']);
+  if (animation === null) return null;
   const behavior = value['zoomBehavior'];
   if (
     behavior !== undefined &&
@@ -352,8 +360,11 @@ function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | 
     return null;
   const motion: Pick<
     QuickEditBackgroundSettings,
-    'zoomBehavior' | 'rememberedImage' | 'rememberedPaint' | 'rememberedLayout'
-  > = behavior ? { zoomBehavior: behavior } : {};
+    'zoomBehavior' | 'rememberedImage' | 'rememberedPaint' | 'rememberedLayout' | 'motion'
+  > = {
+    ...(behavior ? { zoomBehavior: behavior } : {}),
+    ...(animation ? { motion: animation } : {}),
+  };
   const remembered = value['rememberedImage'];
   if (remembered !== undefined) {
     if (
@@ -522,6 +533,8 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
       ? parseReviewAnnotationEffects(raw['annotationEffects'])
       : undefined;
   if (
+    (text?.fragments.some((fragment) => fragment.sourceAnchor) &&
+      !supportsAdvancedSchema(raw['schemaVersion'], 27)) ||
     text === null ||
     captions === null ||
     annotationEffects === null ||
@@ -547,6 +560,12 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   )
     return null;
   const background = parseBackgroundSettings(raw['background']);
+  if (
+    !supportsAdvancedSchema(raw['schemaVersion'], 28) &&
+    (background?.motion !== undefined ||
+      zoom?.regions.some((region) => region.cursorComposition !== undefined))
+  )
+    return null;
   const audio = parseAudioState(raw['audio'], supportsAdvancedSchema(raw['schemaVersion'], 7));
   const actionsEnabled = raw['actionsEnabled'];
   if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
@@ -673,8 +692,9 @@ function parseStoredPresentation(raw: unknown) {
 function supportsAdvancedSchema(version: unknown, firstHistorical: number): boolean {
   return (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
-    [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25].some(
-      (known) => known >= firstHistorical && version === known
-    )
+    [
+      2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
+      27,
+    ].some((known) => known >= firstHistorical && version === known)
   );
 }

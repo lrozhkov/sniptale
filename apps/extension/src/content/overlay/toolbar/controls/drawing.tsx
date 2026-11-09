@@ -1,3 +1,4 @@
+import { SimplifyIcon } from '../../../../ui/drawing-tools/simplify-icon';
 import { PageToolbarGroup, PageToolbarDivider, PageToolbarSlot } from './page-layout';
 import {
   Droplet,
@@ -68,6 +69,7 @@ const tools: readonly DrawingToolDescriptor[] = [
     modifierHint: 'content.toolbar.drawingArrowModifierHint',
   },
   { tool: 'blur', icon: Droplet, label: 'content.toolbar.drawingBlur' },
+  { tool: 'simplify', icon: SimplifyIcon, label: 'content.toolbar.drawingSimplify' },
 ];
 
 /** Narrow presentation seam used by toolbar modes that share drawing tools but own interaction. */
@@ -98,6 +100,7 @@ function DrawingToolControl(props: {
   icon: typeof PenLine;
   label: DrawingToolDescriptor['label'];
   modifierHint: DrawingToolDescriptor['modifierHint'];
+  pageAlignment?: boolean;
   selectionDisclosure: DrawingSelectionDisclosure;
   optionsTool: ReturnType<typeof resolveDrawingQuickOptionsTool>;
   onActivateTool: () => void;
@@ -124,7 +127,15 @@ function DrawingToolControl(props: {
   const modifierHintId = useId();
   const Icon = props.icon;
   const label = translate(props.label);
-  const modifierHint = props.modifierHint ? translate(props.modifierHint) : null;
+  const modifierHint =
+    [
+      props.modifierHint ? translate(props.modifierHint) : null,
+      props.pageAlignment && ['select', 'shape', 'text'].includes(props.tool)
+        ? translate('content.toolbar.drawingAlignmentModifierHint')
+        : null,
+    ]
+      .filter(Boolean)
+      .join('\n') || null;
   const title = modifierHint ? `${label}\n${modifierHint}` : label;
   const disclosureAvailable = props.tool !== 'select' && props.optionsTool === props.tool;
   return (
@@ -183,6 +194,7 @@ export function ToolbarDrawingControls(props: {
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
   owner?: ToolbarDrawingControlsOwner;
+  pageAlignment?: boolean;
 }) {
   const { controller } = props;
   const snapshot = useDrawingSessionSnapshot(controller.session);
@@ -222,6 +234,7 @@ export function ToolbarDrawingControls(props: {
               icon={icon}
               label={label}
               modifierHint={modifierHint}
+              pageAlignment={props.pageAlignment ?? false}
               optionsTool={optionsTool}
               showOptions={
                 optionsAnchorTool === tool &&

@@ -1,5 +1,5 @@
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Ellipsis, Info, type LucideIcon } from 'lucide-react';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { translate } from '../../platform/i18n';
@@ -31,17 +31,18 @@ export function ReviewInspectorPresentation(props: {
       ? (props.selectionScope ?? 'selection')
       : (props.section ?? 'selection');
   const [choices, setChoices] = useState<Readonly<Record<string, string>>>({});
+  const remembered = choices[family];
+  const remember = useCallback(
+    (id: string) => setChoices((current) => ({ ...current, [family]: id })),
+    [family]
+  );
+  const context = useMemo(
+    () => ({ value: props.value, remembered, remember }),
+    [props.value, remembered, remember]
+  );
   return (
     <InspectorDisclosurePreferences scope={`gallery:${family}`}>
-      <PresentationContext
-        value={{
-          value: props.value,
-          remembered: choices[family],
-          remember: (id) => setChoices((current) => ({ ...current, [family]: id })),
-        }}
-      >
-        {props.children}
-      </PresentationContext>
+      <PresentationContext value={context}>{props.children}</PresentationContext>
     </InspectorDisclosurePreferences>
   );
 }
@@ -51,6 +52,8 @@ export type ReviewInspectorSection = {
   id: string;
   label: string;
   icon: LucideIcon;
+  /** Null omits a secondary disclosure icon; category navigation retains its meaningful icon. */
+  disclosureIcon?: LucideIcon | null;
   content: ReactNode;
 };
 
@@ -109,12 +112,12 @@ export function ReviewInspectorSections({
           .filter((column) => column.length > 0)
           .map((column, index) => (
             <div className="review-inspector-section-column" key={index}>
-              {column.map(({ id, label, icon, content }) => (
+              {column.map(({ id, label, icon, disclosureIcon, content }) => (
                 <section key={id} data-section={id} className="review-inspector-section">
                   <ReviewDetails
                     preferenceId={`section:${id}`}
                     label={label}
-                    icon={icon}
+                    {...(disclosureIcon === null ? {} : { icon: disclosureIcon ?? icon })}
                     level="section"
                     initiallyOpen
                   >

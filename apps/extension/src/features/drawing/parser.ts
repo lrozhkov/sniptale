@@ -1,10 +1,16 @@
+import {
+  isImageDataUrl,
+  readImageDataUrlDimensions,
+} from '@sniptale/runtime-contracts/validation/data-url';
+import { parseSimplifySettings } from '../simplify/settings';
 import { parseColor } from '@sniptale/foundation/color';
 import { isNumber, isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   DRAWING_TEXT_FONT_FAMILIES,
   MAX_DRAWING_ARROW_BENDS,
   type DrawingBounds,
-  type DrawingDocumentV1,
+  type DrawingDocument,
+  type DrawingSimplifySnapshot,
   type DrawingObject,
   type DrawingPoint,
   type DrawingSample,
@@ -14,7 +20,109 @@ import {
 const MAX_OBJECTS = 10_000;
 const MAX_SAMPLES = 1_000_000;
 const MAX_TEXT = 1_000_000;
-type Budget = { samples: number; text: number };
+// Two 16-megapixel RGBA planes need at most 128 MiB before render working buffers.
+const MAX_SNAPSHOT_PIXELS = 16_777_216;
+// The common validator limits each encoded image to 25 MiB; cap aggregate retention too.
+const MAX_SNAPSHOT_CHARACTERS = Math.ceil((25 * 1024 * 1024 * 4) / 3) + 128;
+type Budget = {
+  samples: number;
+  text: number;
+  snapshotCharacters: number;
+  snapshotPixels: number;
+  snapshots: Map<string, DrawingSimplifySnapshot>;
+};
+
+function snapshot(value: unknown, budget: Budget): DrawingSimplifySnapshot | null {
+  if (!isPlainRecord(value)) return null;
+  const { dataUrl, width, height } = value;
+  if (
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    !Number.isSafeInteger(width) ||
+    !Number.isSafeInteger(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    width * height > MAX_SNAPSHOT_PIXELS ||
+    typeof dataUrl !== 'string' ||
+    dataUrl.length > MAX_SNAPSHOT_CHARACTERS ||
+    !dataUrl.startsWith('data:image/png;base64,')
+  )
+    return null;
+  const retained = budget.snapshots.get(dataUrl);
+  if (retained) return retained.width === width && retained.height === height ? retained : null;
+  if (
+    width * height > budget.snapshotPixels ||
+    dataUrl.length > budget.snapshotCharacters ||
+    !isImageDataUrl(dataUrl)
+  )
+    return null;
+  const dimensions = readImageDataUrlDimensions(dataUrl);
+  if (!dimensions || dimensions.width !== width || dimensions.height !== height) return null;
+  budget.snapshotCharacters -= dataUrl.length;
+  budget.snapshotPixels -= width * height;
+  const admitted = { dataUrl, width, height };
+  budget.snapshots.set(dataUrl, admitted);
+  return admitted;
+}
+
+/** Admits one bounded local PNG plane without allocating a decoded bitmap. */
+export function parseDrawingSimplifySnapshot(value: unknown): DrawingSimplifySnapshot | null {
+  return snapshot(value, {
+    samples: 0,
+    text: 0,
+    snapshotCharacters: MAX_SNAPSHOT_CHARACTERS,
+    snapshotPixels: MAX_SNAPSHOT_PIXELS,
+    snapshots: new Map(),
+  });
+}
+
+function simplify(
+  value: Record<string, unknown>,
+  id: string,
+  budget: Budget
+): DrawingObject | null {
+  const rect = bounds(value['bounds']);
+  const angle = rotation(value);
+  const settings = parseSimplifySettings(value['settings']);
+  const sourceDirty = value['sourceDirty'];
+  const engineVersion = value['engineVersion'];
+  if (
+    engineVersion !== undefined &&
+    (typeof engineVersion !== 'string' ||
+      engineVersion.length > 128 ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(engineVersion))
+  )
+    return null;
+  if (
+    !rect ||
+    !angle ||
+    !settings ||
+    (sourceDirty !== undefined && typeof sourceDirty !== 'boolean')
+  )
+    return null;
+  const result = value['result'] === undefined ? undefined : snapshot(value['result'], budget);
+  const source = value['source'] === undefined ? undefined : snapshot(value['source'], budget);
+  const sourceBounds =
+    value['source'] === undefined
+      ? undefined
+      : isPlainRecord(value['source'])
+        ? bounds(value['source']['bounds'])
+        : null;
+  if (result === null || source === null || sourceBounds === null) return null;
+  return {
+    id,
+    kind: 'simplify',
+    bounds: rect,
+    settings,
+    ...angle,
+    ...(result === undefined ? {} : { result }),
+    ...(sourceDirty === undefined ? {} : { sourceDirty }),
+    ...(engineVersion === undefined ? {} : { engineVersion }),
+    ...(source === undefined || sourceBounds === undefined
+      ? {}
+      : { source: { ...source, bounds: sourceBounds } }),
+  };
+}
 
 function isColor(value: unknown): value is string {
   return (
@@ -197,6 +305,8 @@ function object(value: unknown, budget: Budget): DrawingObject | null {
       return shape(value, id, value['kind']);
     case 'arrow':
       return arrow(value, id);
+    case 'simplify':
+      return simplify(value, id, budget);
     case 'blur':
       return blur(value, id);
     case 'text':
@@ -207,22 +317,30 @@ function object(value: unknown, budget: Budget): DrawingObject | null {
 }
 
 /** Admits current authored drawing data without DOM access, source mutation, or executable fields. */
-export function parseDrawingDocument(value: unknown): DrawingDocumentV1 | null {
+export function parseDrawingDocument(value: unknown): DrawingDocument | null {
   if (
     !isPlainRecord(value) ||
-    value['version'] !== 1 ||
+    (value['version'] !== 1 && value['version'] !== 2) ||
     !Array.isArray(value['objects']) ||
     value['objects'].length > MAX_OBJECTS
   )
     return null;
   const parsed: DrawingObject[] = [];
   const identities = new Set<string>();
-  const budget: Budget = { samples: MAX_SAMPLES, text: MAX_TEXT };
+  const budget: Budget = {
+    samples: MAX_SAMPLES,
+    text: MAX_TEXT,
+    snapshotCharacters: MAX_SNAPSHOT_CHARACTERS * 2,
+    snapshotPixels: MAX_SNAPSHOT_PIXELS * 2,
+    snapshots: new Map(),
+  };
   for (const candidate of value['objects']) {
     const item = object(candidate, budget);
-    if (!item || identities.has(item.id)) return null;
+    if (!item || (value['version'] === 1 && item.kind === 'simplify') || identities.has(item.id))
+      return null;
     identities.add(item.id);
     parsed.push(item);
   }
-  return { version: 1, objects: parsed };
+  if (value['version'] === 2) return { version: 2, objects: parsed };
+  return { version: 1, objects: parsed.filter((item) => item.kind !== 'simplify') };
 }

@@ -16,9 +16,14 @@ export type TabVideoRequestByType = {
     recordingId: string;
     offsetSeconds?: number;
     frameClock?: RecordingFrameClockAnchor | null;
+    cursorTrajectoryMode?: 'blocks';
+    recordingEventsMode?: 'blocks';
   };
   [VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE]: {
     type: typeof VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE;
+    cursorTrajectoryMode?: 'blocks';
+    recordingEventsMode?: 'blocks';
+    boundaryReason?: 'stop' | 'observation';
   };
   [VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE]: {
     type: typeof VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE;

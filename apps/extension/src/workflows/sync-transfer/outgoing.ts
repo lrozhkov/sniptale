@@ -1,5 +1,5 @@
+import { openArchiveRootObjectSource } from '../media-hub-backup/v6/object-source';
 import type { AssetResidencyCopy } from '../../composition/persistence/assets/residency-records';
-import { sanitizeArchivePathSegment } from '../../composition/archive-transfer';
 import {
   runWithPersistenceMutationTransition,
   type PersistenceMutationTransitionPermit,
@@ -22,6 +22,7 @@ import {
   MissingAssetObjectError,
   AssetObjectSizeMismatchError,
   releaseAssetReadyProtection,
+  settleAssetWritingMarkers,
   runWithDurableAssetOperation,
   readAssetFile,
 } from '../../composition/persistence/assets';
@@ -30,7 +31,6 @@ import {
   commitPreparedOutgoingOperation,
   collectNativeOutgoingAssetRefs,
   loadNativeOutgoingRecoveryCopy,
-  restoreNativeOutgoingAsset,
   loadNativeOutgoingCapture,
   loadPreparedOutgoingOperation,
   readOutgoingOperation,
@@ -56,6 +56,7 @@ import {
   type parseSyncAttemptText,
   parseSyncOperationText,
   isSyncObjectRemoteKey,
+  syncOperationVersionForRoot,
 } from './wire-record';
 
 function check(condition: unknown): asserts condition {
@@ -81,7 +82,7 @@ function preparationDraft(
 ) {
   const recordText = JSON.stringify({
     format: 'sniptale-sync-operation',
-    version: 1,
+    version: syncOperationVersionForRoot(portable?.envelope ?? null),
     spaceId: capture.spaceId,
     operationId: capture.operationId,
     rootKind: capture.rootKind,
@@ -163,6 +164,9 @@ async function settleTransportCopies(
   await releaseAssetReadyProtection(
     staged.filter((object) => kept.has(object.ref.assetId)).map((object) => object.ref.assetId)
   );
+  await settleAssetWritingMarkers(
+    staged.filter((object) => kept.has(object.ref.assetId)).map((object) => object.ref.assetId)
+  );
   const failures = results.flatMap((result) =>
     result.status === 'rejected' ? [result.reason as unknown] : []
   );
@@ -182,12 +186,15 @@ async function prepareNativeOutgoing(
       : await encodeCapturedPortableRoot(capture, deferredExports);
   const digests = new Map<string, string>();
   for (const object of portable?.objects ?? [])
-    digests.set(object.ref.objectId, await hashFile(object.blob));
+    digests.set(
+      object.ref.objectId,
+      await digestBackupObject(await openArchiveRootObjectSource(object))
+    );
   let staged: StagedArchiveObject[] = [];
   let accepted: PreparedOutgoingOperation;
   try {
     if (portable) {
-      const sources = new Map(portable.objects.map((object) => [object.ref.objectId, object.blob]));
+      const sources = new Map(portable.objects.map((object) => [object.ref.objectId, object]));
       const unbound = portable.envelope.objects.filter(
         (object) => !portable.bindings.some((binding) => binding.objectId === object.objectId)
       );
@@ -199,11 +206,9 @@ async function prepareNativeOutgoing(
             unbound.map((object) => [object.objectId, digests.get(object.objectId)!])
           ),
           readObject: async (object) => {
-            const blob = sources.get(object.objectId);
-            check(blob);
-            return {
-              pipeTo: (sink, signal) => blob.stream().pipeTo(sink, signal ? { signal } : {}),
-            };
+            const source = sources.get(object.objectId);
+            check(source);
+            return openArchiveRootObjectSource(source);
           },
         });
     }
@@ -232,64 +237,57 @@ interface OutgoingResourceRecovery {
   signal: AbortSignal;
 }
 
-async function selectDeferredExports(capture: CapturedChange, recovery?: OutgoingResourceRecovery) {
-  const copies = new Map<string, AssetResidencyCopy>();
-  if (capture.change.kind !== 'video-project' || !recovery?.authorization) return copies;
-  const rows = capture.change.rows;
-  const keys = new Set<string>();
-  for (const entry of rows.exports) {
-    if (rows.exports.filter((item) => item.assetId === entry.assetId).length !== 1) continue;
-    recovery.signal.throwIfAborted();
-    const ref = rows.refs.find((item) => item.assetId === entry.assetId);
-    check(ref);
-    try {
-      await readAssetFile(ref, entry.filename);
-      continue;
-    } catch (error) {
-      recovery.signal.throwIfAborted();
-      // Empty interrupted targets must pass the existing ownership-checked recovery.
-      if (error instanceof AssetObjectSizeMismatchError && error.actualSize === 0) continue;
-      if (
-        !(
-          error instanceof MissingAssetObjectError ||
-          (error instanceof DOMException && error.name === 'NotFoundError')
-        )
-      )
-        throw error;
-    }
-    const copy = await loadNativeOutgoingRecoveryCopy({
-      capture,
-      ref,
-      authorization: recovery.authorization,
-    });
-    if (
-      !isSyncObjectRemoteKey(
-        capture.spaceId,
-        sanitizeArchivePathSegment(entry.filename),
-        copy.remote.key
-      )
-    )
-      continue;
-    if (keys.has(copy.remote.key)) continue;
-    keys.add(copy.remote.key);
-    copies.set(ref.assetId, copy);
+/** Exclude causal-only refs and outputs whose transport bytes are generated from local input. */
+function bytePreservingAssetIds(capture: CapturedChange): ReadonlySet<string> {
+  const change = capture.change;
+  switch (change.kind) {
+    case 'tombstone':
+      return new Set();
+    case 'media':
+      return new Set(
+        'webSnapshot' in change.rows
+          ? [change.rows.screenshotRef.assetId]
+          : [change.rows.ref.assetId]
+      );
+    case 'image':
+      return new Set([
+        ...(change.rows.originalRef ? [change.rows.originalRef.assetId] : []),
+        ...(change.rows.workspace?.document.assets.map((asset) => asset.assetId) ?? []),
+      ]);
+    case 'video-review':
+      return new Set([
+        change.rows.source.ref.assetId,
+        ...change.rows.assets.map((asset) => asset.assetId),
+      ]);
+    case 'video-project':
+      return new Set([
+        ...change.rows.assets.map((asset) => asset.assetId),
+        ...change.rows.exports.map((entry) => entry.assetId),
+      ]);
+    case 'scenario-project':
+      return new Set([
+        ...change.rows.assets.map((asset) => asset.assetId),
+        ...change.rows.documents.flatMap((document) =>
+          document.document.assets.map((asset) => asset.assetId)
+        ),
+        ...change.rows.exports.flatMap((entry) => (entry.html ? [entry.html.assetId] : [])),
+      ]);
   }
-  return copies;
 }
 
-async function prepareCapturedFiles(
-  capture: CapturedChange,
-  recovery: OutgoingResourceRecovery,
-  transitionPermit: PersistenceMutationTransitionPermit,
-  deferredExports: ReadonlyMap<string, AssetResidencyCopy>
-) {
+/** Select only exact native copies; publication never downloads an unchanged original. */
+async function selectDeferredAssets(capture: CapturedChange, recovery?: OutgoingResourceRecovery) {
+  const copies = new Map<string, AssetResidencyCopy>();
+  const bytePreserving = bytePreservingAssetIds(capture);
   for (const ref of collectNativeOutgoingAssetRefs(capture)) {
-    if (deferredExports.has(ref.assetId)) continue;
-    recovery.signal.throwIfAborted();
+    if (!bytePreserving.has(ref.assetId)) continue;
+    recovery?.signal.throwIfAborted();
     try {
-      await readAssetFile(ref, ref.assetId);
+      const file = await readAssetFile(ref, ref.assetId);
+      if (ref.sha256 !== null) check((await hashFile(file, recovery?.signal)) === ref.sha256);
       continue;
     } catch (error) {
+      recovery?.signal.throwIfAborted();
       if (
         !(
           error instanceof MissingAssetObjectError ||
@@ -302,50 +300,17 @@ async function prepareCapturedFiles(
     const copy = await loadNativeOutgoingRecoveryCopy({
       capture,
       ref,
-      authorization: recovery.authorization,
+      authorization: recovery?.authorization,
     });
-    // The native owner rechecks capture, copy and authorization before physical installation and settlement.
-    const staged = await stageRootObjects({
-      transitionPermit,
-      objects: [
-        {
-          objectId: ref.assetId,
-          path: ref.location.objectKey,
-          filename: ref.assetId,
-          mimeType: ref.mimeType,
-          size: ref.size,
-        },
-      ],
-      expectedSha256: new Map([[ref.assetId, copy.remote.sha256]]),
-      signal: recovery.signal,
-      async readObject() {
-        const stream = await recovery.remote.read(copy.remote.key, recovery.signal);
-        return { pipeTo: (sink, signal) => stream.pipeTo(sink, signal ? { signal } : {}) };
-      },
-    });
-    try {
-      const source = staged[0];
-      check(source && staged.length === 1);
-      const result = await restoreNativeOutgoingAsset(
-        {
-          capture,
-          copy,
-          authorization: recovery.authorization,
-          sourceBlob: await readAssetFile(source.ref, ref.assetId),
-          signal: recovery.signal,
-        },
-        { persistenceTransitionPermit: transitionPermit }
-      );
-      if (result === 'busy') throw new SyncRemoteError('temporary');
-    } catch (error) {
-      return discardTransportCopies(staged, error);
-    }
-    const failures = await collectPreparedAssetCleanupFailures(
-      staged.map((item) => item.ref.assetId)
+    const physicalFilename = copy.remote.key.split('/').at(-1);
+    check(
+      physicalFilename &&
+        isSyncObjectRemoteKey(capture.spaceId, physicalFilename, copy.remote.key) &&
+        (ref.sha256 === null || ref.sha256 === copy.remote.sha256)
     );
-    if (failures.length)
-      throw new AggregateError(failures, 'Outgoing file recovery cleanup failed.');
+    copies.set(ref.assetId, copy);
   }
+  return copies;
 }
 
 /** Freeze portable bytes once from authoritative native capture and reuse existing file refs. */
@@ -359,7 +324,7 @@ export async function prepareCapturedOutgoing(
   if (existing) {
     await parseSyncOperationText(existing.recordText);
     const accepted = await commitPreparedOutgoingOperation(parsed, existing);
-    await releaseAssetReadyProtection(accepted.objects.map((object) => object.ref.assetId));
+    await settleAssetWritingMarkers(accepted.objects.map((object) => object.ref.assetId));
     return accepted;
   }
   check(parsed.phase === 'native');
@@ -367,8 +332,7 @@ export async function prepareCapturedOutgoing(
   return runWithPersistenceMutationTransition((transition) =>
     runWithAssetResourceRead(() =>
       runWithDurableAssetOperation(async () => {
-        const deferredExports = await selectDeferredExports(capture, recovery);
-        if (recovery) await prepareCapturedFiles(capture, recovery, transition, deferredExports);
+        const deferredExports = await selectDeferredAssets(capture, recovery);
         return prepareNativeOutgoing(capture, transition, deferredExports, recovery?.authorization);
       })
     )
@@ -425,7 +389,10 @@ async function readDispatchSources(
           (item) => item.objectId === object.objectId && item.sha256 === object.sha256
         )
     );
-    check(expected.size === object.ref.size && expected.mimeType === object.ref.mimeType);
+    check(
+      expected.size === object.ref.size &&
+        expected.mimeType === object.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase()
+    );
     const file = await readAssetFile(object.ref, expected.filename);
     check(file.size === expected.size && (await hashFile(file, signal)) === object.sha256);
     files.push({ objectId: object.objectId, file, sha256: object.sha256, expected });
@@ -556,7 +523,7 @@ async function readRetainedCandidates(
         objectId: candidate.objectId,
         filename: candidate.filename,
         size: candidate.ref.size,
-        mimeType: candidate.ref.mimeType,
+        mimeType: candidate.ref.mimeType.split(';', 1)[0]!.trim().toLowerCase(),
       },
       digest: { objectId: candidate.objectId, sha256: candidate.sha256 },
       binding: { objectId: candidate.objectId, remoteKey: candidate.remoteKey },

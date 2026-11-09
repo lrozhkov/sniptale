@@ -16,6 +16,66 @@ const { initDbMock, logger } = vi.hoisted(() => ({
   },
 }));
 
+it('retains the immutable trajectory reference and all raw facts on save and retry', async () => {
+  const db = createDb();
+  initDbMock.mockResolvedValue(db);
+  const entry: RecordingTelemetryEntry = {
+    recordingId: 'blocks-roundtrip',
+    captureMode: 'TAB',
+    createdAt: 1,
+    updatedAt: 2,
+    viewport: null,
+    cursorTrack: null,
+    cursorTrajectory: {
+      format: 'cursor-trajectory-v1',
+      formatVersion: 1,
+      algorithm: 'sed-window-v1',
+      encoding: 'json-ascii-int-v1',
+      trajectoryId: 'a'.repeat(32),
+      state: 'unavailable',
+      finalized: true,
+      totalBlocks: 0,
+      totalRecords: 0,
+      totalSamples: 0,
+      totalBytes: 0,
+      streamSha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    },
+    actionEvents: Array.from({ length: 3000 }, (_, index) => ({
+      id: `click-${index}`,
+      kind: 'CLICK',
+      time: index / 1000,
+      duration: 0.1,
+      label: 'Click',
+      preset: 'CLICK_RIPPLE',
+      point: null,
+      data: { targetId: 'same' },
+    })),
+    signals: Array.from({ length: 700 }, (_, index) => ({
+      id: `signal-${index}`,
+      kind: 'typing',
+      startTime: index,
+      endTime: index,
+      point: null,
+      data: { targetType: 'checkbox', eventCount: 1 },
+    })),
+  };
+  await saveRecordingTelemetry(entry);
+  await saveRecordingTelemetry(entry);
+  expect(db.put).toHaveBeenCalledTimes(2);
+  db.get.mockResolvedValue(structuredClone(db.put.mock.calls[0]?.[1]));
+  const saved = await getRecordingTelemetry(entry.recordingId);
+  expect(saved?.cursorTrajectory).toEqual(entry.cursorTrajectory);
+  expect(saved?.actionEvents).toHaveLength(3000);
+  expect(saved?.signals).toHaveLength(700);
+  await expect(
+    saveRecordingTelemetry({
+      ...entry,
+      cursorTrajectory: { ...entry.cursorTrajectory!, totalBytes: -1 },
+    })
+  ).rejects.toThrow('Invalid recording telemetry entry');
+  expect(db.put).toHaveBeenCalledTimes(2);
+});
+
 vi.mock('../infrastructure/indexed-db/core', () => ({
   RECORDING_TELEMETRY_STORE: 'recording_telemetry',
   initDB: initDbMock,
@@ -38,6 +98,11 @@ function createDb() {
         put: (value: unknown) => db.put(name, value),
         delete: (key: string) => db.delete(name, key),
         get: async () => undefined,
+        index: () => ({
+          getAll: async () => [],
+          count: async () => 0,
+          openCursor: async () => null,
+        }),
       }),
       done: Promise.resolve(),
       abort: vi.fn(),

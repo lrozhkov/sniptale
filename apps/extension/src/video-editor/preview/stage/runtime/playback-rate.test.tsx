@@ -11,6 +11,7 @@ import {
   type VideoProjectVideoClip,
 } from '../../../../features/video/project/types';
 import { usePreviewStageVideoSync } from './index';
+import { preparePreviewStagePlayback } from './playback/prime';
 import type { PreviewStageVideoRefs } from '../types';
 
 let container: HTMLDivElement | null = null;
@@ -116,3 +117,39 @@ it.each([0.0625, 0.4])(
     expect(video.playbackRate).toBe(rate);
   }
 );
+
+it('hands a prepared source to mounted playback without restarting its seek', async () => {
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
+  const clip = createVideoClip({ playbackRate: 2 });
+  const time = 6.1234567;
+  let sourceTime = 6.246913;
+  const seek = vi.fn((next: number) => {
+    sourceTime = next;
+  });
+  const video = createVideoElement({ readyState: 4 });
+  Object.defineProperty(video, 'currentTime', {
+    get: () => sourceTime,
+    set: seek,
+    configurable: true,
+  });
+  vi.mocked(video.play).mockImplementation(async () => {
+    Object.defineProperty(video, 'paused', { value: false, configurable: true });
+  });
+  const videoRefs = { current: { [clip.id]: video } };
+  const activeClips = [clip];
+  await renderHarness({ activeClips, currentTime: time, isPlaying: false, videoRefs });
+  await preparePreviewStagePlayback(
+    { audioBankClips: [], audioRefs: { current: {} }, videoBankClips: activeClips, videoRefs },
+    time
+  );
+  await renderHarness({ activeClips, currentTime: time, isPlaying: true, videoRefs });
+  expect(seek).not.toHaveBeenCalled();
+  expect(video.play).toHaveBeenCalledOnce();
+  expect(video.readyState).toBe(4);
+  await renderHarness({ activeClips, currentTime: time + 1 / 60, isPlaying: false, videoRefs });
+  expect(seek).toHaveBeenCalledOnce();
+  expect(video.currentTime).toBeCloseTo(2 + (time + 1 / 60 - clip.startTime) * 2, 8);
+});

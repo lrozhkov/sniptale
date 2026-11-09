@@ -110,6 +110,21 @@ async function proveInspectorBreakpoints(page: Page, info: TestInfo) {
   );
 }
 
+async function expectCurrentPresentation(
+  review: import('@playwright/test').Locator,
+  canvas: import('@playwright/test').Locator,
+  manual: import('@playwright/test').Locator
+) {
+  const completeComposition = await review.evaluate(() => !!navigator.gpu);
+  if (completeComposition) {
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveAttribute('data-preview-front', 'true');
+    await expect
+      .poll(() => canvas.evaluate((node: HTMLCanvasElement) => node.width > 0 && node.height > 0))
+      .toBe(true);
+  } else await expect(manual).toBeHidden();
+}
+
 async function proveDetailedHandoff(
   review: import('@playwright/test').Locator,
   canvas: import('@playwright/test').Locator,
@@ -126,13 +141,13 @@ async function proveDetailedHandoff(
   await review
     .getByRole('button', { name: label('gallery.videoReview.play'), exact: true })
     .click();
-  await expect(manual).toBeHidden();
+  await expectCurrentPresentation(review, canvas, manual);
   await review
     .getByRole('button', { name: label('gallery.videoReview.pause'), exact: true })
     .click();
   await expect(canvas).toBeVisible();
   await field('gallery.videoReview.previewReset').click();
-  await expect(manual).toBeHidden();
+  await expectCurrentPresentation(review, canvas, manual);
 }
 
 for (const variant of variants) {
@@ -218,7 +233,7 @@ for (const variant of variants) {
         label('gallery.videoReview.previewPausedSame')
       );
       await expect(showFrameRate).toHaveAttribute('aria-checked', 'false');
-      await expect(manual).toBeHidden();
+      await expectCurrentPresentation(review, canvas, manual);
       await panel.press('Escape');
       await expect(gear).toBeFocused();
       await review
@@ -318,6 +333,7 @@ for (const variant of variants) {
           page.evaluate((key) => window.__sniptaleHarness?.getStorageState()[key], preferenceKey)
         )
         .toEqual({
+          renderer: 'gpu',
           rasterPreset: '360p',
           frameRate: '15',
           pausedQuality: 'detailed',
@@ -350,7 +366,7 @@ for (const variant of variants) {
       await expect(field('gallery.videoReview.previewFrameRate')).toHaveText(
         label('gallery.videoReview.previewCurrent')
       );
-      await expect(manual).toBeHidden();
+      await expectCurrentPresentation(review, canvas, manual);
       await expect(fps).toBeHidden();
       await proveDetailedHandoff(review, canvas, manual, label, choose, field);
       await panel.press('Escape');

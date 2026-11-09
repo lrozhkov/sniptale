@@ -1,3 +1,5 @@
+import { createReviewDecodedSampleSink } from '../../workflows/video-review/decoded-video-sample';
+import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
 import {
   useEffect,
   useLayoutEffect,
@@ -32,6 +34,28 @@ export interface ReviewCutPreviewBinding {
 }
 
 export type ReviewCutPreviewRaster = { active: boolean; frame: HTMLCanvasElement | null };
+
+/** Keep asynchronous plane conversion outside the callback that owns native presentation time. */
+async function captureNativeCutRaster(
+  video: HTMLVideoElement,
+  previous: HTMLCanvasElement | null,
+  signal: AbortSignal,
+  isCurrent: () => boolean
+) {
+  const raster = previous ?? document.createElement('canvas');
+  raster.width = Math.max(1, video.videoWidth);
+  raster.height = Math.max(1, video.videoHeight);
+  const context = raster.getContext('2d');
+  if (!context) return null;
+  const captured = await prepareDecodedVideoFrame(new VideoFrame(video), signal);
+  try {
+    if (signal.aborted || !isCurrent() || video.seeking) return null;
+    context.drawImage(captured, 0, 0, raster.width, raster.height);
+    return raster;
+  } finally {
+    captured.close();
+  }
+}
 
 /** Conceals the native raster while composing a transition, including pending seeks and loads. */
 export function ReviewCutTransitionPreview(props: {
@@ -90,7 +114,14 @@ export function ReviewCutTransitionPreview(props: {
     const video = props.video.current;
     if (!video || !video.requestVideoFrameCallback) return;
     let callback = 0;
-    const frame: VideoFrameRequestCallback = (_now, metadata) => {
+    const controller = new AbortController();
+    let revision = 0;
+    const seeking = () => {
+      revision += 1;
+      mediaTime.current = NaN;
+    };
+    video.addEventListener('seeking', seeking);
+    const frame: VideoFrameRequestCallback = async (_now, metadata) => {
       mediaTime.current = NaN;
       const permitted = latest.current.plans.some(
         (plan) =>
@@ -98,22 +129,39 @@ export function ReviewCutTransitionPreview(props: {
           isReviewTransitionFrame(metadata.mediaTime, plan.right)
       );
       if (!video.seeking && permitted) {
-        const raster = nativeRaster.current ?? document.createElement('canvas');
-        raster.width = Math.max(1, video.videoWidth);
-        raster.height = Math.max(1, video.videoHeight);
-        const context = raster.getContext('2d');
-        if (context) {
-          // Bind the raster to this presentation timestamp before a later seek.
-          context.drawImage(video, 0, 0, raster.width, raster.height);
-          nativeRaster.current = raster;
-          mediaTime.current = metadata.mediaTime;
+        const capturedRevision = revision;
+        try {
+          const raster = await captureNativeCutRaster(
+            video,
+            nativeRaster.current,
+            controller.signal,
+            () => revision === capturedRevision
+          );
+          if (
+            raster &&
+            !controller.signal.aborted &&
+            revision === capturedRevision &&
+            !video.seeking
+          ) {
+            nativeRaster.current = raster;
+            mediaTime.current = metadata.mediaTime;
+          }
+        } catch {
+          // Endpoint frames remain authoritative when the native capture is unavailable.
+          if (!controller.signal.aborted && revision === capturedRevision) mediaTime.current = NaN;
         }
       }
-      paintRef.current();
-      callback = video.requestVideoFrameCallback(frame);
+      if (!controller.signal.aborted) {
+        paintRef.current();
+        callback = video.requestVideoFrameCallback(frame);
+      }
     };
     callback = video.requestVideoFrameCallback(frame);
-    return () => video.cancelVideoFrameCallback(callback);
+    return () => {
+      controller.abort();
+      video.removeEventListener('seeking', seeking);
+      video.cancelVideoFrameCallback(callback);
+    };
   }, [props.video, binding.file]);
   if (!blend) return null;
   return (
@@ -212,7 +260,14 @@ function useTransitionEndpoints(
         const track = await input.getPrimaryVideoTrack();
         controller.signal.throwIfAborted();
         if (!track) throw new Error('Video track unavailable.');
-        owner = createReviewTransitionFrames(new VideoSampleSink(track), controller.signal);
+        owner = createReviewTransitionFrames(
+          createReviewDecodedSampleSink(
+            new VideoSampleSink(track),
+            controller.signal,
+            await track.getDecoderConfig()
+          ),
+          controller.signal
+        );
         const frames = await owner.load(next);
         controller.signal.throwIfAborted();
         const allocationBytes = managed && frames ? transitionAllocation(frames) : null;

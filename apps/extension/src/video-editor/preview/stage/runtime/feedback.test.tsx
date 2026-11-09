@@ -63,3 +63,14 @@ it('reports each failing source once until recovery or explicit retry', () => {
   expect(feedback?.failed).toBe(false);
   expect(feedback?.retryVersion).toBe((retryVersion ?? 0) + 1);
 });
+
+it('does not let event or visual recovery clear an independent camera history failure', () => {
+  act(() => feedback?.onFailure('camera-history', new Error('Camera unavailable')));
+  act(() => {
+    feedback?.onRecovery('recording-history');
+    feedback?.onRecovery('visual');
+  });
+  expect(feedback?.failed).toBe(true);
+  act(() => feedback?.onRecovery('camera-history'));
+  expect(feedback?.failed).toBe(false);
+});

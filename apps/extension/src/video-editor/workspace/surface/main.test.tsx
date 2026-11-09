@@ -48,16 +48,25 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
   useVideoEditorTimelineController: () => getHookController().timeline,
 }));
 
-vi.mock('../../runtime/controller/store', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../runtime/controller/store')>()),
-  useVideoEditorExportPort: (selector: (port: unknown) => unknown) =>
-    selector({
-      exportState: { dialogOpen: hookMocks.exportOpen },
-      closeExportDialog: hookMocks.closeExport,
-    }),
-  useVideoEditorEffectEditingPort: (selector: (port: unknown) => unknown) =>
-    selector({ applyEffectDocument: vi.fn() }),
-}));
+vi.mock('../../runtime/controller/store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../runtime/controller/store')>();
+  return {
+    ...actual,
+    useVideoEditorPlaybackPort: (
+      selector: Parameters<typeof actual.useVideoEditorPlaybackPort>[0]
+    ) => actual.useVideoEditorPlaybackPort((port) => selector({ ...port, currentTime: 8 })),
+    useVideoEditorProjectLifecyclePort: (
+      selector: (port: { project: ReturnType<typeof createSidebarState>['project'] }) => unknown
+    ) => selector({ project: createSidebarState().project }),
+    useVideoEditorExportPort: (selector: (port: unknown) => unknown) =>
+      selector({
+        exportState: { dialogOpen: hookMocks.exportOpen },
+        closeExportDialog: hookMocks.closeExport,
+      }),
+    useVideoEditorEffectEditingPort: (selector: (port: unknown) => unknown) =>
+      selector({ applyEffectDocument: vi.fn() }),
+  };
+});
 
 vi.mock('./effects-library', () => ({
   VideoEditorWorkspaceEffectsLibrary: () => <div data-testid="effects-library" />,

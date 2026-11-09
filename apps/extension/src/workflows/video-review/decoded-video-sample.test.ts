@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
+import { createEffectHostClip } from '../../features/video/project/factories/overlay-clip';
+import { resolveVideoCompositionFrame } from '../../features/video/composition/timeline/frame';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
 import {
   createReviewDecodedSampleSink,
   createCompositionCutSampleSource,
+  resolveReviewDecodedColorPatch,
 } from './decoded-video-sample';
 import {
   createProject,
@@ -100,7 +103,87 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-function setup(format: VideoPixelFormat = 'NV12', height = 16, config?: VideoDecoderConfig) {
+it('aligns inferred VP8 native color with canonical defaults without changing its matrix', () => {
+  expect(
+    resolveReviewDecodedColorPatch(
+      { codec: 'vp8' },
+      {
+        format: 'I420',
+        colorSpace: {
+          primaries: 'smpte170m',
+          transfer: 'smpte170m',
+          matrix: 'smpte170m',
+          fullRange: false,
+        },
+      }
+    )
+  ).toEqual({ primaries: 'bt709', transfer: 'bt709' });
+});
+
+it.each(['bt709', 'smpte170m'] as const)(
+  'preserves explicit VP8 %s color and avoids an extra native copy',
+  (color) => {
+    const colorSpace = { primaries: color, transfer: color, matrix: color, fullRange: true };
+    expect(
+      resolveReviewDecodedColorPatch({ codec: 'vp8', colorSpace }, { format: 'I420', colorSpace })
+    ).toBeUndefined();
+    expect(
+      resolveReviewDecodedColorPatch(
+        { codec: 'vp8', colorSpace },
+        {
+          format: 'I420',
+          colorSpace: { primaries: null, transfer: null, matrix: null, fullRange: null },
+        }
+      )
+    ).toEqual(colorSpace);
+  }
+);
+
+it('leaves already conforming VP8 native fields and non-VP8 bitstream interpretation unchanged', () => {
+  const actual = {
+    format: 'I420' as const,
+    colorSpace: {
+      primaries: 'bt709' as const,
+      transfer: 'bt709' as const,
+      matrix: 'smpte170m' as const,
+      fullRange: false,
+    },
+  };
+  expect(resolveReviewDecodedColorPatch({ codec: 'vp8' }, actual)).toBeUndefined();
+  expect(
+    resolveReviewDecodedColorPatch(
+      { codec: 'avc1.42001e' },
+      { ...actual, colorSpace: { matrix: 'bt709' } }
+    )
+  ).toBeUndefined();
+});
+
+it.each(['RGBA', 'RGBX', 'BGRA', 'BGRX'] as const)(
+  'retains converted %s matrix/range representation while aligning missing gamut defaults',
+  (format) => {
+    expect(
+      resolveReviewDecodedColorPatch(
+        { codec: 'vp8' },
+        {
+          format,
+          colorSpace: {
+            primaries: 'smpte170m',
+            transfer: 'smpte170m',
+            matrix: 'rgb',
+            fullRange: true,
+          },
+        }
+      )
+    ).toEqual({ primaries: 'bt709', transfer: 'bt709' });
+  }
+);
+
+function setup(
+  format: VideoPixelFormat = 'NV12',
+  height = 16,
+  config?: VideoDecoderConfig,
+  conversion?: 'canvas' | 'native'
+) {
   const sample = new VideoSample(
     new VideoFrame(new Uint8Array(384), {
       format,
@@ -126,10 +209,28 @@ function setup(format: VideoPixelFormat = 'NV12', height = 16, config?: VideoDec
       },
     },
     controller.signal,
-    config
+    config,
+    conversion
   );
   return { sample, controller, sink };
 }
+
+it.each(['getSample', 'samples', 'samplesAtTimestamps'] as const)(
+  'preserves the original padded texture for native GPU %s without a pixel copy',
+  async (method) => {
+    const { sample, sink } = setup('NV12', 16, undefined, 'native');
+    const decoded =
+      method === 'getSample'
+        ? await sink.getSample(1)
+        : method === 'samples'
+          ? (await sink.samples(0, 2).next()).value
+          : (await sink.samplesAtTimestamps([1]).next()).value;
+    expect(decoded).toBe(sample);
+    expect(copy).not.toHaveBeenCalled();
+    expect(frames[0]!.close).not.toHaveBeenCalled();
+    sample.close();
+  }
+);
 
 it.each(['getSample', 'samples', 'samplesAtTimestamps'] as const)(
   'packs visible NV12 planes for %s, preserving sample metadata',
@@ -164,10 +265,20 @@ it.each([
   ['NV12', 10],
 ] as const)('passes through %s height %i without a pixel copy', async (format, height) => {
   const { sample, sink } = setup(format, height);
-  expect(await sink.getSample(1)).toBe(sample);
+  const prepared = await sink.getSample(1);
+  if (!prepared) throw new Error('Missing sample');
+  if (format === 'I420') expect(prepared).toBe(sample);
+  else {
+    expect(prepared.rotation).toBe(sample.rotation);
+    expect(prepared.timestamp).toBe(sample.timestamp);
+    expect(prepared.displayWidth).toBe(sample.displayWidth);
+    expect(prepared.displayHeight).toBe(sample.displayHeight);
+  }
   expect(copy).not.toHaveBeenCalled();
-  expect(frames[0]!.close).not.toHaveBeenCalled();
-  sample.close();
+  if (format === 'I420') expect(frames[0]!.close).not.toHaveBeenCalled();
+  else expect(frames[0]!.close).toHaveBeenCalledOnce();
+  prepared.close();
+  expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
 });
 
 it.each(['failure', 'abort'] as const)(
@@ -427,4 +538,101 @@ it('samples the explicit project snapshot while retaining the accepted source de
   expect(cutDecode.dispose).not.toHaveBeenCalled();
   source.dispose();
   expect(cutDecode.dispose).toHaveBeenCalledOnce();
+});
+
+it('binds explicit endpoint contexts to resolved exposure clips and effect-only owners', async () => {
+  const clip = createVideoClip({
+    id: 'pose',
+    assetId: 'asset',
+    startTime: 0,
+    duration: 3,
+    sourceDuration: 3,
+  });
+  const project = createProject([clip]);
+  const frame = resolveVideoCompositionFrame(project, 1);
+  const layer = frame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  const exposure = {
+    ...frame,
+    visualLayers: [{ ...layer, clip: { ...clip, sourceStart: 1, sourceDuration: 2 } }],
+  };
+  const inputOnly = { ...frame, visualLayers: [], effectInputLayers: [layer] };
+  cutDecode.getSample.mockImplementation(async (time: number) =>
+    cutFrame(Math.floor(time * 10) / 10)
+  );
+  const source = createCompositionCutSampleSource({ project, sourceUrl: () => 'blob:poses' });
+  const lease = await source.sample(1, new AbortController().signal, 'last', project, [
+    { frame, time: 1 },
+    { frame: exposure, time: 1.21 },
+    { frame: inputOnly, time: 1.31 },
+  ]);
+  expect(cutDecode.getSample.mock.calls.map(([time]) => time)).toEqual([1, 2.21, 1.31]);
+  expect(
+    [...lease.bindings.values()].map((binding) => [binding.target, binding.timestamp])
+  ).toEqual([
+    [1, 1],
+    [2.21, 2.2],
+    [1.31, 1.3],
+  ]);
+  expect(lease.forFrame(exposure, 1.21).get('pose')).not.toBe(lease.media.get('pose'));
+  expect(lease.forFrame(inputOnly, 1.31, inputOnly.effectInputLayers).has('pose')).toBe(true);
+  lease.release();
+  source.dispose();
+});
+
+it('includes an attached video owner absent from visual video and effect input layers', async () => {
+  const clip = createVideoClip({ id: 'owner', startTime: 0, duration: 2, sourceDuration: 2 });
+  const project = createProject([clip]);
+  const frame = resolveVideoCompositionFrame(project, 0.5);
+  const owner = frame.visualLayers[0]!;
+  if (owner.kind !== 'video') throw new Error('Expected video');
+  const effectClip = createEffectHostClip({
+    duration: 2,
+    effectInstanceId: 'attached',
+    name: 'Attached',
+    startTime: 0,
+    trackId: clip.trackId,
+    projectWidth: 16,
+    projectHeight: 16,
+  });
+  const attached = {
+    ...frame,
+    effectInputLayers: [],
+    visualLayers: [
+      {
+        ...owner,
+        kind: 'effect' as const,
+        clip: effectClip,
+        clipId: effectClip.id,
+        sourceAttachment: {
+          owner,
+          mapping: {
+            frame: clip.transform,
+            fitMode: clip.fitMode,
+            sourceWidth: 16,
+            sourceHeight: 16,
+            renderState: owner.renderState,
+          },
+        },
+      },
+    ],
+  };
+  const sample = cutFrame(0.4);
+  const close = vi.spyOn(sample, 'close');
+  cutDecode.getSample.mockResolvedValue(sample);
+  const source = createCompositionCutSampleSource({ project, sourceUrl: () => 'blob:attached' });
+  const lease = await source.sample(0.5, new AbortController().signal, 'first', project, [
+    { frame: attached, time: 0.5 },
+  ]);
+  expect(lease.forFrame(attached, 0.5).has('owner')).toBe(true);
+  expect([...lease.bindings.values()][0]).toMatchObject({
+    target: 0.5,
+    timestamp: 0.4,
+    endpoint: 'first',
+  });
+  expect(close).not.toHaveBeenCalled();
+  lease.release();
+  lease.release();
+  expect(close).toHaveBeenCalledOnce();
+  source.dispose();
 });

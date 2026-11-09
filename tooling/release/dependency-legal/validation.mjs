@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import { readOssReleasePolicy, sha256 } from '../policy/oss-release-policy.mjs';
 import { formatThirdPartyNotices, generateDependencyLegalClosure } from './index.mjs';
+import { normalizeBundledAssetNotices } from './output.mjs';
 
 function interfaceFontMetadata(policy) {
   const interfaceFont = policy.bundledAssets.find((asset) => asset.id === 'golos-ui');
@@ -69,6 +70,37 @@ async function validateLicenseArtifacts(root, policy, closure) {
   return errors;
 }
 
+/** Checks local model, runtime, license, notice, and provenance files against reviewed hashes. */
+export async function validateBundledAssetNotices(root, metadata) {
+  let assets;
+  try {
+    assets = normalizeBundledAssetNotices(metadata);
+  } catch (error) {
+    return [error instanceof Error ? error.message : String(error)];
+  }
+  const errors = [];
+  for (const asset of assets) {
+    const files = [
+      { path: asset.licensePath, sha256: asset.licenseSha256, kind: 'license' },
+      { path: asset.noticePath, sha256: asset.noticeSha256, kind: 'notice' },
+      { path: asset.provenancePath, sha256: asset.provenanceSha256, kind: 'provenance' },
+      ...asset.artifacts.map((artifact) => ({ ...artifact, kind: 'artifact' })),
+    ];
+    for (const file of files) {
+      let contents;
+      try {
+        contents = await fs.readFile(path.resolve(root, file.path));
+      } catch {
+        errors.push(`Bundled asset ${file.kind} is missing: ${file.path}`);
+        continue;
+      }
+      if (sha256(contents) !== file.sha256)
+        errors.push(`Bundled asset ${file.kind} content drift: ${file.path}`);
+    }
+  }
+  return errors;
+}
+
 /** Compares tracked legal outputs with a fresh dependency closure from lockfile and installed tree. */
 export async function validateDependencyLegalClosure(root = process.cwd()) {
   const errors = [];
@@ -85,6 +117,27 @@ export async function validateDependencyLegalClosure(root = process.cwd()) {
     });
   } catch (error) {
     return [error instanceof Error ? error.message : String(error)];
+  }
+  const assetMetadata = policy.dependencyLegal.bundledAssets;
+  errors.push(...(await validateBundledAssetNotices(root, assetMetadata)));
+  let assets;
+  try {
+    assets = normalizeBundledAssetNotices(assetMetadata);
+  } catch {
+    return errors;
+  }
+  for (const asset of assets) {
+    for (const [file, digest] of [
+      [asset.licensePath, asset.licenseSha256],
+      [asset.noticePath, asset.noticeSha256],
+      [asset.provenancePath, asset.provenanceSha256],
+    ])
+      if (
+        !policy.legalFiles.some(
+          (entry) => entry.source === file && entry.archivePath === file && entry.sha256 === digest
+        )
+      )
+        errors.push(`Bundled asset legal payload is missing or stale: ${file}`);
   }
   let manifest;
   try {
@@ -103,8 +156,15 @@ export async function validateDependencyLegalClosure(root = process.cwd()) {
     entries: closure.entries,
     interfaceFont: interfaceFontMetadata(policy),
     documentFont: policy.bundledAssets.find((asset) => asset.id === 'golos-text'),
+    bundledAssets: assets,
   });
-  const notices = await fs.readFile(path.resolve(root, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+  let notices;
+  try {
+    notices = await fs.readFile(path.resolve(root, 'THIRD_PARTY_NOTICES.md'), 'utf8');
+  } catch {
+    errors.push('THIRD_PARTY_NOTICES.md is missing');
+    return errors;
+  }
   if (notices !== expectedNotices) errors.push('THIRD_PARTY_NOTICES.md is incomplete or stale');
   for (const entry of manifest.entries ?? []) {
     if (entry.selectedLicense?.includes('MPL-2.0') && !entry.correspondingSourceUrl) {

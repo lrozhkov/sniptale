@@ -12,6 +12,10 @@ vi.mock('./window-header', async (importOriginal) => ({
 
 const state = vi.hoisted(() => ({
   sourceWidth: 320,
+  firstTimestamp: 0,
+  packetRate: 30,
+  packetStats: vi.fn(),
+  sampleTimes: [] as number[],
   sourceHeight: 180,
   configurations: [] as unknown[],
   encoded: [] as {
@@ -61,6 +65,11 @@ vi.mock('mediabunny', async (importOriginal) => {
     }
     async *samplesAtTimestamps(times: readonly number[]) {
       for (const time of times) {
+        state.sampleTimes.push(time);
+        if (time < state.firstTimestamp) {
+          yield null;
+          continue;
+        }
         const sample = new VideoSample(null, { timestamp: time });
         state.drawn.push({ draw: sample.draw, close: sample.close });
         yield sample;
@@ -73,6 +82,11 @@ vi.mock('mediabunny', async (importOriginal) => {
         codec: 'vp9',
         getDecoderConfig: async () => ({ codec: 'vp09.00.10.08' }),
         getTimeResolution: async () => 1000,
+        getFirstTimestamp: async () => state.firstTimestamp,
+        computePacketStats: async (...args: unknown[]) => {
+          state.packetStats(...args);
+          return { averagePacketRate: state.packetRate };
+        },
         canDecode: async () => true,
         getDisplayWidth: async () => state.sourceWidth,
         getDisplayHeight: async () => state.sourceHeight,
@@ -177,6 +191,10 @@ afterEach(() => {
   state.encoded.length = 0;
   state.drawn.length = 0;
   state.audioTrack = null;
+  state.firstTimestamp = 0;
+  state.packetRate = 30;
+  state.packetStats.mockReset();
+  state.sampleTimes.length = 0;
   state.sourceWidth = 320;
   state.sourceHeight = 180;
   vi.unstubAllGlobals();

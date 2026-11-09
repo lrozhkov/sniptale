@@ -18,6 +18,8 @@ interface BackgroundThumbnailsProps {
   label: string;
   onSelect(id: string): void;
   disabled?: boolean;
+  /** Gate duplicate choices during acquisition without flashing disabled visuals. */
+  pending?: boolean;
   dataUi?: string;
   /** Initial visible choices; later reveals retain the thirty-choice increment. */
   initialCount?: number | undefined;
@@ -50,8 +52,11 @@ export function BackgroundThumbnails(props: BackgroundThumbnailsProps) {
             aria-pressed={item.active ?? false}
             aria-busy={item.loading ?? false}
             disabled={props.disabled || item.disabled}
+            aria-disabled={props.pending || props.disabled || item.disabled || false}
+            onDragStart={(event) => event.preventDefault()}
             className={[
-              'relative h-8 min-w-0 overflow-hidden rounded border border-[var(--sniptale-color-border-subtle)]',
+              'relative h-8 min-w-0 cursor-pointer overflow-hidden rounded border bg-clip-padding',
+              'border-[var(--sniptale-color-border-subtle)]',
               'transition-opacity hover:opacity-80 aria-pressed:outline',
               item.loading ? 'disabled:opacity-100' : 'disabled:opacity-40',
               'aria-pressed:outline-1 aria-pressed:outline-offset-1',
@@ -59,7 +64,9 @@ export function BackgroundThumbnails(props: BackgroundThumbnailsProps) {
               'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
             ].join(' ')}
             style={item.style}
-            onClick={() => props.onSelect(item.id)}
+            onClick={() => {
+              if (!props.pending) props.onSelect(item.id);
+            }}
           >
             {item.content}
             {item.loading && (

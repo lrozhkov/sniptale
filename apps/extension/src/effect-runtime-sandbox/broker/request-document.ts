@@ -31,6 +31,6 @@ export async function parseAndVerifyEffectDocument(
   } catch {
     return null;
   }
-  const validation = validateEffectV1Document(input);
+  const validation = validateEffectV1Document(input, { presentationPolicy: 'retained' });
   return validation.ok && validation.document ? validation.document : null;
 }

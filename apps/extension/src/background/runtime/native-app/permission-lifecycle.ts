@@ -20,10 +20,11 @@ export function initializeNativeAppPermissionLifecycle(
   const reconcile = async () => {
     const requestGeneration = ++generation;
     const granted = await hasNativeMessagingPermission().catch(() => false);
+    const canConnect = granted && (await service.canAutoConnect().catch(() => false));
     if (!active || requestGeneration !== generation) return;
-    if (granted) {
+    if (canConnect) {
       service.connect();
-    } else {
+    } else if (!granted) {
       service.disconnectForPermissionRevocation();
     }
   };

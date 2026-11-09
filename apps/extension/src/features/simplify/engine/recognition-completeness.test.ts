@@ -1,0 +1,723 @@
+import { createCanvas } from 'canvas';
+import { expect, it, vi } from 'vitest';
+
+const { prepare, render, DEFAULTS } = await vi.importActual<{
+  prepare(image: unknown): unknown;
+  render(context: unknown, source: unknown, catalog: unknown, settings: object): void;
+  DEFAULTS: object;
+}>('./render.mjs');
+
+function changed(
+  source: Uint8ClampedArray,
+  output: Uint8ClampedArray,
+  width: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) {
+  let count = 0;
+  for (let yy = y; yy < y + h; yy++)
+    for (let xx = x; xx < x + w; xx++) {
+      const i = (yy * width + xx) * 4;
+      if (
+        source[i] !== output[i] ||
+        source[i + 1] !== output[i + 1] ||
+        source[i + 2] !== output[i + 2]
+      )
+        count++;
+    }
+  return count;
+}
+function execute(canvas: ReturnType<typeof createCanvas>) {
+  const context = canvas.getContext('2d');
+  const input = context.getImageData(0, 0, canvas.width, canvas.height);
+  const catalog = prepare(input);
+  const result = createCanvas(canvas.width, canvas.height);
+  render(result.getContext('2d'), canvas, catalog, { ...DEFAULTS, content: 'text' });
+  const output = result.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+  return (x: number, y: number, w: number, h: number) =>
+    changed(input.data, output.data, canvas.width, x, y, w, h);
+}
+
+it('erases paired terminal marks after a word and after owned baseline dots', () => {
+  const canvas = createCanvas(400, 100),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#112520';
+  context.fillRect(0, 0, 400, 100);
+  context.textBaseline = 'top';
+  context.font = '14px monospace';
+  context.fillStyle = '#00be69';
+  context.fillText('sampleWord', 20, 20);
+  context.fillRect(113, 23, 5, 5);
+  context.fillRect(121, 31, 3, 4);
+  context.fillText('sampleWord', 20, 60);
+  for (const x of [108, 114, 120]) context.fillRect(x, 71, 3, 2);
+  context.fillRect(128, 63, 5, 5);
+  context.fillRect(136, 71, 3, 4);
+  const delta = execute(canvas);
+  for (const [x, y, w, h] of [
+    [113, 23, 5, 5],
+    [121, 31, 3, 4],
+    [128, 63, 5, 5],
+    [136, 71, 3, 4],
+  ] as const)
+    expect(delta(x, y, w, h)).toBe(w * h);
+});
+
+it('preserves separate upper marks and independent ellipsis and dropdown controls', () => {
+  const canvas = createCanvas(400, 150),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#112520';
+  context.fillRect(0, 0, 400, 150);
+  context.textBaseline = 'top';
+  context.font = '14px monospace';
+  context.fillStyle = '#00be69';
+  context.fillText('sampleWord', 20, 20);
+  context.fillRect(113, 23, 5, 5);
+  context.fillText('sampleWord', 20, 60);
+  for (const x of [120, 126, 132]) context.fillRect(x, 71, 3, 2);
+  context.fillText('sampleWord', 20, 100);
+  context.beginPath();
+  context.moveTo(115, 106);
+  context.lineTo(124, 106);
+  context.lineTo(119.5, 111);
+  context.closePath();
+  context.fill();
+  const delta = execute(canvas);
+  expect(delta(113, 23, 5, 5)).toBe(0);
+  expect(delta(120, 71, 15, 2)).toBe(0);
+  expect(delta(115, 106, 9, 5)).toBe(0);
+});
+
+for (const framed of [false, true])
+  it(
+    framed
+      ? 'preserves repeated framed controls in a text flow'
+      : 'erases repeated line glyphs through colored text rows and preserves independent controls',
+    () => {
+      const canvas = createCanvas(500, 200),
+        context = canvas.getContext('2d');
+      context.fillStyle = '#112520';
+      context.fillRect(0, 0, 500, 200);
+      context.font = '14px monospace';
+      context.textBaseline = 'top';
+      const rows: Array<[string, number, number, string]> = [
+        ['opening = calculate(value)', 16, 5, '#dddddd'],
+        ['initial = calculate(value)', 46, 25, '#00be69'],
+        ['initial = calculate(value)', 46, 45, '#00be69'],
+        [')', 16, 65, '#dddddd'],
+        ['opening = calculate(value)', 16, 85, '#dddddd'],
+        ['third = calculate(value)', 46, 105, '#00be69'],
+        ['fourth = calculate(value)', 46, 125, '#00be69'],
+        [')', 16, 145, '#dddddd'],
+        [')', 400, 65, '#dddddd'],
+        [')', 400, 145, '#dddddd'],
+      ];
+      for (const [text, x, y, color] of rows) {
+        if (color === '#00be69') {
+          context.fillStyle = '#113526';
+          context.fillRect(x, y, 235, 17);
+        }
+        context.fillStyle = color;
+        context.fillText(text, x, y);
+      }
+      context.strokeStyle = '#dddddd';
+      context.lineWidth = 1;
+      for (const y of [62.5, 142.5]) {
+        context.strokeRect(395.5, y, 16, 19);
+        if (framed) context.strokeRect(11.5, y, 16, 19);
+      }
+      const delta = execute(canvas);
+      for (const y of [65, 145]) {
+        if (framed) expect(delta(18, y + 3, 4, 10)).toBe(0);
+        else expect(delta(16, y, 10, 16)).toBeGreaterThan(3);
+        expect(delta(400, y, 10, 16)).toBe(0);
+      }
+    }
+  );
+
+it('uses an adjacent font peer to recover baseline marks across agreement levels', async () => {
+  const { recoverTerminalMarks } = await vi.importActual<{
+    recoverTerminalMarks(
+      image: unknown,
+      boxes: object[]
+    ): Array<{ x: number; w: number; terminalMark?: object }>;
+  }>('./terminal-marks.mjs');
+  const canvas = createCanvas(170, 60),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 170, 60);
+  context.fillStyle = '#222222';
+  for (const start of [20, 80])
+    for (let i = 0; i < 6; i++) {
+      context.fillRect(start + i * 7, 20, 1, 7);
+      context.fillRect(start + i * 7, 26, 4, 1);
+    }
+  context.fillRect(62, 25, 2, 4);
+  const source = context.getImageData(0, 0, 170, 60);
+  const metrics = {
+    glyphs: 6,
+    xHeight: 7,
+    upperHeight: 7,
+    stroke: 1,
+    heightAgreement: 1,
+    baselineAgreement: 2 / 3,
+    glyphBounds: { x: 20, y: 20, w: 39, h: 7 },
+  };
+  const label = {
+    x: 18,
+    y: 18,
+    w: 43,
+    h: 12,
+    bg: [255, 255, 255],
+    shape: 'text',
+    textConfidence: true,
+    typeMetrics: metrics,
+  };
+  const peer = {
+    x: 78,
+    y: 18,
+    w: 43,
+    h: 12,
+    bg: [255, 255, 255],
+    shape: 'text',
+    textConfidence: true,
+    typeMetrics: {
+      ...metrics,
+      baselineAgreement: 1,
+      glyphBounds: { ...metrics.glyphBounds, x: 80 },
+    },
+  };
+  expect(recoverTerminalMarks(source, [label])[0]!.terminalMark).toBeUndefined();
+  expect(recoverTerminalMarks(source, [label, peer])[0]!.terminalMark).toMatchObject({
+    x: 62,
+    y: 25,
+    w: 2,
+    h: 4,
+  });
+  const confident = { ...label, typeMetrics: { ...metrics, baselineAgreement: 1 } };
+  expect(recoverTerminalMarks(source, [confident])[0]!.terminalMark).toBeUndefined();
+  expect(recoverTerminalMarks(source, [confident, peer])[0]!.terminalMark).toMatchObject({
+    x: 62,
+    y: 25,
+    w: 2,
+    h: 4,
+  });
+  const control = {
+    x: 61,
+    y: 24,
+    w: 5,
+    h: 6,
+    bg: [255, 255, 255],
+    shape: 'icon',
+    kind: 'control-icon',
+  };
+  expect(recoverTerminalMarks(source, [confident, peer, control])[0]!.terminalMark).toBeUndefined();
+  expect(recoverTerminalMarks(source, [label, peer, control])[0]!.terminalMark).toBeUndefined();
+});
+
+for (const panel of [false, true])
+  it(
+    panel
+      ? 'recovers multiline text inside a shared enclosing panel'
+      : 'recovers closures after different counts of indented rows',
+    () => {
+      const canvas = createCanvas(360, 300),
+        context = canvas.getContext('2d');
+      context.fillStyle = '#112520';
+      context.fillRect(0, 0, 360, 300);
+      if (panel) {
+        context.strokeStyle = '#b0b0b0';
+        context.strokeRect(5.5, 5.5, 300, 275);
+      }
+      context.font = '14px monospace';
+      context.textBaseline = 'top';
+      const closures: number[] = [];
+      for (const [top, count] of [
+        [15, 3],
+        [145, 4],
+      ] as const) {
+        context.fillStyle = '#dddddd';
+        context.fillText('opening = calculate(value)', 16, top);
+        for (let i = 1; i <= count; i++) {
+          context.fillStyle = '#113526';
+          context.fillRect(46, top + i * 20, 235, 17);
+          context.fillStyle = '#00be69';
+          context.fillText('initial = calculate(value)', 46, top + i * 20);
+        }
+        const y = top + (count + 1) * 20;
+        closures.push(y);
+        context.fillStyle = '#dddddd';
+        context.fillText(')', 16, y);
+      }
+      const delta = execute(canvas);
+      for (const y of closures) expect(delta(16, y, 10, 16)).toBeGreaterThan(3);
+    }
+  );
+
+it('claims an unknown only when all its foreground belongs to the terminal pair', async () => {
+  const { recoverTerminalMarks } = await vi.importActual<{
+    recoverTerminalMarks(
+      image: unknown,
+      boxes: object[]
+    ): Array<{ shape: string; terminalMark?: object }>;
+  }>('./terminal-marks.mjs');
+  const canvas = createCanvas(250, 60),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#112520';
+  context.fillRect(0, 0, 250, 60);
+  context.fillStyle = '#00be69';
+  context.textBaseline = 'top';
+  context.font = '14px monospace';
+  context.fillText('sampleWord', 20, 20);
+  const plain = context.getImageData(0, 0, 250, 60);
+  const catalog = prepare(plain) as Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    shape: string;
+  }>;
+  const label = catalog.find((box) => box.shape === 'text');
+  expect(label).toBeDefined();
+  const fullLabel = { ...label!, w: 86 };
+  context.fillRect(113, 23, 5, 5);
+  context.fillRect(121, 31, 3, 4);
+  const unknown = { x: 111, y: 21, w: 16, h: 16, bg: [17, 37, 32], shape: 'unknown', kind: 'auto' };
+  const recovered = recoverTerminalMarks(context.getImageData(0, 0, 250, 60), [fullLabel, unknown]);
+  expect(recovered[0]!.terminalMark).toBeDefined();
+  expect(recovered.some((box) => box.shape === 'unknown')).toBe(false);
+  context.fillRect(125, 24, 2, 3);
+  const conflict = recoverTerminalMarks(context.getImageData(0, 0, 250, 60), [fullLabel, unknown]);
+  expect(conflict[0]!.terminalMark).toBeUndefined();
+  expect(conflict.some((box) => box.shape === 'unknown')).toBe(true);
+});
+
+it('does not publish narrow repeated symbols without matching text flow', () => {
+  const canvas = createCanvas(180, 100),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#112520';
+  context.fillRect(0, 0, 180, 100);
+  context.fillStyle = '#dddddd';
+  context.textBaseline = 'top';
+  context.font = '14px monospace';
+  context.fillText(')', 80, 15);
+  context.fillText(')', 80, 65);
+  const source = context.getImageData(0, 0, 180, 100);
+  const catalog = prepare(source) as Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    shape: string;
+  }>;
+  for (const y of [15, 65])
+    expect(catalog.some((b) => b.x < 90 && b.x + b.w > 80 && b.y < y + 16 && b.y + b.h > y)).toBe(
+      false
+    );
+});
+
+it.each([1, 2])('recovers text-flow glyphs at raster scale %s', (scale) => {
+  const canvas = createCanvas(360 * scale, 250 * scale);
+  const context = canvas.getContext('2d');
+  context.scale(scale, scale);
+  context.fillStyle = '#121418';
+  context.fillRect(0, 0, 360, 250);
+  context.font = '14px monospace';
+  context.textBaseline = 'top';
+  for (const top of [15, 135]) {
+    context.fillStyle = '#dddddd';
+    context.fillText('r = calculate(value)', 16, top);
+    for (const offset of [20, 40]) {
+      context.fillStyle = '#113526';
+      context.fillRect(46, top + offset, 235, 17);
+      context.fillStyle = '#00be69';
+      context.fillText('initial = calculate(value)', 46, top + offset);
+    }
+    context.fillStyle = '#dddddd';
+    context.fillText(')', 16, top + 60);
+  }
+  const delta = execute(canvas);
+  for (const y of [75, 195])
+    expect(delta(16 * scale, y * scale, 10 * scale, 16 * scale)).toBeGreaterThan(3);
+});
+
+for (const family of ['monospace', 'sans-serif'])
+  for (const scale of [1, 2])
+    it(`erases an isolated inline letter in ${family} at scale ${scale}`, () => {
+      const canvas = createCanvas(700 * scale, 120 * scale);
+      const context = canvas.getContext('2d');
+      context.scale(scale, scale);
+      context.fillStyle = '#08090c';
+      context.fillRect(0, 0, 700, 120);
+      context.fillStyle = '#eeeeee';
+      context.font = `bold 24px ${family}`;
+      context.textBaseline = 'alphabetic';
+      const prefix = 'Paragraphs, ';
+      const x = 40 + context.measureText(prefix).width;
+      const width = context.measureText('a').width;
+      context.fillText(`${prefix}a and captions`, 40, 55);
+      const delta = execute(canvas);
+      expect(
+        delta(Math.floor(x * scale), 32 * scale, Math.ceil(width * scale), 26 * scale)
+      ).toBeGreaterThan(10);
+    });
+
+it.each(['а', 'и', 'в'])(
+  'erases the Cyrillic one-letter word %s within a source font row',
+  (letter) => {
+    const canvas = createCanvas(850, 120),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#08090c';
+    context.fillRect(0, 0, 850, 120);
+    context.fillStyle = '#eeeeee';
+    context.font = 'bold 24px monospace';
+    context.textBaseline = 'alphabetic';
+    const prefix = 'Правила, ',
+      x = 40 + context.measureText(prefix).width;
+    context.fillText(`${prefix}${letter} взаимные связи`, 40, 55);
+    expect(execute(canvas)(Math.floor(x), 32, 15, 26)).toBeGreaterThan(10);
+  }
+);
+
+it.each(['plus', 'circle', 'colored-letter', 'distant-letter'])(
+  'preserves an independent %s between text labels',
+  (symbol) => {
+    const canvas = createCanvas(700, 120),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#08090c';
+    context.fillRect(0, 0, 700, 120);
+    context.fillStyle = '#eeeeee';
+    context.font = 'bold 24px monospace';
+    context.textBaseline = 'alphabetic';
+    context.fillText('Paragraphs,', 40, 55);
+    const x = 40 + context.measureText('Paragraphs, ').width;
+    context.fillText('and captions', symbol === 'distant-letter' ? x + 90 : x + 29, 55);
+    if (symbol === 'plus') context.fillText('+', x, 55);
+    if (symbol === 'circle') {
+      context.strokeStyle = '#eeeeee';
+      context.lineWidth = 2;
+      context.beginPath();
+      context.arc(x + 7, 47, 6, 0, Math.PI * 2);
+      context.stroke();
+    }
+    if (symbol === 'colored-letter') {
+      context.fillStyle = '#ee3b3b';
+      context.fillText('a', x, 55);
+    }
+    if (symbol === 'distant-letter') context.fillText('a', x + 40, 55);
+    const left = symbol === 'distant-letter' ? x + 39 : x - 1;
+    expect(execute(canvas)(Math.floor(left), 31, 18, 27)).toBe(0);
+  }
+);
+
+it('erases bold text joined by medium-contrast bridges and preserves a separate outlined symbol', () => {
+  const canvas = createCanvas(180, 60),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#101418';
+  context.fillRect(0, 0, 180, 60);
+  for (let x = 45; x < 115; x += 10) {
+    context.fillStyle = '#f0f0f0';
+    context.fillRect(x, 23, 7, 2);
+    context.fillRect(x, 31, 7, 2);
+    context.fillRect(x, 23, 2, 10);
+    context.fillRect(x + 5, 23, 2, 10);
+    context.fillStyle = '#787878';
+    context.fillRect(x + 7, 27, 3, 1);
+  }
+  context.fillStyle = '#f0f0f0';
+  context.fillRect(12, 22, 12, 2);
+  context.fillRect(12, 30, 12, 2);
+  context.fillRect(12, 22, 2, 10);
+  context.fillRect(22, 22, 2, 10);
+  const delta = execute(canvas);
+  expect(delta(45, 23, 67, 10)).toBeGreaterThan(100);
+  expect(delta(52, 27, 3, 1)).toBe(3);
+  expect(delta(12, 22, 12, 10)).toBe(0);
+});
+
+it.each([1, 2])('simplifies isolated values in a supported text column at scale %s', (scale) => {
+  const canvas = createCanvas(520 * scale, 380 * scale),
+    context = canvas.getContext('2d');
+  context.scale(scale, scale);
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 520, 380);
+  context.font = '20px monospace';
+  context.textBaseline = 'top';
+  for (const [row, value] of [
+    '38193002',
+    '1',
+    '2',
+    '3',
+    '38193002',
+    '5',
+    'contact@example.test',
+  ].entries()) {
+    const top = 20 + row * 45;
+    context.fillStyle = '#0064bf';
+    context.fillText(value, 130, top);
+    context.strokeStyle = '#777777';
+    context.lineWidth = 1;
+    context.strokeRect(25, top + 2, 18, 20);
+    context.beginPath();
+    context.moveTo(25, top + 2);
+    context.lineTo(43, top + 22);
+    context.stroke();
+  }
+  const delta = execute(canvas);
+  for (const row of [1, 2, 3, 5])
+    expect(delta(130 * scale, (20 + row * 45) * scale, 14 * scale, 25 * scale)).toBeGreaterThan(10);
+  for (let row = 0; row < 7; row++)
+    expect(delta(24 * scale, (20 + row * 45 + 1) * scale, 21 * scale, 23 * scale)).toBe(0);
+});
+
+for (const scale of [1, 2])
+  it(`replaces spaced short text values beside a label at scale ${scale}`, () => {
+    const canvas = createCanvas(600 * scale, 100 * scale),
+      context = canvas.getContext('2d');
+    context.scale(scale, scale);
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 600, 100);
+    context.textBaseline = 'top';
+    context.font = '12px Arial';
+    context.fillStyle = '#0064bf';
+    const values = ['2', '3', '4', '5', '6', '7'];
+    values.forEach((text, i) => context.fillText(text, 20 + i * 24, 40));
+    context.fillText('Continue browsing', 190, 40);
+    const delta = execute(canvas);
+    for (let i = 0; i < values.length; i++)
+      expect(
+        delta((20 + i * 24) * scale, 40 * scale, 9 * scale, 15 * scale),
+        values[i]
+      ).toBeGreaterThan(8);
+  });
+
+it('replaces a two-glyph framed label independently of its connected foreground parts', () => {
+  const canvas = createCanvas(250, 90),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 250, 90);
+  context.strokeStyle = '#bbbbbb';
+  context.lineWidth = 1;
+  context.strokeRect(20.5, 30.5, 60, 24);
+  context.fillStyle = '#444444';
+  context.font = '12px Arial';
+  context.textBaseline = 'top';
+  context.fillText('20', 29, 36);
+  context.beginPath();
+  context.moveTo(65, 40);
+  context.lineTo(73, 40);
+  context.lineTo(69, 45);
+  context.closePath();
+  context.fill();
+  const delta = execute(canvas);
+  expect(delta(29, 36, 15, 14)).toBeGreaterThan(20);
+  expect(delta(65, 40, 8, 5)).toBe(0);
+  expect(delta(20, 30, 61, 1)).toBe(0);
+});
+
+it('replaces complete light control labels instead of retaining only their recognized suffix', () => {
+  const canvas = createCanvas(340, 100),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 340, 100);
+  context.fillStyle = '#0063b0';
+  context.fillRect(30, 35, 100, 24);
+  context.fillStyle = '#ffffff';
+  context.font = 'bold 13px Arial';
+  context.textBaseline = 'top';
+  context.fillText('Отменить', 41, 40);
+  const delta = execute(canvas);
+  expect(delta(41, 40, 38, 16)).toBeGreaterThan(30);
+  expect(delta(81, 40, 35, 16)).toBeGreaterThan(20);
+  expect(delta(31, 36, 8, 21)).toBe(0);
+});
+
+it.each(['missing', 'distant', 'different-ink'])(
+  'preserves compact glyph-like rows with %s text evidence',
+  (kind) => {
+    const canvas = createCanvas(650, 100),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 650, 100);
+    context.textBaseline = 'top';
+    context.font = '12px Arial';
+    context.fillStyle = '#0064bf';
+    ['2', '3', '4', '5', '6', '7'].forEach((text, i) => context.fillText(text, 20 + i * 24, 40));
+    if (kind !== 'missing') {
+      if (kind === 'different-ink') context.fillStyle = '#dc2626';
+      context.fillText('Continue browsing', kind === 'distant' ? 450 : 190, 40);
+    }
+    const delta = execute(canvas);
+    for (let i = 0; i < 6; i++) expect(delta(20 + i * 24, 40, 9, 15)).toBe(0);
+  }
+);
+
+it('retains control-label ownership across a one-pixel gutter between filled controls', async () => {
+  const { resolveSurfaceClaims } = await vi.importActual<{
+    resolveSurfaceClaims(
+      image: unknown,
+      media: object[],
+      controls: object,
+      measure: () => null
+    ): { controls: { labels: object[] } };
+  }>('./ownership.mjs');
+  const canvas = createCanvas(240, 80),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 240, 80);
+  context.fillStyle = '#0063b0';
+  context.fillRect(20, 25, 90, 24);
+  context.fillRect(111, 25, 110, 24);
+  context.fillStyle = '#ffffff';
+  context.font = 'bold 13px Arial';
+  context.textBaseline = 'top';
+  context.fillText('Rollback', 30, 30);
+  const label = { x: 29, y: 29, w: 65, h: 17, bg: [0, 99, 176], shape: 'text' };
+  const claims = resolveSurfaceClaims(
+    context.getImageData(0, 0, 240, 80),
+    [],
+    {
+      boundaries: [{ x: 20, y: 25, w: 90, h: 24, kind: 'control' }],
+      protected: [],
+      labels: [label],
+    },
+    () => null
+  );
+  expect(claims.controls.labels).toEqual([label]);
+  expect(execute(canvas)(30, 30, 60, 16)).toBeGreaterThan(100);
+});
+
+for (const scale of [1, 2])
+  for (const neighbor of ['2', 'Next'])
+    it(`keeps a framed short label separate from adjacent ${neighbor} at scale ${scale}`, () => {
+      const canvas = createCanvas(430 * scale, 100 * scale),
+        context = canvas.getContext('2d');
+      context.scale(scale, scale);
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, 430, 100);
+      context.strokeStyle = '#bbbbbb';
+      context.lineWidth = 1;
+      context.strokeRect(20.5, 30.5, 25, 23);
+      context.font = '12px Arial';
+      context.textBaseline = 'top';
+      context.fillStyle = '#666666';
+      context.fillText('1', 29, 36);
+      context.fillStyle = '#0064bf';
+      context.fillText(neighbor, 54, 36);
+      if (neighbor === '2')
+        ['3', '4', '5', '6'].forEach((text, i) => context.fillText(text, 78 + i * 24, 36));
+      context.fillText('Continue browsing', 200, 36);
+      const delta = execute(canvas);
+      expect(delta(29 * scale, 36 * scale, 8 * scale, 14 * scale)).toBeGreaterThan(8);
+      expect(delta(54 * scale, 36 * scale, 8 * scale, 14 * scale)).toBeGreaterThan(8);
+      expect(delta(45 * scale, 34 * scale, scale, 16 * scale)).toBe(0);
+      expect(delta(47 * scale, 34 * scale, 6 * scale, 16 * scale)).toBe(0);
+    });
+
+it.each(['outline', 'arrow'])(
+  'preserves an independent %s icon beside a framed text label',
+  (kind) => {
+    const canvas = createCanvas(300, 100),
+      context = canvas.getContext('2d');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, 300, 100);
+    context.strokeStyle = '#bbbbbb';
+    context.lineWidth = 1;
+    context.strokeRect(20.5, 30.5, 25, 23);
+    context.font = '12px Arial';
+    context.textBaseline = 'top';
+    context.fillStyle = '#666666';
+    context.fillText('1', 29, 36);
+    context.strokeStyle = '#0064bf';
+    context.fillStyle = '#0064bf';
+    if (kind === 'outline') context.strokeRect(54.5, 37.5, 10, 10);
+    else {
+      context.beginPath();
+      context.moveTo(54, 39);
+      context.lineTo(60, 39);
+      context.lineTo(60, 35);
+      context.lineTo(67, 42);
+      context.lineTo(60, 49);
+      context.lineTo(60, 45);
+      context.lineTo(54, 45);
+      context.closePath();
+      context.fill();
+    }
+    const delta = execute(canvas);
+    expect(delta(29, 36, 8, 14)).toBeGreaterThan(8);
+    expect(delta(53, 34, 16, 17)).toBe(0);
+  }
+);
+
+for (const prefix of ['by', 'dy', 'py'])
+  for (const scale of [1, 2])
+    it(`keeps compact ${prefix} text in its paragraph at scale ${scale}`, () => {
+      const canvas = createCanvas(680 * scale, 150 * scale),
+        context = canvas.getContext('2d');
+      context.scale(scale, scale);
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, 680, 150);
+      context.font = '16px Arial';
+      context.textBaseline = 'alphabetic';
+      context.fillStyle = '#202122';
+      context.fillText('Readable paragraphs provide independent font evidence.', 8, 30);
+      context.fillText('Adjacent lines preserve their original spacing and structure.', 8, 56);
+      context.fillText(`${prefix} Author describes the subject in another paragraph line.`, 8, 82);
+      context.fillText('Following text supplies another regular baseline.', 8, 108);
+      const prefixWidth = Math.ceil(context.measureText(prefix).width),
+        input = context.getImageData(0, 0, canvas.width, canvas.height);
+      const boxes = prepare(input) as Array<{
+        x: number;
+        y: number;
+        w: number;
+        h: number;
+        shape: string;
+      }>;
+      expect(
+        boxes.some(
+          (b) =>
+            b.shape === 'text' &&
+            b.x <= 9 * scale &&
+            b.x + b.w >= (8 + prefixWidth + 24) * scale &&
+            b.y <= 78 * scale &&
+            b.y + b.h >= 82 * scale
+        )
+      ).toBe(true);
+      expect(
+        execute(canvas)(8 * scale, 69 * scale, prefixWidth * scale, 17 * scale)
+      ).toBeGreaterThan(15 * scale);
+    });
+
+it.each(['outline', 'arrow'])('keeps an independent %s graphic beside paragraph text', (kind) => {
+  const canvas = createCanvas(680, 150),
+    context = canvas.getContext('2d');
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, 680, 150);
+  context.font = '16px Arial';
+  context.textBaseline = 'alphabetic';
+  context.fillStyle = '#202122';
+  context.fillText('Readable paragraphs provide independent font evidence.', 8, 30);
+  context.fillText('Adjacent lines preserve their original spacing and structure.', 8, 56);
+  context.fillText('Author describes the subject in another paragraph line.', 34, 82);
+  context.fillText('Following text supplies another regular baseline.', 8, 108);
+  context.strokeStyle = '#202122';
+  context.lineWidth = 1;
+  if (kind === 'outline') context.strokeRect(8.5, 68.5, 15, 15);
+  else {
+    context.beginPath();
+    context.moveTo(8, 72);
+    context.lineTo(17, 72);
+    context.lineTo(17, 68);
+    context.lineTo(25, 76);
+    context.lineTo(17, 84);
+    context.lineTo(17, 80);
+    context.lineTo(8, 80);
+    context.closePath();
+    context.fill();
+  }
+  const delta = execute(canvas);
+  expect(delta(7, 67, 19, 19)).toBe(0);
+  expect(delta(34, 69, 400, 17)).toBeGreaterThan(100);
+});

@@ -15,8 +15,106 @@ import {
   VideoMotionFocusMode,
   VideoCursorCaptureMode,
   VideoTemporalEasing,
+  type VideoProjectMotionRegion,
 } from '../../project/types';
-import { resolveProjectCursorCameraPlan, resolveProjectFollowingCamera } from './project-follow';
+import {
+  resolveProjectCursorCameraPlan,
+  resolveProjectCameraConflicts,
+  resolveProjectFollowingCamera,
+  resolveProjectWindowCameraLink,
+} from './project-follow';
+
+it.each([false, true])(
+  'renders the same admitted Native temporary link with expansion=%s',
+  (allowExpansion) => {
+    const project = createVideoProjectFromRecording({
+      recordingId: 'gap',
+      filename: 'gap.webm',
+      width: 1000,
+      height: 600,
+      duration: 5,
+      mimeType: 'video/webm',
+      size: 10,
+      cursorTrack: {
+        captureMode: VideoCursorCaptureMode.EMBEDDED_FALLBACK,
+        skin: normalizeVideoProjectCursorSkin(undefined),
+        samples: [0, 1, 2, 3, 4, 5].map((time) => ({
+          id: String(time),
+          time,
+          x: time === 2 ? 50 : 500,
+          y: 300,
+          visible: true,
+          observation: 'observed' as const,
+          recordingPoint: { x: time === 2 ? 0.05 : 0.5, y: 0.5 },
+          captureSegment: 0,
+        })),
+      },
+    });
+    project.cameraFollowDefaults = { ...createCameraFollowSettings('calm'), allowExpansion };
+    const clip = project.clips.find((item) => item.type === 'VIDEO')!;
+    const region = (start: number, id: string) => ({
+      ...createVideoProjectMotionRegion(project, start, { enter: 'none', exit: 'none' }),
+      id,
+      duration: 1,
+      scale: 2,
+      focusMode: VideoMotionFocusMode.CURSOR,
+      zoomInDuration: 0,
+      zoomOutDuration: 0,
+      sourceBinding: {
+        clipId: clip.id,
+        coordinateSpace: 'source-window' as const,
+        sourceStart: start,
+        sourceEnd: start + 1,
+        animation: { start: 0, end: 1, duration: 1 },
+      },
+    });
+    const from = region(0, 'from'),
+      to = {
+        ...region(3, 'to'),
+        incomingConnection: { fromRegionId: 'from', easing: VideoTemporalEasing.EASE_IN_OUT },
+      };
+    project.motionRegions = [from, to];
+    const manual = {
+      ...project,
+      motionRegions: [from, to].map((region) => ({
+        ...region,
+        focusMode: VideoMotionFocusMode.MANUAL,
+      })),
+    };
+    const { cursorFocusPath: _path, ...manualSource } = manual;
+    const manualWithoutCursor = { ...manualSource, cursorTrack: null };
+    const manualCamera = (input: typeof project) =>
+      resolveVideoCompositionCamera({
+        project: input,
+        currentTime: 2,
+        actions: [],
+        cursorSample: null,
+      });
+    expect(resolveProjectCameraConflicts(manual)).toEqual([]);
+    expect(
+      manualCamera(manual),
+      'Manual camera interpolation must ignore recorded cursor excursions'
+    ).toEqual(manualCamera(manualWithoutCursor));
+    const before = structuredClone(project);
+    const link = resolveProjectWindowCameraLink(project, from, to);
+    expect(!!link.conflict).toBe(!allowExpansion);
+    expect(resolveProjectCameraConflicts(project)).toEqual(allowExpansion ? [] : [link.conflict]);
+    if (allowExpansion) {
+      expect(link.fit).toBeDefined();
+      const camera = resolveVideoCompositionCamera({
+        project,
+        currentTime: 2,
+        actions: [],
+        cursorSample: null,
+      });
+      expect(camera.scale).toBeLessThan(2);
+      const point = mapCompositionPointThroughCamera({ x: 50, y: 300 }, camera);
+      expect(point!.x).toBeGreaterThanOrEqual(-2);
+      expect(resolveProjectWindowCameraLink(project, from, to)).toBe(link);
+    }
+    expect(project).toEqual(before);
+  }
+);
 
 function fixture() {
   const project = createVideoProjectFromRecording({
@@ -575,3 +673,159 @@ it.each([0, 3.05, 0.05])(
     expect(candidate).toEqual(before);
   }
 );
+
+it.each(['canvas', 'window'] as const)(
+  'admits and renders deterministic cursor orbit with saved manual values retained (%s)',
+  (target) => {
+    const { project, region } = fixture();
+    const manual = { enabled: true, rotateX: 25, rotateY: 35, rotateZ: 15, strength: 0.8 };
+    let authored: VideoProjectMotionRegion = {
+      ...region,
+      perspective: manual,
+      cursorComposition: { mode: 'orbit' as const, amount: 0.5, smoothness: 0.6 },
+    };
+    if (target === 'window') {
+      const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+      const bound = bindMotionRegionToClip(authored, clip);
+      authored = {
+        ...authored,
+        ...bound,
+        sourceBinding: { ...bound.sourceBinding!, coordinateSpace: 'source-window' },
+      };
+    }
+    const samples = project.cursorTrack!.samples.map((sample, index) => ({
+      ...sample,
+      x: 530 + index * 60,
+      recordingPoint: { x: 0.53 + index * 0.06, y: 0.5 },
+    }));
+    const candidate = {
+      ...project,
+      cursorTrack: { ...project.cursorTrack!, samples },
+      motionRegions: [authored],
+    };
+    const before = structuredClone(candidate);
+    expect(resolveProjectCursorCameraPlan(candidate, authored).status).toBe('ready');
+    const render = (time: number) =>
+      resolveVideoCompositionCamera({
+        project: candidate,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+    const first = render(0.5),
+      last = render(2.5);
+    expect(first.spatial).toBeDefined();
+    expect(last.spatial?.rotation).not.toEqual(first.spatial?.rotation);
+    expect(render(0.5)).toEqual(first);
+    expect(candidate).toEqual(before);
+    const offRegion = {
+      ...authored,
+      cursorComposition: { mode: 'off' as const, amount: 0.5, smoothness: 0.6 },
+    };
+    const off = resolveVideoCompositionCamera({
+      project: { ...candidate, motionRegions: [offRegion] },
+      currentTime: 1.5,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(off.spatial).toBeUndefined();
+    const manualRegion = { ...authored, focusMode: VideoMotionFocusMode.MANUAL };
+    const restored = resolveVideoCompositionCamera({
+      project: { ...candidate, motionRegions: [manualRegion] },
+      currentTime: 1.5,
+      actions: [],
+      cursorSample: null,
+    });
+    expect(restored.spatial?.rotation).not.toEqual(first.spatial?.rotation);
+  }
+);
+
+it.each(['content', 'fixed', 'follow-video'] as const)(
+  'ignores retained manual spatial settings for Cursor Off across window policy and admission (%s)',
+  (zoomBehavior) => {
+    const { project, region } = fixture();
+    const clip = project.clips.find((clip) => clip.type === 'VIDEO')!;
+    const bound = bindMotionRegionToClip(region, clip);
+    const saved: VideoProjectMotionRegion = {
+      ...bound,
+      sourceBinding: { ...bound.sourceBinding!, coordinateSpace: 'source-window' },
+      cursorComposition: { mode: 'off', amount: 0.5, smoothness: 0.6 },
+      perspective: { enabled: true, rotateX: 25, rotateY: 35, rotateZ: 15, strength: 0.8 },
+      depthOfField: {
+        enabled: true,
+        mode: 'depth',
+        x: 0.5,
+        y: 0.5,
+        width: 0.2,
+        softness: 0.3,
+        strength: 0.7,
+      },
+    };
+    const { perspective: _perspective, depthOfField: _depth, ...clean } = saved;
+    const candidate = {
+      ...project,
+      motionRegions: [saved],
+      sceneBackground: { kind: 'solid' as const, color: '#111111', zoomBehavior },
+    };
+    const reference = { ...candidate, motionRegions: [clean] };
+    const before = structuredClone(candidate);
+    expect(resolveProjectCursorCameraPlan(candidate, saved)).toEqual(
+      resolveProjectCursorCameraPlan(reference, clean)
+    );
+    const render = (input: typeof candidate, time: number) =>
+      resolveVideoCompositionCamera({
+        project: input,
+        currentTime: time,
+        actions: [],
+        cursorSample: null,
+      });
+    for (const time of [0.25, 1.5, 2.75]) {
+      const camera = render(candidate, time);
+      expect(camera).toEqual(render(reference, time));
+      expect(camera.spatial).toBeUndefined();
+      if (zoomBehavior === 'follow-video') expect(camera.backgroundCamera).toBeDefined();
+      else {
+        expect(camera.scale).toBe(1);
+        expect(camera.sourceContentTransform).toBeDefined();
+        expect(camera.backgroundCamera).toBeUndefined();
+      }
+    }
+    const manual = { ...saved, focusMode: VideoMotionFocusMode.MANUAL };
+    const { cursorComposition: _composition, ...originalManual } = manual;
+    const restored = render({ ...candidate, motionRegions: [manual] }, 1.5);
+    expect(restored).toEqual(render({ ...candidate, motionRegions: [originalManual] }, 1.5));
+    expect(restored.spatial?.lockBackground).toBe(true);
+    expect(restored.spatial?.focus[0]?.settings.enabled).toBe(true);
+    expect(candidate).toEqual(before);
+  }
+);
+
+it('uses continuous centering for cursor composition even with its 3D mode off', () => {
+  const { project, region } = fixture();
+  const following = {
+    ...region,
+    scale: 2,
+    cursorComposition: { mode: 'off' as const, amount: 0.5, smoothness: 0 },
+    cameraFollow: createCameraFollowSettings('fast'),
+  };
+  const changed = {
+    ...project,
+    motionRegions: [following],
+    cursorTrack: {
+      ...project.cursorTrack!,
+      samples: project.cursorTrack!.samples.map((sample, index) => ({
+        ...sample,
+        x: index ? 500 : 400,
+        recordingPoint: { x: index ? 0.5 : 0.4, y: 0.5 },
+      })),
+    },
+  };
+  const plan = resolveProjectCursorCameraPlan(changed, following);
+  expect(plan.status).toBe('ready');
+  if (plan.status !== 'ready') return;
+  expect(plan.spans.filter((span) => span.kind === 'transition').length).toBeGreaterThan(2);
+  expect(
+    resolveProjectFollowingCamera(changed, following, 2.4).focusPoint.x -
+      resolveProjectFollowingCamera(changed, following, 0.6).focusPoint.x
+  ).toBeGreaterThan(30);
+});

@@ -17,11 +17,20 @@ beforeEach(() => {
 });
 afterEach(() => {
   act(() => root.unmount());
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 it.each([2, 4])('uses the retained camera slice after a cut at paused time %s', async (time) => {
+  vi.useFakeTimers();
+  const ticks = new Map<number, FrameRequestCallback>();
+  let tickId = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    ticks.set(++tickId, callback);
+    return tickId;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => ticks.delete(id));
   const state = createQuickEditAdvancedState();
   state.ui.mode = 'advanced';
   state.zoom.enabled = true;
@@ -82,7 +91,14 @@ it.each([2, 4])('uses the retained camera slice after a cut at paused time %s', 
       />
     )
   );
-  await act(async () => Promise.resolve());
+  expect(paint).not.toHaveBeenCalled();
+  act(() => {
+    const current = [...ticks.values()];
+    ticks.clear();
+    current.forEach((callback) => callback(0));
+  });
+  await act(async () => vi.runOnlyPendingTimersAsync());
+  expect(paint).toHaveBeenCalled();
   const expected = evaluateQuickEditCameraAtTime(regions, time, {
     source: { width: 640, height: 360 },
     background: state.background,

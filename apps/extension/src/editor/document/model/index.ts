@@ -130,6 +130,8 @@ export function getEditorObjectTypeLabel(type: EditorObjectType): string {
       return translate('editor.runtime.richShape');
     case 'group':
       return translate('editor.runtime.group');
+    case 'simplify':
+      return translate('editor.tools.simplify');
     case 'blur':
       return translate('editor.runtime.blur');
     case 'arrow':

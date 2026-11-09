@@ -1,3 +1,5 @@
+import { ExportEnhancementError } from '../../../features/video/composition/export-enhancement/enhancer';
+import { translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
@@ -34,8 +36,26 @@ export async function sendProjectExportCancelled(jobId: string): Promise<void> {
   });
 }
 
+function exportFailureMessage(error: unknown): string {
+  if (!(error instanceof ExportEnhancementError))
+    return error instanceof Error ? error.message : String(error);
+  switch (error.code) {
+    case 'unavailable':
+      return translate('videoEditor.exportDialog.detailEnhancementUnavailable');
+    case 'initialization-failed':
+      return translate('videoEditor.exportDialog.detailEnhancementInitFailed');
+    case 'device-lost':
+      return translate('videoEditor.exportDialog.detailEnhancementDeviceLost');
+    case 'busy':
+    case 'disposed':
+    case 'invalid-input':
+    case 'invalid-output':
+      return translate('videoEditor.exportDialog.detailEnhancementFailed');
+  }
+}
+
 export async function sendProjectExportFailed(jobId: string, error: unknown): Promise<void> {
-  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = exportFailureMessage(error);
   logger.error('Failed', error);
   await markProjectExportTerminalBestEffort(jobId, 'failed', errorMessage);
   sendRuntimeMessageBestEffort({

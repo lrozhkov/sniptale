@@ -129,6 +129,18 @@ export function mapProjectTimeToSourcePoint(
   };
 }
 
+/** Keeps exact source-end observations and the captured clip clock used by cursor history. */
+export function getClipSourceObservationTime(
+  clip: SourceTimedPointClip,
+  projectTime: number
+): number | undefined {
+  if (clip.playbackWindow)
+    return mapProjectTimeToSourcePoint([clip], projectTime, clip.id)?.sourceTime;
+  return projectTime === clip.startTime + clip.duration
+    ? clip.sourceStart + clip.sourceDuration
+    : clip.sourceStart + (projectTime - clip.startTime) * (clip.playbackRate ?? 1);
+}
+
 export function mapSourceTimeToProjectPoint(
   clips: readonly SourceTimedPointClip[],
   sourceTime: number,

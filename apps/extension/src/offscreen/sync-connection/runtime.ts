@@ -33,6 +33,7 @@ export function registerOffscreenSyncMessageListener(
     const parsed = parseSyncConnectionRuntimeMessage(authorized.message);
     if (
       !parsed ||
+      parsed.type === MessageType.SYNC_CONNECTION_CREDENTIAL ||
       parsed.type === MessageType.SYNC_PRODUCT_COMMAND ||
       parsed.type === MessageType.SYNC_CONNECTION_ORIGIN_PERMISSION ||
       parsed.type === MessageType.SYNC_WORKSPACE_ORIGIN_PERMISSION

@@ -97,13 +97,25 @@ function isProjectSource(value: unknown): boolean {
   return true;
 }
 
-function isActionEventCollection(value: unknown): boolean {
+function isActionEventCollection(value: unknown, feedback: unknown): boolean {
+  const streamed = new Set(
+    Array.isArray(feedback)
+      ? feedback.flatMap((group: unknown) =>
+          isRecord(group) && group['events'] !== undefined
+            ? [JSON.stringify([group['recordingId'], group['sourceInstanceId']])]
+            : []
+        )
+      : []
+  );
   if (!Array.isArray(value)) return false;
   let authoredCount = 0;
   return value.every((event) => {
     if (!isActionEvent(event) || !isRecord(event) || !isRecord(event['anchor'])) return false;
     // Captured source facts retain the source telemetry collection admission.
-    if (event['anchor']['kind'] === 'recording-source') return true;
+    if (event['anchor']['kind'] === 'recording-source')
+      return !streamed.has(
+        JSON.stringify([event['anchor']['recordingId'], event['anchor']['sourceInstanceId']])
+      );
     authoredCount += 1;
     return authoredCount <= MAX_VIDEO_PROJECT_ITEMS;
   });
@@ -156,16 +168,59 @@ function minimumClipSchemaVersion(value: unknown): number {
   return 2;
 }
 
+/** Minimum schema for motion fields. Shape admission remains with the motion parser. */
+function minimumMotionSchemaVersion(value: unknown): number {
+  if (!isRecord(value)) return 2;
+  if (value['cursorComposition'] !== undefined) return 51;
+  if (requiresExtendedBorderSchema(value['border'])) return 48;
+  if (value['spotlightTarget'] === 'source-scene') return 39;
+  if (
+    (isRecord(value['focusArea']) && value['focusArea']['axes'] !== undefined) ||
+    (isRecord(value['sourceBinding']) &&
+      (value['sourceBinding']['unresolvedLinkTo'] !== undefined ||
+        value['sourceBinding']['dormant'] !== undefined ||
+        value['sourceBinding']['phaseProjection'] !== undefined ||
+        value['sourceBinding']['coordinateSpace'] !== undefined)) ||
+    (isRecord(value['phaseTransitions']) && value['phaseTransitions']['link'] !== undefined)
+  )
+    return 34;
+  if (value['spotlight'] !== undefined || value['spotlightTarget'] !== undefined) return 22;
+  if (value['border'] !== undefined || value['borderTarget'] !== undefined) return 21;
+  if (
+    value['perspective'] !== undefined ||
+    value['depthOfField'] !== undefined ||
+    value['spatialReference'] !== undefined
+  )
+    return 19;
+  if (value['phaseTransitions'] !== undefined) return 18;
+  if (value['motionBlur'] !== undefined) return 17;
+  if (value['cameraFollow'] !== undefined) return 4;
+  return 2;
+}
+
 /** Refuse fields that the declared reader version does not support. */
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 48) &&
+    isBoundedNumber(version, 2, 51) &&
     Number.isInteger(version) &&
-    (version >= 48 ||
-      !Array.isArray(value['motionRegions']) ||
+    (version >= 51 ||
+      !isRecord(value['sceneBackground']) ||
+      value['sceneBackground']['motion'] === undefined) &&
+    (!Array.isArray(value['motionRegions']) ||
       value['motionRegions'].every(
-        (region: unknown) => !isRecord(region) || !requiresExtendedBorderSchema(region['border'])
+        (region: unknown) => version >= minimumMotionSchemaVersion(region)
+      )) &&
+    (version >= 50 ||
+      !Array.isArray(value['actionFeedback']) ||
+      value['actionFeedback'].every(
+        (group: unknown) => !isRecord(group) || group['events'] === undefined
+      )) &&
+    (version >= 49 ||
+      !isRecord(value['cursorTrack']) ||
+      !Array.isArray(value['cursorTrack']['sourceObservations']) ||
+      value['cursorTrack']['sourceObservations'].every(
+        (group: unknown) => !isRecord(group) || group['trajectory'] === undefined
       )) &&
     (version >= 47 ||
       !Array.isArray(value['clips']) ||
@@ -200,11 +255,6 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
       value['compositionJoins'].every(
         (join: unknown) => !isRecord(join) || join['sampling'] === undefined
       )) &&
-    (version >= 39 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) => !isRecord(region) || region['spotlightTarget'] !== 'source-scene'
-      )) &&
     (version >= 37 ||
       !isRecord(value['sceneBackground']) ||
       value['sceneBackground']['zoomBehavior'] === undefined) &&
@@ -214,20 +264,6 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
           (value['sceneBackground']['enabled'] === undefined &&
             value['sceneBackground']['rememberedBlur'] === undefined)))) &&
     (version >= 35 || value['rememberedCanvas'] === undefined) &&
-    (version >= 34 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) =>
-          !isRecord(region) ||
-          ((!isRecord(region['focusArea']) || region['focusArea']['axes'] === undefined) &&
-            (!isRecord(region['sourceBinding']) ||
-              (region['sourceBinding']['unresolvedLinkTo'] === undefined &&
-                region['sourceBinding']['dormant'] === undefined &&
-                region['sourceBinding']['phaseProjection'] === undefined &&
-                region['sourceBinding']['coordinateSpace'] === undefined)) &&
-            (!isRecord(region['phaseTransitions']) ||
-              region['phaseTransitions']['link'] === undefined))
-      )) &&
     (version >= 33 ||
       !isRecord(value['cursorTrack']) ||
       value['cursorTrack']['sourceObservations'] === undefined) &&
@@ -252,47 +288,9 @@ function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
     (version >= 24 || value['sceneEdges'] === undefined) &&
     (version >= 23 || value['commentDocuments'] === undefined) &&
     (version >= 20 || value['watermark'] === undefined) &&
-    (version >= 22 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) =>
-          !isRecord(region) ||
-          (region['spotlight'] === undefined && region['spotlightTarget'] === undefined)
-      )) &&
-    (version >= 21 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) =>
-          !isRecord(region) ||
-          (region['border'] === undefined && region['borderTarget'] === undefined)
-      )) &&
     (version >= 3 ||
       (value['cursorFocusPath'] === undefined && value['actionFeedback'] === undefined)) &&
-    (version >= 4 ||
-      (value['cameraFollowDefaults'] === undefined &&
-        (!Array.isArray(value['motionRegions']) ||
-          value['motionRegions'].every(
-            (region: unknown) => !isRecord(region) || region['cameraFollow'] === undefined
-          )))) &&
-    (version >= 19 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) =>
-          !isRecord(region) ||
-          (region['perspective'] === undefined &&
-            region['depthOfField'] === undefined &&
-            region['spatialReference'] === undefined)
-      )) &&
-    (version >= 18 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) => !isRecord(region) || region['phaseTransitions'] === undefined
-      )) &&
-    (version >= 17 ||
-      !Array.isArray(value['motionRegions']) ||
-      value['motionRegions'].every(
-        (region: unknown) => !isRecord(region) || region['motionBlur'] === undefined
-      )) &&
+    (version >= 4 || value['cameraFollowDefaults'] === undefined) &&
     (version >= 16 ||
       !isRecord(value['sceneBackground']) ||
       value['sceneBackground']['blur'] === undefined) &&
@@ -356,7 +354,7 @@ function isHydratableProjectShape(value: unknown, effectMode: 'native' | 'metada
     parseVideoProjectActionFeedback(value['actionFeedback']) !== null &&
     (value['cursorFocusPath'] === undefined ||
       parseCursorFocusPath(value['cursorFocusPath']) !== null) &&
-    isActionEventCollection(value['actionEvents']) &&
+    isActionEventCollection(value['actionEvents'], value['actionFeedback']) &&
     (value['actionPresentation'] === undefined ||
       isVideoProjectActionPresentation(value['actionPresentation'])) &&
     (value['watermarkSource'] === undefined ||
@@ -421,6 +419,22 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
 }
 
 function hasValidInteractionAnchorReferences(project: VideoProject): boolean {
+  if (
+    project.actionFeedback?.some(
+      (group) =>
+        group.events &&
+        !project.clips.some((clip) => {
+          if (clip.type !== 'VIDEO' || clip.sourceInstanceId !== group.sourceInstanceId)
+            return false;
+          const asset = project.assets.find((entry) => entry.id === clip.assetId);
+          return asset?.source.kind === 'recording'
+            ? asset.source.recordingId === group.recordingId
+            : asset?.source.kind === 'project-asset' &&
+                asset.source.originRecordingId === group.recordingId;
+        })
+    )
+  )
+    return false;
   if (
     project.cursorTrack?.samples.some(
       (sample) => sample.sourceAnchor && sample.timeBasis === 'project'

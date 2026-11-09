@@ -80,8 +80,11 @@ beforeEach(() => {
   mocks.transactionMock.mockImplementation(() => createTransaction());
   mocks.initDBMock.mockResolvedValue(createDb());
   vi.spyOn(Date, 'now').mockReturnValue(500);
+  let identity = 0;
   vi.stubGlobal('crypto', {
-    randomUUID: vi.fn(() => 'generated-id'),
+    randomUUID: vi.fn(
+      () => `00000000-0000-4000-8000-${(++identity).toString(16).padStart(12, '0')}`
+    ),
   });
 });
 
@@ -135,7 +138,7 @@ function expectBasicScreenshotEntry(result: MediaLibraryEntry, blob: Blob): void
       blob,
       createdAt: 500,
       filename: 'capture.jpg',
-      id: 'generated-id',
+      id: '00000000-0000-4000-8000-000000000001',
       imageContentState: 'original',
       kind: 'screenshot',
       mimeType: 'image/jpeg',
@@ -153,7 +156,7 @@ function expectBasicScreenshotEntry(result: MediaLibraryEntry, blob: Blob): void
 function expectBasicScreenshotThumbnail(): void {
   expect(mocks.thumbnailPutMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      aggregateId: 'generated-id',
+      aggregateId: '00000000-0000-4000-8000-000000000001',
       aggregateKind: 'image',
       presentationRevision: 0,
       updatedAt: 500,
@@ -340,20 +343,20 @@ it('recreates an enrolled image above its retained revision fence', async () => 
   expect(result.workspaceRevision).toBe(8);
   expect(fixture.rows.get('asset_residency')!.has(oldCopy.id)).toBe(false);
   expect(fixture.rows.get('sync_capture')!.get(stateKey)).toMatchObject({
-    nativeRevision: 8,
-    generation: 3,
-    basis: ['generated-id'],
+    nativeRevision: 7,
+    generation: 2,
+    basis: ['deleted-image'],
+    deleted: true,
   });
-  const captured = [...fixture.rows.get('sync_capture')!.values()]
-    .map(parseSyncCaptureRecord)
-    .find((row) => row?.kind === 'sync-operation');
-  expect(captured).toMatchObject({
-    phase: 'native',
-    change: { kind: 'image', rows: { presentation: { presentationRevision: 8 } } },
+  const records = [...fixture.rows.get('sync_capture')!.values()].map(parseSyncCaptureRecord);
+  expect(records.filter((row) => row?.kind === 'sync-operation')).toHaveLength(0);
+  expect(records.find((row) => row?.kind === 'pending-checkpoint')).toMatchObject({
+    rootId: mediaId,
+    dueAt: 300500,
   });
 });
 
-it('commits a temporary screenshot above the sync metadata limit and refuses its promotion atomically', async () => {
+it('preserves a promoted temporary screenshot when its deferred checkpoint exceeds the metadata limit', async () => {
   const { createReviewWorkspaceStoreFixture } =
     await import('../review-workspaces/store.test-support');
   const { MAX_CAPTURE_METADATA_BYTES } = await import('../sync-capture/contracts');
@@ -407,7 +410,43 @@ it('commits a temporary screenshot above the sync metadata limit and refuses its
     lifecycle: { storageClass: 'temporary' },
   });
   expect(fixture.rows.get('sync_capture')!.size).toBe(1);
-  const before = structuredClone(fixture.rows);
-  await expect(promoteImageAggregate(saved.id, 0)).rejects.toThrow('snapshot');
-  expect(fixture.rows).toEqual(before);
+  await promoteImageAggregate(saved.id, 0);
+  expect(fixture.rows.get('media_library')!.get(saved.id)).toMatchObject({
+    sourceTitle,
+    lifecycle: { storageClass: 'library' },
+  });
+  const beforeCheckpoint = structuredClone(fixture.rows);
+  const { runWithIndexedDbMutation } = await import('../infrastructure/indexed-db/mutation');
+  const { abortIndexedDbMutation } = await import('../infrastructure/indexed-db/transaction');
+  const { readCheckpointInTransaction } = await import('../sync-capture/checkpoints');
+  const { captureRootCheckpointInTransaction } = await import('../sync-capture/capture');
+  await expect(
+    runWithIndexedDbMutation(async (db) => {
+      const tx = db.transaction(
+        [
+          'media_library',
+          'image_workspaces',
+          'aggregate_presentations',
+          'asset_refs',
+          'asset_owners',
+          'asset_residency',
+          'sync_capture',
+        ],
+        'readwrite'
+      );
+      try {
+        const pending = await readCheckpointInTransaction(
+          tx,
+          { spaceId: 'space', profileCreatedAt: 1, connectionGeneration: 1 },
+          { rootKind: 'media', rootId: saved.id }
+        );
+        if (!pending) throw new Error('Expected the promoted image checkpoint.');
+        await captureRootCheckpointInTransaction(tx, pending, { force: true });
+        await tx.done;
+      } catch (error) {
+        return abortIndexedDbMutation(tx, error);
+      }
+    })
+  ).rejects.toThrow('snapshot');
+  expect(fixture.rows).toEqual(beforeCheckpoint);
 });

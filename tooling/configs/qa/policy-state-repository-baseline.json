@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 325,
-  "findingDigest": "sha256:15763fab163fd21a31b92dcf176877abd4ce963b25fe998a5ea014dd4b421313",
+  "findingCount": 336,
+  "findingDigest": "sha256:61a25a53189dd1fe79df0bbd553544046347bb7eb20e77a8859bc5f2b7d14ceb",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -199,6 +199,83 @@
       "reason": "The maps cache pure color coordinates and family classifications by HEX. They do not grant commands, permissions, or persistence access. Cache loss changes calculation cost only.",
       "removalCondition": "Remove when this exact syntax signal disappears or this file acquires policy-state authority.",
       "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.native-history-pull-result-constructor",
+      "owner": "native-recording-history-ingestion",
+      "reason": "The pending function constructs a disposable result. It stores no queue. Injected intent stores and the live controller lease retain mutation admission.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.indexed-row-store-membership",
+      "owner": "indexed-db-projection-adapter",
+      "reason": "Private readonly sets identify stores for derived projections. They grant no capability. Source and projection writes retain one native transaction and abort together.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.sync-queue-index-definitions",
+      "owner": "indexed-db-migrations",
+      "reason": "The triggering index-name strings and static index definitions contain no queue state. The native versionchange transaction owns index population and rollback.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.native-history-body-hash-memo",
+      "owner": "native-recording-history-integrity",
+      "reason": "A two-entry integrity memo covers immutable object bytes. Each call rereads the file and checks size and version. The native owner rechecks root identity around verification. Discarding the memo forces full hashing.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority. Reassess if published OPFS objects become mutable or the memo gains root or publication admission authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.secret-protection-storage-key-literal",
+      "owner": "secret-protection-storage",
+      "reason": "The triggering unlock-request storage key is a fixed string. The existing request store serializes actual mutations. The registered ai-secret-unlock-requests owner retains background unlock authority.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.cursor-observation-queue-budget",
+      "owner": "cursor-observation-contract",
+      "reason": "The triggering declaration is the numeric input capacity512. Content owns the actual queue. Pure packet validation grants no recording authority, sender binding or lease.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.event-observation-queue-budget",
+      "owner": "event-observation-contract",
+      "reason": "The triggering declaration is the numeric input capacity512. Content owns the actual queue. Packet shape, clock and byte checks grant no native recording or sender authority.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.recording-event-json-field-membership",
+      "owner": "recording-event-json-decoder",
+      "reason": "The private scrollFields set contains five fixed numeric field names. The decoder only queries membership. Duplicate-key scratch sets are invocation-local and grant no session or mutation authority.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.effect-control-group-key-membership",
+      "owner": "effect-v1-contract-validation",
+      "reason": "The private GROUP_KEYS set supplies fixed field membership to rejectUnknownKeys. Parent maps and cycle sets are invocation-local validation data. They create no runtime authority or stored group state.",
+      "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.export-enhancement.clark-x2.gpu-probe",
+      "owner": "export-enhancement:clark-x2",
+      "reason": "This exact capability-path signal names a GPU availability probe and its advisory cache. Source review found no authorization, identity, permission, or privileged admission state.",
+      "removalCondition": "Remove if this signal disappears or the owner gains authorization, identity, permission, privileged admission, persistence authority, or cross-runtime authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.editor.controller.scene-mutation-queue",
+      "owner": "apps/extension/src/editor/controller/public-api/scene-actions/scene-mutation-queue.ts",
+      "reason": "The WeakMap orders in-document frame and browser-header callbacks per canvas. It releases settled tails and stores no permission, token, identity, durable state, or cross-runtime admission decision. This matches the existing history transition-queue classification.",
+      "removalCondition": "Remove when this exact signal disappears or the queue acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
     }
   ],
   "findings": [
@@ -309,6 +386,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/background/capture/native-app/history-pull.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.native-history-pull-result-constructor"
     },
     {
       "file": "apps/extension/src/background/capture/page-package/job/recovery.ts",
@@ -665,18 +748,6 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "file": "apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.parser.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
-      "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    },
-    {
-      "file": "apps/extension/src/composition/persistence/ai-settings/secret-unlock-requests.store.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
-      "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    },
-    {
       "file": "apps/extension/src/composition/persistence/annotation-template-tags/owner.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
@@ -797,6 +868,18 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/indexed-row-projections.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.indexed-row-store-membership"
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/sync-queue-index-migration.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.sync-queue-index-definitions"
+    },
+    {
       "file": "apps/extension/src/composition/persistence/infrastructure/mutation-barrier.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
@@ -857,6 +940,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/composition/persistence/recordings/native-history/video-body.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.native-history-body-hash-memo"
+    },
+    {
       "file": "apps/extension/src/composition/persistence/recordings/staging/contracts.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
@@ -877,6 +966,24 @@
     {
       "file": "apps/extension/src/composition/persistence/scenario/store/project-records/store.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/secret-protection/constants.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.secret-protection-storage-key-literal"
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.parser.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/secret-protection/secret-unlock-requests.store.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
@@ -1277,6 +1384,18 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/contracts/video/cursor-observations.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.cursor-observation-queue-budget"
+    },
+    {
+      "file": "apps/extension/src/contracts/video/event-observations.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.event-observation-queue-budget"
+    },
+    {
       "file": "apps/extension/src/editor/controller/document/lifecycle/open/image/favicon.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1317,6 +1436,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/public-api/scene-actions/scene-mutation-queue.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.editor.controller.scene-mutation-queue"
     },
     {
       "file": "apps/extension/src/editor/document/file-actions/import-session.ts",
@@ -1535,6 +1660,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: capability-path.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.export-enhancement.clark-x2.gpu-probe"
+    },
+    {
       "file": "apps/extension/src/features/video/project/annotation-engine/legacy-constants.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1569,6 +1700,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: capability-path.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/features/video/project/recording-events/json.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.recording-event-json-field-membership"
     },
     {
       "file": "apps/extension/src/features/viewport-presets/parser.ts",
@@ -2073,6 +2210,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "packages/runtime-contracts/src/effect-v1/validation/control-groups.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.effect-control-group-key-membership"
     },
     {
       "file": "packages/runtime-contracts/src/effect-v1/validation/control-presentation.ts",

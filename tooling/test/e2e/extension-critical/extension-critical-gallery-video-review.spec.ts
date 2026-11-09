@@ -1,4 +1,5 @@
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import {
   addReviewFocus,
   seedReviewVideo,
@@ -19,6 +20,8 @@ import { betaV1Fixture } from '../../../../apps/extension/src/composition/persis
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+
+enableGpuPreviewProof();
 
 async function timelineGesture(page: Page, start: number, end?: number) {
   const plane = page.locator('[data-ui="gallery.videoReview.timePlane"]');

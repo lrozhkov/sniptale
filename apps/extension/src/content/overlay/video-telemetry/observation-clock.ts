@@ -1,3 +1,4 @@
+import type { CursorSourceMoment } from './cursor-source';
 import type { RecordingFrameClockAnchor } from '../../../contracts/video/recording-frame-clock';
 import type {
   RecordingObservationClock,
@@ -8,6 +9,7 @@ import type {
 export function createObservationClock(timeOriginMs = performance.timeOrigin) {
   const documentId = crypto.randomUUID();
   const clock: RecordingObservationClock = { version: 1, domain: 'observation', segments: [] };
+  const revisions = new Map<string, number>();
   return {
     get id(): string {
       return clock.segments.at(-1)?.id ?? documentId;
@@ -34,7 +36,30 @@ export function createObservationClock(timeOriginMs = performance.timeOrigin) {
           ? {}
           : { maximumUncertaintyMs: anchor.maximumUncertaintyMs }),
       };
+      revisions.set(segment.id, anchor.revision);
       if (anchor.phase === 'paused') segment.mediaEndSeconds = anchor.mediaTimeSeconds;
+    },
+    /** Queued input keeps its original phase when calibration or Resume arrives later. */
+    projectAt(segmentId: string, observationTime: number) {
+      const segment = clock.segments.find((candidate) => candidate.id === segmentId);
+      if (!segment) throw new Error('Unknown observation clock phase');
+      const start = segment.mapping
+        ? segment.mapping.mediaTimeSeconds +
+          (timeOriginMs + segment.startedAtTimestampMs - segment.mapping.captureEpochMs) / 1000
+        : segment.mediaStartEstimateSeconds;
+      const seconds = Math.max(0, start + observationTime - segment.observationStartSeconds);
+      return {
+        activeTimeUs: Math.round(Math.min(seconds, segment.mediaEndSeconds ?? seconds) * 1_000_000),
+        clockRevision: revisions.get(segment.id) ?? 0,
+        clock: {
+          source: 'dom-event-time' as const,
+          timestampQuantumUs: null,
+          resolutionBoundUs: null,
+          mappingUncertaintyUs: segment.mapping
+            ? Math.ceil(segment.mapping.uncertaintyMs * 1000)
+            : null,
+        },
+      };
     },
     estimateAt(observationTime: number): number {
       const segment = clock.segments.at(-1);
@@ -62,6 +87,43 @@ export function createObservationClock(timeOriginMs = performance.timeOrigin) {
           mapping && mapping.uncertaintyMs <= (mapping.maximumUncertaintyMs ?? 1000 / 120)
       );
       return { mode: bounded ? 'bounded' : 'approximate', accuracyMs };
+    },
+  };
+}
+
+interface TelemetryClockState {
+  isPaused: boolean;
+  segmentStartedAtTimestamp: number;
+  accumulatedDurationMs: number;
+  observationClock: { id: string };
+}
+
+/** Source time omits paused intervals and retains the observed viewport geometry. */
+export function getTelemetryElapsedSeconds(
+  state: TelemetryClockState,
+  timestampMs: number
+): number {
+  const runningDurationMs = state.isPaused ? 0 : timestampMs - state.segmentStartedAtTimestamp;
+  return Math.max(0, (state.accumulatedDurationMs + runningDurationMs) / 1000);
+}
+
+/** Events and derived signals use the same DOM source moment. */
+export function createTelemetrySourceMoment(
+  state: TelemetryClockState,
+  timestampMs: number,
+  sourceClockId = state.observationClock.id,
+  observationTimeSeconds = getTelemetryElapsedSeconds(state, timestampMs)
+): CursorSourceMoment {
+  return {
+    sourceClockId,
+    observationTimeSeconds,
+    viewport: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      visualViewportScale: window.visualViewport?.scale ?? 1,
+      visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
+      visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
     },
   };
 }

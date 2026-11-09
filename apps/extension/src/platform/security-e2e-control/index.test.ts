@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createRuntimePortFixture } from '../../../../../tooling/test/support/chrome-runtime-port';
-import type { SecurityE2ESyncWorkspaceSelection } from '.';
+import type { SecurityE2ESyncWorkspaceSelection, SecurityE2ESyncWorkspaceEnrollment } from '.';
 
 const { connectListener } = vi.hoisted(() => ({
   connectListener: { current: null as ((port: chrome.runtime.Port) => void) | null },
@@ -139,7 +139,7 @@ function syncRuntime() {
       executorId,
       executorRevision: 2,
     })),
-    enrollWorkspace: vi.fn(async (_selection: SecurityE2ESyncWorkspaceSelection) => ({
+    enrollWorkspace: vi.fn(async (_selection: SecurityE2ESyncWorkspaceEnrollment) => ({
       version: 1 as const,
       kind: 'sync-connection' as const,
       key: 'connection' as const,
@@ -455,13 +455,52 @@ it.each(['allocation', 'join'] as const)(
     const payload = {
       source: { ...workspaceSelection.source, kind },
       authentication: workspaceSelection.authentication,
+      storagePolicy: { version: 1, mode: 'on-demand' },
     };
     port.onMessage.emit({ type: 'sync-workspace-enroll', requestId: syncRequestId, payload });
     const response = await port.answer;
     expect(runtime.enrollWorkspace).toHaveBeenCalledExactlyOnceWith(payload);
     expect(runtime.enrollWorkspace.mock.calls[0]?.[0].source).not.toBe(payload.source);
+    expect(runtime.enrollWorkspace.mock.calls[0]?.[0].storagePolicy).not.toBe(
+      payload.storagePolicy
+    );
     expect(JSON.stringify(response)).not.toContain('synthetic-secret');
     expect(runtime.start).not.toHaveBeenCalled();
     expect(runtime.startWorkspace).not.toHaveBeenCalled();
   }
 );
+
+it.each([
+  undefined,
+  null,
+  {},
+  { version: 1, mode: 'full-download' },
+  { version: 1, mode: 'on-demand', extra: true },
+])('refuses enrollment without a valid storage policy %#', async (storagePolicy) => {
+  const control = await import('.');
+  const runtime = syncRuntime();
+  control.registerSecurityE2EControl(runtime);
+  const port = syncPort();
+  const payload =
+    storagePolicy === undefined ? workspaceSelection : { ...workspaceSelection, storagePolicy };
+  port.onMessage.emit({ type: 'sync-workspace-enroll', requestId: syncRequestId, payload });
+  await expect(port.answer).resolves.toEqual({ ok: false, requestId: syncRequestId, sync: null });
+  expect(runtime.enrollWorkspace).not.toHaveBeenCalled();
+});
+
+it('does not accept enrollment policy on a workspace start command', async () => {
+  const control = await import('.');
+  const runtime = syncRuntime();
+  control.registerSecurityE2EControl(runtime);
+  const port = syncPort();
+  port.onMessage.emit({
+    type: 'sync-workspace-start',
+    requestId: syncRequestId,
+    payload: {
+      ...workspaceSelection,
+      storagePolicy: { version: 1, mode: 'on-demand' },
+    },
+  });
+  await expect(port.answer).resolves.toEqual({ ok: false, requestId: syncRequestId, sync: null });
+  expect(runtime.startWorkspace).not.toHaveBeenCalled();
+});

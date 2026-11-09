@@ -1,3 +1,9 @@
+import { EffectControl } from './control-field';
+import { EffectControlTree } from '../../../../../ui/effect-control-presentation/groups';
+import {
+  effectControlIcons,
+  effectControlRootIcon,
+} from '../../../../../ui/effect-control-presentation/icons';
 import { InspectorActionButton } from '../shared/actions';
 import {
   useVideoEditorEffectEditingPort,
@@ -8,14 +14,14 @@ import {
   planEffectSourceRangeRestore,
 } from '../../../../project/state/effects.effect-instance';
 import type { VideoProjectEffectClip } from '../../../../../features/video/project/types';
-import { useEffectPresetEditing, useEffectPresetMatchingControls } from './editing';
+import { useEffectPresetMatchingControls } from './editing';
 import { readEffectPresentationDocument } from '../../../../../features/video/project/effect-bundle/presentation-document';
 import type { InspectorGroupDefinition } from '../grouped-inspector/types';
 import { EffectVisualPresets } from './presets';
 import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
 import { InspectorDetails } from '../shared/details';
 import { useEffectInstanceExport } from '../../../../runtime/effect-export';
-import { getEffectControlSections, getEffectSequenceOptions } from './presentation';
+import { getEffectControlSections } from './presentation';
 import {
   resolveEffectLocaleText,
   type ControlDefinition,
@@ -26,11 +32,9 @@ import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import type { VideoProjectEffectTarget } from '../../../../../features/video/project/effect-instance/types';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import { getCurrentLocale, translate } from '../../../../../platform/i18n';
-import { useInspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
-import { TextField } from '../../../../../ui/compact-inspector-controls';
 import type { VideoProjectEffectInstancePatch } from '../../../../contracts/commands/patches';
 import { NumberInput } from '../inputs/number';
-import { ColorField, ToggleField } from '../shared/controls';
+import { ToggleField } from '../shared/controls';
 import { OptionButtonsField } from '../shared/option-buttons';
 
 const EFFECT_ACTION_CLASS_NAME = [
@@ -174,7 +178,14 @@ export function createEffectInstanceGroups(
             {content}
           </>
         );
-      else groups.push({ id, semantic: section.semantic, label: section.label, content });
+      else
+        groups.push({
+          id,
+          semantic: section.semantic,
+          label: section.label,
+          icon: effectControlRootIcon(section.id),
+          content,
+        });
     }
   }
   const order = [
@@ -354,12 +365,32 @@ function EffectInstanceControls(
     <EffectControl
       control={control}
       controls={props.instance.controls}
-      documentId={document.id}
       disabled={props.disabled ?? false}
       instanceId={props.instance.id}
       key={control.id}
       onUpdate={props.onUpdateEffectInstance}
       value={props.instance.controls[control.id] ?? control.defaultValue}
+    />
+  );
+  const renderSection = (parentId: string, controls: readonly ControlDefinition[]) => (
+    <EffectControlTree
+      document={document}
+      parentId={parentId}
+      controls={controls}
+      renderControl={renderControl}
+      renderGroup={(group, children) => (
+        // The host owns Move and Sparkles; nested groups retain their labels.
+        <InspectorDetails
+          preferenceId={`effect-group:${document.id}:${group.id}`}
+          label={readLocaleText(group.label)}
+          initiallyOpen={!group.collapsed}
+          {...(group.icon && group.icon !== 'move' && group.icon !== 'sparkles'
+            ? { icon: effectControlIcons[group.icon] }
+            : {})}
+        >
+          {children}
+        </InspectorDetails>
+      )}
     />
   );
   return (
@@ -375,7 +406,7 @@ function EffectInstanceControls(
               key={index}
               label={section.label}
             >
-              {section.controls.map(renderControl)}
+              {renderSection(section.id, section.controls)}
             </InspectorDetails>
           ) : (
             <div key={index} className="space-y-1">
@@ -384,7 +415,7 @@ function EffectInstanceControls(
                   {section.label}
                 </p>
               ) : null}
-              {section.controls.map(renderControl)}
+              {renderSection(section.id, section.controls)}
             </div>
           )
         )}
@@ -485,76 +516,6 @@ function EffectInstanceActions(props: EffectInstanceCardProps): React.JSX.Elemen
         </span>
       </div>
     </>
-  );
-}
-
-function EffectControl(props: {
-  documentId: string;
-  control: ControlDefinition;
-  controls: Readonly<Record<string, number | string>>;
-  disabled: boolean;
-  instanceId: string;
-  onUpdate(instanceId: string, patch: VideoProjectEffectInstancePatch): void;
-  value: number | string;
-}): React.JSX.Element {
-  const editing = useEffectPresetEditing(props.instanceId, props.controls);
-  const inspector = useInspectorLayout();
-  const label = readLocaleText(props.control.label) || props.control.id;
-  const update = (value: number | string) =>
-    props.onUpdate(props.instanceId, { controls: { [props.control.id]: value } });
-  const sequenceOptions = getEffectSequenceOptions(props.documentId, props.control);
-  if (sequenceOptions)
-    return (
-      <OptionButtonsField
-        label={label}
-        value={String(props.value)}
-        options={sequenceOptions}
-        disabled={props.disabled}
-        onChange={(value) => update(props.control.kind === 'number' ? Number(value) : value)}
-      />
-    );
-  if (props.control.kind === 'number') {
-    return (
-      <NumberInput
-        disabled={props.disabled ?? false}
-        label={label}
-        value={typeof props.value === 'number' ? props.value : props.control.defaultValue}
-        onChange={update}
-        onPreview={editing.begin}
-        onCommit={editing.finish}
-        {...(props.control.min === undefined ? {} : { min: props.control.min })}
-        {...(props.control.max === undefined ? {} : { max: props.control.max })}
-        {...(props.control.step === undefined ? {} : { step: props.control.step })}
-      />
-    );
-  }
-  if (props.control.kind === 'color') {
-    return (
-      <ColorField
-        className="border-transparent! bg-transparent! px-0! py-0!"
-        disabled={props.disabled ?? false}
-        label={label}
-        value={typeof props.value === 'string' ? props.value : props.control.defaultValue}
-        onChange={update}
-        onRememberRecentColor={undefined}
-        recentColors={undefined}
-      />
-    );
-  }
-  const value = typeof props.value === 'string' ? props.value : props.control.defaultValue;
-  return (
-    <TextField
-      className={
-        inspector
-          ? undefined
-          : '!min-h-9 !bg-transparent !px-0 !py-0 data-[editing=false]:!border-transparent'
-      }
-      defaultValue={value}
-      disabled={props.disabled ?? false}
-      key={`${props.instanceId}:${props.control.id}:${value}`}
-      label={label}
-      onValueCommit={update}
-    />
   );
 }
 

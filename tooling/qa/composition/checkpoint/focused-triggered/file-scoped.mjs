@@ -5,7 +5,7 @@ import {
   collectFocusedSecurityDataFiles,
   collectFocusedSharedStyleFiles,
 } from './helpers.mjs';
-import { runI18nCheck } from '../../../guards/product-contracts/verify-i18n.mjs';
+import { runI18nReport } from '../../../guards/product-contracts/verify-i18n.mjs';
 import { runSecretStorageCheck } from '../../../guards/security/verify-secret-storage.mjs';
 import { runSensitiveRetentionCheck } from '../../../guards/security/verify-sensitive-retention.mjs';
 import { runSharedStyleOwnershipCheck } from '../../../guards/product-contracts/verify-shared-style-ownership.mjs';
@@ -53,13 +53,13 @@ function runI18nTriggeredCheck(i18nFiles) {
   }
 
   return [
-    timeSyncStep(() =>
-      createStringFailureStep(
-        'i18n',
-        'i18n guardrail violations found:',
-        runI18nCheck({ files: i18nFiles })
-      )
-    ),
+    timeSyncStep(() => {
+      const { failures, usage } = runI18nReport({ files: i18nFiles });
+      return {
+        ...createStringFailureStep('i18n', 'i18n guardrail violations found:', failures),
+        detail: `usage advisory: scoped scan; ${usage.unresolved.length} unresolved dynamic accesses`,
+      };
+    }),
   ];
 }
 

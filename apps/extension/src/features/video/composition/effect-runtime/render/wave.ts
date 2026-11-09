@@ -1,3 +1,4 @@
+import { applyEffectRuntimeRasterDimensions } from '../frame/plan';
 import { shouldLockVisualLayerToViewport } from '../../motion/layer-camera';
 import { drawSceneBackground, getProjectSceneBackground } from '../../../project/scene/background';
 import { resolveSceneBackgroundAudioEnvelope } from '../../../project/scene/background-audio';
@@ -12,8 +13,11 @@ import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effe
 import type { VideoCompositionMediaSource } from '../../draw/media-source';
 import type { VideoCompositionFrame, VideoCompositionVisualPass } from '../../types';
 import { renderEffectRuntimeFramePlans } from '../runtime/driver';
-import { createEffectRuntimeInputMaterializer } from '../frame/inputs';
-import { disposeEffectRuntimeComposition } from './rendered';
+import {
+  type EffectRuntimeInputComposition,
+  createEffectRuntimeInputMaterializer,
+} from '../frame/inputs';
+import { prepareEffectRuntimeCompositionSamples } from './composition-samples';
 import { createEffectRuntimeCompositionResourceLedger } from '../runtime/resource-limits';
 import type {
   EffectRuntimeFramePlan,
@@ -25,6 +29,17 @@ import type {
 const EMPTY_EFFECT_RUNTIME_FRAMES: EffectRuntimeRenderedFrameMap = new Map();
 
 export async function renderEffectRuntimeComposition(args: {
+  prepareSourcePass?: (
+    frame: VideoCompositionFrame,
+    time: number
+  ) => Promise<{
+    media: ReadonlyMap<string, VideoCompositionMediaSource>;
+    renderDimensions(plan: EffectRuntimeFramePlan): { width: number; height: number };
+    effectMedia?(plan: EffectRuntimeFramePlan): ReadonlyMap<string, VideoCompositionMediaSource>;
+  }>;
+  composeInput?: (
+    request: EffectRuntimeInputComposition & { frame: VideoCompositionFrame; time: number }
+  ) => Promise<ImageBitmap>;
   project?: VideoProject;
   clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>;
   executor: EffectRuntimeSandboxExecutor;
@@ -38,71 +53,22 @@ export async function renderEffectRuntimeComposition(args: {
   streamVisualPasses?: boolean;
   visualPasses: readonly VideoCompositionVisualPass[];
 }): Promise<EffectRuntimeRenderedComposition> {
-  const renderedByTime = new Map<number, EffectRuntimeRenderedFrameMap>();
   const resourceLedger = createEffectRuntimeCompositionResourceLedger();
-  let disposed = false;
-  let preparing = false;
-  let sampledTime: number | undefined;
-  const releaseSampled = () => {
-    if (sampledTime === undefined) return;
-    const frames = renderedByTime.get(sampledTime);
-    if (frames) for (const frame of frames.values()) closeEffectRuntimeBitmap(frame.bitmap);
-    renderedByTime.delete(sampledTime);
-    sampledTime = undefined;
-  };
-  const dispose = () => {
-    if (disposed) return;
-    disposed = true;
-    disposeEffectRuntimeComposition({
-      framesByTime: renderedByTime,
-      overlayFrames: EMPTY_EFFECT_RUNTIME_FRAMES,
-    });
-    renderedByTime.clear();
-  };
-  const prepareVisualPass = async (time: number) => {
-    if (disposed) throw new Error('EFFECT_RUNTIME_COMPOSITION_DISPOSED');
-    if (preparing) throw new Error('EFFECT_RUNTIME_COMPOSITION_BUSY');
-    if (time === args.overlayTime) {
-      releaseSampled();
-      return;
-    }
-    if (time === sampledTime) return;
-    const pass = args.visualPasses.find((pass) => pass.time === time);
-    if (!pass) throw new Error('EFFECT_RUNTIME_VISUAL_PASS_MISSING');
-    releaseSampled();
-    preparing = true;
-    try {
-      const frames = await renderFrame(pass.frame, time, true);
-      if (disposed) {
-        for (const frame of frames.values()) closeEffectRuntimeBitmap(frame.bitmap);
-        throw new Error('EFFECT_RUNTIME_COMPOSITION_DISPOSED');
-      }
-      renderedByTime.set(time, frames);
-      sampledTime = time;
-    } catch (error) {
-      dispose();
-      throw error;
-    } finally {
-      preparing = false;
-    }
-  };
-  try {
-    const overlayFrames = await renderFrame(args.overlayFrame, args.overlayTime);
-    renderedByTime.set(args.overlayTime, overlayFrames);
-    if (args.streamVisualPasses)
-      return { framesByTime: renderedByTime, overlayFrames, prepareVisualPass, dispose };
-    for (const pass of args.visualPasses) {
-      if (renderedByTime.has(pass.time)) continue;
-      renderedByTime.set(pass.time, await renderFrame(pass.frame, pass.time, true));
-    }
-    return { framesByTime: renderedByTime, overlayFrames };
-  } catch (error) {
-    disposeEffectRuntimeComposition({
-      framesByTime: renderedByTime,
-      overlayFrames: EMPTY_EFFECT_RUNTIME_FRAMES,
-    });
-    throw error;
-  }
+  return prepareEffectRuntimeCompositionSamples({
+    overlayTime: args.overlayTime,
+    sampleTimes: args.visualPasses.map((pass) => pass.time),
+    stream: args.streamVisualPasses ?? false,
+    render: (time, sampled) => {
+      const frame = sampled
+        ? args.visualPasses.find((pass) => pass.time === time)?.frame
+        : args.overlayFrame;
+      if (!frame) throw new Error('EFFECT_RUNTIME_VISUAL_PASS_MISSING');
+      return renderFrame(frame, time, sampled);
+    },
+    release: (frames) => {
+      for (const frame of frames.values()) closeEffectRuntimeBitmap(frame.bitmap);
+    },
+  });
 
   async function renderFrame(
     frame: VideoCompositionFrame,
@@ -118,14 +84,26 @@ export async function renderEffectRuntimeComposition(args: {
     }
     if (frame.sceneSpotlights?.some((state) => state.afterClipId) && !args.project)
       throw new Error('EFFECT_RUNTIME_SOURCE_SCENE_CONTEXT_MISSING');
+    const sourcePass = await args.prepareSourcePass?.(frame, time);
+    args.signal?.throwIfAborted();
     const resourceScope = resourceLedger.createFrameScope();
     const plans = orderBackdropTrackPlans(
-      selected.map((plan) => scaleEffectRuntimeFramePlan(plan, args.rasterScale)),
+      selected.map((plan) =>
+        sourcePass
+          ? applyEffectRuntimeRasterDimensions(plan, sourcePass.renderDimensions(plan))
+          : scaleEffectRuntimeFramePlan(plan, args.rasterScale)
+      ),
       frame
     );
     const frames = await renderEffectRuntimeFramePlans({
       executor: args.executor,
       inputMaterializer: createEffectRuntimeInputMaterializer({
+        ...(args.composeInput
+          ? {
+              composeInput: (request: EffectRuntimeInputComposition) =>
+                args.composeInput!({ ...request, frame, time }),
+            }
+          : {}),
         camera: frame.camera,
         ...(args.project ? { scene: { project: args.project, frame } } : {}),
         drawBackground: (context, dimensions) => {
@@ -143,7 +121,10 @@ export async function renderEffectRuntimeComposition(args: {
           });
         },
         ...(args.spatialRenderer ? { spatialRenderer: args.spatialRenderer } : {}),
-        clipMediaElements: args.clipMediaElements,
+        clipMediaElements: sourcePass?.media ?? args.clipMediaElements,
+        ...(sourcePass?.effectMedia
+          ? { mediaForPlan: (plan) => sourcePass.effectMedia!(plan) }
+          : {}),
         imageBank: args.imageBank,
         ...(args.ownerDocument ? { ownerDocument: args.ownerDocument } : {}),
         visualLayers: frame.effectInputLayers,
@@ -193,7 +174,7 @@ function releaseConsumedEffectOutputs(
 }
 
 /** Locked standalone layers draw once from the overlay; sampled dependencies still need their own clock. */
-function selectExposurePlans(
+export function selectExposurePlans(
   frame: VideoCompositionFrame,
   overlay: VideoCompositionFrame
 ): readonly EffectRuntimeFramePlan[] {
@@ -250,7 +231,7 @@ function orderBackdropTrackPlans(plans: EffectRuntimeFramePlan[], frame: VideoCo
   return plans.map((plan) => (plan.target.kind === 'track' ? tracks[nextTrack++]! : plan));
 }
 
-function scaleEffectRuntimeFramePlan(
+export function scaleEffectRuntimeFramePlan(
   plan: EffectRuntimeFramePlan,
   rasterScale: number | undefined
 ): EffectRuntimeFramePlan {

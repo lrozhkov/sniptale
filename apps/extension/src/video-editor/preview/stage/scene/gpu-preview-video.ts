@@ -1,0 +1,554 @@
+import { resolveVideoMediaShadowParams } from '../../../../features/video/composition/canvas/media-shadow';
+import type { GpuPreviewLayer } from '../../../../features/video/composition/canvas/gpu-preview';
+import type {
+  VideoCompositionFrame,
+  VideoCompositionVisualLayer,
+} from '../../../../features/video/composition/types';
+import {
+  isVideoCompositionFrameSource,
+  type VideoCompositionMediaSource,
+} from '../../../../features/video/composition/draw/media-source';
+
+import { drawCompositionVisualLayer } from '../../../../features/video/composition/draw';
+
+import {
+  invertQuickEditProjection,
+  multiplyQuickEditProjections,
+  projectQuickEditPoint,
+  type QuickEditHomography,
+} from '../../../../features/video/composition/motion/spatial-geometry';
+import { type SceneSpotlightLayer } from '../../../../features/video/composition/draw/spotlight';
+import { sampleCompositionSpotlightLayer } from '../../../../features/video/composition/draw/project-spotlight';
+
+import {
+  getFittedMediaContentFrame,
+  getFittedMediaOriginalWindowFrame,
+  getFittedMediaWindowFrame,
+  drawFittedMediaLayer,
+} from '../../../../features/video/composition/draw/fitted-media';
+import {
+  resolveVideoWindowMedia,
+  resolveVideoSourceActionPaintBounds,
+} from '../../../../features/video/composition/draw/video';
+import {
+  drawPointerFeedbackLensShadow,
+  pointerFeedbackLensPaintBounds,
+} from '../../../../features/video/composition/draw/pointer-feedback';
+import {
+  DEFAULT_CAMERA_APPEARANCE,
+  cameraWindowFrame,
+} from '../../../../features/video/project/camera/appearance';
+import { traceCameraShape } from '../../../../features/video/composition/draw/media-shadow';
+import {
+  roundedWindowRadius,
+  resolveDecoratedMediaFrame,
+} from '../../../../features/video/project/window-geometry';
+import { VideoMediaFitMode } from '../../../../features/video/project/types';
+
+type Layer = VideoCompositionVisualLayer;
+type VideoLayer = Extract<Layer, { kind: 'video' }>;
+const IDENTITY: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+type Raster = (
+  paint: (context: CanvasRenderingContext2D) => void,
+  padded?: boolean,
+  bounds?: GpuPreviewLayer['rect']
+) => GpuPreviewLayer;
+type WindowMedia = ReturnType<typeof resolveVideoWindowMedia> & { frame: GpuPreviewLayer['rect'] };
+
+/** Borrows immutable source-plane artwork until the requesting GPU plan releases its lease. */
+export type NativeGpuSourceMaterial = (
+  ownerDocument: Document,
+  bounds: GpuPreviewLayer['rect'],
+  key: string,
+  paint: (context: CanvasRenderingContext2D) => void
+) => { layer: GpuPreviewLayer; release(): void };
+
+/** Immutable source artwork is shared only by derived draws of the same resolved layer. */
+interface NativeGpuVideoSourceBody {
+  layers: readonly GpuPreviewLayer[];
+  snapshot: GpuPreviewLayer;
+}
+
+/** Retain the header's own source alpha, with one logical boundary shared by the video. */
+export function nativeGpuWindowHeader(media: WindowMedia, raster: Raster, inverse = IDENTITY) {
+  const image = media.windowHeaderImage;
+  if (!image) return null;
+  const plane = resolveDecoratedMediaFrame({
+    ...media,
+    contentWidth: media.sourceWidth * (media.sourceCrop?.width ?? 1),
+    contentHeight: media.sourceHeight * (media.sourceCrop?.height ?? 1),
+    fit:
+      media.fitMode === VideoMediaFitMode.CONTAIN
+        ? 'contain'
+        : media.fitMode === VideoMediaFitMode.COVER
+          ? 'cover'
+          : 'stretch',
+  });
+  const source = { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
+  const pixels = raster(
+    (context) => context.drawImage(image, 0, 0, source.width, source.height),
+    false,
+    source
+  );
+  return {
+    ...pixels,
+    rect: { x: plane.x, y: plane.y, width: plane.width, height: plane.headerHeight },
+    inverse,
+    clampSourceEdges: ['bottom'],
+  } satisfies GpuPreviewLayer;
+}
+
+/** Decorations retain canonical shadow geometry without rasterizing an internal header edge. */
+export function paintNativeGpuDecoration(context: CanvasRenderingContext2D, media: WindowMedia) {
+  drawFittedMediaLayer({ ...media, context, hideWindowHeader: true, render() {} });
+}
+
+/** Builds one video material; the caller owns raster allocation and ordered scene composition. */
+function buildNativeGpuVideoLayers(args: {
+  layer: VideoLayer;
+  source: VideoFrame;
+  borrowed: VideoCompositionMediaSource | undefined;
+  media: ReadonlyMap<string, VideoCompositionMediaSource>;
+  imageBank: Record<string, HTMLImageElement>;
+  inverse: QuickEditHomography;
+  sourceOwner: VideoLayer;
+  sourceBodies: Map<VideoLayer, NativeGpuVideoSourceBody>;
+  raster: Raster;
+  sourceMask?: (key: string, paint: (context: CanvasRenderingContext2D) => void) => GpuPreviewLayer;
+  sourceDecoration?: (
+    key: string,
+    paint: (context: CanvasRenderingContext2D) => void
+  ) => GpuPreviewLayer;
+  groupLayer: (
+    layers: readonly GpuPreviewLayer[],
+    padded?: boolean,
+    bounds?: GpuPreviewLayer['rect']
+  ) => GpuPreviewLayer;
+  spotlight: (
+    layers: readonly GpuPreviewLayer[],
+    frames: readonly SceneSpotlightLayer[]
+  ) => GpuPreviewLayer[];
+}): GpuPreviewLayer[] {
+  const { layer, source, inverse, raster, groupLayer, spotlight } = args;
+  const borrowed = args.borrowed;
+  const orientation = isVideoCompositionFrameSource(borrowed) ? borrowed.orientation : undefined;
+  const appearance =
+    layer.trackRole === 'CAMERA'
+      ? (layer.clip.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE)
+      : undefined;
+  const dimensions = {
+    sourceWidth: isVideoCompositionFrameSource(borrowed)
+      ? borrowed.sourceWidth
+      : source.displayWidth,
+    sourceHeight: isVideoCompositionFrameSource(borrowed)
+      ? borrowed.sourceHeight
+      : source.displayHeight,
+  };
+  const media = {
+    ...resolveVideoWindowMedia(layer, dimensions, 1, args.imageBank),
+    frame: { x: layer.x, y: layer.y, width: layer.width, height: layer.height },
+    ...(appearance ? { cameraAppearance: appearance } : {}),
+  };
+  const window = appearance
+    ? cameraWindowFrame(media.frame, appearance.shape)
+    : getFittedMediaWindowFrame(media);
+  const content = getFittedMediaContentFrame(media);
+  const bare: VideoLayer = {
+    ...layer,
+    rotation: 0,
+    opacity: 1,
+    renderState: {
+      blurAmount: 0,
+      opacityMultiplier: 1,
+      scaleX: 1,
+      scaleY: 1,
+      translateX: 0,
+      translateY: 0,
+    },
+    actions: [],
+    borders: [],
+    spotlights: [],
+  };
+  const traceWindow = (context: CanvasRenderingContext2D) => {
+    context.fillStyle = '#fff';
+    if (appearance) traceCameraShape(context, window, appearance);
+    else {
+      context.beginPath();
+      context.roundRect(
+        window.x,
+        window.y,
+        window.width,
+        window.height,
+        roundedWindowRadius(window.width, window.height, layer.clip.windowCornerRadius ?? 0)
+      );
+    }
+    context.fill();
+  };
+  const hasMagnifier = layer.actions?.some(
+    (action) =>
+      action.gestureFeedback?.effect === 'magnify' &&
+      action.gestureFeedback.lens &&
+      action.gestureFeedback.lens.scale > 1
+  );
+  const needsSource = !layer.effectActionsOnly || hasMagnifier;
+  let sourceBodyPlan = needsSource ? args.sourceBodies.get(args.sourceOwner) : undefined;
+  if (needsSource && !sourceBodyPlan) {
+    const mirror: QuickEditHomography =
+      layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored
+        ? [-1, 0, layer.x * 2 + layer.width, 0, 1, 0, 0, 0, 1]
+        : IDENTITY;
+    const sourceInverse = invertQuickEditProjection(
+      multiplyQuickEditProjections(layer.sourceContentTransform ?? IDENTITY, mirror)
+    );
+    if (!sourceInverse) throw new Error('Source projection is unavailable.');
+    const sourceLayers: GpuPreviewLayer[] = [
+      { source, rect: content, inverse: sourceInverse, ...(orientation ? { orientation } : {}) },
+    ];
+    const header =
+      layer.effectActionsOnly &&
+      !layer.actions?.some((action) => action.gestureFeedback?.effect === 'magnify')
+        ? null
+        : nativeGpuWindowHeader(media, raster, sourceInverse);
+    const paintMask = (context: CanvasRenderingContext2D) => {
+      traceWindow(context);
+      if (layer.clip.sourceCrop && !header) {
+        const crop = layer.clip.sourceCrop;
+        context.globalCompositeOperation = 'destination-in';
+        context.fillRect(
+          content.x + content.width * crop.x,
+          content.y + content.height * crop.y,
+          content.width * crop.width,
+          content.height * crop.height
+        );
+      }
+    };
+    // White coverage depends on window geometry, not source pixels or playback time.
+    const maskKey = JSON.stringify([
+      window,
+      appearance,
+      layer.clip.windowCornerRadius ?? 0,
+      !header && layer.clip.sourceCrop ? [layer.clip.sourceCrop, content] : null,
+    ]);
+    const mask = args.sourceMask ? args.sourceMask(maskKey, paintMask) : raster(paintMask, true);
+    if (header && layer.clip.sourceCrop) {
+      const crop = layer.clip.sourceCrop;
+      sourceLayers[0] = {
+        ...sourceLayers[0]!,
+        clip: {
+          rect: {
+            x: content.x + content.width * crop.x,
+            y: header.rect.y + header.rect.height,
+            width: content.width * crop.width,
+            height: content.height * crop.height,
+          },
+          radius: 0,
+          shape: 'hard-rect',
+        },
+      };
+    }
+    // The existing window group clips both transformed sources; crop coverage affects video only.
+    if (header) sourceLayers.unshift(header);
+    sourceLayers.push({ ...mask, blend: 'mask' });
+    const decorationMedia = {
+      ...resolveVideoWindowMedia(bare, dimensions, 1, args.imageBank),
+      frame: bare,
+    };
+    const sourceBody: GpuPreviewLayer[] = [];
+    if (
+      resolveVideoMediaShadowParams(
+        decorationMedia.shadowIntensity,
+        decorationMedia.displayScale,
+        decorationMedia.shadowMode,
+        decorationMedia.camera
+      )
+    ) {
+      const paint = (context: CanvasRenderingContext2D) =>
+        paintNativeGpuDecoration(context, decorationMedia);
+      const key = JSON.stringify([
+        { x: bare.x, y: bare.y, width: bare.width, height: bare.height },
+        decorationMedia.sourceWidth,
+        decorationMedia.sourceHeight,
+        decorationMedia.fitMode,
+        decorationMedia.sourceCrop,
+        decorationMedia.windowCornerRadius,
+        decorationMedia.windowHeader,
+        decorationMedia.windowHeaderImage
+          ? [
+              decorationMedia.windowHeaderImage.naturalWidth,
+              decorationMedia.windowHeaderImage.naturalHeight,
+            ]
+          : null,
+        decorationMedia.cameraAppearance,
+        decorationMedia.camera,
+        decorationMedia.displayScale,
+        decorationMedia.shadowColor,
+        decorationMedia.shadowIntensity,
+        decorationMedia.shadowMode,
+        decorationMedia.cameraShadowLocalVector,
+      ]);
+      sourceBody.push(
+        args.sourceDecoration ? args.sourceDecoration(key, paint) : raster(paint, true)
+      );
+    }
+    sourceBody.push(groupLayer(sourceLayers, true));
+    // A single same-grid child already is the complete source snapshot.
+    sourceBodyPlan = {
+      layers: sourceBody,
+      snapshot: sourceBody.length === 1 ? sourceBody[0]! : groupLayer(sourceBody, true),
+    };
+    args.sourceBodies.set(args.sourceOwner, sourceBodyPlan);
+  }
+  const sourceBody = sourceBodyPlan?.layers ?? [];
+  let body: GpuPreviewLayer[] = layer.effectActionsOnly ? [] : [...sourceBody];
+  if (!layer.effectActionsOnly && layer.spotlights?.length) {
+    const snapshot = groupLayer(body, true);
+    const modified = spotlight(
+      body,
+      layer.spotlights.map((state) =>
+        sampleCompositionSpotlightLayer({
+          state,
+          window:
+            state.coordinateSpace === 'source-window'
+              ? getFittedMediaOriginalWindowFrame(media)
+              : window,
+          extent: window,
+          projection: IDENTITY,
+          scale: 1,
+          clip: { rect: window, radius: layer.clip.windowCornerRadius ?? 0 },
+        })
+      )
+    );
+    const windowMask = raster(traceWindow, true);
+    body = [
+      snapshot,
+      { ...windowMask, blend: 'erase' },
+      { ...groupLayer([...modified, { ...windowMask, blend: 'mask' }], true), blend: 'add' },
+    ];
+  }
+  const sourceSnapshot = sourceBodyPlan?.snapshot;
+  const magnifierBounds: GpuPreviewLayer['rect'][] = [];
+  let boundedMagnifiers = true;
+  for (const action of layer.actions ?? []) {
+    const feedback = action.gestureFeedback;
+    if (feedback?.effect !== 'magnify' || !feedback.lens || feedback.lens.scale <= 1) continue;
+    if (!sourceSnapshot) throw new Error('Pointer lens source is unavailable.');
+    const actionScale =
+      (content.width / media.sourceWidth + content.height / media.sourceHeight) / 2;
+    const sourcePoint = action.point ?? feedback.point;
+    const point = {
+      x: content.x + sourcePoint.x * content.width,
+      y: content.y + sourcePoint.y * content.height,
+    };
+    if (layer.trackRole === 'CAMERA' && layer.clip.cameraMirrored)
+      point.x = 2 * layer.x + layer.width - point.x;
+    const projected = layer.sourceContentTransform
+      ? projectQuickEditPoint(layer.sourceContentTransform, point)
+      : point;
+    if (!projected) throw new Error('Pointer lens projection is unavailable.');
+    const innerScale = layer.sourceContentTransform
+      ? Math.hypot(layer.sourceContentTransform[0], layer.sourceContentTransform[3])
+      : 1;
+    const radius = feedback.radius * actionScale * innerScale;
+    const bounds = {
+      x: projected.x - radius,
+      y: projected.y - radius,
+      width: radius * 2,
+      height: radius * 2,
+    };
+    const shape = feedback.lens.shape;
+    const shadowFeedback = {
+      ...feedback,
+      point: projected,
+      radius,
+      stroke: feedback.stroke * Math.max(0.2, actionScale) * innerScale,
+    };
+    const artworkBounds = pointerFeedbackLensPaintBounds({
+      ...shadowFeedback,
+      stroke: Math.max(shadowFeedback.stroke, feedback.stroke * Math.max(0.2, actionScale)),
+    });
+    if (artworkBounds) magnifierBounds.push(artworkBounds);
+    else boundedMagnifiers = false;
+    const trace = (context: CanvasRenderingContext2D) => {
+      context.beginPath();
+      if (shape === 'circle') context.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+      else context.roundRect(bounds.x, bounds.y, bounds.width, bounds.height, radius * 0.18);
+    };
+    body.push(
+      raster(
+        (context) => drawPointerFeedbackLensShadow(context, shadowFeedback),
+        true,
+        artworkBounds ?? undefined
+      )
+    );
+    body.push(
+      groupLayer(
+        [
+          {
+            ...sourceSnapshot,
+            lens: {
+              bounds,
+              scale: feedback.lens.scale,
+              optics: feedback.lens.optics ?? 'flat',
+              edgeWidth: feedback.lens.edgeWidth ?? 8,
+              corner: shape === 'circle' ? 'circle' : 0.18,
+            },
+            clip: {
+              rect: bounds,
+              radius: radius * 0.18,
+              ...(shape === 'circle' ? { shape: 'ellipse' } : {}),
+            },
+          },
+        ],
+        true,
+        artworkBounds ?? undefined
+      )
+    );
+    body.push(
+      raster(
+        (context) => {
+          context.save();
+          trace(context);
+          context.globalAlpha = feedback.opacity;
+          context.strokeStyle = feedback.color;
+          context.lineWidth = feedback.stroke * Math.max(0.2, actionScale);
+          context.stroke();
+          context.restore();
+        },
+        true,
+        artworkBounds ?? undefined
+      )
+    );
+  }
+  const ordinaryActions =
+    layer.actions?.filter((action) => action.gestureFeedback?.effect !== 'magnify') ?? [];
+  const ordinaryBounds =
+    ordinaryActions.length || layer.borders?.length
+      ? resolveVideoSourceActionPaintBounds(
+          { ...bare, actions: ordinaryActions, borders: layer.borders ?? [] },
+          dimensions,
+          1,
+          args.imageBank
+        )
+      : null;
+  if ((ordinaryActions.length || layer.borders?.length) && ordinaryBounds !== null)
+    body.push(
+      raster(
+        (context) =>
+          drawCompositionVisualLayer(
+            context,
+            {
+              ...bare,
+              effectActionsOnly: true,
+              deferSourceBorders: !layer.effectActionsOnly || layer.deferSourceBorders === true,
+              actions: ordinaryActions,
+              borders: layer.borders ?? [],
+            },
+            1,
+            1,
+            args.imageBank,
+            args.media
+          ),
+        true,
+        ordinaryBounds
+      )
+    );
+  if (!body.length) return [];
+  let feedbackBounds: GpuPreviewLayer['rect'] | undefined;
+  if (
+    layer.effectActionsOnly &&
+    ordinaryBounds !== undefined &&
+    !layer.borders?.length &&
+    boundedMagnifiers &&
+    (magnifierBounds.length || ordinaryBounds)
+  ) {
+    const footprints = ordinaryBounds ? [...magnifierBounds, ordinaryBounds] : magnifierBounds;
+    const x = Math.min(...footprints.map((bounds) => bounds.x));
+    const y = Math.min(...footprints.map((bounds) => bounds.y));
+    feedbackBounds = {
+      x,
+      y,
+      width: Math.max(...footprints.map((bounds) => bounds.x + bounds.width)) - x,
+      height: Math.max(...footprints.map((bounds) => bounds.y + bounds.height)) - y,
+    };
+  }
+  const material =
+    sourceBodyPlan &&
+    body.length === sourceBody.length &&
+    body.every((entry, index) => entry === sourceBody[index])
+      ? sourceBodyPlan.snapshot
+      : groupLayer(body, true, feedbackBounds);
+  return [
+    {
+      ...material,
+      inverse,
+      opacity: layer.opacity,
+      blur: layer.renderState.blurAmount,
+    },
+  ];
+}
+
+/** One selected source pose owns body/sharp reuse and source decoration leases. */
+export function createNativeGpuVideoLayerBuilder(args: {
+  select(
+    layer: VideoLayer,
+    frame: Pick<VideoCompositionFrame, 'visualLayers'>,
+    time: number
+  ): {
+    frames: ReadonlyMap<string, VideoFrame>;
+    media: ReadonlyMap<string, VideoCompositionMediaSource>;
+  };
+  imageBank: Record<string, HTMLImageElement>;
+  inverse(layer: VideoLayer): QuickEditHomography | null;
+  raster: Raster;
+  groupLayer: Parameters<typeof buildNativeGpuVideoLayers>[0]['groupLayer'];
+  spotlight: Parameters<typeof buildNativeGpuVideoLayers>[0]['spotlight'];
+  ownerDocument: Document;
+  plane: GpuPreviewLayer['rect'];
+  retain(lease: { release(): void }): void;
+  sourceMask?: NativeGpuSourceMaterial;
+  sourceDecoration?: NativeGpuSourceMaterial;
+}) {
+  const bodies = new Map<
+    Pick<VideoCompositionFrame, 'visualLayers'>,
+    Map<VideoLayer, NativeGpuVideoSourceBody>
+  >();
+  const material =
+    (owner: NativeGpuSourceMaterial) =>
+    (key: string, paint: (context: CanvasRenderingContext2D) => void) => {
+      const lease = owner(args.ownerDocument, args.plane, key, paint);
+      args.retain(lease);
+      return lease.layer;
+    };
+  return (
+    layer: VideoLayer,
+    sourceOwner: VideoLayer,
+    frame: Pick<VideoCompositionFrame, 'visualLayers'>,
+    time: number
+  ) => {
+    const selected = args.select(sourceOwner, frame, time);
+    const source = selected.frames.get(layer.clipId);
+    if (!source) throw new Error('GPU video source is unavailable.');
+    const inverse = args.inverse(layer);
+    if (!inverse) throw new Error('Visual layer projection is unavailable.');
+    let sourceBodies = bodies.get(frame);
+    if (!sourceBodies) {
+      sourceBodies = new Map();
+      bodies.set(frame, sourceBodies);
+    }
+    return buildNativeGpuVideoLayers({
+      layer,
+      source,
+      borrowed: selected.media.get(layer.clipId),
+      media: selected.media,
+      imageBank: args.imageBank,
+      inverse,
+      sourceOwner,
+      sourceBodies,
+      raster: args.raster,
+      groupLayer: args.groupLayer,
+      spotlight: args.spotlight,
+      ...(args.sourceMask ? { sourceMask: material(args.sourceMask) } : {}),
+      ...(args.sourceDecoration ? { sourceDecoration: material(args.sourceDecoration) } : {}),
+    });
+  };
+}

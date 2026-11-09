@@ -56,7 +56,8 @@ export async function parseEffectRuntimeRenderRequest(
 
 function hasValidRenderRequestHeader(value: Record<string, unknown>): boolean {
   return (
-    value['kind'] === 'renderFrame' && value['protocolVersion'] === EFFECT_RUNTIME_PROTOCOL_VERSION
+    (value['kind'] === 'renderFrame' || value['kind'] === 'prepareGpuFrame') &&
+    value['protocolVersion'] === EFFECT_RUNTIME_PROTOCOL_VERSION
   );
 }
 

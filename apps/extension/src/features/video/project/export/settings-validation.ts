@@ -108,6 +108,10 @@ export function isBoundedVideoProjectExportSettings(
     (settings['frameRateMode'] === undefined ||
       settings['frameRateMode'] === 'constant' ||
       (settings['frameRateMode'] === 'adaptive' && settings['fps'] === 60)) &&
+    (settings['detailEnhancement'] === undefined ||
+      settings['detailEnhancement'] === 'off' ||
+      settings['detailEnhancement'] === 'bicubic-sharpen' ||
+      settings['detailEnhancement'] === 'clark-x2') &&
     hasCanonicalOutputSettings(settings) &&
     hasValidRangeShape(settings) &&
     hasValidSelectedClipShape(settings) &&

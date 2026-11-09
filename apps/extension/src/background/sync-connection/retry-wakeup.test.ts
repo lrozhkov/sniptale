@@ -1,3 +1,7 @@
+import { createSyncConnectionCoordinator, SyncConnectionCoordinatorError } from './coordinator';
+import { SyncWorkspaceError } from '../../workflows/sync-transfer/workspace';
+import { SyncCatalogError } from '../../workflows/sync-transfer/catalog';
+import { SyncRemoteError } from '../../workflows/sync-transfer/remote-store';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { SyncConnectionMetadata } from '../../composition/persistence/remote-connection/model';
 import type {
@@ -8,9 +12,9 @@ import type { SyncQueueDueCandidate } from '../../composition/persistence/sync-c
 import type { SyncExecutorSnapshot } from '../../contracts/messaging/contracts/runtime-message/sync-connection.types';
 import { createSyncQueueRetryWakeup, type SyncQueueRetryWakeupDependencies } from './retry-wakeup';
 
-const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+const { warn, info } = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn() }));
 vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({ warn }),
+  createLogger: () => ({ warn, info }),
 }));
 const scope = {
   spaceId: '33333333-3333-4333-8333-333333333333',
@@ -368,27 +372,52 @@ it('uses the second existing executor slot and refreshes observation before late
   expect(deps.deferDue).toHaveBeenCalledExactlyOnceWith(later);
 });
 
-it.each(['alarm', 'load', 'initialize', 'discover', 'inspect', 'start'] as const)(
+it.each([
+  'alarm-get',
+  'alarm-create',
+  'connection-load',
+  'schedule-load',
+  'schedule-initialize',
+  'discovery',
+  'dispatch-inspect',
+  'dispatch-start',
+  'dispatch-defer',
+  'dispatch-recover',
+] as const)(
   'contains %s failure with a fixed diagnostic and allows a later pass',
   async (stage) => {
     const deps = dependencies();
     const error = new Error('private URL and credential detail');
     deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
-    if (stage === 'alarm') {
+    if (stage === 'alarm-get') deps.getAlarm.mockRejectedValueOnce(error);
+    if (stage === 'alarm-create') {
       deps.createAlarm.mockRejectedValueOnce(error);
       deps.getAlarm.mockResolvedValueOnce(null);
     }
-    if (stage === 'load') deps.loadConnection.mockRejectedValueOnce(error);
-    if (stage === 'initialize') {
+    if (stage === 'connection-load') deps.loadConnection.mockRejectedValueOnce(error);
+    if (stage === 'schedule-load') deps.loadProgress.mockRejectedValueOnce(error);
+    if (stage === 'schedule-initialize') {
       deps.loadProgress.mockResolvedValueOnce(null);
       deps.initializePage.mockRejectedValueOnce(error);
     }
-    if (stage === 'discover') deps.discoverDue.mockRejectedValueOnce(error);
-    if (stage === 'inspect') deps.coordinator.inspect.mockRejectedValueOnce(error);
-    if (stage === 'start') deps.coordinator.start.mockRejectedValueOnce(error);
+    if (stage === 'discovery') deps.discoverDue.mockRejectedValueOnce(error);
+    if (stage === 'dispatch-inspect') deps.coordinator.inspect.mockRejectedValueOnce(error);
+    if (stage === 'dispatch-start') deps.coordinator.start.mockRejectedValueOnce(error);
+    if (stage === 'dispatch-defer' || stage === 'dispatch-recover') {
+      deps.discoverDue.mockResolvedValueOnce({
+        candidates: [candidate({ status: 'running' })],
+        progress: progress(),
+      });
+      if (stage === 'dispatch-defer') {
+        deps.coordinator.inspect.mockResolvedValueOnce(snapshot({ phase: 'failed' }));
+        deps.deferDue.mockRejectedValueOnce(error);
+      } else deps.recoverInterrupted.mockRejectedValueOnce(error);
+    }
     const owner = createSyncQueueRetryWakeup(deps);
     await expect(owner.run()).resolves.toBeUndefined();
-    expect(warn).toHaveBeenCalledExactlyOnceWith('Sync queue retry deferred');
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      `sync.retry.deferred stage=${stage} reason=unexpected`
+    );
     await owner.run();
     expect(deps.coordinator.start).toHaveBeenCalled();
   }
@@ -458,7 +487,9 @@ it('preserves queued retries when reconciliation refuses and logs only a fixed m
   const owner = createSyncQueueRetryWakeup(deps);
   await owner.run();
   expect(deps.coordinator.start).toHaveBeenCalledOnce();
-  expect(warn).toHaveBeenCalledExactlyOnceWith('Sync capture enqueue deferred');
+  expect(warn).toHaveBeenCalledExactlyOnceWith(
+    'sync.retry.deferred stage=capture-enqueue reason=unexpected'
+  );
   await owner.run();
   expect(deps.reconcileCaptures).toHaveBeenCalledTimes(2);
   owner.dispose();
@@ -490,7 +521,9 @@ it('continues valid due work after a per-capture refusal without leaking capture
   const owner = createSyncQueueRetryWakeup(deps);
   await owner.run();
   expect(deps.coordinator.start).toHaveBeenCalledOnce();
-  expect(warn).toHaveBeenCalledExactlyOnceWith('Sync capture enqueue deferred');
+  expect(warn).toHaveBeenCalledExactlyOnceWith(
+    'sync.retry.deferred stage=capture-enqueue reason=refused'
+  );
   owner.dispose();
 });
 
@@ -681,5 +714,330 @@ it('starts incoming after enrollment and preserves outgoing dispatch on refusal'
   expect(refreshIncoming).toHaveBeenCalledOnce();
   expect(deps.coordinator.start).toHaveBeenCalledTimes(2);
   expect(warn).toHaveBeenCalled();
+  owner.dispose();
+});
+
+it('retains only known typed refusal codes and continues after a failed candidate', async () => {
+  const deps = dependencies();
+  deps.discoverDue.mockResolvedValue({
+    candidates: [candidate(), candidate({ operationId: 'later' })],
+    progress: progress(),
+  });
+  deps.coordinator.start.mockRejectedValueOnce(new SyncRemoteError('authentication', 401));
+  await createSyncQueueRetryWakeup(deps).run();
+  expect(warn).toHaveBeenCalledExactlyOnceWith(
+    'sync.retry.deferred stage=dispatch-start reason=authentication'
+  );
+  expect(deps.coordinator.start).toHaveBeenCalledTimes(2);
+});
+
+it('excludes hostile errors and contains a throwing diagnostic sink', async () => {
+  const deps = dependencies();
+  const secret = 'https://private.test/path?id=secret Authorization: Bearer password capture-id';
+  deps.coordinator.start.mockRejectedValueOnce(Object.assign(new Error(secret), { code: secret }));
+  deps.discoverDue.mockResolvedValue({
+    candidates: [candidate(), candidate({ operationId: 'later' })],
+    progress: progress(),
+  });
+  warn.mockImplementationOnce(() => {
+    throw new Error(secret);
+  });
+  const owner = createSyncQueueRetryWakeup(deps);
+  await expect(owner.run()).resolves.toBeUndefined();
+  expect(deps.coordinator.start).toHaveBeenCalledTimes(2);
+  expect(warn).toHaveBeenCalledExactlyOnceWith(
+    'sync.retry.deferred stage=dispatch-start reason=unexpected'
+  );
+  expect(JSON.stringify(warn.mock.calls)).not.toContain(secret);
+  await owner.run();
+  expect(deps.coordinator.start).toHaveBeenCalledTimes(4);
+});
+
+it.each([
+  [new SyncWorkspaceError('workspace-changed'), 'workspace-changed'],
+  [new SyncCatalogError('metadata-limit'), 'metadata-limit'],
+  [Object.assign(new SyncRemoteError('transport'), { code: 'private-hostile-code' }), 'unexpected'],
+])('retains only allowlisted typed retry reasons: %s', async (error, reason) => {
+  const deps = dependencies();
+  deps.discoverDue.mockRejectedValueOnce(error);
+  await createSyncQueueRetryWakeup(deps).run();
+  expect(warn).toHaveBeenCalledExactlyOnceWith(
+    `sync.retry.deferred stage=discovery reason=${reason}`
+  );
+});
+
+it.each(['initial-discovery', 'capture-enqueue', 'incoming-refresh'] as const)(
+  'names the contained %s failure and still dispatches queued work',
+  async (stage) => {
+    const deps = dependencies();
+    const error = new SyncRemoteError('temporary');
+    const discoverInitialRoots = vi
+      .fn()
+      .mockResolvedValue({ captured: 0, existing: 0, refused: 0, remaining: false });
+    const refreshIncoming = vi.fn().mockResolvedValue(undefined);
+    if (stage === 'initial-discovery') discoverInitialRoots.mockRejectedValueOnce(error);
+    if (stage === 'capture-enqueue') deps.reconcileCaptures.mockRejectedValueOnce(error);
+    if (stage === 'incoming-refresh') refreshIncoming.mockRejectedValueOnce(error);
+    deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+    await createSyncQueueRetryWakeup({ ...deps, discoverInitialRoots, refreshIncoming }).run();
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      `sync.retry.deferred stage=${stage} reason=temporary`
+    );
+    expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  }
+);
+
+it('retains stage and reason through the real persisted diagnostic observer', async () => {
+  const actual = await vi.importActual<typeof import('@sniptale/platform/observability/logger')>(
+    '@sniptale/platform/observability/logger'
+  );
+  const observed = vi.fn();
+  const dispose = actual.installDiagnosticLogObserver(observed);
+  const sink = { debug: vi.fn(), error: vi.fn(), info: vi.fn(), log: vi.fn(), warn: vi.fn() };
+  const real = actual.createLogger({ namespace: 'SyncQueueRetry', sink });
+  warn.mockImplementationOnce(real.warn);
+  const deps = dependencies();
+  deps.discoverDue.mockRejectedValueOnce(new SyncRemoteError('authentication', 401));
+  try {
+    await createSyncQueueRetryWakeup(deps).run();
+    expect(observed).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        source: 'SyncQueueRetry',
+        level: 'warn',
+        message: 'sync.retry.deferred stage=discovery reason=authentication',
+      })
+    );
+  } finally {
+    dispose();
+  }
+});
+
+it('retains an actual coordinator selection refusal in the persisted diagnostic message', async () => {
+  const deps = dependencies();
+  const coordinator = createSyncConnectionCoordinator({
+    loadConnection: async () => null,
+    loadWorkspace: async () => null,
+    revokeWorkspace: vi.fn(),
+    hasOriginPermission: async () => false,
+    enrollConnection: vi.fn(),
+    revokeConnection: vi.fn(),
+    ensureDocument: vi.fn(),
+    inspectExecutor: vi.fn(),
+    startExecutor: vi.fn(),
+    stopExecutor: vi.fn(),
+    startWorkspaceExecutor: vi.fn(),
+    createChallenge: () => 'challenge',
+  });
+  deps.coordinator.start.mockImplementation(coordinator.start.bind(coordinator));
+  deps.discoverDue.mockResolvedValueOnce({ candidates: [candidate()], progress: progress() });
+  await createSyncQueueRetryWakeup(deps).run();
+  expect(warn).toHaveBeenCalledExactlyOnceWith(
+    'sync.retry.deferred stage=dispatch-start reason=selection-changed'
+  );
+});
+
+it.each([
+  'coordinator-refused',
+  'privacy-exclusion',
+  'generation-changed',
+  'selection-changed',
+  'executor-unavailable',
+  'binding-changed',
+  'receipt-invalid',
+] as const)(
+  'retains the finite coordinator %s reason and continues later candidates',
+  async (code) => {
+    const deps = dependencies();
+    deps.discoverDue.mockResolvedValue({
+      candidates: [candidate(), candidate({ operationId: 'later' })],
+      progress: progress(),
+    });
+    deps.coordinator.start.mockRejectedValueOnce(new SyncConnectionCoordinatorError(code));
+    await createSyncQueueRetryWakeup(deps).run();
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      `sync.retry.deferred stage=dispatch-start reason=${code}`
+    );
+    expect(deps.coordinator.start).toHaveBeenCalledTimes(2);
+  }
+);
+
+it.each(['value', 'getter'] as const)(
+  'rejects a hostile typed coordinator code %s without leaking or changing retry',
+  async (kind) => {
+    const deps = dependencies();
+    const secret = 'https://private.test/path?id=private Authorization: Bearer password capture-id';
+    const error = new SyncConnectionCoordinatorError('selection-changed');
+    if (kind === 'value') Object.assign(error, { code: secret });
+    else
+      Object.defineProperty(error, 'code', {
+        get() {
+          throw new Error(secret);
+        },
+      });
+    deps.coordinator.start.mockRejectedValueOnce(error);
+    deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+    const owner = createSyncQueueRetryWakeup(deps);
+    await expect(owner.run()).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      'sync.retry.deferred stage=dispatch-start reason=unexpected'
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(secret);
+    await owner.run();
+    expect(deps.coordinator.start).toHaveBeenCalledTimes(2);
+  }
+);
+
+it('materializes checkpoints before reconciliation and incoming refresh', async () => {
+  const deps = dependencies();
+  const flushCheckpoints = vi
+    .fn()
+    .mockResolvedValue({ captured: 1, skipped: 0, refused: 0, remaining: false, advanced: true });
+  const refreshIncoming = vi.fn().mockResolvedValue(undefined);
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints, refreshIncoming });
+  await owner.run();
+  expect(flushCheckpoints).toHaveBeenCalledExactlyOnceWith(
+    scope,
+    authorization,
+    expect.any(Function)
+  );
+  expect(flushCheckpoints.mock.invocationCallOrder[0]).toBeLessThan(
+    deps.reconcileCaptures.mock.invocationCallOrder[0]!
+  );
+  expect(deps.reconcileCaptures.mock.invocationCallOrder[0]).toBeLessThan(
+    refreshIncoming.mock.invocationCallOrder[0]!
+  );
+  owner.dispose();
+});
+
+it('finishes a refused checkpoint suffix once and stops at wrap', async () => {
+  const deps = dependencies();
+  const completed = deferred<void>();
+  const flushCheckpoints = vi
+    .fn()
+    .mockResolvedValueOnce({
+      captured: 0,
+      skipped: 63,
+      refused: 1,
+      remaining: true,
+      advanced: true,
+    })
+    .mockImplementationOnce(async () => {
+      completed.resolve();
+      return { captured: 0, skipped: 1, refused: 0, remaining: false, advanced: true };
+    });
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints });
+  await owner.run();
+  await completed.promise;
+  await owner.run();
+  expect(flushCheckpoints).toHaveBeenCalledTimes(2);
+  owner.dispose();
+});
+
+it('preserves queued retries after checkpoint refusal with fixed diagnostics', async () => {
+  const deps = dependencies();
+  const flushCheckpoints = vi.fn().mockRejectedValue(new Error('private endpoint credential'));
+  deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints });
+  await owner.run();
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
+  expect(warn).toHaveBeenCalledWith(
+    'sync.retry.deferred stage=checkpoint-capture reason=unexpected'
+  );
+  owner.dispose();
+});
+
+it('stops after disposal while checkpoint materialization is pending', async () => {
+  const deps = dependencies();
+  const entered = deferred<void>();
+  const release = deferred<{
+    captured: number;
+    skipped: number;
+    refused: number;
+    remaining: boolean;
+    advanced: boolean;
+  }>();
+  const flushCheckpoints = vi.fn().mockImplementationOnce(() => {
+    entered.resolve();
+    return release.promise;
+  });
+  const refreshIncoming = vi.fn();
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints, refreshIncoming });
+  const running = owner.run();
+  await entered.promise;
+  owner.dispose();
+  release.resolve({ captured: 1, skipped: 0, refused: 0, remaining: true, advanced: true });
+  await running;
+  expect(deps.reconcileCaptures).not.toHaveBeenCalled();
+  expect(refreshIncoming).not.toHaveBeenCalled();
+  expect(deps.discoverDue).not.toHaveBeenCalled();
+});
+
+it('does not retry or mutate native work while shared secrets are locked', async () => {
+  const deps = dependencies();
+  const canDispatch = vi.fn(async () => false);
+  const owner = createSyncQueueRetryWakeup({ ...deps, canDispatch });
+  await owner.run();
+  await owner.run();
+  await owner.run();
+  expect(deps.loadConnection).not.toHaveBeenCalled();
+  expect(deps.reconcileCaptures).not.toHaveBeenCalled();
+  expect(deps.discoverDue).not.toHaveBeenCalled();
+  expect(deps.deferDue).not.toHaveBeenCalled();
+  expect(deps.coordinator.start).not.toHaveBeenCalled();
+  canDispatch.mockResolvedValue(true);
+  await owner.run();
+  expect(deps.discoverDue).toHaveBeenCalledOnce();
+});
+
+it('logs one fixed checkpoint phase and aggregate root/pass counts without generic duplicate refusal', async () => {
+  const deps = dependencies();
+  const flushCheckpoints = vi.fn().mockImplementation(async (_scope, _identity, observe) => {
+    observe?.({ phase: 'preparing' });
+    observe?.({
+      phase: 'settled',
+      counts: {
+        capturedRoots: 1,
+        acknowledgedRoots: 1,
+        deadlineWaitingRoots: 2,
+        scopeMismatchRoots: 0,
+        invalidPendingRoots: 0,
+        revisionChangedRoots: 1,
+        predecessorWaitingRoots: 1,
+        admissionRefusedRoots: 1,
+        captureFailedRoots: 0,
+        deferredRoots: 0,
+        publicationBusyPasses: 0,
+        progressChangedPasses: 0,
+        admissionRefusedPasses: 0,
+        failedPasses: 0,
+      },
+    });
+    return { captured: 1, skipped: 4, refused: 1, remaining: false, advanced: true };
+  });
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints });
+  await owner.run();
+  expect(info).toHaveBeenCalledTimes(2);
+  expect(info).toHaveBeenCalledWith('sync.checkpoint.preparing');
+  expect(info).toHaveBeenCalledWith(expect.stringContaining('deadlineWaitingRoots=2'));
+  expect(info).toHaveBeenCalledWith(expect.stringContaining('revisionChangedRoots=1'));
+  expect(warn).not.toHaveBeenCalledWith(
+    'sync.retry.deferred stage=checkpoint-capture reason=refused'
+  );
+  owner.dispose();
+});
+
+it('contains checkpoint logger failure and continues queued retry dispatch', async () => {
+  const deps = dependencies();
+  info.mockImplementationOnce(() => {
+    throw new Error('private logger failure');
+  });
+  const flushCheckpoints = vi.fn().mockImplementation(async (_scope, _identity, observe) => {
+    observe?.({ phase: 'preparing' });
+    return { captured: 1, skipped: 0, refused: 0, remaining: false, advanced: true };
+  });
+  deps.discoverDue.mockResolvedValue({ candidates: [candidate()], progress: progress() });
+  const owner = createSyncQueueRetryWakeup({ ...deps, flushCheckpoints });
+  await expect(owner.run()).resolves.toBeUndefined();
+  expect(deps.coordinator.start).toHaveBeenCalledOnce();
   owner.dispose();
 });

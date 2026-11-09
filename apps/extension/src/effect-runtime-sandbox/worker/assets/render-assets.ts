@@ -67,7 +67,8 @@ export function drawImageAsset(
   context.restore();
 }
 
-function resolveCoverCrop(
+/** Resolve the native image crop for both raster drawing and evaluated GPU operands. */
+export function resolveCoverCrop(
   bitmap: ImageBitmap,
   drawWidth: number,
   drawHeight: number,

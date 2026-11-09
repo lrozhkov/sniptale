@@ -1,3 +1,5 @@
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
+import { rectCorners } from '../motion/math';
 import {
   sceneSpotlightPath,
   sceneSpotlightOpeningPath,
@@ -19,6 +21,7 @@ export type SceneSpotlightClip = {
 
 /** Each opening retains its own decorated-window clip and output projection. */
 export interface SceneSpotlightLayer extends SceneSpotlightFrame {
+  sharpPaint?: (context: CanvasRenderingContext2D) => void;
   /** Mutually exclusive source appearances blend coverage. Independent masks retain union coverage. */
   blend?: { groupId: string; weight: number };
   clip?: SceneSpotlightClip | undefined;
@@ -31,10 +34,12 @@ export function drawSceneSpotlight(
   canvas: HTMLCanvasElement | OffscreenCanvas,
   scratch: HTMLCanvasElement | OffscreenCanvas | null,
   frame: SceneSpotlightFrame | null,
-  resources?: RenderResources
+  resources?: RenderResources,
+  sharpPaint?: (context: CanvasRenderingContext2D) => void
 ) {
   if (!frame) return;
-  if (frame.lens) drawSpotlightLenses(context, canvas, [frame]);
+  if (frame.lens)
+    drawSpotlightLenses(context, canvas, sharpPaint ? [{ ...frame, sharpPaint }] : [frame]);
   if (frame.dim <= 0 && frame.blur <= 0) return;
   context.save();
   try {
@@ -289,15 +294,26 @@ function paintMaskTile(
       frame.projection
     )
   );
-  const protections = frames.map((frame) =>
-    coverage(
-      frame.protectionOpening ?? frame.opening,
-      frame.protectionRadius ?? frame.radius,
+  const protections = frames.map((frame, index) => {
+    const rect = frame.protectionOpening ?? frame.opening;
+    const corner = frame.protectionRadius ?? frame.radius;
+    // Equal geometry also makes opening-clip expansion zero; projection and clipping are shared.
+    if (
+      rect.x === frame.opening.x &&
+      rect.y === frame.opening.y &&
+      rect.width === frame.opening.width &&
+      rect.height === frame.opening.height &&
+      corner === frame.radius
+    )
+      return openings[index]!;
+    return coverage(
+      rect,
+      corner,
       frame.clip,
       sceneSpotlightNeedsClip(frame, frame.clip),
       frame.projection
-    )
-  );
+    );
+  });
   const dimPixels = dim.createImageData(tile.width, tile.height),
     blurPixels = blur.createImageData(tile.width, tile.height);
   const protection = (members: readonly number[], pixel: number) => {
@@ -342,7 +358,14 @@ export function drawSceneSpotlights(
     !frames[0]?.blend &&
     (!frames[0] || (!frames[0].projection && !sceneSpotlightNeedsClip(frames[0], frames[0].clip)))
   ) {
-    drawSceneSpotlight(context, canvas, scratch, frames[0] ?? null, resources);
+    drawSceneSpotlight(
+      context,
+      canvas,
+      scratch,
+      frames[0] ?? null,
+      resources,
+      frames[0]?.sharpPaint
+    );
     return;
   }
   if (!frames.length) return;
@@ -405,7 +428,9 @@ function drawSpotlightLenses(
           context.clip(clip);
         }
         context.clip(opening);
-        drawSceneLens(context, source, bounds, frame.lens!, frame.radius);
+        if (frame.sharpPaint)
+          drawSceneLens(context, source, bounds, frame.lens!, frame.radius, frame.sharpPaint);
+        else drawSceneLens(context, source, bounds, frame.lens!, frame.radius);
       } finally {
         context.restore();
       }
@@ -416,25 +441,17 @@ function drawSpotlightLenses(
 }
 
 function projectedLensBounds(rect: SceneSpotlightRect, projection: QuickEditHomography) {
-  const points = [
-    { x: rect.x, y: rect.y },
-    { x: rect.x + rect.width, y: rect.y },
-    { x: rect.x, y: rect.y + rect.height },
-    { x: rect.x + rect.width, y: rect.y + rect.height },
-  ].map((point) => projectQuickEditPoint(projection, point));
+  const points = rectCorners(rect).map((point) => projectQuickEditPoint(projection, point));
   if (points.some((point) => !point)) return null;
-  const x = points.map((point) => point!.x);
-  const y = points.map((point) => point!.y);
-  return {
-    x: Math.min(...x),
-    y: Math.min(...y),
-    width: Math.max(...x) - Math.min(...x),
-    height: Math.max(...y) - Math.min(...y),
-  };
+  return getCanvasPointsBounds(points.map((point) => point!));
 }
 
 /** Rounded openings become a bounded polygon in the same projected space as the window. */
-function projectedOpening(rect: SceneSpotlightRect, radius: number, matrix: QuickEditHomography) {
+export function projectedOpening(
+  rect: SceneSpotlightRect,
+  radius: number,
+  matrix?: QuickEditHomography
+) {
   const path = new Path2D();
   const r = Math.max(0, Math.min(radius, rect.width / 2, rect.height / 2));
   const corners = [
@@ -447,10 +464,11 @@ function projectedOpening(rect: SceneSpotlightRect, radius: number, matrix: Quic
   for (let corner = 0; corner < 4; corner++)
     for (let step = 0; step <= 12; step++) {
       const angle = ((corner - 1 + step / 12) * Math.PI) / 2;
-      const point = projectQuickEditPoint(matrix, {
+      const local = {
         x: corners[corner]![0]! + r * Math.cos(angle),
         y: corners[corner]![1]! + r * Math.sin(angle),
-      });
+      };
+      const point = matrix ? projectQuickEditPoint(matrix, local) : local;
       if (!point) continue;
       if (first) {
         path.moveTo(point.x, point.y);

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { RecordingActionEvent } from '../project/types';
-import { projectReviewTelemetry } from './telemetry';
+import { projectReviewTelemetry, attachReviewRecordingWindow } from './telemetry';
 
 it('shows one observed gesture range and preserves anonymous keyboard attacks and repeats', () => {
   const rhythm = [
@@ -420,7 +420,7 @@ it('projects raw capture time even when optional animation and source anchor dif
   expect(event).toEqual(before);
 });
 
-it('filters positively identified nontext changes without hiding a click followed by real typing', () => {
+it('retains nontext changes alongside clicks and typing without silently dropping captured signals', () => {
   const action: RecordingActionEvent = {
     id: 'click',
     kind: 'CLICK',
@@ -461,7 +461,7 @@ it('filters positively identified nontext changes without hiding a click followe
     projectReviewTelemetry({ actionEvents: [action], signals, cursorTrack: null }, 4).markers.map(
       (marker) => marker.ref.id
     )
-  ).toEqual(['click', 'text']);
+  ).toEqual(['checkbox', 'click', 'select', 'text']);
 });
 
 it('uses immutable recording coordinates and only associates typing with a matching recent field click', () => {
@@ -649,4 +649,19 @@ it('projects a burst of browser scroll observations as one history interval per 
   expect(markers[1]?.end).toBeCloseTo(1.02 + 49 * 0.016 + 0.45);
   expect(markers[2]).toMatchObject({ start: 5, end: 5.2 });
   expect(input).toEqual(snapshot);
+});
+
+it('uses disposable canonical markers without adding JSON fields or a fake legacy keyboard attack', () => {
+  const base = { actionEvents: [], signals: [], cursorTrack: null };
+  const marker = {
+    ref: { kind: 'action' as const, id: 'unknown-onset' },
+    eventType: 'KEY',
+    start: 1,
+    end: 1,
+    observed: true,
+  };
+  const prepared = attachReviewRecordingWindow(base, { markers: [marker] });
+  expect(projectReviewTelemetry(prepared, 10).markers).toEqual([marker]);
+  expect(JSON.stringify(prepared)).toBe(JSON.stringify(base));
+  expect(projectReviewTelemetry(base, 10).markers).toEqual([]);
 });

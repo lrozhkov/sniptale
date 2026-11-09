@@ -1,15 +1,18 @@
 import { resolveVideoProjectActionOccurrences } from '../../features/video/project/action-occurrences';
 import { describe, expect, it } from 'vitest';
+import { hydrateVideoProject } from '../../features/video/project/hydration';
+import { applyProjectUpdate } from '../project/state/helpers';
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
 import {
   createEmptyVideoProject,
+  createVideoProjectFromRecording,
   createVideoProjectTrack,
 } from '../../features/video/project/factories/creation';
 import {
   createSubtitleClip,
   createTextClip,
 } from '../../features/video/project/factories/overlay-clip';
-import { VideoTrackKind } from '../../features/video/project/types';
+import { VideoTrackKind, type VideoProject } from '../../features/video/project/types';
 import { createVideoProjectCursorTrack } from '../../features/video/project/defaults';
 import {
   createProject,
@@ -30,6 +33,191 @@ function createTimelineStore() {
     ...createExportStateActions(set),
   }));
 }
+
+describe('admitted project update hydration', () => {
+  it('does not reread admitted captured facts for a scene-only update', () => {
+    const store = createTimelineStore();
+    const project = createProject([createVideoClip()]);
+    project.cursorTrack = {
+      ...createVideoProjectCursorTrack(),
+      samples: [{ id: 'cursor', time: 1, x: 0.5, y: 0.5, visible: true }],
+    };
+    store.getState().setProject(project);
+    const current = store.getState().project!;
+    const sample = current.cursorTrack!.samples[0]!;
+    let reads = 0;
+    Object.defineProperty(sample, 'x', {
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return 0.5;
+      },
+    });
+    store.getState().updateProject((value) => ({ ...value, name: 'Renamed scene' }));
+    expect(store.getState().project?.name).toBe('Renamed scene');
+    expect(reads).toBe(0);
+    expect(store.getState().project?.cursorTrack).toBe(current.cursorTrack);
+  });
+
+  it.each<[string, (project: VideoProject) => VideoProject]>([
+    ['name', (p) => ({ ...p, name: 'Updated' })],
+    [
+      'focus path',
+      (p) => ({
+        ...p,
+        cursorFocusPath: {
+          version: 1,
+          smoothing: 0.3,
+          sensitivity: 0.6,
+          mode: 'follow',
+          gapPolicy: 'hold',
+          segments: [],
+        },
+      }),
+    ],
+    ['canvas', (p) => ({ ...p, width: 1920, height: 1080 })],
+    ['scene', (p) => ({ ...p, sceneBackground: { ...p.sceneBackground!, blur: 7 } })],
+    ['clips', (p) => ({ ...p, clips: p.clips.map((clip) => ({ ...clip, startTime: 2 })) })],
+    [
+      'assets',
+      (p) => ({
+        ...p,
+        assets: p.assets.map((asset) => ({
+          ...asset,
+          metadata: { ...asset.metadata, audioPeaks: [-1, 2] },
+        })),
+      }),
+    ],
+    [
+      'source',
+      (p) => ({
+        ...p,
+        source: { kind: 'recording', recordingId: 'different' },
+        baseRecordingId: 'different',
+      }),
+    ],
+    [
+      'cursor',
+      (p) => ({
+        ...p,
+        cursorTrack: {
+          ...p.cursorTrack!,
+          samples: [{ id: 'new', time: 2, x: 0.2, y: 0.3, visible: true }],
+        },
+      }),
+    ],
+    ['cursor removal', (p) => ({ ...p, cursorTrack: null })],
+  ])('matches complete hydration for %s updates and history navigation', (_name, update) => {
+    const store = createTimelineStore();
+    const project = createProject([createVideoClip()]);
+    project.cursorTrack = {
+      ...createVideoProjectCursorTrack(),
+      samples: [{ id: 'cursor', time: 1, x: 0.5, y: 0.5, visible: true }],
+    };
+    store.getState().setProject(project);
+    const before = store.getState();
+    const proposed = update(before.project!);
+    const expected = applyProjectUpdate(before, () => hydrateVideoProject(proposed)).project!;
+    store.getState().updateProject(() => proposed);
+    const actual = store.getState().project!;
+    expect({ ...actual, updatedAt: 0 }).toEqual({ ...expected, updatedAt: 0 });
+    store.getState().undoProject();
+    expect({ ...store.getState().project, updatedAt: 0 }).toEqual({
+      ...before.project,
+      updatedAt: 0,
+    });
+    store.getState().redoProject();
+    expect({ ...store.getState().project, updatedAt: 0 }).toEqual({ ...actual, updatedAt: 0 });
+  });
+
+  it('matches full source projection after scene changes, trimming, new facts and source removal', () => {
+    const store = createTimelineStore();
+    const project = createVideoProjectFromRecording({
+      recordingId: 'recording',
+      filename: 'capture.webm',
+      duration: 3,
+      width: 1920,
+      height: 1080,
+      mimeType: 'video/webm',
+      size: 1024,
+    });
+    const clip = project.clips.find((value) => value.type === 'VIDEO')!;
+    if (clip.type !== 'VIDEO') throw new Error('Expected video');
+    clip.sourceInstanceId = 'instance';
+    project.cursorTrack = {
+      ...createVideoProjectCursorTrack(),
+      sourceObservations: [
+        {
+          recordingId: 'recording',
+          sourceInstanceId: 'instance',
+          samples: [0, 1, 2].map((time) => ({
+            id: `raw-${time}`,
+            time,
+            x: 0.5,
+            y: 0.5,
+            visible: true,
+            recordingPoint: { x: 0.5, y: 0.5 },
+          })),
+        },
+      ],
+    };
+    store.getState().setProject(project);
+    const edits: ((p: VideoProject) => VideoProject)[] = [
+      (p) => ({ ...p, sceneBackground: { ...p.sceneBackground!, blur: 6 } }),
+      (p) => ({ ...p, sceneBackground: { ...p.sceneBackground!, blur: 8 } }),
+      (p) => ({
+        ...p,
+        clips: p.clips.map((value) =>
+          value.type === 'VIDEO' ? { ...value, sourceStart: 1, sourceDuration: 2 } : value
+        ),
+      }),
+      (p) => ({
+        ...p,
+        cursorTrack: {
+          ...p.cursorTrack!,
+          sourceObservations: p.cursorTrack!.sourceObservations!.map((group) => ({
+            ...group,
+            samples: [
+              ...group.samples,
+              {
+                id: 'new',
+                time: 2.5,
+                x: 0.3,
+                y: 0.3,
+                visible: true,
+                recordingPoint: { x: 0.3, y: 0.3 },
+              },
+            ],
+          })),
+        },
+      }),
+      (p) => ({ ...p, clips: [] }),
+    ];
+    for (const update of edits) {
+      const before = store.getState();
+      const proposed = update(before.project!);
+      const expected = applyProjectUpdate(before, () => hydrateVideoProject(proposed)).project!;
+      store.getState().updateProject(() => proposed);
+      expect({ ...store.getState().project, updatedAt: 0 }).toEqual({ ...expected, updatedAt: 0 });
+    }
+  });
+
+  it('retains complete normalization when shared clips need repair', () => {
+    const store = createTimelineStore();
+    const project = createProject([createVideoClip()]);
+    project.cursorTrack = { ...createVideoProjectCursorTrack(), samples: [] };
+    store.getState().setProject(project);
+    const before = store.getState();
+    const clip = before.project!.clips[0]!;
+    // Exercise a noncanonical shared branch without replacing its identity.
+    clip.fadeInMs = -10;
+    const proposed = { ...before.project!, name: 'Renamed' };
+    const expected = applyProjectUpdate(before, () => hydrateVideoProject(proposed)).project!;
+    store.getState().updateProject(() => proposed);
+    expect({ ...store.getState().project, updatedAt: 0 }).toEqual({ ...expected, updatedAt: 0 });
+    expect(store.getState().project?.clips[0]?.fadeInMs).toBeGreaterThanOrEqual(0);
+  });
+});
 
 describe('video editor timeline project state', () => {
   it('keeps another recording instance bound through move, speed, Undo and project replacement', () => {

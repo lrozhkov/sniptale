@@ -1,3 +1,4 @@
+import { RECORDING_EVENT_LABELS } from '../../../features/video/project/recording-events/types';
 import { describeTelemetryTarget } from './target';
 import { createPointerGestureRecorder } from './gestures';
 import {
@@ -13,17 +14,16 @@ import {
 } from '../../../features/video/project/types';
 import type { TelemetryListeners, TelemetryState } from './types';
 import {
+  createTelemetrySourceMoment as cursorMoment,
+  getTelemetryElapsedSeconds as getElapsedSeconds,
+} from './observation-clock';
+import {
   finalizeTelemetrySignals,
   finalizeTypingSignal,
   recordTypingActivity,
   tickCursorIdleTelemetry,
   updatePointerIdleAnchor,
 } from './signals';
-
-function getElapsedSeconds(state: TelemetryState, timestampMs: number): number {
-  const runningDurationMs = state.isPaused ? 0 : timestampMs - state.segmentStartedAtTimestamp;
-  return Math.max(0, (state.accumulatedDurationMs + runningDurationMs) / 1000);
-}
 
 function ensureCursorTrack(state: TelemetryState): NonNullable<TelemetryState['cursorTrack']> {
   if (state.cursorTrack) {
@@ -73,6 +73,8 @@ function recordCursorSample(
     x: event.clientX,
     y: event.clientY,
   });
+  if (state.cursorSource && state.cursorTrack)
+    state.cursorTrack.samples.splice(0, state.cursorTrack.samples.length - 1);
   state.lastKnownPointerPosition = {
     x: event.clientX,
     y: event.clientY,
@@ -104,9 +106,16 @@ function recordLastKnownPointerBoundary(
 function endObservation(
   state: TelemetryState,
   reason: 'outside' | 'hidden' | 'blur' | 'paused',
-  boundaryTimestamp?: number
+  boundaryTimestamp?: number,
+  sourceBoundary?: 'pause' | 'stop' | 'observation'
 ): void {
   const timestamp = boundaryTimestamp ?? performance.now();
+  if (state.cursorSource)
+    state.cursorSource.boundary(
+      cursorMoment(state, timestamp),
+      sourceBoundary ??
+        (reason === 'paused' ? 'pause' : reason === 'hidden' ? 'visibility' : 'observation')
+    );
   if (state.observationAvailable) {
     if (boundaryTimestamp === undefined) tickCursorIdleTelemetry(state);
     recordLastKnownPointerBoundary(state, timestamp, false);
@@ -115,7 +124,15 @@ function endObservation(
   }
   endKeyboardObservation(state);
   finalizeTelemetrySignals(state);
-  createPointerGestureRecorder(state).lose('lost', timestamp, reason === 'outside');
+  createPointerGestureRecorder(state).lose('lost', reason === 'outside');
+  state.eventSource?.boundary(
+    cursorMoment(state, timestamp),
+    sourceBoundary === 'stop'
+      ? 'stop'
+      : sourceBoundary === 'pause' || (!sourceBoundary && reason === 'paused')
+        ? 'pause'
+        : 'visibility'
+  );
   state.observationAvailable = false;
   state.pointerStationaryPosition = null;
   state.pointerStationaryStartedAtMs = null;
@@ -124,8 +141,52 @@ function endObservation(
 export function createTelemetryListeners(state: TelemetryState): TelemetryListeners {
   const gestures = createPointerGestureRecorder(state);
   const keyboard = createKeyboardRecorder(state);
-  const observePointer = (event: MouseEvent, force: boolean) => {
-    if (!event.isTrusted) return;
+  const released = new Map<number, { pointerId: number; sequence: number }>();
+  const rawPointer = (event: MouseEvent, kind: 'move' | 'down' | 'up' | 'click') => {
+    if (!state.cursorSource) return;
+    if (!state.observationAvailable) released.clear();
+    const pointerId =
+      typeof PointerEvent !== 'undefined' && event instanceof PointerEvent ? event.pointerId : null;
+    const previous = released.get(event.button);
+    if (kind === 'down') released.delete(event.button);
+    const sequence = state.cursorSource.sample(cursorMoment(state, event.timeStamp), {
+      x: event.clientX,
+      y: event.clientY,
+      observed: true,
+      visible: true,
+      event: kind,
+      button:
+        kind === 'move'
+          ? 'none'
+          : event.button === 0
+            ? 'left'
+            : event.button === 1
+              ? 'middle'
+              : event.button === 2
+                ? 'right'
+                : event.button === 3
+                  ? 'x1'
+                  : event.button === 4
+                    ? 'x2'
+                    : 'none',
+      relatedLocalSequence:
+        kind === 'click' && pointerId !== null && previous?.pointerId === pointerId
+          ? previous.sequence
+          : null,
+    });
+    if (kind === 'up' && pointerId !== null && event.button >= 0 && event.button <= 4)
+      released.set(event.button, { pointerId, sequence });
+    if (kind === 'click') released.delete(event.button);
+  };
+  const observePointer = (
+    event: MouseEvent,
+    force: boolean,
+    kind: 'move' | 'down' | 'up' = 'move',
+    trustedParent = false
+  ) => {
+    if (!event.isTrusted && !trustedParent) return;
+    if (!state.observationAvailable) released.clear();
+    rawPointer(event, kind);
     state.observationAvailable = true;
     updatePointerIdleAnchor(state, event, { reset: force });
     recordCursorSample(state, event, { force });
@@ -134,6 +195,43 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
     if (!event.isTrusted) return;
     const point =
       wheel && event instanceof MouseEvent ? { x: event.clientX, y: event.clientY } : null;
+    if (state.eventSource) {
+      const observedWheel = wheel && event instanceof WheelEvent ? event : null;
+      const normalized =
+        point &&
+        point.x >= 0 &&
+        point.x <= window.innerWidth &&
+        point.y >= 0 &&
+        point.y <= window.innerHeight
+          ? { x: point.x / window.innerWidth, y: point.y / window.innerHeight }
+          : null;
+      state.eventSource.emit(cursorMoment(state, event.timeStamp), {
+        kind: 'action',
+        action: {
+          id: crypto.randomUUID(),
+          kind: 'SCROLL',
+          timeUs: Math.round(getElapsedSeconds(state, event.timeStamp) * 1000000),
+          durationUs: 0,
+          point: normalized,
+          label: RECORDING_EVENT_LABELS.SCROLL,
+          preset: 'NONE',
+          data: {
+            eventType: observedWheel ? 'wheel' : 'scroll',
+            deltaX: observedWheel?.deltaX ?? null,
+            deltaY: observedWheel?.deltaY ?? null,
+            deltaZ: observedWheel?.deltaZ ?? null,
+            deltaMode: observedWheel?.deltaMode ?? null,
+            scrollX: observedWheel ? null : window.scrollX,
+            scrollY: observedWheel ? null : window.scrollY,
+            ctrlKey: observedWheel?.ctrlKey ?? null,
+            altKey: observedWheel?.altKey ?? null,
+            shiftKey: observedWheel?.shiftKey ?? null,
+            metaKey: observedWheel?.metaKey ?? null,
+          },
+        },
+      });
+      return;
+    }
     state.actionEvents.push({
       id: crypto.randomUUID(),
       kind: VideoProjectActionEventKind.SCROLL,
@@ -166,10 +264,14 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
   };
   return {
     change: () => undefined,
-    click: gestures.click,
+    click: (event) => {
+      if (!event.isTrusted) return;
+      rawPointer(event, 'click');
+      gestures.click(event);
+    },
     input: (event) => {
       if (!event.isTrusted) return;
-      if (isProtectedKeyboardTarget(event)) endKeyboardObservation(state, true);
+      if (isProtectedKeyboardTarget(event)) endKeyboardObservation(state);
       else if (describeTelemetryTarget(event).element !== state.keyboard.target)
         flushKeyboardRhythm(state);
       gestures.controlInput(event);
@@ -181,34 +283,47 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
       if (!event.isTrusted) return;
       finalizeTypingSignal(state, event.timeStamp);
       flushKeyboardRhythm(state);
-      observePointer(event, true);
+      observePointer(event, true, 'down');
       gestures.down(event);
     },
     pointerMove: (event) => {
-      if (event instanceof MouseEvent) {
-        observePointer(event, false);
+      if (event instanceof MouseEvent && event.isTrusted) {
+        const coalesced =
+          state.cursorSource &&
+          typeof PointerEvent !== 'undefined' &&
+          event instanceof PointerEvent &&
+          typeof event.getCoalescedEvents === 'function'
+            ? event.getCoalescedEvents()
+            : [];
+        if (coalesced.length) {
+          for (const sample of coalesced) observePointer(sample, false, 'move', true);
+        } else observePointer(event, false);
         gestures.move(event);
       }
     },
     pointerUp: (event) => {
-      observePointer(event, true);
+      observePointer(event, true, 'up');
       gestures.up(event);
     },
-    pointerCancel: gestures.cancel,
+    pointerCancel: (event) => {
+      if (event.isTrusted) released.clear();
+      gestures.cancel(event);
+    },
     mouseDown: (event) => {
       if (event.isTrusted && !state.gestures.has(event.button)) {
-        observePointer(event, true);
+        observePointer(event, true, 'down');
         gestures.down(event);
       }
     },
     mouseUp: (event) => {
       if (event.isTrusted && state.gestures.has(event.button)) {
-        observePointer(event, true);
+        observePointer(event, true, 'up');
         gestures.up(event);
       }
     },
     pointerLeave: (event) => {
-      if (event.isTrusted && event.relatedTarget === null) endObservation(state, 'outside');
+      if (event.isTrusted && event.relatedTarget === null)
+        endObservation(state, 'outside', event.timeStamp);
     },
     dragStart: gestures.dragStart,
     dragEnd: gestures.dragEnd,
@@ -219,7 +334,7 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
     blur: (event) => {
       if (!event || event.target === window) endObservation(state, 'blur');
       else {
-        endKeyboardObservation(state, isProtectedKeyboardTarget(event));
+        endKeyboardObservation(state);
         finalizeTypingSignal(state, event.timeStamp);
       }
     },
@@ -231,7 +346,8 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
 
 export function recordTelemetryPauseBoundary(
   state: TelemetryState,
-  boundaryTimestamp?: number
+  boundaryTimestamp?: number,
+  sourceBoundary: 'pause' | 'stop' | 'observation' = 'pause'
 ): void {
-  endObservation(state, 'paused', boundaryTimestamp);
+  endObservation(state, 'paused', boundaryTimestamp, sourceBoundary);
 }

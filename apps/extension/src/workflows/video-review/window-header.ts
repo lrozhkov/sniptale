@@ -2,7 +2,7 @@ import type { RenderResources } from '../../features/video/composition/canvas/re
 import { acquireVideoCompositionBuffer } from '../../features/video/composition/canvas/buffer-pool';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
-import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
+import { windowHeaderRasterHeight } from '../../features/video/composition/draw/window-header';
 import { composeWindowHeaderSvg } from '../../features/browser-frame/appearance';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
 
@@ -32,7 +32,7 @@ export function reviewWindowRasterBacking(args: {
 
 /** The synchronous consumer borrows the original image, never its disposal authority. */
 export type ReviewWindowRaster = Readonly<
-  Pick<ReturnType<typeof createReviewWindowRaster>, 'image' | 'width' | 'height'>
+  Pick<ReturnType<typeof createReviewWindowRaster>, 'image' | 'width' | 'height' | 'rect'>
 >;
 
 /** Base scene and sharp effects share one source lease, including exceptional exits. */
@@ -42,7 +42,12 @@ export function withReviewWindowRaster(
 ): void {
   const raster = createReviewWindowRaster(args);
   try {
-    consume({ image: raster.image, width: raster.width, height: raster.height });
+    consume({
+      image: raster.image,
+      width: raster.width,
+      height: raster.height,
+      ...(raster.rect ? { rect: raster.rect } : {}),
+    });
   } finally {
     raster.release();
   }
@@ -56,11 +61,43 @@ export function reviewWindowHeaderUrl(
   displayHeight?: number
 ): string {
   const source = { width, height };
-  const rasterHeight =
-    displayHeight ?? Math.max(2, Math.ceil(windowHeaderGeometry(header, source).height / 2) * 2);
+  const rasterHeight = displayHeight ?? windowHeaderRasterHeight(header, source);
   // Encoder rows extend the toolbar surface; glyphs keep the same scale on both axes.
   const svg = composeWindowHeaderSvg(header, source, rasterHeight);
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/** Loads borrowed local artwork. The caller retains image caching and disposal policy. */
+export function loadReviewArtworkImage(
+  url: string,
+  signal: AbortSignal,
+  loadErrorMessage: string,
+  checkAbortedAfterStart = false
+): Promise<HTMLImageElement> {
+  const image = new Image();
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const clean = () => {
+      image.onload = null;
+      image.onerror = null;
+      signal.removeEventListener('abort', abort);
+    };
+    const abort = () => {
+      clean();
+      image.src = '';
+      reject(signal.reason);
+    };
+    image.onload = () => {
+      clean();
+      resolve(image);
+    };
+    image.onerror = () => {
+      clean();
+      reject(new Error(loadErrorMessage));
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    image.src = url;
+    if (checkAbortedAfterStart && signal.aborted) abort();
+  });
 }
 
 /** Rasterize the complete SVG once; the caller owns the bitmap and must close it. */
@@ -76,29 +113,7 @@ export async function loadReviewWindowHeader(
     ![backing.width, backing.height].every((value) => Number.isSafeInteger(value) && value > 0)
   )
     throw new Error('Invalid window header backing.');
-  const image = new Image();
-  await new Promise<void>((resolve, reject) => {
-    const clean = () => {
-      image.onload = null;
-      image.onerror = null;
-      signal.removeEventListener('abort', abort);
-    };
-    const abort = () => {
-      clean();
-      image.src = '';
-      reject(signal.reason);
-    };
-    image.onload = () => {
-      clean();
-      resolve();
-    };
-    image.onerror = () => {
-      clean();
-      reject(new Error('Window header is unavailable.'));
-    };
-    signal.addEventListener('abort', abort, { once: true });
-    image.src = url;
-  });
+  const image = await loadReviewArtworkImage(url, signal, 'Window header is unavailable.');
   try {
     signal.throwIfAborted();
     // Re-rasterizing nested SVG viewports for each fractional zoom opens antialiased
@@ -124,6 +139,7 @@ export async function loadReviewWindowHeader(
 export function createReviewWindowRaster(args: {
   header?: CanvasImageSource | undefined;
   backing?: { width: number; height: number } | undefined;
+  region?: QuickEditRect;
   resources?: RenderResources | undefined;
   videoRect: QuickEditRect;
   visibleVideoRect?: QuickEditRect | undefined;
@@ -152,9 +168,10 @@ export function createReviewWindowRaster(args: {
     args.header.width > 0
       ? args.header.width
       : args.windowRect.width);
-  const scale = width / args.windowRect.width;
-  const height = args.backing?.height ?? args.windowRect.height * scale;
-  const scaleY = args.backing ? height / args.windowRect.height : scale;
+  const region = args.region ?? args.windowRect;
+  const scale = width / region.width;
+  const height = args.backing?.height ?? region.height * scale;
+  const scaleY = args.backing ? height / region.height : scale;
   const managed = args.resources?.canvas('decorated-window', {
     width: Math.ceil(width),
     height: Math.ceil(height),
@@ -178,14 +195,21 @@ export function createReviewWindowRaster(args: {
       context.imageSmoothingQuality = 'high';
       const visible = args.visibleVideoRect ?? args.videoRect;
       const headerHeight = (visible.y - args.windowRect.y) * scaleY;
-      if (args.header) context.drawImage(args.header, 0, 0, width, headerHeight);
+      if (args.header)
+        context.drawImage(
+          args.header,
+          (args.windowRect.x - region.x) * scale,
+          (args.windowRect.y - region.y) * scaleY,
+          args.windowRect.width * scale,
+          headerHeight
+        );
       // Sum coverage at the shared edge without backing transparent source pixels.
       context.globalCompositeOperation = 'lighter';
       if (args.visibleVideoRect) {
         context.beginPath();
         context.rect(
-          (visible.x - args.windowRect.x) * scale,
-          headerHeight,
+          (visible.x - region.x) * scale,
+          (visible.y - region.y) * scaleY,
           visible.width * scale,
           visible.height * scaleY
         );
@@ -193,8 +217,8 @@ export function createReviewWindowRaster(args: {
       }
       args.draw(
         context,
-        (args.videoRect.x - args.windowRect.x) * scale,
-        (args.videoRect.y - args.windowRect.y) * scaleY,
+        (args.videoRect.x - region.x) * scale,
+        (args.videoRect.y - region.y) * scaleY,
         args.videoRect.width * scale,
         args.videoRect.height * scaleY
       );
@@ -205,5 +229,11 @@ export function createReviewWindowRaster(args: {
     lease.release();
     throw error;
   }
-  return { image: lease.canvas, width, height, release: lease.release };
+  return {
+    image: lease.canvas,
+    width,
+    height,
+    ...(args.region ? { rect: args.region } : {}),
+    release: lease.release,
+  };
 }

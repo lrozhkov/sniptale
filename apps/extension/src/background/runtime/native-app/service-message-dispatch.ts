@@ -13,7 +13,6 @@ import {
 import { applyNativeHelloAuthority } from './service-hello';
 import { dispatchNativeMediaMessage, type NativeMediaMessage } from './service-media';
 import type { NativeControllerAcquireReason } from './service-types';
-import type { NativeSettingsSyncTracker } from './settings-sync-state';
 import {
   applyNativeOperationFailedStatus,
   applyNativeSettingsAcceptedStatus,
@@ -40,8 +39,6 @@ interface DispatchContext {
   post(message: NativeAppOutboundMessage): void;
   setHandshakeAccepted(accepted: boolean): void;
   setStatus(status: NativeAppRuntimeStatus): void;
-  settingsSync: NativeSettingsSyncTracker;
-  sync(): Promise<void>;
   warn(message: string): void;
 }
 
@@ -63,6 +60,8 @@ function dispatchNativeControlMessage(
   message: NativeRuntimeControlMessage
 ): void {
   switch (message.type) {
+    case 'app.connection.closed':
+      return;
     case 'app.hello':
       handleHello(ctx, message);
       return;
@@ -102,7 +101,13 @@ function isNativeMediaMessage(message: NativeAppInboundMessage): message is Nati
     message.type === 'app.screenshot.chunk' ||
     message.type === 'app.screenshot.commit' ||
     message.type === 'app.recording.stopped' ||
-    message.type === 'app.recording.chunk'
+    message.type === 'app.recording.chunk' ||
+    message.type === 'app.recording.attachment.manifest' ||
+    message.type === 'app.recording.attachment.chunk' ||
+    message.type === 'app.recording.attachment.available' ||
+    message.type === 'app.recording.events.manifest' ||
+    message.type === 'app.recording.events.chunk' ||
+    message.type === 'app.recording.events.available'
   );
 }
 
@@ -132,7 +137,6 @@ function handleLease(
     extensionId: chrome.runtime.id,
     handshakeAccepted: ctx.getHandshakeAccepted(),
     message,
-    settingsSync: ctx.settingsSync,
     status: ctx.getStatus(),
     warn: ctx.warn,
   });
@@ -141,10 +145,14 @@ function handleLease(
   }
   ctx.setStatus(next.status);
   ctx.acceptLeaseGeneration();
-  void ctx.sync();
   if (next.resumeLeaseId) {
     postNativeResponses(
       ctx.ingestion.resumePendingTransfers(next.resumeLeaseId),
+      ctx.post,
+      ctx.warn
+    );
+    postNativeResponses(
+      ctx.ingestion.resumePendingHistoryTransfers(next.resumeLeaseId, true),
       ctx.post,
       ctx.warn
     );
@@ -157,10 +165,6 @@ function handleSettingsAccepted(
 ): void {
   if (!ctx.ownsLease(message)) {
     ctx.warn('Stale settings');
-    return;
-  }
-  if (!ctx.settingsSync.acceptRevision(message.revision)) {
-    ctx.warn('Settings revision');
     return;
   }
   ctx.setStatus(applyNativeSettingsAcceptedStatus(ctx.getStatus(), message));

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { readValidBundleArtifact } from './fixture.test-support';
+import { readRetainedTitleCatalogEntry, readValidBundleArtifact } from './fixture.test-support';
 import {
   deleteEffectBundle,
   EffectBundlePersistenceError,
@@ -316,4 +316,28 @@ it('writes availability only for the requested document and rejects missing docu
   });
   await expect(setEffectDocumentEnabled(entry.packId, 'missing', true)).rejects.toThrow();
   expect(preferences.mutate).toHaveBeenCalledOnce();
+});
+
+it('opens and lists a retained title without rewriting its source or catalog row', async () => {
+  const entry = await readRetainedTitleCatalogEntry();
+  const original = structuredClone(entry);
+  mocks.db.get.mockResolvedValue(entry);
+  mocks.db.getAll.mockResolvedValue([entry]);
+
+  const expectedDocuments = original.documents.map((document) => ({
+    ...document,
+    enabled: true,
+  }));
+  const opened = await getEffectBundle(entry.packId);
+  expect(opened?.documents).toEqual(expectedDocuments);
+  expect(opened?.sourceSha256).toBe(original.sourceSha256);
+  await expect(listEffectBundles()).resolves.toEqual([
+    expect.objectContaining({
+      status: 'ready',
+      entry: expect.objectContaining({ documents: original.documents }),
+    }),
+  ]);
+  expect(entry).toEqual(original);
+  expect(mocks.transaction).not.toHaveBeenCalled();
+  expect(mocks.put).not.toHaveBeenCalled();
 });

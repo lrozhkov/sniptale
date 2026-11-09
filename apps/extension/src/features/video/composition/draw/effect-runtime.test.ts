@@ -7,6 +7,8 @@ import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/prese
 import type { VideoCompositionVisualLayer } from '../types';
 import type { EffectRuntimeRenderedFrame } from '../effect-runtime/runtime/types';
 import {
+  resolveEffectRuntimeVisualLayerFrame,
+  resolveEffectRuntimeVisualLayers,
   createEffectRuntimeDrawState,
   drawEffectRuntimeVisualLayer,
   hasEffectRuntimeTransitionFrame,
@@ -221,3 +223,41 @@ function createLayer(clipId: string): VideoCompositionVisualLayer {
     zIndex: 0,
   };
 }
+
+it('separates full-frame draw selection from camera-baked viewport locking', () => {
+  const layer = createLayer('source');
+  const transition = createFrame(
+    { kind: 'transition', leadingClipId: 'source', trailingClipId: 'other', transitionId: 'join' },
+    'transition'
+  );
+  const transitionFrames = new Map([['join', transition]]);
+  expect(resolveEffectRuntimeVisualLayerFrame(transitionFrames, layer)).toEqual({
+    frame: transition,
+    fullFrame: true,
+    deduplicationKey: 'join',
+  });
+  expect(
+    resolveEffectRuntimeVisualLayers([layer], transitionFrames)[0]?.effectViewportRaster
+  ).toBeUndefined();
+  const track = createFrame(
+    { kind: 'track', trackId: 'track', clipIds: ['source'] },
+    'targetEffect'
+  );
+  const grouped = createFrame({ kind: 'video-group', clipIds: ['source'] }, 'targetEffect');
+  grouped.effectInstanceId = 'video-group';
+  const groupedFrames = new Map([
+    ['track', track],
+    ['video', grouped],
+    ['join', transition],
+  ]);
+  expect(resolveEffectRuntimeVisualLayerFrame(groupedFrames, layer)).toEqual({
+    frame: grouped,
+    fullFrame: true,
+    deduplicationKey: 'group:video-group',
+  });
+  expect(resolveEffectRuntimeVisualLayers([layer], groupedFrames)[0]?.effectViewportRaster).toBe(
+    true
+  );
+  expect(transition.bitmap.close).not.toHaveBeenCalled();
+  expect(grouped.bitmap.close).not.toHaveBeenCalled();
+});

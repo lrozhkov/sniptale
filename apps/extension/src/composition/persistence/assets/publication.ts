@@ -87,7 +87,8 @@ export async function publishReadyJournalWithRetry(
   publish: (
     journal: AssetReadyJournal,
     lifecyclePermit?: DurableAssetLifecyclePermit
-  ) => Promise<void>
+  ) => Promise<void>,
+  lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<void> {
   // Cold database admission reserves the exclusive transition gate; it must settle before
   // the durable asset lifecycle lock is held or callers waiting on that lock can deadlock
@@ -96,8 +97,9 @@ export async function publishReadyJournalWithRetry(
   let publicationError: unknown;
   try {
     await initDB();
-    await runWithDurableAssetLifecycleLock((permit) =>
-      publishReadyJournal(journal, publish, permit)
+    await runWithDurableAssetLifecycleLock(
+      (permit) => publishReadyJournal(journal, publish, permit),
+      lifecyclePermit
     );
   } catch (error) {
     publicationError = error;

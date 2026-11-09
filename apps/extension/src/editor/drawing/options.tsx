@@ -23,6 +23,7 @@ import {
   DrawingWidthOptions,
   MarkerOpacityOptions,
 } from '../../ui/drawing-tools/options';
+import { DrawingSimplifyOptions } from '../../ui/drawing-tools/simplify-options';
 import { translate } from '../../platform/i18n';
 import { getColorAlpha } from '@sniptale/foundation/color';
 import {
@@ -235,6 +236,7 @@ function ToolOptions(props: {
   tool: DrawingOptionsTool;
   update: DrawingSettingsUpdate;
   preview: DrawingSettingsUpdate;
+  onRebuild?: () => void;
 }) {
   switch (props.tool) {
     case 'pencil':
@@ -288,6 +290,17 @@ function ToolOptions(props: {
           onFontSizeChange={(fontSize) => props.update('text', { fontSize })}
         />
       );
+    case 'simplify':
+      return (
+        <DrawingSimplifyOptions
+          {...props.common}
+          settings={props.settings.simplify}
+          onChange={(patch) => props.update('simplify', patch)}
+          onPreview={(color) => props.preview('simplify', { color })}
+          onPreviewReset={(color) => props.preview('simplify', { color })}
+          {...(props.onRebuild ? { onRebuild: props.onRebuild } : {})}
+        />
+      );
     case 'blur':
       return (
         <DrawingBlurStrengthOptions
@@ -308,6 +321,7 @@ export function EditorDrawingOptions(props: {
   onDeleteSelection: () => void;
   selectedType: string | null | undefined;
   tool: DrawingOptionsTool;
+  onRebuild?: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const colors = useDrawingPalette();
@@ -364,6 +378,7 @@ export function EditorDrawingOptions(props: {
         tool={props.tool}
         update={update}
         preview={preview}
+        {...(selected && props.onRebuild ? { onRebuild: props.onRebuild } : {})}
       />
     </div>
   );

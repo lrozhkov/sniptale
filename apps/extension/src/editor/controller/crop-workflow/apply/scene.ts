@@ -1,15 +1,22 @@
+import type {
+  BrowserFrameState,
+  EditorFrameSettings,
+} from '../../../../features/editor/document/types';
+import { resolveCanvasCompositionBase } from '../../document/scene/composition';
 import type { Canvas, FabricObject } from 'fabric';
 import { getSourceObject } from '../../document/layers';
 import { syncSourceStateFromObject } from '../../document/source';
 import type { CropSelection } from '../../core/types';
 import type { SourceState } from '../../../document/model/source-state';
-import { isUserObject } from '../../../document/model';
+import { isBrowserFrameObject, isUserObject } from '../../../document/model';
 import { shiftFrameAnnotationProxyForCrop } from '../../../frame-annotation/proxy';
 import { setEditorEditingSurfaceDimensions } from '../../../document/canvas-surface/editing-surface';
 import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 export async function runEditorCropSelection(context: {
   canvas: Canvas;
+  frame: EditorFrameSettings;
+  browserFrame: BrowserFrameState;
   crop: CropSelection;
   rebuildFrameDecorations: () => Promise<void>;
   setCanvasDocumentSize: (size: { width: number; height: number }) => void;
@@ -27,7 +34,18 @@ export async function runEditorCropSelection(context: {
   }
   context.setCanvasDocumentSize(nextCanvasSize);
   setEditorEditingSurfaceDimensions(context.canvas, nextCanvasSize);
-  context.setSource(createPostCropSourceState(context.canvas, context.source, context.crop));
+  const nextSource = createPostCropSourceState(context.canvas, context.source, context.crop);
+  if (nextSource) {
+    const header = context.canvas.getObjects().find(isBrowserFrameObject);
+    nextSource.compositionBase = resolveCanvasCompositionBase({
+      source: nextSource,
+      canvasSize: nextCanvasSize,
+      frame: context.frame,
+      browserFrame: context.browserFrame,
+      headerHeight: header?.getScaledHeight() ?? 0,
+    });
+  }
+  context.setSource(nextSource);
   context.syncViewportTransform();
   await context.rebuildFrameDecorations();
 }

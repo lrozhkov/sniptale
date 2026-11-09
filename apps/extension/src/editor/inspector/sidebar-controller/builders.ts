@@ -141,8 +141,8 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
       DimensionInput,
       backgroundImageInputRef: args.backgroundImageInputRef,
       importSessionInputRef: args.importSessionInputRef,
-      onApplyFrame: () => {
-        args.controller.applyFrameSettings({
+      onApplyFrame: async () => {
+        await args.controller.applyFrameSettings({
           ...args.frameDraft,
           sourceImage: {
             ...normalizeEditorImageSettings(args.frameDraft.sourceImage),

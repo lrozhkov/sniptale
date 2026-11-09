@@ -1,3 +1,11 @@
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
+import {
+  ensureOffscreenDocument,
+  waitForOffscreenReady,
+} from '../../../offscreen-document/service';
+import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
+import { createSimplifyRoute, routeSimplifyMessage } from '../../../simplify/route';
 import { routeSyncProductCommand } from '../../../sync-connection/product-route';
 import { routePageLaunchPreferencesMessage } from '../../page-access/page-launch-preferences';
 import {
@@ -49,6 +57,21 @@ type BackgroundOwnedRouteDispatcher = {
   readonly route: BackgroundOwnedRouteHandler;
 };
 
+const simplifyRoute = createSimplifyRoute({
+  async ensureDocument() {
+    await ensureOffscreenDocument('Compute Simplify image effects in a dedicated worker');
+    await waitForOffscreenReady();
+  },
+  send: (command) =>
+    getBackgroundRuntimeMessaging().sendRuntimeMessage(
+      attachOffscreenCommandCapability({ ...command, type: MessageType.OFFSCREEN_SIMPLIFY_COMMAND })
+    ),
+  createId: () => crypto.randomUUID(),
+});
+
+/** Releases this registered route instance's sessions when the native tab lifecycle ends. */
+export const retireSimplifySessionsForTab = simplifyRoute.retireTab;
+
 const keepOpen = (handled: boolean): ActionResult | null =>
   handled ? { handled: true, keepChannelOpen: true } : null;
 
@@ -62,6 +85,15 @@ export const backgroundOwnedHandlerBindings = {
   'annotation-fork-session': routeAnnotationForkSessionAction,
   'content-action-capability-issuance': routeContentActionCapabilityIssuance,
   'content-runtime-wakeup': routeContentRuntimeWakeupAction,
+  simplify: (action) =>
+    keepOpen(
+      routeSimplifyMessage(
+        simplifyRoute,
+        action.message,
+        action.context.sender,
+        action.context.sendResponse
+      )
+    ),
   'frame-annotation-raster': routeFrameAnnotationRasterAction,
   'llm-content-processing': routeLlmAction,
   'llm-scenario-editor-processing': routeScenarioEditorLlmAction,
@@ -117,17 +149,22 @@ function routeFrameAnnotationRasterAction(action: BackgroundOwnedAction): Action
 function routeSyncConnectionOriginPermissionAction(
   action: BackgroundOwnedAction
 ): ActionResult | null {
-  return keepOpen(
-    routeSyncConnectionOriginPermission(
-      action.message,
-      action.context.sender,
-      action.context.sendResponse
-    )
-  );
+  const { runtimeState, sender, sendResponse } = action.context;
+  if (runtimeState.syncCredentialRoute?.(action.message, sender, sendResponse))
+    return keepOpen(true);
+  if (runtimeState.syncOriginPermissionRoute)
+    return keepOpen(runtimeState.syncOriginPermissionRoute(action.message, sender, sendResponse));
+  return keepOpen(routeSyncConnectionOriginPermission(action.message, sender, sendResponse));
 }
 
 function routeVoiceInputOffscreenEventAction(action: BackgroundOwnedAction): ActionResult | null {
-  return keepOpen(routeVoiceInputOffscreenEvent(action.message, action.context.sendResponse));
+  return keepOpen(
+    routeVoiceInputOffscreenEvent(
+      action.message,
+      action.context.sendResponse,
+      action.context.runtimeState.voiceInputRuntime
+    )
+  );
 }
 
 function routeNativeAppRuntimeAction(action: BackgroundOwnedAction): ActionResult | null {
@@ -138,7 +175,12 @@ function routeNativeAppRuntimeAction(action: BackgroundOwnedAction): ActionResul
 
 function routeLlmSessionAction(action: BackgroundOwnedAction): ActionResult | null {
   return keepOpen(
-    routeLlmSessionMessage(action.message, action.context.sender, action.context.sendResponse)
+    routeLlmSessionMessage(
+      action.message,
+      action.context.sender,
+      action.context.sendResponse,
+      action.context.runtimeState.secretProtection
+    )
   );
 }
 
@@ -151,7 +193,8 @@ function routeAiSettingsQueryAction(
       action.message,
       action.context.sender,
       action.context.sendResponse,
-      routeContext
+      routeContext,
+      action.context.runtimeState.secretProtection
     )
   );
 }
@@ -161,7 +204,9 @@ function routeAiSettingsMutationAction(action: BackgroundOwnedAction): ActionRes
     routeAiSettingsMutationMessage(
       action.message,
       action.context.sender,
-      action.context.sendResponse
+      action.context.sendResponse,
+      action.context.runtimeState.secretProtection,
+      action.context.runtimeState.aiSettingsMutator
     )
   );
 }
@@ -197,7 +242,9 @@ function routeAiSecretUnlockAction(
       action.message,
       action.context.sender,
       action.context.sendResponse,
-      routeContext
+      routeContext,
+      action.context.runtimeState.secretProtection,
+      action.context.runtimeState.secretUnlockSync
     )
   );
 }
@@ -236,7 +283,12 @@ function routeSettingsTransferAction(action: BackgroundOwnedAction): ActionResul
 
 function routeLlmAction(action: BackgroundOwnedAction): ActionResult | null {
   return keepOpen(
-    routeLlmMessage(action.message, action.context.sendResponse, action.context.sender)
+    routeLlmMessage(
+      action.message,
+      action.context.sendResponse,
+      action.context.sender,
+      action.context.runtimeState.secretProtection
+    )
   );
 }
 
@@ -245,7 +297,8 @@ function routeScenarioEditorLlmAction(action: BackgroundOwnedAction): ActionResu
     routeScenarioEditorLlmMessage(
       action.message,
       action.context.sendResponse,
-      action.context.sender
+      action.context.sender,
+      action.context.runtimeState.secretProtection
     )
   );
 }

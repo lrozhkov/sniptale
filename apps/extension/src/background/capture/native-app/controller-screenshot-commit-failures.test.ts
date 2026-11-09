@@ -106,7 +106,7 @@ async function createScreenshotStart(bytes: Uint8Array): Promise<AppScreenshotSt
     mimeType: 'image/png',
     mode: 'screen',
     openEditor: true,
-    protocolVersion: 1,
+    protocolVersion: 2,
     sha256: await sha256Hex(bytes),
     totalBytes: bytes.byteLength,
     type: 'app.screenshot.start',
@@ -123,7 +123,7 @@ async function createScreenshotChunk(bytes: Uint8Array): Promise<AppScreenshotCh
     chunkRawBytes: bytes.byteLength,
     chunkSha256: await sha256Hex(bytes),
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.chunk',
   };
 }
@@ -132,7 +132,7 @@ function createScreenshotCommit(): AppScreenshotCommitMessage {
   return {
     captureId: 'capture-1',
     controllerLeaseId: 'lease-1',
-    protocolVersion: 1,
+    protocolVersion: 2,
     type: 'app.screenshot.commit',
   };
 }
@@ -192,7 +192,11 @@ it('acks screenshot commits after media save when optional editor opening fails'
   mocks.editorFails = true;
 
   await expect(controller.handleScreenshotCommit(createScreenshotCommit())).resolves.toEqual([
-    expect.objectContaining({ assetId: 'capture-1', type: 'extension.screenshot.ack' }),
+    expect.objectContaining({
+      assetId: 'capture-1',
+      type: 'extension.screenshot.ack',
+      receipt: { durable: true, sha256: await sha256Hex(bytes), totalBytes: bytes.byteLength },
+    }),
   ]);
   expect(mocks.screenshotSaveMock).toHaveBeenCalled();
   expect(mocks.screenshotSaveMock).toHaveBeenCalledWith(
@@ -206,7 +210,11 @@ it('rejects replayed screenshot starts after a successful commit without saving 
   const controller = await stageScreenshot(bytes);
 
   await expect(controller.handleScreenshotCommit(createScreenshotCommit())).resolves.toEqual([
-    expect.objectContaining({ assetId: 'capture-1', type: 'extension.screenshot.ack' }),
+    expect.objectContaining({
+      assetId: 'capture-1',
+      type: 'extension.screenshot.ack',
+      receipt: { durable: true, sha256: await sha256Hex(bytes), totalBytes: bytes.byteLength },
+    }),
   ]);
   await expect(
     controller.handleScreenshotStart(await createScreenshotStart(bytes))

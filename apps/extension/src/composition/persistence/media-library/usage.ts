@@ -1,6 +1,8 @@
-import { readAllWorkspaceStorage } from '../review-workspaces/storage';
+import { readDeletionDependencyRows } from './deletion-index';
+import { readScenarioStorage } from '../scenario/storage';
+import type { IDBPTransaction } from 'idb';
 import { readIndexedProjectUsage } from './usage-index';
-import { parseProjectAssetEntry } from '../projects/read-guards';
+import { parseProjectAssetEntry, parseVideoProjectEntry } from '../projects/read-guards';
 import {
   mediaDependencyTarget,
   scenarioChildUsesMedia,
@@ -8,11 +10,13 @@ import {
   isVideoPrimaryMediaSource,
   reviewWorkspaceUsesMedia,
 } from './dependencies';
-import { listScenarioProjectEntries } from '../scenario/projects';
-import { parseScenarioAssetEntry } from '../scenario/read-guards';
-import { listVideoProjectEntries } from '../projects/queries';
+import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/read-guards';
 import {
   initDB,
+  VIDEO_PROJECTS_STORE,
+  SCENARIO_PROJECTS_STORE,
+  SCENARIO_PROJECT_HISTORY_STORE,
+  SCENARIO_PROJECT_UNITS_STORE,
   SCENARIO_ASSETS_STORE,
   PROJECT_ASSETS_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -29,48 +33,54 @@ export type { MediaAssetProjectUsage } from './contracts';
 
 interface UsageSnapshot {
   mediaById: Map<string, MediaLibraryEntry>;
-  videoProjects: Awaited<ReturnType<typeof listVideoProjectEntries>>;
-  scenarioProjects: Awaited<ReturnType<typeof listScenarioProjectEntries>>;
+  videoProjects: NonNullable<ReturnType<typeof parseVideoProjectEntry>>[];
+  scenarioProjects: NonNullable<ReturnType<typeof parseScenarioProjectEntry>>[];
   scenarioAssets: ScenarioAssetEntry[];
   projectAssets: NonNullable<ReturnType<typeof parseProjectAssetEntry>>[];
   reviewWorkspaces: NonNullable<ReturnType<typeof parseVideoWorkspace>>[];
 }
 
-async function loadUsageSnapshot(db?: Awaited<ReturnType<typeof initDB>>): Promise<UsageSnapshot> {
-  const connection = db ?? (await initDB());
-  const [
-    videoProjects,
-    scenarioProjects,
-    rawScenarioAssets,
-    rawReviewWorkspaces,
-    rawMedia,
-    rawProjectAssets,
-  ] = await Promise.all([
-    listVideoProjectEntries(),
-    listScenarioProjectEntries(),
-    connection.getAll(SCENARIO_ASSETS_STORE),
-    readAllWorkspaceStorage(
-      connection.transaction([VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE], 'readonly')
+async function loadUsageSnapshot(
+  tx: IDBPTransaction<unknown, string[], 'readonly'>,
+  root: MediaLibraryEntry
+): Promise<UsageSnapshot> {
+  const matches = await readDeletionDependencyRows(tx, root);
+  const scenarioAssets = matches.children
+    .map(parseScenarioAssetEntry)
+    .filter((entry) => entry !== null);
+  const scenarioIds = [
+    ...new Set(
+      scenarioAssets
+        .filter((child) => scenarioChildUsesMedia(child, matches.target))
+        .map((child) => child.projectId)
     ),
-    connection.getAll(MEDIA_LIBRARY_STORE),
-    connection.getAll(PROJECT_ASSETS_STORE),
-  ]);
+  ];
+  const scenarioProjects = (
+    await Promise.all(
+      scenarioIds.map(async (id) =>
+        parseScenarioProjectEntry((await readScenarioStorage(tx, id)).logical)
+      )
+    )
+  ).filter((entry) => entry !== null);
+  const reviewWorkspaces = matches.reviews
+    .map(parseVideoWorkspace)
+    .filter((entry) => entry !== null);
+  const mediaById = new Map([[root.id, root]]);
+  for (const workspace of reviewWorkspaces) {
+    const id = workspace.sourceMediaId ?? workspace.aggregateId;
+    if (mediaById.has(id)) continue;
+    const owner = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(id));
+    if (owner) mediaById.set(id, owner);
+  }
   return {
-    projectAssets: rawProjectAssets.map(parseProjectAssetEntry).filter((entry) => entry !== null),
-    videoProjects,
+    projectAssets: matches.projectAssets
+      .map(parseProjectAssetEntry)
+      .filter((entry) => entry !== null),
+    videoProjects: matches.videos.map(parseVideoProjectEntry).filter((entry) => entry !== null),
     scenarioProjects,
-    scenarioAssets: rawScenarioAssets
-      .map(parseScenarioAssetEntry)
-      .filter((entry) => entry !== null),
-    reviewWorkspaces: rawReviewWorkspaces
-      .map(parseVideoWorkspace)
-      .filter((entry) => entry !== null),
-    mediaById: new Map(
-      rawMedia
-        .map(parseMediaLibraryEntry)
-        .filter((entry) => entry !== null)
-        .map((entry) => [entry.id, entry])
-    ),
+    scenarioAssets,
+    reviewWorkspaces,
+    mediaById,
   };
 }
 
@@ -125,23 +135,51 @@ function projectUsageFromSnapshot(
   return usage;
 }
 
-/** Read-only projection from authoritative project documents, not a cached counter. */
+/** Read selected authoritative source documents in a fresh native snapshot. */
 export async function listMediaAssetProjectUsage(
   mediaId: string
 ): Promise<MediaAssetProjectUsage[]> {
-  const db = await initDB();
-  if (!parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, mediaId))) return [];
-  return projectUsageFromSnapshot(mediaId, await loadUsageSnapshot(db));
+  return (await listMediaAssetProjectUsageBatch([mediaId])).get(mediaId) ?? [];
 }
 
-/** One fresh authoritative read for a deletion selection; never uses the advisory preview cache. */
+/** One fresh snapshot for the deletion selection; absence uses the complete native index. */
 export async function listMediaAssetProjectUsageBatch(
   mediaIds: readonly string[]
 ): Promise<Map<string, MediaAssetProjectUsage[]>> {
   const ids = [...new Set(mediaIds)];
-  if (ids.length === 0) return new Map();
-  const snapshot = await loadUsageSnapshot();
-  return new Map(ids.map((id) => [id, projectUsageFromSnapshot(id, snapshot)]));
+  if (!ids.length) return new Map();
+  const db = await initDB();
+  const tx = db.transaction(
+    [
+      MEDIA_LIBRARY_STORE,
+      VIDEO_PROJECTS_STORE,
+      PROJECT_ASSETS_STORE,
+      SCENARIO_ASSETS_STORE,
+      SCENARIO_PROJECTS_STORE,
+      SCENARIO_PROJECT_HISTORY_STORE,
+      SCENARIO_PROJECT_UNITS_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+    ],
+    'readonly'
+  );
+  try {
+    const result = new Map<string, MediaAssetProjectUsage[]>();
+    for (const id of ids) {
+      const root = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(id));
+      result.set(id, root ? projectUsageFromSnapshot(id, await loadUsageSnapshot(tx, root)) : []);
+    }
+    await tx.done;
+    return result;
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      /* The native snapshot may already be closed. */
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
 }
 
 /** Subscribe to advisory relationship changes with page-scoped listener cleanup. */
@@ -165,7 +203,7 @@ export function subscribeToPreviewProjectUsageInvalidation(listener: () => void)
   };
 }
 
-/** Indexed advisory lookup; deletion consumers deliberately retain the fresh graph read above. */
+/** Inspector lookup retains its existing advisory invalidation policy. */
 export function listPreviewMediaAssetProjectUsage(
   mediaId: string
 ): Promise<MediaAssetProjectUsage[]> {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildExecutableDiscovery } from '../discovery.mjs';
+import { collectControlPolicyViolations } from '../policy.mjs';
+
 import {
   collectCatalogOrigins,
   collectDeclaredEntryOrigins,
@@ -336,5 +339,91 @@ describe('executable origin admission failures', () => {
           '`tooling/bin/${name}.mjs` });',
       })
     ).toEqual({ origins: [], unresolved: [expect.objectContaining({ ordinal: 1 })] });
+  });
+});
+
+describe('browser module origins', () => {
+  const target = 'tooling/browser/app.mjs';
+  const authority = 'tooling/browser/index.html';
+  const source = "const config = await (await fetch('/config.json')).json();";
+  const project = (html: string) =>
+    collectExecutableOriginProjection({
+      authorities: [
+        { kind: 'html', path: authority, source: html },
+        { kind: 'source', path: target, source },
+      ],
+      exists: (file: string) => file === target || file === 'tooling/shared.js',
+    });
+
+  it('derives browser consumers from parsed literal relative module scripts', () => {
+    const projection = project(`
+      <!-- <script type="module" src="./comment.mjs"></script> -->
+      <script src="./classic.mjs"></script>
+      <script type='module' data-example='>' src='./app.mjs'></script>
+      <script type="module" src="../shared.js"></script>
+      <script type="module">import './inline.mjs';</script>
+    `);
+    expect(projection.origins.filter(({ kind }) => kind === 'browser-module')).toEqual([
+      expect.objectContaining({
+        authority,
+        kind: 'browser-module',
+        target,
+      }),
+      expect.objectContaining({
+        authority,
+        kind: 'browser-module',
+        target: 'tooling/shared.js',
+      }),
+    ]);
+    expect(projection.origins.some(({ kind }) => kind.includes('process-target'))).toBe(false);
+  });
+
+  it.each([
+    'https://example.com/app.mjs',
+    '//example.com/app.mjs',
+    'data:text/javascript,run()',
+    '#app.mjs',
+    '/app.mjs',
+    './missing.mjs',
+    './unknown.css',
+    '../../../app.mjs',
+    './app.mjs?unknown',
+    './app.mjs#fragment',
+    '../..%2f../app.mjs',
+  ])('does not infer a repository consumer for %s', (src) => {
+    expect(
+      project(`<script type="module" src="${src}"></script>`).origins.filter(
+        ({ kind }) => kind === 'browser-module'
+      )
+    ).toEqual([]);
+  });
+
+  it('does not resolve module paths against an unknown HTML base', () => {
+    expect(
+      project(
+        '<base href="https://example.com/"><script type="module" src="./app.mjs"></script>'
+      ).origins.filter(({ kind }) => kind === 'browser-module')
+    ).toEqual([]);
+  });
+
+  it('restores orphan and unsafe-import diagnostics when the HTML binding is removed', () => {
+    const rules = (html: string) =>
+      collectControlPolicyViolations(
+        {
+          controls: [],
+          executables: buildExecutableDiscovery({
+            controls: [],
+            originProjection: project(html),
+            readSource: () => source,
+          }),
+          policyFiles: [],
+        },
+        { $comment: 'No exceptions.', schemaVersion: 4, exceptions: [] },
+        {
+          readSource: () => source,
+        }
+      ).map(({ rule }) => rule);
+    expect(rules('<script type="module" src="./app.mjs"></script>')).toEqual([]);
+    expect(rules('')).toEqual(['qa-executable-orphan', 'qa-executable-import-safety']);
   });
 });

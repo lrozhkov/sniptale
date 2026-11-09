@@ -1,5 +1,11 @@
-import type { CameraPerspective, CameraDepthOfField, CameraSpatialRect } from '../motion/spatial';
+import type {
+  CameraPerspective,
+  CameraDepthOfField,
+  CameraSpatialRect,
+  CursorCompositionSettings,
+} from '../motion/spatial';
 import type { MotionBlurPhases } from '../motion/blur';
+import type { CursorTrajectoryDescriptor } from '../cursor-trajectory/types';
 export const VideoProjectSourceKind = {
   MANUAL: 'manual',
   RECORDING: 'recording',
@@ -161,6 +167,7 @@ export interface VideoProjectCursorSourceObservations {
   recordingId: string;
   sourceInstanceId: string;
   samples: VideoProjectCursorSample[];
+  trajectory?: CursorTrajectoryDescriptor;
 }
 
 export interface VideoProjectCursorTrack {
@@ -423,6 +430,7 @@ export interface VideoProjectMotionRegion {
   /** Explicit phase settings override the retained legacy scalar. */
   motionBlur?: MotionBlurPhases;
   phaseTransitions?: MotionPhaseTransitions;
+  cursorComposition?: CursorCompositionSettings;
   perspective?: CameraPerspective;
   depthOfField?: CameraDepthOfField;
   /** Independent normalized scene plane; omission uses the whole project canvas. */

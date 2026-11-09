@@ -1,3 +1,4 @@
+import { unmountEditorSimplifyRuntime } from '../../../../drawing/simplify-runtime';
 import { detachEditorControllerEventHandlers } from '../../../events';
 import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
@@ -17,6 +18,7 @@ export function disposeEditorController(controller: EditorControllerInstance): v
     handlers: controller.eventHandlers,
     viewportResizeObserver: controller.viewportResizeObserver,
   });
+  unmountEditorSimplifyRuntime(controller.canvas);
   disposeEditorSelectionChrome(controller.canvas);
   controller.magnetManager?.dispose();
   controller.magnetManager = null;

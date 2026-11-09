@@ -1,4 +1,9 @@
+import { recoverNativeRecordingHistories } from '../recordings/native-history/recovery';
+import { retireJournalRecordingEventStages } from '../recordings/recording-events/staging';
+import { prepareAssetReadyClaimIndex } from '../assets/opfs-store';
 import { syncReplicaPublicationAdapter } from '../sync-capture/replica-publication';
+import { recordingCursorTrajectoryPublicationAdapter } from '../recordings/telemetry';
+import { retireJournalCursorTrajectoryStages } from '../recordings/cursor-trajectory/staging';
 import { readAllWorkspaceStorage } from '../review-workspaces/storage';
 import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
 import {
@@ -468,6 +473,10 @@ async function recoverBackupRestoreOperations(
         archiveSessionsWithAmbiguousJournals.add(archiveSession.operationId);
         continue;
       }
+      if (journal.domain === 'archive-restore-root') {
+        await retireJournalCursorTrajectoryStages(journal.journalId);
+        await retireJournalRecordingEventStages(journal.journalId);
+      }
       await cancelAssetPublication(journal, lifecyclePermit);
       continue;
     }
@@ -484,6 +493,10 @@ async function recoverBackupRestoreOperations(
       return false;
     });
     if (!referenced) {
+      if (journal.domain === 'archive-restore-root') {
+        await retireJournalCursorTrajectoryStages(journal.journalId);
+        await retireJournalRecordingEventStages(journal.journalId);
+      }
       await cancelAssetPublication(journal, lifecyclePermit);
     }
   }
@@ -540,13 +553,21 @@ async function recoverPublications(
   return runStorageStartupPhase('asset-recovery', () =>
     runWithDurableAssetOperationRecovery(permit, async () => {
       await runStorageStartupPhase('asset-writing-cleanup', () =>
-        runWithDurableAssetLifecycleLock(async () => {
-          // Publication holds this same lifecycle lock, so one lazy snapshot covers this cleanup batch.
-          let authority: ReturnType<typeof readPhysicalDeleteAuthority> | undefined;
-          return collectQuiescentWritingObjects({}, async (assetId) => {
-            authority ??= readPhysicalDeleteAuthority();
-            return (await authority)(assetId) !== 'unowned';
-          });
+        runWithDurableAssetLifecycleLock(async (lifecyclePermit) => {
+          await prepareAssetReadyClaimIndex(lifecyclePermit);
+          return collectQuiescentWritingObjects(
+            {},
+            async (assetId) => {
+              const authority = await readPhysicalDeleteAuthority(
+                [assetId],
+                undefined,
+                lifecyclePermit
+              );
+              const state = authority(assetId);
+              return state === 'invalid' || state === 'mismatch' ? null : state !== 'unowned';
+            },
+            lifecyclePermit
+          );
         })
       );
       await runStorageStartupPhase('asset-backup-recovery', () =>
@@ -556,6 +577,7 @@ async function recoverPublications(
         recoverStandaloneAssetPublications(
           [
             recordingAssetPublicationAdapter,
+            recordingCursorTrajectoryPublicationAdapter,
             projectAssetPublicationAdapter,
             projectExportPublicationAdapter,
             scenarioAssetPublicationAdapter,
@@ -567,8 +589,9 @@ async function recoverPublications(
           transitionPermit
         )
       );
+      const nativeRecovered = await recoverNativeRecordingHistories(transitionPermit);
       if (collectOrphans) await collectOrphanAssetObjects();
-      return recovered;
+      return recovered + nativeRecovered;
     })
   );
 }

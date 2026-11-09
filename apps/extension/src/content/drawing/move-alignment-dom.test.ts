@@ -78,3 +78,20 @@ it('ignores invisible/tiny and viewport-filling candidates and fails soft if the
   });
   expect(read()).toEqual([]);
 });
+
+it('probes both sides of a grabbed resize edge within the existing nine-hit budget', () => {
+  const target = document.createElement('div');
+  document.body.append(target);
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(620, 320, 180, 140));
+  const hit = vi.fn((x: number, y: number) =>
+    x >= 620 && x <= 800 && y >= 320 && y <= 460 ? [target] : []
+  );
+  Object.defineProperty(document, 'elementsFromPoint', { configurable: true, value: hit });
+  const bounds = { x: 400, y: 160, width: 396, height: 164 };
+  expect(collectDrawingDomAlignmentBounds(bounds, { kind: 'viewport', element: null })).toEqual([]);
+  hit.mockClear();
+  expect(
+    collectDrawingDomAlignmentBounds(bounds, { kind: 'viewport', element: null }, { x: 796 })
+  ).toEqual([{ x: 620, y: 320, width: 180, height: 140 }]);
+  expect(hit).toHaveBeenCalledTimes(9);
+});

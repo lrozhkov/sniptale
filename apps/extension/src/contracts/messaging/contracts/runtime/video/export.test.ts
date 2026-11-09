@@ -285,3 +285,40 @@ it('parses offscreen project export capability responses', () => {
     })
   );
 });
+
+it.each(['off', 'bicubic-sharpen', 'clark-x2'])(
+  'retains detail mode %s through actual export request parsing',
+  (detailEnhancement) => {
+    const request = {
+      ...createProjectExportRequest(),
+      settings: { ...createExportSettings(), detailEnhancement },
+    };
+    expect(
+      runtimeVideoExportMessageContracts[VideoMessageType.START_PROJECT_EXPORT].parseRequest(
+        request
+      )
+    ).toMatchObject({ settings: { detailEnhancement } });
+  }
+);
+it.each([null, 0, {}, 'unknown'])(
+  'rejects invalid detail mode %s at runtime ingress',
+  (detailEnhancement) => {
+    const request = {
+      ...createProjectExportRequest(),
+      settings: { ...createExportSettings(), detailEnhancement },
+    };
+    expect(() =>
+      runtimeVideoExportMessageContracts[VideoMessageType.START_PROJECT_EXPORT].parseRequest(
+        request
+      )
+    ).toThrow();
+    expect(() =>
+      runtimeVideoExportMessageContracts[
+        VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES
+      ].parseRequest({
+        type: VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES,
+        settings: request.settings,
+      })
+    ).toThrow();
+  }
+);

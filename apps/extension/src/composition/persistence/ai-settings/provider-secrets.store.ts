@@ -1,6 +1,8 @@
+import { withSecretProtectionWriter } from '../secret-protection/service';
+import type { SecretProtectionAdmissionPermit } from '../secret-protection/model';
 import type { AIProvider } from '../../../contracts/settings';
 import { selectSettingsTransferProviderMetadata } from '../../../contracts/settings-transfer/provider-metadata';
-import { browserStorage } from '../infrastructure/browser-storage';
+import { browserStorage, restoreSelectedStorageKeys } from '../infrastructure/browser-storage';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   decryptSecret,
@@ -50,9 +52,10 @@ export interface AIProviderTransferMutationPlan {
   rollback(): Promise<void>;
 }
 
-export async function prepareAIProviderTransferMutation(args: {
+async function performPrepareAIProviderTransferMutation(args: {
   importedProviders: readonly AIProvider[];
   permit?: PersistenceMutationPermit;
+  admissionPermit?: SecretProtectionAdmissionPermit;
 }): Promise<AIProviderTransferMutationPlan> {
   const keys = [
     AI_PROVIDERS_KEY,
@@ -116,15 +119,23 @@ export async function prepareAIProviderTransferMutation(args: {
     [AI_PROVIDERS_KEY]: nextProviders,
     [AI_PROVIDER_SECRETS_KEY]: nextSecrets,
   };
+  let committedState: Record<string, unknown> | null = null;
+  const currentState = () => browserStorage.local.get([...keys]);
+  const same = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right);
   const restore = async () => {
-    const present = Object.fromEntries(
-      keys.filter((key) => key in before).map((key) => [key, before[key]])
-    );
-    const missing = keys.filter((key) => !(key in before));
-    if (Object.keys(present).length > 0) await browserStorage.local.set(present, args.permit);
-    if (missing.length > 0) await browserStorage.local.remove([...missing], args.permit);
-    const verified = await browserStorage.local.get([...keys]);
-    if (JSON.stringify(verified) !== JSON.stringify(present)) {
+    const current = await currentState();
+    const withoutKey =
+      committedState &&
+      Object.fromEntries(
+        Object.entries(committedState).filter(([key]) => key !== AI_LOCAL_SECRET_KEY_STORAGE_KEY)
+      );
+    const mayRestore =
+      same(current, before) ||
+      (committedState && same(current, committedState)) ||
+      (Object.keys(nextSecrets).length === 0 && withoutKey && same(current, withoutKey));
+    if (!mayRestore)
+      throw new AIProviderTransferRollbackError('AI provider transfer rollback selection changed');
+    if (!(await restoreSelectedStorageKeys(browserStorage.local, keys, before, args.permit))) {
       throw new AIProviderTransferRollbackError(
         'AI provider transfer rollback verification failed'
       );
@@ -134,19 +145,27 @@ export async function prepareAIProviderTransferMutation(args: {
     clearedProviderIds: [...new Set(clearedProviderIds)],
     missingProviderIds: [...new Set(missingProviderIds)],
     async commit() {
-      try {
-        await browserStorage.local.set(next, args.permit);
-        await removeTransparentKeyIfUnused(Object.keys(nextSecrets).length, args.permit);
-      } catch (error) {
+      return withSecretProtectionWriter(async () => {
+        if (!same(await currentState(), before))
+          throw new Error('AI provider transfer selection changed');
         try {
-          await restore();
-        } catch {
-          throw new AIProviderTransferRollbackError('AI provider transfer rollback failed');
+          // A failed atomic set can report an ambiguous acknowledgement. Retain only its exact intended target.
+          committedState = { ...before, ...next };
+          await browserStorage.local.set(next, args.permit);
+          committedState = await currentState();
+          await removeTransparentKeyIfUnused(Object.keys(nextSecrets).length, args.permit);
+          committedState = await currentState();
+        } catch (error) {
+          try {
+            await restore();
+          } catch {
+            throw new AIProviderTransferRollbackError('AI provider transfer rollback failed');
+          }
+          throw error;
         }
-        throw error;
-      }
+      }, args.admissionPermit);
     },
-    rollback: restore,
+    rollback: () => withSecretProtectionWriter(restore, args.admissionPermit),
   };
 }
 
@@ -189,7 +208,7 @@ export async function loadStoredAIProviders(): Promise<AIProvider[]> {
   return readStoredProviderMetadata();
 }
 
-export async function saveStoredAIProviders(providers: AIProvider[]): Promise<void> {
+async function performSaveStoredAIProviders(providers: AIProvider[]): Promise<void> {
   await browserStorage.local.set({
     [AI_PROVIDERS_KEY]: providers,
   });
@@ -229,16 +248,22 @@ export async function setStoredAIProviderEnabled(
   );
 }
 
-export async function upsertStoredAIProviderRecord(
+async function performUpsertStoredAIProviderRecord(
   input: AIProviderUpsertInput,
-  permit?: PersistenceMutationPermit
+  permit?: PersistenceMutationPermit,
+  operationKey?: CryptoKey | null
 ): Promise<void> {
   const [providers, secrets] = await Promise.all([
     readStoredProviderMetadata(),
     readStoredProviderSecrets(),
   ]);
   const previousProvider = providers.find((provider) => provider.id === input.id);
-  const plan = await createProviderSecretUpsertPlan({ input, previousProvider, secrets });
+  const plan = await createProviderSecretUpsertPlan({
+    input,
+    previousProvider,
+    secrets,
+    operationKey,
+  });
 
   const nextProviders = previousProvider
     ? providers.map((provider) => (provider.id === input.id ? plan.nextProvider : provider))
@@ -260,7 +285,7 @@ export async function upsertStoredAIProviderRecord(
   }
 }
 
-export async function deleteStoredAIProviderRecord(providerId: string): Promise<void> {
+async function performDeleteStoredAIProviderRecord(providerId: string): Promise<void> {
   const [providers, secrets] = await Promise.all([
     readStoredProviderMetadata(),
     readStoredProviderSecrets(),
@@ -272,7 +297,7 @@ export async function deleteStoredAIProviderRecord(providerId: string): Promise<
   await removeTransparentKeyIfUnused(removal.remainingSecretCount);
 }
 
-export async function clearStoredAIProviderSecret(
+async function performClearStoredAIProviderSecret(
   providerId: string,
   permit?: PersistenceMutationPermit
 ): Promise<void> {
@@ -323,8 +348,10 @@ function createProviderSecretRemovalPayload({
   };
 }
 
-export async function readStoredAIProviderSecretState(
-  providerId: string
+async function performReadStoredAIProviderSecretState(
+  providerId: string,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<AIProviderSecretReadState> {
   const providers = await readStoredProviderMetadata();
   const provider = providers.find((current) => current.id === providerId);
@@ -332,11 +359,12 @@ export async function readStoredAIProviderSecretState(
     return { status: 'missing' };
   }
 
-  return readStoredAIProviderSecretStateForProvider(provider);
+  return readStoredAIProviderSecretStateForProvider(provider, operationKey, admissionPermit);
 }
 
-export async function readStoredAIProviderSecretStateForProvider(
-  provider: AIProvider
+async function performReadStoredAIProviderSecretStateForProvider(
+  provider: AIProvider,
+  operationKey?: CryptoKey | null
 ): Promise<AIProviderSecretReadState> {
   const secretMap = await readStoredProviderSecrets();
   const envelope = secretMap[provider.id];
@@ -345,7 +373,7 @@ export async function readStoredAIProviderSecretStateForProvider(
     return { status: 'missing' };
   }
 
-  const keyState = await readProviderSecretKeyState();
+  const keyState = await readProviderSecretKeyState(operationKey);
   if (keyState.status !== 'ok') {
     return keyState;
   }
@@ -358,15 +386,21 @@ export async function readStoredAIProviderSecretStateForProvider(
   }
 }
 
-export async function activateStoredAIProviderSecretForUse(
-  provider: AIProvider
+async function performActivateStoredAIProviderSecretForUse(
+  provider: AIProvider,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
 ): Promise<string | null> {
   const secretMap = await readStoredProviderSecrets();
   const envelope = secretMap[provider.id];
-  const state = await readStoredAIProviderSecretStateForProvider(provider);
+  const state = await readStoredAIProviderSecretStateForProvider(
+    provider,
+    operationKey,
+    admissionPermit
+  );
 
   if (state.status === 'ok' && envelope?.version === 1) {
-    await rewriteLegacyProviderSecretEnvelope(provider, secretMap, state.secret);
+    await rewriteLegacyProviderSecretEnvelope(provider, secretMap, state.secret, operationKey);
   }
 
   return readPlaintextProviderSecretFromState(provider.id, state);
@@ -375,9 +409,10 @@ export async function activateStoredAIProviderSecretForUse(
 async function rewriteLegacyProviderSecretEnvelope(
   provider: AIProvider,
   secretMap: Record<string, EncryptedSecretEnvelope>,
-  secret: string
+  secret: string,
+  operationKey?: CryptoKey | null
 ): Promise<void> {
-  const keyState = await readProviderSecretKeyState();
+  const keyState = await readProviderSecretKeyState(operationKey);
   if (keyState.status !== 'ok') {
     return;
   }
@@ -394,7 +429,99 @@ async function rewriteLegacyProviderSecretEnvelope(
   });
 }
 
-export async function loadStoredAIProviderSecret(providerId: string): Promise<string | null> {
-  const state = await readStoredAIProviderSecretState(providerId);
+async function performLoadStoredAIProviderSecret(
+  providerId: string,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<string | null> {
+  const state = await readStoredAIProviderSecretState(providerId, operationKey, admissionPermit);
   return readPlaintextProviderSecretFromState(providerId, state);
+}
+
+export function saveStoredAIProviders(
+  providers: AIProvider[],
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<void> {
+  return withSecretProtectionWriter(() => performSaveStoredAIProviders(providers), admissionPermit);
+}
+export function upsertStoredAIProviderRecord(
+  input: AIProviderUpsertInput,
+  permit?: PersistenceMutationPermit,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<void> {
+  return withSecretProtectionWriter(
+    () => performUpsertStoredAIProviderRecord(input, permit, operationKey),
+    admissionPermit
+  );
+}
+export function deleteStoredAIProviderRecord(
+  providerId: string,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<void> {
+  return withSecretProtectionWriter(
+    () => performDeleteStoredAIProviderRecord(providerId),
+    admissionPermit
+  );
+}
+export function clearStoredAIProviderSecret(
+  providerId: string,
+  permit?: PersistenceMutationPermit,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<void> {
+  return withSecretProtectionWriter(
+    () => performClearStoredAIProviderSecret(providerId, permit),
+    admissionPermit
+  );
+}
+export function readStoredAIProviderSecretState(
+  providerId: string,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<AIProviderSecretReadState> {
+  return withSecretProtectionWriter(
+    (checked) => performReadStoredAIProviderSecretState(providerId, operationKey, checked),
+    admissionPermit
+  );
+}
+export function readStoredAIProviderSecretStateForProvider(
+  provider: AIProvider,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<AIProviderSecretReadState> {
+  return withSecretProtectionWriter(
+    () => performReadStoredAIProviderSecretStateForProvider(provider, operationKey),
+    admissionPermit
+  );
+}
+export function activateStoredAIProviderSecretForUse(
+  provider: AIProvider,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<string | null> {
+  return withSecretProtectionWriter(
+    (checked) => performActivateStoredAIProviderSecretForUse(provider, operationKey, checked),
+    admissionPermit
+  );
+}
+export function loadStoredAIProviderSecret(
+  providerId: string,
+  operationKey?: CryptoKey | null,
+  admissionPermit?: SecretProtectionAdmissionPermit
+): Promise<string | null> {
+  return withSecretProtectionWriter(
+    (checked) => performLoadStoredAIProviderSecret(providerId, operationKey, checked),
+    admissionPermit
+  );
+}
+
+export function prepareAIProviderTransferMutation(args: {
+  importedProviders: readonly AIProvider[];
+  permit?: PersistenceMutationPermit;
+  admissionPermit?: SecretProtectionAdmissionPermit;
+}): Promise<AIProviderTransferMutationPlan> {
+  return withSecretProtectionWriter(
+    () => performPrepareAIProviderTransferMutation(args),
+    args.admissionPermit
+  );
 }

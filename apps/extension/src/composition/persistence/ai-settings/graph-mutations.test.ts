@@ -1,3 +1,25 @@
+vi.mock('../secret-protection/service', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secret-protection/service')>();
+  const { SecretProtectionAdmissionPermit, SecretProtectionLockedError } =
+    await import('../secret-protection/model');
+  const { readPreparedSecretProtectionControl } =
+    await import('../secret-protection/transition.store');
+  const withSecretProtectionWriter: typeof actual.withSecretProtectionWriter = async (
+    operation,
+    permit
+  ) => {
+    const control = await readPreparedSecretProtectionControl();
+    if (control?.phase === 'transitioning') throw new SecretProtectionLockedError();
+    if (permit) {
+      if (!SecretProtectionAdmissionPermit.isActive(permit))
+        throw new SecretProtectionLockedError();
+      return operation(permit);
+    }
+    return SecretProtectionAdmissionPermit.run(operation);
+  };
+  return { ...actual, withSecretProtectionWriter };
+});
+
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import type { AIModel, AIProvider } from '../../../contracts/settings';
@@ -229,7 +251,11 @@ it('clears provider secrets only for existing providers and deletes their graph'
   ).rejects.toThrow('Provider missing-provider not found');
   await mutateStoredAISettings({ operation: 'delete-provider', providerId: 'provider-1' });
 
-  expect(coreMocks.clearAIProviderSecret).toHaveBeenCalledWith('provider-1', expect.any(Object));
+  expect(coreMocks.clearAIProviderSecret).toHaveBeenCalledWith(
+    'provider-1',
+    expect.any(Object),
+    expect.any(Object)
+  );
   expect(coreMocks.deleteAIProviderGraphRecord).toHaveBeenCalledWith(
     'provider-1',
     expect.any(Object)

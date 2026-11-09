@@ -336,3 +336,69 @@ it('refuses workspace commands with missing capability, stale freshness, foreign
   }
   expect(test.createWorkspaceExecution).not.toHaveBeenCalled();
 });
+
+it(
+  'dispatches authorized JOIN discovery and returns bounded discovered evidence ' +
+    'through normal inspection',
+  async () => {
+    const test = fixture();
+    const source = {
+      kind: 'join' as const,
+      identity: { incarnation: '44444444-4444-4444-8444-444444444444', revision: 1 },
+    };
+    const start = attachOffscreenCommandCapability({
+      type: MessageType.OFFSCREEN_SYNC_WORKSPACE_START,
+      executorId,
+      offscreenStartupId,
+      executorRevision: 1,
+      requestId: crypto.randomUUID(),
+      source,
+      operation: 'discover',
+      authentication: { kind: 'bearer', accessToken: 'private-discovery-secret' },
+    });
+    const reply = vi.fn();
+    expect(test.listener(attachRuntimeMessageFreshness(start), sender, reply)).toBe(false);
+    expect(reply).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true, result: 'accepted' })
+    );
+    expect(test.createWorkspaceExecution).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'discover', source })
+    );
+    test.workspaceWorkflow.resolve({
+      containment: 'contained',
+      snapshot: {
+        state: 'discovered',
+        failureCode: null,
+        discovery: {
+          source: { kind: 'join', identity: { ...source.identity, revision: 2 } },
+          scope: 'children',
+          complete: true,
+          candidates: [],
+          issues: [],
+        },
+      },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    const inspection = test.executor.inspect({
+      type: MessageType.OFFSCREEN_SYNC_INSPECT,
+      capabilityToken: 'test',
+      requestId: crypto.randomUUID(),
+      offscreenStartupId,
+      challenge: crypto.randomUUID(),
+    });
+    expect(inspection).toMatchObject({
+      success: true,
+      snapshot: {
+        workspace: {
+          state: 'discovered',
+          selectionRevision: 2,
+          discovery: { source: { kind: 'join', identity: { ...source.identity, revision: 2 } } },
+        },
+      },
+    });
+    expect(JSON.stringify(inspection)).not.toContain('private-discovery-secret');
+    expect(sendMessage).not.toHaveBeenCalled();
+  }
+);

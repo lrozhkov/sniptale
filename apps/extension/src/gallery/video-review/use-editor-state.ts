@@ -1,3 +1,4 @@
+import { useReviewRecordingHistory } from './use-recording-history';
 import {
   addReviewCursorFocusKey,
   moveCursorFocusTimelineKey,
@@ -9,7 +10,12 @@ import { createReviewSpeechEditGuard } from './speech-edit-guard';
 import { scheduleReviewKeys } from '../../features/video/review/key-animation';
 import { scheduleReviewClicks } from '../../features/video/review/click-animation';
 import { useReviewNoteTransitions } from './note-transitions';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  attachReviewRecordingWindow,
+  projectReviewTelemetry,
+  reviewRecordingWindow,
+} from '../../features/video/review/telemetry';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -75,7 +81,8 @@ export function useReviewEditorState(resource: LoadedReview) {
     seek,
     setTimelineSelection: setSelection,
     setCutting: cuts.setCutting,
-    telemetry: resource.telemetry,
+    telemetry: core.historyTelemetry,
+    historyPending: core.history.pending,
     sourceDuration: source.duration,
     sourceGeometry: source,
     actionsVisible: advanced.ui.tracks.actions,
@@ -109,6 +116,71 @@ export function useReviewEditorState(resource: LoadedReview) {
 function useReviewEditorCore(resource: LoadedReview) {
   const base = useReviewEditorBase(resource);
   const timeline = useReviewEditorTimeline(resource, base);
+  const styles = [...(base.advanced.keyAnimations ?? []), ...(base.advanced.clickAnimations ?? [])];
+  const reach =
+    Math.max(
+      1,
+      ...styles.map((style) => Math.max(style.before, style.after) + Math.abs(style.offset))
+    ) * Math.max(1, ...timeline.timeline.timeMap.getSegments().map((segment) => segment.rate));
+  const previewHistory = useReviewRecordingHistory(resource, timeline.time, base.activeSelection, {
+    reach,
+  });
+  const [visibleHistory, setVisibleHistory] = useState<{
+    project: LoadedReview['historyProject'];
+    start: number;
+    end: number;
+  } | null>(null);
+  const historyRange =
+    visibleHistory && visibleHistory.project === resource.historyProject
+      ? visibleHistory
+      : { start: 0, end: resource.source.duration };
+  const setHistoryRange = useCallback(
+    (range: { start: number; end: number }) =>
+      setVisibleHistory((current) =>
+        current &&
+        current.project === resource.historyProject &&
+        current.start === range.start &&
+        current.end === range.end
+          ? current
+          : { project: resource.historyProject, ...range }
+      ),
+    [resource.historyProject]
+  );
+  const timelineHistory = useReviewRecordingHistory(
+    resource,
+    (historyRange.start + historyRange.end) / 2,
+    base.activeSelection,
+    { range: historyRange, includeCursor: false }
+  );
+  const history = {
+    ...previewHistory,
+    failed: previewHistory.failed || timelineHistory.failed,
+    pending: previewHistory.pending || timelineHistory.pending,
+    initialLoading: previewHistory.initialLoading || timelineHistory.initialLoading,
+    retry() {
+      previewHistory.retry();
+      timelineHistory.retry();
+    },
+  };
+  const historyTelemetry = useMemo(() => {
+    if (!resource.historyProject || !previewHistory.telemetry) return resource.telemetry;
+    const markers = new Map(
+      [
+        ...projectReviewTelemetry(timelineHistory.telemetry!, resource.source.duration).markers,
+        ...projectReviewTelemetry(previewHistory.telemetry, resource.source.duration).markers,
+      ].map((marker) => [JSON.stringify(marker.ref), marker])
+    );
+    return attachReviewRecordingWindow(previewHistory.telemetry, {
+      ...reviewRecordingWindow(previewHistory.telemetry),
+      markers: [...markers.values()].sort((left, right) => left.start - right.start),
+    });
+  }, [
+    resource.historyProject,
+    resource.telemetry,
+    resource.source.duration,
+    previewHistory.telemetry,
+    timelineHistory.telemetry,
+  ]);
   const presentationPending = useRef(false);
   const webcam = useReviewWebcamEditor({
     session: base.session,
@@ -181,6 +253,14 @@ function useReviewEditorCore(resource: LoadedReview) {
   return {
     ...base,
     ...timeline,
+    history,
+    historyTelemetry,
+    setHistoryRange,
+    cursorArchiveAvailable: !!resource.telemetry?.cursorTrajectory?.totalSamples,
+    features: resolveQuickEditEffectiveState(base.advanced, {
+      facts: previewHistory.telemetry,
+      source: resource.source,
+    }),
     performAction: async (action: () => Promise<boolean>) => {
       await annotationEffects.flush();
       return await base.performAction(action);
@@ -358,6 +438,8 @@ function useReviewEditorTimeline(
     onTime,
     playing,
     setPlaying,
+    setPresentationActive,
+    onPresentedTime,
     seek,
     play,
     timeline,
@@ -430,6 +512,8 @@ function useReviewEditorTimeline(
     navigationRevision,
     playing,
     setPlaying,
+    setPresentationActive,
+    onPresentedTime,
     seek,
     play,
     timeline,

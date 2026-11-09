@@ -9,6 +9,7 @@ import { createQuickEditWebcam } from '../../features/video/review/advanced/webc
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
 import type { ReviewCaptionConflict } from '../../features/video/review/caption-plan';
 import { createReviewCaptionSettings } from '../../features/video/review/text-document';
+import { calculatePreviewRenderAllocation } from './preview-render-allocation';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 const io = vi.hoisted(() => ({
@@ -28,13 +29,30 @@ const io = vi.hoisted(() => ({
   prepare: vi.fn(),
   render: vi.fn(),
   realRenderer: false,
+  retainedSpatialBytes: 0,
   resolution: 1000,
+  firstTimestamp: 0,
+  packetStats: vi.fn(),
   missingTrack: false,
   decode: true,
   missingSample: false,
   allocation: 4096,
   captionConflicts: [] as ReviewCaptionConflict[],
 }));
+
+it('forwards the borrowed export enhancer without transferring its job ownership', async () => {
+  const enhancer = { withEnhancedRegion: vi.fn(), dispose: vi.fn(async () => undefined) };
+  const main = await createReviewPresentationMain({ ...fixture(), exportEnhancer: enhancer });
+  try {
+    const frame = await main.renderAtTime(0);
+    expect(io.render).toHaveBeenCalledWith(expect.objectContaining({ exportEnhancer: enhancer }));
+    frame.release();
+  } finally {
+    main.dispose();
+  }
+  expect(enhancer.dispose).not.toHaveBeenCalled();
+  for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
   BlobSource: class {},
@@ -56,6 +74,8 @@ vi.mock('mediabunny', () => ({
             getDisplayWidth: async () => 64,
             getDisplayHeight: async () => 36,
             getTimeResolution: async () => io.resolution,
+            getFirstTimestamp: async () => io.firstTimestamp,
+            computePacketStats: (...args: unknown[]) => io.packetStats(...args),
             computeDuration: async () => 3,
           };
     }
@@ -91,6 +111,13 @@ vi.mock('./render-preview', async (importOriginal) => {
         : {
             prepare: async (...input: unknown[]) => {
               await io.prepare(...input);
+              if (io.retainedSpatialBytes) {
+                args.allocation!.replaceLimits({
+                  maximumManagedBytes: 100_000_000,
+                  maximumCanvases: 10,
+                });
+                args.resources.bytes('retained-dense-spatial', io.retainedSpatialBytes);
+              }
               return {
                 captionConflicts: io.captionConflicts,
                 allocationAssets: {
@@ -102,8 +129,15 @@ vi.mock('./render-preview', async (importOriginal) => {
                 release: vi.fn(),
               };
             },
-            render: (_prepared: unknown, frame: unknown) => {
-              io.render(frame);
+            admit: () => {
+              const graph = calculatePreviewRenderAllocation(args.allocation!.describe());
+              args.allocation!.replaceLimits({
+                ...graph,
+                maximumManagedBytes: graph.maximumManagedBytes + io.retainedSpatialBytes,
+              });
+            },
+            render: async (_prepared: unknown, frame: unknown) => {
+              await io.render(frame);
               return args.resources.canvas('publication', { width: 64, height: 36 });
             },
             dispose: vi.fn(),
@@ -157,7 +191,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   io.samples.length = io.times.length = io.inputs.length = io.canvases.length = 0;
   io.realRenderer = false;
+  io.retainedSpatialBytes = 0;
   io.resolution = 1000;
+  io.firstTimestamp = 0;
+  io.packetStats.mockResolvedValue({ averagePacketRate: 30 });
   io.missingTrack = false;
   io.decode = true;
   io.missingSample = false;
@@ -263,6 +300,7 @@ it('holds the complete last output composition using its lattice clock and actua
 
 it('clamps a last-in-range request to the final actual track tick without crossing the edit boundary', async () => {
   io.resolution = 1000;
+  io.firstTimestamp = 0;
   const owner = await open();
   const frame = await owner.render(candidate(2.9999));
   expect(io.times).toEqual([2.999]);
@@ -581,3 +619,234 @@ it('decodes planned presentation frames in one stream at the exact mapped clocks
   expect(io.times).toEqual([0.1, 0.2, 0.3]);
   expect(io.samples.every((sample) => sample.close.mock.calls.length === 1)).toBe(true);
 });
+
+it(
+  'prepares archived frame facts on the global output clock and passes the same reader ' +
+    'to endpoint drawing',
+  async () => {
+    const args = fixture();
+    const recordingHistory = {
+      read: vi.fn(
+        async (
+          _source: number,
+          _result: number,
+          _output: { width: number; height: number; frameDuration: number },
+          _signal?: AbortSignal
+        ) => ({
+          telemetry: {
+            recordingId: 'recording',
+            createdAt: 1,
+            updatedAt: 1,
+            captureMode: null,
+            viewport: null,
+            cursorTrack: null,
+            actionEvents: [],
+            signals: [],
+          },
+          effective: args.effective,
+          keyCues: [],
+          clickCues: [],
+        })
+      ),
+      dispose: vi.fn(),
+    };
+    const owner = await open({ ...args, recordingHistory });
+    const output = await owner.render(candidate(1));
+    expect(recordingHistory.read.mock.calls.map((call) => call.slice(0, 2))).toEqual([
+      [0, 7],
+      [1, 8],
+    ]);
+    expect(io.render.mock.calls.at(-1)![0]).toMatchObject({
+      recordingHistory,
+      resultTime: 8,
+      sourceTime: 1,
+    });
+    output.release();
+    owner.dispose();
+    expect(recordingHistory.dispose).not.toHaveBeenCalled();
+  }
+);
+it('closes the decoder when the first archived frame fails admission', async () => {
+  const recordingHistory = {
+    read: vi.fn(async () => {
+      throw new Error('history-unavailable');
+    }),
+    dispose: vi.fn(),
+  };
+  await expect(open({ ...fixture(), recordingHistory })).rejects.toThrow('history-unavailable');
+  expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+});
+
+it('admits retained dense spatial resources before reserving the next decoded source without GPU', async () => {
+  vi.stubGlobal('navigator', {});
+  io.retainedSpatialBytes = 75_346_756;
+  const owner = await open();
+  const output = await owner.render(candidate(0.2));
+  expect(io.render).toHaveBeenCalledOnce();
+  output.release();
+  expect(io.samples.at(-1)!.close).toHaveBeenCalledOnce();
+});
+
+it.each(['ordinary', 'planned'] as const)(
+  'admits a one-frame leading video gap without moving %s export clocks',
+  async (route) => {
+    io.resolution = 60_000;
+    io.firstTimestamp = 1 / 60;
+    const make = io.sample.getMockImplementation()!;
+    io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+    const first = candidate(0);
+    const args = fixture();
+    args.index.frameRate = 60;
+    if (route === 'planned') args.plannedCandidates = () => [first];
+    const owner = await open(args);
+    const frame = await (route === 'planned' ? owner.render(first) : owner.renderAtTime(0));
+    expect(io.times).toEqual([1 / 60]);
+    expect(io.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sourceTime: 0, resultTime: 7 })
+    );
+    frame.release();
+    expect(io.samples[0]!.close).toHaveBeenCalledOnce();
+    if (route === 'planned') expect(io.stream).toHaveBeenCalledOnce();
+  }
+);
+
+it.each(['long-leading-gap', 'outside-retained-interval'] as const)(
+  'keeps missing video a failure for %s',
+  async (reason) => {
+    io.firstTimestamp = reason === 'long-leading-gap' ? 0.2 : 1 / 60;
+    io.resolution = 60_000;
+    const make = io.sample.getMockImplementation()!;
+    io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+    const args = fixture();
+    args.index.frameRate = 60;
+    if (reason === 'outside-retained-interval')
+      args.edits = [
+        {
+          id: 'cut',
+          kind: 'cut',
+          start: 0.01,
+          end: 3,
+          requestedStart: 0.01,
+          requestedEnd: 3,
+        },
+      ];
+    const owner = await open(args);
+    await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+    expect(io.render).not.toHaveBeenCalled();
+    expect(io.samples).toEqual([]);
+  }
+);
+
+it('borrows an owned GPU source clone with SDK orientation until render settlement', async () => {
+  const raw = { close: vi.fn() };
+  const source = {
+    timestamp: 0,
+    draw: vi.fn(),
+    close: vi.fn(),
+    allocationSize: () => 4096,
+    toVideoFrame: vi.fn(() => raw),
+    rotation: 90,
+    flip: true,
+  };
+  io.sample.mockResolvedValueOnce(source);
+  let complete!: () => void;
+  io.render.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        complete = resolve;
+      })
+  );
+  const args = { ...fixture(), renderer: 'gpu' as const };
+  const owner = await open(args);
+  const pending = owner.renderAtTime(0);
+  await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
+  const frame = io.render.mock.calls[0]![0];
+  expect(frame.source.videoFrame()).toBe(raw);
+  expect(frame.source.orientation).toEqual({ rotation: 90, flip: true });
+  owner.dispose();
+  expect(raw.close).not.toHaveBeenCalled();
+  expect(source.close).not.toHaveBeenCalled();
+  expect(io.inputs[0]!.dispose).not.toHaveBeenCalled();
+  complete();
+  await expect(pending).rejects.toThrow();
+  expect(raw.close).toHaveBeenCalledOnce();
+  expect(source.close).toHaveBeenCalledOnce();
+  expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+});
+
+it.each(['ordinary', 'planned'] as const)(
+  'uses bounded-prefix metadata rather than index average for %s leading admission',
+  async (route) => {
+    io.firstTimestamp = 0.025;
+    io.packetStats.mockResolvedValue({ averagePacketRate: 30 });
+    const make = io.sample.getMockImplementation()!;
+    io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+    const args = fixture();
+    args.index.frameRate = 60;
+    const candidates = [0, 1 / 60, 2 / 60].map((time, index) => ({
+      ...candidate(time),
+      tick: 90 + index,
+    }));
+    if (route === 'planned') args.plannedCandidates = () => candidates;
+    const owner = await open(args);
+    for (const item of candidates) {
+      const output = await (route === 'planned'
+        ? owner.render(item)
+        : owner.renderAtTime(item.mapping.kind === 'main' ? item.mapping.mainLocalTime : 0));
+      output.release();
+    }
+    expect(io.packetStats).toHaveBeenCalledExactlyOnceWith(256, { metadataOnly: true });
+    expect(io.times).toEqual([0.025, 0.025, 0.033]);
+    expect(io.render.mock.calls.map(([frame]) => [frame.sourceTime, frame.resultTime])).toEqual([
+      [0, 7],
+      [0.017, 7 + 1 / 60],
+      [0.033, 7 + 2 / 60],
+    ]);
+    for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('rejects a leading gap that only the whole-file average would admit', async () => {
+  io.firstTimestamp = 0.025;
+  io.packetStats.mockResolvedValue({ averagePacketRate: 60 });
+  const make = io.sample.getMockImplementation()!;
+  io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+  const args = fixture();
+  args.index.frameRate = 30;
+  const owner = await open(args);
+  await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+  expect(io.render).not.toHaveBeenCalled();
+});
+
+it.each([0, NaN, Infinity])(
+  'does not admit a leading gap from invalid prefix rate %s',
+  async (rate) => {
+    io.firstTimestamp = 0.025;
+    io.packetStats.mockResolvedValue({ averagePacketRate: rate });
+    const make = io.sample.getMockImplementation()!;
+    io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+    const args = fixture();
+    args.index.frameRate = 30;
+    const owner = await open(args);
+    await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+  }
+);
+
+it.each(['error', 'abort'] as const)(
+  'retires Main input after leading metadata %s',
+  async (failure) => {
+    io.firstTimestamp = 0.025;
+    const controller = new AbortController();
+    const error = new Error('leading-metadata-failed');
+    io.packetStats.mockImplementation(async () => {
+      if (failure === 'error') throw error;
+      controller.abort();
+      return { averagePacketRate: 30 };
+    });
+    const request = open({ ...fixture(), signal: controller.signal });
+    if (failure === 'error') await expect(request).rejects.toBe(error);
+    else await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+    expect(io.render).not.toHaveBeenCalled();
+  }
+);

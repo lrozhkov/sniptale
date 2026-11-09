@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { EditorInspectorFramePanel } from '../../scene/panel';
 
 import React from 'react';
 import { act } from 'react';
@@ -132,50 +133,43 @@ it('maps file compact commands from document action groups', () => {
   expect(contentCommand).toBeDefined();
 });
 
-it('builds frame-surface commands with explicit icons and routes background actions', () => {
-  const params = createInspectorCommandParams();
-  const commands = buildFrameSurfaceCommands(params as never);
-  const backgroundModeProps = (
-    (commands[0]!.content as any).props.children.props.children[0] as any
-  ).props;
-  const backgroundEditorProps = (
-    (commands[0]!.content as any).props.children.props.children[1].props.children[1] as any
-  ).props;
-  const backgroundBlurProps = (
-    (commands[0]!.content as any).props.children.props.children[1].props.children[2] as any
-  ).props;
-  const paddingFieldsProps = ((commands[1]!.content as any).props.children as any).props;
-
-  expect(commands.map((command) => command.icon)).toEqual(['color', 'size', undefined]);
-  expect(backgroundModeProps.setBackgroundMode).toEqual(expect.any(Function));
-
-  (backgroundModeProps.setBackgroundMode as (mode: string) => void)('image');
-  (backgroundEditorProps.applyGradientPreset as (preset: unknown) => void)({ angle: 180 });
-  (backgroundEditorProps.previewFramePatch as (patch: unknown) => void)({
-    backgroundMode: 'gradient',
-  });
-  (backgroundEditorProps.applyFramePatch as (patch: unknown) => void)({ padding: 24 });
-  (backgroundEditorProps.onPickBackgroundImage as () => void)();
-  (backgroundEditorProps.onClearBackgroundImage as () => void)();
-  (backgroundBlurProps.applyFramePatch as (patch: unknown) => void)({
-    backgroundBlurAmount: 12,
-  });
-  (paddingFieldsProps.setFrameDraft as typeof params.setFrameDraft)(
-    (state: typeof params.frameDraft) => ({
-      ...state,
-      paddingTop: 24,
-    })
+it('adapts compact background commands to the shared panel and reset owner', () => {
+  const params = {
+    ...createInspectorCommandParams(),
+    richShapeSelection: null,
+    lastFillModeRef: { current: 'color' as const },
+  };
+  const commands = buildFrameSurfaceCommands(
+    params as Parameters<typeof buildFrameSurfaceCommands>[0]
   );
+  const content = commands[0]!.content as React.ReactElement<{
+    children: React.ReactElement<React.ComponentProps<typeof EditorInspectorFramePanel>>;
+  }>;
+  const panel = content.props.children.props;
+  expect(content.props.children.type).toBe(EditorInspectorFramePanel);
+  expect(commands.map((command) => command.id)).toEqual([
+    'frame-background-fill',
+    'frame-padding',
+    'frame-apply',
+  ]);
+  panel.setBackgroundMode('image');
+  panel.applyGradientPreset({
+    id: 'example',
+    label: 'Example',
+    from: '#000000',
+    to: '#ffffff',
+    angle: 180,
+  });
+  panel.previewFramePatch({ backgroundMode: 'gradient' });
+  panel.applyFramePatch({ paddingTop: 24 });
+  panel.setLayoutMode('fit-image');
+  panel.onPickBackgroundImage();
+  panel.onClearBackgroundImage();
   commands[2]?.onClick?.();
-
-  expect(params.applyGradientPreset).toHaveBeenCalledWith({ angle: 180 });
-  expect(params.setFrameDraft).toHaveBeenCalledTimes(6);
-  for (const [update] of params.setFrameDraft.mock.calls) {
-    if (typeof update === 'function') update(params.frameDraft);
-  }
-  expect(params.onPickBackgroundImage).toHaveBeenCalledTimes(1);
-  expect(params.clearBackgroundImage).toHaveBeenCalledTimes(1);
-  expect(params.onApplyFrame).not.toHaveBeenCalled();
+  expect(params.applyGradientPreset).toHaveBeenCalledOnce();
+  expect(params.setFrameDraft).toHaveBeenCalledTimes(4);
+  expect(params.onPickBackgroundImage).toHaveBeenCalledOnce();
+  expect(params.clearBackgroundImage).toHaveBeenCalledOnce();
 });
 
 it('builds workspace color commands with a separate save-default action', () => {

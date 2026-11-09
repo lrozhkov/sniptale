@@ -1,3 +1,4 @@
+import type { ProjectExportSourceSampling } from './renderer/source-sampling';
 import type { VideoProject } from '../../features/video/project/types/model';
 import type { VideoProjectExportSettings } from '../../features/video/project/types/export';
 import type { VideoProjectCompositionJoinPlan } from '../../features/video/project/scene/joins-types';
@@ -7,6 +8,8 @@ import type { ExportTimeEstimator } from '../../features/video/project/export/ti
 import type { ExportAudioSettings } from './codecs/types';
 import { type ClipAudioNode } from './media';
 import type { VideoProjectCaptionRenderer } from '../../workflows/video-review/project-captions';
+import type { createRecordingCursorTrajectoryRenderer } from '../../workflows/video-review/cursor-trajectory';
+import type { createRecordingEventsRenderer } from '../../workflows/video-review/recording-events';
 
 /** The existing job owns the immutable endpoints and borrowed-URL paused decoders. */
 export interface ProjectExportCompositionJoinRenderer {
@@ -23,9 +26,12 @@ export interface ProjectExportCompositionJoinRenderer {
 }
 
 export interface ProjectExportRuntimeState {
+  sourceSampling?: ProjectExportSourceSampling;
   compositionJoinRenderer?: ProjectExportCompositionJoinRenderer;
   cameraSpatialRenderer?: ReviewSpatialRenderer;
   captionRenderer?: VideoProjectCaptionRenderer;
+  cursorTrajectoryRenderer?: ReturnType<typeof createRecordingCursorTrajectoryRenderer>;
+  recordingEventsRenderer?: ReturnType<typeof createRecordingEventsRenderer>;
   watermarkRenderer?: VideoProjectWatermarkRenderer;
   mediaRecorder: MediaRecorder | null;
   clipMediaElements: Map<string, HTMLMediaElement>;

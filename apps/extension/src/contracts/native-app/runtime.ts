@@ -11,9 +11,11 @@ import type {
   NativeSettingsWarning,
   NativeTrayActionRegistry,
 } from './types';
-import type { NativeCaptureSettings } from '@sniptale/runtime-contracts/video/types/types';
 
 export type NativeAppConnectionState =
+  | 'reconnecting'
+  | 'trust-required'
+  | 'selection-required'
   | 'not-connected'
   | 'connecting'
   | 'connected'
@@ -28,6 +30,7 @@ export type NativeAppConnectionState =
   | 'error';
 
 export interface NativeAppRuntimeStatus {
+  appIdentity: { clientId: string; trustVersion: 1 } | null;
   capabilities: NativeAppCapabilities | null;
   connectionState: NativeAppConnectionState;
   controllerLease: AppControllerLeaseMessage | null;
@@ -57,17 +60,17 @@ export interface NativeAppQueryMessage {
   requestId: string;
 }
 
-export type NativeAppMutationOperation = 'reconnect' | 'take-controller' | 'sync-settings';
+export type NativeAppMutationOperation = 'reconnect' | 'trust-client' | 'forget-client';
 
 export interface NativeAppMutationMessage {
   type: typeof MessageType.NATIVE_APP_MUTATION;
   operation: NativeAppMutationOperation;
+  clientId?: string;
   requestId: string;
 }
 
 export interface NativeAppRuntimeResponse {
   success: boolean;
   error?: string;
-  settings?: NativeCaptureSettings;
   status?: NativeAppRuntimeStatus;
 }

@@ -22,7 +22,8 @@
       },
       "defaultValue": "#fb923c",
       "group": "appearance",
-      "order": 0
+      "order": 0,
+      "presentation": "color"
     },
     {
       "id": "surface",
@@ -33,7 +34,8 @@
       },
       "defaultValue": "#171a20",
       "group": "appearance",
-      "order": 1
+      "order": 1,
+      "presentation": "color"
     },
     {
       "id": "ink",
@@ -44,21 +46,24 @@
       },
       "defaultValue": "#fafafa",
       "group": "appearance",
-      "order": 2
+      "order": 2,
+      "presentation": "color"
     },
     {
       "id": "entry",
       "kind": "number",
       "label": {
-        "ru": "Вход (% длительности)",
-        "en": "Entrance (% duration)"
+        "en": "Entrance duration",
+        "ru": "Длительность входа"
       },
       "defaultValue": 18,
       "min": 5,
       "max": 40,
       "step": 1,
       "group": "animation",
-      "order": 3
+      "order": 3,
+      "unit": "percent",
+      "presentation": "slider"
     },
     {
       "id": "font",
@@ -72,7 +77,9 @@
       "max": 28,
       "step": 1,
       "group": "typography",
-      "order": 4
+      "order": 4,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "bodyFont",
@@ -86,7 +93,9 @@
       "max": 30,
       "step": 1,
       "group": "typography",
-      "order": 5
+      "order": 5,
+      "unit": "px",
+      "presentation": "slider"
     },
     {
       "id": "count",
@@ -172,7 +181,9 @@
             "en": "10"
           }
         }
-      ]
+      ],
+      "presentation": "dropdown",
+      "unit": "count"
     },
     {
       "id": "active",
@@ -265,7 +276,8 @@
             "en": "Chapter 10"
           }
         }
-      ]
+      ],
+      "presentation": "dropdown"
     },
     {
       "id": "title",
@@ -280,7 +292,8 @@
       "localizedDefaultValue": {
         "ru": "В ЭТОМ ВИДЕО",
         "en": "IN THIS VIDEO"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "subtitle",
@@ -290,12 +303,13 @@
         "en": "Chapter 1"
       },
       "defaultValue": "С чего начать",
-      "group": "content",
+      "group": "chapters",
       "order": 9,
       "localizedDefaultValue": {
         "ru": "С чего начать",
         "en": "Getting started"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "item2",
@@ -305,12 +319,13 @@
         "en": "Chapter 2"
       },
       "defaultValue": "Как это работает",
-      "group": "content",
+      "group": "chapters",
       "order": 10,
       "localizedDefaultValue": {
         "ru": "Как это работает",
         "en": "How it works"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "item3",
@@ -320,12 +335,13 @@
         "en": "Chapter 3"
       },
       "defaultValue": "Что получилось",
-      "group": "content",
+      "group": "chapters",
       "order": 11,
       "localizedDefaultValue": {
         "ru": "Что получилось",
         "en": "The result"
-      }
+      },
+      "presentation": "text"
     },
     {
       "id": "item4",
@@ -339,8 +355,9 @@
         "ru": "Детали",
         "en": "Details"
       },
-      "group": "content",
-      "order": 12
+      "group": "chapters",
+      "order": 12,
+      "presentation": "text"
     },
     {
       "id": "item5",
@@ -354,8 +371,9 @@
         "ru": "Практика",
         "en": "Practice"
       },
-      "group": "content",
-      "order": 13
+      "group": "chapters",
+      "order": 13,
+      "presentation": "text"
     },
     {
       "id": "item6",
@@ -369,8 +387,9 @@
         "ru": "Пример",
         "en": "Example"
       },
-      "group": "content",
-      "order": 14
+      "group": "chapters",
+      "order": 14,
+      "presentation": "text"
     },
     {
       "id": "item7",
@@ -384,8 +403,9 @@
         "ru": "Настройка",
         "en": "Setup"
       },
-      "group": "content",
-      "order": 15
+      "group": "chapters",
+      "order": 15,
+      "presentation": "text"
     },
     {
       "id": "item8",
@@ -399,8 +419,9 @@
         "ru": "Проверка",
         "en": "Review"
       },
-      "group": "content",
-      "order": 16
+      "group": "chapters",
+      "order": 16,
+      "presentation": "text"
     },
     {
       "id": "item9",
@@ -414,8 +435,9 @@
         "ru": "Итоги",
         "en": "Summary"
       },
-      "group": "content",
-      "order": 17
+      "group": "chapters",
+      "order": 17,
+      "presentation": "text"
     },
     {
       "id": "item10",
@@ -429,8 +451,9 @@
         "ru": "Дальше",
         "en": "Next steps"
       },
-      "group": "content",
-      "order": 18
+      "group": "chapters",
+      "order": 18,
+      "presentation": "text"
     }
   ],
   "layers": [],
@@ -5706,5 +5729,18 @@
       }
     }
   ],
-  "defaultControlPresetId": "sniptale-orange-dark"
+  "defaultControlPresetId": "sniptale-orange-dark",
+  "controlGroups": [
+    {
+      "id": "chapters",
+      "parentId": "content",
+      "label": {
+        "en": "Chapter titles",
+        "ru": "Названия разделов"
+      },
+      "icon": "list",
+      "order": 10,
+      "collapsed": true
+    }
+  ]
 }

@@ -217,7 +217,7 @@ export function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorSta
   const { onImportAudioFile, voiceover } = useReviewEditorAudio({
     busy: state.busy,
     canStart: state.canStart,
-    time: state.time,
+    time: state.playbackRange?.start ?? state.time,
     resultDuration: state.timeline.resultDuration,
     segments: state.timeline.timeMap.getSegments(),
     toOutputTime: state.timeline.toOutputTime,

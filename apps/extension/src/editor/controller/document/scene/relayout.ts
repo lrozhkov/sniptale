@@ -8,6 +8,7 @@ import type { SourceState } from '../../../document/model/source-state';
 import { syncManagedBackgroundLayerLayout } from '../../background';
 import { updateUserObjectLayout } from '../scene-object-layout';
 import { resolveRelayoutSceneGeometry } from './layout';
+import { resolveNextSceneCompositionBase, resolveSceneCompositionBase } from './composition';
 import { resolveRelayoutSourceState } from './source-state';
 import type { SceneRelayoutOptions } from './types';
 
@@ -54,12 +55,29 @@ export function relayoutEditorScene(
       canvas,
       currentSource,
       sourceSizeChanged:
-        options.sourceSize !== undefined &&
-        (layout.source.width !== currentSource.displayWidth ||
-          layout.source.height !== currentSource.displayHeight),
+        layout.source.width !== currentSource.displayWidth ||
+        layout.source.height !== currentSource.displayHeight,
       layoutSource: layout.source,
+      header: layout.header,
     });
+    const base =
+      options.compositionBase ??
+      resolveSceneCompositionBase({
+        source: currentSource,
+        canvasSize: canvasDocumentSize,
+        frame,
+        browserFrame,
+        hasBrowserFrame: options.hasBrowserFrame ?? layout.header !== null,
+      });
     const nextSource = resolveRelayoutSourceState(canvas, currentSource, layout.source);
+    nextSource.compositionBase = resolveNextSceneCompositionBase({
+      base,
+      frame,
+      browserFrame,
+      options,
+      layout,
+      source: nextSource,
+    });
 
     return {
       canvasSize: {

@@ -1,4 +1,12 @@
 import {
+  createReviewRecordingRenderSource,
+  type ReviewRecordingRenderSource,
+} from './recording-render';
+import {
+  createReviewRecordingActionAudioSource,
+  type RecordingProjectActionAudioSource,
+} from './recording-action-audio';
+import {
   openReviewAudioClipSource,
   decodeReviewAudioClipBuffer,
   type ReviewAudioClipInput,
@@ -128,6 +136,7 @@ export async function buildReviewExportClipPlan(
     /** Main-output interval required by an unpublished preview; null excludes all main clips. */
     window?: { start: number; end: number } | null;
     action?: Omit<QuickEditActionAudioSchedule, 'busGain'>;
+    recordingAction?: Omit<NonNullable<ReviewExportClipPlan['recordingAction']>, 'busGain'>;
   },
   deps: {
     openAudioSource: typeof openReviewAudioClipSource;
@@ -153,6 +162,7 @@ export async function buildReviewExportClipPlan(
     );
   const buffers = new Map<string, ReviewAudioClipInput>();
   let action: QuickEditActionAudioSchedule | undefined;
+  let recordingAction: ReviewExportClipPlan['recordingAction'];
   let actionSource: ReviewActionAudioSource<AudioBuffer> | undefined;
   let disposed = false;
   const dispose = () => {
@@ -162,9 +172,13 @@ export async function buildReviewExportClipPlan(
     for (const source of buffers.values()) if ('dispose' in source) source.dispose();
   };
   try {
-    if (args.action && args.window !== null) {
-      const admission = await admitReviewActionAudioPlan(args.action.plan, args.signal);
-      action = { ...args.action, busGain: admission.busGain };
+    if ((args.action || args.recordingAction) && args.window !== null) {
+      const admission = args.recordingAction
+        ? await args.recordingAction.source.admit(args.signal)
+        : await admitReviewActionAudioPlan(args.action!.plan, args.signal);
+      if (args.recordingAction)
+        recordingAction = { ...args.recordingAction, busGain: admission.busGain };
+      else action = { ...args.action!, busGain: admission.busGain };
       actionSource = (deps.createActionSource ?? persistence.createActionSource)(args.signal);
       for (const sampleId of admission.sampleIds) {
         const buffer = await actionSource.read(sampleId);
@@ -193,6 +207,7 @@ export async function buildReviewExportClipPlan(
       entries,
       buffers,
       ...(action ? { action } : {}),
+      ...(recordingAction ? { recordingAction } : {}),
       originalVolume: effective.originalAudio.volume,
       ...(effective.originalAudio.ranges ? { originalRanges: effective.originalAudio.ranges } : {}),
       originalMuted: effective.originalAudio.muted,
@@ -230,6 +245,7 @@ function createReviewExportTiming(
     height: outputProfile.height,
     fps: outputProfile.fps,
     quality: renderSettings?.quality ?? 'HIGH',
+    detailEnhancement: renderSettings?.detailEnhancement,
     complexity:
       1 +
       (effective.zoomRegions.some((region) => region.spotlight?.effect === 'blur') ? 1 : 0) +
@@ -318,15 +334,35 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
       end: fragment ? reviewOutputTimeAt(fullMap, fragment.end) : actionPlan.duration,
     },
   };
-  const actionAudioPresent = hasQuickEditActionAudio(
-    { ...action, busGain: 1 },
-    {
-      start: 0,
-      end: action.bounds.end - action.bounds.start,
-    }
-  );
+  const recordingAudioRequest =
+    original.historyProject &&
+    original.historyProject.actionFeedback?.some(
+      (group) => group.events && group.events.totalBlocks > 0
+    ) &&
+    resolveQuickEditEffectiveFeatures(advanced).actionsApplied &&
+    advanced.actionAudio?.some(
+      (setting) => setting.enabled && setting.presetId !== null && setting.volume > 0
+    )
+      ? {
+          project: original.historyProject,
+          source: original.source,
+          edits: document.edits,
+          settings: advanced.actionAudio,
+          applied: true,
+        }
+      : null;
+  const actionAudioPresent =
+    !!recordingAudioRequest ||
+    hasQuickEditActionAudio(
+      { ...action, busGain: 1 },
+      {
+        start: 0,
+        end: action.bounds.end - action.bounds.start,
+      }
+    );
   const plan = configuredReviewExportPlan({
     includeBookends,
+    recordingHistory: !!original.historyProject,
     index,
     renderSettings,
     document: { ...document, edits },
@@ -365,7 +401,7 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
         : (fullMap.at(-1)?.resultEnd ?? index.duration),
     }
   );
-  if (cameraConflicts.length)
+  if (cameraConflicts.length && !(original.historyProject && original.telemetry))
     throw new QuickEditExportUnavailable(['camera-follow'], [], cameraConflicts);
   return {
     workspace,
@@ -379,7 +415,9 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     outputProfile,
     plan,
     fragmentOffset,
-    action: actionAudioPresent ? action : undefined,
+    action: actionAudioPresent && !recordingAudioRequest ? action : undefined,
+    recordingAudioRequest,
+    actionBounds: action.bounds,
   };
 }
 
@@ -423,8 +461,33 @@ async function exportWithRetainedResources(
   });
   const { signal } = args;
   let exportAudio: ReviewExportClipPlan | undefined;
+  let recordingActionSource: RecordingProjectActionAudioSource | null = null;
+  let recordingHistory: ReviewRecordingRenderSource | null = null;
+  const disposeAudio = () => {
+    try {
+      exportAudio?.dispose?.();
+    } finally {
+      try {
+        recordingActionSource?.dispose();
+      } finally {
+        recordingHistory?.dispose();
+      }
+    }
+  };
   let result: Awaited<ReturnType<typeof writePreparedReviewExport>>;
   try {
+    if (plan.video === 'render' && prepared.original.historyProject && prepared.original.telemetry)
+      recordingHistory = createReviewRecordingRenderSource({
+        project: prepared.original.historyProject,
+        telemetry: prepared.original.telemetry,
+        source: prepared.original.source,
+        advanced,
+        edits: prepared.document.edits,
+      });
+    if (prepared.recordingAudioRequest)
+      recordingActionSource = createReviewRecordingActionAudioSource(
+        prepared.recordingAudioRequest
+      );
     if (plan.audio === 'process') {
       exportAudio = await diagnostics.phase('audio-prepare', () =>
         buildReviewExportClipPlan(
@@ -434,16 +497,32 @@ async function exportWithRetainedResources(
             signal,
             readProjectAsset: deps.readProjectAsset,
             ...(prepared.action ? { action: prepared.action } : {}),
+            ...(recordingActionSource
+              ? {
+                  recordingAction: {
+                    source: recordingActionSource,
+                    offset: fragmentOffset,
+                    bounds: prepared.actionBounds,
+                  },
+                }
+              : {}),
           },
           { openAudioSource: deps.openAudioSource, createActionSource: deps.createActionSource }
         )
       );
     }
-    result = await writePreparedReviewExport(args, prepared, exportAudio, deps, diagnostics);
+    result = await writePreparedReviewExport(
+      args,
+      prepared,
+      exportAudio,
+      deps,
+      diagnostics,
+      recordingHistory
+    );
   } catch (error) {
-    return await cleanupReviewExportFailure(error, () => exportAudio?.dispose?.());
+    return await cleanupReviewExportFailure(error, disposeAudio);
   }
-  await diagnostics.phase('cleanup', () => exportAudio?.dispose?.());
+  await diagnostics.phase('cleanup', disposeAudio);
   return result;
 }
 
@@ -452,7 +531,8 @@ async function writePreparedReviewExport(
   prepared: PreparedReviewExport,
   exportAudio: ReviewExportClipPlan | undefined,
   deps: typeof persistence,
-  diagnostics: ReviewExportDiagnostics
+  diagnostics: ReviewExportDiagnostics,
+  recordingHistory: ReviewRecordingRenderSource | null
 ) {
   const { signal, index } = args;
   const { workspace, original, advanced, fragment, edits, renderSettings, outputProfile, plan } =
@@ -515,7 +595,7 @@ async function writePreparedReviewExport(
         renderPreparedReviewExport(
           args,
           prepared,
-          { writer, timing, provenance, exportAudio },
+          { writer, timing, provenance, exportAudio, recordingHistory },
           deps
         )
     );
@@ -600,6 +680,7 @@ async function renderPreparedReviewExport(
     timing: ReturnType<typeof createReviewExportTiming>;
     provenance: ReturnType<typeof encodeReviewProvenance>;
     exportAudio: ReviewExportClipPlan | undefined;
+    recordingHistory: ReviewRecordingRenderSource | null;
   },
   deps: typeof persistence
 ) {
@@ -624,6 +705,7 @@ async function renderPreparedReviewExport(
         edits,
         advanced,
         cursorFacts: { facts: original.telemetry, source: original.source },
+        ...(output.recordingHistory ? { recordingHistory: output.recordingHistory } : {}),
         captionTimeMap: buildReviewTimeMap(index.duration, document.edits),
         ...(prepared.workspace.effectSnapshots
           ? { effectSnapshots: prepared.workspace.effectSnapshots }

@@ -11,6 +11,7 @@ import {
   deriveReviewCursorFocusPath,
   evaluateReviewCursorFocus,
   evaluateReviewFollowCursor,
+  reviewCameraPlanObservations,
   type ReviewCursorFacts,
 } from './cursor-focus-path';
 import {
@@ -19,6 +20,82 @@ import {
   resolveReviewSceneCameraPlan,
 } from './scene';
 import type { QuickEditZoomRegion } from './types';
+
+it.each([undefined, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4])(
+  'emits both exact capture endpoints before the next 30Hz observation at rate %s',
+  (rate) => {
+    const cut = 2.01;
+    const resultStart = 0.123;
+    const sourceStart = 0.2;
+    const resultEnd = rate === undefined ? 4 : resultStart + (4 - sourceStart) / rate;
+    const resultCut = rate === undefined ? cut : resultStart + (cut - sourceStart) / rate;
+    const path: CursorFocusPath = {
+      version: 1,
+      mode: 'follow',
+      smoothing: 0,
+      sensitivity: 0.5,
+      gapPolicy: 'hold',
+      segments: [
+        {
+          id: 'before',
+          start: 0,
+          end: cut,
+          binding: { kind: 'project' },
+          keys: [
+            { id: 'a', time: 0, x: 0.26, y: 0.42, anchor: 'boundary', interpolation: 'linear' },
+            { id: 'b', time: cut, x: 0.26, y: 0.42, anchor: 'movement', interpolation: 'linear' },
+          ],
+        },
+        {
+          id: 'after',
+          start: cut,
+          end: 4,
+          binding: { kind: 'project' },
+          keys: [
+            { id: 'c', time: cut, x: 0.27, y: 0.41, anchor: 'boundary', interpolation: 'linear' },
+            { id: 'd', time: 4, x: 0.3, y: 0.18, anchor: 'movement', interpolation: 'linear' },
+          ],
+        },
+      ],
+    };
+    const region: QuickEditZoomRegion = {
+      id: 'capture-cut',
+      start: 0,
+      end: resultEnd,
+      transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+      cursorFocus: {
+        path,
+        observed: path,
+        ...(rate === undefined
+          ? {}
+          : {
+              timeMap: [{ kind: 'speed', sourceStart, sourceEnd: 4, resultStart, resultEnd, rate }],
+            }),
+      },
+    };
+    const before = structuredClone(region);
+    const frames = reviewCameraPlanObservations(region);
+    expect(frames.filter((frame) => frame.time === resultCut)).toEqual([
+      expect.objectContaining({
+        x: 0.26,
+        y: 0.42,
+        segmentId: 'before:0',
+        actual: { x: 0.26, y: 0.42 },
+      }),
+      expect.objectContaining({
+        x: 0.27,
+        y: 0.41,
+        segmentId: 'after:0',
+        actual: { x: 0.27, y: 0.41 },
+      }),
+    ]);
+    expect(frames.find((frame) => frame.segmentId === 'after:0')?.time).toBe(resultCut);
+    expect(reviewCameraPlanObservations(region)).toEqual(frames);
+    expect(region).toEqual(before);
+  }
+);
 
 const facts: ReviewCursorFacts = {
   cursorTrack: {
@@ -308,4 +385,165 @@ it('reuses the camera plan as time advances and replaces it after geometry or tr
     },
   };
   expect(resolveReviewSceneCameraPlan([changed], changed, scene)).not.toBe(plan);
+});
+
+it('retains immutable source-clock observation work across geometry and policy revisions', async () => {
+  const { reviewCameraPlanObservations } = await import('./cursor-focus-path');
+  const path = deriveReviewCursorFocusPath(facts, source, true);
+  let reads = 0;
+  for (const segment of path.segments)
+    for (const key of segment.keys) {
+      const time = key.time;
+      Object.defineProperty(key, 'time', {
+        get() {
+          reads++;
+          return time;
+        },
+      });
+    }
+  const region: QuickEditZoomRegion = {
+    id: 'observations',
+    start: 0,
+    end: 4,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    cursorFocus: { path, observed: path, scene: { source, background: { enabled: false } } },
+  };
+  const first = reviewCameraPlanObservations(region);
+  reads = 0;
+  const changed = {
+    ...region,
+    cursorFocus: {
+      ...region.cursorFocus!,
+      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('fast') }),
+      scene: {
+        source,
+        background: { enabled: false as const },
+        canvas: { width: 720, height: 720 },
+      },
+    },
+  };
+  const again = reviewCameraPlanObservations(changed);
+  expect(again).toEqual(first);
+  expect(reads).toBe(0);
+  expect(again).not.toBe(first);
+  again[0]!.x = -10;
+  again[0]!.actual!.x = -10;
+  expect(reviewCameraPlanObservations(region)).toEqual(first);
+  reads = 0;
+  reviewCameraPlanObservations({ ...region, end: 3 });
+  expect(reads).toBeGreaterThan(0);
+  reads = 0;
+  reviewCameraPlanObservations({
+    ...region,
+    cursorFocus: { ...region.cursorFocus!, path: { ...path, smoothing: 0.9 } },
+  });
+  expect(reads).toBeGreaterThan(0);
+  reads = 0;
+  reviewCameraPlanObservations({
+    ...region,
+    cursorFocus: {
+      ...region.cursorFocus!,
+      timeMap: [
+        { kind: 'speed', sourceStart: 0, sourceEnd: 4, resultStart: 0, resultEnd: 2, rate: 2 },
+      ],
+    },
+  });
+  expect(reads).toBeGreaterThan(0);
+});
+
+it('applies current crop and path revisions after retained observation derivation', async () => {
+  const { reviewCameraPlanObservations } = await import('./cursor-focus-path');
+  const path = deriveReviewCursorFocusPath(facts, source, true);
+  const region: QuickEditZoomRegion = {
+    id: 'crop-observations',
+    start: 0,
+    end: 4,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'none', duration: 0 },
+    exit: { type: 'none', duration: 0 },
+    cursorFocus: { path, observed: path, scene: { source, background: { enabled: false } } },
+  };
+  const original = reviewCameraPlanObservations(region);
+  const authored = structuredClone(path);
+  authored.segments[0]!.keys[1]!.x = 0.4;
+  const observed = structuredClone(path);
+  observed.segments[0]!.keys[1]!.x = 0.6;
+  const variants: QuickEditZoomRegion[] = [
+    { ...region, cursorFocus: { ...region.cursorFocus!, path: authored } },
+    { ...region, cursorFocus: { ...region.cursorFocus!, observed } },
+    ...[0, 0.5].map((x) => ({
+      ...region,
+      cursorFocus: {
+        ...region.cursorFocus!,
+        scene: {
+          source,
+          background: { enabled: false as const },
+          canvas: { width: 100, height: 100, crop: { x, y: 0.2, width: 0.5, height: 0.5 } },
+        },
+      },
+    })),
+    {
+      ...region,
+      cursorFocus: {
+        ...region.cursorFocus!,
+        scene: {
+          source: { ...source, width: 200 },
+          background: { enabled: false },
+          canvas: { width: 100, height: 100, crop: { x: 0, y: 0.2, width: 0.5, height: 0.5 } },
+        },
+      },
+    },
+  ];
+  for (const candidate of variants) {
+    const actual = reviewCameraPlanObservations(candidate);
+    expect(actual).toEqual(reviewCameraPlanObservations(structuredClone(candidate)));
+    expect(actual).not.toEqual(original);
+  }
+  expect(reviewCameraPlanObservations(region)).toEqual(original);
+});
+
+it('continuously centers the new Gallery cursor workflow when 3D is off', () => {
+  const path: CursorFocusPath = {
+    version: 1,
+    smoothing: 0,
+    sensitivity: 0.5,
+    mode: 'follow',
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'sweep',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 4,
+        keys: [
+          { id: 'a', time: 0, x: 0.4, y: 0.5, anchor: 'boundary', interpolation: 'linear' },
+          { id: 'b', time: 4, x: 0.5, y: 0.5, anchor: 'boundary', interpolation: 'linear' },
+        ],
+      },
+    ],
+  };
+  const region: QuickEditZoomRegion = {
+    id: 'continuous',
+    start: 0,
+    end: 4,
+    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'linear', duration: 0 },
+    exit: { type: 'linear', duration: 0 },
+    cursorComposition: { mode: 'off', amount: 0.5, smoothness: 0 },
+    cursorFocus: {
+      scene: { source, background: { enabled: false } },
+      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('fast') }),
+      path,
+    },
+  };
+  const plan = resolveReviewSceneCameraPlan([region], region);
+  expect(plan?.status).toBe('ready');
+  if (plan?.status !== 'ready') return;
+  expect(plan.spans.filter((span) => span.kind === 'transition').length).toBeGreaterThan(2);
+  expect(
+    evaluateQuickEditCameraAtTime([region], 3).centerX -
+      evaluateQuickEditCameraAtTime([region], 1).centerX
+  ).toBeGreaterThan(0.03);
 });

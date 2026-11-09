@@ -1,4 +1,5 @@
 import { readNativeReviewWorkspace } from '../support/native-review-workspace';
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page, type Locator, type TestInfo } from '@playwright/test';
@@ -11,6 +12,8 @@ import {
 } from '../support/quick-editor-media-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
+
+enableGpuPreviewProof();
 
 type Message = Parameters<typeof translate>[0];
 type Metrics = {
@@ -611,7 +614,9 @@ for (const scenario of [
       const preview = ui.dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await expect(preview).toHaveAttribute('data-status', 'ready');
       const stage = ui.dialog.locator('[data-ui="gallery.videoReview.stage"]');
-      const mainCanvas = stage.locator('[data-ui="gallery.videoReview.motionBlurCanvas"]');
+      const mainCanvas = stage.locator(
+        '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+      );
       await expect(mainCanvas).toBeVisible();
       const time = await stage
         .locator('video')

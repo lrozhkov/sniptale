@@ -1,3 +1,4 @@
+import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { DelayedLoadingFallback } from '@sniptale/ui/loading-delay';
 import { useEffect, useState, type RefObject, type PointerEvent } from 'react';
 import { sameQuickEditCamera } from '../../features/video/review/advanced/motion-blur';
@@ -40,8 +41,10 @@ type PresentationProps = {
     | {
         preferences: PreviewInput['preferences'];
         playing: boolean;
+        onPresentationActive?: PreviewInput['onPresentationActive'];
         interacting?: boolean;
         sourceToResult: PreviewInput['sourceToResult'];
+        onRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
         sourceFrameRate?: number | undefined;
       }
@@ -105,7 +108,8 @@ export function useStagePresentation(
   props: PresentationProps,
   publication: RefObject<HTMLDivElement | null>,
   watermarkOutput: { width: number; height: number },
-  size: { width: number; height: number }
+  size: { width: number; height: number },
+  onGeometry?: PreviewInput['onGeometry']
 ) {
   const [interacting, setInteracting] = useState(false);
   useEffect(() => {
@@ -126,8 +130,12 @@ export function useStagePresentation(
   }, []);
   const presentation = useReviewPreviewPresentation({
     video: props.video,
+    ...(onGeometry ? { onGeometry } : {}),
     host: publication,
     sourceIdentity: props.url,
+    ...(props.preview?.onPresentationActive
+      ? { onPresentationActive: props.preview.onPresentationActive }
+      : {}),
     ...(props.readAsset ? { readAsset: props.readAsset } : {}),
     sourceFrameRate: props.preview?.sourceFrameRate,
     backgroundPending: props.backgroundPending,
@@ -149,6 +157,16 @@ export function useStagePresentation(
     cut: props.cutPreview,
     webcam: props.webcam,
   });
+  const onRendererStatus = props.preview?.onRendererStatus;
+  const rendererBackend = presentation.status.renderer?.backend;
+  const rendererFallback = presentation.status.renderer?.fallback;
+  useEffect(() => {
+    onRendererStatus?.(
+      rendererBackend
+        ? { backend: rendererBackend, ...(rendererFallback ? { fallback: rendererFallback } : {}) }
+        : null
+    );
+  }, [onRendererStatus, rendererBackend, rendererFallback]);
   const onRaster = props.preview?.onRaster;
   const rasterWidth = presentation.status.actualRaster?.width;
   const rasterHeight = presentation.status.actualRaster?.height;

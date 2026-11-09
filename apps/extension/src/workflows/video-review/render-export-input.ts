@@ -1,3 +1,4 @@
+import type { ReviewRecordingRenderSource } from './recording-render';
 import type { VideoSample } from 'mediabunny';
 import type { SeekableAssetObjectWriter } from '../../composition/persistence/assets';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
@@ -13,6 +14,7 @@ import type { ReviewAnnotationEffectSnapshot } from '../../features/video/review
 
 /** Caller-owned inputs shared by ordinary and presentation frame export. */
 export interface ReviewFrameExportInput {
+  recordingHistory?: ReviewRecordingRenderSource;
   cursorFacts?: {
     facts:
       | import('../../features/video/review/advanced/cursor-focus-path').ReviewCursorFacts
@@ -48,9 +50,10 @@ export interface ReviewFrameExportInput {
 }
 
 export function reviewFrameDecorations(
-  args: Pick<ReviewFrameExportInput, 'comments' | 'clickCues' | 'keyCues'>
+  args: Pick<ReviewFrameExportInput, 'comments' | 'clickCues' | 'keyCues' | 'recordingHistory'>
 ) {
   return {
+    ...(args.recordingHistory ? { recordingHistory: args.recordingHistory } : {}),
     ...(args.comments ? { comments: args.comments } : {}),
     ...(args.clickCues ? { clickCues: args.clickCues } : {}),
     ...(args.keyCues ? { keyCues: args.keyCues } : {}),

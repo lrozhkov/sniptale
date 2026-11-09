@@ -12,7 +12,7 @@ import {
 } from '../../../../features/video/project/types';
 import { createVideoEditorProjectClipTimelineActions } from './actions';
 import type { VideoEditorProjectState } from '../contracts';
-import { resetVideoEditorProjectHistory } from '../../history';
+import { resetVideoEditorProjectHistory, undoVideoEditorProjectHistory } from '../../history';
 import { createProjectWithEffects } from '../effects.effect-instance.test-support';
 
 function createMutableState() {
@@ -503,6 +503,8 @@ it('deletes an explicitly selected group in one history step and refuses locked 
   actions.deleteClip(['video-1', 'audio-1']);
   expect(runtime.getState().project?.clips).toHaveLength(0);
   expect(runtime.getState().projectHistory.past).toHaveLength(1);
-  expect(runtime.getState().projectHistory.past[0]?.project.clips).toEqual(original.clips);
+  expect(
+    undoVideoEditorProjectHistory(runtime.getState().projectHistory, runtime.getState().project!)
+  ).toMatchObject({ status: 'applied', project: { clips: original.clips } });
   expect(runtime.getState().project?.assets).toEqual(original.assets);
 });

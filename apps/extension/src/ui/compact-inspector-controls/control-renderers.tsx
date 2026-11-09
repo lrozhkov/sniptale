@@ -10,7 +10,13 @@ import { CompactSelect } from './select';
 export function CompactSegmentedSelector<T extends string>(props: {
   ariaLabel: string;
   columns: 1 | 2 | 3 | 4 | 5;
-  options: Array<{ disabled?: boolean; icon?: React.ReactNode; label: string; value: T }>;
+  options: Array<{
+    disabled?: boolean;
+    description?: string;
+    icon?: React.ReactNode;
+    label: string;
+    value: T;
+  }>;
   value: T;
   onChange: (value: T) => void;
 }) {
@@ -110,7 +116,7 @@ function InspectorSegments<T extends string>(
               key={option.value}
               type="button"
               aria-label={option.label}
-              title={option.label}
+              title={option.description ?? option.label}
               aria-pressed={option.value === props.value}
               disabled={option.disabled}
               onClick={() => props.onChange(option.value)}
@@ -126,7 +132,13 @@ function InspectorSegments<T extends string>(
 
 function SegmentedOption<T extends string>(props: {
   active: boolean;
-  option: { disabled?: boolean; icon?: React.ReactNode; label: string; value: T };
+  option: {
+    disabled?: boolean;
+    description?: string;
+    icon?: React.ReactNode;
+    label: string;
+    value: T;
+  };
   onChange: (value: T) => void;
 }) {
   return (
@@ -140,7 +152,7 @@ function SegmentedOption<T extends string>(props: {
       ].join(' ')}
       aria-pressed={props.active}
       disabled={props.option.disabled === true}
-      title={props.option.label}
+      title={props.option.description ?? props.option.label}
       onClick={() => props.onChange(props.option.value)}
     >
       {props.option.icon ?? (

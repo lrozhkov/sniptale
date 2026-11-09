@@ -11,11 +11,12 @@ const curveKeys = new WeakMap<CursorFocusKey[], CursorFocusKey[]>();
 /** Manual focus has a continuous time weight that reaches four at its key and one at adjacent recorded keys. */
 export function cursorFocusPreferenceWeight(segment: CursorFocusSegment, time: number): number {
   segment = effectiveCurveSegment(segment);
-  const left = segment.keys.findLast((key) => key.time <= time) ?? segment.keys[0];
+  const rightIndex = nextCursorKeyIndex(segment.keys, time);
+  const left = segment.keys[Math.max(0, rightIndex - 1)];
   if (!left) return 1;
-  const right = segment.keys.find((key) => key.time > time);
+  const right = segment.keys[rightIndex];
   const weight = (key: CursorFocusKey) => (key.anchor === 'manual' || key.authored ? 4 : 1);
-  if (!right || time <= left.time) return weight(left);
+  if (rightIndex === 0 || !right || time <= left.time) return weight(left);
   const progress = (time - left.time) / (right.time - left.time);
   return weight(left) + (weight(right) - weight(left)) * progress;
 }
@@ -34,6 +35,17 @@ function effectiveCurveSegment(segment: CursorFocusSegment): CursorFocusSegment 
   return keys.length === segment.keys.length ? segment : { ...segment, keys };
 }
 
+function nextCursorKeyIndex(keys: readonly CursorFocusKey[], time: number): number {
+  let low = 0;
+  let high = keys.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if (keys[middle]!.time <= time) low = middle + 1;
+    else high = middle;
+  }
+  return low;
+}
+
 /** Deterministic bounded curve evaluation, shared by seek, preview and export. */
 export function evaluateCursorFocusSegment(
   segment: CursorFocusSegment,
@@ -42,14 +54,7 @@ export function evaluateCursorFocusSegment(
 ): CursorFocusEvaluation | null {
   segment = effectiveCurveSegment(segment);
   if (time < segment.start || time > segment.end || !segment.keys.length) return null;
-  let low = 0;
-  let high = segment.keys.length;
-  while (low < high) {
-    const middle = (low + high) >>> 1;
-    if (segment.keys[middle]!.time <= time) low = middle + 1;
-    else high = middle;
-  }
-  const leftIndex = Math.max(0, low - 1);
+  const leftIndex = Math.max(0, nextCursorKeyIndex(segment.keys, time) - 1);
   const left = segment.keys[leftIndex]!;
   const right = segment.keys[leftIndex + 1];
   if (!right || left.interpolation === 'hold' || time < left.time)

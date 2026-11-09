@@ -1,6 +1,14 @@
 import { composeWindowHeaderSvg } from '../../../browser-frame/appearance';
-import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
+import { windowHeaderGeometry, type WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { VideoProject, VideoProjectClip } from '../../project/types';
+
+/** Complete encoder rows keep the SVG viewport opaque without stretching its glyphs. */
+export function windowHeaderRasterHeight(
+  header: WindowHeader,
+  source: { width: number; height: number }
+): number {
+  return Math.max(2, Math.ceil(windowHeaderGeometry(header, source).height / 2) * 2);
+}
 
 /** Content-bound keys prevent a stale async raster from appearing after an edit or undo. */
 export function windowHeaderImageKey(clipId: string, header: WindowHeader): string {
@@ -21,7 +29,11 @@ export function projectWindowHeaderImages(
       return [];
     const asset = project.assets.find(({ id }) => id === clip.assetId);
     if (!asset || asset.metadata.width <= 0 || asset.metadata.height <= 0) return [];
-    const svg = composeWindowHeaderSvg(clip.windowHeader, asset.metadata);
+    const svg = composeWindowHeaderSvg(
+      clip.windowHeader,
+      asset.metadata,
+      windowHeaderRasterHeight(clip.windowHeader, asset.metadata)
+    );
     return [
       {
         key: windowHeaderImageKey(clip.id, clip.windowHeader),

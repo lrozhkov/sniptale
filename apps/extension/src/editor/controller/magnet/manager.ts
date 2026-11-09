@@ -1,6 +1,7 @@
 import { Rect, type Canvas, type FabricObject } from 'fabric';
 import type { EditorTool, EditorWorkspaceSettings } from '../../../features/editor/document/types';
 import { AligningGuidelines, type EditorMagnetTransformEvent } from './aligning-guidelines';
+import { getEditorMovePosition } from './move-axis';
 import { DEFAULT_EDITOR_MAGNET_OPTIONS } from './options';
 import { collectMagnetTargets, isMagnetTarget } from './targets';
 import { projectMagnetGuides, type MagnetGuideProjection } from './guide-projection';
@@ -46,6 +47,15 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
   }
 
   moving(event: EditorMagnetTransformEvent) {
+    const move =
+      this.managerOptions.getCropGuide() === null && isMagnetTarget(event.target)
+        ? getEditorMovePosition(event)
+        : null;
+    if (move) {
+      if (!event.target.lockMovementX) event.target.set('left', move.left);
+      if (!event.target.lockMovementY) event.target.set('top', move.top);
+      event.target.setCoords();
+    }
     if (!this.shouldHandleEvent(event.target)) {
       this.clearGuides();
       return;
@@ -53,6 +63,12 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
 
     this.updateScreenMargin();
     super.moving(event);
+    if (move?.lockedAxis) {
+      event.target.set(move.lockedAxis, move[move.lockedAxis]);
+      if (move.lockedAxis === 'top') this.horizontalLines.clear();
+      else this.verticalLines.clear();
+      event.target.setCoords();
+    }
   }
 
   scalingOrResizing(event: EditorMagnetTransformEvent) {
@@ -100,10 +116,10 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
   }
 
   private updateScreenMargin(): void {
-    const logicalWidth = this.managerOptions.getCanvasDocumentSize().width;
     const screenWidth = this.canvas.upperCanvasEl?.getBoundingClientRect?.().width;
-    if (logicalWidth > 0 && screenWidth && screenWidth > 0)
-      this.margin = 6 / (screenWidth / logicalWidth);
+    if (!screenWidth || screenWidth <= 0) return;
+    const logicalWidth = this.canvas.getWidth();
+    if (logicalWidth > 0) this.margin = 6 / (screenWidth / logicalWidth);
   }
 
   snapRect(input: {

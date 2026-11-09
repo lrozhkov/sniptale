@@ -1,7 +1,21 @@
+import { resolveReviewCursorOrientation } from './cursor-focus-path';
+import {
+  createCursorOrientationPlan,
+  evaluateCursorOrientation,
+} from '../../composition/motion/cursor-orientation';
+import type { CursorFocusPath } from '../../project/cursor-focus-path/types';
+import {
+  createQuickEditSpotlight,
+  createQuickEditBorder,
+} from '../../project/scene/focus-appearance';
 import { describe, expect, it } from 'vitest';
 import { evaluateQuickEditCameraAtTime } from './scene';
 import { createQuickEditZoomRegion, updateQuickEditZoomRegion } from './zoom';
-import { quickEditSpatialSpan, quickEditSpatialTargetCamera } from './spatial';
+import {
+  quickEditSpatialSpan,
+  quickEditSpatialTargetCamera,
+  quickEditRegionNeedsSpatialRenderer,
+} from './spatial';
 import {
   DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE,
   DEFAULT_CAMERA_DEPTH as DEFAULT_QUICK_EDIT_DEPTH,
@@ -148,4 +162,185 @@ it('preserves the visual anchor when switching a projected comment between conte
   )!;
   expect(restored.position.x).toBeCloseTo(content.position.x, 6);
   expect(restored.position.y).toBeCloseTo(content.position.y, 6);
+});
+
+it('retains explicit cursor composition through strict reads and refuses older-schema claims', () => {
+  const state = createQuickEditAdvancedState();
+  const cursorComposition = { mode: 'left' as const, amount: 0.7, smoothness: 0.4 };
+  state.zoom = {
+    enabled: true,
+    regions: updateQuickEditZoomRegion([a], a.id, { cursorComposition }),
+  };
+  expect(
+    loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))?.zoom.regions[0]
+      ?.cursorComposition
+  ).toEqual(cursorComposition);
+  expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 27 })).toBeNull();
+  expect(
+    updateQuickEditZoomRegion(state.zoom.regions, a.id, {
+      cursorComposition: { ...cursorComposition, smoothness: NaN },
+    })
+  ).toEqual(state.zoom.regions);
+});
+
+it('uses effective cursor spatial activation while retaining legacy and manual settings', () => {
+  const region = createQuickEditZoomRegion({ id: 'default-cursor', at: 0 });
+  region.cursorFocus = {
+    path: {
+      version: 1,
+      mode: 'follow',
+      smoothing: 0.5,
+      sensitivity: 0.5,
+      gapPolicy: 'hold',
+      segments: [],
+    },
+  };
+  expect(region.perspective).toBeUndefined();
+  expect(quickEditRegionNeedsSpatialRenderer(region)).toBe(true);
+  const manual = {
+    ...region,
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: 20 },
+    depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true },
+  };
+  const off = {
+    ...manual,
+    cursorComposition: { ...region.cursorComposition!, mode: 'off' as const },
+  };
+  expect(quickEditRegionNeedsSpatialRenderer(off)).toBe(false);
+  const { cursorFocus: _cursor, ...manualMode } = off;
+  expect(quickEditRegionNeedsSpatialRenderer(manualMode)).toBe(true);
+  const { cursorComposition: _composition, ...legacy } = manual;
+  expect(quickEditRegionNeedsSpatialRenderer(legacy)).toBe(true);
+  expect(quickEditRegionNeedsSpatialRenderer({ ...region, dormant: true })).toBe(false);
+  expect(
+    quickEditRegionNeedsSpatialRenderer({ ...region, spotlight: createQuickEditSpotlight() })
+  ).toBe(false);
+  expect(quickEditRegionNeedsSpatialRenderer({ ...region, border: createQuickEditBorder() })).toBe(
+    false
+  );
+});
+
+it('uses raw observed positions outside the crop and shares history across adjacent cursor regions', async () => {
+  const path = (x: number): CursorFocusPath => ({
+    version: 1,
+    mode: 'follow',
+    smoothing: 1,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'capture',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 6,
+        keys: [
+          { time: 0, x, y: 0.5 },
+          { time: 0.2, x: 1 - x, y: 0.5 },
+          { time: 6, x: 1 - x, y: 0.5 },
+        ].map((point, index) => ({
+          ...point,
+          id: `key${index}`,
+          anchor: 'movement',
+          interpolation: 'linear',
+        })),
+      },
+    ],
+  });
+  const first = createQuickEditZoomRegion({ id: 'first', at: 0, duration: 3 });
+  first.cursorFocus = {
+    path: path(0.9),
+    observed: path(0.1),
+    scene: {
+      source: { width: 1000, height: 600 },
+      background: createQuickEditAdvancedState().background,
+      canvas: { width: 500, height: 300, crop: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } },
+    },
+  };
+  const second = { ...first, id: 'second', start: 3, end: 6 };
+  const plan = resolveReviewCursorOrientation(first)!;
+  const next = resolveReviewCursorOrientation(second)!;
+  expect(next).not.toBe(plan);
+  expect(plan.spans[0]!.start).toBe(0);
+  expect(plan.spans.at(-1)!.end).toBe(3);
+  expect(next.spans[0]!.start).toBe(3);
+  expect(next.spans.at(-1)!.end).toBe(6);
+  const expected = createCursorOrientationPlan({
+    settings: first.cursorComposition!,
+    start: 0,
+    end: 6,
+    observations: [
+      { time: 0, x: -0.3, y: 0.5 },
+      { time: 0.2, x: 1.3, y: 0.5 },
+      { time: 6, x: 1.3, y: 0.5 },
+    ],
+  });
+  for (const time of [0, 0.05, 0.1, 0.3, 1, 3, 5.9]) {
+    const actual = evaluateCursorOrientation(time <= 3 ? plan : next, time);
+    const reference = evaluateCursorOrientation(expected, time);
+    expect(Math.hypot(actual.x - reference.x, actual.y - reference.y)).toBeLessThanOrEqual(0.1);
+  }
+  expect(evaluateCursorOrientation(plan, 3)).toEqual(evaluateCursorOrientation(next, 3));
+  const { evaluateCameraTrajectoryDerivative } =
+    await import('../../composition/motion/camera-trajectory');
+  for (const order of [1, 2] as const) {
+    const left = evaluateCameraTrajectoryDerivative(plan.spans.at(-1)!, 3, order);
+    const right = evaluateCameraTrajectoryDerivative(next.spans[0]!, 3, order);
+    expect(left.x).toBeCloseTo(right.x, 9);
+    expect(left.y).toBeCloseTo(right.y, 9);
+  }
+  expect(evaluateCursorOrientation(next, 5.9).y).toBeCloseTo(-22, 5);
+});
+
+it('starts an independent Gallery response at the exact source cut without anticipating the next run', () => {
+  const region = createQuickEditZoomRegion({ id: 'cut', at: 0, duration: 4 });
+  const path: CursorFocusPath = {
+    version: 1,
+    mode: 'follow',
+    smoothing: 0,
+    sensitivity: 0.5,
+    gapPolicy: 'hold',
+    segments: [
+      {
+        id: 'before',
+        binding: { kind: 'project' },
+        start: 0,
+        end: 2,
+        keys: [0, 2].map((time) => ({
+          id: `a${time}`,
+          time,
+          x: 0,
+          y: 0.5,
+          anchor: 'boundary',
+          interpolation: 'linear',
+        })),
+      },
+      {
+        id: 'after',
+        binding: { kind: 'project' },
+        start: 4,
+        end: 6,
+        keys: [4, 6].map((time) => ({
+          id: `b${time}`,
+          time,
+          x: 1,
+          y: 0.5,
+          anchor: 'boundary',
+          interpolation: 'linear',
+        })),
+      },
+    ],
+  };
+  region.cursorFocus = {
+    path,
+    observed: path,
+    timeMap: [
+      { kind: 'keep', sourceStart: 0, sourceEnd: 2, resultStart: 0, resultEnd: 2, rate: 1 },
+      { kind: 'cut', sourceStart: 2, sourceEnd: 4, resultStart: 2, resultEnd: 2, rate: 1 },
+      { kind: 'keep', sourceStart: 4, sourceEnd: 6, resultStart: 2, resultEnd: 4, rate: 1 },
+    ],
+  };
+  const plan = resolveReviewCursorOrientation(region)!;
+  expect(evaluateCursorOrientation(plan, 1.99).y).toBeCloseTo(22, 9);
+  expect(evaluateCursorOrientation(plan, 2).y).toBeCloseTo(-22, 9);
+  expect(evaluateCursorOrientation(plan, 3.99).y).toBeCloseTo(-22, 9);
 });

@@ -16,6 +16,7 @@ it('admits only bounded typed header artwork with a background capability', () =
     { source: { width: Infinity, height: 1 } },
     { source: { width: 32768, height: 32768 } },
     { header: { ...DEFAULT_WINDOW_HEADER, title: 'x'.repeat(513) } },
+    { faviconRedirectGuardReady: 'true' },
     { rawHtml: '<script>unsafe</script>' },
   ]) {
     expect(() => contract.parseRequest({ ...request, ...patch })).toThrow();
@@ -34,4 +35,23 @@ it('admits bounded PNG completion and refuses arbitrary or oversized payloads', 
       dataUrl: 'data:image/png;base64,' + 'A'.repeat(22_369_648),
     })
   ).toThrow();
+});
+
+it('admits only a typed optional redirect guard receipt', () => {
+  for (const faviconRedirectGuardReady of [true, false]) {
+    expect(contract.parseRequest({ ...request, faviconRedirectGuardReady })).toEqual({
+      ...request,
+      faviconRedirectGuardReady,
+    });
+  }
+});
+
+it('admits a bounded optional favicon hint and rejects invalid wire values', () => {
+  const faviconHintUrl = 'https://example.test/brand.svg';
+  expect(contract.parseRequest({ ...request, faviconHintUrl })).toEqual({
+    ...request,
+    faviconHintUrl,
+  });
+  for (const value of [false, 42, {}, 'x'.repeat(2049)])
+    expect(() => contract.parseRequest({ ...request, faviconHintUrl: value })).toThrow();
 });

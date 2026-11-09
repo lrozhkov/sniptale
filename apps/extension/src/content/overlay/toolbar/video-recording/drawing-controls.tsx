@@ -20,9 +20,9 @@ import {
 } from '../../../../features/drawing/public';
 import { translate } from '../../../../platform/i18n';
 import { ToolbarDrawingControls, type ToolbarDrawingControlsOwner } from '../controls/drawing';
-import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
+import { ToolbarMenuDropdown } from '../menu/dropdown';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
-import { getToolbarMenuPosition } from '../menu/position';
+import { resolveRecordingToolbarMenuLayout } from '../menu/position';
 import { useToolbarMenuDirection } from '../menu/direction';
 import {
   RECORDING_DRAWING_AUTO_HIDE_DELAYS,
@@ -43,6 +43,7 @@ const DRAWING_TOOLS: readonly DrawingTool[] = [
   'shape',
   'arrow',
   'blur',
+  'simplify',
 ];
 
 function isDrawingTool(mode: RecordingDrawingInteractionMode): mode is DrawingTool {
@@ -97,17 +98,13 @@ function AutoHideControl(props: {
     open,
     triggerRef,
   });
-  const resolveLayout = () => {
-    const dropdown = resolveToolbarDropdownState({
+  const resolveLayout = () =>
+    resolveRecordingToolbarMenuLayout({
       anchorRef: triggerRef,
       displayMode: props.displayMode,
-      getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
       menuHeight: 280,
       menuWidth: 220,
-      preferredAlign: 'end',
     });
-    return { placement: dropdown.menuPlacement, style: dropdown.style };
-  };
   const dropdown = resolveLayout();
   const menuSide = useToolbarMenuDirection(resolveLayout);
   const label = translate('content.toolbar.recordingDrawingAutoHide');

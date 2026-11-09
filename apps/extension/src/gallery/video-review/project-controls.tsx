@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from 'react';
+import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { translate } from '../../platform/i18n';
 import type { useReviewEditorState } from './use-editor-state';
 
 type EditorState = ReturnType<typeof useReviewEditorState>;
 type ProjectCommandState = Pick<EditorState, 'canStart' | 'setBusy' | 'beforeAction' | 'run'> & {
-  session: Pick<EditorState['session'], 'rename' | 'createProject'>;
+  session: Pick<EditorState['session'], 'rename' | 'createProject' | 'getSnapshot'>;
 };
 
 /** Project metadata commands retain one receipt and use the mounted session writer. */
@@ -14,6 +15,15 @@ export function useReviewProjectCommands(
   onCreated: ((aggregateId: string) => void) | undefined
 ) {
   const receipt = useRef<string | null>(null);
+  const active = useRef(true);
+  const latest = useRef({ state, onCreated });
+  latest.current = { state, onCreated };
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
   return {
     newProject: onCreated
       ? () => {
@@ -21,10 +31,50 @@ export function useReviewProjectCommands(
             () =>
               void state.run(async () => {
                 await flush();
+                const session = state.session;
+                const isCurrent = () =>
+                  active.current &&
+                  latest.current.state.session === session &&
+                  Boolean(latest.current.onCreated);
+                if (!isCurrent()) return;
                 receipt.current ??= crypto.randomUUID();
-                const created = await state.session.createProject(receipt.current);
+                const command = receipt.current;
+                const created = await session.createProject(command);
+                const before = session.getSnapshot();
+                const canContinue = () => {
+                  if (!isCurrent() || receipt.current !== command) return false;
+                  const current = session.getSnapshot();
+                  return (
+                    !current.dirty &&
+                    !current.pending &&
+                    !current.error &&
+                    current.snapshot === before.snapshot
+                  );
+                };
+                if (!canContinue()) return;
+                if (created.archiveCheckpointReceipt) {
+                  try {
+                    await createSyncProductClient().requestCheckpointExit(
+                      created.archiveCheckpointReceipt
+                    );
+                  } catch {
+                    /* Committed creation and its original pending deadline survive a missed advisory request. */
+                  }
+                  if (!canContinue()) return;
+                }
+                if (created.retainedEditorCheckpointReceipt) {
+                  try {
+                    await createSyncProductClient().requestCheckpointExit(
+                      created.retainedEditorCheckpointReceipt
+                    );
+                  } catch {
+                    /* Do not replace the selected receipt after a missed advisory request. */
+                  }
+                  if (!canContinue()) return;
+                }
+                if (!canContinue()) return;
+                latest.current.onCreated?.(created.workspace.aggregateId);
                 receipt.current = null;
-                onCreated(created.workspace.aggregateId);
               })
           );
         }

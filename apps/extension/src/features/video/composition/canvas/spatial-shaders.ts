@@ -5,6 +5,28 @@ void main() {
   gl_Position = vec4(position.x * 2.0 - 1.0, 1.0 - position.y * 2.0, 0.0, 1.0);
 }`;
 
+/** Exact level-zero path selected only when the CPU bound excludes filtering everywhere. */
+export const REVIEW_SPATIAL_BASE_FRAGMENT = `
+precision highp float;
+uniform highp sampler2D surface0;
+uniform mat3 inverseProjection;
+uniform vec2 outputSize;
+uniform vec4 sourceRect;
+uniform vec2 sourceRasterSize;
+vec4 transparentSample(highp sampler2D image, vec2 point, vec2 size) {
+  vec2 coverage = clamp(point * size + 0.5, 0.0, 1.0)
+                 * clamp((1.0 - point) * size + 0.5, 0.0, 1.0);
+  return texture2D(image, point) * coverage.x * coverage.y;
+}
+void main() {
+  vec2 point = vec2(gl_FragCoord.x, outputSize.y - gl_FragCoord.y);
+  vec3 projected = inverseProjection * vec3(point, 1.0);
+  if (projected.z <= 0.000001) { gl_FragColor = vec4(0.0); return; }
+  vec2 scenePoint = projected.xy / projected.z;
+  vec2 uv = (scenePoint - sourceRect.xy) / sourceRect.zw;
+  gl_FragColor = transparentSample(surface0, uv, sourceRasterSize);
+}`;
+
 export const REVIEW_SPATIAL_FRAGMENT = `
 precision highp float;
 uniform highp sampler2D surface0;
@@ -20,6 +42,7 @@ uniform mat3 inversePlane;
 uniform vec2 levelSize[8];
 uniform vec2 outputSize;
 uniform vec4 sourceRect;
+uniform vec2 sourceRasterSize;
 uniform vec4 windowRect;
 uniform vec2 depthAxis;
 uniform vec4 focusA;
@@ -63,6 +86,7 @@ vec4 smoothLevel(highp sampler2D image, vec2 size) {
 }
 // Interpolated low-pass levels remove sparse-tap ghosts and the retained sharp center.
 vec4 filtered(float level) {
+  if (level <= 0.0) return transparentSample(surface0, uv, levelSize[0]);
   if (level < 1.0) return mix(transparentSample(surface0, uv, levelSize[0]),
                               smoothLevel(surface1, levelSize[1]), level);
   if (level < 2.0) return mix(smoothLevel(surface1, levelSize[1]), smoothLevel(surface2, levelSize[2]), level - 1.0);
@@ -83,10 +107,11 @@ void main() {
   scenePoint = projected.xy / projected.z;
   uv = (scenePoint - sourceRect.xy) / sourceRect.zw;
   float blur = blurAmount(focusA, blurSettings.x, modes.x) + blurAmount(focusB, blurSettings.y, modes.y);
-  float radius = blur * 24.0 * outputSize.x / 1920.0;
+  vec2 sourceDensity = sourceRasterSize / sourceRect.zw;
+  float radius = blur * 24.0 * outputSize.x / 1920.0 * max(sourceDensity.x, sourceDensity.y);
   vec2 center = scenePoint;
-  float footprint = max(length(sourcePoint(point + vec2(1.0, 0.0)) - center),
-                        length(sourcePoint(point + vec2(0.0, 1.0)) - center));
+  float footprint = max(length((sourcePoint(point + vec2(1.0, 0.0)) - center) * sourceDensity),
+                        length((sourcePoint(point + vec2(0.0, 1.0)) - center) * sourceDensity));
   float level = log2(max(1.0, max(footprint, radius)));
   gl_FragColor = filtered(level);
 }`;

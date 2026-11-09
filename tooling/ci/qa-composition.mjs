@@ -101,21 +101,27 @@ export async function collectCiProofResults({
 } = {}) {
   capability('proof');
   const verifyScope = scopeResolver();
-  const [product, audit, productionBuild] = await collectOwnedProofResults(
+  const [product, harnessTests, productionBuild] = await collectOwnedProofResults(
     [
       { label: 'Product proof', collect: () => productProofCollector(verifyScope) },
-      { label: 'Audit', collect: () => auditCollector({ profileId: 'pr', session }) },
-      { label: 'Production build', collect: productionBuildCollector },
-    ],
-    session
-  );
-  const [harnessTests] = await collectOwnedProofResults(
-    [
       {
         label: 'Harness unit tests',
         collect: () => harnessTestCollector(resolveCiHarnessTestPlan(verifyScope)),
       },
+      { label: 'Production build', collect: productionBuildCollector },
     ],
+    session
+  );
+  const prerequisites = [...product.steps, harnessTests, productionBuild];
+  const failures = prerequisites.filter(
+    ({ status }) => status === 'failed' || status === 'blocked'
+  );
+  if (failures.length > 0) {
+    for (const step of failures) printStepResult(step);
+    throw new Error('CI prerequisites failed. Audit and full product coverage did not run.');
+  }
+  const [audit] = await collectOwnedProofResults(
+    [{ label: 'Audit', collect: () => auditCollector({ profileId: 'pr', session }) }],
     session
   );
   const coverageStep = audit.steps.find(({ label }) => label === 'Full product coverage');

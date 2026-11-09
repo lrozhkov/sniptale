@@ -60,7 +60,7 @@ async function dispatchSidebarFileChanges(inputs: ReturnType<typeof getSidebarFi
 
 function getApplyCropButton() {
   return Array.from(document.querySelectorAll('button')).find((button) =>
-    button.textContent?.includes(translate('editor.compact.apply'))
+    button.textContent?.includes(translate('editor.compact.applyCropCanvas'))
   );
 }
 

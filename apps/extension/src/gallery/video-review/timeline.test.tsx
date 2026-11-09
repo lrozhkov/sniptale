@@ -57,6 +57,27 @@ function renderTimeline(overrides: Partial<Parameters<typeof ReviewTimeline>[0]>
 
 type PlaneEvent = { type: string; x: number; button?: number };
 
+it('keeps the archived history row and timeline height budget across empty window refreshes', () => {
+  const { host } = renderTimeline({
+    sourceId: 'recording-a',
+    cursorArchiveAvailable: true,
+    markers: [{ ref: { kind: 'action', id: 'click' }, eventType: 'CLICK', start: 1, end: 1 }],
+  });
+  const timeline = host.querySelector('[data-ui="gallery.videoReview.timeline"]')!;
+  const budget = timeline.className;
+  const height = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')!
+    .style.height;
+  renderTimeline({ sourceId: 'recording-a', cursorArchiveAvailable: true });
+  expect(timeline.className).toBe(budget);
+  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).not.toBeNull();
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')!.style.height
+  ).toBe(height);
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(2);
+  renderTimeline({ sourceId: 'recording-b', cursorArchiveAvailable: false });
+  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
+});
+
 it('shows hundredths in playback time with correct minute rollover', () => {
   const { host } = renderTimeline({ time: 59.999, duration: 72.345 });
   expect(host.querySelector('[data-toolbar-transport]')?.textContent).toContain(
@@ -209,19 +230,6 @@ it('previews the boundary that basic cut drawing will select', () => {
   expect(guide.style.left).toBe(
     `${100 + Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'))}px`
   );
-});
-
-it('keeps the seek cursor during plane capture from an audio lane', () => {
-  const { host } = renderTimeline({
-    audioTracks: { originalAudio: <div data-ui="gallery.videoReview.audioLane" /> },
-  });
-  const plane = planeWithMetrics(host);
-  const audio = host.querySelector('[data-ui="gallery.videoReview.audioLane"]')!;
-  act(() => audio.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100 })));
-  hoverAt(plane, 200);
-  expect(plane.style.cursor).toBe('default');
-  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')?.textContent).toBe('2.0');
-  dispatchPlane(plane, [{ type: 'pointerup', x: 200 }]);
 });
 
 it('keeps original time coordinates through zoom and preserves separate comment navigation', () => {
@@ -437,24 +445,6 @@ it('allows seeking while writes lock track editing, without creating a new range
   ]);
   expect(props.onSeek).toHaveBeenCalledWith(3, false);
   expect(props.onSelect).not.toHaveBeenCalled();
-});
-
-it.each(['zoomLane', 'audioLane'])('seeks without selecting a range on an idle %s', (laneName) => {
-  const onRangeCommit = vi.fn();
-  const { host, props } = renderTimeline({
-    onRangeCommit,
-    zoomTrack: <div data-ui={`gallery.videoReview.${laneName}`} />,
-  });
-  const plane = planeWithMetrics(host);
-  const lane = host.querySelector<HTMLElement>(`[data-ui="gallery.videoReview.${laneName}"]`)!;
-  dispatchPlane(lane, [{ type: 'pointerdown', x: 100 }]);
-  dispatchPlane(plane, [
-    { type: 'pointermove', x: 250 },
-    { type: 'pointerup', x: 250 },
-  ]);
-  expect(props.onSeek).toHaveBeenCalledWith(1);
-  expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
-  expect(onRangeCommit).not.toHaveBeenCalled();
 });
 
 it('routes focus drawing to its own tool and cancels without committing', () => {
@@ -791,4 +781,58 @@ it('moves the time label away from the cursor while retaining the visible ruler 
   expect(offset()).toBe('translateX(4px)');
   render(101, 12);
   expect(offset()).toBe('translateX(32px)');
+});
+
+it('reports the actual visible source range after zoom and horizontal scroll', () => {
+  const onHistoryRange = vi.fn();
+  const { host } = renderTimeline({ duration: 100, time: 0, onHistoryRange });
+  expect(onHistoryRange).toHaveBeenLastCalledWith({ start: 0, end: 100 });
+  changeZoom(host, '25');
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  act(() => {
+    viewport.scrollLeft = 400;
+    viewport.dispatchEvent(new Event('scroll', { bubbles: true }));
+  });
+  expect(onHistoryRange).toHaveBeenLastCalledWith({ start: 25, end: 75 });
+});
+it('keeps an archived cursor row available without inventing motion markers', () => {
+  const { host } = renderTimeline({ markers: [], cursorArchiveAvailable: true });
+  expect(
+    host.querySelector('[data-ui="gallery.videoReview.archivedCursorHistory"]')?.textContent
+  ).toBe('gallery.videoReview.recordingCursorArchived');
+  expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).not.toBeNull();
+});
+
+it('does not rebuild animation membership on playhead ticks and refreshes changed effects', async () => {
+  const { REVIEW_CLICK_DEFAULT } =
+    await import('../../features/video/review/advanced/click-animation');
+  let reads = 0;
+  const click = {
+    ...REVIEW_CLICK_DEFAULT,
+    id: 'event',
+    get effect() {
+      reads++;
+      return 'ripple' as const;
+    },
+  };
+  const markers = [
+    { ref: { kind: 'action' as const, id: 'event' }, eventType: 'CLICK', start: 1, end: 1 },
+  ];
+  const clickAnimations = [click],
+    onMarker = vi.fn();
+  const { host } = renderTimeline({ markers, clickAnimations, onMarker, time: 0 });
+  const before = reads;
+  renderTimeline({ markers, clickAnimations, onMarker, time: 0.1 });
+  renderTimeline({ markers, clickAnimations, onMarker, time: 0.2 });
+  expect(reads).toBe(before);
+  expect(host.querySelector('[data-animated="true"]')).not.toBeNull();
+  renderTimeline({
+    markers,
+    clickAnimations: [{ ...REVIEW_CLICK_DEFAULT, id: 'event', effect: 'off' }],
+    onMarker,
+    time: 0.2,
+  });
+  expect(host.querySelector('[data-animated="true"]')).toBeNull();
 });

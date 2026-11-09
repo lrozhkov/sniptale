@@ -20,6 +20,10 @@ const {
   cameraSplitMock,
   cameraSplitPaintMock,
   deferredSpotlightMock,
+  sharpStagesMock,
+  drawFxMock,
+  sceneSpotlightsMock,
+  spatialDrawMock,
 } = vi.hoisted(() => ({
   drawSceneActionCompositionStatesMock: vi.fn(),
   drawCompositionLayerMock: vi.fn(),
@@ -30,6 +34,29 @@ const {
   cameraSplitMock: vi.fn(() => null),
   cameraSplitPaintMock: vi.fn(),
   deferredSpotlightMock: vi.fn(),
+  spatialDrawMock: vi.fn<
+    typeof import('../../../features/video/composition/draw/spatial').drawSpatialCompositionGroup
+  >(() => true),
+  sharpStagesMock: vi.fn<typeof import('./source-sharp-stage').createNativeSharpStages>(() => []),
+  drawFxMock: vi.fn<
+    typeof import('../../../features/video/composition/draw').drawEffectRuntimeVisualLayer
+  >(() => false),
+  sceneSpotlightsMock:
+    vi.fn<
+      typeof import('../../../features/video/composition/draw/project-spotlight').drawCompositionSceneSpotlights
+    >(),
+}));
+
+vi.mock('../../../features/video/composition/draw/spatial', () => ({
+  drawSpatialCompositionGroup: spatialDrawMock,
+  drawSpatialSceneOverlays: vi.fn(() => true),
+}));
+vi.mock('./source-sharp-stage', () => ({ createNativeSharpStages: sharpStagesMock }));
+vi.mock('../../../features/video/composition/draw/project-spotlight', async (original) => ({
+  ...(await original<
+    typeof import('../../../features/video/composition/draw/project-spotlight')
+  >()),
+  drawCompositionSceneSpotlights: sceneSpotlightsMock,
 }));
 
 vi.mock('../../../features/video/composition/camera-split', () => ({
@@ -43,6 +70,7 @@ vi.mock('../../../features/video/composition/draw', async (importOriginal) => ({
   drawSceneActionCompositionStates: drawSceneActionCompositionStatesMock,
   drawCursorCompositionState: drawCursorCompositionStateMock,
   drawTransitionOverlay: drawTransitionOverlayMock,
+  drawEffectRuntimeVisualLayer: drawFxMock,
 }));
 
 vi.mock('../../../features/video/composition/motion/layer-camera', async (importOriginal) => ({
@@ -458,4 +486,323 @@ it('passes the burn-in flag into composition rendering when subtitle export is e
     cameraViewport: { width: 200, height: 100 },
     includeSubtitles: true,
   });
+});
+
+it.each([false, true])(
+  'isolates sharp-stage FX state and releases retained stages after controlled draw failure=%s',
+  async (failure) => {
+    const { drawProjectFrame } = await import('./frame');
+    const { createQuickEditSpotlight } =
+      await import('../../../features/video/project/scene/focus-appearance');
+    const { frame, project, settings } = createRenderedFrame();
+    frame.visualLayers.push({ ...frame.visualLayers[0]!, clipId: 'clip-2' });
+    const overlay = {
+      ...frame,
+      sceneSpotlights: [
+        {
+          id: 'boundary',
+          afterClipId: 'clip-1',
+          phase: 'hold',
+          progress: 1,
+          spotlight: createQuickEditSpotlight(),
+        },
+      ],
+    };
+    resolveVideoCompositionRenderPassesMock.mockReturnValue({
+      overlayFrame: overlay,
+      visualPasses: [{ alpha: 1, frame: overlay, time: 1 }],
+    });
+    const context = createContext(),
+      sharpContext = { ...createContext(), setTransform: vi.fn() };
+    const release = vi.fn(),
+      releasePass = vi.fn();
+    const stage = {
+      id: 'sceneLens:global',
+      context: sharpContext,
+      output: { width: 20, height: 10 },
+      transform: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+      finished: false,
+      paint: (paint: (ctx: CanvasRenderingContext2D) => void) =>
+        paint(sharpContext as CanvasRenderingContext2D),
+      publish: vi.fn(() => {
+        stage.finished = true;
+      }),
+      dispose: release,
+    };
+    sharpStagesMock.mockReturnValueOnce([stage] as never);
+    const media = new Map(),
+      sampling = {
+        prepare: vi.fn(async () => ({
+          media,
+          sourceRasterScale: 1,
+          rasterScaleForDemand: () => 1,
+          forDemand: () => media,
+        })),
+        releasePass,
+      };
+    const states: unknown[] = [],
+      painted: unknown[] = [];
+    drawFxMock.mockImplementation((args) => {
+      const input = args as unknown as {
+        context: unknown;
+        state: { drawnTransitionIds: Set<string> };
+      };
+      states.push(input.state);
+      if (!input.state.drawnTransitionIds.has('shared')) {
+        input.state.drawnTransitionIds.add('shared');
+        painted.push(input.context);
+      }
+      return true;
+    });
+    const gate = Promise.withResolvers<void>(),
+      entered = Promise.withResolvers<void>();
+    sampling.prepare.mockImplementationOnce(() => {
+      entered.resolve();
+      return gate.promise.then(() => ({
+        media,
+        sourceRasterScale: 1,
+        rasterScaleForDemand: () => 1,
+        forDemand: () => media,
+      }));
+    });
+    sceneSpotlightsMock.mockImplementation((args) => {
+      if (!args.afterClipId) args.sharpPaint?.('global', context);
+    });
+    const pending = drawProjectFrame(context, project, settings, 1, {}, media, {
+      sourceSampling: sampling as unknown as NonNullable<
+        NonNullable<Parameters<typeof drawProjectFrame>[6]>['sourceSampling']
+      >,
+    });
+    await entered.promise;
+    expect(release).not.toHaveBeenCalled();
+    expect(stage.publish).not.toHaveBeenCalled();
+    if (failure) gate.reject(new Error('sample failed'));
+    else gate.resolve();
+    if (failure) {
+      await expect(pending).rejects.toThrow('sample failed');
+      expect(stage.publish).not.toHaveBeenCalled();
+    } else {
+      await pending;
+      expect(painted).toEqual([context, sharpContext]);
+      expect(new Set(states).size).toBe(2);
+      expect(stage.publish).toHaveBeenCalledOnce();
+    }
+    expect(release).toHaveBeenCalledOnce();
+    expect(releasePass).toHaveBeenCalledOnce();
+    drawFxMock.mockImplementation(() => false);
+    sceneSpotlightsMock.mockReset();
+  }
+);
+it('projects the body into its aperture while sharp stages retain their density', async () => {
+  const { drawProjectFrame } = await import('./frame');
+  const { frame } = createRenderedFrame();
+  const project = createEmptyVideoProject('FHD selected', 1920, 1080),
+    settings = createExportSettings(project, VideoResolutionPreset.SOURCE);
+  const spatial = {
+    ...frame,
+    camera: {
+      ...frame.camera,
+      scale: 3,
+      spatial: {
+        rotation: [0, 0, 0, 1],
+        perspective: 0,
+        windowMotion: 0,
+        lockBackground: false,
+        focus: [],
+        reference: { x: 0, y: 0, width: 1920, height: 1080 },
+      },
+    },
+  };
+  resolveVideoCompositionRenderPassesMock.mockReturnValue({
+    overlayFrame: spatial,
+    visualPasses: [{ time: 1, alpha: 1, frame: spatial }],
+  });
+  const context = createContext(),
+    sharp = { ...createContext(), setTransform: vi.fn() };
+  const stage = {
+    id: 'sceneLens:tiny',
+    context: sharp,
+    output: { width: 40, height: 30 },
+    transform: [8, 0, 0, 0, 8, 0, 0, 0, 1],
+    finished: false,
+    paint: (paint: (ctx: CanvasRenderingContext2D) => void) =>
+      paint(sharp as CanvasRenderingContext2D),
+    dispose: vi.fn(),
+    publish: vi.fn(),
+  };
+  sharpStagesMock.mockReturnValueOnce([stage] as never);
+  const media = new Map(),
+    sampling = {
+      prepare: vi.fn(async () => ({
+        media,
+        sourceRasterScale: 3,
+        rasterScaleForDemand: () => 24,
+        forDemand: () => media,
+      })),
+      releasePass: vi.fn(),
+    };
+  await drawProjectFrame(context, project, settings, 1, {}, media, {
+    sourceSampling: sampling as unknown as NonNullable<
+      NonNullable<Parameters<typeof drawProjectFrame>[6]>['sourceSampling']
+    >,
+    spatialRenderer: () => ({}) as never,
+  });
+  const calls = spatialDrawMock.mock.calls.slice(-2).map((call) => call[0]);
+  expect(calls[0]!.sourceRasterScale).toBe(3);
+  expect(calls[0]!.sharpOutput!.output).toEqual({ width: 1920, height: 1080 });
+  expect(calls[0]!.sharpOutput!.destination).toEqual({ x: 0, y: 0, width: 1920, height: 1080 });
+  expect(calls[1]!.sourceRasterScale).toBe(24);
+  expect(calls[1]!.sharpOutput!.output).toEqual({ width: 40, height: 30 });
+});
+
+it.each([true, false])(
+  'keeps locked overlay geometry while selecting each sharp source demand (prepared=%s)',
+  async (enhanced) => {
+    const { drawProjectFrame } = await import('./frame');
+    const { segmentVisualLayersByViewportLock } =
+      await import('../../../features/video/composition/motion/layer-camera');
+    const { frame } = createRenderedFrame();
+    const project = createEmptyVideoProject('Locked overlay sampling', 100, 50);
+    const settings = createExportSettings(project, VideoResolutionPreset.SOURCE);
+    const context = createContext(),
+      sharpContext = { ...createContext(), setTransform: vi.fn() };
+    const layer = frame.visualLayers[0]!;
+    vi.mocked(segmentVisualLayersByViewportLock).mockReturnValueOnce([
+      {
+        isLocked: true,
+        layers: [layer] as unknown as Parameters<typeof segmentVisualLayersByViewportLock>[0],
+      },
+    ]);
+    resolveVideoCompositionRenderPassesMock.mockReturnValue({
+      overlayFrame: frame,
+      visualPasses: [{ time: 1, alpha: 1, frame, transitionOverlays: [] }],
+    });
+    const stage: import('./source-sharp-stage').NativeSharpStage = {
+      id: 'sceneLens:active',
+      finished: false,
+      context: sharpContext,
+      output: { width: 20, height: 10 },
+      transform: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+      paint: (paint: (target: CanvasRenderingContext2D) => void) => paint(sharpContext),
+      publish: vi.fn(),
+      dispose: vi.fn(),
+    };
+    const finished = {
+      ...stage,
+      id: 'sceneLens:finished',
+      finished: true,
+      paint: vi.fn(),
+      dispose: vi.fn(),
+    };
+    if (enhanced) sharpStagesMock.mockReturnValueOnce([stage, finished]);
+    const original = new Map(),
+      ordinary = new Map([['ordinary', { sourceWidth: 100, sourceHeight: 50, draw() {} }]]),
+      sharp = new Map([['sharp', { sourceWidth: 200, sourceHeight: 100, draw() {} }]]);
+    const forDemand = vi.fn(() => sharp),
+      releasePass = vi.fn(),
+      prepare = vi.fn(async () => ({ media: ordinary, forDemand }));
+    const signal = new AbortController().signal;
+    await drawProjectFrame(
+      context,
+      project,
+      settings,
+      1,
+      {},
+      original,
+      enhanced
+        ? {
+            sourceSampling: {
+              prepare,
+              releasePass,
+            } as unknown as import('./source-sampling').ProjectExportSourceSampling,
+            sourceSamplingFallback: 'first',
+            signal,
+          }
+        : {}
+    );
+    const ordinaryCall = drawCompositionLayerMock.mock.calls.find(([target]) => target === context);
+    const sharpCall = drawCompositionLayerMock.mock.calls.find(
+      ([target]) => target === sharpContext
+    );
+    expect(ordinaryCall?.[1]).toBe(layer);
+    if (enhanced) expect(sharpCall?.[1]).toBe(layer);
+    expect(ordinaryCall?.[5]).toBe(enhanced ? ordinary : original);
+    if (enhanced) expect(sharpCall?.[5]).toBe(sharp);
+    expect(drawCompositionLayerMock).toHaveBeenCalledTimes(enhanced ? 2 : 1);
+    if (enhanced) {
+      expect(prepare).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          project,
+          frame,
+          time: 1,
+          media: original,
+          fallback: 'first',
+          signal,
+        })
+      );
+      expect(forDemand).toHaveBeenCalledExactlyOnceWith('sceneLens:active');
+      expect(releasePass).toHaveBeenCalledOnce();
+    } else expect(forDemand).not.toHaveBeenCalled();
+    if (enhanced) {
+      expect(stage.dispose).toHaveBeenCalledOnce();
+      expect(finished.dispose).toHaveBeenCalledOnce();
+    }
+  }
+);
+
+it('releases locked-overlay sharp resources when source sampling fails before painting', async () => {
+  const { drawProjectFrame } = await import('./frame');
+  const { segmentVisualLayersByViewportLock } =
+    await import('../../../features/video/composition/motion/layer-camera');
+  const { frame } = createRenderedFrame();
+  vi.mocked(segmentVisualLayersByViewportLock).mockReturnValueOnce([
+    {
+      isLocked: true,
+      layers: frame.visualLayers as unknown as Parameters<
+        typeof segmentVisualLayersByViewportLock
+      >[0],
+    },
+  ]);
+  resolveVideoCompositionRenderPassesMock.mockReturnValue({
+    overlayFrame: frame,
+    visualPasses: [{ time: 1, alpha: 1, frame, transitionOverlays: [] }],
+  });
+  const context = createContext();
+  const stage: import('./source-sharp-stage').NativeSharpStage = {
+    id: 'sceneLens:failed',
+    finished: false,
+    context,
+    output: { width: 20, height: 10 },
+    transform: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    paint: vi.fn(),
+    publish: vi.fn(),
+    dispose: vi.fn(),
+  };
+  sharpStagesMock.mockReturnValueOnce([stage]);
+  const error = new Error('Enhanced source unavailable'),
+    releasePass = vi.fn();
+  const project = createEmptyVideoProject('Locked sampling failure', 100, 50);
+  await expect(
+    drawProjectFrame(
+      context,
+      project,
+      createExportSettings(project, VideoResolutionPreset.SOURCE),
+      1,
+      {},
+      new Map(),
+      {
+        sourceSampling: {
+          prepare: vi.fn(async () => {
+            throw error;
+          }),
+          releasePass,
+        } as unknown as import('./source-sampling').ProjectExportSourceSampling,
+      }
+    )
+  ).rejects.toBe(error);
+  expect(drawCompositionLayerMock).not.toHaveBeenCalled();
+  expect(stage.publish).not.toHaveBeenCalled();
+  expect(stage.dispose).toHaveBeenCalledOnce();
+  expect(releasePass).toHaveBeenCalledOnce();
+  expect(context.restore).toHaveBeenCalledOnce();
 });

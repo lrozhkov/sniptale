@@ -130,8 +130,7 @@
       "id": "main",
       "label": "Main",
       "locked": false,
-      "start": 0,
-      "transition": null
+      "start": 0
     }
   ],
   "schemaVersion": "sniptale.effect.v1",

@@ -65,6 +65,7 @@ export async function createProviderSecretUpsertPlan(args: {
   input: AIProviderUpsertInput;
   previousProvider: AIProvider | undefined;
   secrets: Record<string, EncryptedSecretEnvelope>;
+  operationKey?: CryptoKey | null | undefined;
 }): Promise<ProviderSecretUpsertPlan> {
   const { input, previousProvider, secrets } = args;
   let nextSecrets = secrets;
@@ -75,7 +76,7 @@ export async function createProviderSecretUpsertPlan(args: {
   );
 
   if (typeof input.apiKey === 'string' && input.apiKey.length > 0) {
-    const resolvedKey = await resolveProviderSecretKeyForWrite();
+    const resolvedKey = await resolveProviderSecretKeyForWrite(args.operationKey);
     nextSecrets = {
       ...secrets,
       [input.id]: await encryptSecret(

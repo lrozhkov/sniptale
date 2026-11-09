@@ -1,3 +1,4 @@
+import type { PreviewSceneSourceFrames } from './source-frames';
 import type { VideoCompositionMediaSource } from '../../../../features/video/composition/draw/media-source';
 import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
 import { drawSpatialCompositionGroup } from '../../../../features/video/composition/draw/spatial';
@@ -149,6 +150,7 @@ function drawPreparedPreviewVisualPass(params: {
 }
 
 export async function drawPreviewVisualPasses(params: {
+  sourceFrames?: PreviewSceneSourceFrames;
   canvas: HTMLCanvasElement;
   viewportCanvas?: HTMLCanvasElement;
   spatialRenderer?: () => ReviewSpatialRenderer;
@@ -180,6 +182,7 @@ export async function drawPreviewVisualPasses(params: {
   }
 
   await drawPreviewOrderedVisualLayers({
+    ...(params.sourceFrames ? { sourceFrames: params.sourceFrames } : {}),
     project: params.project,
     time: params.currentTime ?? 0,
     canvas: params.canvas,
@@ -201,6 +204,7 @@ export async function drawPreviewVisualPasses(params: {
 }
 
 async function drawPreviewOrderedVisualLayers(params: {
+  sourceFrames?: PreviewSceneSourceFrames;
   project: VideoProject;
   time: number;
   canvas: HTMLCanvasElement;
@@ -247,6 +251,7 @@ async function drawPreviewOrderedVisualLayers(params: {
           );
       } else
         await drawPreviewUnlockedLayerGroup({
+          ...(params.sourceFrames ? { sourceFrames: params.sourceFrames } : {}),
           canvas: params.canvas,
           clipMediaElements: params.clipMediaElements,
           effectRuntimeFrames: params.effectRuntimeFrames,
@@ -281,6 +286,7 @@ async function drawPreviewOrderedVisualLayers(params: {
 }
 
 async function drawPreviewUnlockedLayerGroup(params: {
+  sourceFrames?: PreviewSceneSourceFrames;
   canvas: HTMLCanvasElement;
   clipMediaElements: Map<string, VideoCompositionMediaSource>;
   imageBank: Record<string, HTMLImageElement>;
@@ -312,7 +318,8 @@ async function drawPreviewUnlockedLayerGroup(params: {
       await params.effectRuntimeFrames?.prepareVisualPass?.(pass.time);
       const paint = (context: CanvasRenderingContext2D) =>
         drawPreparedPreviewVisualPass({
-          clipMediaElements: params.clipMediaElements,
+          clipMediaElements:
+            params.sourceFrames?.media(pass.frame, pass.time) ?? params.clipMediaElements,
           effectRuntimeFrames: getEffectRuntimeVisualPassFrames(
             params.effectRuntimeFrames,
             pass.time

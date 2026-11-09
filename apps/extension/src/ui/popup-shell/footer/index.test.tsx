@@ -155,7 +155,7 @@ it('keeps application launchers out of the menu footer', async () => {
 
 it('places Settings on the left and GitHub with the theme control on the right', async () => {
   await renderFooter();
-  const footer = container?.querySelector('footer');
+  const footer = container?.querySelector('[data-ui="popup.footer.actions"]');
   expect(container?.querySelector('[data-ui="popup.footer.version"]')).toBeNull();
   expect(footer?.firstElementChild?.getAttribute('data-ui')).toBe('popup.footer.settings-button');
   expect(
@@ -204,8 +204,32 @@ it('keeps the settings action as the leftmost footer button', async () => {
     container?.querySelectorAll<HTMLElement>('[data-ui^="popup.footer."]') ?? []
   ).map((node) => node.getAttribute('data-ui'));
 
-  expect(actions.at(0)).toBe('popup.footer.settings-button');
+  expect(actions.filter((id) => id !== 'popup.footer.actions').at(0)).toBe(
+    'popup.footer.settings-button'
+  );
   expect(
     container?.querySelector<HTMLElement>('[data-ui="popup.footer.settings-button"]')?.className
   ).toContain('border-none');
+});
+
+it('renders a presentation status while retaining working footer actions', async () => {
+  const onOpenSettings = vi.fn();
+  await renderFooterWithProps({
+    status: <span role="status">Waiting for sync</span>,
+    onOpenSettings,
+  });
+  expect(container?.querySelector('[role="status"]')?.textContent).toBe('Waiting for sync');
+  act(() => clickFooterAction('popup.footer.settings-button'));
+  expect(onOpenSettings).toHaveBeenCalledOnce();
+  expect(footerAction('popup.footer.github-button')).not.toBeNull();
+  expect(container?.querySelector('[data-locale-preference]')).not.toBeNull();
+});
+
+it('keeps the status slot inside the utility row without an additional footer row', async () => {
+  await renderFooterWithProps({ status: <button data-ui="test.sync-control">Sync</button> });
+  const footer = container?.querySelector('footer');
+  expect(footer?.children).toHaveLength(1);
+  expect(
+    footer?.querySelector('[data-ui="popup.footer.actions"] [data-ui="test.sync-control"]')
+  ).not.toBeNull();
 });

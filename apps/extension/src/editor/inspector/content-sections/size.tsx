@@ -75,6 +75,7 @@ interface RenderFrameSectionParams {
   shapeStrokePalette?: readonly string[] | undefined;
   toNumber: (value: string, fallback?: number) => number;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
+  previewFrameDraft?: React.Dispatch<React.SetStateAction<EditorFrameSettings>> | undefined;
   applyGradientPreset: (preset: BackgroundGradientPreset) => void;
   onPickBackgroundImage: () => void;
   clearBackgroundImage: () => void;
@@ -104,13 +105,14 @@ export function renderEditorInspectorFrameSection(props: RenderFrameSectionParam
         : { shapeStrokePalette: props.shapeStrokePalette })}
       toNumber={props.toNumber}
       setFrameDraft={props.setFrameDraft}
+      previewFrameDraft={props.previewFrameDraft}
       setLayoutMode={(value) => props.setFrameDraft((state) => ({ ...state, layoutMode: value }))}
       setBackgroundMode={(value) =>
         props.setFrameDraft((state) => changeFrameBackgroundMode(state, value))
       }
       applyGradientPreset={props.applyGradientPreset}
       previewFramePatch={(patch) => {
-        props.setFrameDraft((state) => ({ ...state, ...patch }));
+        props.previewFrameDraft?.((state) => ({ ...state, ...patch }));
       }}
       applyFramePatch={(patch) => {
         props.setFrameDraft((state) => ({ ...state, ...patch }));

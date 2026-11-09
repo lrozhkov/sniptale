@@ -1,3 +1,4 @@
+import { projectCursorSpatialSettings, projectCursorSpatial } from './cursor-orientation';
 import { resolveVideoCompositionActions } from '../timeline/frame/actions';
 import { resolveCursorSample } from '../timeline/frame/cursor';
 import { applySourceWindowCameraMode } from './source-window';
@@ -17,7 +18,9 @@ import {
   resolveProjectFollowingCamera,
   resolveProjectCameraEdges,
   resolveProjectWindowCameraEndpoint,
+  resolveProjectWindowCameraLink,
 } from './project-follow';
+import { evaluateWindowCameraLinkFit } from './window-camera-geometry';
 import {
   resolveMotionOverlayZoomMode,
   resolveMotionConnectionVideo,
@@ -131,7 +134,7 @@ export function resolveVideoCompositionCamera(params: {
     edges.connectedIn,
     edges.connectedOut
   );
-  const spatial = evaluateMotionSpatial(params.project, null, activeRegion, progress);
+  const spatial = projectCursorSpatial(params.project, activeRegion, params.currentTime, progress);
   const following =
     activeRegion.focusMode === VideoMotionFocusMode.CURSOR
       ? resolveProjectFollowingCamera(
@@ -271,7 +274,36 @@ function resolveConnectingCamera(
       const from = endpoint(source, start);
       const to = endpoint(destination, destination.startTime);
       if (!from || !to) return null;
-      const scale = lerpNumber(from.scale, to.scale, progress);
+      const fit =
+        source.focusMode === VideoMotionFocusMode.CURSOR ||
+        destination.focusMode === VideoMotionFocusMode.CURSOR
+          ? resolveProjectWindowCameraLink(
+              params.project,
+              source,
+              destination,
+              params.cameraViewport
+            ).fit
+          : undefined;
+      const fitted =
+        fit && progress > 0 && progress < 1
+          ? evaluateWindowCameraLinkFit(fit, params.currentTime)
+          : undefined;
+      const fittedCamera =
+        fitted && fit
+          ? resolveSourceWindowCamera(
+              params.project,
+              currentTarget,
+              params.currentTime,
+              destination.focusPoint ?? {
+                x: params.project.width / 2,
+                y: params.project.height / 2,
+              },
+              fitted.scale,
+              1,
+              { x: fitted.pan.x / fit.window.width, y: fitted.pan.y / fit.window.height }
+            )
+          : undefined;
+      const scale = fittedCamera?.scale ?? lerpNumber(from.scale, to.scale, progress);
       const spatialReference = {
         x: geometry.window.x / params.project.width,
         y: geometry.window.y / params.project.height,
@@ -280,17 +312,22 @@ function resolveConnectingCamera(
       };
       const spatial = evaluateMotionSpatial(
         params.project,
-        { ...source, spatialReference },
-        { ...destination, spatialReference },
+        { ...projectCursorSpatialSettings(params.project, source, start), spatialReference },
+        {
+          ...projectCursorSpatialSettings(params.project, destination, destination.startTime),
+          spatialReference,
+        },
         progress
       );
       return {
         sourceClipId: geometry.clipId,
         scale,
-        focusPoint: lerpPoint(from.focusPoint, to.focusPoint, progress),
+        focusPoint: fittedCamera?.focusPoint ?? lerpPoint(from.focusPoint, to.focusPoint, progress),
         viewportX:
+          fittedCamera?.viewportX ??
           lerpNumber(from.viewportX * from.scale, to.viewportX * to.scale, progress) / scale,
         viewportY:
+          fittedCamera?.viewportY ??
           lerpNumber(from.viewportY * from.scale, to.viewportY * to.scale, progress) / scale,
         viewportWidth: params.project.width / scale,
         viewportHeight: params.project.height / scale,
@@ -323,7 +360,12 @@ function resolveConnectingCamera(
       resolveMotionTargetScale(params.project, destination),
       progress
     );
-    const spatial = evaluateMotionSpatial(params.project, source, destination, progress);
+    const spatial = evaluateMotionSpatial(
+      params.project,
+      projectCursorSpatialSettings(params.project, source, start),
+      projectCursorSpatialSettings(params.project, destination, destination.startTime),
+      progress
+    );
     return {
       focusPoint,
       scale,

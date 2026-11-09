@@ -74,3 +74,20 @@ it('skips work when the lens has no magnification or opening', () => {
   expect(sampled).not.toHaveBeenCalled();
   expect(target.drawImage).not.toHaveBeenCalled();
 });
+
+it.each(['flat', 'optical'] as const)(
+  'replays enhanced sharp content while retaining the original %s rim source',
+  (optics) => {
+    const { target, sampled, published } = canvasContexts();
+    const sharpPaint = vi.fn();
+    drawSceneLens(target, source, bounds, { scale: 2, optics }, 0, sharpPaint);
+    expect(sharpPaint).toHaveBeenCalledExactlyOnceWith(target);
+    if (optics === 'optical') {
+      expect(sampled).toHaveBeenCalledExactlyOnceWith(source, 20, 10, 16, 16, 0, 0, 16, 16);
+      expect(published).toHaveBeenCalledOnce();
+    } else {
+      expect(sampled).not.toHaveBeenCalled();
+      expect(published).not.toHaveBeenCalled();
+    }
+  }
+);

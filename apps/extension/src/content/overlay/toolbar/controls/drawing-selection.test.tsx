@@ -84,7 +84,7 @@ it('shows only the shared stroke color for a mixed multi-selection and updates i
   act(() => root.unmount());
 });
 
-it('uses the effective alpha for a mixed legacy marker selection', () => {
+it('shows legacy marker alpha and replaces it with the selected palette color atomically', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const onDocumentCommit = vi.fn(() => true);
   const session = createDrawingSession({ onDocumentCommit });
@@ -120,9 +120,10 @@ it('uses the effective alpha for a mixed legacy marker selection', () => {
   expect(picker?.title).toBe('#FFFF004D');
   act(() => panel?.querySelector<HTMLButtonElement>('button[title="#6495ed"]')?.click());
   expect(session.getSnapshot().document.objects).toMatchObject([
-    { color: '#6495ed4d', kind: 'marker', opacity: 1 },
-    { color: '#6495ed4d', kind: 'pencil' },
+    { color: '#6495ed', kind: 'marker', opacity: 1 },
+    { color: '#6495ed', kind: 'pencil' },
   ]);
+  expect(picker?.title).toBe('#6495ED');
   expect(onDocumentCommit).toHaveBeenCalledTimes(1);
   act(() => root.unmount());
 });

@@ -41,7 +41,7 @@ function preserveBrowserFrameLayerState(
 export async function createBrowserFrameLayerObject(
   options: BrowserFrameLayerObjectParams
 ): Promise<FabricObject> {
-  const width = Math.max(1, Math.round(options.width));
+  const width = Math.max(1, options.width);
   const sourceHeight = options.sourceHeight ?? width;
   const headerHeight = windowHeaderGeometry(resolveEditorWindowHeader(options.browserFrame), {
     width,

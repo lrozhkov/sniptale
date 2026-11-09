@@ -1,8 +1,10 @@
+import { parsePreparedRemoteBinding } from './guards';
 import { preparedPresentationRefs } from './prepared-project';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseAssetRef, readAssetFile, type AssetRef } from '../assets';
 import type { PreparedScenarioProjectArchiveRoot } from '../scenario/backup-restore';
+import type { ScenarioExportEntry } from '../scenario/contracts';
 import {
   parseScenarioProjectEntry,
   parseScenarioAssetEntry,
@@ -16,6 +18,14 @@ import type { AggregatePresentationEntry } from '../aggregate-presentations/cont
 import { isBoundedScenarioMetadata, MAX_NATIVE_SCENARIO_HISTORY_BYTES } from './scenario-snapshot';
 import { captureProfileBounds } from './contracts';
 
+/** An explicit native export descriptor retains its body remotely without claiming staged bytes. */
+export interface PreparedScenarioReplicaExport {
+  entry: ScenarioExportEntry;
+  ref: AssetRef;
+  remote: { key: string; sha256: string };
+  reuseExisting?: boolean;
+}
+
 /** Durable JSON stage for an existing native Scenario publisher, with metadata bytes held by claimed refs. */
 export interface PreparedScenarioReplicaRoot {
   entry: Omit<PreparedScenarioProjectArchiveRoot['entry'], 'history'>;
@@ -23,6 +33,7 @@ export interface PreparedScenarioReplicaRoot {
   assets: PreparedScenarioProjectArchiveRoot['assets'];
   exports: PreparedScenarioProjectArchiveRoot['exports'];
   exportRefs: AssetRef[];
+  deferredExports?: PreparedScenarioReplicaExport[];
   stepDocuments: PreparedScenarioProjectArchiveRoot['stepDocuments'];
   thumbnails: { entry: Omit<MediaThumbnailEntry, 'blob'>; ref: AssetRef }[];
   presentation?: {
@@ -54,6 +65,32 @@ function parseScenarioAssetBinding(raw: unknown): PreparedScenarioReplicaRoot['a
   )
     invalid();
   return { entry, ref: source };
+}
+
+function parseDeferredScenarioExport(raw: unknown): PreparedScenarioReplicaExport {
+  if (
+    !isRecord(raw) ||
+    Object.keys(raw).some((key) => !['entry', 'ref', 'remote', 'reuseExisting'].includes(key))
+  )
+    invalid();
+  const entry = parseScenarioExportEntry(raw['entry']);
+  const source = ref(raw['ref']);
+  const remote = parsePreparedRemoteBinding(raw['remote'], source.sha256);
+  if (
+    !entry?.html ||
+    entry.html.assetId !== source.assetId ||
+    entry.size !== source.size ||
+    !/^text\/html(?:;charset=utf-8)?$/iu.test(source.mimeType) ||
+    (raw['reuseExisting'] !== undefined && typeof raw['reuseExisting'] !== 'boolean') ||
+    !remote
+  )
+    invalid();
+  return {
+    entry,
+    ref: source,
+    remote,
+    ...(raw['reuseExisting'] === undefined ? {} : { reuseExisting: raw['reuseExisting'] }),
+  };
 }
 
 function parseScenarioDocumentBinding(
@@ -124,6 +161,25 @@ function parseScenarioPresentationBinding(
 
 function assertPreparedScenarioAssociations(root: PreparedScenarioReplicaRoot): void {
   const { entry, assets, exports, stepDocuments, thumbnails, exportRefs } = root;
+  const deferred = root.deferredExports ?? [];
+  if (
+    new Set(deferred.map((item) => item.entry.id)).size !== deferred.length ||
+    new Set(deferred.map((item) => item.ref.assetId)).size !== deferred.length ||
+    [
+      ...assets.map((item) => item.ref),
+      ...stepDocuments.flatMap((item) => item.refs),
+      ...thumbnails.map((item) => item.ref),
+      ...(root.historyRef ? [root.historyRef] : []),
+      ...preparedPresentationRefs(root.presentation),
+    ].some((source) => deferred.some((item) => item.ref.assetId === source.assetId)) ||
+    deferred.some(
+      (item) =>
+        item.entry.projectId !== entry.id ||
+        !exports.some((output) => JSON.stringify(output) === JSON.stringify(item.entry)) ||
+        !exportRefs.some((source) => JSON.stringify(source) === JSON.stringify(item.ref))
+    )
+  )
+    invalid();
   if (
     [
       ...assets.map((item) => item.entry),
@@ -181,6 +237,9 @@ export function parsePreparedScenarioReplicaRoot(value: unknown): PreparedScenar
     assets: list(value['assets'], parseScenarioAssetBinding),
     exports: list(value['exports'], (raw) => parseScenarioExportEntry(raw) ?? invalid()),
     exportRefs: list(value['exportRefs'], ref),
+    ...(value['deferredExports'] === undefined
+      ? {}
+      : { deferredExports: list(value['deferredExports'], parseDeferredScenarioExport) }),
     stepDocuments: list(value['stepDocuments'], parseScenarioDocumentBinding),
     thumbnails: list(value['thumbnails'], parseScenarioThumbnailBinding),
     ...(historyRef ? { historyRef } : {}),
@@ -193,14 +252,16 @@ export function parsePreparedScenarioReplicaRoot(value: unknown): PreparedScenar
 /** Exact immutable claims include the canonical history sidecar and all retained document resources. */
 export function collectPreparedScenarioReplicaRefs(value: PreparedScenarioReplicaRoot): AssetRef[] {
   const root = parsePreparedScenarioReplicaRoot(value);
+  const deferredIds = new Set((root.deferredExports ?? []).map((item) => item.ref.assetId));
   const refs = [
     ...root.assets.map((item) => item.ref),
-    ...root.exportRefs,
+    ...root.exportRefs.filter((source) => !deferredIds.has(source.assetId)),
     ...root.stepDocuments.flatMap((item) => item.refs),
     ...root.thumbnails.map((item) => item.ref),
     ...(root.historyRef ? [root.historyRef] : []),
     ...preparedPresentationRefs(root.presentation),
   ];
+  if (refs.some((source) => deferredIds.has(source.assetId))) invalid();
   const unique = new Map<string, AssetRef>();
   for (const source of refs) {
     const previous = unique.get(source.assetId);

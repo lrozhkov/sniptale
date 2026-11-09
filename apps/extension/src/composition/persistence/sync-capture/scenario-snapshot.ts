@@ -35,6 +35,7 @@ export type { CapturedScenarioRows } from './contracts';
 /** Stores required for a complete native Scenario after-image, including borrowed source admission. */
 export const SCENARIO_CAPTURE_STORES = [
   stores.SYNC_CAPTURE_STORE,
+  stores.SYNC_OUTBOX_STORE,
   stores.ASSET_RESIDENCY_STORE,
   stores.SCENARIO_PROJECTS_STORE,
   stores.SCENARIO_PROJECT_HISTORY_STORE,

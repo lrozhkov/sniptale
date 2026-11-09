@@ -30,6 +30,7 @@ vi.mock('../assets', async (importOriginal) => ({
 vi.mock('../assets/opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets/opfs-store')>()),
   listReadyJournals: async () => [],
+  readAssetReadyPublicationClaims: async () => ({ valid: true, pending: false, journals: [] }),
 }));
 
 vi.mock('./asset-publication', async (importOriginal) => ({
