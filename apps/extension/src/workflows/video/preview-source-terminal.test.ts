@@ -430,3 +430,39 @@ it('keeps mixed ordinary and whole-source terminal loans alive through disposal'
   lease?.release();
   expect(f.clones.every((sample) => vi.mocked(sample.close).mock.calls.length === 1)).toBe(true);
 });
+
+it('starts a cold strict endpoint before a keyframe that SDK timestamp rounding would otherwise select', async () => {
+  const starts: number[] = [];
+  const times = [0, 0.6, 1.2, 1.8, 2.1, 2.4];
+  const stream = {
+    end: 3,
+    timeResolution: 1000,
+    async *samples(start: number) {
+      starts.push(start);
+      const sdkLookup = Math.round(start * 1000) / 1000;
+      const first = times.findLastIndex((time) => time <= sdkLookup);
+      for (const timestamp of times.slice(first))
+        yield new VideoSample(new Uint8Array(16), {
+          format: 'RGBA',
+          codedWidth: 2,
+          codedHeight: 2,
+          timestamp,
+        });
+    },
+    dispose: vi.fn(),
+  };
+  const provider = createPreviewSourceProvider({ open: async () => stream });
+  const lease = await provider.acquire(
+    [{ id: 'terminal', url: 'blob:cold-key', time: 2.1, rangeEnd: 2.1, endpoint: 'retained-end' }],
+    signal()
+  );
+  expect(binding(lease)).toMatchObject({
+    timestamp: 1.8,
+    nextTimestamp: 2.1,
+    target: 2.1,
+    heldAtRetainedEnd: true,
+  });
+  expect(starts).toEqual([2.099]);
+  lease?.release();
+  provider.dispose();
+});

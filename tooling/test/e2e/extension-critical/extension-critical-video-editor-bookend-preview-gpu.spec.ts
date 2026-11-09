@@ -593,7 +593,7 @@ for (const declined of [false, true]) {
       );
       const initial = await savedProject(page);
       const red = vfrBookendReference(0.9),
-        blue = vfrBookendReference(2.1);
+        blue = vfrBookendReference(1.8);
       await expect(gpu).toBeVisible();
       await expect
         .poll(async () => bookendColorError(red, await bookendColors(gpu)))
@@ -609,11 +609,11 @@ for (const declined of [false, true]) {
         name: label('gallery.videoReview.presentationTrimStart'),
         exact: true,
       });
-      await start.fill('2.2');
+      await start.fill('1.9');
       await start.press('Enter');
       await expect
         .poll(async () => (await savedProject(page)).bookendPresets?.intro.video?.trim.start)
-        .toBe(2.2);
+        .toBe(1.9);
       await expect
         .poll(async () => bookendColorError(blue, await bookendColors(gpu)))
         .toBeLessThan(4);
@@ -627,7 +627,7 @@ for (const declined of [false, true]) {
                 (frame) => frame.timestamp === 900000 && Math.abs(frame.time - 1.02) < 0.001
               ) &&
               frames.some(
-                (frame) => frame.timestamp === 2100000 && Math.abs(frame.time - 2.2) < 0.001
+                (frame) => frame.timestamp === 1800000 && Math.abs(frame.time - 1.9) < 0.001
               )
             );
           })

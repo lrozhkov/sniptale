@@ -1,7 +1,8 @@
 import { ALL_FORMATS, EncodedPacketSink, Input, UrlSource, VideoSample } from 'mediabunny';
 import {
   readPreviewSourceLeadingSampleTime,
-  resolvePreviewSourceOrdinaryTime,
+  resolvePreviewSourceRequest,
+  validatePreviewSourceDemands,
   type PreviewSourceBinding,
   type PreviewSourceDemand,
 } from './preview-source';
@@ -19,6 +20,8 @@ export interface PreviewHtmlSourceBinding {
   readonly timestamp: number;
   readonly target: number;
   readonly sampleTime?: number;
+  readonly heldAtEnd?: true;
+  readonly heldAtRetainedEnd?: true;
   readonly url: string;
 }
 
@@ -90,14 +93,18 @@ function openHtmlSource(url: string) {
     controller.signal.throwIfAborted();
     if (!track) throw unavailable();
     const end = await track.computeDuration();
+    const timeResolution = await track.getTimeResolution();
+    controller.signal.throwIfAborted();
+    if (!Number.isFinite(timeResolution) || timeResolution <= 0) throw unavailable();
     const leadingSampleTime = await readPreviewSourceLeadingSampleTime(
       track,
       end,
-      controller.signal
+      controller.signal,
+      timeResolution
     );
     const config = await track.getDecoderConfig();
     controller.signal.throwIfAborted();
-    return { end, leadingSampleTime, config, sink: new EncodedPacketSink(track) };
+    return { end, timeResolution, leadingSampleTime, config, sink: new EncodedPacketSink(track) };
   })();
   // Install load listeners before load starts; metadata and decoder initialization run together.
   const loaded =
@@ -124,24 +131,6 @@ function openHtmlSource(url: string) {
   };
 }
 
-function validateHtmlDemand(demand: PreviewSourceDemand) {
-  if (
-    !demand.id ||
-    !demand.url ||
-    demand.holdEnd ||
-    demand.holdSourceEnd ||
-    demand.endpoint ||
-    (demand.rangeStart !== undefined &&
-      (!Number.isFinite(demand.rangeStart) || demand.time < demand.rangeStart - 0.000002)) ||
-    (demand.rangeEnd !== undefined &&
-      (!Number.isFinite(demand.rangeEnd) || demand.time >= demand.rangeEnd)) ||
-    (demand.rangeStart !== undefined &&
-      demand.rangeEnd !== undefined &&
-      demand.rangeStart >= demand.rangeEnd)
-  )
-    throw unavailable();
-}
-
 /** One sampling transaction owns its raw frame and reservation until immutable admission. */
 async function captureHtmlSource(
   demand: PreviewSourceDemand,
@@ -156,18 +145,12 @@ async function captureHtmlSource(
   try {
     const index = await awaitHtmlSource(state.opening, interest);
     interest.throwIfAborted();
-    const selection = resolvePreviewSourceOrdinaryTime(
-      demand.time,
+    const selection = resolvePreviewSourceRequest(
+      demand,
       index.end,
-      index.leadingSampleTime
+      index.leadingSampleTime,
+      index.timeResolution
     );
-    if (
-      (demand.rangeEnd !== undefined && selection.effectiveTime >= demand.rangeEnd) ||
-      (selection.effectiveTime !== demand.time &&
-        demand.rangeStart !== undefined &&
-        selection.effectiveTime < demand.rangeStart)
-    )
-      throw unavailable();
     const packet = await awaitHtmlSource(
       index.sink.getPacket(selection.lookupTime, { metadataOnly: true }),
       interest
@@ -178,13 +161,22 @@ async function captureHtmlSource(
       !Number.isFinite(packet.timestamp) ||
       packet.timestamp > selection.lookupTime ||
       packet.timestamp >= index.end ||
+      (selection.strictEnd !== undefined && packet.timestamp >= selection.strictEnd) ||
+      (selection.strictEnd !== undefined &&
+        demand.rangeStart !== undefined &&
+        packet.timestamp < demand.rangeStart) ||
+      (selection.sampleTime !== undefined &&
+        Math.abs(packet.timestamp - selection.sampleTime) > 0.000002) ||
       !Number.isSafeInteger(Math.round(packet.timestamp * 1_000_000))
     )
       throw unavailable();
     await awaitHtmlSource(state.loaded, interest);
     interest.throwIfAborted();
     const video = state.video;
-    const seekTime = Math.max(selection.effectiveTime, packet.timestamp);
+    const seekTime =
+      selection.strictEnd === undefined
+        ? Math.max(selection.sampleTime ?? demand.time, packet.timestamp)
+        : packet.timestamp;
     if (video.currentTime !== seekTime || video.seeking) {
       const settled = waitForVideo(video, 'seeked', interest);
       video.currentTime = seekTime;
@@ -223,7 +215,9 @@ async function captureHtmlSource(
         timestamp: packet.timestamp,
         target: demand.time,
         url: demand.url,
-        ...(selection.effectiveTime === demand.time ? {} : { sampleTime: selection.effectiveTime }),
+        ...(selection.sampleTime === undefined ? {} : { sampleTime: selection.sampleTime }),
+        ...(selection.terminalTime === undefined ? {} : { heldAtEnd: true }),
+        ...(selection.retainedEnd === undefined ? {} : { heldAtRetainedEnd: true }),
       }),
       release() {
         if (!released) {
@@ -283,6 +277,7 @@ export function createPreviewHtmlSourceProvider() {
   const execute = async (demands: readonly PreviewSourceDemand[], requestSignal: AbortSignal) => {
     const signal = AbortSignal.any([lifetime.signal, requestSignal]);
     signal.throwIfAborted();
+    validatePreviewSourceDemands(demands);
     const bindings = new Map<string, PreviewHtmlSourceBinding>();
     const releases: (() => void)[] = [];
     const release = () => {
@@ -291,7 +286,6 @@ export function createPreviewHtmlSourceProvider() {
     try {
       for (const demand of demands) {
         signal.throwIfAborted();
-        validateHtmlDemand(demand);
         if (bindings.has(demand.id)) throw unavailable();
         let state = sources.get(demand.url);
         if (!state) {

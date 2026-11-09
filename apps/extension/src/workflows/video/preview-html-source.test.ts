@@ -7,6 +7,9 @@ const metadata = vi.hoisted(() => ({
   dispose: vi.fn(),
   opening: vi.fn<() => Promise<void>>(async () => undefined),
   bytes: 512,
+  resolution: 1000,
+  first: 0,
+  rate: 30,
 }));
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
@@ -17,7 +20,9 @@ vi.mock('mediabunny', () => ({
       await metadata.opening();
       return {
         computeDuration: async () => 2,
-        getFirstTimestamp: async () => 0,
+        getFirstTimestamp: async () => metadata.first,
+        computePacketStats: async () => ({ averagePacketRate: metadata.rate }),
+        getTimeResolution: async () => metadata.resolution,
         getDecoderConfig: async () => ({ codec: 'avc1' }),
       };
     }
@@ -84,6 +89,9 @@ function decoder(stale = false, pendingLoad = false) {
 }
 afterEach(() => {
   metadata.bytes = 512;
+  metadata.resolution = 1000;
+  metadata.first = 0;
+  metadata.rate = 30;
   frames.length = 0;
   metadata.floor.mockClear();
   metadata.dispose.mockClear();
@@ -207,4 +215,93 @@ it('reserves normalization scratch temporarily and restores exact lease storage 
   third.release();
   provider.dispose();
   expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
+});
+
+it.each([
+  { time: 0.5, rangeEnd: 0.5, endpoint: 'retained-end' as const },
+  { time: 2, rangeEnd: 2, holdEnd: true },
+  { time: 12, holdSourceEnd: true as const },
+])(
+  'verifies terminal HTML packet identity without seeking excluded endpoint: %j',
+  async (request) => {
+    const video = decoder();
+    const provider = createPreviewHtmlSourceProvider();
+    const lease = await provider.acquire(
+      [{ id: 'terminal', url: 'blob:test', ...request }],
+      new AbortController().signal
+    );
+    const selected = lease.bindings.get('terminal')!;
+    expect(selected).toMatchObject({
+      timestamp: request.time === 0.5 ? 0.1000006 : 0.6000006,
+      target: request.time,
+    });
+    expect(selected).toHaveProperty(request.time === 0.5 ? 'heldAtRetainedEnd' : 'heldAtEnd', true);
+    expect(selected).not.toHaveProperty('nextTimestamp');
+    expect(video.currentTime).toBe(selected.timestamp);
+    expect(metadata.floor).toHaveBeenLastCalledWith(request.time === 0.5 ? 0.499 : 1.999, {
+      metadataOnly: true,
+    });
+    provider.dispose();
+    expect(frames[0]!.close).not.toHaveBeenCalled();
+    lease.release();
+    expect(frames[0]!.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('keeps verified bounded leading admission separate from held endpoint flags', async () => {
+  decoder();
+  metadata.first = 0.1000006;
+  metadata.rate = 1;
+  const provider = createPreviewHtmlSourceProvider();
+  const lease = await provider.acquire(
+    [{ id: 'leading', url: 'blob:test', time: 0, rangeEnd: 0.5 }],
+    new AbortController().signal
+  );
+  expect(lease.bindings.get('leading')).toMatchObject({
+    target: 0,
+    sampleTime: 0.1000006,
+    timestamp: 0.1000006,
+  });
+  expect(lease.bindings.get('leading')).not.toHaveProperty('heldAtEnd');
+  expect(lease.bindings.get('leading')).not.toHaveProperty('heldAtRetainedEnd');
+  lease.release();
+  provider.dispose();
+});
+it('rejects a floor response at the excluded endpoint and a predecessor outside the retained start', async () => {
+  decoder();
+  metadata.floor.mockResolvedValueOnce({ timestamp: 0.5 });
+  const provider = createPreviewHtmlSourceProvider();
+  const request = {
+    id: 'held',
+    url: 'blob:test',
+    time: 0.5,
+    rangeEnd: 0.5,
+    endpoint: 'retained-end' as const,
+  };
+  await expect(provider.acquire([request], new AbortController().signal)).rejects.toThrow(
+    'Preview source frame is unavailable.'
+  );
+  await expect(
+    provider.acquire([{ ...request, rangeStart: 0.2 }], new AbortController().signal)
+  ).rejects.toThrow('Preview source frame is unavailable.');
+  expect(frames).toHaveLength(0);
+  provider.dispose();
+});
+it.each([
+  { time: 0.5, holdEnd: true },
+  { time: 0.4, rangeEnd: 0.5, endpoint: 'retained-end' as const },
+  { time: 0.5, rangeEnd: 1, holdSourceEnd: true as const },
+  { time: -1 },
+  { time: NaN },
+])('rejects invalid common HTML source intent before opening: %j', async (request) => {
+  decoder();
+  const provider = createPreviewHtmlSourceProvider();
+  await expect(
+    provider.acquire(
+      [{ id: 'invalid', url: 'blob:test', ...request }],
+      new AbortController().signal
+    )
+  ).rejects.toThrow('Preview source frame is unavailable.');
+  expect(metadata.opening).not.toHaveBeenCalled();
+  provider.dispose();
 });

@@ -6089,11 +6089,11 @@
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.tsx",
       "symbol": "createCameraCropFrameQueue.drain",
       "owner": "extension:video-editor:workspace",
-      "astHash": "1c9e8e3209c622ed7b1dbb9422ad12ba3349cbf867712c5895fc465e90ca0abe",
+      "astHash": "04579b667be53df31fac51a7966edb3859657beb688ed997f1381e30f76e16a3",
       "signatureHash": "89e2e5ae8b58fd08adeb1290ec6ce42a63fbc6a5042fd96f549b542d48e0e407",
-      "reviewDate": "2026-11-08",
-      "reason": "tool-noise: One frame transaction acquires a provider lease and retains it through GPU completion. GPU and Canvas use the same admitted image. Selection guards reject stale publication. The transaction releases samples, leases and untransferred output together. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One request ticket and signal control acquisition, rendering, normalization and publication. Admission checks follow asynchronous boundaries. One final cleanup releases rejected outputs and source leases. Independent diagnosis found no separate acquisition or retirement authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent state authority, recovery workflow, public contract or reusable test fixture. Reassess independently changing acquisition, publication or retirement. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-file-risk",
@@ -6375,11 +6375,11 @@
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.test.tsx",
       "symbol": "<file>",
       "owner": "extension:video-editor:workspace",
-      "astHash": "2cd4e38e19ec1daecb81f1f7b2f03f3d24bf4f86077935e8376c30d1f5b28462",
+      "astHash": "38fb361870adde2888dc97d8312f8ff25806e673e799099f1f27a17aa725602a",
       "signatureHash": "572af726207cd482891a809dc7a736ec9e143708603a29e7f34b7ca4d89d6156",
-      "reviewDate": "2026-11-08",
-      "reason": "tool-noise: One mounted camera control shares a root, media mocks and controlled provider leases across its tests. The cases check source selection, completion, replacement, retry and cleanup through that same lifecycle. No separate fixture or persistence authority exists. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One mounted camera fixture tests interaction, readiness, geometry and resource lifetime. Controlled GPU completions and source doubles belong to that contract. Independent diagnosis found no separate reusable test infrastructure. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent state authority, recovery workflow, public contract or reusable test fixture. Reassess independently changing acquisition, publication or retirement. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-function-risk",
@@ -6397,22 +6397,22 @@
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.tsx",
       "symbol": "useCameraCropFrame",
       "owner": "extension:video-editor:workspace",
-      "astHash": "b1801ba366772330b20d966e4618f7d681194c79c0949ebdad36031f43f4c5bb",
+      "astHash": "a86b6e580503238ce2b5dde48e7a2c530139c224f0034d587b12b8f7f01d2390",
       "signatureHash": "491399e3c87f04438782b32337f1ff18f77033a9c851556a126ba5f19f09f7c4",
-      "reviewDate": "2026-11-08",
-      "reason": "tool-noise: One mounted hook binds media readiness, accepted dimensions, retry and presenter cleanup to one crop queue. Its states feed that same control and queue. The shared provider owns physical source selection. Selection identity rejects stale readiness. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One mounted surface owns refs, readiness, queue binding, resize and retry. Shared workflow owners retain sampling policy. Independent diagnosis found no separate lifecycle or state authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent state authority, recovery workflow, public contract or reusable test fixture. Reassess independently changing acquisition, publication or retirement. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/camera-crop-preview.tsx",
       "symbol": "createCameraCropFrameQueue",
       "owner": "extension:video-editor:workspace",
-      "astHash": "ee3692a6cc7e7ea6f0a5c3103cb4fed5f325f8d6e685bd806d0365dc401eb78b",
+      "astHash": "741c8fcdc088f1d6c86460f8f68323202e18d1d8b726bd8fabfcb677e9e49742",
       "signatureHash": "c8f853c27d02004df499d0cfa1dde9c61c03aab47d05ee338bcf232704c453d8",
-      "reviewDate": "2026-11-08",
-      "reason": "tool-noise: One queue owns request replacement, cancellation, reset and disposal for one mounted crop source. The shared provider owns decoding and frame selection. The renderer owns GPU frame clones. The presenter owns visible destinations. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source, decoder, queue, publication, authoring or lifecycle owners. Remove when the analyzer models this cohesive operation."
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One serial request owns provider lifetimes, cancellation, rendering, publication and disposal. Canonical and verified HTML acquisition use the same lease slot. Independent diagnosis supports this transaction boundary. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent state authority, recovery workflow, public contract or reusable test fixture. Reassess independently changing acquisition, publication or retirement. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-function-risk",
@@ -6551,11 +6551,11 @@
       "file": "apps/extension/src/workflows/video/preview-source.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "astHash": "fa8735afd2f166b03ecc3c26e2333503c04eab0ced18bb78655f9737a2d49eaf",
+      "astHash": "35ddb07fd55d11540e857c16168a6b45bd5c3cd9a79847473c57302e441da9e4",
       "signatureHash": "1e3d2d3be52d4180519b46ed0393af3f5fb9afc2f6f463671999bdea74e846c5",
       "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One fixture tests canonical selection and source retirement. New resolver cases connect arithmetic to the actual provider. Existing stream fixtures retain their setup and cleanup. Independent diagnosis found no separate policy service. Fresh architecture review must assess this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independently owned resolver or source policy. Remove when the analyzer models this cohesive boundary."
+      "reason": "tool-noise: One source provider contract owns these local presentation stream and opener fixtures. New grid cases test its existing request policy. Terminal scenarios already use their separate file. Independent diagnosis found no further independent fixture owner. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent state authority, recovery workflow, public contract or reusable test fixture. Reassess independently changing acquisition, publication or retirement. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-file-risk",

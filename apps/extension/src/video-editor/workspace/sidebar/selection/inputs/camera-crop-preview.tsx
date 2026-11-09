@@ -1,9 +1,12 @@
 import { VideoSample } from 'mediabunny';
 import {
   createPreviewSourceProvider,
-  type PreviewSourceLease,
   type PreviewSourceProvider,
 } from '../../../../../workflows/video/preview-source';
+import {
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+} from '../../../../../workflows/video/preview-html-source';
 import { prepareDecodedVideoSample } from '../../../../../features/video/composition/draw/decoded-sample';
 import type { GpuPreviewOutput } from '../../../../../features/video/composition/canvas/preview-presentation';
 import { WorkspacePreviewContext } from '../../../../runtime/controller/composition/contexts';
@@ -238,7 +241,10 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
     height: number;
   } | null>(null);
   const [revision, setRevision] = useState(0);
-  const ready = source?.url === props.url && source?.time === props.sourceTime && !failed;
+  const managed = typeof VideoFrame !== 'undefined';
+  const ready =
+    (managed ? !!props.url : source?.url === props.url && source?.time === props.sourceTime) &&
+    !failed;
   const latest = useRef<CropFrameInput>({
     url: props.url,
     sourceTime: props.sourceTime,
@@ -318,12 +324,14 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
       media.currentTime = sourceTime.current;
     };
     const loaded = () => {
+      if (managed) return;
       if (media.readyState < 2 || media.seeking) return;
       setSource({ url: props.url, time: sourceTime.current });
       setFailed(false);
       setRevision((value) => value + 1);
     };
     const error = () => {
+      if (managed && props.url) return;
       queueRef.current?.cancel();
       setSource(null);
       setFailed(true);
@@ -345,7 +353,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
       media.removeAttribute('src');
       media.load();
     };
-  }, [props.url]);
+  }, [props.url, managed]);
   useEffect(() => {
     if (!ready) {
       queueRef.current?.cancel();
@@ -363,6 +371,8 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
     revision,
     props.width,
     props.height,
+    props.sourceTime,
+    props.url,
     props.rangeStart,
     props.rangeEnd,
     props.endpoint,
@@ -389,9 +399,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
     gpuHost,
     ready:
       ready &&
-      (typeof VideoDecoder === 'undefined' ||
-        typeof VideoFrame === 'undefined' ||
-        sameCropSourceSelection(displayed?.selection, props)),
+      (typeof VideoFrame === 'undefined' || sameCropSourceSelection(displayed?.selection, props)),
     sourceSize: displayed,
     failed,
     retry: () => {
@@ -399,6 +407,7 @@ function useCameraCropFrame(props: CameraCropPreviewProps, appearance: CameraApp
       setSource(null);
       setFailed(false);
       video.current?.load();
+      if (managed) setRevision((value) => value + 1);
     },
   };
 }
@@ -414,6 +423,7 @@ function createCameraCropFrameQueue(options: {
 }) {
   let gpu: ReturnType<typeof createCameraCropGpuRenderer> | null = null;
   let provider: PreviewSourceProvider | null = null;
+  let compatible: ReturnType<typeof createPreviewHtmlSourceProvider> | null = null;
   let controller: AbortController | null = null;
   let version = 0,
     wanted = false,
@@ -433,7 +443,8 @@ function createCameraCropFrameQueue(options: {
           input = options.read(),
           media = options.media,
           target = options.target;
-        if (!input.ready || media.readyState < 2 || media.seeking) continue;
+        const managed = typeof VideoFrame !== 'undefined';
+        if (!input.ready || (!managed && (media.readyState < 2 || media.seeking))) continue;
         controller = new AbortController();
         const signal = controller.signal;
         const rect = target.getBoundingClientRect();
@@ -443,7 +454,7 @@ function createCameraCropFrameQueue(options: {
         };
         let output: GpuPreviewOutput | undefined | false;
         let accepted = false;
-        let lease: PreviewSourceLease | null = null;
+        let lease: PreparedPreviewSourceLease | null = null;
         let canvasSample: VideoSample | undefined;
         try {
           if (reset) {
@@ -451,29 +462,36 @@ function createCameraCropFrameQueue(options: {
             gpu = null;
             provider?.dispose();
             provider = null;
+            compatible?.dispose();
+            compatible = null;
             reset = false;
           }
-          if (typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined') {
+          if (managed) {
             if (!input.url) throw new Error('Camera preview source is unavailable.');
-            provider ??= createPreviewSourceProvider();
-            provider.retainSources(new Set([input.url]));
-            lease = await provider.acquire(
-              [
-                {
-                  id: 'camera-crop',
-                  url: input.url,
-                  time: input.sourceTime,
-                  ...(input.rangeStart === undefined ? {} : { rangeStart: input.rangeStart }),
-                  ...(input.rangeEnd === undefined ? {} : { rangeEnd: input.rangeEnd }),
-                  ...(input.endpoint === undefined ? {} : { endpoint: input.endpoint }),
-                  ...(input.endpoint === undefined && Number.isFinite(input.rangeEnd)
-                    ? { holdEnd: true }
-                    : {}),
-                },
-              ],
-              signal,
-              { discontinuity: true }
-            );
+            const demands = [
+              {
+                id: 'camera-crop',
+                url: input.url,
+                time: input.sourceTime,
+                ...(input.rangeStart === undefined ? {} : { rangeStart: input.rangeStart }),
+                ...(input.rangeEnd === undefined ? {} : { rangeEnd: input.rangeEnd }),
+                ...(input.endpoint === undefined ? {} : { endpoint: input.endpoint }),
+                ...(input.endpoint === undefined && Number.isFinite(input.rangeEnd)
+                  ? { holdEnd: true }
+                  : {}),
+              },
+            ];
+            if (typeof VideoDecoder !== 'undefined') {
+              provider ??= createPreviewSourceProvider();
+              provider.retainSources(new Set([input.url]));
+              lease = await provider.acquire(demands, signal, { discontinuity: true });
+            }
+            if (!lease) {
+              signal.throwIfAborted();
+              compatible ??= createPreviewHtmlSourceProvider();
+              compatible.retainSources(new Set([input.url]));
+              lease = await compatible.acquire(demands, signal);
+            }
           }
           if (
             disposed ||
@@ -607,6 +625,8 @@ function createCameraCropFrameQueue(options: {
       gpu = null;
       provider?.dispose();
       provider = null;
+      compatible?.dispose();
+      compatible = null;
     },
   };
 }

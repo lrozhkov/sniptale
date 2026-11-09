@@ -45,6 +45,8 @@ export interface PreviewSourceLease {
 /** A presentation-ordered stream with a verified terminal timestamp. */
 export interface PreviewSourceStream {
   readonly end: number;
+  /** Verified container timestamp grid; absent only in injected presentation streams. */
+  readonly timeResolution?: number;
   /** Verified first PTS admitted within one estimated frame plus one container tick. */
   readonly leadingSampleTime?: number;
   samples(start: number, end: number): AsyncIterableIterator<VideoSample>;
@@ -135,13 +137,14 @@ export function resolvePreviewSourceOrdinaryTime(
 export async function readPreviewSourceLeadingSampleTime(
   track: InputVideoTrack,
   end: number,
-  signal: AbortSignal
+  signal: AbortSignal,
+  knownTimeResolution?: number
 ): Promise<number | undefined> {
   const first = await track.getFirstTimestamp();
   signal.throwIfAborted();
   if (!Number.isFinite(first)) throw unavailable();
   if (first <= 0) return undefined;
-  const resolution = await track.getTimeResolution();
+  const resolution = knownTimeResolution ?? (await track.getTimeResolution());
   signal.throwIfAborted();
   // The SDK target permits additional metadata reads to finish packet reordering.
   const stats = await track.computePacketStats(256, { metadataOnly: true });
@@ -182,8 +185,15 @@ async function openPreviewSource(
       return null;
     }
     const end = await track.computeDuration();
+    const timeResolution = await track.getTimeResolution();
     signal.throwIfAborted();
-    const leadingSampleTime = await readPreviewSourceLeadingSampleTime(track, end, signal);
+    if (!Number.isFinite(timeResolution) || timeResolution <= 0) throw unavailable();
+    const leadingSampleTime = await readPreviewSourceLeadingSampleTime(
+      track,
+      end,
+      signal,
+      timeResolution
+    );
     const sink = createReviewDecodedSampleSink(
       new sdk.VideoSampleSink(track),
       signal,
@@ -192,6 +202,7 @@ async function openPreviewSource(
     );
     return {
       end,
+      timeResolution,
       ...(leadingSampleTime === undefined ? {} : { leadingSampleTime }),
       samples: (start, stop) => sink.samples(start, stop),
       dispose,
@@ -202,7 +213,8 @@ async function openPreviewSource(
   }
 }
 
-function validateDemands(demands: readonly PreviewSourceDemand[]): void {
+/** Rejects conflicting or invalid source intent before decoder acquisition. */
+export function validatePreviewSourceDemands(demands: readonly PreviewSourceDemand[]): void {
   const ids = new Set<string>();
   for (const demand of demands) {
     if (
@@ -262,6 +274,60 @@ function beforeEndpoint(endpoint: number) {
   return view.getFloat64(0);
 }
 
+/** Keep strict endpoint lookups outside SDK near-integer timestamp rounding. */
+function strictSourceLookup(endpoint: number, resolution?: number): number {
+  if (resolution === undefined) return beforeEndpoint(endpoint);
+  if (!Number.isFinite(resolution) || resolution <= 0) throw unavailable();
+  let tick = Math.floor(endpoint * resolution);
+  if (!Number.isSafeInteger(tick)) throw unavailable();
+  if (tick / resolution >= endpoint) tick--;
+  else if ((tick + 1) / resolution < endpoint) tick++;
+  const time = tick / resolution;
+  if (!Number.isFinite(time) || time >= endpoint || (tick + 1) / resolution < endpoint)
+    throw unavailable();
+  return time;
+}
+
+/** Shared explicit source intent; adapters retain their independent membership evidence. */
+export function resolvePreviewSourceRequest(
+  demand: PreviewSourceDemand,
+  end: number,
+  leadingSampleTime?: number,
+  timeResolution?: number
+) {
+  validatePreviewSourceDemands([demand]);
+  if (!Number.isFinite(end) || end <= 0) throw unavailable();
+  const retainedEnd =
+    demand.endpoint === 'retained-end' ? Math.min(end, demand.rangeEnd!) : undefined;
+  if (
+    retainedEnd !== undefined &&
+    (retainedEnd <= 0 || (demand.rangeStart !== undefined && retainedEnd <= demand.rangeStart))
+  )
+    throw unavailable();
+  const terminalTime = terminalSourceTime(demand, end);
+  const strictEnd =
+    retainedEnd ?? (terminalTime === undefined ? undefined : Math.min(end, demand.rangeEnd ?? end));
+  const ordinary =
+    demand.time < end
+      ? resolvePreviewSourceOrdinaryTime(demand.time, end, leadingSampleTime)
+      : undefined;
+  const sampleTime =
+    ordinary && ordinary.effectiveTime !== demand.time ? ordinary.effectiveTime : undefined;
+  if (
+    sampleTime !== undefined &&
+    (sampleTime >= end ||
+      (demand.rangeStart !== undefined && sampleTime < demand.rangeStart) ||
+      (demand.rangeEnd !== undefined && sampleTime >= demand.rangeEnd))
+  )
+    throw unavailable();
+  const strictLookup =
+    strictEnd === undefined ? undefined : strictSourceLookup(strictEnd, timeResolution);
+  const decodeTime = strictLookup ?? sampleTime ?? demand.time;
+  const lookupTime = strictLookup ?? ordinary?.lookupTime;
+  if (lookupTime === undefined) throw unavailable();
+  return { retainedEnd, terminalTime, strictEnd, sampleTime, decodeTime, lookupTime };
+}
+
 class PreviewSourceOwner implements PreviewSourceProvider {
   private readonly sources = new Map<string, SourceState>();
   private readonly entries = new Set<SampleEntry>();
@@ -280,7 +346,7 @@ class PreviewSourceOwner implements PreviewSourceProvider {
   ): Promise<PreviewSourceLease | null> {
     signal.throwIfAborted();
     if (this.disposed) throw aborted();
-    validateDemands(demands);
+    validatePreviewSourceDemands(demands);
     return new Promise((resolve, reject) => {
       const request: Acquisition = {
         demands: demands.map((demand) => ({ ...demand })),
@@ -610,40 +676,14 @@ class PreviewSourceOwner implements PreviewSourceProvider {
         }
         const discontinuity = request.discontinuity && !visited.has(demand.url);
         visited.add(demand.url);
-        const retainedEnd =
-          demand.endpoint === 'retained-end' ? Math.min(stream.end, demand.rangeEnd!) : undefined;
-        if (
-          retainedEnd !== undefined &&
-          (retainedEnd <= 0 ||
-            (demand.rangeStart !== undefined && retainedEnd <= demand.rangeStart))
-        )
-          throw unavailable();
-        const terminalTime = terminalSourceTime(demand, stream.end);
-        const strictEnd =
-          retainedEnd ??
-          (demand.holdSourceEnd === true && terminalTime !== undefined ? stream.end : undefined);
-        const ordinary =
-          demand.time < stream.end
-            ? resolvePreviewSourceOrdinaryTime(demand.time, stream.end, stream.leadingSampleTime)
-            : undefined;
-        const sampleTime =
-          ordinary && ordinary.effectiveTime !== demand.time ? ordinary.effectiveTime : undefined;
-        if (
-          sampleTime !== undefined &&
-          (sampleTime >= stream.end ||
-            (demand.rangeStart !== undefined && sampleTime < demand.rangeStart) ||
-            (demand.rangeEnd !== undefined && sampleTime >= demand.rangeEnd))
-        )
-          throw unavailable();
-        const entry = await this.select(
-          state,
-          retainedEnd !== undefined
-            ? beforeEndpoint(retainedEnd)
-            : (terminalTime ?? sampleTime ?? demand.time),
-          request,
-          discontinuity,
-          strictEnd
-        );
+        const { retainedEnd, terminalTime, strictEnd, sampleTime, decodeTime } =
+          resolvePreviewSourceRequest(
+            demand,
+            stream.end,
+            stream.leadingSampleTime,
+            stream.timeResolution
+          );
+        const entry = await this.select(state, decodeTime, request, discontinuity, strictEnd);
         if (
           retainedEnd !== undefined &&
           (entry.sample.timestamp >= retainedEnd ||

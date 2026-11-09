@@ -16,6 +16,15 @@ const sources = vi.hoisted(() => ({
 vi.mock('../../../../../workflows/video/preview-source', () => ({
   createPreviewSourceProvider: sources.create,
 }));
+const compatible = vi.hoisted(() => ({
+  create: vi.fn(),
+  acquire: vi.fn(),
+  retain: vi.fn(),
+  dispose: vi.fn(),
+}));
+vi.mock('../../../../../workflows/video/preview-html-source', () => ({
+  createPreviewHtmlSourceProvider: compatible.create,
+}));
 const gpu = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../../../../../features/video/composition/canvas/camera-crop-gpu', () => ({
   createCameraCropGpuRenderer: gpu.create,
@@ -48,6 +57,12 @@ const observations: { notify: () => void; disconnected: boolean }[] = [];
 const observe = vi.fn();
 beforeEach(() => {
   sources.acquire.mockReset().mockResolvedValue(null);
+  compatible.acquire.mockReset();
+  compatible.create.mockReturnValue({
+    acquire: compatible.acquire,
+    retainSources: compatible.retain,
+    dispose: compatible.dispose,
+  });
   sources.retain.mockReset();
   sources.dispose.mockReset();
   sources.create.mockReturnValue({
@@ -75,9 +90,6 @@ beforeEach(() => {
       }
       observe() {
         observe();
-        queueMicrotask(() => {
-          if (!this.entry.disconnected) this.entry.notify();
-        });
       }
       disconnect() {
         this.entry.disconnected = true;
@@ -688,7 +700,7 @@ function canonicalLease() {
   return { source, release, lease };
 }
 
-it.each(['cancel', 'time', 'source', 'unmount', 'reject'] as const)(
+it.each(['missing-source', 'time', 'source', 'unmount', 'reject'] as const)(
   'retains the canonical lease until GPU settlement after %s',
   async (mode) => {
     const p = props();
@@ -702,8 +714,8 @@ it.each(['cancel', 'time', 'source', 'unmount', 'reject'] as const)(
     const late = f.output(0);
     if (mode === 'time') act(() => root.render(<CameraCropPreview {...p} sourceTime={1} />));
     if (mode === 'source') act(() => root.render(<CameraCropPreview {...p} url="blob:new" />));
-    if (mode === 'cancel')
-      act(() => container.querySelector('video')!.dispatchEvent(new Event('error')));
+    if (mode === 'missing-source')
+      act(() => root.render(<CameraCropPreview {...p} url={undefined} />));
     if (mode === 'unmount') act(() => root.render(null));
     expect(source.release).not.toHaveBeenCalled();
     await act(async () => {
@@ -740,7 +752,8 @@ it.each(['unsupported', 'decode-failure'] as const)(
   'uses HTML compatibility only for actual unsupported acquisition: %s',
   async (mode) => {
     const p = props();
-    canonicalLease();
+    const owned = canonicalLease();
+    compatible.acquire.mockResolvedValueOnce(owned.lease);
     if (mode === 'decode-failure')
       sources.acquire.mockRejectedValueOnce(new Error('decode failed'));
     const f = pendingGpu();
@@ -753,9 +766,10 @@ it.each(['unsupported', 'decode-failure'] as const)(
       expect(button().disabled).toBe(true);
       expect(container.textContent).toContain(translate('common.actions.retry'));
     } else {
-      expect(f.calls[0]!.input).not.toHaveProperty('source');
-      await act(async () => f.calls[0]!.resolve(undefined));
-      expect(draw).toHaveBeenCalled();
+      expect(f.calls[0]!.input.source).toBe(owned.source);
+      expect(compatible.acquire).toHaveBeenCalledOnce();
+      await act(async () => f.calls[0]!.resolve(f.output(0)));
+      expect(draw).not.toHaveBeenCalled();
       expect(button().disabled).toBe(false);
     }
   }
@@ -990,4 +1004,54 @@ it.each([11, 13])('keeps a bounded camera request at %s across physical EOF', as
     expect.any(AbortSignal),
     { discontinuity: true }
   );
+});
+
+it('uses a verified retained HTML camera lease after upfront decline without witness decoder readiness', async () => {
+  const p = { ...props(), rangeEnd: 0.5, endpoint: 'retained-end' as const };
+  const owned = canonicalLease();
+  compatible.acquire.mockResolvedValueOnce(owned.lease);
+  const f = pendingGpu();
+  act(() => root.render(<CameraCropPreview {...p} />));
+  await flush();
+  expect(compatible.acquire).toHaveBeenCalledWith(
+    [
+      expect.objectContaining({
+        id: 'camera-crop',
+        time: 0.5,
+        endpoint: 'retained-end',
+        rangeEnd: 0.5,
+      }),
+    ],
+    expect.any(AbortSignal)
+  );
+  expect(f.calls[0]!.input.source).toBe(owned.source);
+  expect(container.querySelector('video')!.readyState).toBe(0);
+  act(() => container.querySelector('video')!.dispatchEvent(new Event('error')));
+  expect(container.textContent).not.toContain(translate('common.actions.retry'));
+  expect(owned.release).not.toHaveBeenCalled();
+  const output = f.output(0);
+  act(() => root.render(null));
+  expect(owned.release).not.toHaveBeenCalled();
+  await act(async () => f.calls[0]!.resolve(output));
+  expect(owned.release).toHaveBeenCalledOnce();
+});
+
+it('replaces pending source interest after resize and releases its late lease', async () => {
+  const old = canonicalLease();
+  const fresh = canonicalLease();
+  const gate = Promise.withResolvers<typeof old.lease>();
+  sources.acquire.mockReturnValueOnce(gate.promise).mockResolvedValueOnce(fresh.lease);
+  const f = pendingGpu();
+  act(() => root.render(<CameraCropPreview {...props()} />));
+  await flush();
+  expect(sources.acquire).toHaveBeenCalledOnce();
+  act(() => observations.find((entry) => !entry.disconnected)!.notify());
+  await act(async () => gate.resolve(old.lease));
+  expect(old.release).toHaveBeenCalledOnce();
+  expect(f.calls).toHaveLength(1);
+  expect(f.calls[0]!.input.source).toBe(fresh.source);
+  expect(fresh.release).not.toHaveBeenCalled();
+  await act(async () => f.calls[0]!.resolve(f.output(0)));
+  expect(fresh.release).toHaveBeenCalledOnce();
+  expect(button().disabled).toBe(false);
 });

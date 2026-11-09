@@ -5,6 +5,7 @@ import {
   createPreviewSourceProvider,
   PreviewSourceSupersededError,
   resolvePreviewSourceOrdinaryTime,
+  resolvePreviewSourceRequest,
   type PreviewSourceDemand,
   type PreviewSourceLease,
   type PreviewSourceStream,
@@ -775,7 +776,7 @@ it.each([1 / 60, 0, 0.2, NaN] as const)(
         expect(f.getTimeResolution).toHaveBeenCalledOnce();
       } else {
         expect(f.computePacketStats).not.toHaveBeenCalled();
-        expect(f.getTimeResolution).not.toHaveBeenCalled();
+        expect(f.getTimeResolution).toHaveBeenCalledOnce();
       }
     } finally {
       provider.dispose();
@@ -879,3 +880,42 @@ it.each(['open', 'decode'] as const)(
     }
   }
 );
+
+it.each([1000, 1e9 / 3_000_000])(
+  'keeps strict request intent on the verified %s timestamp grid',
+  (resolution) => {
+    const end = 700 / resolution;
+    const request = {
+      id: 'held',
+      url: 'blob:grid',
+      time: end,
+      rangeEnd: end,
+      endpoint: 'retained-end' as const,
+    };
+    const selected = resolvePreviewSourceRequest(request, end + 1, undefined, resolution);
+    expect(selected).toMatchObject({
+      retainedEnd: end,
+      strictEnd: end,
+      decodeTime: 699 / resolution,
+      lookupTime: 699 / resolution,
+    });
+    expect(selected.lookupTime).toBeLessThan(end);
+    expect(
+      resolvePreviewSourceRequest(
+        { id: 'ordinary', url: 'blob:grid', time: 0.1 },
+        end + 1,
+        undefined,
+        resolution
+      ).lookupTime
+    ).toBe(resolvePreviewSourceOrdinaryTime(0.1, end + 1).lookupTime);
+  }
+);
+it('opens an ordinary real source with a fractional container resolution', async () => {
+  const f = defaultLeadingFixture(0, 30, 1e9 / 3_000_000);
+  const provider = createPreviewSourceProvider();
+  const lease = await provider.acquire([demand(0)], signal());
+  expect(binding(lease)).toMatchObject({ timestamp: 0, target: 0 });
+  expect(f.getTimeResolution).toHaveBeenCalledOnce();
+  lease?.release();
+  provider.dispose();
+});
