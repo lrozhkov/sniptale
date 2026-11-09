@@ -801,7 +801,7 @@ it('keeps the native GPU clone and artwork alive until a disposed render settles
   const native: GpuPreviewLayer[] = [];
   const visit = (layers: readonly GpuPreviewLayer[]) => {
     for (const layer of layers) {
-      if (layer.source === c.frames[0]) native.push(layer);
+      if (Object.is(layer.source, c.frames[0])) native.push(layer);
       if ('kind' in layer.source && layer.source.kind === 'group') visit(layer.source.layers);
     }
   };
@@ -1076,7 +1076,9 @@ it.each(['unsupported', 'decode-error', 'missing-binding', 'missing-accessor'] a
               ]),
         release: c.release,
       });
-    const render = vi.fn(async () => bitmap()),
+    const render = vi.fn<ReturnType<typeof createZoomPreviewGpuRenderer>['render']>(async () =>
+        bitmap()
+      ),
       onError = vi.fn(),
       receipt = vi.fn();
     const owner = createZoomPreviewPaintOwner({

@@ -4,7 +4,7 @@ import { resolveCameraWindowWeight } from '../../project/motion/spatial';
 import {
   createWindowCameraGeometry,
   createWindowCameraLinkGeometry,
-  proveWindowCameraGap,
+  planWindowCameraGap,
 } from '../../composition/motion/window-camera-geometry';
 import type { proveCameraPlan } from '../../composition/motion/camera-plan-proof';
 import type { ResolvedCameraFollowPolicy } from '../../project/camera/cursor-policy';
@@ -163,7 +163,7 @@ export function proveReviewCameraGap(input: {
     to: { region: target, scale: input.to.scale, pan: toPan },
     policy,
   });
-  return proveWindowCameraGap({
+  return planWindowCameraGap({
     adapter,
     start: source.end,
     end: target.start,

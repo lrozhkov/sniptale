@@ -13,6 +13,7 @@ import {
 } from './camera-plan-proof';
 import {
   cameraTransitionDerivative,
+  cameraTransitionProgress,
   type CameraTransition,
   type CameraTransitionType,
 } from '../../project/motion/transitions';
@@ -33,6 +34,7 @@ import {
   cameraTrajectoryBounds,
 } from './camera-trajectory';
 import type { WorkingZoneCameraGeometry, FollowCursorFrame } from './follow-cursor';
+import { cameraExpansionScales } from './follow-cursor';
 import {
   boundQuickEditCameraMotion,
   boundQuickEditCameraProjection,
@@ -584,13 +586,18 @@ export function createWindowCameraLinkGeometry(input: {
     cursorOffset?: { x: number; y: number };
   };
   policy: ResolvedCameraFollowPolicy;
+  /** Automatic pieces count their complete motion; authored nominal phases keep existing limits. */
+  automaticPhase?: ReturnType<typeof createCameraTrajectory>;
+  /** The original linked spatial clock survives a temporary scale/pan fit. */
+  spatialPhase?: number | ReturnType<typeof createCameraTrajectory>;
 }) {
   const start = input.from.end,
     end = input.to.start;
   const phase =
-    input.type === 'instant' || input.type === 'none'
+    input.automaticPhase ??
+    (input.type === 'instant' || input.type === 'none'
       ? 1
-      : createWindowPhaseTrajectory(start, end, input.type, true);
+      : createWindowPhaseTrajectory(start, end, input.type, true));
   const perspective = (
     value: CameraSpatialSettings['perspective'],
     cursorOffset: { x: number; y: number } | undefined
@@ -622,6 +629,8 @@ export function createWindowCameraLinkGeometry(input: {
     ...(input.planeTransform ? { planeTransform: input.planeTransform } : {}),
     targetScale: input.to.scale,
     phase: input.type === 'instant' && b === start ? 0 : phase,
+    ...(input.spatialPhase === undefined ? {} : { spatialPhase: input.spatialPhase }),
+    automaticMotion: input.automaticPhase !== undefined,
     pan,
     windowWeight: input.windowWeight,
     perspective: perspective(input.to.perspective, input.to.cursorOffset),
@@ -670,6 +679,7 @@ export function createWindowCameraLinkGeometry(input: {
     },
   };
   return {
+    input,
     geometry,
     limits: cameraFollowMotionLimits(input.policy, {
       viewportWidth: input.output.width,
@@ -698,10 +708,12 @@ export function proveWindowCameraGap(input: {
     const current = observations[index]!,
       next = observations[index + 1];
     if (next?.segmentId === current.segmentId) continue;
-    const end = next?.time ?? input.end;
+    const end = Math.min(next?.time ?? input.end, input.end);
+    if (end < cursor) continue;
     if (end > cursor || spans.length === 0)
       spans.push({ kind: 'hold', pan: toPan, start: cursor, end, segmentId: current.segmentId });
     cursor = end;
+    if (cursor >= input.end) break;
   }
   if (!spans.length)
     spans.push({ kind: 'hold', pan: toPan, start: input.start, end: input.end, segmentId: '' });
@@ -713,4 +725,101 @@ export function proveWindowCameraGap(input: {
     limits: adapter.limits,
     preservePointer: input.policy.settings.preservePointer,
   });
+}
+
+/** Pixel-space camera knots retain the exact frozen link endpoints. */
+export interface WindowCameraLinkFit {
+  phases: readonly ReturnType<typeof createCameraTrajectory>[];
+  window: { width: number; height: number };
+  poses: readonly { time: number; scale: number; pan: { x: number; y: number } }[];
+}
+
+/** Evaluate exactly the piecewise interpolation admitted by the gap proof. */
+export function evaluateWindowCameraLinkFit(fit: WindowCameraLinkFit, time: number) {
+  const first = fit.poses[0]!;
+  const last = fit.poses.at(-1)!;
+  if (time <= first.time) return first;
+  if (time >= last.time) return last;
+  const index = fit.poses.findIndex((pose) => pose.time > time);
+  const from = fit.poses[index - 1]!,
+    to = fit.poses[index]!;
+  const progress = evaluateCameraTrajectory(fit.phases[index - 1]!, time).x;
+  const mix = (a: number, b: number) => a + (b - a) * progress;
+  return {
+    time,
+    scale: mix(from.scale, to.scale),
+    pan: { x: mix(from.pan.x, to.pan.x), y: mix(from.pan.y, to.pan.y) },
+  };
+}
+
+/** Fit only a proved temporary interior expansion; the nominal plan remains the failure result. */
+export function planWindowCameraGap(input: Parameters<typeof proveWindowCameraGap>[0]) {
+  const nominal = proveWindowCameraGap(input);
+  if (nominal.status === 'proven') return { ...nominal, fit: undefined };
+  const original = input.adapter.input;
+  const duration = input.end - input.start;
+  if (!(duration > 0) || original.type === 'instant' || original.type === 'none') return nominal;
+  const spatialPhase =
+    original.spatialPhase ??
+    createWindowPhaseTrajectory(input.start, input.end, original.type, true);
+  const from = { time: input.start, scale: original.from.scale, pan: original.from.pan };
+  const to = { time: input.end, scale: original.to.scale, pan: original.to.pan };
+  for (const scale of cameraExpansionScales(Math.max(from.scale, to.scale), input.policy).filter(
+    (value) => value <= Math.min(from.scale, to.scale)
+  )) {
+    for (const factor of [1, 1.5, 2, 3]) {
+      const ramp = Math.min(input.policy.settings.transitionDuration * factor, duration / 2);
+      if (!(ramp > 0)) continue;
+      const interior = (time: number) => {
+        const progress = cameraTransitionProgress((time - input.start) / duration, original.type);
+        const nominalScale = from.scale + (to.scale - from.scale) * progress;
+        const ratio = nominalScale > 1 ? (scale - 1) / (nominalScale - 1) : 0;
+        return {
+          time,
+          scale,
+          pan: {
+            x: (from.pan.x + (to.pan.x - from.pan.x) * progress) * ratio,
+            y: (from.pan.y + (to.pan.y - from.pan.y) * progress) * ratio,
+          },
+        };
+      };
+      const poses = [
+        from,
+        interior(input.start + ramp),
+        ...(ramp < duration / 2 ? [interior(input.end - ramp)] : []),
+        to,
+      ];
+      const phases = poses.slice(1).map((target, index) =>
+        createCameraTrajectory({
+          start: poses[index]!.time,
+          end: target.time,
+          from: { x: 0, y: 0 },
+          to: { x: 1, y: 0 },
+        })
+      );
+      const fit: WindowCameraLinkFit = { phases, poses, window: original.window };
+      const proven = poses.slice(1).every((target, index) => {
+        const source = poses[index]!;
+        const adapter = createWindowCameraLinkGeometry({
+          ...original,
+          automaticPhase: phases[index]!,
+          spatialPhase,
+          from: { ...original.from, end: source.time, scale: source.scale, pan: source.pan },
+          to: { ...original.to, start: target.time, scale: target.scale, pan: target.pan },
+        });
+        const result = proveWindowCameraGap({
+          ...input,
+          adapter,
+          start: source.time,
+          end: target.time,
+          targetScale: target.scale,
+          toPan: target.pan,
+        });
+        return result.status === 'proven';
+      });
+      if (proven) return { status: 'proven' as const, fit };
+      if (ramp === duration / 2) break;
+    }
+  }
+  return nominal;
 }

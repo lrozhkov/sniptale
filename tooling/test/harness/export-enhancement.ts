@@ -98,7 +98,9 @@ const EDITS: ReviewEdit[] = [
     transition: { type: 'dissolve', before: 0.1, after: 0.1 },
   },
 ];
+export type EnhancementFixtureVariant = 'overlapping-scene-lenses';
 export interface EnhancementFixture {
+  variant?: EnhancementFixtureVariant;
   project: Omit<VideoProject, 'effectSnapshots'>;
   historyProject: Omit<VideoProject, 'effectSnapshots'>;
   sourceAssetId: string;
@@ -116,6 +118,7 @@ export interface InspectionOptions {
   fadeIn?: boolean;
   probes?: readonly number[];
   seeks?: readonly number[];
+  effectRoi?: boolean;
 }
 let retainedOutput: Blob | null = null;
 
@@ -219,7 +222,7 @@ function magnifyingLens(optics: 'flat' | 'optical') {
     lensEdgeWidth: 8,
   };
 }
-function nativeRegions(project: VideoProject) {
+function nativeRegions(project: VideoProject, variant?: EnhancementFixtureVariant) {
   const regions = POSES.map((pose) => ({
     ...createVideoProjectMotionRegion(project, pose.start, { enter: 'none', exit: 'none' }),
     duration: pose.end - pose.start,
@@ -265,6 +268,29 @@ function nativeRegions(project: VideoProject) {
         )
       );
     }
+  if (variant === 'overlapping-scene-lenses') {
+    for (const clip of project.clips) {
+      if (clip.type !== 'VIDEO' || clip.startTime > 7 || clip.startTime + clip.duration < 8)
+        continue;
+      regions.push(
+        bindMotionRegionToClip(
+          {
+            ...createVideoProjectMotionRegion(project, 7, { enter: 'none', exit: 'none' }),
+            duration: 1,
+            scale: 1,
+            zoomInDuration: 0,
+            zoomOutDuration: 0,
+            spotlight: {
+              ...magnifyingLens('optical'),
+              area: { x: 0.375, y: 0.325, width: 0.25, height: 0.35 },
+            },
+            spotlightTarget: 'scene',
+          },
+          clip
+        )
+      );
+    }
+  }
   return regions;
 }
 function sourceActions() {
@@ -415,7 +441,7 @@ function fixtureRefusals(project: VideoProject) {
       throw new Error(`Schema proof accepted invalid ${name}.`);
   return cases.map(([name]) => name);
 }
-export function checkEnhancementFixtureSchema() {
+export function checkEnhancementFixtureSchema(variant?: EnhancementFixtureVariant) {
   const recordingId = 'export-enhancement-schema';
   const { descriptor } = packedCursor(recordingId);
   const assets = ['A', 'B', 'combined'].map((name) =>
@@ -442,7 +468,8 @@ export function checkEnhancementFixtureSchema() {
     assets,
     recordingId,
     descriptor,
-    'mp4'
+    'mp4',
+    variant
   );
   const sceneRegions =
     project.motionRegions?.filter((region) => region.spotlightTarget === 'scene') ?? [];
@@ -465,7 +492,9 @@ export function checkEnhancementFixtureSchema() {
     rejected: fixtureRefusals(project),
   };
 }
-export async function createEnhancementFixture(): Promise<EnhancementFixture> {
+export async function createEnhancementFixture(
+  variant?: EnhancementFixtureVariant
+): Promise<EnhancementFixture> {
   const avc = await VideoEncoder.isConfigSupported({
     codec: 'avc1.420028',
     width: WIDTH,
@@ -485,13 +514,14 @@ export async function createEnhancementFixture(): Promise<EnhancementFixture> {
   for (const kind of ['A', 'B', 'combined'] as const)
     assets.push(await makeAsset(`${kind}.${format}`, await sourceFile(kind, format), recordingId));
   const trajectory = await archivedCursor(recordingId);
-  return buildEnhancementFixtureProjects(assets, recordingId, trajectory, format);
+  return buildEnhancementFixtureProjects(assets, recordingId, trajectory, format, variant);
 }
 export function buildEnhancementFixtureProjects(
   assets: readonly VideoProjectAsset[],
   recordingId: string,
   trajectory: CursorTrajectoryDescriptor,
-  format: 'mp4' | 'webm'
+  format: 'mp4' | 'webm',
+  variant?: EnhancementFixtureVariant
 ): EnhancementFixture {
   const [a, b, combined] = assets;
   if (!a || !b || !combined || combined.source.kind !== 'project-asset')
@@ -539,7 +569,7 @@ export function buildEnhancementFixtureProjects(
       transition: { type: 'dissolve', before: 0.1, after: 0.1 },
     },
   ];
-  project.motionRegions = nativeRegions(project);
+  project.motionRegions = nativeRegions(project, variant);
   for (const group of project.actionFeedback ?? [])
     group.gestureStyles = sourceActions().map((event) => ({
       ...REVIEW_CLICK_DEFAULT,
@@ -589,6 +619,7 @@ export function buildEnhancementFixtureProjects(
     sourceAssetId: combined.source.projectAssetId,
     sourceFormat: format,
     telemetry,
+    ...(variant ? { variant } : {}),
   };
 }
 function assertFixtureProject(project: VideoProject, name: string) {
@@ -622,7 +653,10 @@ function assertFixtureProject(project: VideoProject, name: string) {
     );
   }
 }
-function galleryState(presentation: boolean): QuickEditAdvancedState {
+function galleryState(
+  presentation: boolean,
+  variant?: EnhancementFixtureVariant
+): QuickEditAdvancedState {
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
   advanced.ui.tracks.zoom = true;
@@ -659,6 +693,17 @@ function galleryState(presentation: boolean): QuickEditAdvancedState {
       enter: { type: 'none', duration: 0 },
       exit: { type: 'none', duration: 0 },
       spotlight: magnifyingLens(optics),
+    });
+  if (variant === 'overlapping-scene-lenses')
+    advanced.zoom.regions.push({
+      ...createQuickEditZoomRegion({ id: 'lens-overlap', at: 7, duration: 1 }),
+      transform: { scale: 1, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none', duration: 0 },
+      exit: { type: 'none', duration: 0 },
+      spotlight: {
+        ...magnifyingLens('optical'),
+        area: { x: 0.375, y: 0.325, width: 0.25, height: 0.35 },
+      },
     });
   advanced.clickAnimations = sourceActions().map((event) => ({
     ...REVIEW_CLICK_DEFAULT,
@@ -739,11 +784,12 @@ export async function renderEnhancementGallery(
   mode: VideoExportDetailMode,
   presentation: boolean,
   reference = false,
-  window?: EnhancementProofWindow
+  window?: EnhancementProofWindow,
+  inspection: Pick<InspectionOptions, 'effectRoi'> = {}
 ) {
   const file = await assetFile(fixture.sourceAssetId),
     signal = new AbortController().signal;
-  const advanced = galleryState(presentation);
+  const advanced = galleryState(presentation, fixture.variant);
   const index = await inspectReviewMedia(file, signal);
   const edits = galleryEdits(index.duration, reference, window);
   const history = createReviewRecordingRenderSource({
@@ -814,6 +860,7 @@ export async function renderEnhancementGallery(
         duration: window ? window.end - window.start : reference ? 0.5 : 10,
         offset: window?.start ?? (reference ? 1 : 0),
         fadeIn: presentation,
+        ...inspection,
         ...(window ? { probes: [0.1, 0.3, 0.6, 0.9], seeks: [0.9, 0.1, 0.6] } : {}),
       })),
       sourceIndex: { duration: index.duration },
@@ -870,6 +917,57 @@ function landmark(context: CanvasRenderingContext2D, scale: number) {
       }
     }
   return { count, expected, x: count ? sumX / count : null, y: count ? sumY / count : null };
+}
+function effectRoi(context: CanvasRenderingContext2D) {
+  const bounds = { x: 480, y: 180, width: 960, height: 720 };
+  // Read real neighboring pixels so the negative controls translate the decoded image, not its metric.
+  const margin = 3,
+    width = bounds.width,
+    height = bounds.height,
+    stride = width + margin * 2;
+  const pixels = context.getImageData(
+    bounds.x - margin,
+    bounds.y - margin,
+    stride,
+    height + margin * 2
+  ).data;
+  const profiles = (dx: number, dy: number) => {
+    const integral = new Float64Array((width + 1) * (height + 1));
+    for (let y = 0; y < height; y++) {
+      let row = 0;
+      for (let x = 0; x < width; x++) {
+        const index = ((y + margin - dy) * stride + x + margin - dx) * 4;
+        row += 0.2126 * pixels[index]! + 0.7152 * pixels[index + 1]! + 0.0722 * pixels[index + 2]!;
+        integral[(y + 1) * (width + 1) + x + 1] = row + integral[y * (width + 1) + x + 1]!;
+      }
+    }
+    // A 31-pixel box removes the fine stripe phase; the observed panel boundary supplies placement.
+    const blurred = new Float64Array(width * height);
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const left = Math.max(0, x - 15),
+          right = Math.min(width, x + 16);
+        const top = Math.max(0, y - 15),
+          bottom = Math.min(height, y + 16);
+        blurred[y * width + x] =
+          (integral[bottom * (width + 1) + right]! -
+            integral[top * (width + 1) + right]! -
+            integral[bottom * (width + 1) + left]! +
+            integral[top * (width + 1) + left]!) /
+          ((right - left) * (bottom - top));
+      }
+    const horizontal = new Array<number>(width).fill(0),
+      vertical = new Array<number>(height).fill(0);
+    for (let y = 1; y < height - 1; y++)
+      for (let x = 1; x < width - 1; x++) {
+        horizontal[x] =
+          horizontal[x]! + Math.abs(blurred[y * width + x + 1]! - blurred[y * width + x - 1]!);
+        vertical[y] =
+          vertical[y]! + Math.abs(blurred[(y + 1) * width + x]! - blurred[(y - 1) * width + x]!);
+      }
+    return { x: horizontal, y: vertical };
+  };
+  return { bounds, boundary: profiles(0, 0), shiftedX: profiles(3, 0), shiftedY: profiles(0, 3) };
 }
 async function inspectAudio(input: Input, duration: number) {
   const track = await input.getPrimaryAudioTrack();
@@ -947,6 +1045,7 @@ export async function inspectEnhancementOutput(file: Blob, options: InspectionOp
     colorError: number;
     landmark: ReturnType<typeof landmark> | null;
     detail: number[];
+    effectRoi?: ReturnType<typeof effectRoi>;
   }[] = [];
   const decodedSamples: { timestamp: number; duration: number }[] = [];
   const failures: { timestamp: number; error: number }[] = [],
@@ -988,6 +1087,7 @@ export async function inspectEnhancementOutput(file: Blob, options: InspectionOp
             timestamp: sample.timestamp,
             colorError: error,
             landmark: time < 2.75 && pose ? landmark(context, pose.scale) : null,
+            ...(options.effectRoi ? { effectRoi: effectRoi(context) } : {}),
             detail: Array.from(context.getImageData(928, 524, 64, 32).data).filter(
               (_, i) => i % 4 === 0
             ),
@@ -1094,6 +1194,7 @@ export const enhancementProof = {
   schema: checkEnhancementFixtureSchema,
   gallery: renderEnhancementGallery,
   inspectNative: inspectNativeEnhancement,
+  inspectFile: inspectEnhancementOutput,
   capabilities: probeEnhancementCapabilities,
   download: downloadEnhancementOutput,
 };

@@ -36,6 +36,39 @@ const base: QuickEditCameraProjectionInterval = {
 };
 
 describe('real camera projection interval bounds', () => {
+  it('keeps the spatial clock independent and bounds automatic scale and pan derivatives', () => {
+    const phase = createCameraTrajectory({
+      start: 0,
+      end: 1,
+      from: { x: 0, y: 0 },
+      to: { x: 1, y: 0 },
+    });
+    const interval: QuickEditCameraProjectionInterval = {
+      ...base,
+      start: 0.5,
+      end: 0.5,
+      phase,
+      spatialPhase: 0.25,
+      from: {
+        scale: 1,
+        pan: { x: 0, y: 0 },
+        perspective: { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 },
+        windowMotion: 0,
+      },
+      perspective: { rotateX: 0, rotateY: 0, rotateZ: 0, strength: 0 },
+    };
+    const projection = boundQuickEditCameraProjection(interval)!;
+    const independent = boundQuickEditCameraProjection({ ...interval, spatialPhase: 0.75 })!;
+    expect(projection).toEqual(independent);
+    expect(boundQuickEditCameraMotion(interval)).toEqual({ speed: 0, acceleration: 0, jerk: 0 });
+    const motion = boundQuickEditCameraMotion({ ...interval, automaticMotion: true })!;
+    expect(motion.speed).toBeGreaterThan(0);
+    expect(motion.jerk).toBeGreaterThan(0);
+    const spatial = { ...interval, perspective: base.perspective };
+    expect(boundQuickEditCameraProjection(spatial)).not.toEqual(
+      boundQuickEditCameraProjection({ ...spatial, spatialPhase: 0.75 })
+    );
+  });
   it.each(['window', 'content', 'spatial'] as const)(
     'bounds added follow derivatives through rendered perspective (%s)',
     (windowWeight) => {

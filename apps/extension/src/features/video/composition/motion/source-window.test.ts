@@ -1,5 +1,6 @@
 import { VIDEO_PROJECT_ATTACHMENT_GEOMETRY } from '../../project/types/export';
 import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
+import { createCameraFollowSettings } from '../../project/camera/cursor-policy';
 import { motionCameraProjection } from './spatial';
 import { quickEditPlaneProjection, projectQuickEditPoint } from './spatial-geometry';
 import { expect, it } from 'vitest';
@@ -656,7 +657,7 @@ it.each(
     )
   )
 )(
-  'checks an exported follow-link fragment against native observations with excursion=%s instant=%s rotation=%s',
+  'checks an exported follow-link fragment with expansion disabled and excursion=%s instant=%s rotation=%s',
   async (excursion, instant, rotation) => {
     const { createVideoProjectFromRecording } = await import('../../project/factories/creation');
     const { normalizeVideoProjectCursorSkin } = await import('../../project/cursor');
@@ -697,6 +698,10 @@ it.each(
         }),
       },
     });
+    project.cameraFollowDefaults = {
+      ...createCameraFollowSettings('balanced'),
+      allowExpansion: false,
+    };
     const clip = project.clips[0]!;
     clip.transform.rotation = rotation;
     const first = {

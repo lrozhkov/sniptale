@@ -73,7 +73,9 @@ it.each([0.5, 0.05])(
         path,
         observed: path,
         scene,
-        policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') }),
+        policy: resolveCameraFollowPolicy({
+          defaults: { ...createCameraFollowSettings('calm'), allowExpansion: false },
+        }),
       },
     };
     const to: QuickEditZoomRegion = {
@@ -107,73 +109,91 @@ it.each([0.5, 0.05])(
   }
 );
 
-it('rejects a fragment inside a link gap when its captured pointer leaves the admitted output', () => {
-  const focus = {
-    version: 1 as const,
-    mode: 'follow' as const,
-    smoothing: 0,
-    sensitivity: 0.5,
-    gapPolicy: 'hold' as const,
-    segments: [
-      {
-        id: 'native',
-        start: 0,
-        end: 4,
-        binding: { kind: 'project' as const },
-        keys: [0, 1, 2, 3, 4].map((time) => ({
-          id: `point-${time}`,
-          time,
-          x: 0.5,
-          y: 0.5,
-          anchor: 'movement' as const,
-          interpolation: 'linear' as const,
-        })),
+it.each([false, true])(
+  'applies temporary expansion=%s across the complete captured link gap',
+  (allowExpansion) => {
+    const focus = {
+      version: 1 as const,
+      mode: 'follow' as const,
+      smoothing: 0,
+      sensitivity: 0.5,
+      gapPolicy: 'hold' as const,
+      segments: [
+        {
+          id: 'native',
+          start: 0,
+          end: 4,
+          binding: { kind: 'project' as const },
+          keys: [0, 1, 2, 3, 4].map((time) => ({
+            id: `point-${time}`,
+            time,
+            x: 0.5,
+            y: 0.5,
+            anchor: 'movement' as const,
+            interpolation: 'linear' as const,
+          })),
+        },
+      ],
+    };
+    const observed = {
+      ...focus,
+      segments: focus.segments.map((segment) => ({
+        ...segment,
+        keys: segment.keys.map((key) => ({ ...key, x: key.time === 2 ? 0.05 : 0.5 })),
+      })),
+    };
+    const scene = {
+      source: { width: 1000, height: 600 },
+      background: { enabled: false as const, zoomBehavior: 'window' as const },
+    };
+    const from = {
+      id: 'from',
+      start: 0,
+      end: 1,
+      linkTo: 'to',
+      transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+      enter: { type: 'none' as const, duration: 0 },
+      exit: { type: 'none' as const, duration: 0 },
+      cursorFocus: {
+        path: focus,
+        observed,
+        scene,
+        policy: resolveCameraFollowPolicy({
+          defaults: { ...createCameraFollowSettings('calm'), allowExpansion },
+        }),
       },
-    ],
-  };
-  const observed = {
-    ...focus,
-    segments: focus.segments.map((segment) => ({
-      ...segment,
-      keys: segment.keys.map((key) => ({ ...key, x: key.time === 2 ? 0.05 : 0.5 })),
-    })),
-  };
-  const scene = {
-    source: { width: 1000, height: 600 },
-    background: { enabled: false as const, zoomBehavior: 'window' as const },
-  };
-  const from = {
-    id: 'from',
-    start: 0,
-    end: 1,
-    linkTo: 'to',
-    transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
-    enter: { type: 'none' as const, duration: 0 },
-    exit: { type: 'none' as const, duration: 0 },
-    cursorFocus: {
-      path: focus,
-      observed,
-      scene,
-      policy: resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') }),
-    },
-  };
-  const to = {
-    id: 'to',
-    start: 3,
-    end: 4,
-    transform: from.transform,
-    enter: from.enter,
-    exit: from.exit,
-  };
-  expect(resolveReviewCameraConflicts([from, to], scene, { start: 0, end: 0.5 })).toEqual([]);
-  expect(resolveReviewCameraConflicts([from, to], scene, { start: 1.9, end: 2.1 })).toContainEqual(
-    expect.objectContaining({
-      regionId: 'from',
-      interval: { start: 1, end: 3 },
-      reason: 'viewport',
-    })
-  );
-});
+    };
+    const to = {
+      id: 'to',
+      start: 3,
+      end: 4,
+      transform: from.transform,
+      enter: from.enter,
+      exit: from.exit,
+    };
+    expect(resolveReviewCameraConflicts([from, to], scene, { start: 0, end: 0.5 })).toEqual([]);
+    if (!allowExpansion)
+      expect(
+        resolveReviewCameraConflicts([from, to], scene, { start: 1.9, end: 2.1 })
+      ).toContainEqual(
+        expect.objectContaining({
+          regionId: 'from',
+          interval: { start: 1, end: 3 },
+          reason: 'viewport',
+        })
+      );
+    else {
+      expect(resolveReviewCameraConflicts([from, to], scene)).toEqual([]);
+      for (let time = 1; time <= 3; time += 1 / 60) {
+        const camera = evaluateQuickEditCameraAtTime([from, to], time, scene);
+        const actualX = time <= 2 ? 0.5 - 0.45 * (time - 1) : 0.05 + 0.45 * (time - 2);
+        expect(0.5 + (actualX - camera.centerX) * camera.scale).toBeGreaterThanOrEqual(-0.002);
+      }
+      expect(evaluateQuickEditCameraAtTime([from, to], 1, scene).scale).toBe(2);
+      expect(evaluateQuickEditCameraAtTime([from, to], 3, scene).scale).toBe(2);
+    }
+  }
+);
 
 it.each([
   ['manual', 'none'],

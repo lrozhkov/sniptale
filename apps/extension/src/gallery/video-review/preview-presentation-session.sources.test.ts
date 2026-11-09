@@ -375,7 +375,7 @@ it.each(['cold', 'warm', 'retry'] as const)(
       resultTime: 1,
       source: { timestamp: 1 },
     });
-    expect(io.decoded.mock.lastCall?.[0].binding.heldAtEnd).toBeUndefined();
+    expect(Reflect.get(io.decoded.mock.lastCall?.[0].binding ?? {}, 'heldAtEnd')).toBeUndefined();
     replay.release();
     expect(opened).toHaveBeenCalledTimes(mode === 'retry' ? 2 : 1);
     expect(io.legacy).not.toHaveBeenCalled();

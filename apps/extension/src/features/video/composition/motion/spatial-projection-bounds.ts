@@ -239,6 +239,10 @@ export interface QuickEditCameraProjectionInterval {
     | { from: { x: number; y: number }; to: { x: number; y: number } };
   targetScale: number;
   phase: number | CameraTrajectory;
+  /** A temporary fit can change scale/pan while retaining the authored spatial phase. */
+  spatialPhase?: number | CameraTrajectory;
+  /** Automatic fits must account for all projected movement, including their scale phase. */
+  automaticMotion?: boolean;
   pan: CameraPanBounds;
   trajectory?: CameraTrajectory;
   windowWeight: 'window' | 'content' | 'spatial';
@@ -296,7 +300,11 @@ function nominalCameraJets(input: QuickEditCameraProjectionInterval, motion: boo
     ty = translation('y');
   const scale = add(constant(startScale), multiply(constant(input.targetScale - startScale), g));
   const startWeight = input.from?.windowMotion ?? 0;
-  const activation = cursorActivationJet(input, g, motion);
+  const spatial =
+    input.spatialPhase === undefined
+      ? g
+      : projectionPhaseJet(input.spatialPhase, input.start, input.end, motion);
+  const activation = cursorActivationJet(input, spatial, motion);
   const weight =
     input.windowWeight === 'window'
       ? constant(1)
@@ -445,7 +453,7 @@ function projectInterval(input: QuickEditCameraProjectionInterval, motion: boole
 function projectPlaneJets(
   input: Pick<
     QuickEditCameraProjectionInterval,
-    'window' | 'perspective' | 'from' | 'orbit' | 'start' | 'end'
+    'window' | 'perspective' | 'from' | 'orbit' | 'start' | 'end' | 'spatialPhase'
   >,
   g: ProjectionJet,
   qx: ProjectionJet,
@@ -456,7 +464,11 @@ function projectPlaneJets(
   motion = false
 ) {
   const windowRect = input.window;
-  const activation = cursorActivationJet(input, g, motion);
+  const spatial =
+    input.spatialPhase === undefined
+      ? g
+      : projectionPhaseJet(input.spatialPhase, input.start, input.end, motion);
+  const activation = cursorActivationJet(input, spatial, motion);
   const angle = (axis: 'rotateX' | 'rotateY' | 'rotateZ') => {
     const start = input.from?.perspective[axis] ?? 0;
     const delta = input.perspective[axis] - start;
@@ -481,7 +493,7 @@ function projectPlaneJets(
             })()
           : add(
               constant(orbit.from[coordinate]),
-              multiply(g, constant(orbit.to[coordinate] - orbit.from[coordinate]))
+              multiply(spatial, constant(orbit.to[coordinate] - orbit.from[coordinate]))
             );
       const contribution = 'angles' in orbit ? multiply(activation, offset) : offset;
       // The complete cursor contribution, including its phase envelope, is added follow movement.
@@ -583,17 +595,20 @@ export function boundQuickEditCameraProjection(
 
 /** Bound added follow movement, including its cross derivatives with authored nominal phases. */
 export function boundQuickEditCameraMotion(input: QuickEditCameraProjectionInterval) {
-  if (!input.trajectory && !input.orbit) return { speed: 0, acceleration: 0, jerk: 0 };
+  if (!input.trajectory && !input.orbit && !input.automaticMotion)
+    return { speed: 0, acceleration: 0, jerk: 0 };
   const result = projectInterval(input, true);
   if (!result) return null;
   const norm = (order: 0 | 1 | 2) => {
     const x = (
-      typeof input.phase === 'number' && !input.planeTransition && !input.orbit
+      input.automaticMotion ||
+      (typeof input.phase === 'number' && !input.planeTransition && !input.orbit)
         ? result.outX.derivatives
         : (result.outX.follow ?? zeros)
     )[order];
     const y = (
-      typeof input.phase === 'number' && !input.planeTransition && !input.orbit
+      input.automaticMotion ||
+      (typeof input.phase === 'number' && !input.planeTransition && !input.orbit)
         ? result.outY.derivatives
         : (result.outY.follow ?? zeros)
     )[order];

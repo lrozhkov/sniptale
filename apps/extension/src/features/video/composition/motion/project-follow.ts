@@ -15,7 +15,8 @@ import { motionTransitionTypeForEasing } from '../../project/motion/timing';
 import { resolveProjectOutputTransform } from '../../project/export/output-dimensions';
 import {
   createWindowCameraLinkGeometry,
-  proveWindowCameraGap,
+  planWindowCameraGap,
+  type WindowCameraLinkFit,
   cropWindowCameraObservations,
 } from './window-camera-geometry';
 import { resolveMotionSourceWindow, motionWindowFocusToWindow } from './source-window';
@@ -73,6 +74,7 @@ interface ProjectCameraPlanEntry {
   plan: WorkingZoneCameraPlan;
   geometry: WorkingZoneCameraGeometry;
   input: Parameters<typeof planWorkingZoneCamera>[0];
+  links?: Map<string, { conflict: ProjectCameraConflict | null; fit?: WindowCameraLinkFit }>;
 }
 const plans = new WeakMap<VideoProject, Map<string, ProjectCameraPlanEntry>>();
 
@@ -455,7 +457,7 @@ function resolvePlanEntry(
   project: VideoProject,
   region: VideoProjectMotionRegion,
   output?: CameraOutputViewport
-) {
+): ProjectCameraPlanEntry {
   region = resolveMotionWindowCameraRegion(project, region);
   const provisional = resolveProvisionalPlanEntry(project, region, output);
   const boundaries: WorkingZoneCameraBoundaries = {};
@@ -592,19 +594,19 @@ export function resolveProjectWindowCameraEndpoint(
   };
 }
 
-function resolveProjectWindowLinkConflict(
+/** The same disposable link result owns validation and the rendered temporary fit. */
+export function resolveProjectWindowCameraLink(
   project: VideoProject,
   source: VideoProjectMotionRegion,
   destination: VideoProjectMotionRegion,
   output?: CameraOutputViewport
-): ProjectCameraConflict | null {
+): { conflict: ProjectCameraConflict | null; fit?: WindowCameraLinkFit } {
   const start = source.startTime + source.duration,
     end = destination.startTime;
   const interval = { start, end };
-  const failure = (
-    reason: ProjectCameraConflict['reason'],
-    time = start
-  ): ProjectCameraConflict => ({ regionId: source.id, interval, reason, time });
+  const failure = (reason: ProjectCameraConflict['reason'], time = start) => ({
+    conflict: { regionId: source.id, interval, reason, time },
+  });
   const from = resolveProjectWindowCameraEndpoint(project, source, start, output);
   const to = resolveProjectWindowCameraEndpoint(project, destination, end, output);
   if (!from || !to) return failure('unproven');
@@ -634,6 +636,20 @@ function resolveProjectWindowLinkConflict(
     ...(context.cameraFollow ? { override: context.cameraFollow } : {}),
   });
   const spatial = projectCursorLinkSettings(project, source, destination, start, end);
+  const entry = resolvePlanEntry(project, context, output);
+  const key = JSON.stringify([
+    entry.signature,
+    source,
+    destination,
+    from,
+    to,
+    size,
+    layout,
+    spatial,
+  ]);
+  const cached = (entry.links ??= new Map());
+  const previous = cached.get(key);
+  if (previous) return previous;
   const adapter = createWindowCameraLinkGeometry({
     output: size,
     window,
@@ -658,7 +674,7 @@ function resolveProjectWindowLinkConflict(
   });
   const gap = { ...context, startTime: start, duration: end - start };
   const observations = collectProjectCameraFrames(project, gap, { source, destination }).frames;
-  const proof = proveWindowCameraGap({
+  const proof = planWindowCameraGap({
     adapter,
     start,
     end,
@@ -667,7 +683,13 @@ function resolveProjectWindowLinkConflict(
     policy,
     observations,
   });
-  return proof.status === 'conflict' ? failure(proof.reason, proof.time) : null;
+  const result =
+    proof.status === 'conflict'
+      ? failure(proof.reason, proof.time)
+      : { conflict: null, ...(proof.fit ? { fit: proof.fit } : {}) };
+  cached.set(key, result);
+  if (cached.size > 4) cached.delete(cached.keys().next().value ?? '');
+  return result;
 }
 
 /** Refuse only exports that use an unresolved active follow camera. This check acquires no resources. */
@@ -712,7 +734,7 @@ export function resolveProjectCameraConflicts(
       destination.startTime <= interval.start
     )
       continue;
-    const conflict = resolveProjectWindowLinkConflict(project, source, destination, output);
+    const { conflict } = resolveProjectWindowCameraLink(project, source, destination, output);
     if (conflict) conflicts.push(conflict);
   }
   return conflicts;

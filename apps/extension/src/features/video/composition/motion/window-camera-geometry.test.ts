@@ -1,7 +1,166 @@
 import { expect, it } from 'vitest';
-import { createWindowCameraGeometry } from './window-camera-geometry';
+import {
+  createWindowCameraGeometry,
+  createWindowCameraLinkGeometry,
+  planWindowCameraGap,
+  evaluateWindowCameraLinkFit,
+} from './window-camera-geometry';
 import { proveCameraPlan, type CameraPlanSpan } from './camera-plan-proof';
-import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
+import {
+  resolveCameraFollowPolicy,
+  createCameraFollowSettings,
+} from '../../project/camera/cursor-policy';
+
+it.each([
+  { allowExpansion: true, minimumScale: 1, x: 0.05, ready: true, expanded: true },
+  { allowExpansion: false, minimumScale: 1, x: 0.05, ready: false, expanded: false },
+  { allowExpansion: true, minimumScale: 2, x: 0.05, ready: false, expanded: false },
+  { allowExpansion: true, minimumScale: 1, x: 0.5, ready: true, expanded: false },
+])(
+  'proves the complete shared temporary link fit %j',
+  ({ allowExpansion, minimumScale, x, ready, expanded }) => {
+    const window = { x: 0, y: 0, width: 1000, height: 600 };
+    const policy = resolveCameraFollowPolicy({
+      defaults: { ...createCameraFollowSettings('calm'), allowExpansion, minimumScale },
+    });
+    const adapter = createWindowCameraLinkGeometry({
+      output: window,
+      window,
+      video: window,
+      cornerRadius: 0,
+      windowWeight: 'window',
+      type: 'ease-in-out',
+      from: { end: 1, scale: 2, pan: { x: 500, y: 300 } },
+      to: { start: 3, scale: 2, pan: { x: 500, y: 300 } },
+      policy,
+    });
+    const observations = [1, 2, 3].map((time) => ({
+      time,
+      segmentId: 'source',
+      actual: { x: time === 2 ? x : 0.5, y: 0.5 },
+    }));
+    const proof = planWindowCameraGap({
+      adapter,
+      start: 1,
+      end: 3,
+      targetScale: 2,
+      toPan: { x: 500, y: 300 },
+      policy,
+      observations,
+    });
+    expect(proof.status).toBe(ready ? 'proven' : 'conflict');
+    if (proof.status !== 'proven') return;
+    expect(!!proof.fit).toBe(expanded);
+    if (!proof.fit) return;
+    const before = structuredClone(proof.fit);
+    expect(evaluateWindowCameraLinkFit(proof.fit, 1)).toEqual(proof.fit.poses[0]);
+    expect(evaluateWindowCameraLinkFit(proof.fit, 3)).toEqual(proof.fit.poses.at(-1));
+    const a = proof.fit.poses[0]!,
+      b = proof.fit.poses[1]!;
+    const automatic = createWindowCameraLinkGeometry({
+      ...adapter.input,
+      automaticPhase: proof.fit.phases[0]!,
+      from: { ...adapter.input.from, end: a.time, scale: a.scale, pan: a.pan },
+      to: { ...adapter.input.to, start: b.time, scale: b.scale, pan: b.pan },
+    });
+    const motion = automatic.geometry.motionBounds!({
+      start: a.time,
+      end: b.time,
+      pan: { minX: b.pan.x, maxX: b.pan.x, minY: b.pan.y, maxY: b.pan.y },
+      targetScale: b.scale,
+    })!;
+    expect(motion.speed).toBeGreaterThan(0);
+    const mid = (a.time + b.time) / 2,
+      dt = 1e-5;
+    const left = evaluateWindowCameraLinkFit(proof.fit, mid - dt),
+      right = evaluateWindowCameraLinkFit(proof.fit, mid + dt);
+    expect(
+      Math.hypot(right.pan.x - left.pan.x, right.pan.y - left.pan.y) / (2 * dt)
+    ).toBeLessThanOrEqual(motion.speed);
+    for (let time = 1; time <= 3; time += 1 / 120) {
+      const actualX = time <= 2 ? 0.5 + (x - 0.5) * (time - 1) : x + (0.5 - x) * (time - 2);
+      const pose = evaluateWindowCameraLinkFit(proof.fit, time);
+      expect(pose.scale * actualX * window.width - pose.pan.x).toBeGreaterThanOrEqual(-2);
+      expect(pose.pan.x).toBeGreaterThanOrEqual(-1e-8);
+      expect(pose.pan.x).toBeLessThanOrEqual((pose.scale - 1) * window.width + 1e-8);
+    }
+    expect(proof.fit).toEqual(before);
+  }
+);
+
+it('keeps independent captured observations on both sides of a link discontinuity', () => {
+  const window = { x: 0, y: 0, width: 1000, height: 600 };
+  const policy = resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') });
+  const adapter = createWindowCameraLinkGeometry({
+    output: window,
+    window,
+    video: window,
+    cornerRadius: 0,
+    windowWeight: 'window',
+    type: 'ease-in-out',
+    from: { end: 1, scale: 2, pan: { x: 500, y: 300 } },
+    to: { start: 3, scale: 2, pan: { x: 500, y: 300 } },
+    policy,
+  });
+  const observations = [
+    { time: 1, segmentId: 'left', actual: { x: 0.5, y: 0.5 } },
+    { time: 2, segmentId: 'left', actual: { x: 0.05, y: 0.5 } },
+    { time: 2, segmentId: 'right', actual: { x: 0.95, y: 0.5 } },
+    { time: 3, segmentId: 'right', actual: { x: 0.5, y: 0.5 } },
+  ];
+  const result = planWindowCameraGap({
+    adapter,
+    start: 1,
+    end: 3,
+    targetScale: 2,
+    toPan: { x: 500, y: 300 },
+    policy,
+    observations,
+  });
+  expect(result.status).toBe('proven');
+  if (result.status === 'proven') expect(evaluateWindowCameraLinkFit(result.fit!, 2).scale).toBe(1);
+});
+
+it('fits a full-frame interior between unequal frozen endpoint scales', () => {
+  const window = { x: 0, y: 0, width: 1000, height: 600 };
+  const policy = resolveCameraFollowPolicy({ defaults: createCameraFollowSettings('calm') });
+  const adapter = createWindowCameraLinkGeometry({
+    output: window,
+    window,
+    video: window,
+    cornerRadius: 0,
+    windowWeight: 'window',
+    type: 'ease-in-out',
+    policy,
+    from: { end: 1, scale: 1, pan: { x: 0, y: 0 } },
+    to: { start: 3, scale: 1.3, pan: { x: 150, y: 90 } },
+  });
+  const result = planWindowCameraGap({
+    adapter,
+    start: 1,
+    end: 3,
+    targetScale: 1.3,
+    toPan: adapter.input.to.pan,
+    policy,
+    observations: [1, 2, 3].map((time) => ({
+      time,
+      segmentId: 'source',
+      actual: { x: time === 2 ? 0.05 : 0.5, y: 0.5 },
+    })),
+  });
+  expect(result.status).toBe('proven');
+  if (result.status !== 'proven') return;
+  expect(result.fit).toBeDefined();
+  expect(evaluateWindowCameraLinkFit(result.fit!, 1)).toMatchObject({
+    scale: 1,
+    pan: { x: 0, y: 0 },
+  });
+  expect(evaluateWindowCameraLinkFit(result.fit!, 2).scale).toBe(1);
+  expect(evaluateWindowCameraLinkFit(result.fit!, 3)).toMatchObject({
+    scale: 1.3,
+    pan: { x: 150, y: 90 },
+  });
+});
 
 it.each(['none', 'instant', 'linear'] as const)(
   'preserves detailed native admission across %s phase boundaries and interior pointer excursions',

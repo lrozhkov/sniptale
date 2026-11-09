@@ -1,4 +1,4 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
@@ -14,6 +14,7 @@ import type {
 } from '../../../../apps/extension/src/features/video/project/types';
 import type {
   EnhancementFixture,
+  EnhancementFixtureVariant,
   EnhancementProofWindow,
   InspectionOptions,
   inspectEnhancementOutput,
@@ -66,17 +67,19 @@ async function gallery(
     presentation: boolean;
     reference: boolean;
     interval?: EnhancementProofWindow;
+    inspection?: Pick<InspectionOptions, 'effectRoi'>;
   }
 ) {
   try {
     return await page.evaluate(
-      ({ fixture, mode, presentation, reference, interval }) =>
+      ({ fixture, mode, presentation, reference, interval, inspection }) =>
         window.__sniptaleOffscreenHarness!.enhancementProof.gallery(
           fixture,
           mode,
           presentation,
           reference,
-          interval
+          interval,
+          inspection
         ),
       args
     );
@@ -105,7 +108,8 @@ async function native(
   mode: VideoExportDetailMode,
   mp4 = false,
   reference = false,
-  interval?: EnhancementProofWindow
+  interval?: EnhancementProofWindow,
+  inspection?: Pick<InspectionOptions, 'effectRoi'>
 ) {
   const range = reference ? { start: 1, end: 1.5 } : interval;
   await encodedNativeVideoSamples(
@@ -136,10 +140,14 @@ async function native(
   return page.evaluate(
     ({ exportId, options }) =>
       window.__sniptaleOffscreenHarness!.enhancementProof.inspectNative(exportId, options),
-    { exportId: last.exportId, options }
+    { exportId: last.exportId, options: { ...options, ...inspection } }
   );
 }
-function checkFile(result: Inspection, duration = 10, expected?: typeof NEURAL_EXPECTED) {
+function checkFileTransport(
+  result: Inspection,
+  duration = 10,
+  expected?: { audioPulses: readonly number[] }
+) {
   expect(result.dimensions).toEqual({ width: 1920, height: 1080 });
   expect(result.presentedFrames).toBe(Math.round(duration * 30));
   expect(result.decodedFrames).toBe(result.presentedFrames + result.terminalSamples);
@@ -178,6 +186,9 @@ function checkFile(result: Inspection, duration = 10, expected?: typeof NEURAL_E
     expect(
       Math.min(...result.audio.pulses.map((pulse) => Math.abs(pulse - time)))
     ).toBeLessThanOrEqual(0.04);
+}
+function checkFile(result: Inspection, duration = 10, expected?: typeof NEURAL_EXPECTED) {
+  checkFileTransport(result, duration, expected);
   for (const sample of result.selected)
     if (sample.landmark) {
       expect(sample.landmark.count).toBeGreaterThan(30);
@@ -348,6 +359,272 @@ for (const mode of ['bicubic-sharpen', 'clark-x2'] as const) {
           description:
             'AVC/AAC source encoding is unavailable. Run the MP4 gate case on the physical target.',
         });
+    } finally {
+      host.server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
+
+const LATE_PROBES = [0.1, 0.3, 0.6, 0.9];
+const LATE_SEEKS = [0.9, 0.1, 0.6];
+const LATE_CONTROLS = [
+  {
+    name: 'optical-scene-lens',
+    window: { start: 3.7, end: 4.7 },
+    audioPulses: [0.3],
+    detail: false,
+  },
+  {
+    name: 'perspective-optical-click',
+    window: { start: 5.5, end: 6.5 },
+    audioPulses: [0.5],
+    detail: true,
+  },
+  {
+    name: 'camera-scene-optical-click',
+    window: { start: 6.9, end: 7.9 },
+    audioPulses: [0.1],
+    detail: true,
+  },
+];
+const OVERLAP_CONTROL = {
+  name: 'two-overlapping-scene-lenses',
+  window: { start: 7, end: 8 },
+  audioPulses: [0],
+  detail: true,
+};
+type LateControl = typeof OVERLAP_CONTROL;
+
+function checkLateFile(result: Inspection, control: LateControl) {
+  checkFileTransport(result, 1, control);
+  expect(result.selected).toHaveLength(LATE_PROBES.length);
+  expect(result.seeks.map((seek) => seek.time)).toEqual(LATE_SEEKS);
+  for (const [index, probe] of LATE_PROBES.entries()) {
+    expect(Math.abs(result.selected[index]!.timestamp - probe)).toBeLessThanOrEqual(0.0005 + 1e-9);
+  }
+}
+function panelDisplacement(
+  reference: readonly number[],
+  current: readonly number[]
+): number | null {
+  if (reference.length !== current.length || reference.length <= 12) return null;
+  const scores: { shift: number; score: number }[] = [];
+  for (let shift = -6; shift <= 6; shift++) {
+    let a = 0,
+      b = 0,
+      aa = 0,
+      bb = 0,
+      ab = 0,
+      count = 0;
+    for (let index = 6; index < reference.length - 6; index++) {
+      const left = reference[index]!,
+        right = current[index + shift]!;
+      if (!Number.isFinite(left) || !Number.isFinite(right)) return null;
+      a += left;
+      b += right;
+      aa += left * left;
+      bb += right * right;
+      ab += left * right;
+      count++;
+    }
+    const variance = (aa - (a * a) / count) * (bb - (b * b) / count);
+    if (variance <= 0) return null;
+    const score = (ab - (a * b) / count) / Math.sqrt(variance);
+    if (!Number.isFinite(score)) return null;
+    scores.push({ shift, score });
+  }
+  scores.sort((a, b) => b.score - a.score);
+  // Normalized double-precision correlations within 1e-9 are numerically ambiguous, not geometry proof.
+  return scores[0]!.score - scores[1]!.score <= 1e-9 ? null : scores[0]!.shift;
+}
+
+function compareLateGeometry(
+  enhanced: Inspection,
+  reference: Inspection,
+  control: LateControl,
+  fullNative = false
+) {
+  for (const probe of LATE_PROBES) {
+    const enhancedTime = fullNative ? control.window.start + probe : probe;
+    const current = enhanced.selected.find(
+      (sample) => Math.abs(sample.timestamp - enhancedTime) < 0.001
+    );
+    const original = reference.selected.find(
+      (sample) => Math.abs(sample.timestamp - probe) < 0.001
+    );
+    expect(
+      current,
+      `${control.name} enhanced source time${control.window.start + probe}`
+    ).toBeDefined();
+    expect(
+      original,
+      `${control.name} OFF source time${control.window.start + probe}`
+    ).toBeDefined();
+    expect(Math.abs(current!.timestamp - enhancedTime)).toBeLessThanOrEqual(0.0005 + 1e-9);
+    expect(Math.abs(original!.timestamp - probe)).toBeLessThanOrEqual(0.0005 + 1e-9);
+    for (const sample of [current!, original!]) {
+      expect(sample.effectRoi).toBeDefined();
+      const roi = sample.effectRoi!;
+      expect(roi.bounds).toEqual({ x: 480, y: 180, width: 960, height: 720 });
+      for (const [axis, shifted] of [
+        ['x', roi.shiftedX],
+        ['y', roi.shiftedY],
+      ] as const) {
+        const displacement = panelDisplacement(roi.boundary[axis], shifted[axis]);
+        expect(displacement, `${control.name} actual decoded +3px${axis} negative control`).toBe(3);
+        expect(Math.abs(displacement!)).toBeGreaterThan(2);
+      }
+    }
+    for (const axis of ['x', 'y'] as const) {
+      const displacement = panelDisplacement(
+        original!.effectRoi!.boundary[axis],
+        current!.effectRoi!.boundary[axis]
+      );
+      expect(
+        displacement,
+        `${control.name} unique panel boundary ${axis} alignment`
+      ).not.toBeNull();
+      expect(Math.abs(displacement!)).toBeLessThanOrEqual(2);
+    }
+    // Existing authored detail improvement remains independent of the placement measurement.
+    if (control.detail)
+      compareDetail(enhanced, { ...reference, selected: [original!] }, enhancedTime);
+  }
+}
+
+for (const variant of [undefined, 'overlapping-scene-lenses'] satisfies (
+  | EnhancementFixtureVariant
+  | undefined
+)[]) {
+  test(`remaining Clark late effect acceptance ${variant ?? 'existing full Native file'}`, async ({
+    page,
+  }, info) => {
+    test.setTimeout(900_000);
+    expect(panelDisplacement(new Array(32).fill(0), new Array(32).fill(0))).toBeNull();
+    expect(panelDisplacement(new Array(32).fill(1), new Array(32).fill(1))).toBeNull();
+    const ambiguous = Array.from({ length: 32 }, (_, index) => index % 2);
+    expect(panelDisplacement(ambiguous, ambiguous)).toBeNull();
+    const fullFile = process.env['SNIPTALE_ENHANCEMENT_NATIVE_FULL_FILE'];
+    test.skip(
+      !fullFile,
+      'Supply the completed 10-second Native Clark file; do not re-encode it for inspection.'
+    );
+    const fullBytes = variant ? null : await readFile(fullFile!);
+    const controls = variant ? [OVERLAP_CONTROL] : LATE_CONTROLS;
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1920, height: 900 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        apiBehavior: { runtimeFallback: 'typed-success' },
+      });
+      await page.goto(host.origin + OFFSCREEN_HARNESS_PATH);
+      await page.locator('[data-ui="offscreen.harness.root"][data-state="ready"]').waitFor();
+      const capabilities = await page.evaluate(() =>
+        window.__sniptaleOffscreenHarness!.enhancementProof.capabilities()
+      );
+      expect(
+        capabilities.clark,
+        capabilities.reason ?? 'Clark must execute on the acceptance target.'
+      ).toBe(true);
+      const schema = await page.evaluate(
+        (variant) => window.__sniptaleOffscreenHarness!.enhancementProof.schema(variant),
+        variant
+      );
+      expect(schema.nativeClips).toBe(6);
+      expect(schema.sceneRegions).toBe(variant ? 5 : 4);
+      expect(schema.archivedSamples).toBe(361);
+      const fixture = await page.evaluate(
+        (variant) => window.__sniptaleOffscreenHarness!.enhancementProof.createFixture(variant),
+        variant
+      );
+      let full: Inspection | undefined;
+      if (fullBytes) {
+        full = await page.evaluate(
+          ({ bytes, probes }) =>
+            window.__sniptaleOffscreenHarness!.enhancementProof.inspectFile(
+              new Blob([Uint8Array.from(bytes)], { type: 'video/webm' }),
+              { duration: 10, probes, effectRoi: true }
+            ),
+          {
+            bytes: [...fullBytes],
+            probes: controls.flatMap((control) =>
+              LATE_PROBES.map((probe) => control.window.start + probe)
+            ),
+          }
+        );
+        checkFileTransport(full);
+        await record(info, 'completed-native-full-late-rois', full);
+      }
+      await record(info, 'late-control-scope', {
+        variant: variant ?? 'existing',
+        controls,
+        outputRaster: [1920, 1080],
+        viewport: [1920, 900],
+        fps: 30,
+        shortFrames: 30,
+        probes: LATE_PROBES,
+        seeks: LATE_SEEKS,
+        roi: { x: 480, y: 180, width: 960, height: 720 },
+        geometryPolicy:
+          'Paired same-source-time actual panel boundary alignment; enhancement geometry, not an independent effect algorithm oracle.',
+      });
+      for (const control of controls) {
+        const off = await native(page, host.origin, fixture, 'off', false, false, control.window, {
+          effectRoi: true,
+        });
+        checkLateFile(off, control);
+        await record(info, `native-${control.name}-off`, off);
+        await saveOutput(page, info, `native-${control.name}-off.webm`);
+        const enhanced =
+          full ??
+          (await native(page, host.origin, fixture, 'clark-x2', false, false, control.window, {
+            effectRoi: true,
+          }));
+        if (!full) {
+          checkLateFile(enhanced, control);
+          await record(info, `native-${control.name}-clark`, enhanced);
+          await saveOutput(page, info, `native-${control.name}-clark.webm`);
+        }
+        compareLateGeometry(enhanced, off, control, Boolean(full));
+        for (const presentation of [false, true]) {
+          const route = presentation ? 'presentation' : 'ordinary';
+          const reference = await gallery(page, info, {
+            fixture,
+            mode: 'off',
+            presentation,
+            reference: false,
+            interval: control.window,
+            inspection: { effectRoi: true },
+          });
+          checkLateFile(reference, control);
+          await record(info, `gallery-${route}-${control.name}-off`, reference);
+          await saveOutput(page, info, `gallery-${route}-${control.name}-off.mp4`);
+          const result = await gallery(page, info, {
+            fixture,
+            mode: 'clark-x2',
+            presentation,
+            reference: false,
+            interval: control.window,
+            inspection: { effectRoi: true },
+          });
+          checkLateFile(result, control);
+          await record(info, `gallery-${route}-${control.name}-clark`, result);
+          await saveOutput(page, info, `gallery-${route}-${control.name}-clark.mp4`);
+          compareLateGeometry(result, reference, control);
+          expect(result.history.reads).toBeGreaterThanOrEqual(30);
+          for (const clock of [result.history.firstClock, result.history.lastClock]) {
+            expect(clock).not.toBeNull();
+            expect(clock!.sourceTime).toBeGreaterThanOrEqual(control.window.start - 1 / 30);
+            expect(clock!.sourceTime).toBeLessThanOrEqual(control.window.end + 1 / 30);
+            expect(clock!.globalResultTime).toBeGreaterThanOrEqual(control.window.start - 1 / 30);
+            expect(clock!.globalResultTime).toBeLessThanOrEqual(control.window.end + 1 / 30);
+          }
+        }
+      }
     } finally {
       host.server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>

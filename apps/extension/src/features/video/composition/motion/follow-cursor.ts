@@ -118,6 +118,14 @@ interface WorkingZoneCameraInput extends WorkingZoneCameraBoundaries {
   fallback?: CameraPanPoint;
 }
 
+/** The same bounded expansion candidates apply to regions and their connecting gaps. */
+export function cameraExpansionScales(targetScale: number, policy: ResolvedCameraFollowPolicy) {
+  const minimum = Math.max(1, Math.min(targetScale, policy.settings.minimumScale));
+  return !policy.settings.allowExpansion || minimum === targetScale
+    ? []
+    : [0.75, 0.5, 0.25, 0].map((fraction) => minimum + (targetScale - minimum) * fraction);
+}
+
 export function planWorkingZoneCamera(input: WorkingZoneCameraInput): WorkingZoneCameraPlan {
   const nominal = planWorkingZoneCameraAtScale(input);
   // A shared boundary uses its neighbor's nominal scale.
@@ -129,12 +137,10 @@ export function planWorkingZoneCamera(input: WorkingZoneCameraInput): WorkingZon
     input.outgoing
   )
     return nominal;
-  const minimum = Math.max(1, Math.min(input.targetScale, input.policy.settings.minimumScale));
-  if (minimum === input.targetScale) return nominal;
-  for (const fraction of [0.75, 0.5, 0.25, 0]) {
+  for (const targetScale of cameraExpansionScales(input.targetScale, input.policy)) {
     const expanded = planWorkingZoneCameraAtScale({
       ...input,
-      targetScale: minimum + (input.targetScale - minimum) * fraction,
+      targetScale,
     });
     if (expanded.status === 'ready') return expanded;
   }

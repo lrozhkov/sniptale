@@ -578,22 +578,22 @@
       "file": "apps/extension/src/features/video/composition/motion/project-follow.ts",
       "symbol": "<file>",
       "owner": "composition:motion",
-      "reason": "tool-noise: This file owns the existing readonly follow plan and its geometry cache. The candidate maps source clocks before the same plan lookup. Its three state signals remain disposable plan caches, without durable writers or independent recovery. Main inspected this exact implementation. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "c7ef3f4e5888d003578aaf74f9ad700cb75caaf235c69efe478be8c4576dc4d2",
-      "signatureHash": "32bd3e67233c3986f0027472e6b6ee5a77ee6bfcc2628cfbdcc910fc2635c301"
+      "reason": "tool-noise: This file owns Native follow-plan construction, endpoints, admission and its disposable cache. Each plan entry retains at most four derived link results. Admission and drawing consume the same fit. No durable writer or independent resource lifetime enters this owner. Independent source review supports Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, projection policy, cache authority, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "1b78db22ca09d3c08ed26fd6625c664cfc6af9d96a6abfedc0fd69095e6c80f2",
+      "signatureHash": "b73890040dfbe2b068b1ab1ab4c16b15c51e1400a3f792ac6e0aa3a81d892262"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/features/video/composition/motion/source-window.test.ts",
       "symbol": "<file>",
       "owner": "composition:motion:proof",
-      "reason": "tool-noise: This file compares one source-window geometry contract with Gallery. Each case creates its own project and captured cursor. Reported state signals count isolated fixtures. The candidate adds source attachment cases to the same geometry receiver.",
-      "removalCondition": "Remove when this AST or signature changes. Reassess any new owner, writer, resource lifetime, result, or recovery. Remove when analysis models this cohesive operation. Independent architecture review must assess this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "3d0ea476b0ddcaa998dd32541f73a2ad2f08e7aeafeac1341ddb4ae54b70b4c8",
-      "signatureHash": "76b80d6a6e51b34f6ce67c3d27d365f04b37b8bed438358d84299b115960d6cb"
+      "reason": "tool-noise: The existing fragment matrix explicitly disables expansion. Unchanged conflict assertions retain rotations, cursor excursions, instant links, interval exclusion, attachment geometry and authored immutability. The companion suite checks expansion-enabled admission. State signals remain local source-window fixtures. No independent lifecycle or responsibility enters this file. Independent source review supports Keep. Final architecture review must check this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent fixture, admission policy, proof selection, writing, resource ownership or recovery. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "2ecba31bfcb9526441cb02d185f26e3e0c0f2c91823d4ada4de8ef70f59622c9",
+      "signatureHash": "e7e9a0cedcd7abb30139371e1f08cf629295877c7cf5a1cf4a93917c6942a6f7"
     },
     {
       "rule": "structural-file-risk",
@@ -633,11 +633,11 @@
       "file": "apps/extension/src/features/video/review/advanced/scene.ts",
       "symbol": "<file>",
       "owner": "extension:features:video-review",
-      "reason": "tool-noise: This is the canonical scene geometry and camera algebra owner. Crop transforms use the existing layout and source coordinate contract. The file has no UI, I/O, persistence or resource lifetime. Its helpers change with the same projection contract. Independent read-only diagnosis checked this boundary. Final architecture review must validate the complete candidate.",
-      "removalCondition": "Remove when the exact body or signature changes. Reassess any new independent state, effect, writer, recovery authority or projection contract. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-10-14",
-      "astHash": "b3bfd4e08731d54338a2db5e4216ce2a2e04d98aad7274872514c83690362619",
-      "signatureHash": "ac85b7bd27e76539dba10ee4e48a88fe9b0bad560b7b6a8d98ee6db384706542"
+      "reason": "tool-noise: The existing scene cache carries a proved fit beside its conflict result. Drawing evaluates that fit and preserves spatial application. Layout, endpoints, admission and drawing retain one Gallery camera contract. No UI, persistence, I/O or independent resource authority enters this file. Independent source review supports Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, projection policy, cache authority, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "eea8ba1bbfe0f34c6fe2b4e9afa5e7f2fdb7dced9f9fde9d10feb4b24ca1a655",
+      "signatureHash": "364f6bbde30c5050388e6a66f5207d575f395dd5b7c1ede19a1940e9b68abcb1"
     },
     {
       "rule": "structural-file-risk",
@@ -1359,10 +1359,10 @@
       "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
       "symbol": "<file>",
       "owner": "tooling:qa",
-      "reason": "tool-noise: The file is the declarative LOCAL_OWNER_MAPPINGS array. Current diff renames the common unlock-request store/parser owner paths and adds lifecycle/authorization tests to each exact mapping. It contains no functions, mutable service, runtime IO, fallback registry or new waiver mechanism. Keep one canonical focused-proof mapping inventory. Splitting a static registry at a line threshold would create arbitrary navigation and no behavior boundary. Fresh complete-candidate architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST/body or signature changes. Reassess any new independent writer, state receiver, transport, recovery, resource, fixture setup/cleanup or protocol authority. Remove when analyzer models this cohesive transaction, registry or fixture shape. This investigation does not renew allowances: main must bind final normalized AST/signature hashes and obtain independent final architecture review after checkpoint passes.",
-      "reviewDate": "2026-11-02",
-      "astHash": "0311237f3b8b9c3e04711e10cfa6cf7f43115b02a7704e16282b461cb4457771",
+      "reason": "tool-noise: This file remains the declarative LOCAL_OWNER_MAPPINGS inventory. The exact project-follow mapping adds full-project and exported-fragment admission proof for a missing consumer. It adds no exclusion, threshold change, cross-owner waiver, executable behavior or new registry. Keep the canonical inventory together. Independent source review supports Keep. Final architecture review must check this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent fixture, admission policy, proof selection, writing, resource ownership or recovery. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "e5fbbdfb6835fd2d23e23ee960139240bee35168be8145b14050296996c108bf",
       "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
     },
     {
@@ -2679,22 +2679,11 @@
       "file": "apps/extension/src/features/video/composition/motion/index.ts",
       "symbol": "resolveConnectingCamera",
       "owner": "composition:motion",
-      "reason": "tool-noise: This pure resolver interpolates one concrete camera connection. The source-window branch conjugates both endpoints through the current clip plane. The scene branch preserves legacy interpolation. Missing clip or endpoint returns null. The optional spatial and blur branches compose one frame without effects, mutable state or independent recovery. Main inspected this exact implementation. Independent architecture review must check this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any new owner, state authority, effect or recovery lifetime. Remove when the analyzer models this cohesive receiver. Independent architecture review must check this classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "eb26fac01c7f429d96f7903687059d812e88d204179a10962dfc81b5a73f4897",
+      "reason": "tool-noise: One connection resolver converts endpoint or fitted geometry into the current camera. It retains authored spatial interpolation and existing overlay fields. The disposable cache remains in project-follow.ts. Fit evaluation adds no rendering authority. Independent source review supports Keep. Final architecture review must check this exact binding. Cursor endpoint eligibility matches export admission. Manual connections keep their nominal path.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, projection policy, cache authority, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "a67ada447f68942a24353236b20c721d69b054c368d8c9cebc28a44bd3e25e05",
       "signatureHash": "37dde7f5c20374c27c241e514685392cd079422da64e09ceb7ed2521658165a7"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/composition/motion/index.ts",
-      "symbol": "resolveVideoCompositionCamera",
-      "owner": "composition:motion",
-      "reason": "tool-noise: This resolver produces one camera frame. It first maps retained playback into a readonly source context, then uses the existing camera operation. Derived observations confer no persistence, resource or recovery authority. Main inspected this exact implementation. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "9043079563a7eb54bf24d6fbc396ea61b98bebd8a6c73532c3ab1061bba31a31",
-      "signatureHash": "40a97668312cca68cbb4b5f4e9aaf1a061ed96f550635aedbd54936e4887d342"
     },
     {
       "rule": "structural-function-risk",
@@ -2734,22 +2723,11 @@
       "file": "apps/extension/src/features/video/composition/motion/spatial-projection-bounds.test.ts",
       "symbol": "describe callback",
       "owner": "extension:app-core:features",
-      "reason": "tool-noise: This callback groups projection bounds tests with one shared geometry fixture. It owns no runtime state or effects. The added cases compare follow derivatives with rendered positions. Splitting the callback only to reduce its length would separate the same mathematical contract.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any new state authority, effect, recovery policy, or independent responsibility. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-14",
-      "astHash": "48a8d6cbdf746ed5cf12a39fe13a77130572bb22c21b5cd6f7d628e9d0d03abc",
+      "reason": "tool-noise: This callback groups projection mathematics around one shared fixture. Added assertions distinguish the authored spatial clock from automatic scale and pan derivatives. The callback owns no runtime state, effects or recovery. Its length does not establish an independent responsibility. Independent source review supports Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, projection policy, cache authority, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "beaf0ab9be868e82b76ee079e775f9dfe4b0cda0e56d35e1aadb2cdde3f6a703",
       "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
-      "symbol": "createWindowCameraGeometry",
-      "owner": "composition:motion",
-      "reason": "tool-noise: This factory returns one immutable window geometry receiver. Phase, pan, containment and derivative closures share one window, region, output and policy. A held phase requires its boundary in the same proof cells. No independent writer, effect or recovery applies. Main inspected this exact implementation. Independent architecture review must assess this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent owner, writer, state authority, resource lifetime, effect or recovery. Remove when the analyzer models this cohesive receiver.",
-      "reviewDate": "2026-10-23",
-      "astHash": "c4c6ea65ccccc2d090431c2d52df121c48d526bee403a54044a7ff483a600509",
-      "signatureHash": "f33198130165d0ccacb82f7558345429ed1abaa3027b272694af666606a7d1a8"
     },
     {
       "rule": "structural-function-risk",
@@ -2937,17 +2915,6 @@
       "reviewDate": "2026-11-01",
       "astHash": "5094e4ae899a2fa16ad7dfb67e148bb29ecf95a966c182757d3db221fe1dd00b",
       "signatureHash": "346d804c14ab0289db12c220cacfd66ba4e5301510c52178259b0d1bb8c74a0d"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/features/video/review/advanced/camera-geometry.ts",
-      "symbol": "createReviewWorkingZoneCameraGeometry",
-      "owner": "extension:feature:video:review",
-      "reason": "tool-noise: This factory binds one Gallery geometry snapshot. Its parent lines include returned geometry methods and phase closures. The analyzer measures those methods separately. The parent has 14 statements, no effects or state, and one owner. Phase selection and raster modes belong to this adapter. A forwarding factory split would retain every closure and add navigation. Projection parity and continuous admission tests prove those methods. The architecture reviewer must assess this classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess new authority, independent responsibilities, or method growth. Remove when the analyzer separates parent and nested method line counts.",
-      "reviewDate": "2026-10-14",
-      "astHash": "1c78cd78d0f8d7182c0e6068ec7d39174dbeeb9bb427684e4231f458e5bee2a8",
-      "signatureHash": "d7eedef8ad30f228812a1c1dfd6213c1bd5617c0ae6336b72ea201f8ef198fee"
     },
     {
       "rule": "structural-function-risk",
@@ -5704,22 +5671,11 @@
       "file": "tooling/test/harness/export-enhancement.ts",
       "symbol": "<file>",
       "owner": "tooling:test:harness",
-      "reason": "tool-noise: One source and pose contract drives fixture construction, export and inspection. Container grammar has a separate pure owner. The serial spec saves each retained output before replacement. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "01b1aaa30a4153a852cfeb97845b55f3aa1e4a420a99605465bc0e5af383c0fa",
-      "signatureHash": "a2489125d1a196f6224c59c6fc48e812c246ced5a377baf9afd7bf9725db6921"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "tooling/test/harness/export-enhancement.ts",
-      "symbol": "inspectEnhancementOutput",
-      "owner": "tooling:test:harness",
-      "reason": "tool-noise: One transaction inspects a completed encoded artifact. Timing, detail, packet, audio and seek evidence share the same buffers. Each decoder and sample retains its existing cleanup. Independent wrapper diagnosis supports this classification. Final architecture review must check this binding.",
-      "removalCondition": "Remove this record when its AST or signature changes. Reassess any separate writer, queue, publication, recovery or resource lifetime. Remove it when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-04",
-      "astHash": "e9c901a5eda1f661108a4392b607fca8cd88b9a31dab96cf86c58e076a542cfb",
-      "signatureHash": "7d32867fa527d2d3646e8eebf53c8e9e099097f9033da9643ccdcc652a54b233"
+      "reason": "tool-noise: This file retains one enhancement fixture, export and inspection contract. Panel profiles and translated controls use the existing decoded canvas. Integral images, blur buffers and profiles are local numerical scratch. They add no fixture, writer, cache or retained resource lifetime. Default inspection and existing decoder cleanup remain unchanged. Independent source review supports Keep. Final architecture review must check this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent fixture, source selection, scheduling, geometry measurement, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "c4459703d5b283874de1bcb4e837e5642a7b4cd69186d6740910ca15a9f7d2b9",
+      "signatureHash": "b12e516e259aa0880d3b73f2a9d93ea32c874726b6bb7a2d6b196d18f5ecb8fe"
     },
     {
       "rule": "structural-file-risk",
@@ -6441,10 +6397,10 @@
       "file": "apps/extension/src/gallery/video-review/zoom-preview-gpu.test.ts",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One focus-preview acceptance suite connects projection, renderer input, readiness, request replacement and source lifetime. Compatibility uses the same source fixtures and controlled completions. Independent diagnosis found no unrelated workflow or support owner. Fresh architecture review must assess this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent acquisition, scheduling, publication, recovery or resource authority. Reassess an unrelated workflow or reusable fixture owner. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One preview GPU fixture checks source, frame and publication ownership. The changes preserve exact frame identity and type one existing mock. They add no fixture or lifecycle owner. Independent structural validation classified this owner as Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess any independent fixture, source selection, scheduling, writer, publication, recovery or resource lifetime. Remove when the analyzer models this cohesive boundary. Revert this binding if its candidate is reverted.",
       "reviewDate": "2026-11-09",
-      "astHash": "bfef7a81f91b88fd9d556ccf1d0592ea9732c6b82a4b27a33366452f858e457d",
+      "astHash": "aadef2850208f02ce32464dc363a3c81931af70cfd31f107c9800e5e634c2db4",
       "signatureHash": "e50ca9755787ba938261f30f60fb9a0bc0a19313ad07e13b677195b26f454785"
     },
     {
@@ -6632,6 +6588,50 @@
       "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-09",
       "astHash": "5d465871f95a24f18e5c766766c798857843d0f1cde89b5ed29f21095459c22a",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/motion/project-follow.test.ts",
+      "symbol": "<file>",
+      "owner": "composition:motion",
+      "reason": "tool-noise: These tests exercise one Native follow-plan boundary. Counted state consists of local projects, clips and expected candidates. Expansion cases check refusal, admission, visibility, cache reuse and unchanged authored data. They add no independent fixture lifetime. Independent source review supports Keep. Final architecture review must check this exact binding. The same fixture checks public export admission and rendered temporary-fit behavior against one conflict contract. Recorded cursor movement cannot change a manual camera under either expansion setting.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, projection policy, cache authority, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "2247b731ff9cd74ce0c3bf18459d5c4752be02bea56a17952a758e47ec290d0f",
+      "signatureHash": "823f3f95a51f097c4dea6885e7ad16fe7479ec0455f88c57c1c34b501d7fe7f7"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/motion/project-follow.ts",
+      "symbol": "resolveProjectWindowCameraLink",
+      "owner": "composition:motion",
+      "reason": "tool-noise: One link operation checks endpoints and maps source and output geometry. It resolves policy and observations, invokes the shared planner and caches its result. The mutable receiver belongs to the existing plan entry. Admission and drawing consume one conflict or fit result. Independent source review supports Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, projection policy, cache authority, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "1e14a8a4dd85918150c28963557c93441a7c8238a8ff88ad83e845d78bb98cda",
+      "signatureHash": "a48947fc867c438004d1ea5b72283d39afb86b610cbe159cd671e87e68d89e06"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/motion/window-camera-geometry.ts",
+      "symbol": "<file>",
+      "owner": "composition:motion",
+      "reason": "tool-noise: This owner defines source-window projection and continuous admission. Fit planning reuses existing geometry, proof and expansion candidates. The evaluator consumes the admitted trajectories. Candidate poses and bounds are local derived values. Failed fitting retains the nominal conflict. No independent cache, writer or resource lifetime enters this owner. Independent source review supports Keep. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, projection policy, cache authority, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "2f8ade5bd576dfba755d0d580d91c85975a645e7c30035b0258cb8a3ff97d42f",
+      "signatureHash": "a802486e18ba7014c8ec19985503e8f6dc5fdb38cfeb4211a2f7c410cd5cfd16"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-export-enhancement.spec.ts",
+      "symbol": "test callback#2",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One late-export scenario compares the same source times across Native and Gallery routes. Named helpers own transport, geometry, correlation and detail calculations. Translated decoded pixels and ambiguous profiles check its geometry oracle. Host cleanup remains in finally. The scenario saves each output before replacement. No independent scheduling or resource authority enters this scenario. Independent source review supports Keep. Final architecture review must check this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent fixture, source selection, scheduling, geometry measurement, writing, publication, recovery or resource ownership. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "c1c81211f915aa1ce3ddd1d3de4952dde47f05038d2b7922dd39af7d34a32d60",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     }
   ]
