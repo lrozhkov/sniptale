@@ -1,14 +1,13 @@
-import {
-  ALL_FORMATS,
-  BlobSource,
-  Input,
-  VideoSampleSink,
-  type InputAudioTrack,
-  type VideoSample,
-} from 'mediabunny';
+import { ALL_FORMATS, BlobSource, Input, type InputAudioTrack, VideoSample } from 'mediabunny';
 import type { QuickEditPresentationSettings } from '../../features/video/review/advanced/presentation';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
-import { createReviewDecodedSampleSink } from './decoded-video-sample';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+  type PreviewSourceLease,
+} from '../video/preview-source';
+import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
+import { reviewExportPhase } from './export-diagnostics';
 import { drawReviewPresentationFrame } from './presentation-frame';
 
 type Slot = Exclude<QuickEditPresentationSettings['intro'], { mode: 'none' }>;
@@ -92,7 +91,9 @@ export async function createReviewPresentationMedia(args: {
   let bitmap: ImageBitmap | null = null;
   let sample: VideoSample | null = null;
   let currentLease: PresentationMediaFrame | null = null;
-  let sink: ReturnType<typeof createReviewDecodedSampleSink> | null = null;
+  let provider: PreviewSourceProvider | null = null;
+  let sourceLease: PreviewSourceLease | null = null;
+  let sourceUrl: string | null = null;
   let audioTrack: InputAudioTrack | null = null;
   let resolution = 0;
   const assertLive = () => {
@@ -103,8 +104,18 @@ export async function createReviewPresentationMedia(args: {
     if (disposed) return;
     disposed = true;
     currentLease?.release();
-    sample?.close();
-    sample = null;
+    // An uncancellable clone normalization owns its resources until frame() settles.
+    if (!pending) {
+      sample?.close();
+      sample = null;
+      sourceLease?.release();
+      sourceLease = null;
+    }
+    provider?.dispose();
+    if (sourceUrl) {
+      URL.revokeObjectURL(sourceUrl);
+      sourceUrl = null;
+    }
     bitmap?.close();
     bitmap = null;
     input?.dispose();
@@ -133,14 +144,11 @@ export async function createReviewPresentationMedia(args: {
         throw new PresentationMediaError('metadata');
       input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
       const admitted = await admitVideo(input, slot.video);
-      const { track, audio, resolution: admittedResolution } = admitted;
+      const { audio, resolution: admittedResolution } = admitted;
       resolution = admittedResolution;
       assertLive();
-      sink = createReviewDecodedSampleSink(
-        new VideoSampleSink(track),
-        signal,
-        await track.getDecoderConfig()
-      );
+      sourceUrl = URL.createObjectURL(blob);
+      provider = createPreviewSourceProvider();
       audioTrack = audio[0] ?? null;
     }
   } catch (error) {
@@ -168,6 +176,7 @@ export async function createReviewPresentationMedia(args: {
       )
         throw new PresentationMediaError('mapping');
       pending = true;
+      let raw: VideoFrame | undefined;
       try {
         if (slot.mode === 'video' && mapping.kind === 'video') {
           const { start, end } = mapping.range;
@@ -182,21 +191,49 @@ export async function createReviewPresentationMedia(args: {
             (mapping.holdLast ? start !== trim.end || end !== trim.end : start >= trim.end)
           )
             throw new PresentationMediaError('mapping');
-          // Track ticks, rather than an arbitrary epsilon, define the half-open endpoint.
-          const time = mapping.holdLast
-            ? (Math.ceil(trim.end * resolution) - 1) / resolution
-            : start;
-          if (time < trim.start || time >= trim.end) throw new PresentationMediaError('mapping');
-          const decoded = await sink!.getSample(time);
-          if (!decoded) throw new PresentationMediaError('decode');
-          sample = decoded;
+          // Keep the existing container-tick admission for a retained window with no representable endpoint.
+          const finalTick = (Math.ceil(trim.end * resolution) - 1) / resolution;
+          if (mapping.holdLast && finalTick < trim.start)
+            throw new PresentationMediaError('mapping');
+          const time = mapping.holdLast ? trim.end : start;
+          sourceLease = await reviewExportPhase(signal, 'decode', () =>
+            provider!.acquire(
+              [
+                {
+                  id: 'bookend',
+                  url: sourceUrl!,
+                  time,
+                  rangeEnd: trim.end,
+                  ...(mapping.holdLast ? { endpoint: 'retained-end' as const } : {}),
+                },
+              ],
+              signal
+            )
+          );
+          assertLive();
+          const binding = sourceLease?.bindings.get('bookend');
+          if (!binding?.source.toVideoFrame) throw new PresentationMediaError('decode');
+          const effective = binding.sampleTime ?? time;
+          if (
+            binding.target !== time ||
+            ![binding.timestamp, binding.nextTimestamp, effective].every(Number.isFinite) ||
+            binding.nextTimestamp <= binding.timestamp ||
+            binding.timestamp >= trim.end ||
+            binding.nextTimestamp <= trim.start ||
+            (mapping.holdLast && (!binding.heldAtRetainedEnd || binding.nextTimestamp < trim.end))
+          )
+            throw new PresentationMediaError('metadata');
+          raw = binding.source.toVideoFrame();
+          const borrowed = new VideoSample(raw, {
+            timestamp: binding.timestamp,
+            rotation: binding.source.orientation?.rotation ?? 0,
+            flip: binding.source.orientation?.flip ?? false,
+          });
+          raw = undefined;
+          sample = await prepareDecodedVideoSample(borrowed, signal);
           assertLive();
           if (
             !Number.isFinite(sample.timestamp) ||
-            !Number.isFinite(sample.duration) ||
-            sample.duration <= 0 ||
-            sample.timestamp > time ||
-            sample.timestamp + sample.duration <= time ||
             sample.displayWidth !== slot.video.source.width ||
             sample.displayHeight !== slot.video.source.height
           )
@@ -204,6 +241,7 @@ export async function createReviewPresentationMedia(args: {
         }
         let released = false;
         const heldSample = sample;
+        const heldSource = sourceLease;
         const source = slot.mode === 'image' ? slot.image : slot.video.source;
         const lease: PresentationMediaFrame = {
           draw(context) {
@@ -255,15 +293,20 @@ export async function createReviewPresentationMedia(args: {
             if (released) return;
             released = true;
             heldSample?.close();
+            heldSource?.release();
             if (sample === heldSample) sample = null;
+            if (sourceLease === heldSource) sourceLease = null;
             if (currentLease === lease) currentLease = null;
           },
         };
         currentLease = lease;
         return lease;
       } catch (error) {
+        raw?.close();
         sample?.close();
         sample = null;
+        sourceLease?.release();
+        sourceLease = null;
         if (!(error instanceof PresentationMediaError) || error.code !== 'mapping') dispose();
         signal.throwIfAborted();
         throw error instanceof PresentationMediaError

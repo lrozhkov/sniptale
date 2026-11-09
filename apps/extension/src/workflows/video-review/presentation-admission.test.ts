@@ -245,3 +245,74 @@ it('accepts native samples crossing a trim boundary when they cover the requeste
   expect(result.source.duration).toBe(12);
   expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
 });
+
+it.each([0, 0.01])('admits bounded leading PTS without changing trim start %s', async (start) => {
+  vi.spyOn(InputVideoTrack.prototype, 'getFirstTimestamp').mockResolvedValue(0.017);
+  const frames: ReturnType<typeof sample>[] = [];
+  decode.mockImplementation(async (time: number) => {
+    if (time < 0.017) return null;
+    const frame = sample(time);
+    frames.push(frame);
+    return frame;
+  });
+  const trim = { start, end: 2 };
+  const result = await inspectReviewPresentationVideo(
+    await fixture(),
+    new AbortController().signal,
+    { trim }
+  );
+  expect(result.source.duration).toBe(12);
+  expect(trim).toEqual({ start, end: 2 });
+  expect(decode.mock.calls[0]).toEqual([0.017]);
+  expect(frames).toHaveLength(2);
+  expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
+});
+
+it.each([0.2, NaN, Infinity])('rejects an unverified leading PTS %s', async (first) => {
+  let complete!: (time: number) => void;
+  const pending = vi.spyOn(InputVideoTrack.prototype, 'getFirstTimestamp').mockReturnValue(
+    new Promise((resolve) => {
+      complete = resolve;
+    })
+  );
+  decode.mockImplementation(async (time: number) => (time === 0 ? null : sample(time)));
+  const dispose = vi.spyOn(Input.prototype, 'dispose');
+  const operation = inspectReviewPresentationVideo(await fixture(), new AbortController().signal);
+  await vi.waitFor(() => expect(pending).toHaveBeenCalledOnce());
+  expect(decode).not.toHaveBeenCalled();
+  complete(first);
+  await expect(operation).rejects.toMatchObject({
+    code: 'decode',
+    message: 'presentation-media:decode',
+  });
+  expect(decode.mock.calls.every(([time]) => time === 0)).toBe(true);
+  expect(dispose).toHaveBeenCalledOnce();
+});
+
+it('cancels a pending leading metadata probe before sample acquisition', async () => {
+  let complete!: (time: number) => void;
+  const first = vi.spyOn(InputVideoTrack.prototype, 'getFirstTimestamp').mockReturnValue(
+    new Promise((resolve) => {
+      complete = resolve;
+    })
+  );
+  const controller = new AbortController();
+  const operation = inspectReviewPresentationVideo(await fixture(), controller.signal);
+  await vi.waitFor(() => expect(first).toHaveBeenCalledOnce());
+  controller.abort();
+  await expect(operation).rejects.toMatchObject({ name: 'AbortError' });
+  complete(0.017);
+  await Promise.resolve();
+  expect(decode).not.toHaveBeenCalled();
+});
+
+it('rejects a trim ending before the verified first frame', async () => {
+  vi.spyOn(InputVideoTrack.prototype, 'getFirstTimestamp').mockResolvedValue(0.017);
+  decode.mockImplementation(async (time: number) => (time < 0.017 ? null : sample(time)));
+  await expect(
+    inspectReviewPresentationVideo(await fixture(), new AbortController().signal, {
+      trim: { start: 0, end: 0.01 },
+    })
+  ).rejects.toMatchObject({ code: 'decode' });
+  expect(decode).toHaveBeenCalledWith(0);
+});

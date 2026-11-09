@@ -1,5 +1,6 @@
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from 'mediabunny';
 import type { ReviewSource } from '../../features/video/review/types';
+import { readPreviewSourceLeadingSampleTime } from '../video/preview-source';
 
 type Failure =
   | 'size'
@@ -104,10 +105,12 @@ async function inspect(
     throw new ReviewPresentationAdmissionError('trim');
   const last = (Math.ceil(trim.end * resolution) - 1) / resolution;
   if (last < trim.start) throw new ReviewPresentationAdmissionError('trim');
+  const leading = await readPreviewSourceLeadingSampleTime(video, trim.end, signal);
   const sink = new VideoSampleSink(video);
   for (const time of [trim.start, last]) {
     signal.throwIfAborted();
-    const sample = await sink.getSample(time);
+    const probeTime = leading === undefined ? time : Math.max(time, leading);
+    const sample = await sink.getSample(probeTime);
     try {
       signal.throwIfAborted();
       if (
@@ -115,8 +118,8 @@ async function inspect(
         !Number.isFinite(sample.timestamp) ||
         !Number.isFinite(sample.duration) ||
         sample.duration <= 0 ||
-        sample.timestamp > time ||
-        sample.timestamp + sample.duration <= time ||
+        sample.timestamp > probeTime ||
+        sample.timestamp + sample.duration <= probeTime ||
         sample.displayWidth !== width ||
         sample.displayHeight !== height
       )

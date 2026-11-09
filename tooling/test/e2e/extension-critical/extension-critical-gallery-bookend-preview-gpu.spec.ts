@@ -1,4 +1,8 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, dirname } from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { resolveMediaFitFrame } from '../../../../apps/extension/src/features/video/project/window-geometry';
@@ -576,6 +580,339 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))
       );
+    }
+  });
+}
+
+/** Encode twenty colored frames, then remux PTS while retaining their shorter nominal duration. */
+function createVfrBookendControl(output: string, leading: number) {
+  const source = join(dirname(output), 'source-cfr.webm');
+  execFileSync(
+    '/usr/bin/ffmpeg',
+    [
+      '-v',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      'color=c=red:s=160x90:r=10:d=1',
+      '-f',
+      'lavfi',
+      '-i',
+      'color=c=blue:s=160x90:r=10:d=1',
+      '-filter_complex',
+      '[0:v][1:v]concat=n=2:v=1:a=0[v]',
+      '-map',
+      '[v]',
+      '-r',
+      '10',
+      '-frames:v',
+      '20',
+      '-c:v',
+      'libvpx',
+      '-deadline',
+      'realtime',
+      '-cpu-used',
+      '8',
+      '-threads',
+      '1',
+      '-g',
+      '10',
+      '-b:v',
+      '200k',
+      '-an',
+      '-fflags',
+      '+bitexact',
+      '-flags:v',
+      '+bitexact',
+      '-y',
+      source,
+    ],
+    { timeout: 10_000 }
+  );
+  execFileSync(
+    '/usr/bin/ffmpeg',
+    [
+      '-v',
+      'error',
+      '-i',
+      source,
+      '-map',
+      '0:v:0',
+      '-an',
+      '-c:v',
+      'copy',
+      '-bsf:v',
+      'setts=pts=3*PTS:dts=3*DTS',
+      '-output_ts_offset',
+      String(leading),
+      '-fflags',
+      '+bitexact',
+      '-y',
+      output,
+    ],
+    { timeout: 10_000 }
+  );
+  const probe: unknown = JSON.parse(
+    execFileSync(
+      '/usr/bin/ffprobe',
+      [
+        '-v',
+        'error',
+        '-select_streams',
+        'v:0',
+        '-show_packets',
+        '-show_entries',
+        'packet=pts_time,duration_time',
+        '-of',
+        'json',
+        output,
+      ],
+      { encoding: 'utf8', timeout: 10_000, maxBuffer: 128 * 1024 }
+    )
+  );
+  if (!probe || typeof probe !== 'object' || !('packets' in probe) || !Array.isArray(probe.packets))
+    throw new Error('The VFR control packet inventory is unavailable');
+  const packets = probe.packets
+    .map((packet: unknown) => {
+      if (
+        !packet ||
+        typeof packet !== 'object' ||
+        !('pts_time' in packet) ||
+        !('duration_time' in packet) ||
+        typeof packet.pts_time !== 'string' ||
+        !packet.pts_time.trim() ||
+        typeof packet.duration_time !== 'string' ||
+        !packet.duration_time.trim()
+      )
+        throw new Error('The VFR control packet metadata is invalid');
+      const timestamp = Number(packet.pts_time),
+        duration = Number(packet.duration_time);
+      if (!Number.isFinite(timestamp) || !Number.isFinite(duration) || duration <= 0)
+        throw new Error('The VFR control packet time is invalid');
+      return { timestamp, duration };
+    })
+    .sort((left, right) => left.timestamp - right.timestamp);
+  expect(packets.map((packet) => packet.timestamp)).toEqual(
+    Array.from({ length: 20 }, (_, index) => (index * 300 + Math.round(leading * 1000)) / 1000)
+  );
+  expect(packets.every((packet) => packet.duration === 0.1)).toBe(true);
+  return {
+    packetCount: packets.length,
+    firstPTS: leading,
+    nominalDuration: 0.1,
+    presentationGap: 0.3,
+    heldPTS: (2700 + Math.round(leading * 1000)) / 1000,
+    nextPTS: (3000 + Math.round(leading * 1000)) / 1000,
+  };
+}
+
+for (const leading of [0, 0.017]) {
+  test(`Gallery bookend VFR long hold and changed source keep GPU pixels${leading ? ' with leading PTS' : ''}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 1920, height: 900 });
+    const fixtureDirectory = await mkdtemp(join(tmpdir(), 'sniptale-bookend-vfr-'));
+    const host = await startHostServer().catch(async (error: unknown) => {
+      await rm(fixtureDirectory, { recursive: true, force: true });
+      throw error;
+    });
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    const review = page.locator('[data-ui="gallery.videoReview.dialog"]');
+    const fields = review.locator('[data-ui="gallery.videoReview.presentationInspector"]');
+    const intro = fields.locator(
+      `section[aria-label="${label('gallery.videoReview.presentationIntro')}"]`
+    );
+    const preview = intro.locator('[data-ui="gallery.videoReview.presentationMediaPreview"]');
+    const front = preview.locator(
+      '[data-ui="gallery.videoReview.presentationMedia.gpuHost"] [data-preview-inspector-canvas]'
+    );
+    const main = review.locator('[data-ui="gallery.videoReview.stage"] video').first();
+    const transport = () =>
+      main.evaluate((video: HTMLVideoElement) => ({
+        time: video.currentTime,
+        paused: video.paused,
+        rate: video.playbackRate,
+        source: video.currentSrc,
+      }));
+    const fixture = join(fixtureDirectory, 'bookend-vfr.webm');
+    const reference = (frameIndex: number) => {
+      const bytes = execFileSync(
+        '/usr/bin/ffmpeg',
+        [
+          '-v',
+          'error',
+          '-i',
+          fixture,
+          '-vf',
+          `select=eq(n\\,${frameIndex})`,
+          '-fps_mode',
+          'passthrough',
+          '-frames:v',
+          '1',
+          '-f',
+          'rawvideo',
+          '-pix_fmt',
+          'rgb24',
+          'pipe:1',
+        ],
+        { timeout: 10_000, maxBuffer: 128 * 1024 }
+      );
+      expect(bytes.byteLength).toBe(160 * 90 * 3);
+      return [
+        [20, 70],
+        [70, 80],
+        [40, 82],
+      ].map(([x, y]) => [...bytes.subarray((y! * 160 + x!) * 3, (y! * 160 + x!) * 3 + 3)]);
+    };
+    const error = (a: number[][], b: number[][]) =>
+      Math.max(
+        ...a.flatMap((color, index) =>
+          color.map((value, channel) => Math.abs(value - b[index]![channel]!))
+        )
+      );
+    const colors = async () => {
+      const data = await pixels(front);
+      return [
+        [20 / 160, 70 / 90],
+        [70 / 160, 80 / 90],
+        [40 / 160, 82 / 90],
+      ].map(([x, y]) => {
+        const offset = (Math.floor(y! * grid) * grid + Math.floor(x! * grid)) * 4;
+        return data.slice(offset, offset + 3);
+      });
+    };
+    try {
+      const fixtureFacts = createVfrBookendControl(fixture, leading);
+      const bytes = await readFile(fixture);
+      const red = reference(9),
+        blue = reference(10);
+      expect(error(red, blue)).toBeGreaterThan(128);
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      const filename = 'VFR bookend.webm';
+      await page
+        .locator('input[type="file"][multiple]')
+        .setInputFiles([{ name: filename, mimeType: 'video/webm', buffer: bytes }]);
+      await expect(page.getByRole('button', { name: filename, exact: true }).first()).toBeVisible();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await review
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      await review
+        .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
+        .click();
+      await intro
+        .getByRole('button', {
+          name: label('gallery.videoReview.presentationBookend'),
+          exact: true,
+        })
+        .click();
+      await intro
+        .getByRole('button', {
+          name: label('gallery.videoReview.presentationLibrary'),
+          exact: true,
+        })
+        .click();
+      const drawer = page.locator('[data-ui="gallery.videoReview.presentationLibrary.drawer"]');
+      await drawer.locator(`button[title="${filename}"]`).click();
+      await expect(drawer).toHaveCount(0);
+      await expect(fields).toHaveAttribute('aria-busy', 'false');
+      await expect(preview).toHaveAttribute('aria-busy', 'false');
+      await expect(front).toBeVisible();
+      const initial = await persisted(page),
+        mainClock = await transport();
+      const position = preview.getByRole('textbox', {
+        name: label('gallery.videoReview.presentationMediaPosition'),
+        exact: true,
+      });
+      const seek = async (time: number) => {
+        const before = await front.elementHandle();
+        if (!before) throw new Error('Previous bookend publication is unavailable');
+        try {
+          await position.fill(String(time));
+          await position.press('Enter');
+          await expect
+            .poll(() => front.evaluate((canvas, previous) => canvas !== previous, before), {
+              message: 'A valid VFR source interval must produce a new accepted GPU publication',
+            })
+            .toBe(true);
+          await expect(preview.getByRole('alert')).toHaveCount(0);
+          await expect(front).toBeVisible();
+          await expect.poll(async () => Number(await position.inputValue())).toBe(time);
+        } finally {
+          await before.dispose();
+        }
+      };
+      await seek(2.91);
+      await expect.poll(async () => error(red, await colors())).toBeLessThan(4);
+      const held = await colors();
+      await seek(3.02);
+      await expect.poll(async () => error(blue, await colors())).toBeLessThan(4);
+      const changed = await colors();
+      expect(error(held, changed)).toBeGreaterThan(128);
+      expect((await persisted(page)).history).toEqual(initial.history);
+      expect(await transport()).toEqual(mainClock);
+      await writeFile(
+        info.outputPath('gallery-bookend-vfr-source.json'),
+        JSON.stringify(
+          {
+            viewport: page.viewportSize(),
+            fixtureFacts,
+            source: {
+              generator:
+                'Twenty synthetic frames; PTS remux x3; nominal duration100ms, actual gap300ms',
+              width: 160,
+              height: 90,
+              sha256: createHash('sha256').update(bytes).digest('hex'),
+            },
+            actualRaster: await front.evaluate((canvas: HTMLCanvasElement) => ({
+              width: canvas.width,
+              height: canvas.height,
+            })),
+            held: {
+              target: 2.91,
+              expectedPTS: fixtureFacts.heldPTS,
+              nextPTS: fixtureFacts.nextPTS,
+              packetDuration: fixtureFacts.nominalDuration,
+              reference: red,
+              actual: held,
+            },
+            changed: {
+              target: 3.02,
+              expectedPTS: fixtureFacts.nextPTS,
+              nextPTS: (3300 + Math.round(leading * 1000)) / 1000,
+              reference: blue,
+              actual: changed,
+            },
+            maximumRGBDifference: Math.max(error(red, held), error(blue, changed)),
+            limitation:
+              'Independent FFmpeg pixels and actual accepted GPU publication. Controlled provider/owner proof establishes source intervals and lifetime. No FPS claim.',
+          },
+          null,
+          2
+        )
+      );
+      await preview.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('gallery-bookend-vfr-source.png'),
+        fullPage: false,
+      });
+    } finally {
+      try {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      } finally {
+        await rm(fixtureDirectory, { recursive: true, force: true });
+      }
     }
   });
 }

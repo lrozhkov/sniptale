@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
+import { createReviewExportDiagnostics } from '../video-review/export-diagnostics';
 import {
   createPreviewSourceProvider,
   PreviewSourceSupersededError,
@@ -796,3 +797,54 @@ it('disposes a source cancelled while its bounded metadata probe is pending', as
     vi.doUnmock('mediabunny');
   }
 });
+
+it.each(['open', 'decode'] as const)(
+  'retains the %s cause behind a fixed source error and controlled summary',
+  async (stage) => {
+    const cause = new Error('private decoder details');
+    const stream: PreviewSourceStream = {
+      end: 1,
+      samples() {
+        return {
+          async next(): Promise<IteratorResult<VideoSample>> {
+            throw cause;
+          },
+          [Symbol.asyncIterator]() {
+            return this;
+          },
+        };
+      },
+      dispose: vi.fn(),
+    };
+    const provider = createPreviewSourceProvider({
+      open: async () => {
+        if (stage === 'open') throw cause;
+        return stream;
+      },
+    });
+    const summary = vi.fn();
+    const attempt = createReviewExportDiagnostics(
+      { destination: 'preview', route: 'render' },
+      summary
+    );
+    try {
+      const failure = await attempt
+        .phase('decode', () => provider.acquire([demand(0.02)], signal()))
+        .catch((value: unknown) => value);
+      expect(failure).toMatchObject({
+        stage: 'decode',
+        cause: {
+          message: 'Preview source frame is unavailable.',
+          cause,
+        },
+      });
+      attempt.reportFailure(failure);
+      expect(summary).toHaveBeenCalledExactlyOnceWith(
+        'preview outcome=failed route=render destination=preview stage=decode code=decode-failed'
+      );
+      expect(summary.mock.calls[0]![0]).not.toContain('private decoder details');
+    } finally {
+      provider.dispose();
+    }
+  }
+);

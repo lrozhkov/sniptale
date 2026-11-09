@@ -103,10 +103,12 @@ export class PreviewSourceSupersededError extends DOMException {
 }
 
 const ROUNDING_SECONDS = 0.000002;
-const unavailable = () => new Error('Preview source frame is unavailable.');
+const unavailable = (cause?: unknown) =>
+  new Error('Preview source frame is unavailable.', cause === undefined ? undefined : { cause });
 const aborted = () => new DOMException('Preview source request was cancelled.', 'AbortError');
 
-async function readLeadingSampleTime(
+/** Returns the verified bounded first PTS. Callers retain the original requested time separately. */
+export async function readPreviewSourceLeadingSampleTime(
   track: InputVideoTrack,
   end: number,
   signal: AbortSignal
@@ -157,7 +159,7 @@ async function openPreviewSource(
     }
     const end = await track.computeDuration();
     signal.throwIfAborted();
-    const leadingSampleTime = await readLeadingSampleTime(track, end, signal);
+    const leadingSampleTime = await readPreviewSourceLeadingSampleTime(track, end, signal);
     const sink = createReviewDecodedSampleSink(
       new sdk.VideoSampleSink(track),
       signal,
@@ -661,7 +663,7 @@ class PreviewSourceOwner implements PreviewSourceProvider {
         (error instanceof DOMException && error.name === 'AbortError')
       )
         throw error;
-      throw unavailable();
+      throw unavailable(error);
     }
   }
 }
