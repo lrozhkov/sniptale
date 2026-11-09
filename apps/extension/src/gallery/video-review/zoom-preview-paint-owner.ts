@@ -2,8 +2,11 @@ import { VideoSample } from 'mediabunny';
 import {
   createPreviewSourceProvider,
   type PreviewSourceProvider,
-  type PreviewSourceLease,
 } from '../../workflows/video/preview-source';
+import {
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+} from '../../workflows/video/preview-html-source';
 import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
 import type { VideoPreviewRenderer } from '../../features/video/preview/preferences';
 import {
@@ -34,6 +37,7 @@ export function createZoomPreviewPaintOwner(args: {
   let disposed = false;
   let retired = false;
   let provider: PreviewSourceProvider | null = null;
+  let compatible: ReturnType<typeof createPreviewHtmlSourceProvider> | null = null;
   let acquired: ZoomPreviewGpuInput['liveSource'];
   const retire = () => {
     if (disposed && !active && !retired) {
@@ -86,34 +90,36 @@ export function createZoomPreviewPaintOwner(args: {
     const generation = revision;
     const controller = new AbortController();
     active = controller;
-    let lease: PreviewSourceLease | null = null;
+    let lease: PreparedPreviewSourceLease | null = null;
     let sample: VideoSample | undefined;
     let receipt = input;
     try {
-      if (
-        input.liveSource &&
-        typeof VideoDecoder !== 'undefined' &&
-        typeof VideoFrame !== 'undefined'
-      ) {
-        provider ??= createPreviewSourceProvider();
-        provider.retainSources(new Set([input.liveSource.url]));
+      if (input.liveSource && typeof VideoFrame !== 'undefined') {
+        const demands = [
+          {
+            id: 'zoom-preview',
+            url: input.liveSource.url,
+            time: input.liveSource.time,
+            holdSourceEnd: true as const,
+          },
+        ];
         const discontinuity =
           !acquired ||
           acquired.url !== input.liveSource.url ||
           acquired.seekRevision !== input.liveSource.seekRevision ||
           acquired.segmentStart !== input.liveSource.segmentStart;
-        lease = await provider.acquire(
-          [
-            {
-              id: 'zoom-preview',
-              url: input.liveSource.url,
-              time: input.liveSource.time,
-              holdSourceEnd: true,
-            },
-          ],
-          controller.signal,
-          { discontinuity }
-        );
+        if (typeof VideoDecoder !== 'undefined') {
+          provider ??= createPreviewSourceProvider();
+          provider.retainSources(new Set([input.liveSource.url]));
+          lease = await provider.acquire(demands, controller.signal, { discontinuity });
+        }
+        if (!lease) {
+          controller.signal.throwIfAborted();
+          compatible ??= createPreviewHtmlSourceProvider();
+          compatible.retainSources(new Set([input.liveSource.url]));
+          lease = await compatible.acquire(demands, controller.signal);
+          if (!lease) throw new Error('Inspector source binding is unavailable.');
+        }
         if (disposed || generation !== revision || controller.signal.aborted) return;
         acquired = input.liveSource;
       }
@@ -134,7 +140,14 @@ export function createZoomPreviewPaintOwner(args: {
             url: binding.url,
             target: binding.target,
             timestamp: binding.timestamp,
-            nextTimestamp: binding.nextTimestamp,
+            ...('membership' in binding
+              ? {
+                  membership: binding.membership,
+                  ...(binding.heldSourceEnd === undefined
+                    ? {}
+                    : { heldSourceEnd: binding.heldSourceEnd }),
+                }
+              : { nextTimestamp: binding.nextTimestamp }),
             ...(binding.sampleTime === undefined ? {} : { sampleTime: binding.sampleTime }),
             ...(binding.heldAtEnd === undefined ? {} : { heldAtEnd: binding.heldAtEnd }),
           }),
@@ -292,6 +305,7 @@ export function createZoomPreviewPaintOwner(args: {
       active?.abort();
       if (scheduled !== null) cancelTick(scheduled);
       provider?.dispose();
+      compatible?.dispose();
       retire();
     },
   };

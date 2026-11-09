@@ -33,7 +33,17 @@ export interface PreparedPreviewSourceLease {
   release(): void;
 }
 
-const unavailable = () => new Error('Preview source frame is unavailable.');
+type HtmlSourceRefusal =
+  | { reason: 'native-frame-not-ready'; readyState: number; seeking: boolean }
+  | {
+      reason: 'native-frame-timestamp-mismatch';
+      expectedMicroseconds: number;
+      actualMicroseconds: number;
+      packetTimeSeconds: number;
+      targetSeconds: number;
+    };
+const unavailable = (cause?: HtmlSourceRefusal) =>
+  new Error('Preview source frame is unavailable.', cause === undefined ? undefined : { cause });
 
 function awaitHtmlSource<T>(outcome: Promise<T>, signal: AbortSignal): Promise<T> {
   signal.throwIfAborted();
@@ -133,6 +143,101 @@ function openHtmlSource(url: string) {
   };
 }
 
+/** Seek completion can precede native presentation; only exact native PTS admits the owned snapshot. */
+async function capturePresentedHtmlFrame(
+  video: HTMLVideoElement,
+  seekTime: number,
+  packetTimeSeconds: number,
+  targetSeconds: number,
+  signal: AbortSignal
+): Promise<VideoFrame> {
+  const expectedMicroseconds = Math.round(packetTimeSeconds * 1_000_000);
+  const callbacks =
+    typeof video.requestVideoFrameCallback === 'function' &&
+    typeof video.cancelVideoFrameCallback === 'function';
+  const deadline = new AbortController();
+  const interest = AbortSignal.any([signal, deadline.signal]);
+  let callbackId: number | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let pending: ReturnType<typeof Promise.withResolvers<void>> | undefined;
+  let mediaFailure: Error | undefined;
+  let mismatch: HtmlSourceRefusal | undefined;
+  let retired = false;
+  let presented = false;
+  const arm = () => {
+    if (!callbacks || callbackId !== undefined || retired) return;
+    callbackId = video.requestVideoFrameCallback(() => {
+      if (retired) return;
+      callbackId = undefined;
+      presented = true;
+      const waiter = pending;
+      pending = undefined;
+      waiter?.resolve();
+    });
+  };
+  const failed = () => {
+    mediaFailure = unavailable();
+    pending?.reject(mediaFailure);
+    pending = undefined;
+  };
+  const capture = () => {
+    interest.throwIfAborted();
+    if (video.seeking || video.readyState < 2)
+      throw unavailable({
+        reason: 'native-frame-not-ready',
+        readyState: video.readyState,
+        seeking: video.seeking,
+      });
+    const candidate = new VideoFrame(video);
+    if (candidate.timestamp === expectedMicroseconds) return candidate;
+    mismatch = {
+      reason: 'native-frame-timestamp-mismatch',
+      expectedMicroseconds,
+      actualMicroseconds: candidate.timestamp,
+      packetTimeSeconds,
+      targetSeconds,
+    };
+    candidate.close();
+    return null;
+  };
+  video.addEventListener('error', failed);
+  try {
+    signal.throwIfAborted();
+    // A paused frame can present before seeked is dispatched. Keep that callback armed through seek.
+    arm();
+    if (video.currentTime !== seekTime || video.seeking) {
+      const settled = waitForVideo(video, 'seeked', interest);
+      video.currentTime = seekTime;
+      await settled;
+    }
+    const immediate = capture();
+    if (immediate) return immediate;
+    if (!callbacks) throw unavailable(mismatch);
+    timer = setTimeout(
+      () => deadline.abort(unavailable(mismatch)),
+      EFFECT_RUNTIME_RESOURCE_LIMITS.mediaDecodeTimeoutMs
+    );
+    while (true) {
+      if (mediaFailure) throw mediaFailure;
+      if (!presented) {
+        const waiter = Promise.withResolvers<void>();
+        pending = waiter;
+        arm();
+        await awaitHtmlSource(waiter.promise, interest);
+      }
+      presented = false;
+      const frame = capture();
+      if (frame) return frame;
+    }
+  } finally {
+    retired = true;
+    if (callbackId !== undefined) video.cancelVideoFrameCallback(callbackId);
+    if (timer !== undefined) clearTimeout(timer);
+    video.removeEventListener('error', failed);
+    pending = undefined;
+  }
+}
+
 /** One sampling transaction owns its raw frame and reservation until immutable admission. */
 async function captureHtmlSource(
   demand: PreviewSourceDemand,
@@ -179,15 +284,7 @@ async function captureHtmlSource(
       selection.strictEnd === undefined
         ? Math.max(selection.sampleTime ?? demand.time, packet.timestamp)
         : packet.timestamp;
-    if (video.currentTime !== seekTime || video.seeking) {
-      const settled = waitForVideo(video, 'seeked', interest);
-      video.currentTime = seekTime;
-      await settled;
-    }
-    interest.throwIfAborted();
-    if (video.seeking || video.readyState < 2) throw unavailable();
-    raw = new VideoFrame(video);
-    if (raw.timestamp !== Math.round(packet.timestamp * 1_000_000)) throw unavailable();
+    raw = await capturePresentedHtmlFrame(video, seekTime, packet.timestamp, demand.time, interest);
     reservation = reserve(raw.allocationSize());
     const original = raw;
     raw = undefined;

@@ -5,9 +5,11 @@ import {
   type PreviewSourceBinding,
 } from '../../workflows/video/preview-source';
 import {
-  prepareDecodedVideoFrame,
-  prepareDecodedVideoSample,
-} from '../../features/video/composition/draw/decoded-sample';
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+  type PreviewHtmlSourceBinding,
+} from '../../workflows/video/preview-html-source';
+import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
 import { useEffect, useState } from 'react';
 
 /** One materialized source frame, independent of the main playback element. */
@@ -16,10 +18,15 @@ export interface ZoomPreviewFrame {
   width: number;
   height: number;
   /** Scalar provenance survives the owned RGB copy; the decoded source lease does not escape. */
-  readonly selection?: Pick<
-    PreviewSourceBinding,
-    'url' | 'target' | 'timestamp' | 'nextTimestamp' | 'sampleTime' | 'heldAtEnd'
-  >;
+  readonly selection?:
+    | Pick<
+        PreviewSourceBinding,
+        'url' | 'target' | 'timestamp' | 'nextTimestamp' | 'sampleTime' | 'heldAtEnd'
+      >
+    | Pick<
+        PreviewHtmlSourceBinding,
+        'membership' | 'url' | 'target' | 'timestamp' | 'sampleTime' | 'heldAtEnd' | 'heldSourceEnd'
+      >;
 }
 
 export type ZoomPreviewFrameLoader = (
@@ -87,54 +94,68 @@ export function useZoomPreviewSource(file: File | null): ZoomPreviewFrameLoader 
     video.src = url;
     let queue: Promise<unknown> = Promise.resolve();
     let provider: PreviewSourceProvider | null = null;
+    let compatible: ReturnType<typeof createPreviewHtmlSourceProvider> | null = null;
     const load: ZoomPreviewFrameLoader = (sourceTime, requestedSignal) => {
       const signal = AbortSignal.any([owner.signal, requestedSignal]);
       const task = queue.then(async () => {
         signal.throwIfAborted();
-        if (typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined') {
-          provider ??= createPreviewSourceProvider();
-          provider.retainSources(new Set([url]));
-          const lease = await provider.acquire(
-            [{ id: 'zoom-preview', url, time: sourceTime, holdSourceEnd: true }],
-            signal,
-            { discontinuity: true }
-          );
-          if (lease) {
-            let sample: VideoSample | undefined;
-            try {
-              signal.throwIfAborted();
-              const binding = lease.bindings.get('zoom-preview');
-              if (!binding?.source.toVideoFrame)
-                throw new Error('Preview source binding is unavailable.');
-              sample = await prepareDecodedVideoSample(
-                new VideoSample(binding.source.toVideoFrame(), binding.source.orientation),
-                signal
-              );
-              signal.throwIfAborted();
-              const canvas = document.createElement('canvas');
-              canvas.width = binding.source.sourceWidth;
-              canvas.height = binding.source.sourceHeight;
-              const context = canvas.getContext('2d');
-              if (!context) throw new Error('Preview canvas is unavailable.');
-              sample.draw(context, 0, 0, canvas.width, canvas.height);
-              signal.throwIfAborted();
-              return {
-                image: canvas,
-                width: canvas.width,
-                height: canvas.height,
-                selection: Object.freeze({
-                  url: binding.url,
-                  target: binding.target,
-                  timestamp: binding.timestamp,
-                  nextTimestamp: binding.nextTimestamp,
-                  ...(binding.sampleTime === undefined ? {} : { sampleTime: binding.sampleTime }),
-                  ...(binding.heldAtEnd === undefined ? {} : { heldAtEnd: binding.heldAtEnd }),
-                }),
-              };
-            } finally {
-              sample?.close();
-              lease.release();
-            }
+        if (typeof VideoFrame !== 'undefined') {
+          const demands = [
+            { id: 'zoom-preview', url, time: sourceTime, holdSourceEnd: true as const },
+          ];
+          let lease: PreparedPreviewSourceLease | null = null;
+          if (typeof VideoDecoder !== 'undefined') {
+            provider ??= createPreviewSourceProvider();
+            provider.retainSources(new Set([url]));
+            lease = await provider.acquire(demands, signal, { discontinuity: true });
+          }
+          if (!lease) {
+            signal.throwIfAborted();
+            compatible ??= createPreviewHtmlSourceProvider();
+            compatible.retainSources(new Set([url]));
+            lease = await compatible.acquire(demands, signal);
+          }
+          let sample: VideoSample | undefined;
+          try {
+            signal.throwIfAborted();
+            const binding = lease.bindings.get('zoom-preview');
+            if (!binding?.source.toVideoFrame)
+              throw new Error('Preview source binding is unavailable.');
+            sample = await prepareDecodedVideoSample(
+              new VideoSample(binding.source.toVideoFrame(), binding.source.orientation),
+              signal
+            );
+            signal.throwIfAborted();
+            const canvas = document.createElement('canvas');
+            canvas.width = binding.source.sourceWidth;
+            canvas.height = binding.source.sourceHeight;
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error('Preview canvas is unavailable.');
+            sample.draw(context, 0, 0, canvas.width, canvas.height);
+            signal.throwIfAborted();
+            return {
+              image: canvas,
+              width: canvas.width,
+              height: canvas.height,
+              selection: Object.freeze({
+                url: binding.url,
+                target: binding.target,
+                timestamp: binding.timestamp,
+                ...('membership' in binding
+                  ? {
+                      membership: binding.membership,
+                      ...(binding.heldSourceEnd === undefined
+                        ? {}
+                        : { heldSourceEnd: binding.heldSourceEnd }),
+                    }
+                  : { nextTimestamp: binding.nextTimestamp }),
+                ...(binding.sampleTime === undefined ? {} : { sampleTime: binding.sampleTime }),
+                ...(binding.heldAtEnd === undefined ? {} : { heldAtEnd: binding.heldAtEnd }),
+              }),
+            };
+          } finally {
+            sample?.close();
+            lease.release();
           }
         }
         await waitForVideo(video, 'loadeddata', () => video.readyState >= 2, signal);
@@ -155,24 +176,14 @@ export function useZoomPreviewSource(file: File | null): ZoomPreviewFrameLoader 
         canvas.height = Math.max(1, video.videoHeight);
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Preview canvas is unavailable.');
-        if (typeof VideoFrame === 'undefined') {
-          try {
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            signal.throwIfAborted();
-            return { image: canvas, width: canvas.width, height: canvas.height };
-          } catch (error) {
-            canvas.width = canvas.height = 0;
-            throw error;
-          }
-        }
-        const frame = await prepareDecodedVideoFrame(new VideoFrame(video), signal);
         try {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
           signal.throwIfAborted();
-          context.drawImage(frame, 0, 0);
-        } finally {
-          frame.close();
+          return { image: canvas, width: canvas.width, height: canvas.height };
+        } catch (error) {
+          canvas.width = canvas.height = 0;
+          throw error;
         }
-        return { image: canvas, width: canvas.width, height: canvas.height };
       });
       queue = task.catch(() => undefined);
       return task;
@@ -181,6 +192,7 @@ export function useZoomPreviewSource(file: File | null): ZoomPreviewFrameLoader 
     return () => {
       owner.abort();
       provider?.dispose();
+      compatible?.dispose();
       video.removeAttribute('src');
       video.load();
       URL.revokeObjectURL(url);

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { createPreviewHtmlSourceProvider } from './preview-html-source';
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 
 const metadata = vi.hoisted(() => ({
   floor: vi.fn(async (time: number) => ({ timestamp: time < 0.5 ? 0.1000006 : 0.6000006 })),
@@ -44,7 +45,17 @@ vi.mock('mediabunny', () => ({
   },
 }));
 const frames: { timestamp: number; close: ReturnType<typeof vi.fn> }[] = [];
-function decoder(stale = false, pendingLoad = false) {
+function decoder(
+  stale = false,
+  pendingLoad = false,
+  notReadyOnSeek = false,
+  presentation?: {
+    timestamp: number;
+    staleSnapshots?: number;
+    captured?(): void;
+    beforeSeeked?(): void;
+  }
+) {
   const video = document.createElement('video');
   let currentTime = 0;
   Object.defineProperties(video, {
@@ -54,7 +65,12 @@ function decoder(stale = false, pendingLoad = false) {
       get: () => currentTime,
       set: (time: number) => {
         currentTime = time;
-        queueMicrotask(() => video.dispatchEvent(new Event('seeked')));
+        queueMicrotask(() => {
+          if (notReadyOnSeek)
+            Object.defineProperty(video, 'readyState', { configurable: true, value: 1 });
+          presentation?.beforeSeeked?.();
+          video.dispatchEvent(new Event('seeked'));
+        });
       },
     },
     load: { value: vi.fn() },
@@ -72,10 +88,15 @@ function decoder(stale = false, pendingLoad = false) {
       colorSpace = {};
       close = vi.fn();
       constructor() {
-        this.timestamp = stale
-          ? 100000
-          : Math.round((currentTime < 0.5 ? 0.1000006 : 0.6000006) * 1e6);
+        this.timestamp =
+          presentation?.timestamp ??
+          (stale ? 100000 : Math.round((currentTime < 0.5 ? 0.1000006 : 0.6000006) * 1e6));
+        if (presentation?.staleSnapshots) {
+          this.timestamp = 0;
+          presentation.staleSnapshots--;
+        }
         frames.push(this);
+        presentation?.captured?.();
       }
       allocationSize() {
         return metadata.bytes;
@@ -93,11 +114,14 @@ afterEach(() => {
   metadata.first = 0;
   metadata.rate = 30;
   frames.length = 0;
-  metadata.floor.mockClear();
+  metadata.floor.mockReset().mockImplementation(async (time: number) => ({
+    timestamp: time < 0.5 ? 0.1000006 : 0.6000006,
+  }));
   metadata.dispose.mockClear();
   metadata.opening.mockReset().mockResolvedValue(undefined);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 it('snapshots distinct pass packets with native rounded PTS and no invented coverage', async () => {
   const video = decoder();
@@ -126,9 +150,20 @@ it('snapshots distinct pass packets with native rounded PTS and no invented cove
 it('rejects a stale native frame instead of manufacturing membership', async () => {
   decoder(true);
   const provider = createPreviewHtmlSourceProvider();
-  await expect(
-    provider.acquire([{ id: 'a', url: 'blob:test', time: 0.2 }], new AbortController().signal)
-  ).rejects.toThrow('Preview source frame is unavailable.');
+  const failed = provider.acquire(
+    [{ id: 'a', url: 'blob:test', time: 0.2 }],
+    new AbortController().signal
+  );
+  await expect(failed).rejects.toThrow('Preview source frame is unavailable.');
+  await expect(failed).rejects.toMatchObject({
+    cause: {
+      reason: 'native-frame-timestamp-mismatch',
+      expectedMicroseconds: 100001,
+      actualMicroseconds: 100000,
+      packetTimeSeconds: 0.1000006,
+      targetSeconds: 0.2,
+    },
+  });
   expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
   provider.dispose();
 });
@@ -306,4 +341,188 @@ it.each([
   ).rejects.toThrow('Preview source frame is unavailable.');
   expect(metadata.opening).not.toHaveBeenCalled();
   provider.dispose();
+});
+
+it('keeps post-seek readiness refusal distinct from timestamp membership failure', async () => {
+  decoder(false, false, true);
+  const provider = createPreviewHtmlSourceProvider();
+  await expect(
+    provider.acquire([{ id: 'a', url: 'blob:test', time: 0.2 }], new AbortController().signal)
+  ).rejects.toMatchObject({
+    message: 'Preview source frame is unavailable.',
+    cause: { reason: 'native-frame-not-ready', readyState: 1, seeking: false },
+  });
+  expect(frames).toHaveLength(0);
+  expect(metadata.dispose).toHaveBeenCalledOnce();
+  provider.dispose();
+});
+
+function presentedDecoder() {
+  const captured = Promise.withResolvers<void>();
+  const state = {
+    timestamp: 0,
+    staleSnapshots: 0,
+    captured: () => captured.resolve(),
+    beforeSeeked: () => {},
+  };
+  const video = decoder(false, false, false, state);
+  metadata.floor.mockResolvedValue({ timestamp: 1.2 });
+  let nextId = 0;
+  const callbacks = new Map<number, VideoFrameRequestCallback>();
+  const request = vi.fn((callback: VideoFrameRequestCallback) => {
+    const id = ++nextId;
+    callbacks.set(id, callback);
+    return id;
+  });
+  const cancel = vi.fn((id: number) => {
+    callbacks.delete(id);
+  });
+  Object.defineProperties(video, {
+    requestVideoFrameCallback: { value: request },
+    cancelVideoFrameCallback: { value: cancel },
+  });
+  const invoke = (callback: VideoFrameRequestCallback) =>
+    callback(0, {
+      mediaTime: state.timestamp / 1e6,
+      presentationTime: 0,
+      expectedDisplayTime: 0,
+      width: 16,
+      height: 8,
+      presentedFrames: 1,
+    });
+  const present = (timestamp: number) => {
+    state.timestamp = timestamp;
+    const entry = callbacks.entries().next().value;
+    if (!entry) throw new Error('Expected an armed presentation callback.');
+    callbacks.delete(entry[0]);
+    invoke(entry[1]);
+  };
+  return { video, state, captured: captured.promise, request, cancel, callbacks, present, invoke };
+}
+const presentedDemand = { id: 'presented', url: 'blob:private', time: 1.3124 };
+
+it('waits for actual native presentation after seeked reports ready with a stale initial frame', async () => {
+  const f = presentedDecoder();
+  const provider = createPreviewHtmlSourceProvider();
+  const pending = provider.acquire([presentedDemand], new AbortController().signal);
+  void pending.catch(() => undefined);
+  await f.captured;
+  expect(f.video.currentTime).toBe(1.3124);
+  expect(f.request).toHaveBeenCalledOnce();
+  expect(frames[0]!.timestamp).toBe(0);
+  expect(frames[0]!.close).toHaveBeenCalledOnce();
+  f.present(1_200_000);
+  const lease = await pending;
+  expect(lease.bindings.get('presented')).toMatchObject({
+    target: 1.3124,
+    timestamp: 1.2,
+    membership: 'packet-floor',
+  });
+  expect(frames[1]!.close).not.toHaveBeenCalled();
+  expect(f.callbacks.size).toBe(0);
+  lease.release();
+  provider.dispose();
+  expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
+});
+
+it.each(['selected', 'stale'] as const)(
+  'retains %s presentation evidence delivered before seeked',
+  async (kind) => {
+    const f = presentedDecoder();
+    const provider = createPreviewHtmlSourceProvider();
+    f.state.beforeSeeked = () => f.present(kind === 'selected' ? 1_200_000 : 0);
+    const pending = provider.acquire([presentedDemand], new AbortController().signal);
+    await f.captured;
+    if (kind === 'stale') {
+      expect(f.request).toHaveBeenCalledTimes(2);
+      f.present(1_200_000);
+    }
+    const lease = await pending;
+    expect(lease.bindings.get('presented')!.timestamp).toBe(1.2);
+    expect(f.callbacks.size).toBe(0);
+    expect(f.request).toHaveBeenCalledTimes(kind === 'selected' ? 1 : 2);
+    lease.release();
+    provider.dispose();
+    expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
+  }
+);
+it('rejects persistently wrong presented PTS at the fixed deadline without resetting its budget', async () => {
+  vi.useFakeTimers();
+  const f = presentedDecoder();
+  const provider = createPreviewHtmlSourceProvider();
+  const pending = provider.acquire([presentedDemand], new AbortController().signal);
+  const refused = expect(pending).rejects.toMatchObject({
+    message: 'Preview source frame is unavailable.',
+    cause: {
+      reason: 'native-frame-timestamp-mismatch',
+      expectedMicroseconds: 1_200_000,
+      actualMicroseconds: 0,
+      packetTimeSeconds: 1.2,
+      targetSeconds: 1.3124,
+    },
+  });
+  await f.captured;
+  const third = EFFECT_RUNTIME_RESOURCE_LIMITS.mediaDecodeTimeoutMs / 3;
+  for (let index = 0; index < 2; index++) {
+    await vi.advanceTimersByTimeAsync(third);
+    f.present(0);
+    await vi.advanceTimersByTimeAsync(0);
+  }
+  expect(frames).toHaveLength(3);
+  await vi.advanceTimersByTimeAsync(third);
+  await refused;
+  expect(f.callbacks.size).toBe(0);
+  expect(f.cancel).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+  expect(frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
+  provider.dispose();
+});
+it.each(['abort', 'dispose', 'error'] as const)(
+  'cleans a presentation wait after %s and ignores its late callback',
+  async (reason) => {
+    vi.useFakeTimers();
+    const f = presentedDecoder();
+    const provider = createPreviewHtmlSourceProvider();
+    const controller = new AbortController();
+    const pending = provider.acquire([presentedDemand], controller.signal);
+    const rejected = expect(pending).rejects.toMatchObject(
+      reason === 'error'
+        ? { message: 'Preview source frame is unavailable.' }
+        : { name: 'AbortError' }
+    );
+    await f.captured;
+    const late = f.callbacks.values().next().value;
+    if (!late) throw new Error('Expected pending presentation.');
+    if (reason === 'abort') controller.abort();
+    if (reason === 'dispose') provider.dispose();
+    if (reason === 'error') f.video.dispatchEvent(new Event('error'));
+    await rejected;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(f.callbacks.size).toBe(0);
+    expect(f.cancel).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+    f.state.timestamp = 1_200_000;
+    f.invoke(late);
+    await Promise.resolve();
+    expect(frames).toHaveLength(1);
+    expect(frames[0]!.close).toHaveBeenCalledOnce();
+    provider.dispose();
+  }
+);
+
+it('consumes early presentation evidence when the first post-seek native snapshot is still stale', async () => {
+  const f = presentedDecoder();
+  const provider = createPreviewHtmlSourceProvider();
+  f.state.staleSnapshots = 1;
+  f.state.beforeSeeked = () => f.present(1_200_000);
+  const lease = await provider.acquire([presentedDemand], new AbortController().signal);
+  expect(f.request).toHaveBeenCalledOnce();
+  expect(frames.map((frame) => frame.timestamp)).toEqual([0, 1_200_000]);
+  expect(frames[0]!.close).toHaveBeenCalledOnce();
+  expect(frames[1]!.close).not.toHaveBeenCalled();
+  expect(lease.bindings.get('presented')).toMatchObject({ timestamp: 1.2, target: 1.3124 });
+  expect(f.callbacks.size).toBe(0);
+  lease.release();
+  provider.dispose();
+  expect(frames[1]!.close).toHaveBeenCalledOnce();
 });

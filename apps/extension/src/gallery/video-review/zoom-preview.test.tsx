@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, type ComponentProps } from 'react';
+import { act, useEffect, type ComponentProps } from 'react';
+import * as canvasModule from './zoom-preview-canvas';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as scenePlans from '../../features/video/review/advanced/scene';
@@ -70,6 +71,7 @@ const frame: ZoomPreviewFrame = {
 function renderPreview(args: {
   cursorFollowing?: boolean;
   focus?: ComponentProps<typeof ReviewZoomPreview>['focus'];
+  playback?: ComponentProps<typeof ReviewZoomPreview>['playback'];
   region?: QuickEditZoomRegion;
   spatialEdit?: ComponentProps<typeof ReviewZoomPreview>['spatialEdit'];
   sourceTime?: number | null;
@@ -85,6 +87,7 @@ function renderPreview(args: {
       <ReviewZoomPreview
         region={args.region ?? region()}
         focus={args.focus}
+        playback={args.playback}
         cursorFollowing={args.cursorFollowing ?? false}
         {...(args.spatialEdit ? { spatialEdit: args.spatialEdit } : {})}
         background={background}
@@ -205,35 +208,57 @@ it('cancels a stale frame load when the mapped source time changes', async () =>
   expect(view.section().getAttribute('data-status')).toBe('loading');
 });
 
-it('reports failures accessibly and retries through the loader', async () => {
-  let calls = 0;
-  const view = renderPreview({
-    loadFrame: async () => {
-      calls += 1;
-      if (calls === 1) throw new Error('decode failed');
-      return frame;
-    },
-  });
-  await act(async () => Promise.resolve());
-  expect(view.section().getAttribute('data-status')).toBe('failed');
-  expect(host.querySelector('[role="alert"]')).not.toBeNull();
-  await act(async () =>
-    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.retry"]')!.click()
-  );
-  await act(async () => Promise.resolve());
-  expect(view.loadFrame).toHaveBeenCalledTimes(2);
-  expect(view.section().getAttribute('data-status')).toBe('ready');
-});
+function unavailableGpu() {
+  const requestAdapter = vi.fn(async () => null);
+  vi.stubGlobal('navigator', { gpu: { requestAdapter }, userAgent: 'jsdom', language: 'en-US' });
+  vi.stubGlobal('VideoFrame', class {});
+  return requestAdapter;
+}
 
-it('skips the load and explains the state when the midpoint has no source frame', async () => {
-  const view = renderPreview({ sourceTime: null });
-  await act(async () => Promise.resolve());
-  expect(view.loadFrame).not.toHaveBeenCalled();
-  expect(view.section().getAttribute('data-status')).toBe('unavailable');
-  expect(host.querySelector('[role="status"]')?.textContent).toContain(
-    'gallery.videoReview.zoomPreviewUnavailable'
-  );
-});
+it.each(['legacy', 'gpu-unavailable'] as const)(
+  'reports failures accessibly and retries through the loader (%s)',
+  async (backend) => {
+    const adapter = backend === 'gpu-unavailable' ? unavailableGpu() : undefined;
+    let calls = 0;
+    const view = renderPreview({
+      loadFrame: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('decode failed');
+        return frame;
+      },
+    });
+    await act(async () => Promise.resolve());
+    expect(view.section().getAttribute('data-status')).toBe('failed');
+    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    if (adapter) expect(adapter).not.toHaveBeenCalled();
+    const available = Promise.withResolvers<null>();
+    adapter?.mockImplementationOnce(() => available.promise);
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.retry"]')!.click()
+    );
+    if (adapter) {
+      expect(view.section().getAttribute('data-status')).toBe('loading');
+      await act(async () => available.resolve(null));
+    }
+    await act(async () => Promise.resolve());
+    expect(view.loadFrame).toHaveBeenCalledTimes(2);
+    expect(view.section().getAttribute('data-status')).toBe('ready');
+  }
+);
+
+it.each(['legacy', 'gpu-unavailable'] as const)(
+  'skips the load and explains the state when the midpoint has no source frame (%s)',
+  async (backend) => {
+    if (backend === 'gpu-unavailable') unavailableGpu();
+    const view = renderPreview({ sourceTime: null });
+    await act(async () => Promise.resolve());
+    expect(view.loadFrame).not.toHaveBeenCalled();
+    expect(view.section().getAttribute('data-status')).toBe('unavailable');
+    expect(host.querySelector('[role="status"]')?.textContent).toContain(
+      'gallery.videoReview.zoomPreviewUnavailable'
+    );
+  }
+);
 
 it('synchronizes framing gestures to the displayed source frame, not unrelated keys', async () => {
   const onInteract = vi.fn();
@@ -742,3 +767,24 @@ it.each(['border', 'spotlight'] as const)(
     expect(plan).not.toHaveBeenCalled();
   }
 );
+
+it('keeps a published live preview ready when the unrelated paused loader fails', async () => {
+  vi.spyOn(canvasModule, 'ZoomPreviewCanvas').mockImplementation((props) => {
+    const onPaintReady = props.onPaintReady;
+    useEffect(() => {
+      onPaintReady?.(true);
+    }, [onPaintReady]);
+    return <canvas />;
+  });
+  const video = document.createElement('video');
+  const view = renderPreview({
+    playback: { video, camera: { scale: 1, centerX: 0.5, centerY: 0.5 } },
+    loadFrame: async () => {
+      throw new Error('Private paused source failed');
+    },
+  });
+  await act(async () => Promise.resolve());
+  expect(view.section().getAttribute('data-playing')).toBe('true');
+  expect(view.section().getAttribute('data-status')).toBe('ready');
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});

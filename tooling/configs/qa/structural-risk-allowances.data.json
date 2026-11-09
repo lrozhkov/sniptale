@@ -5088,10 +5088,10 @@
       "file": "apps/extension/src/gallery/video-review/zoom-preview-paint-owner.ts",
       "symbol": "createZoomPreviewPaintOwner",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One queue owns acquisition, rendering, cancellation and publication. The canonical provider owns physical selection. Its lease remains valid until the active job settles. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent source, state, publication or resource owner. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: One focus request owns acquisition, cancellation, GPU or Standard publication and retirement. Compatibility changes acquisition within that lifetime. Shared source selection retains temporal policy. Splitting this closure would distribute one resource authority. Independent diagnosis confirmed cohesion. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent acquisition, scheduling, publication, recovery or resource authority. Reassess an unrelated workflow or reusable fixture owner. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "astHash": "1cc3507d9d38c5f994a41bf7fa7205b642f69d1bbc41a2ebdb6df86f228bae50",
+      "astHash": "23dbbb88bd71d0a2de4cef9119f01309a591acdc8a10cd7bfaf06a8b9d2ccb06",
       "signatureHash": "1817e8f3161700f42da7beb211afcade39900fcc8f4d0d6adba6fd3257afbe22"
     },
     {
@@ -5099,10 +5099,10 @@
       "file": "apps/extension/src/gallery/video-review/zoom-preview.tsx",
       "symbol": "PreparedZoomPreview",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: One mounted view tracks painting readiness and accepted geometry. Live input keeps source time with its prepared scene. Fallback decorations use the accepted frame. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent source, state, publication or resource owner. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: This component joins camera state, paused source status and publication readiness for one surface. Failure selection belongs at that join. Geometry and interaction use the same accepted input. Independent diagnosis found no new authority or lifecycle. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent surface, preparation, publication, interaction, recovery or resource authority. Reassess an unrelated workflow or reusable fixture owner. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "astHash": "0af82ec8a94c2a051e2c537f849be583dafd296951053a2be682b9ef7895a779",
+      "astHash": "6bf36473de71301109d0f92fd30fe58c3a64ef54bd2de31ef2b9b0a48672ff0c",
       "signatureHash": "7c44831b4025de8885552b21d17cc3166a87a4cd297249376666d53c5ef57d97"
     },
     {
@@ -6485,22 +6485,22 @@
       "file": "apps/extension/src/gallery/video-review/zoom-preview-gpu.test.ts",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "astHash": "fa154ecee1e6b8793a98543f3e828f6d71bbd5b587ab0e4714ec9acb1d173569",
-      "signatureHash": "e50ca9755787ba938261f30f60fb9a0bc0a19313ad07e13b677195b26f454785",
+      "reason": "tool-noise: One focus-preview acceptance suite connects projection, renderer input, readiness, request replacement and source lifetime. Compatibility uses the same source fixtures and controlled completions. Independent diagnosis found no unrelated workflow or support owner. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent acquisition, scheduling, publication, recovery or resource authority. Reassess an unrelated workflow or reusable fixture owner. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One controlled fixture owns the inspector renderer, media objects and teardown. Separate cases test native capture and absent API recovery. API-present cases install the same explicit frame fixture. Independent diagnosis found no second fixture authority. Fresh architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary."
+      "astHash": "bfef7a81f91b88fd9d556ccf1d0592ea9732c6b82a4b27a33366452f858e457d",
+      "signatureHash": "e50ca9755787ba938261f30f60fb9a0bc0a19313ad07e13b677195b26f454785"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/gallery/video-review/zoom-preview.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "astHash": "5a0e79858a47d1dc151175c2935c0ed019863cf787363433ce5b6d1f9356d015",
-      "signatureHash": "973fc4b1970603fd53db5a13664571aee3f3b32bc0a603baceb9a5ce1011e424",
+      "reason": "tool-noise: One focus surface composes geometry, tools, navigation, result layers and feedback through named local boundaries. Source preparation and rendering retain external owners. The candidate changes status priority at that surface. Independent diagnosis found no separate change reason. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent surface, preparation, publication, interaction, recovery or resource authority. Reassess an unrelated workflow or reusable fixture owner. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One mounted inspector connects prepared geometry, tools and accepted presentation. It delegates decoding, queue execution and authored commands. It adds no independent durable writer. Fresh independent architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent source, state, publication or resource owner. Remove when the analyzer models this cohesive operation."
+      "astHash": "668a2dcd2814235c0d56e1889f486d693ebf1fbf9dc61a0b817b28b930db3b96",
+      "signatureHash": "973fc4b1970603fd53db5a13664571aee3f3b32bc0a603baceb9a5ce1011e424"
     },
     {
       "rule": "structural-function-risk",
@@ -6622,6 +6622,17 @@
       "reviewDate": "2026-11-09",
       "reason": "tool-noise: One camera source lifetime owns asset acquisition, compatible capture, admission and frame leases. Shared color policy remains in its existing workflow owner. Native normalization and rollback stay within the same resource transaction. Independent diagnosis found no responsibility split at the file length threshold. Fresh architecture review must assess this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess a route with an independent lifecycle or consumer contract. Remove when the analyzer models this cohesive boundary."
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-focus-preview-source.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One Gallery source preparation suite covers the changed loader and its consumers. Existing fixtures and independent references support focus, crop, retry and renderer cases. Browser, injection, decoding and artifact effects belong to those cases. The private refusal helper owns one concrete protocol with two consumers. Independent diagnosis found no separate production or reusable support authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an unrelated product contract or independently reusable fixture responsibility. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "959de0ebb96766bf245eb30e197ecdc07113f7870eb92f5b8189ae536fae378e",
+      "signatureHash": "4d3b761d8b8cc12263423b8783aabe1904806c7ec62dfda3f08dc44220c642b2"
     }
   ]
 }

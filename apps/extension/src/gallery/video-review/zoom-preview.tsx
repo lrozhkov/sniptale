@@ -173,13 +173,16 @@ function PreparedZoomPreview(
     [paintIdentity]
   );
   const ready = painted?.identity === paintIdentity && painted.ready;
-  const previewStatus = props.preparationFailed
-    ? 'failed'
-    : !ready
-      ? 'loading'
-      : playback
-        ? 'ready'
-        : status;
+  const previewStatus =
+    props.preparationFailed || (!playback && status === 'failed')
+      ? 'failed'
+      : !playback && status === 'unavailable'
+        ? 'unavailable'
+        : !ready
+          ? 'loading'
+          : playback
+            ? 'ready'
+            : status;
   const admittedInteraction = resolvePreviewInteraction(props, status);
   const positionInteractive = admittedInteraction.positionInteractive && ready;
   const spatialInteractive = admittedInteraction.spatialInteractive && ready;

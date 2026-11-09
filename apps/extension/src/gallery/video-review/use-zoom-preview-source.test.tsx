@@ -20,7 +20,22 @@ const canonical = vi.hoisted(() => ({
 vi.mock('../../workflows/video/preview-source', () => ({
   createPreviewSourceProvider: canonical.create,
 }));
+const compatible = vi.hoisted(() => ({
+  create: vi.fn(),
+  acquire: vi.fn(),
+  retain: vi.fn(),
+  dispose: vi.fn(),
+}));
+vi.mock('../../workflows/video/preview-html-source', () => ({
+  createPreviewHtmlSourceProvider: compatible.create,
+}));
 beforeEach(() => {
+  compatible.acquire.mockReset();
+  compatible.create.mockReturnValue({
+    acquire: compatible.acquire,
+    retainSources: compatible.retain,
+    dispose: compatible.dispose,
+  });
   canonical.acquire.mockReset().mockResolvedValue(null);
   canonical.retain.mockReset();
   canonical.dispose.mockReset();
@@ -43,12 +58,7 @@ function mountSource(readyState = 2) {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const video = document.createElement('video');
   const normalized = { format: 'RGBA', close: vi.fn() };
-  vi.stubGlobal(
-    'VideoFrame',
-    vi.fn(function () {
-      return normalized;
-    })
-  );
+  vi.stubGlobal('VideoFrame', undefined);
   Object.defineProperties(video, {
     readyState: { value: readyState, configurable: true },
     duration: { value: 12 },
@@ -127,12 +137,11 @@ it('times out a source which produces neither data nor an error', async () => {
   await rejected;
 });
 
-it('converts a captured frame before materializing the framing source canvas', async () => {
+it('materializes owned source pixels through Frame-absent recovery', async () => {
   const source = mountSource();
   await source.load(0, new AbortController().signal);
   const context = document.createElement('canvas').getContext('2d')!;
-  expect(context.drawImage).toHaveBeenCalledWith(source.normalized, 0, 0);
-  expect(source.normalized.close).toHaveBeenCalledOnce();
+  expect(context.drawImage).toHaveBeenCalledWith(source.video, 0, 0, 640, 360);
 });
 
 function canonicalSource() {
@@ -215,10 +224,14 @@ it('copies canonical PTS and display geometry without waiting for HTML metadata'
   expect(source.source.draw).not.toHaveBeenCalled();
 });
 
-it.each(['abort', 'unmount'] as const)(
-  'keeps native resources until delayed normalization settles after %s',
-  async (mode) => {
-    const source = canonicalSource();
+it.each(
+  (['abort', 'unmount'] as const).flatMap((mode) =>
+    (['canonical', 'compatible'] as const).map((route) => ({ mode, route }))
+  )
+)(
+  'keeps $route resources until delayed normalization settles after $mode',
+  async ({ mode, route }) => {
+    const source = route === 'canonical' ? canonicalSource() : compatibleSource();
     const gate = Promise.withResolvers<void>();
     const started = Promise.withResolvers<void>();
     const normalize = normalization.prepareDecodedVideoSample;
@@ -295,15 +308,56 @@ it('propagates decode failure without using HTML compatibility', async () => {
   expect(source.release).toHaveBeenCalledOnce();
 });
 
-it('uses HTML compatibility after actual provider null with decoder APIs present', async () => {
-  const source = mountSource();
-  vi.stubGlobal('VideoDecoder', class {});
+function compatibleSource() {
+  const source = canonicalSource();
   canonical.acquire.mockResolvedValue(null);
-  const frame = await source.load(0, new AbortController().signal);
-  expect(canonical.acquire).toHaveBeenCalledOnce();
-  expect(frame).toMatchObject({ width: 640, height: 360 });
-  expect(frame).not.toHaveProperty('selection');
-  expect(source.normalized.close).toHaveBeenCalledOnce();
+  const lease = {
+    bindings: new Map([
+      [
+        'zoom-preview',
+        {
+          membership: 'packet-floor' as const,
+          source: source.source,
+          target: 0.5,
+          timestamp: 0.3,
+          url: 'blob:preview',
+        },
+      ],
+    ]),
+    release: source.release,
+  };
+  compatible.acquire.mockResolvedValue(lease);
+  return { ...source, compatibleLease: lease };
+}
+
+it('normalizes verified compatibility after actual provider null and preserves EOF evidence', async () => {
+  const f = compatibleSource();
+  compatible.acquire.mockResolvedValueOnce({
+    bindings: new Map([
+      [
+        'zoom-preview',
+        {
+          ...f.compatibleLease.bindings.get('zoom-preview')!,
+          target: 13,
+          heldAtEnd: true,
+          heldSourceEnd: 0.7,
+        },
+      ],
+    ]),
+    release: f.release,
+  });
+  const frame = await f.load(13, new AbortController().signal);
+  expect(frame.selection).toEqual({
+    membership: 'packet-floor',
+    url: 'blob:preview',
+    target: 13,
+    timestamp: 0.3,
+    heldAtEnd: true,
+    heldSourceEnd: 0.7,
+  });
+  expect(frame.selection).not.toHaveProperty('nextTimestamp');
+  expect(f.release).toHaveBeenCalledOnce();
+  expect(f.frames[0]!.close).toHaveBeenCalledOnce();
 });
 
 it.each(['leading', 'terminal'] as const)(
@@ -538,3 +592,42 @@ it('loads owned RGB when VideoFrame is absent and preserves the completed canvas
   expect(canvas.width).toBe(640);
   expect(canvas.height).toBe(360);
 });
+
+it.each(['declined', 'decoder-absent'] as const)(
+  'copies verified paused focus pixels and packet-floor provenance when %s',
+  async (mode) => {
+    const f = canonicalSource();
+    canonical.acquire.mockResolvedValue(null);
+    if (mode === 'decoder-absent') vi.stubGlobal('VideoDecoder', undefined);
+    compatible.acquire.mockResolvedValue({
+      bindings: new Map([
+        [
+          'zoom-preview',
+          {
+            membership: 'packet-floor',
+            source: f.source,
+            target: 0.5,
+            timestamp: 0.3,
+            url: 'blob:preview',
+          },
+        ],
+      ]),
+      release: f.release,
+    });
+    f.video.currentTime = 99;
+    const pending = f.load(0.5, new AbortController().signal);
+    void pending.catch(() => undefined);
+    await vi.waitFor(() => expect(compatible.acquire).toHaveBeenCalledOnce());
+    const frame = await pending;
+    expect(frame.selection).toEqual({
+      membership: 'packet-floor',
+      target: 0.5,
+      timestamp: 0.3,
+      url: 'blob:preview',
+    });
+    expect(frame.selection).not.toHaveProperty('nextTimestamp');
+    expect(frame).toMatchObject({ width: 800, height: 400 });
+    expect(f.video.currentTime).toBe(99);
+    expect(f.release).toHaveBeenCalledOnce();
+  }
+);
