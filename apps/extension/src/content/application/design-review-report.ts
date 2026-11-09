@@ -1,6 +1,7 @@
 import type { CaptureResponse } from '../../contracts/messaging/contracts/response-types';
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { cropImage } from '@sniptale/platform/browser/media/image-crop';
+import type { BrowserAnnotationSessionSnapshot } from '../parser/page-preparation/annotations';
 import type { createBrowserAnnotationSession } from '../parser/page-preparation/annotations';
 import type {
   printReviewReport,
@@ -11,16 +12,31 @@ import { resolveContentShadowRoot } from '../platform/dom-host';
 import type { ContentRuntimeServices } from './runtime-services/services';
 import type { ContentPrivilegedActionIntentSource } from './privileged-action-intent';
 
-/** Owns export-time capture only. No raster or preview is written to storage. */
+export interface DesignReviewReportSnapshot {
+  snapshot: BrowserAnnotationSessionSnapshot;
+  previews: ReadonlyMap<number, ReviewReportPreview>;
+}
+
+/** Prints saved aggregate evidence, or captures current targets for page-only consumers. */
 export function createDesignReviewReportExporter(deps: {
   annotations: ReturnType<typeof createBrowserAnnotationSession>;
   services(): ContentRuntimeServices;
   print: typeof printReviewReport;
+  captureSnapshot?(): DesignReviewReportSnapshot;
 }) {
   let busy = false;
   return async (title: string, source: ContentPrivilegedActionIntentSource): Promise<void> => {
     if (busy) throw new Error('A review report is already being prepared');
     busy = true;
+    if (deps.captureSnapshot) {
+      try {
+        const { snapshot, previews } = structuredClone(deps.captureSnapshot());
+        await deps.print(title, snapshot, { previews });
+      } finally {
+        busy = false;
+      }
+      return;
+    }
     const snapshot = deps.annotations.captureSnapshot();
     let invalidated = false;
     const unsubscribe = deps.annotations.subscribe(() => {

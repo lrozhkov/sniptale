@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Canvas } from 'fabric';
 import { createScaledFrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
 
 export function useProjectionRect(elementRef: React.RefObject<HTMLElement | null>) {
@@ -41,4 +42,32 @@ export function useEditorFrameCoordinateSpace(input: {
       }),
     [canvasRect?.left, canvasRect?.top, scale, viewport]
   );
+}
+
+/** Coalesces native annotation transforms without subscribing to the render loop. */
+export function useFrameAnnotationCanvasUpdates(canvas: Canvas | null, refresh: () => void): void {
+  React.useEffect(() => {
+    if (!canvas) return;
+    let frame: number | null = null;
+    const schedule = () => {
+      if (
+        frame !== null ||
+        !canvas.getActiveObjects().some((object) => object.sniptaleType === 'frame-annotation')
+      )
+        return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        refresh();
+      });
+    };
+    const subscriptions = [
+      canvas.on('object:moving', schedule),
+      canvas.on('object:scaling', schedule),
+      canvas.on('object:modified', schedule),
+    ];
+    return () => {
+      subscriptions.forEach((dispose) => dispose());
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+  }, [canvas, refresh]);
 }

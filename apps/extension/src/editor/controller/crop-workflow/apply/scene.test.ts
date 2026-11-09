@@ -1,3 +1,7 @@
+import {
+  DEFAULT_BROWSER_FRAME_STATE,
+  DEFAULT_EDITOR_FRAME_SETTINGS,
+} from '../../../../features/editor/document/constants';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -46,6 +50,8 @@ function registerSceneMutationTest() {
     const setSource = vi.fn();
 
     await runEditorCropSelection({
+      frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+      browserFrame: DEFAULT_BROWSER_FRAME_STATE,
       canvas: canvas as never,
       crop: { height: 20, left: 3, top: 4, width: 30 },
       rebuildFrameDecorations: vi.fn(async () => undefined),
@@ -73,6 +79,8 @@ function registerSceneMutationTest() {
       setDimensions: vi.fn(),
     };
     await runEditorCropSelection({
+      frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+      browserFrame: DEFAULT_BROWSER_FRAME_STATE,
       canvas: canvas as never,
       crop: { left: 20, top: 15, width: 100, height: 80 },
       rebuildFrameDecorations: vi.fn(async () => undefined),

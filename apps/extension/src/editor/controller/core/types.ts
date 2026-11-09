@@ -1,7 +1,16 @@
 import type { FabricObject, Point } from 'fabric';
 
 export interface DrawSession {
-  tool: 'pencil' | 'marker' | 'shape' | 'blur' | 'arrow' | 'text' | 'crop' | 'rich-shape';
+  tool:
+    | 'simplify'
+    | 'pencil'
+    | 'marker'
+    | 'shape'
+    | 'blur'
+    | 'arrow'
+    | 'text'
+    | 'crop'
+    | 'rich-shape';
   pointerId: number | null;
   start: Point;
   lastPoint?: Point;
@@ -23,7 +32,12 @@ export interface ApplyDocumentOptions {
   preserveViewport?: boolean;
 }
 
-export interface OpenImageOptions {
+export interface EditorDocumentOpenOptions {
+  /** Keep the selected inspector during an in-place project switch. */
+  preserveInspector?: boolean;
+}
+
+export interface OpenImageOptions extends EditorDocumentOpenOptions {
   browserFrameUrl?: string;
   pageTitle?: string;
   sourceFaviconUrl?: string | null;

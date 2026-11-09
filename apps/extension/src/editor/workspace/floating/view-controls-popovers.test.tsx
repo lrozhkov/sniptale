@@ -70,7 +70,7 @@ afterEach(() => {
 });
 
 it.each([false, true])(
-  'hides snap without resetting saved state (%s) and passes save state through',
+  'keeps snap accessible independently of visibility (%s) and passes color state through',
   (savedSnap) => {
     const updateWorkspace = vi.fn();
     const saveWorkspaceColorAsDefault = vi.fn();
@@ -99,7 +99,7 @@ it.each([false, true])(
       );
 
     render(false);
-    expect(container.querySelectorAll('section')).toHaveLength(1);
+    expect(container.querySelectorAll('section')).toHaveLength(4);
     expect(container.querySelector('h2 button')).toBeNull();
     expect(container.textContent).toContain('#f2f4f7');
     expect(container.textContent).toContain('Could not save');
@@ -116,7 +116,7 @@ it.each([false, true])(
     expect(workspaceSurface?.className).toContain('pb-3');
     expect(workspaceSurface?.className).toContain('max-h-[calc(100dvh-6.5rem)]');
     expect(workspaceSurface?.className).toContain('max-[720px]:max-h-[calc(100dvh-10.5rem)]');
-    expect(container.querySelector('[aria-label="Enable snapping"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Enable snapping"]')).not.toBeNull();
     act(() => container?.querySelector<HTMLButtonElement>('[aria-label="Show grid"]')?.click());
     expect(updateWorkspace).toHaveBeenCalledExactlyOnceWith({ gridEnabled: true });
     render(true);
@@ -125,7 +125,7 @@ it.each([false, true])(
     act(() => snap.click());
     expect(updateWorkspace).toHaveBeenLastCalledWith({ gridSnapEnabled: !savedSnap });
     render(false);
-    expect(container.querySelector('[aria-label="Enable snapping"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Enable snapping"]')).not.toBeNull();
     render(true);
     expect(
       container.querySelector('[aria-label="Enable snapping"]')?.getAttribute('aria-pressed')

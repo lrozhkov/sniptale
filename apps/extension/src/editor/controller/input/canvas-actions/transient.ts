@@ -1,3 +1,4 @@
+import { cancelPendingEditorSimplify } from '../../../drawing/simplify-runtime';
 import type { Canvas, Rect } from 'fabric';
 import type { DrawSession } from '../../core/types';
 import { cancelEditorDrawingArrowBend } from '../../../drawing/object/controls/arrow';
@@ -8,6 +9,7 @@ interface CancelEditorTransientInteractionOptions {
   cropGuide: Rect | null;
   activeTool: string;
   preserveActiveTool?: boolean;
+  preservePendingSimplify?: boolean;
   clearCropSelection: () => void;
   switchToSelectTool: () => void;
   syncRuntimeState: () => void;
@@ -29,7 +31,8 @@ export function cancelEditorTransientInteraction(
     return { changed: false, drawSession };
   }
 
-  let changed = false;
+  // Pointer cleanup on focus loss must not cancel work submitted on pointerup.
+  let changed = options.preservePendingSimplify ? false : cancelPendingEditorSimplify(canvas);
   let nextDrawSession = drawSession;
 
   if (cancelEditorDrawingArrowBend(canvas)) {

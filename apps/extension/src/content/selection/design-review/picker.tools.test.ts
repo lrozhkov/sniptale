@@ -212,3 +212,45 @@ it('clears the candidate during inspector interaction, suppression, and editing'
   picker.refreshFrame();
   expect(candidate?.style.display).toBe('none');
 });
+
+it('releases native page interaction, cursor, hover, and frames while navigation is active', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  initializeContentUiRoots(host.attachShadow({ mode: 'open' }));
+  const target = makeVisible(document.createElement('a'));
+  target.href = '#next';
+  document.body.append(target);
+  let enabled = true;
+  const onSelection = vi.fn();
+  const onHover = vi.fn();
+  const picker = startPicker({
+    onSelection,
+    onHover,
+    trackHover: () => true,
+    isPageInteractionEnabled: () => enabled,
+  });
+  picker.selectElement(target);
+  picker.setMeasurementsExpanded(true);
+  enabled = false;
+  picker.refreshFrame();
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+  const nativeClick = vi.fn();
+  target.addEventListener('click', nativeClick);
+  target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  target.dispatchEvent(click);
+  expect(click.defaultPrevented).toBe(false);
+  expect(nativeClick).toHaveBeenCalledOnce();
+  expect(onSelection).toHaveBeenCalledOnce();
+  expect(onHover).toHaveBeenLastCalledWith(null);
+  expect(document.getElementById('sniptale-design-review-cursor-style')).toBeNull();
+  picker.selectElement(target, 'feedback');
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).toBeNull();
+  expect(queryContentUiElement<HTMLElement>('.sniptale-design-review-frame')?.style.display).toBe(
+    'none'
+  );
+  enabled = true;
+  picker.refreshFrame();
+  target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  expect(onHover).toHaveBeenLastCalledWith(target);
+  expectFrameSummary('a');
+});

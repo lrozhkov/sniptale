@@ -37,6 +37,7 @@ type ResetDocumentState = Pick<
   | 'frameAnnotationCreationKind'
   | 'inspector'
   | 'freshImageBackgroundPending'
+  | 'framePreviewActive'
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
@@ -50,6 +51,7 @@ type ResetDocumentState = Pick<
   | 'cropSelection'
   | 'richShapeToolSelection'
   | 'canvasCropMode'
+  | 'canvasCropAspectRatio'
   | 'layers'
   | 'selection'
   | 'history'
@@ -189,6 +191,7 @@ function createResetDocumentUiState(
   | 'frameAnnotationCreationKind'
   | 'inspector'
   | 'freshImageBackgroundPending'
+  | 'framePreviewActive'
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
@@ -202,12 +205,14 @@ function createResetDocumentUiState(
   | 'cropSelection'
   | 'richShapeToolSelection'
   | 'canvasCropMode'
+  | 'canvasCropAspectRatio'
 > {
   return {
     activeTool: 'select',
     frameAnnotationCreationKind: null,
     inspector: 'file',
     freshImageBackgroundPending: false,
+    framePreviewActive: false,
     inspectorCollapsed: false,
     layerEffectsCategory: 'adjustments',
     viewportPreviewOpen: state.viewportPreviewAutomationBlockedInSession
@@ -223,6 +228,7 @@ function createResetDocumentUiState(
     cropSelection: null,
     richShapeToolSelection: null,
     canvasCropMode: 'crop',
+    canvasCropAspectRatio: null,
   };
 }
 

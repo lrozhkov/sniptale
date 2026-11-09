@@ -40,6 +40,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'project-export-capabilities',
   'project-export-job-ledger',
   'recent-capture-editor-asset-binding',
+  'simplify-compute-sessions',
   'surface-style-preset-mutation-queue',
   'sync-connection-erasure-exclusion',
   'tab-mode-runtime-state',

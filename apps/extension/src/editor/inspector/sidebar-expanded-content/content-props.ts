@@ -108,6 +108,7 @@ function selectEditorInspectorSizeDraft(controller: SidebarExpandedController) {
     setCanvasSizeLocked: controller.setCanvasSizeLocked,
     setLayerSizeLocked: controller.setLayerSizeLocked,
     setFrameDraft: controller.setFrameDraft,
+    previewFrameDraft: controller.previewFrameDraft,
   };
 }
 

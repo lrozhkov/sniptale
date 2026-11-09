@@ -68,6 +68,7 @@ export interface EditorInspectorFrameMutationActions {
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
   insertOrUpdateBrowserFrame?: () => Promise<void> | void;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
+  previewFrameDraft?: React.Dispatch<React.SetStateAction<EditorFrameSettings>> | undefined;
   updateWorkspace: (patch: Partial<EditorWorkspaceSettings>) => void;
   applyWorkspaceColor: (color: string) => Promise<void> | void;
   saveWorkspaceColorAsDefault: () => Promise<void> | void;

@@ -19,7 +19,12 @@ vi.mock('fabric', async (importOriginal) => ({
   },
 }));
 
-import { rasterizeBlurredBackground, resolveBackgroundRasterSize } from './raster';
+import {
+  createAdvancedBackgroundImage,
+  rasterizeBlurredBackground,
+  resolveBackgroundRasterSize,
+} from './raster';
+import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -150,4 +155,53 @@ it('retries failed raster encoding instead of caching failure', () => {
   expect(result.toObject()).toMatchObject({ src: 'data:image/png;base64,retry' });
   expect(encode).toHaveBeenCalledTimes(2);
   encode.mockRestore();
+});
+
+it('uses a smaller transient raster budget without changing the committed budget', () => {
+  const large = { width: 6000, height: 4000 };
+  expect(resolveBackgroundRasterSize(large, true)).toEqual({ width: 768, height: 512 });
+  expect(resolveBackgroundRasterSize(large)).toEqual({ width: 2048, height: 1365 });
+  expect(resolveBackgroundRasterSize({ width: 6000, height: 6000 }, true)).toEqual({
+    width: 768,
+    height: 768,
+  });
+  expect(resolveBackgroundRasterSize({ width: 6000, height: 6000 })).toEqual({
+    width: 2048,
+    height: 2048,
+  });
+  expect(resolveBackgroundRasterSize({ width: 320, height: 180 }, true)).toEqual({
+    width: 320,
+    height: 180,
+  });
+});
+
+it('bounds advanced gradient previews and scales their raster to the unchanged document', () => {
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: vi.fn(() => ({
+      createImageData: (width: number, height: number) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+      }),
+      putImageData: vi.fn(),
+    })),
+  });
+  const image = createAdvancedBackgroundImage(
+    { width: 6000, height: 4000 },
+    {
+      ...DEFAULT_EDITOR_FRAME_SETTINGS,
+      backgroundGradient: {
+        type: 'linear',
+        angle: 90,
+        interpolation: 'oklab',
+        repeat: { enabled: false, span: 1 },
+        stops: [
+          { id: 'first', color: '#000000ff', position: 0, midpoint: 0.5 },
+          { id: 'last', color: '#ffffffff', position: 1, midpoint: 0.5 },
+        ],
+      },
+    },
+    true
+  );
+  expect(image?.getElement()).toMatchObject({ width: 768, height: 512 });
+  expect(image).toMatchObject({ scaleX: 6000 / 768, scaleY: 4000 / 512 });
 });

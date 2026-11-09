@@ -39,12 +39,19 @@ export interface ProductGlassLinkedPaddingFieldsProps {
     unlink: string;
   };
   onChange: (padding: ProductGlassLinkedPaddingValue) => void;
+  /** Preview linked values without accepting the edit. */
+  onPreviewChange?: ((padding: ProductGlassLinkedPaddingValue) => void) | undefined;
   padding: ProductGlassLinkedPaddingValue;
-  renderUniformField?: (props: { onChange: (value: number) => void; value: number }) => ReactNode;
+  renderUniformField?: (props: {
+    onChange: (value: number) => void;
+    onPreview?: ((value: number) => void) | undefined;
+    value: number;
+  }) => ReactNode;
   renderValueField: (props: {
     compact: boolean;
     label: string;
     onChange: (value: number) => void;
+    onPreview?: ((value: number) => void) | undefined;
     side: PaddingSide;
     value: number;
   }) => ReactNode;
@@ -81,6 +88,7 @@ function ExpandedAxisGroup(props: {
   linked: boolean;
   onLinkToggle: () => void;
   onSideChange: (side: PaddingSide, value: number) => void;
+  onSidePreview?: ((side: PaddingSide, value: number) => void) | undefined;
   padding: ProductGlassLinkedPaddingValue;
   shared: ProductGlassLinkedPaddingFieldsProps;
 }) {
@@ -122,6 +130,9 @@ function ExpandedAxisGroup(props: {
                   ? sides.map((linkedSide) => props.shared.labels[linkedSide]).join(' / ')
                   : props.shared.labels[side],
               onChange: (value) => props.onSideChange(side, value),
+              onPreview: props.onSidePreview
+                ? (value) => props.onSidePreview?.(side, value)
+                : undefined,
               side,
               value: props.padding[side],
             })}
@@ -166,15 +177,16 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
     });
   }, [props.padding]);
 
-  const emitChange = (padding: ProductGlassLinkedPaddingValue) => {
+  const emitChange = (padding: ProductGlassLinkedPaddingValue, preview = false) => {
     lastEmittedPaddingRef.current = padding;
-    props.onChange(padding);
+    if (preview) props.onPreviewChange?.(padding);
+    else props.onChange(padding);
   };
 
-  const updateSide = (side: PaddingSide, value: number) => {
+  const updateSide = (side: PaddingSide, value: number, preview = false) => {
     const nextValue = Math.max(0, value);
     if (allLinked) {
-      emitChange({ top: nextValue, right: nextValue, bottom: nextValue, left: nextValue });
+      emitChange({ top: nextValue, right: nextValue, bottom: nextValue, left: nextValue }, preview);
       return;
     }
     const axis: PaddingAxis = side === 'top' || side === 'bottom' ? 'vertical' : 'horizontal';
@@ -183,7 +195,8 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
       sides.reduce<ProductGlassLinkedPaddingValue>(
         (padding, linkedSide) => ({ ...padding, [linkedSide]: nextValue }),
         props.padding
-      )
+      ),
+      preview
     );
   };
 
@@ -239,6 +252,9 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
               compact: true,
               label: props.labels.top,
               onChange: (value) => updateSide('top', value),
+              onPreview: props.onPreviewChange
+                ? (value) => updateSide('top', value, true)
+                : undefined,
               side: 'top',
               value: props.padding.top,
             })}
@@ -249,6 +265,9 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
       {!expanded && props.renderUniformField
         ? props.renderUniformField({
             onChange: (value) => updateSide('top', value),
+            onPreview: props.onPreviewChange
+              ? (value) => updateSide('top', value, true)
+              : undefined,
             value: props.padding.top,
           })
         : null}
@@ -261,6 +280,9 @@ export function ProductGlassLinkedPaddingFields(props: ProductGlassLinkedPadding
               linked={allLinked || axisLinked[axis]}
               onLinkToggle={() => toggleAxis(axis)}
               onSideChange={updateSide}
+              onSidePreview={
+                props.onPreviewChange ? (side, value) => updateSide(side, value, true) : undefined
+              }
               padding={props.padding}
               shared={props}
             />

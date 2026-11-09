@@ -1,4 +1,4 @@
-import type { DrawingDocumentV1 } from '../../../../features/drawing/model';
+import type { DrawingDocument } from '../../../../features/drawing/model';
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import type {
   AppliedBorderSettings,
@@ -67,8 +67,8 @@ export interface PagePreparationHistoryDomEffectResult {
 
 /** Reversible owner effect retained by in-memory page-preparation history. */
 export interface DrawingRecoveryEffect {
-  before: DrawingDocumentV1;
-  after: DrawingDocumentV1;
+  before: DrawingDocument;
+  after: DrawingDocument;
 }
 
 /** Exact declaration endpoints; the style owner validates and applies these values. */

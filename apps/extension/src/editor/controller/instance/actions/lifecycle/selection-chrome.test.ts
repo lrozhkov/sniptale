@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
-import { expect, it } from 'vitest';
-import { Control } from 'fabric';
+import { expect, it, vi } from 'vitest';
+import { Control, Point, Rect } from 'fabric';
+import { createFrameAnnotationProxy } from '../../../../frame-annotation/proxy';
+import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
+import type { EditorMagnetManager } from '../../../magnet';
 import { useEditorStore } from '../../../../state/useEditorStore';
 import { patchEdgeControl } from '../../../document/interaction-border-controls';
 import {
@@ -57,7 +60,13 @@ it('fades controls for a selected shape during a pointer gesture and restores th
   const controls = container.querySelector(
     '[data-ui="editor.canvas.selection-controls"]'
   ) as SVGGElement;
+  listeners.get('mouse:down')?.({ e: { button: 0, clientX: 10, clientY: 10 }, target: object });
+  listeners.get('object:moving')?.({ e: { clientX: 11, clientY: 11 }, target: object });
+  expect(controls.style.opacity).not.toBe('0');
+  listeners.get('mouse:up')?.();
+  expect(controls.style.opacity).not.toBe('0');
   listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  listeners.get('object:moving')?.({ target: object });
   expect(controls.style.opacity).toBe('0');
   expect(controls.style.transition).toContain('150ms');
   expect(upperCanvasEl.style.cursor).toBe('none');
@@ -120,6 +129,7 @@ it('leaves text selection visible and respects the workspace switch', () => {
   listeners.get('mouse:up')?.();
   useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: true });
   listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  listeners.get('object:moving')?.({ target: object });
   canvas.setCursor('move');
   expect(controls.style.opacity).toBe('0');
   expect(upperCanvasEl.style.cursor).toBe('none');
@@ -352,3 +362,276 @@ it('keeps live selection chrome unchanged after a temporary preview render', () 
   expect(svg.innerHTML).toBe(liveMarkup);
   disposeEditorSelectionChrome(canvas as never);
 });
+
+it('keeps the Simplify resize border visible while hiding controls until release', () => {
+  useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: true });
+  const container = document.createElement('div');
+  const upperCanvasEl = document.createElement('canvas');
+  container.appendChild(upperCanvasEl);
+  upperCanvasEl.getBoundingClientRect = () => ({ width: 100 }) as DOMRect;
+  const object = {
+    sniptaleType: 'simplify',
+    hasBorders: true,
+    hasControls: false,
+    controls: {},
+    borderColor: '#2563eb',
+    getCoords: () => [
+      { x: 10, y: 10 },
+      { x: 80, y: 10 },
+      { x: 80, y: 60 },
+      { x: 10, y: 60 },
+    ],
+  };
+  const listeners = new Map<
+    string,
+    (event?: { e?: { button: number }; target?: typeof object }) => void
+  >();
+  const canvas = {
+    upperCanvasEl,
+    _currentTransform: { action: 'scale' },
+    getWidth: () => 100,
+    getHeight: () => 100,
+    getActiveObject: () => object,
+    setCursor: (cursor: string) => {
+      upperCanvasEl.style.cursor = cursor;
+    },
+    on: (
+      name: string,
+      handler: (event?: { e?: { button: number }; target?: typeof object }) => void
+    ) => {
+      listeners.set(name, handler);
+      return () => listeners.delete(name);
+    },
+  };
+  mountEditorSelectionChrome(
+    canvas as never,
+    { getVisualGuides: () => ({ lines: [], points: [] }) } as never
+  );
+  const controls = container.querySelector<SVGGElement>(
+    '[data-ui="editor.canvas.selection-controls"]'
+  )!;
+  listeners.get('mouse:down')?.({ e: { button: 0 }, target: object });
+  expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).not.toBe('0');
+  listeners.get('object:scaling')?.({ target: object });
+  expect(controls.style.opacity).toBe('1');
+  expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).toBe('0');
+  expect(controls.querySelector('polygon')?.getAttribute('stroke')).toBe('#2563eb');
+  window.dispatchEvent(new Event('pointercancel'));
+  expect(controls.style.getPropertyValue('--editor-selection-controls-opacity')).toBe('1');
+  disposeEditorSelectionChrome(canvas as never);
+});
+
+it('renders hover as a border only and clears it on selection, leave, blur and disposal', () => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  const element = document.createElement('canvas');
+  document.body.append(element);
+  const canvas = new EditorCanvas(element, { width: 200, height: 120, renderOnAddRemove: false });
+  const object = new Rect({
+    left: 20,
+    top: 20,
+    width: 40,
+    height: 30,
+    originX: 'left',
+    originY: 'top',
+    strokeWidth: 0,
+  });
+  object.sniptaleId = 'hover-layer';
+  canvas.add(object);
+  const magnet: EditorMagnetManager = {
+    clearGuides() {},
+    dispose() {},
+    hasActiveGuides: () => false,
+    getVisualGuides: () => ({ lines: [], points: [] }),
+    snapRect: ({ rect }) => rect,
+  };
+  mountEditorSelectionChrome(canvas, magnet);
+  const root = canvas.upperCanvasEl.parentElement!;
+  const preview = () => root.querySelector('[data-ui="editor.canvas.selection-preview"]')!;
+  const hover = () =>
+    canvas.fire('mouse:move', {
+      e: new MouseEvent('mousemove'),
+      target: object,
+      scenePoint: new Point(25, 25),
+      viewportPoint: new Point(25, 25),
+    });
+  hover();
+  expect(preview().querySelector('polygon')?.getAttribute('data-layer-id')).toBe('hover-layer');
+  expect(preview().querySelectorAll('circle')).toHaveLength(0);
+  expect(canvas.getActiveObjects()).toEqual([]);
+  canvas.setZoom(2);
+  canvas.renderAll();
+  expect(preview().querySelector('polygon')?.getAttribute('points')).toMatch(/^40,40 /);
+  canvas.setActiveObject(object);
+  canvas.renderAll();
+  expect(preview().children).toHaveLength(0);
+  canvas.discardActiveObject();
+  canvas.upperCanvasEl.dispatchEvent(new MouseEvent('mouseout'));
+  expect(preview().children).toHaveLength(0);
+  hover();
+  expect(preview().children).toHaveLength(1);
+  window.dispatchEvent(new Event('blur'));
+  expect(preview().children).toHaveLength(0);
+  disposeEditorSelectionChrome(canvas);
+  hover();
+  expect(root.querySelector('[data-ui="editor.canvas.selection-chrome"]')).toBeNull();
+  canvas.dispose();
+  root.remove();
+  vi.unstubAllGlobals();
+});
+
+it.each(['callout', 'step-badge'] as const)(
+  'uses rendered %s bounds for layer outline, hover and full containment',
+  async (kind) => {
+    let mutationDeliveries = 0;
+    const NativeMutationObserver = globalThis.MutationObserver;
+    vi.stubGlobal(
+      'MutationObserver',
+      class extends NativeMutationObserver {
+        constructor(callback: MutationCallback) {
+          super((records, observer) => {
+            mutationDeliveries += 1;
+            callback(records, observer);
+          });
+        }
+      }
+    );
+    const observed = new Set<Element>();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(element: Element) {
+          observed.add(element);
+        }
+        unobserve(element: Element) {
+          observed.delete(element);
+        }
+        disconnect() {
+          observed.clear();
+        }
+      }
+    );
+    vi.stubGlobal('PointerEvent', MouseEvent);
+    class MarqueeCanvas extends EditorCanvas {
+      marquee(value: { x: number; y: number; deltaX: number; deltaY: number } | null) {
+        this._groupSelector = value;
+      }
+    }
+    const viewport = document.createElement('div');
+    viewport.dataset['ui'] = 'editor.canvas.viewport';
+    const element = document.createElement('canvas');
+    viewport.append(element);
+    document.body.append(viewport);
+    const canvas = new MarqueeCanvas(element, {
+      width: 200,
+      height: 120,
+      renderOnAddRemove: false,
+    });
+    canvas.upperCanvasEl.getBoundingClientRect = () => new DOMRect(0, 0, 200, 120);
+    const object = createFrameAnnotationProxy({
+      frame: { id: 'standalone', annotationKind: kind, x: 100, y: 60, width: 1, height: 1 },
+      ordering: 0,
+      label: 'Annotation',
+    });
+    object.selectable = true;
+    canvas.add(object);
+    const scene = document.createElement('div');
+    scene.dataset['ui'] = 'editor.frame-annotation-scene';
+    const marker = document.createElement('div');
+    marker.dataset['frameId'] = 'standalone';
+    marker.className = kind === 'callout' ? 'sniptale-callout' : 'sniptale-step-badge-layer';
+    const surface = kind === 'callout' ? marker : document.createElement('div');
+    if (kind === 'step-badge') {
+      surface.className = 'sniptale-step-badge';
+      marker.append(surface);
+    }
+    surface.getBoundingClientRect = () => new DOMRect(80, 40, 80, 40);
+    scene.append(marker);
+    viewport.append(scene);
+    const magnet: EditorMagnetManager = {
+      clearGuides() {},
+      dispose() {},
+      hasActiveGuides: () => false,
+      getVisualGuides: () => ({ lines: [], points: [] }),
+      snapRect: ({ rect }) => rect,
+    };
+    mountEditorSelectionChrome(canvas, magnet);
+    canvas.setActiveObject(object);
+    canvas.renderAll();
+    const chrome = viewport.querySelector<SVGElement>(
+      '[data-ui="editor.canvas.selection-chrome"]'
+    )!;
+    expect(Number(chrome.style.zIndex)).toBeGreaterThan(30);
+    const outline = viewport.querySelector('[data-ui="editor.canvas.projected-selection-outline"]');
+    expect(outline?.getAttribute('points')).toBe('80,40 160,40 160,80 80,80');
+    expect(outline?.getAttribute('stroke')).toBe('#2563eb');
+    expect(object.width).toBe(1);
+    await Promise.resolve();
+    mutationDeliveries = 0;
+    for (let index = 0; index < 100; index += 1) outline?.setAttribute('data-probe', String(index));
+    await Promise.resolve();
+    expect(mutationDeliveries).toBe(0);
+    marker.style.left = '1px';
+    await Promise.resolve();
+    expect(mutationDeliveries).toBe(1);
+    await Promise.resolve();
+    expect(mutationDeliveries).toBe(1);
+
+    surface.getBoundingClientRect = () => new DOMRect(80, 40, 0, 0);
+    canvas.renderAll();
+    expect(
+      viewport.querySelector('[data-ui="editor.canvas.projected-selection-outline"]')
+    ).toBeNull();
+    surface.getBoundingClientRect = () => new DOMRect(80, 40, 80, 40);
+    canvas.discardActiveObject();
+    surface.dispatchEvent(new MouseEvent('pointermove', { bubbles: true }));
+    expect(
+      viewport.querySelectorAll('[data-ui="editor.canvas.selection-preview-outline"]')
+    ).toHaveLength(1);
+    viewport.dispatchEvent(new MouseEvent('pointerleave'));
+    expect(
+      viewport.querySelectorAll('[data-ui="editor.canvas.selection-preview-outline"]')
+    ).toHaveLength(0);
+    canvas.marquee({ x: 75, y: 35, deltaX: 50, deltaY: 30 });
+    expect(canvas.getSelectionPreviewObjects()).toEqual([]);
+    canvas.marquee({ x: 75, y: 35, deltaX: 90, deltaY: 50 });
+    expect(canvas.getSelectionPreviewObjects()).toEqual([object]);
+    canvas.marquee(null);
+    const replacement = createFrameAnnotationProxy({
+      frame: { id: 'standalone', annotationKind: kind, x: 100, y: 60, width: 1, height: 1 },
+      ordering: 0,
+      label: 'Restored annotation',
+    });
+    replacement.selectable = true;
+    canvas.remove(object);
+    canvas.add(replacement);
+    canvas.setActiveObject(replacement);
+    marker.dataset['revision'] = 'restored';
+    await Promise.resolve();
+    canvas.renderAll();
+    expect(observed.has(surface)).toBe(true);
+    marker.remove();
+    await Promise.resolve();
+    canvas.renderAll();
+    expect(observed.has(surface)).toBe(false);
+    expect(
+      viewport.querySelector('[data-ui="editor.canvas.projected-selection-outline"]')
+    ).toBeNull();
+    disposeEditorSelectionChrome(canvas);
+    expect(
+      canvas.collectObjects(
+        { left: 75, top: 35, width: 50, height: 30 },
+        { includeIntersecting: false }
+      )
+    ).toEqual([replacement]);
+    await canvas.dispose();
+    viewport.remove();
+    vi.unstubAllGlobals();
+  }
+);

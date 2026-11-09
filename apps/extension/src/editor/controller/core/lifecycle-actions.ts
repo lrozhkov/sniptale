@@ -12,7 +12,7 @@ import {
   suspendToolModeForController,
 } from '../instance/actions/lifecycle/tool-mode';
 import { ImageEditorControllerLayerActions } from './controller-layer-actions';
-import type { OpenImageOptions } from './types';
+import type { OpenImageOptions, EditorDocumentOpenOptions } from './types';
 import { renderEditorControllerForExport } from '../public-api';
 import { runEditorDocumentTransition } from '../history/transition-queue';
 
@@ -34,10 +34,12 @@ export abstract class ImageEditorControllerLifecycleActions extends ImageEditorC
     );
   }
 
-  async loadDocument(document: EditorDocument) {
+  async loadDocument(document: EditorDocument, options?: EditorDocumentOpenOptions) {
     const controller = this.getControllerInstance();
     await runEditorDocumentTransition(controller.canvas ?? controller.history ?? controller, () =>
-      this.getDocumentCommandService().loadDocument(controller, document)
+      options
+        ? this.getDocumentCommandService().loadDocument(controller, document, options)
+        : this.getDocumentCommandService().loadDocument(controller, document)
     );
   }
 

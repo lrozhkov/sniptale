@@ -596,6 +596,9 @@ for (const variant of [
     await waitForEditorReady(page);
     const title = page.locator('[data-ui="editor.floating.document-bar.title"]');
     const oldTitle = (await title.textContent())!.trim();
+    await expect(
+      page.locator('[data-ui="editor.floating.layers.mode.browser-frame"]')
+    ).toHaveAttribute('title', variant.locale === 'ru' ? 'Шапка окна' : 'Window header');
     const rename = page.getByRole('textbox', {
       name: translate('editor.page.renameImage', variant.locale),
       exact: true,
@@ -605,6 +608,12 @@ for (const variant of [
     await rename.press('Enter');
     await expect(rename).toHaveCount(0);
     await expect(title).toContainText('Схема.png');
+    await expect(title).toBeFocused();
+    await expect(title).toHaveCSS('outline-style', 'none');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(title).toBeFocused();
+    await expect(title).not.toHaveCSS('outline-style', 'none');
     await expect
       .poll(async () => (await readImageWorkspaceRecord(page, assetId)).displayName)
       .toBe('Схема.png');

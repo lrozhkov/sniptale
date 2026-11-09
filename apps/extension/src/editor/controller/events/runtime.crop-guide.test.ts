@@ -18,7 +18,10 @@ vi.mock('../tools/crop', async (importOriginal) => ({
 
 import { syncCropGuideInteraction } from './runtime.crop-guide';
 
-afterEach(() => useEditorStore.getState().setCanvasCropMode('crop'));
+afterEach(() => {
+  useEditorStore.getState().setCanvasCropMode('crop');
+  useEditorStore.getState().setCanvasCropAspectRatio(null);
+});
 
 it('ignores regular objects and syncs crop-guide selections through crop bindings', () => {
   const bindings = {
@@ -102,4 +105,52 @@ it('keeps a free guide reachable at the workspace edge while moving or resizing'
     { left: 2200, top: 2100, width: 28, height: 28 },
     'selection'
   );
+});
+
+it('applies the locked ratio around the fixed edge origin before bounds normalization', () => {
+  useEditorStore.getState().setCanvasCropAspectRatio(2);
+  const bindings = {
+    getCanvas: () => ({
+      getZoom: () => 1,
+      _currentTransform: { originX: 'left', originY: 'center', corner: 'mr' },
+    }),
+    getCanvasDocumentSize: () => ({ width: 1000, height: 800 }),
+    setCropState: vi.fn(),
+  };
+  const target = { id: 'crop-guide' };
+  mocks.isEditorCropGuide.mockReturnValue(true);
+  mocks.createCropSelectionFromRect.mockReturnValueOnce({
+    left: 100,
+    top: 100,
+    width: 400,
+    height: 100,
+  });
+  syncCropGuideInteraction(bindings as never, target as never);
+  expect(bindings.setCropState).toHaveBeenCalledWith(
+    target,
+    expect.objectContaining({ left: 100, top: 50, width: 400, height: 200 })
+  );
+});
+
+it.each([
+  { originX: 'right', originY: 'bottom', mode: 'crop' },
+  { originX: 0.5, originY: 0, mode: 'expand' },
+] as const)('uses $originX/$originY origin in $mode mode', ({ originX, originY, mode }) => {
+  useEditorStore.getState().setCanvasCropAspectRatio(2);
+  useEditorStore.getState().setCanvasCropMode(mode);
+  const bindings = {
+    getCanvas: () => ({ getZoom: () => 1, _currentTransform: { originX, originY } }),
+    getCanvasDocumentSize: () => ({ width: 1000, height: 800 }),
+    setCropState: vi.fn(),
+  };
+  mocks.isEditorCropGuide.mockReturnValue(true);
+  mocks.createCropSelectionFromRect.mockReturnValueOnce({
+    left: 100,
+    top: 100,
+    width: 300,
+    height: 100,
+  });
+  syncCropGuideInteraction(bindings as never, { id: 'crop-guide' } as never);
+  const selection = bindings.setCropState.mock.calls[0]![1];
+  expect(Math.abs(selection.width - selection.height * 2)).toBeLessThanOrEqual(1.5);
 });

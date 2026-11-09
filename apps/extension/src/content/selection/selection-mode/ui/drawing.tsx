@@ -1,3 +1,7 @@
+import { createContentSimplifyDependencies } from '../../../drawing/simplify';
+import { getContentRuntimeServices } from '../../../application/runtime-services/services';
+import { readSimplifyPngDimensions } from '../../../../contracts/messaging/contracts/runtime-message/simplify.types';
+import type { FrozenSelectionFrame } from '../types';
 import type { ContentSizeTooltipDom } from '@sniptale/ui/content-size-tooltip/dom';
 import type { ContentDrawingCaptureSnapshot } from '../../../drawing/capture';
 import {
@@ -62,12 +66,33 @@ function projectCropFrameDrawingMode(container: HTMLElement, drawing: boolean) {
 export function createSelectionDrawingRuntime(options: {
   container: HTMLElement;
   initialDrawing: boolean;
+  frozenFrame?: FrozenSelectionFrame;
   onModeChange(drawing: boolean): void;
   onLayout(): void;
 }) {
   const history = createCropDrawingHistory();
+  const dependencies = createContentSimplifyDependencies({
+    services: getContentRuntimeServices(),
+    getBounds: () => ({
+      ...getDrawingViewportProjection({ kind: 'viewport', element: null }),
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }),
+    getRetainedSource: () => {
+      const frame = options.frozenFrame;
+      if (!frame) return null;
+      frame.geometry.assertViewport();
+      const dimensions = readSimplifyPngDimensions(frame.dataUrl);
+      if (!dimensions) throw new Error('Frozen source is invalid.');
+      return {
+        dataUrl: frame.dataUrl,
+        ...dimensions,
+        bounds: { x: 0, y: 0, width: frame.geometry.width, height: frame.geometry.height },
+      };
+    },
+  });
   const controller: ContentDrawingController = {
-    ...createContentDrawingController(history.session),
+    ...createContentDrawingController(history.session, dependencies),
     prepareActivation: () => true,
   };
   const stopPreferences = synchronizeContentDrawingPreferences(controller);
@@ -165,6 +190,7 @@ export function createSelectionDrawingRuntime(options: {
       view.dispose();
       slots?.dispose();
       stopPreferences();
+      controller.simplify?.dispose();
       controller.session.dispose();
     },
   };

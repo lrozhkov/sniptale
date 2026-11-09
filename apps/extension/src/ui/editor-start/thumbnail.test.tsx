@@ -93,3 +93,34 @@ it('keeps a fallback for missing, failed, unavailable and undecodable previews',
   expect(container.textContent).toContain('Fallback');
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:cover');
 });
+
+it('keeps a loaded image during same-id refresh, missing results and failure until replacement', async () => {
+  vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:first').mockReturnValueOnce('blob:next');
+  await render();
+  let finish!: (blob: Blob | undefined) => void;
+  load.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  await render();
+  expect(container.querySelector('img')?.src).toBe('blob:first');
+  expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  await act(async () => finish(undefined));
+  expect(container.querySelector('img')?.src).toBe('blob:first');
+  load.mockRejectedValueOnce(new Error('temporary read failure'));
+  await render();
+  expect(container.querySelector('img')?.src).toBe('blob:first');
+  await render();
+  expect(container.querySelector('img')?.src).toBe('blob:next');
+  expect(URL.revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:first');
+});
+
+it('does not keep a previous identity visible while the next image is pending', async () => {
+  await render(item('first'));
+  load.mockImplementationOnce(() => new Promise(() => {}));
+  await render(item('second'));
+  expect(container.querySelector('img')).toBeNull();
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:cover');
+});

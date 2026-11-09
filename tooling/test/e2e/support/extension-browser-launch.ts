@@ -26,6 +26,8 @@ type LaunchExtensionBrowserOptions = {
   userDataDir?: string;
   fakeMediaDevices?: boolean;
   showScrollbars?: boolean;
+  /** Enables native document restoration only for explicit lifecycle proof. */
+  enableBackForwardCache?: boolean;
   autoGrantMediaPermissions?: boolean;
   ignoreHTTPSErrors?: boolean;
   windowCaptureTitle?: string;
@@ -138,6 +140,7 @@ export async function launchExtensionBrowser(
       headless: process.env.PLAYWRIGHT_HEADLESS !== '0',
       ignoreDefaultArgs: [
         '--disable-extensions',
+        ...(options.enableBackForwardCache ? ['--disable-back-forward-cache'] : []),
         ...(options.showScrollbars ? ['--hide-scrollbars'] : []),
       ],
     });

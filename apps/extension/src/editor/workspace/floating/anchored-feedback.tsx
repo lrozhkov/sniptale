@@ -219,6 +219,7 @@ export function EditorAnchoredHistoryChoices(props: {
           compact
           tone="secondary"
           className={`${rowClass} !h-auto !justify-start !whitespace-normal`}
+          data-command-layout="multiline"
           data-history-start="true"
           disabled={!props.canReturnToStart}
           onClick={props.onReturnToStart}
@@ -237,6 +238,7 @@ export function EditorAnchoredHistoryChoices(props: {
           compact
           tone="secondary"
           className={`${rowClass} !h-auto !justify-start !whitespace-normal`}
+          data-command-layout="multiline"
           data-history-original="true"
           onClick={props.onRestoreOriginal}
         >

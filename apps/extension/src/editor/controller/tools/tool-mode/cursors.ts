@@ -6,6 +6,7 @@ export function resolveEditorToolCursor(tool: EditorTool, arrowDrawFromTip = fal
     case 'pencil':
     case 'marker':
     case 'arrow':
+    case 'simplify':
     case 'blur':
     case 'text':
     case 'select':

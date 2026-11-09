@@ -59,7 +59,12 @@ it('omits unavailable favicon and still completes the configured header', async 
       faviconWebsite: 'https://example.test',
     })
   ).resolves.toEqual({ dataUrl: raster });
-  expect(mocks.favicon).toHaveBeenCalledWith('https://example.test', expect.any(AbortSignal));
+  expect(mocks.favicon).toHaveBeenCalledWith(
+    'https://example.test',
+    expect.any(AbortSignal),
+    expect.any(Function),
+    undefined
+  );
 });
 it('releases the object URL after raster failure and allows an explicit retry', async () => {
   fail = true;
@@ -98,4 +103,40 @@ it('finishes the header after the optional favicon budget even when acquisition 
     await rendering;
     vi.useRealTimers();
   }
+});
+
+it.each([true, false, undefined])(
+  'allows redirected acquisition only with a background guard receipt: %s',
+  async (ready) => {
+    mocks.favicon.mockImplementation(async (_website, _signal, ensureGuard) => {
+      await ensureGuard();
+      return null;
+    });
+    await expect(
+      renderQuickActionHeader({
+        header: { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true },
+        source: { width: 1280, height: 560 },
+        faviconWebsite: 'https://example.test',
+        ...(ready === undefined ? {} : { faviconRedirectGuardReady: ready }),
+      })
+    ).resolves.toEqual({ dataUrl: raster });
+    const callback = mocks.favicon.mock.calls[0]![2];
+    if (ready) await expect(callback()).resolves.toBeUndefined();
+    else await expect(callback()).rejects.toThrow('guard was not installed');
+  }
+);
+
+it('forwards the optional browser metadata hint without accessing tabs from offscreen', async () => {
+  await renderQuickActionHeader({
+    header: { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true },
+    source: { width: 1280, height: 560 },
+    faviconWebsite: 'https://example.test',
+    faviconHintUrl: 'https://example.test/brand.svg',
+  });
+  expect(mocks.favicon).toHaveBeenCalledWith(
+    'https://example.test',
+    expect.any(AbortSignal),
+    expect.any(Function),
+    'https://example.test/brand.svg'
+  );
 });

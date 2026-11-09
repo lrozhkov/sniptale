@@ -6,7 +6,6 @@ export {
   WORKSPACE_BACKGROUND_PALETTE,
   clampGridSize,
   getBrowserCanvasModeOptions,
-  getBrowserContentModeOptions,
   getFrameBackgroundImageFitOptions,
   getFrameBackgroundModeOptions,
   getFrameGradientPresets,

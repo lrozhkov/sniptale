@@ -6,6 +6,13 @@
       "owner": "background-web-snapshot-asset-fetch",
       "justification": "The capture-session owner performs anonymous public HTTPS asset fetches after URL and session authorization.",
       "reviewNote": "Every fetch must retain private-network rejection, session authority, credentials omit, pre-network redirect guard installation, redirect policy, and final-URL revalidation."
+    },
+    {
+      "file": "apps/extension/src/platform/network/https-redirects.ts",
+      "owner": "platform-public-https-head-redirects",
+      "requestPolicy": "guarded-head",
+      "justification": "The platform resolver follows anonymous public HTTPS redirects with HEAD before a separate nonredirecting body fetch.",
+      "reviewNote": "Require validated public HTTPS targets without userinfo, the canonical guard default awaited before fetch, anonymous HEAD/follow/no-referrer/no-store with AbortSignal, and final URL revalidation."
     }
   ],
   "secretHeaderOwners": [

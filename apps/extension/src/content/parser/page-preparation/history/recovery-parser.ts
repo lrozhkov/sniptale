@@ -296,3 +296,9 @@ export function parsePagePreparationRecovery(value: unknown): PagePreparationRec
     return null;
   }
 }
+
+/** Validates persisted annotation evidence without retaining document targets. */
+export function parseBrowserAnnotationSnapshot(value: unknown) {
+  const result = annotations.safeParse(value);
+  return result.success ? result.data : null;
+}

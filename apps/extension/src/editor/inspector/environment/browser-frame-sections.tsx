@@ -1,95 +1,25 @@
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import React, { useState } from 'react';
+import React from 'react';
 import { translate } from '../../../platform/i18n';
-import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
-import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
+import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import { SelectField, type CompactSelectOption } from '../../chrome/ui';
-import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from '../chrome';
-
-interface BrowserFrameState {
-  canvasMode: 'resize' | 'keep-size';
-  contentMode: 'push-down' | 'fit-content';
-}
+import type { BrowserFrameState } from '../../../features/editor/document/types';
 
 export const BrowserFrameBehaviorSections: React.FC<{
   browserCanvasModeOptions: CompactSelectOption<'resize' | 'keep-size'>[];
-  browserContentModeOptions: CompactSelectOption<'push-down' | 'fit-content'>[];
-  browserFrame: BrowserFrameState;
+  browserFrame: Pick<BrowserFrameState, 'canvasMode' | 'contentMode'>;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
-}> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => (
-  <fieldset className="sniptale-parameter-stack">
-    <legend className="sr-only">{translate('editor.compact.browserFrameLayout')}</legend>
-    <SelectField
-      label={translate('editor.compact.canvasBehavior')}
-      options={browserCanvasModeOptions}
-      value={browserFrame.canvasMode}
-      onChange={(value) =>
-        fireAndReportEditorAction('browser-frame-canvas-mode', () =>
-          syncBrowserFrame({ canvasMode: value })
-        )
-      }
-    />
-    <SelectField
-      label={translate('editor.compact.sceneBehavior')}
-      options={browserContentModeOptions}
-      value={browserFrame.contentMode}
-      onChange={(value) =>
-        fireAndReportEditorAction('browser-frame-content-mode', () =>
-          syncBrowserFrame({ contentMode: value })
-        )
-      }
-    />
-  </fieldset>
-);
-
-export const BrowserFrameResetSection: React.FC<{
-  disabled?: boolean;
-  resetBrowserFrame: () => Promise<void> | void;
-}> = ({ disabled = false, resetBrowserFrame }) => {
-  const [pending, setPending] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-
-  const handleReset = async () => {
-    if (disabled || pending) return;
-
-    setPending(true);
-    setActionError(null);
-    try {
-      await runAndReportEditorAction('browser-frame-reset', resetBrowserFrame, {
-        fallbackKey: 'editor.compact.browserFrameApplyFailed',
-        notify: false,
-      });
-    } catch (error) {
-      setActionError(
-        createUserFacingErrorMessage({
-          cause: error,
-          detail: 'unexpected',
-          summaryKey: 'editor.compact.browserFrameApplyFailed',
+}> = ({ browserCanvasModeOptions, browserFrame, syncBrowserFrame }) => (
+  <SelectField
+    label={translate('windowHeader.placement')}
+    options={browserCanvasModeOptions}
+    value={browserFrame.canvasMode}
+    onChange={(value) =>
+      fireAndReportEditorAction('browser-frame-composition', () =>
+        syncBrowserFrame({
+          canvasMode: value,
+          contentMode: value === 'resize' ? 'push-down' : 'fit-content',
         })
-      );
-    } finally {
-      setPending(false);
+      )
     }
-  };
-
-  return (
-    <div className="space-y-2">
-      {actionError ? (
-        <p role="alert" className="text-xs text-[color:var(--sniptale-color-danger)]">
-          {actionError}
-        </p>
-      ) : null}
-      <ProductActionButton
-        compact
-        tone="secondary"
-        type="button"
-        className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
-        disabled={disabled || pending}
-        aria-busy={pending}
-        onClick={() => void handleReset()}
-      >
-        {pending ? translate('common.states.loading') : translate('windowHeader.reset')}
-      </ProductActionButton>
-    </div>
-  );
-};
+  />
+);

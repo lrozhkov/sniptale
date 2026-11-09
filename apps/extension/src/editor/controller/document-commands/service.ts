@@ -4,7 +4,7 @@ import type {
   EditorRenderToDataUrlOptions,
 } from '../../document/model/render-options';
 import type { EditorSessionAutosaveService } from '../../document/session-autosave';
-import type { OpenImageOptions } from '../core/types';
+import type { OpenImageOptions, EditorDocumentOpenOptions } from '../core/types';
 import {
   closeEditorDocumentViaController,
   copyRenderedEditorImageViaController,
@@ -25,7 +25,11 @@ interface EditorDocumentCommandOperations<TAdapter = EditorControllerPublicApiAd
   closeDocument(controller: TAdapter): void;
   copyRenderedImage(controller: TAdapter, options?: EditorRenderedImageOptions): Promise<void>;
   exportDocument(controller: TAdapter): EditorDocument;
-  loadDocument(controller: TAdapter, document: EditorDocument): Promise<void>;
+  loadDocument(
+    controller: TAdapter,
+    document: EditorDocument,
+    options?: EditorDocumentOpenOptions
+  ): Promise<void>;
   openImage(
     controller: TAdapter,
     dataUrl: string,
@@ -44,7 +48,8 @@ export interface EditorDocumentCommandService<TAdapter = EditorControllerPublicA
   exportDocument(controller: EditorDocumentCommandController<TAdapter>): EditorDocument;
   loadDocument(
     controller: EditorDocumentCommandController<TAdapter>,
-    document: EditorDocument
+    document: EditorDocument,
+    options?: EditorDocumentOpenOptions
   ): Promise<void>;
   openImage(
     controller: EditorDocumentCommandController<TAdapter>,
@@ -94,8 +99,10 @@ function buildEditorDocumentCommandService<TAdapter>(args: {
       await persistAutosaveSnapshot(controller);
     },
 
-    async loadDocument(controller, document) {
-      await args.operations.loadDocument(controller.getPublicApiAdapter(), document);
+    async loadDocument(controller, document, options) {
+      if (options)
+        await args.operations.loadDocument(controller.getPublicApiAdapter(), document, options);
+      else await args.operations.loadDocument(controller.getPublicApiAdapter(), document);
       await persistAutosaveSnapshot(controller);
     },
 

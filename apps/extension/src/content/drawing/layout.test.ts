@@ -6,7 +6,8 @@ import { renderDrawingObject } from './render';
 vi.mock('./render', () => ({ renderDrawingObject: vi.fn() }));
 import { afterEach, expect, it, vi } from 'vitest';
 import { createContentDrawingController } from './controller';
-import { createDrawingLayout } from './layout';
+import { createDrawingLayout, clipDrawingObjectToRoot } from './layout';
+import { createDefaultSimplifySettings } from '../../features/simplify/settings';
 import { createDrawingSession, type DrawingDocumentCommit } from '../../features/drawing/public';
 
 const history = { commitEntry: () => true, subscribeToClear: () => () => undefined };
@@ -229,4 +230,77 @@ it('does not attach a previously free object when a page element appears beneath
   expect(
     controller.getObjectAnchor?.(controller.session.getSnapshot().document.objects[1]!)
   ).toBeNull();
+});
+
+it('keeps header Simplify pixels aligned when the internal scroller moves', () => {
+  const scroll = document.createElement('div');
+  const header = document.createElement('div');
+  document.body.append(header, scroll);
+  vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 100, 800, 500));
+  vi.spyOn(header, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 800, 80));
+  Object.defineProperty(document, 'elementsFromPoint', {
+    configurable: true,
+    value: () => [header, document.body],
+  });
+  const layout = createDrawingLayout(() => ({ kind: 'element', element: scroll }));
+  const object = {
+    id: 'header',
+    kind: 'simplify' as const,
+    bounds: { x: 20, y: -80, width: 60, height: 30 },
+    settings: createDefaultSimplifySettings(),
+    source: {
+      dataUrl: 'data:image/png;base64,',
+      width: 800,
+      height: 600,
+      bounds: { x: 0, y: -100, width: 800, height: 600 },
+    },
+    sourceDirty: false,
+  };
+  layout.projection.capture(object);
+  expect(layout.getAnchor(object)).toBe(header);
+  scroll.scrollTop = 150;
+  const projected = layout.projection.resolve(object);
+  expect(projected).toMatchObject({
+    bounds: { y: 70 },
+    source: { bounds: { y: 50 } },
+    sourceDirty: false,
+  });
+  if (projected.kind !== 'simplify' || !projected.source) throw new Error('Expected source');
+  expect(projected.bounds.y - projected.source.bounds.y).toBe(
+    object.bounds.y - object.source.bounds.y
+  );
+  layout.dispose();
+});
+
+it('clips a body mask and leaves header mask and pending header regions visible', () => {
+  const scroll = document.createElement('div');
+  const body = document.createElement('div');
+  const header = document.createElement('div');
+  scroll.append(body);
+  document.body.append(header, scroll);
+  vi.spyOn(scroll, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 100, 800, 500));
+  const root = { kind: 'element' as const, element: scroll };
+  const mask = {
+    id: 'mask',
+    kind: 'simplify' as const,
+    bounds: { x: 20, y: -80, width: 60, height: 30 },
+    settings: createDefaultSimplifySettings(),
+  };
+  expect(clipDrawingObjectToRoot(mask, root, header)).toBe(false);
+  expect(clipDrawingObjectToRoot(mask, root, body)).toBe(true);
+  expect(clipDrawingObjectToRoot(mask, root, null)).toBe(false);
+});
+
+it('preserves an existing anchor for an uncommitted Simplify preview version', () => {
+  const { controller, target } = fixture();
+  const object = {
+    id: 'preview-anchor',
+    kind: 'simplify' as const,
+    bounds: { x: 310, y: 110, width: 60, height: 30 },
+    settings: createDefaultSimplifySettings(),
+  };
+  controller.session.commitObject(object);
+  expect(controller.getObjectAnchor?.({ ...object, bounds: { ...object.bounds, y: 500 } })).toBe(
+    target
+  );
 });

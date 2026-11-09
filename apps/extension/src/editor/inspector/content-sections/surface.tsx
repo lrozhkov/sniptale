@@ -24,7 +24,6 @@ export interface EditorInspectorContentSurfaceSectionsProps extends Omit<
   browserFrame: BrowserFrameState;
   workspace: EditorWorkspaceSettings;
   browserCanvasModeOptions: CompactSelectOption<BrowserFrameState['canvasMode']>[];
-  browserContentModeOptions: CompactSelectOption<BrowserFrameState['contentMode']>[];
   workspaceColorError: string | null;
   workspaceColorMatchesDefault: boolean;
   workspaceDefaultSavePending: boolean;
@@ -79,7 +78,6 @@ export function renderEditorInspectorContentSurfaceSections(
       <EditorInspectorBrowserFramePanel
         browserFrame={props.browserFrame}
         browserCanvasModeOptions={props.browserCanvasModeOptions}
-        browserContentModeOptions={props.browserContentModeOptions}
         syncBrowserFrame={props.syncBrowserFrame}
         {...(props.insertOrUpdateBrowserFrame === undefined
           ? {}

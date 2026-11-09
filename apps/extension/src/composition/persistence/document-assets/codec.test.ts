@@ -516,3 +516,61 @@ it('discards a shared staged source once after a later slot fails and permits re
   );
   expect(retried.refs.every((ref) => ref.assetId !== 'asset-1')).toBe(true);
 });
+
+it('externalizes Simplify source and result and restores both for document transfer', async () => {
+  const document = createEditorDocumentFixture();
+  document.canvasJson = JSON.stringify({
+    objects: [
+      {
+        type: 'image',
+        src: 'data:image/png;base64,cmVzdWx0',
+        sniptaleSimplifySourceData: 'data:image/png;base64,c291cmNl',
+      },
+    ],
+  });
+  const prepared = await preparePersistedEditorDocument(document);
+  expect(prepared.document.assets.map((asset) => asset.role)).toContain(
+    'canvas:$.objects[0].sniptaleSimplifySourceData'
+  );
+  expect(prepared.document.canvasJson).not.toContain('data:');
+  expect(parsePersistedEditorDocument(prepared.document)).toEqual(prepared.document);
+  mocks.readAssetFile.mockImplementation(
+    async (_ref, role: string) =>
+      new File([role.endsWith('.src') ? 'result' : 'source'], 'raster', { type: 'image/png' })
+  );
+  const materialized = await materializePersistedEditorDocumentForLegacyTransfer({
+    document: prepared.document,
+    refs: prepared.refs,
+  });
+  expect(JSON.parse(materialized.canvasJson).objects[0]).toMatchObject({
+    src: 'data:image/png;base64,cmVzdWx0',
+    sniptaleSimplifySourceData: 'data:image/png;base64,c291cmNl',
+  });
+});
+
+it.each([800, 0, -20])(
+  'preserves composition extents %s through asset persistence, hydration and portable transfer',
+  async (extent) => {
+    const base = { sourceWidth: 800, sourceHeight: 600, canvasWidth: extent, canvasHeight: extent };
+    const document = { ...createEditorDocumentFixture(), compositionBase: base };
+    const prepared = await preparePersistedEditorDocument(document);
+    expect(prepared.document.compositionBase).toEqual(base);
+    const parsed = parsePersistedEditorDocument(prepared.document)!;
+    expect(parsed.compositionBase).toEqual(base);
+    mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+    const hydrated = await hydratePersistedEditorDocument({
+      document: parsed,
+      refs: prepared.refs,
+    });
+    try {
+      expect(hydrated.document.compositionBase).toEqual(base);
+    } finally {
+      hydrated.release();
+    }
+    const transferred = await materializePersistedEditorDocumentForLegacyTransfer({
+      document: parsed,
+      refs: prepared.refs,
+    });
+    expect(transferred.compositionBase).toEqual(base);
+  }
+);

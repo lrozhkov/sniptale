@@ -27,9 +27,18 @@ export function applyEditorDrawingInteractionControls(object: FabricObject): voi
 
 export function applyEditorDrawingActiveSelectionChrome(object: FabricObject | undefined): void {
   if (!(object instanceof ActiveSelection)) return;
-  if (!isEditorDrawingSelection(object)) return;
+  const projected = object
+    .getObjects()
+    .some((member) => member.sniptaleType === 'frame-annotation');
+  if (!isEditorDrawingSelection(object) && !projected) return;
   const locked = object.getObjects().some((member) => member.sniptaleLocked);
   applyDrawingSelectionChrome(object, { controls: !locked });
+  if (projected) {
+    object.controls = {};
+    object.set({ lockRotation: true, lockScalingX: true, lockScalingY: true, hasControls: false });
+    object.setCoords();
+    return;
+  }
   const rotation = createDrawingRotationControl();
   const rotate = rotation.actionHandler;
   rotation.actionHandler = (event, transform, sceneX, sceneY) => {

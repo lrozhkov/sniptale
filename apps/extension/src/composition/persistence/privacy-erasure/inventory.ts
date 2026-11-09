@@ -108,6 +108,7 @@ const aiProviderSecretKeys = [
 const localSensitiveKeys = [
   'sniptale.nativeApp.trustedClient',
   'sniptale_page_recovery',
+  'sniptale_design_review_sessions',
   'sniptale_background_presets',
   ALPHA_RESET_JOURNAL_KEY,
   DATABASE_BACKUP_RECEIPT_KEY,
@@ -136,6 +137,7 @@ const localSensitiveKeys = [
 const sessionSensitiveKeys = [
   'sniptale.nativeApp.autoConnectPaused',
   'sniptale_page_recovery_claims',
+  'sniptale_design_review_bindings',
   'diagnostics-active-sessions',
   'interaction-diagnostics-active-sessions',
   'scenario-tab-sessions',

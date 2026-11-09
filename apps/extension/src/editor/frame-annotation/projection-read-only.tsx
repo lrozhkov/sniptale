@@ -9,7 +9,7 @@ import type { resolveFrameAnnotationVisualScene } from '../../features/highlight
 import type { FrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
 import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
-/** Renders crop-mode frame content without editing controls. */
+/** Renders frame content without editing controls. */
 export function FrameProjectionReadOnlyOverlays(props: {
   coordinateSpace: FrameAnnotationCoordinateSpace;
   controlsRoot: HTMLDivElement | null;
@@ -40,6 +40,7 @@ export function FrameProjectionReadOnlyOverlays(props: {
           chrome="export"
           controlsPortalTarget={props.controlsRoot ?? props.sceneRoot}
           frameRect={props.snapshot}
+          frameId={props.snapshot.id}
           portalTheme={null}
           settings={badge}
           showSettingsHandle={false}

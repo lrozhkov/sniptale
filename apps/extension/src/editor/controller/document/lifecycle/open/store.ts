@@ -5,11 +5,12 @@ export function syncOpenedDocumentState(options: {
   dataUrl: string;
   faviconDataUrl?: string | null;
   pageTitle: string;
+  preserveInspector?: boolean;
 }): void {
   const store = useEditorStore.getState();
 
   store.setShowOutsideCanvas(false);
-  store.setInspector('file');
+  if (!options.preserveInspector) store.setInspector('file');
   store.setFreshImageBackgroundPending(true);
   store.setImageData(options.dataUrl);
   store.setPageTitle(options.pageTitle);
@@ -20,11 +21,11 @@ export function syncOpenedDocumentState(options: {
   });
 }
 
-export function syncLoadedDocumentState(sourceImageData: string): void {
+export function syncLoadedDocumentState(sourceImageData: string, preserveInspector = false): void {
   const store = useEditorStore.getState();
 
   store.setShowOutsideCanvas(false);
-  store.setInspector('file');
+  if (!preserveInspector) store.setInspector('file');
   store.setFreshImageBackgroundPending(false);
   store.setImageData(sourceImageData);
 }

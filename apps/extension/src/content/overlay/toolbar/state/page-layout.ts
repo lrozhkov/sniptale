@@ -57,6 +57,7 @@ const MODE_ITEMS: Record<PageToolbarMode, PageToolbarLayoutItem[]> = {
     'drawing-shape',
     'drawing-arrow',
     'drawing-blur',
+    'drawing-simplify',
   ],
   highlighter: [
     'annotation-effects',
@@ -73,6 +74,7 @@ const MODE_ITEMS: Record<PageToolbarMode, PageToolbarLayoutItem[]> = {
     'editing-ai-text',
   ],
   'design-review': [
+    'review-navigate',
     'review-comment',
     'review-inspect',
     'review-compare',

@@ -266,3 +266,20 @@ function runActionCallbackBridgeSuite() {
 }
 
 describe('public-api action callback bridges', runActionCallbackBridgeSuite);
+
+it('preserves the active tool only for an explicit successful insertion selection', () => {
+  const controller = createController();
+  selectEditorControllerLayer(controller, 'created', {
+    preserveActiveTool: true,
+    focusViewport: false,
+  });
+  expect(controller.switchToSelectTool).not.toHaveBeenCalled();
+  expect(controller.setLastLayerSelectionAnchorId).toHaveBeenCalledWith('created');
+  selectEditorControllerLayer(controller, 'ordinary');
+  expect(controller.switchToSelectTool).toHaveBeenCalledOnce();
+  controller.switchToSelectTool.mockClear();
+  mocks.selectEditorLayerByIdMock.mockReturnValueOnce(false);
+  selectEditorControllerLayer(controller, 'missing', { preserveActiveTool: true });
+  expect(controller.switchToSelectTool).not.toHaveBeenCalled();
+  expect(controller.setLastLayerSelectionAnchorId).toHaveBeenCalledTimes(2);
+});

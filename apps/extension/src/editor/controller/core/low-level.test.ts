@@ -115,22 +115,25 @@ function registerHelperTests() {
 }
 
 function registerGridTests() {
-  it('snaps editable objects to the workspace grid', () => {
-    const object = createGridObject();
+  it.each([false, true])(
+    'snaps editable objects independently of grid visibility (%s)',
+    (gridEnabled) => {
+      const object = createGridObject();
 
-    applyEditorGridSnap(
-      object as never,
-      {
-        gridEnabled: true,
-        gridSize: 10,
-        gridSnapEnabled: true,
-      } as never
-    );
+      applyEditorGridSnap(
+        object as never,
+        {
+          gridEnabled,
+          gridSize: 10,
+          gridSnapEnabled: true,
+        } as never
+      );
 
-    expect(object.left).toBe(10);
-    expect(object.top).toBe(30);
-    expect(object.setCoords).toHaveBeenCalledOnce();
-  });
+      expect(object.left).toBe(10);
+      expect(object.top).toBe(30);
+      expect(object.setCoords).toHaveBeenCalledOnce();
+    }
+  );
 
   it('skips grid snapping for non-user and source-owned objects', () => {
     const object = createGridObject();

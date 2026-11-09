@@ -113,9 +113,9 @@ function registerEditorFrameDefaultTests() {
     expect(normalizeEditorImageSettings({ shadow: 20 }).shadowBlur).toBe(0);
     expect(normalizeEditorImageSettings({ shadowBlur: 12 }).shadowBlur).toBe(12);
     expect(resolveEditorSourceImageGlowBlur({ ...DEFAULT_EDITOR_IMAGE_SETTINGS, shadow: 20 })).toBe(
-      15
+      30
     );
-    expect(resolveEditorSourceImageGlowBlur(settingsWithoutBlur)).toBe(15);
+    expect(resolveEditorSourceImageGlowBlur(settingsWithoutBlur)).toBe(30);
   });
 
   it(
@@ -216,4 +216,14 @@ it('keeps custom icon provenance across image normalization and clears it for we
   expect(
     normalizeBrowserFrameState({ ...local, faviconEnabled: false }).faviconSource
   ).toBeUndefined();
+});
+
+it('retains header composition baseline during document normalization', () => {
+  const compositionBase = {
+    sourceWidth: 801,
+    sourceHeight: 601,
+    canvasWidth: 801,
+    canvasHeight: 601,
+  };
+  expect(normalizeBrowserFrameState({ compositionBase }).compositionBase).toEqual(compositionBase);
 });

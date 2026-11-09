@@ -486,3 +486,129 @@ it('reads committed drawing geometry without publishing or replacing the live pr
   });
   session.dispose();
 });
+
+it('keeps simplify edits, duplication, refused commits and history replay in versioned sessions', () => {
+  const commits: DrawingDocumentCommit[] = [];
+  let accepted = true;
+  const session = createDrawingSession({
+    onDocumentCommit: (commit) => {
+      if (accepted) commits.push(commit);
+      return accepted;
+    },
+  });
+  const draft = {
+    id: 'simplify',
+    kind: 'simplify' as const,
+    bounds: { x: 1, y: 2, width: 30, height: 40 },
+    settings: createDefaultDrawingToolDefaults().simplify,
+  };
+  session.commitObject(draft);
+  expect(session.getCommittedDocument()).toEqual({ version: 2, objects: [draft] });
+  session.previewObjects([{ ...draft, bounds: { ...draft.bounds, x: 99 } }]);
+  expect(session.getSnapshot().document.version).toBe(2);
+  expect(session.getCommittedDocument().objects[0]).toEqual(draft);
+  session.clearObjectPreview();
+  session.duplicateSelected();
+  expect(session.getCommittedDocument().objects).toHaveLength(2);
+  expect(session.getCommittedDocument().version).toBe(2);
+  const committed = session.getCommittedDocument();
+  accepted = false;
+  session.clear();
+  expect(session.getCommittedDocument()).toBe(committed);
+  accepted = true;
+  const first = commits[0]!;
+  expect(first.replay(first.before)).toBe(true);
+  expect(session.getCommittedDocument()).toEqual({ version: 1, objects: [] });
+  expect(first.replay(first.after)).toBe(true);
+  expect(session.getCommittedDocument()).toEqual({ version: 2, objects: [draft] });
+  session.select(draft.id);
+  session.deleteSelected();
+  expect(session.getCommittedDocument()).toEqual({ version: 1, objects: [] });
+});
+
+it('appends a prepared batch in one V2 history commit and replays the complete batch', () => {
+  const commits: DrawingDocumentCommit[] = [];
+  const session = createDrawingSession({
+    onDocumentCommit: (commit) => {
+      commits.push(commit);
+      return true;
+    },
+  });
+  const blur = {
+    id: 'blur-batch',
+    kind: 'blur' as const,
+    bounds: { x: 0, y: 0, width: 10, height: 10 },
+  };
+  const simplify = {
+    id: 'simplify-batch',
+    kind: 'simplify' as const,
+    bounds: blur.bounds,
+    settings: createDefaultDrawingToolDefaults().simplify,
+    engineVersion: 'performance4',
+  };
+  const batch = [blur, simplify];
+  session.commitObjects(batch);
+  expect(commits).toHaveLength(1);
+  expect(session.getCommittedDocument()).toEqual({ version: 2, objects: batch });
+  expect(session.getSnapshot().selectedObjectIds).toEqual(batch.map((object) => object.id));
+  expect(session.getCommittedDocument().objects[0]).toBe(blur);
+  expect(session.getCommittedDocument().objects[1]).toBe(simplify);
+  expect(commits[0]!.replay(commits[0]!.before)).toBe(true);
+  expect(session.getCommittedDocument()).toEqual({ version: 1, objects: [] });
+  expect(commits[0]!.replay(commits[0]!.after)).toBe(true);
+  expect(session.getCommittedDocument()).toEqual({ version: 2, objects: batch });
+  expect(commits).toHaveLength(1);
+});
+
+it('refuses batches with existing, repeated or malformed identities without changing selection or data', () => {
+  const onDocumentCommit = vi.fn(() => true);
+  const session = createDrawingSession({ onDocumentCommit });
+  const existing = {
+    id: 'existing',
+    kind: 'blur' as const,
+    bounds: { x: 0, y: 0, width: 10, height: 10 },
+  };
+  session.commitObject(existing);
+  const before = session.getSnapshot();
+  const fresh = { ...existing, id: 'fresh' };
+  for (const batch of [
+    [],
+    [fresh, existing],
+    [fresh, { ...fresh }],
+    [fresh, { ...fresh, id: '' }],
+    [fresh, { ...fresh, id: 'x'.repeat(257) }],
+  ]) {
+    const original = structuredClone(batch);
+    session.commitObjects(batch);
+    expect(session.getSnapshot()).toEqual(before);
+    expect(session.getCommittedDocument()).toBe(before.document);
+    expect(batch).toEqual(original);
+  }
+  expect(onDocumentCommit).toHaveBeenCalledTimes(1);
+});
+
+it('rolls back refused prepared batches and applies batch selection policy on acceptance', () => {
+  let accepted = true;
+  const commits = vi.fn(() => accepted);
+  const session = createDrawingSession({ onDocumentCommit: commits });
+  const old = {
+    id: 'old-batch',
+    kind: 'blur' as const,
+    bounds: { x: 0, y: 0, width: 10, height: 10 },
+  };
+  session.commitObject(old);
+  const before = session.getSnapshot();
+  const batch = [
+    { ...old, id: 'new-a' },
+    { ...old, id: 'new-b' },
+  ];
+  accepted = false;
+  session.commitObjects(batch);
+  expect(session.getSnapshot()).toEqual(before);
+  expect(session.getCommittedDocument()).toBe(before.document);
+  accepted = true;
+  session.commitObjects(batch, { select: false });
+  expect(session.getCommittedDocument()).toEqual({ version: 1, objects: [old, ...batch] });
+  expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+  expect(commits).toHaveBeenCalledTimes(3);
+});

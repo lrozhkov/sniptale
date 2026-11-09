@@ -65,7 +65,7 @@ export function snapExternalEditorResizeRectForController(
   const workspace = useEditorStore.getState().workspace;
   const snapped = controller.magnetManager?.snapResizeRect?.(input) ?? input.rect;
   if (workspace.magnetEnabled && controller.magnetManager?.hasActiveGuides()) return snapped;
-  if (!workspace.gridEnabled || !workspace.gridSnapEnabled) return snapped;
+  if (!workspace.gridSnapEnabled) return snapped;
   const size = Math.max(1, workspace.gridSize);
   const right = snapped.x + snapped.width;
   const bottom = snapped.y + snapped.height;

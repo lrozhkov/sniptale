@@ -31,10 +31,11 @@ export interface TextFieldProps extends ProductInputProps {
   inputClassName?: string | undefined;
   label: string;
   trailingActions?: React.ReactNode;
+  stacked?: boolean;
 }
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { className, invalid = false, label, trailingActions, ...props },
+  { className, invalid = false, label, trailingActions, stacked, ...props },
   ref
 ) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -49,6 +50,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
     return (
       <InspectorParameterRow
         label={label}
+        stacked={stacked ?? false}
         valueMinimum={trailingActions ? 220 : 144}
         valueText={String(props.value ?? uncontrolledText)}
         className={className}

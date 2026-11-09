@@ -25,6 +25,16 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
       ? {}
       : { maxExpandedHeightRatio: args.maxExpandedHeightRatio }),
   });
+  const { initialScrollOffset, onScrollOffsetChange } = args;
+  useLayoutEffect(() => {
+    const list = height.listRef.current;
+    if (!list || !state.expanded) return;
+    if (initialScrollOffset === undefined && !onScrollOffsetChange) return;
+    if (initialScrollOffset !== undefined) list.scrollTop = initialScrollOffset;
+    const remember = () => onScrollOffsetChange?.(list.scrollTop);
+    list.addEventListener('scroll', remember, { passive: true });
+    return () => list.removeEventListener('scroll', remember);
+  }, [height.listRef, state.expanded, initialScrollOffset, onScrollOffsetChange]);
   const handleLayerDrop = useMemo(
     () =>
       createLayerDropHandler({

@@ -108,6 +108,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/voice-input`
 - `apps/extension/src/contracts/aggregate-promotion.ts`
 - `apps/extension/src/contracts/ai`
+- `apps/extension/src/contracts/design-review-session.ts`
 - `apps/extension/src/contracts/diagnostics.test.ts`
 - `apps/extension/src/contracts/diagnostics.ts`
 - `apps/extension/src/contracts/effect-runtime`
@@ -139,6 +140,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/features/prompt-templates`
 - `apps/extension/src/features/quick-actions-presets`
 - `apps/extension/src/features/scenario`
+- `apps/extension/src/features/simplify`
 - `apps/extension/src/features/tab-capabilities`
 - `apps/extension/src/features/video`
 - `apps/extension/src/features/viewport-presets`
@@ -147,6 +149,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/platform/i18n`
 - `apps/extension/src/platform/media-utils`
 - `apps/extension/src/platform/navigation`
+- `apps/extension/src/platform/network`
 - `apps/extension/src/platform/runtime-messaging`
 - `apps/extension/src/platform/security-e2e-control`
 - `apps/extension/src/ui/action-audio`
@@ -223,6 +226,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/scenario-capture-edit`
 - `apps/extension/src/workflows/scenario-narration`
 - `apps/extension/src/workflows/settings-transfer`
+- `apps/extension/src/workflows/simplify`
 - `apps/extension/src/workflows/sync-transfer`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`
@@ -315,6 +319,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/runtime/routing/capabilities/popup-tab/route-capabilities.ts`
 - `apps/extension/src/background/runtime/tab-mode-router/router.ts`
 - `apps/extension/src/background/scenario/router/index.ts`
+- `apps/extension/src/background/simplify/route.ts`
 - `apps/extension/src/background/sync-connection/product-route.ts`
 - `apps/extension/src/background/sync-connection/route.ts`
 - `apps/extension/src/background/voice-input/route.ts`

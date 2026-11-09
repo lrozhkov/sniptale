@@ -2,7 +2,11 @@ import type { EditorDocument } from '../../../../features/editor/document/types'
 import { closeEditorControllerDocument } from '../../document/lifecycle/close/run';
 import { openEditorControllerImage } from '../../document/lifecycle/open/image/run';
 import { openLoadedEditorControllerDocument } from '../../document/lifecycle/open/load/run';
-import type { ApplyDocumentOptions, OpenImageOptions } from '../../core/types';
+import type {
+  ApplyDocumentOptions,
+  OpenImageOptions,
+  EditorDocumentOpenOptions,
+} from '../../core/types';
 import { useEditorStore } from '../../../state/useEditorStore';
 import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 import type {
@@ -44,10 +48,12 @@ export async function openEditorImageViaController(
 
 export async function loadEditorDocumentViaController(
   controller: EditorDocumentOpenLifecycleController,
-  document: EditorDocument
+  document: EditorDocument,
+  openOptions: EditorDocumentOpenOptions = {}
 ): Promise<void> {
   await openLoadedEditorControllerDocument({
     document,
+    ...openOptions,
     applyDocument: (nextDocument, applyOptions) =>
       applyNewDocumentWithOutsideHidden(controller, nextDocument, applyOptions),
     scheduleZoomToFit: () => controller.scheduleZoomToFit(),

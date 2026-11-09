@@ -1,11 +1,5 @@
 import { expect, it } from 'vitest';
-import {
-  hasBrowserFrameSourceSizeChange,
-  resolveBrowserFrameRelayoutOptions,
-  resolveBrowserFrameScene,
-  resolveNextBrowserFramePosition,
-  resolveNextBrowserFrameWidth,
-} from './layout';
+import { resolveBrowserFrameScene, resolveNextBrowserFramePosition } from './layout';
 
 const currentSource = {
   dataUrl: 'data:image/png;base64,source',
@@ -45,66 +39,6 @@ it('resolves browser-frame source deltas into layer position', () => {
       nextSource: { left: 35, top: 75 },
     })
   ).toEqual({ left: 35, top: 75 - (86 * 480) / 900 });
-});
-
-it('resolves browser-frame size changes into layer width', () => {
-  expect(
-    hasBrowserFrameSourceSizeChange({
-      currentSource,
-      nextSource: { height: 480, width: 800 },
-    })
-  ).toBe(true);
-  expect(
-    hasBrowserFrameSourceSizeChange({
-      currentSource,
-      nextSource: { height: 480, width: 640 },
-    })
-  ).toBe(false);
-  expect(
-    resolveNextBrowserFrameWidth({
-      currentSource,
-      existingLayer: null,
-      nextSource: { height: 720, width: 1280 },
-    })
-  ).toBe(1280);
-  expect(
-    resolveNextBrowserFrameWidth({
-      currentSource,
-      existingLayer: { getScaledWidth: () => 700 } as never,
-      nextSource: { height: 480, width: 640 },
-    })
-  ).toBe(700);
-  expect(
-    resolveNextBrowserFrameWidth({
-      currentSource,
-      existingLayer: null,
-      nextSource: { height: 480, width: 640 },
-    })
-  ).toBe(640);
-});
-
-it('maps browser-frame modes to relayout options', () => {
-  expect(
-    resolveBrowserFrameRelayoutOptions({
-      canvasMode: 'keep-size',
-      contentMode: 'fit-content',
-    } as never)
-  ).toEqual({
-    fitSourceToContent: true,
-    hasBrowserFrame: true,
-    preserveCanvasSize: true,
-  });
-
-  expect(
-    resolveBrowserFrameRelayoutOptions({
-      canvasMode: 'resize',
-      contentMode: 'push-down',
-    } as never)
-  ).toEqual({
-    fitSourceToContent: false,
-    hasBrowserFrame: true,
-    preserveCanvasSize: false,
-  });
 });
 
 it('resolves browser-frame scene layout with default relayout flags', () => {

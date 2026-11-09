@@ -1,3 +1,4 @@
+import { prepareAppliedDocument } from './prepare-applied';
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -359,4 +360,31 @@ it('serializes the editable caption separately from the source name', () => {
   const renamed = buildEditorCanvasDocument({ ...options, displayName: 'Renamed image' });
   expect(renamed).toEqual({ ...before, displayName: 'Renamed image' });
   expect(renamed.sourceName).toBe(before.sourceName);
+});
+
+it('retains the shared composition baseline through export and document preparation', () => {
+  const { options } = createEditorCanvasDocumentOptions();
+  const base = { sourceWidth: 800, sourceHeight: 600, canvasWidth: 800, canvasHeight: 600 };
+  const document = buildEditorCanvasDocument({
+    ...options,
+    source: {
+      id: 'source',
+      dataUrl: 'data:image/png;base64,source',
+      name: null,
+      intrinsicWidth: 800,
+      intrinsicHeight: 600,
+      displayWidth: 640,
+      displayHeight: 480,
+      left: 60,
+      top: 60,
+      visible: true,
+      locked: true,
+      compositionBase: base,
+    },
+  });
+  expect(document.compositionBase).toEqual(base);
+  expect(document.compositionBase).not.toBe(base);
+  const restored = prepareAppliedDocument(document);
+  expect(restored.source.compositionBase).toEqual(base);
+  expect(restored.source.compositionBase).not.toBe(document.compositionBase);
 });

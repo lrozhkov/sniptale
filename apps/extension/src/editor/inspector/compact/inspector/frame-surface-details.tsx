@@ -1,16 +1,15 @@
+import { RotateCcw } from 'lucide-react';
 import {
   changeFrameBackgroundMode,
-  disableFrameBackground,
+  resetFrameBackground,
+  isFrameBackgroundDefault,
   isFrameBackgroundNone,
 } from '../../scene/background/settings';
 import { translate } from '../../../../platform/i18n';
 import { CompactCommandField, CompactCommandToken, type CompactCommand } from '..';
 import type { InspectorCommandParams } from './command-types';
-import { EditorInspectorFrameBackgroundFillEditor } from '../../scene';
-import { EditorInspectorBackgroundBlurControl } from '../../scene/background/blur';
-import { EditorInspectorFrameBackgroundModeControl } from '../../scene/placement/background';
+import { EditorInspectorFramePanel } from '../../scene/panel';
 import { FramePaddingFields } from '../../scene/padding';
-import { EditorInspectorFramePreviewCard } from '../../scene/preview/card';
 
 function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCommand {
   return {
@@ -24,46 +23,38 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
         label={translate('editor.compact.sceneBackground')}
         value={params.backgroundSummary}
       >
-        <div className="space-y-1">
-          <EditorInspectorFrameBackgroundModeControl
-            frameDraft={params.frameDraft}
-            lastFillModeRef={params.lastFillModeRef}
-            setBackgroundMode={(backgroundMode) =>
-              params.setFrameDraft((state) => changeFrameBackgroundMode(state, backgroundMode))
-            }
-          />
-          {!isFrameBackgroundNone(params.frameDraft) && (
-            <>
-              <EditorInspectorFramePreviewCard
-                backgroundPreviewStyle={params.backgroundPreviewStyle}
-                frameDraft={params.frameDraft}
-              />
-              <EditorInspectorFrameBackgroundFillEditor
-                frameDraft={params.frameDraft}
-                gradientPresets={params.frameGradientPresets}
-                frameBackgroundPalette={params.frameBackgroundPalette}
-                frameBackgroundImageFitOptions={params.frameBackgroundImageFitOptions}
-                recentColors={params.recentColors}
-                toNumber={params.toNumber}
-                applyGradientPreset={params.applyGradientPreset}
-                previewFramePatch={(patch: Partial<typeof params.frameDraft>) => {
-                  params.setFrameDraft((state) => ({ ...state, ...patch }));
-                }}
-                applyFramePatch={(patch: Partial<typeof params.frameDraft>) => {
-                  params.setFrameDraft((state) => ({ ...state, ...patch }));
-                }}
-                onPickBackgroundImage={params.onPickBackgroundImage}
-                onClearBackgroundImage={params.clearBackgroundImage}
-              />
-              <EditorInspectorBackgroundBlurControl
-                frameDraft={params.frameDraft}
-                applyFramePatch={(patch) =>
-                  params.setFrameDraft((state) => ({ ...state, ...patch }))
-                }
-              />
-            </>
-          )}
-        </div>
+        <EditorInspectorFramePanel
+          scenePresetHeader={null}
+          frameDraft={params.frameDraft}
+          lastFillModeRef={params.lastFillModeRef}
+          backgroundPreviewStyle={params.backgroundPreviewStyle}
+          framePaddingSummary={params.framePaddingSummary}
+          frameLayoutModeOptions={params.frameLayoutModeOptions}
+          frameBackgroundModeOptions={params.frameBackgroundModeOptions}
+          gradientPresets={params.frameGradientPresets}
+          frameBackgroundPalette={params.frameBackgroundPalette}
+          frameBackgroundImageFitOptions={params.frameBackgroundImageFitOptions}
+          lineStyleOptions={params.lineStyleOptions}
+          shapeStrokePalette={params.shapeStrokePalette}
+          recentColors={params.recentColors}
+          toNumber={params.toNumber}
+          setFrameDraft={params.setFrameDraft}
+          previewFrameDraft={params.previewFrameDraft}
+          setLayoutMode={(layoutMode) =>
+            params.setFrameDraft((state) => ({ ...state, layoutMode }))
+          }
+          setBackgroundMode={(mode) =>
+            params.setFrameDraft((state) => changeFrameBackgroundMode(state, mode))
+          }
+          applyGradientPreset={params.applyGradientPreset}
+          previewFramePatch={(patch) =>
+            params.previewFrameDraft?.((state) => ({ ...state, ...patch }))
+          }
+          applyFramePatch={(patch) => params.setFrameDraft((state) => ({ ...state, ...patch }))}
+          onPickBackgroundImage={params.onPickBackgroundImage}
+          onClearBackgroundImage={params.clearBackgroundImage}
+          onApplyFrame={params.onApplyFrame}
+        />
       </CompactCommandField>
     ),
   };
@@ -81,7 +72,11 @@ function buildFramePaddingCommand(params: InspectorCommandParams): CompactComman
         label={translate('editor.compact.scenePadding')}
         value={params.framePaddingSummary}
       >
-        <FramePaddingFields frameDraft={params.frameDraft} setFrameDraft={params.setFrameDraft} />
+        <FramePaddingFields
+          frameDraft={params.frameDraft}
+          setFrameDraft={params.setFrameDraft}
+          previewFrameDraft={params.previewFrameDraft}
+        />
       </CompactCommandField>
     ),
   };
@@ -90,12 +85,17 @@ function buildFramePaddingCommand(params: InspectorCommandParams): CompactComman
 export function buildFrameSurfaceCommands(params: InspectorCommandParams): CompactCommand[] {
   return [
     buildFrameBackgroundCommand(params),
-    ...(!isFrameBackgroundNone(params.frameDraft) ? [buildFramePaddingCommand(params)] : []),
-    {
-      id: 'frame-apply',
-      title: translate('editor.scene.resetBackground'),
-      trigger: <CompactCommandToken>↺</CompactCommandToken>,
-      onClick: () => params.setFrameDraft(disableFrameBackground),
-    },
+    ...(!isFrameBackgroundNone(params.frameDraft)
+      ? [
+          buildFramePaddingCommand(params),
+          {
+            id: 'frame-apply',
+            title: translate('editor.scene.resetBackground'),
+            disabled: isFrameBackgroundDefault(params.frameDraft),
+            trigger: <RotateCcw size={15} aria-hidden="true" />,
+            onClick: () => params.setFrameDraft(resetFrameBackground),
+          },
+        ]
+      : []),
   ];
 }

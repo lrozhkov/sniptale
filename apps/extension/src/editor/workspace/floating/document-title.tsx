@@ -50,7 +50,18 @@ export function EditorDocumentTitleEditor(props: {
   useEffect(() => {
     if (!editing && restoreFocus.current) {
       restoreFocus.current = false;
-      trigger.current?.focus();
+      const button = trigger.current;
+      if (!button) return;
+      const clearRestoredFocus = () => {
+        button.removeAttribute('data-focus-restoration');
+        button.removeEventListener('blur', clearRestoredFocus);
+        button.removeEventListener('keydown', clearRestoredFocus);
+      };
+      button.setAttribute('data-focus-restoration', 'pointer');
+      button.focus({ preventScroll: true });
+      button.addEventListener('blur', clearRestoredFocus);
+      button.addEventListener('keydown', clearRestoredFocus);
+      return clearRestoredFocus;
     }
   }, [editing]);
 

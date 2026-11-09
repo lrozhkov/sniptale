@@ -9,6 +9,7 @@ import {
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../../platform/i18n';
+import { useReviewSessionRuntime } from '../../../application/design-review-session/use-session';
 import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
 import type { ToolbarMenuState } from '../state/menu';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
@@ -173,6 +174,7 @@ function getErrorMessage(action: ToolbarAnnotationExportAction): string {
 }
 
 export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
+  const reviewSession = useReviewSessionRuntime();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [menuHeight, setMenuHeight] = useState(230);
   const menuSide = useToolbarMenuDirection(() =>
@@ -229,7 +231,14 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
 
       busyRef.current = true;
       setBusyAction(action);
-      void executeToolbarAnnotationExportAction(action, contentIntentSource)
+      const operation = reviewSession?.getSnapshot().active
+        ? executeToolbarAnnotationExportAction(
+            action,
+            contentIntentSource,
+            reviewSession.exportSnapshot
+          )
+        : executeToolbarAnnotationExportAction(action, contentIntentSource);
+      void operation
         .then(() => {
           showToast(getSuccessMessage(action), 'success');
           closeMenuAfterAction();
@@ -242,7 +251,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
           setBusyAction(null);
         });
     },
-    [props.disabled, closeMenuAfterAction]
+    [props.disabled, closeMenuAfterAction, reviewSession]
   );
 
   return (

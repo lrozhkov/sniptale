@@ -59,7 +59,8 @@ for (const theme of ['light', 'dark'] as const) {
         );
         expect(Math.abs(geometry[0]!.x - geometry[1]!.x)).toBeLessThanOrEqual(1);
         expect(geometry[1]!.y - geometry[0]!.y).toBeCloseTo(44, 0);
-        const baselines = await section
+        const baselines = await dimensions
+          .locator('..')
           .locator('.sniptale-parameter-name')
           .evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().y));
         for (let index = 1; index < baselines.length; index++) {
@@ -94,7 +95,7 @@ for (const theme of ['light', 'dark'] as const) {
           await width.click();
           await width.fill('640');
           await width.press('Enter');
-          const apply = section.getByRole('button', {
+          const apply = section.locator('[data-ui="editor.resize.actions"]').getByRole('button', {
             name: label('editor.compact.applyImageSize'),
             exact: true,
           });
@@ -105,6 +106,7 @@ for (const theme of ['light', 'dark'] as const) {
           await page.screenshot({ path: info.outputPath('image-resized.png'), fullPage: false });
         } else {
           await section
+            .getByRole('group', { name: label('editor.compact.cropWithinCanvas'), exact: true })
             .getByRole('button', { name: label('editor.compact.expandCanvas'), exact: true })
             .click();
           await width.click();
@@ -116,12 +118,14 @@ for (const theme of ['light', 'dark'] as const) {
           await ui(page, 'editor.floating.layers.mode.canvas-size').click();
           await expect(width).toHaveValue('640');
           await section
+            .getByRole('group', { name: label('editor.compact.cropWithinCanvas'), exact: true })
             .getByRole('button', { name: label('editor.compact.expandCanvas'), exact: true })
             .click();
           await width.click();
           await width.fill('720');
           await width.press('Enter');
           await section
+            .locator('[data-ui="editor.resize.actions"]')
             .getByRole('button', { name: label('editor.compact.applyExpandCanvas'), exact: true })
             .click();
           await expect(ui(page, 'editor.floating.layers.mode.layers')).toHaveAttribute(
@@ -132,12 +136,13 @@ for (const theme of ['light', 'dark'] as const) {
           await expect(width).toHaveValue('720');
           await page.screenshot({ path: info.outputPath('canvas-expanded.png'), fullPage: false });
           await section
+            .getByRole('group', { name: label('editor.compact.cropWithinCanvas'), exact: true })
             .getByRole('button', { name: label('editor.compact.cropWithinCanvas'), exact: true })
             .click();
           await width.click();
           await width.fill('480');
           await width.press('Enter');
-          const apply = section.getByRole('button', {
+          const apply = section.locator('[data-ui="editor.resize.actions"]').getByRole('button', {
             name: label('editor.compact.applyCropCanvas'),
             exact: true,
           });

@@ -1,5 +1,9 @@
+import { createContentSimplifyDependencies } from '../../../drawing/simplify';
+import { getContentRuntimeServices } from '../../../application/runtime-services/services';
+import { getDrawingViewportProjection } from '../../../drawing/interaction';
+import { resolvePageScrollRoot } from '../../../platform/page-scroll';
 import { pagePreparationHistory } from '../../../parser/page-preparation/history';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { disableAiPickModeIfLoaded } from '../../ai/pick/runtime/lazy';
 import { disableHighlighterMode } from '../../../selection/highlighter';
 import { disableQuickEditDocumentMode, disableQuickEditMode } from '../../../selection/quick-edit';
@@ -204,11 +208,30 @@ function useVideoRecordingModeConflictRecovery(args: {
   }, [disableDrawing, modeController, modeState, videoRecordingController]);
 }
 
+function usePageDrawingSimplifyDependencies() {
+  return useMemo(
+    () =>
+      createContentSimplifyDependencies({
+        services: getContentRuntimeServices(),
+        getBounds: () => ({
+          ...getDrawingViewportProjection(resolvePageScrollRoot()),
+          width: window.innerWidth,
+          height: window.innerHeight,
+        }),
+      }),
+    []
+  );
+}
+
 export function useContentAppControllers(
   modeState: ContentAppModeStateValue,
   dependencies: ContentAppControllerDependencies
 ): ContentCoreControllers {
-  const drawingController = useContentDrawingController(pagePreparationHistory);
+  const simplifyDependencies = usePageDrawingSimplifyDependencies();
+  const drawingController = useContentDrawingController(
+    pagePreparationHistory,
+    simplifyDependencies
+  );
   const scenarioController = useContentScenarioController(modeState);
   const baseAiController = useContentAiController(modeState, dependencies);
   const baseModeController = useContentToolbarModeController(modeState);

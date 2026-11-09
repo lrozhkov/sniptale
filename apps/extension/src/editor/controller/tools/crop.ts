@@ -7,6 +7,7 @@ export {
 export { cropRenderedEditorDocument } from './crop-render';
 export {
   createCropSelectionFromRect,
+  constrainEditorCropResize,
   normalizeEditorCropSelection,
   normalizeEditorFreeCanvasSelection,
   clampEditorFreeCanvasSelectionPosition,

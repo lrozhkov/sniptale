@@ -27,6 +27,7 @@ export interface EditorInspectorFramePanelProps {
   recentColors: string[];
   shapeStrokePalette?: readonly string[] | undefined;
   toNumber: (value: string, fallback?: number) => number;
+  previewFrameDraft?: React.Dispatch<React.SetStateAction<EditorFrameSettings>> | undefined;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
   setLayoutMode: (value: EditorFrameSettings['layoutMode']) => void;
   setBackgroundMode: (value: EditorFrameSettings['backgroundMode'] | 'none') => void;

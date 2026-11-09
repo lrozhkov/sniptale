@@ -69,12 +69,13 @@ export function EditorFloatingRightStack({
   };
   const layersPanel = renderLayersPanel(props);
 
-  if (layersCollapsed && documentController.inspector !== 'layer-effects') {
-    return layersPanel;
-  }
-
+  const collapsed = layersCollapsed && documentController.inspector !== 'layer-effects';
+  // Keep the panel owner mounted; contents preserves the collapsed toolbar's anchor geometry.
   return (
-    <div data-ui="editor.floating.right-stack" className={RIGHT_STACK_CLASS_NAME}>
+    <div
+      data-ui="editor.floating.right-stack"
+      className={collapsed ? 'contents' : RIGHT_STACK_CLASS_NAME}
+    >
       {layersPanel}
     </div>
   );

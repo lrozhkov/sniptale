@@ -1,3 +1,7 @@
+import { replaceCurrentEditorSnapshotHistory } from '../../../history';
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../../../platform/i18n';
+import { mountEditorSimplifyRuntime } from '../../../../drawing/simplify-runtime';
 import type { Canvas } from 'fabric';
 import { useEditorStore } from '../../../../state/useEditorStore';
 import { attachEditorControllerEventHandlers } from '../../../events';
@@ -22,6 +26,7 @@ export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
     fireMiddleClick: false,
     preserveObjectStacking: true,
     selection: true,
+    selectionFullyContained: true,
     selectionKey: 'ctrlKey',
     targetFindTolerance: 5,
     uniformScaling: false,
@@ -69,6 +74,29 @@ export function mountEditorController(
     canvas.setRenderViewport(viewportElement, stageElement);
 
     controller.canvas = canvas;
+    if (controller.createSimplifyCompute)
+      mountEditorSimplifyRuntime({
+        canvas,
+        createCompute: controller.createSimplifyCompute,
+        prepareObject: (object) => controller.prepareObject(object),
+        commitHistory: () => controller.commitHistory(),
+        syncRuntimeState: () => controller.syncRuntimeState(),
+        publishDerived: () => {
+          const history = controller.history;
+          if (!history) return false;
+          const changed = replaceCurrentEditorSnapshotHistory({
+            history,
+            expectedRevision: history.getRevision(),
+            exportDocument: () => controller.exportDocument(),
+          });
+          if (changed) {
+            controller.autosaveService?.scheduleAutosave(controller.exportDocument());
+            controller.syncRuntimeState();
+          }
+          return changed;
+        },
+        reportFailure: () => showToast(translate('content.toolbar.drawingSimplifyFailed'), 'error'),
+      });
     controller.viewportElement = viewportElement;
     controller.stageElement = stageElement;
     controller.zoomLevel = 1;

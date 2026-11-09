@@ -3,7 +3,7 @@ import {
   parseWindowHeader,
 } from '@sniptale/runtime-contracts/window-header';
 import { parseEditorFrameGradient } from './frame-gradient';
-import type { EditorDocument } from './types';
+import type { EditorCompositionBase, EditorDocument } from './types';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import {
   isNullable,
@@ -102,6 +102,36 @@ function isEditorFrameSettings(value: unknown): boolean {
   );
 }
 
+/** Validate the source and canvas baseline before it can control composition allocation. */
+export function isEditorCompositionBase(value: unknown): value is EditorCompositionBase {
+  if (!isRecord(value)) return false;
+  const { sourceWidth, sourceHeight, canvasWidth, canvasHeight } = value;
+  if (
+    typeof sourceWidth !== 'number' ||
+    typeof sourceHeight !== 'number' ||
+    typeof canvasWidth !== 'number' ||
+    typeof canvasHeight !== 'number'
+  )
+    return false;
+  return (
+    [sourceWidth, sourceHeight].every(
+      (size) => Number.isFinite(size) && size >= 1 && size <= 32768
+    ) &&
+    [canvasWidth, canvasHeight].every(
+      (extent) => Number.isFinite(extent) && Math.abs(extent) <= 32768
+    ) &&
+    sourceWidth * sourceHeight <= 100000000 &&
+    Math.abs(canvasWidth * canvasHeight) <= 100000000
+  );
+}
+
+function isOptionalHeaderCompositionBase(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isEditorCompositionBase(value) && value.canvasWidth >= 1 && value.canvasHeight >= 1)
+  );
+}
+
 function isBrowserFrameState(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -120,6 +150,7 @@ function isBrowserFrameState(value: unknown): boolean {
       faviconDataUrl: value['faviconDataUrl'] ?? undefined,
       faviconSource: value['faviconSource'] ?? undefined,
     }) !== null &&
+    isOptionalHeaderCompositionBase(value['compositionBase']) &&
     (value['canvasMode'] === 'resize' || value['canvasMode'] === 'keep-size') &&
     (value['contentMode'] === 'push-down' || value['contentMode'] === 'fit-content')
   );
@@ -140,6 +171,7 @@ export function isEditorDocument(value: unknown): value is EditorDocument {
     isNumber(value['sourceTop']) &&
     isNumber(value['sourceDisplayWidth']) &&
     isNumber(value['sourceDisplayHeight']) &&
+    (value['compositionBase'] === undefined || isEditorCompositionBase(value['compositionBase'])) &&
     isEditorFrameSettings(value['frame']) &&
     (value['browserFrame'] === undefined || isBrowserFrameState(value['browserFrame'])) &&
     isString(value['canvasJson']) &&

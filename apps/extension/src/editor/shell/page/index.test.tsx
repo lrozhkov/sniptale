@@ -20,7 +20,18 @@ const {
   flushEditorAutosaveIfNeededMock: vi.fn(),
   loadEditorPageDefaultsMock: vi.fn(),
   openEditorBootstrapPayloadMock: vi.fn(),
-  useEditorStoreMock: vi.fn(),
+  useEditorStoreMock: Object.assign(vi.fn(), {
+    getState: vi.fn(),
+    subscribe:
+      vi.fn<
+        (
+          listener: (
+            state: { framePreviewActive: boolean },
+            previous: { framePreviewActive: boolean }
+          ) => void
+        ) => () => void
+      >(),
+  }),
   useAppLocaleMock: vi.fn(),
   useCommandPaletteHotkeyMock: vi.fn(),
 }));
@@ -121,6 +132,7 @@ function createEditorStoreState(
   > = {}
 ) {
   return {
+    framePreviewActive: false,
     imageData: 'data:image/png;base64,1',
     pageTitle: 'Image name',
     hydrateDefaults: vi.fn(),
@@ -133,6 +145,8 @@ function createEditorStoreState(
 type EditorStoreState = ReturnType<typeof createEditorStoreState>;
 
 function applyEditorStoreState(state: EditorStoreState) {
+  useEditorStoreMock.getState.mockReturnValue(state);
+  useEditorStoreMock.subscribe.mockImplementation(() => vi.fn());
   useEditorStoreMock.mockImplementation((selector: (editorState: EditorStoreState) => unknown) =>
     selector(state)
   );
@@ -307,6 +321,85 @@ describe('EditorPage', () => {
     'routes bootstrap events through the extracted runtime opener and disposes services on unmount',
     verifiesBootstrapEventRoutingAndDispose
   );
+  it('binds an existing preview immediately without clearing its owner state on disposal', async () => {
+    const services = createServices();
+    const state = createEditorStoreState();
+    state.framePreviewActive = true;
+    createEditorPageServicesMock.mockReturnValue(services);
+    applyEditorStoreState(state);
+    await renderEditorPage();
+    expect(services.autosaveService.setInteractionActive).toHaveBeenLastCalledWith(true);
+    await act(async () => root?.unmount());
+    root = null;
+    expect(services.autosaveService.setInteractionActive).toHaveBeenLastCalledWith(false);
+    expect(state.framePreviewActive).toBe(true);
+  });
+  it('holds autosave through preview quiet time and blur, and releases only after all activity ends', async () => {
+    vi.useFakeTimers();
+    try {
+      const services = createServices();
+      const state = createEditorStoreState();
+      createEditorPageServicesMock.mockReturnValue(services);
+      applyEditorStoreState(state);
+      await renderEditorPage();
+      const active = services.autosaveService.setInteractionActive;
+      const setPreview = (framePreviewActive: boolean) => {
+        const previous = { ...state };
+        state.framePreviewActive = framePreviewActive;
+        useEditorStoreMock.subscribe.mock.calls[0]?.[0](state, previous);
+      };
+      const pointer = (type: string) => {
+        const event = new Event(type);
+        Object.defineProperty(event, 'pointerId', { value: 1 });
+        window.dispatchEvent(event);
+      };
+      pointer('pointerdown');
+      setPreview(true);
+      pointer('pointerup');
+      expect(active).toHaveBeenLastCalledWith(true);
+      window.dispatchEvent(new Event('input'));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(active).toHaveBeenLastCalledWith(true);
+      window.dispatchEvent(new Event('blur'));
+      expect(active).toHaveBeenLastCalledWith(true);
+      setPreview(false);
+      expect(active).toHaveBeenLastCalledWith(false);
+
+      setPreview(true);
+      window.dispatchEvent(new Event('input'));
+      setPreview(false);
+      expect(active).toHaveBeenLastCalledWith(true);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(active).toHaveBeenLastCalledWith(false);
+      setPreview(true);
+      pointer('pointerdown');
+      setPreview(false);
+      expect(active).toHaveBeenLastCalledWith(true);
+      pointer('pointerup');
+      expect(active).toHaveBeenLastCalledWith(false);
+      setPreview(true);
+      window.dispatchEvent(new Event('compositionstart'));
+      setPreview(false);
+      expect(active).toHaveBeenLastCalledWith(true);
+      window.dispatchEvent(new Event('compositionend'));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(active).toHaveBeenLastCalledWith(false);
+
+      setPreview(true);
+      const unsubscribe = useEditorStoreMock.subscribe.mock.results[0]?.value;
+      await act(async () => root?.unmount());
+      root = null;
+      expect(active).toHaveBeenLastCalledWith(false);
+      expect(unsubscribe).toHaveBeenCalledOnce();
+      active.mockClear();
+      pointer('pointerdown');
+      window.dispatchEvent(new Event('input'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(active).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('tracks held pointers and input idle time, and removes activity listeners on unmount', async () => {
     vi.useFakeTimers();
     try {

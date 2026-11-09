@@ -26,7 +26,9 @@ import { useEditorInspectorSidebarLocalState } from './local-state';
 import { useEditorPresetStorageState } from './presets';
 import { useEditorInspectorPresetHeaders } from './preset-headers';
 
-type EditorInspectorLocalState = ReturnType<typeof useEditorInspectorSidebarLocalState>;
+type EditorInspectorLocalState = ReturnType<typeof useEditorInspectorSidebarLocalState> & {
+  previewFrameDraft?: ReturnType<typeof useCommittedFrameDraft>['previewFrameDraft'] | undefined;
+};
 type EditorInspectorActionGroups = ReturnType<typeof useEditorInspectorSidebarActions>;
 type EditorInspectorActions = EditorInspectorActionGroups['catalogActions'] &
   EditorInspectorActionGroups['editorActions'] &
@@ -75,14 +77,17 @@ function useSidebarDerivedState(
     workspaceBackgroundColor: store.workspace.backgroundColor,
     workspaceDefaultColor,
   });
-  const setFrameDraft = useCommittedFrameDraft({
-    frame: drafts.frameDraft,
+  const frameDraftActions = useCommittedFrameDraft({
+    frame: store.frame,
+    active: store.inspector === 'frame',
+    onPreviewActivityChange: (framePreviewActive) =>
+      useEditorStore.setState({ framePreviewActive }),
     setDraft: drafts.setFrameDraft,
-    apply: (frame) => {
-      if (hasImage) editorController.applyFrameSettings(frame);
+    apply: (frame, options) => {
+      if (hasImage) return editorController.applyFrameSettings(frame, options);
     },
   });
-  const localState = { ...drafts, setFrameDraft };
+  const localState = { ...drafts, ...frameDraftActions };
   const derived = useEditorInspectorSidebarDerived({
     ...derivedParams,
     editorPresetState,

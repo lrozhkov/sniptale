@@ -18,7 +18,7 @@ import { ReviewToolsSection } from '../settings/sections/tools';
 import { useDesignReviewPopoverMetrics } from '../popover/position';
 import { useDesignReviewPopoverDrag } from '../popover/drag';
 
-const LABELS: Record<Exclude<DesignReviewTool, 'comment'>, TranslationKey> = {
+const LABELS: Record<Exclude<DesignReviewTool, 'comment' | 'navigate'>, TranslationKey> = {
   inspect: 'content.designReview.toolInspect',
   compare: 'content.designReview.toolCompare',
   move: 'content.designReview.toolMove',
@@ -83,7 +83,7 @@ function WorkspaceTree(props: {
 
 /** The workspace position belongs to the review session, not to the selected element. */
 interface ToolPanelProps {
-  tool: Exclude<DesignReviewTool, 'comment'>;
+  tool: Exclude<DesignReviewTool, 'comment' | 'navigate'>;
   checkOpen?: boolean;
   checks?: DesignReviewChecks;
   onFinding?: (finding: ReviewCheckFinding, action: 'show' | 'inspect' | 'comment') => void;

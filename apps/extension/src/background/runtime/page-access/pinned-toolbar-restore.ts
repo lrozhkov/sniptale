@@ -24,15 +24,19 @@ type PinnedToolbarRestoreState = Pick<
 
 export async function restorePinnedToolbarAfterNavigation(
   tabId: number,
-  runtimeState: PinnedToolbarRestoreState
+  runtimeState: PinnedToolbarRestoreState,
+  reviewActive = false
 ): Promise<boolean> {
   const operation = beginPinnedToolbarRestoreOperation(tabId);
   return operation.runExclusive(async () => {
-    if (!operation.isCurrent() || !(await readPinToTabSessionStorageState(tabId))) {
+    if (
+      !operation.isCurrent() ||
+      (!reviewActive && !(await readPinToTabSessionStorageState(tabId)))
+    ) {
       return false;
     }
 
-    if (!operation.isCurrent() || !(await hasPinnedToolbarAllSitesAccess())) {
+    if (!operation.isCurrent() || (!reviewActive && !(await hasPinnedToolbarAllSitesAccess()))) {
       return false;
     }
 
@@ -67,7 +71,11 @@ export async function restorePinnedToolbarAfterNavigation(
       runtimeState.viewportOwnerState,
       runtimeState.webSnapshotViewerPorts,
       {
-        commitGuard: async () => operation.isCurrent() && (await hasPinnedToolbarAllSitesAccess()),
+        commitGuard: async () =>
+          operation.isCurrent() &&
+          (reviewActive
+            ? await hasActivePageAccess(tabId)
+            : await hasPinnedToolbarAllSitesAccess()),
         readPreparationState: () => waitForContentToolbarReady(tabId),
         toolbarVisible,
       }

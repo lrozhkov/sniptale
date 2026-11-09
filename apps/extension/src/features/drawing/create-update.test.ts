@@ -175,3 +175,17 @@ describe('shared drawing creation', () => {
     ).toMatchObject({ start: point, end: start });
   });
 });
+
+it('creates a bounded simplify draft with independent settings and no unresolved raster promises', () => {
+  const defaults = createDefaultDrawingToolDefaults();
+  const draft = createDrawingObject('simplify', { x: 5, y: 6 }, 0, defaults);
+  expect(draft).toMatchObject({
+    kind: 'simplify',
+    bounds: { x: 5, y: 6, width: 0, height: 0 },
+    settings: defaults.simplify,
+  });
+  if (draft?.kind !== 'simplify') throw new Error('Expected simplify draft');
+  expect(draft.settings).not.toBe(defaults.simplify);
+  expect(draft).not.toHaveProperty('result');
+  expect(draft).not.toHaveProperty('source');
+});

@@ -6,6 +6,7 @@ import {
   type DrawingPoint,
 } from '../../features/drawing/public';
 import { renderDrawingObject } from './render';
+import { getContentSimplifyRasterBounds, getContentSimplifyMaskCorners } from './simplify-object';
 
 export type ContentDrawingCaptureSnapshot = {
   objects: readonly DrawingObject[];
@@ -100,7 +101,39 @@ export async function compositeContentDrawingCapture(
   const scaleY = canvas.height / snapshot.viewport.height;
   context.scale(scaleX, scaleY);
   for (const object of snapshot.objects) {
-    if (object.kind === 'blur') drawCaptureBlur(context, canvas, object, snapshot, scaleX);
+    if (object.kind === 'simplify') {
+      if (!object.result) continue;
+      const tile = await loadCaptureImage(object.result.dataUrl);
+      const bounds = getContentSimplifyRasterBounds(object);
+      context.save();
+      if (object.settings.automatic) {
+        const corners = getContentSimplifyMaskCorners(object);
+        context.beginPath();
+        context.moveTo(
+          corners[0]!.x - snapshot.projection.x,
+          corners[0]!.y - snapshot.projection.y
+        );
+        for (const point of corners.slice(1))
+          context.lineTo(point.x - snapshot.projection.x, point.y - snapshot.projection.y);
+        context.closePath();
+        context.clip();
+        context.drawImage(
+          tile,
+          bounds.x - snapshot.projection.x,
+          bounds.y - snapshot.projection.y,
+          bounds.width,
+          bounds.height
+        );
+      } else {
+        context.translate(
+          bounds.x + bounds.width / 2 - snapshot.projection.x,
+          bounds.y + bounds.height / 2 - snapshot.projection.y
+        );
+        context.rotate((getDrawingObjectRotation(object) * Math.PI) / 180);
+        context.drawImage(tile, -bounds.width / 2, -bounds.height / 2, bounds.width, bounds.height);
+      }
+      context.restore();
+    } else if (object.kind === 'blur') drawCaptureBlur(context, canvas, object, snapshot, scaleX);
     else renderDrawingObject(context, object, snapshot.projection);
   }
   const result = canvas.toDataURL('image/png');

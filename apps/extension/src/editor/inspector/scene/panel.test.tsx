@@ -1,3 +1,4 @@
+import { translate } from '../../../platform/i18n';
 // @vitest-environment jsdom
 
 import type React from 'react';
@@ -13,6 +14,9 @@ const paddingSection = vi.fn();
 const applyButton = vi.fn();
 const presetHeader = vi.fn();
 
+vi.mock('../../../composition/background-resources/catalog', () => ({
+  useBackgroundCatalog: () => ({ presets: [], status: 'ready' }),
+}));
 vi.mock('../presets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../presets')>()),
   EditorInspectorPresetHeader: (props: React.PropsWithChildren<{ state: unknown }>) => {
@@ -255,10 +259,31 @@ it('renders scene controls without the template wrapper when no state is provide
   expect(container?.querySelector('[data-testid="mode-buttons"]')).not.toBeNull();
 });
 
-it('keeps an existing blur editable even on a solid fill', async () => {
+it('shows blur only for image or gradient backgrounds', async () => {
   const { props } = createPanelProps();
   await renderUi(
     <EditorInspectorFramePanel {...props} frameDraft={{ ...FRAME, backgroundBlurAmount: 4 }} />
   );
-  expect(container?.querySelector('[data-testid="background-blur-section"]')).not.toBeNull();
+  expect(container?.querySelector('[data-testid="background-blur-section"]')).toBeNull();
+});
+
+it('hides reset in None and keeps three open groups with placement in Composition', async () => {
+  const { props } = createPanelProps();
+  const { disableFrameBackground } = await import('./background/settings');
+  await renderUi(
+    <EditorInspectorFramePanel {...props} frameDraft={disableFrameBackground(FRAME)} />
+  );
+  expect(container?.querySelector('[data-testid="apply-button"]')).toBeNull();
+  await renderUi(<EditorInspectorFramePanel {...props} />);
+  const placement = container?.querySelector('[data-testid="placement-section"]');
+  expect(placement?.closest('details')?.querySelector('summary')?.textContent).toContain(
+    translate('editor.scene.placementSection')
+  );
+  expect(placement?.closest('details')?.open).toBe(true);
+  const groups = Array.from(
+    container?.querySelectorAll<HTMLDetailsElement>('details[data-level=section]') ?? []
+  );
+  expect(groups).toHaveLength(3);
+  expect(groups.every((group) => group.open)).toBe(true);
+  expect(container?.textContent).not.toContain(translate('editor.scene.backgroundAdvanced'));
 });

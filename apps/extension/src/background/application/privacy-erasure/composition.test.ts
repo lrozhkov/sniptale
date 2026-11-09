@@ -46,10 +46,13 @@ vi.mock('./runtime-cleanup', async (importOriginal) => ({
   configureBackgroundRuntimeScreenshotCleanupPort: screenshotCleanupPortMock,
 }));
 
+import { DesignReviewSessionService } from '../../design-review-session/service';
+import { DesignReviewSessionStorage } from '../../storage/design-review-session';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { createBackgroundRuntimeState } from '../runtime-state';
 import {
   configureAudioJobPrivacyErasurePort,
+  configureDesignReviewSessionPrivacyErasurePort,
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
   configureSyncPrivacyErasurePort,
@@ -317,4 +320,39 @@ it('fails closed and releases both reservations when shared protection preparati
   expect(storageCleanupMock).not.toHaveBeenCalled();
   expect(release).toHaveBeenCalledOnce();
   expect(syncRelease).toHaveBeenCalledOnce();
+});
+
+it('drains and revokes the installed Design Review owner before storage erasure', async () => {
+  const area = { get: async () => ({}), set: async () => {}, remove: async () => {} };
+  const service = new DesignReviewSessionService({
+    storage: new DesignReviewSessionStorage(area, area),
+    isCurrentDocument: async () => true,
+  });
+  const connection = service.connect({ tabId: 1, documentId: 'native-document' });
+  const opened = await connection.request({ requestId: crypto.randomUUID(), kind: 'open' });
+  const reserve = vi.spyOn(service, 'reserveErasureExclusion');
+  const cleanup = vi.spyOn(service, 'cleanup');
+  configureDesignReviewSessionPrivacyErasurePort(service);
+  const result = await eraseLocalExtensionDataFromBackground(
+    {
+      type: MessageType.ERASE_LOCAL_EXTENSION_DATA,
+      includeAiProviderSecrets: true,
+      preservePreferences: true,
+    },
+    createBackgroundRuntimeState()
+  );
+  expect(result.success).toBe(true);
+  expect(reserve).toHaveBeenCalledOnce();
+  expect(cleanup).toHaveBeenCalledBefore(storageCleanupMock);
+  expect(
+    (
+      await connection.request({
+        requestId: crypto.randomUUID(),
+        kind: 'save',
+        lease: opened.lease!,
+        expectedRevision: 0,
+        payload: 'late',
+      })
+    ).status
+  ).toBe('refused');
 });

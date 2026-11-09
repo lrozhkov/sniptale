@@ -11,12 +11,14 @@ const tempDirs: string[] = [];
 const OFFSCREEN_OPTIONS_SOURCE = [
   "const OFFSCREEN_DOCUMENT_REASON = 'USER_MEDIA' satisfies `${chrome.offscreen.Reason}`;",
   "const OFFSCREEN_DISPLAY_REASON = 'DISPLAY_MEDIA' satisfies `${chrome.offscreen.Reason}`;",
+  "const OFFSCREEN_WORKER_REASON = 'WORKERS' satisfies `${chrome.offscreen.Reason}`;",
   "const OFFSCREEN_BLOB_REASON = 'BLOBS' satisfies `${chrome.offscreen.Reason}`;",
   "const OFFSCREEN_CLIPBOARD_REASON = 'CLIPBOARD' satisfies `${chrome.offscreen.Reason}`;",
   "const PRIVACY_ERASURE_OFFSCREEN_DOCUMENT_REASON = 'LOCAL_STORAGE' satisfies `${chrome.offscreen.Reason}`;",
   'export function createUserMediaOffscreenDocumentOptions() {',
   '  return { reasons: [',
-  '    OFFSCREEN_DOCUMENT_REASON, OFFSCREEN_CLIPBOARD_REASON, OFFSCREEN_DISPLAY_REASON, OFFSCREEN_BLOB_REASON,',
+  '    OFFSCREEN_DOCUMENT_REASON, OFFSCREEN_CLIPBOARD_REASON, OFFSCREEN_DISPLAY_REASON,',
+  '    OFFSCREEN_BLOB_REASON, OFFSCREEN_WORKER_REASON,',
   '  ] };',
   '}',
   'export function createPrivacyErasureOffscreenDocumentOptions() {',
@@ -236,7 +238,26 @@ describe('collectManifestIntegrityViolations', () => {
   it('flags action title drift', verifiesActionTitleViolation);
   it('flags extension CSP drift', verifiesExtensionCspViolation);
   it('flags offscreen reason drift', verifiesOffscreenReasonViolation);
-  it('requires the Blob reason for the shared sync executor', () => {
+  it.each([
+    ['missing worker', 'OFFSCREEN_WORKER_REASON,', ''],
+    ['extra reason', 'OFFSCREEN_WORKER_REASON,', "OFFSCREEN_WORKER_REASON, 'AUDIO_PLAYBACK',"],
+  ])('rejects %s authority in the shared document', (_label, original, replacement) => {
+    const root = createTempRoot();
+    writeManifest(root, createBaseManifest());
+    writeStandardManifestFiles(root);
+    writeFile(
+      root,
+      'apps/extension/src/background/offscreen-document/create-options.ts',
+      OFFSCREEN_OPTIONS_SOURCE.replace(original, replacement)
+    );
+    expect(collectManifestIntegrityViolations({ rootDir: root })).toContainEqual(
+      expect.objectContaining({
+        rule: 'manifest-integrity',
+        message: expect.stringContaining('createUserMediaOffscreenDocumentOptions'),
+      })
+    );
+  });
+  it('rejects worker authority in the isolated privacy-erasure document', () => {
     const root = createTempRoot();
     writeManifest(root, createBaseManifest());
     writeStandardManifestFiles(root);
@@ -244,9 +265,25 @@ describe('collectManifestIntegrityViolations', () => {
       root,
       'apps/extension/src/background/offscreen-document/create-options.ts',
       OFFSCREEN_OPTIONS_SOURCE.replace(
-        'OFFSCREEN_DISPLAY_REASON, OFFSCREEN_BLOB_REASON,',
-        'OFFSCREEN_DISPLAY_REASON,'
+        '[PRIVACY_ERASURE_OFFSCREEN_DOCUMENT_REASON]',
+        '[PRIVACY_ERASURE_OFFSCREEN_DOCUMENT_REASON, OFFSCREEN_WORKER_REASON]'
       )
+    );
+    expect(collectManifestIntegrityViolations({ rootDir: root })).toContainEqual(
+      expect.objectContaining({
+        rule: 'manifest-integrity',
+        message: expect.stringContaining('createPrivacyErasureOffscreenDocumentOptions'),
+      })
+    );
+  });
+  it('requires the Blob reason for the shared sync executor', () => {
+    const root = createTempRoot();
+    writeManifest(root, createBaseManifest());
+    writeStandardManifestFiles(root);
+    writeFile(
+      root,
+      'apps/extension/src/background/offscreen-document/create-options.ts',
+      OFFSCREEN_OPTIONS_SOURCE.replace('OFFSCREEN_BLOB_REASON,', '')
     );
     expect(collectManifestIntegrityViolations({ rootDir: root })).toContainEqual(
       expect.objectContaining({

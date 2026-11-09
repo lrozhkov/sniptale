@@ -31,7 +31,7 @@ vi.mock('../transport/client', async (importOriginal) => ({
   },
 }));
 vi.mock('../../toolbar/video-recording/drawing-session', () => ({
-  createRecordingDrawingOwner: () => ({
+  createRecordingSurfaceDrawingOwner: () => ({
     controller: { session: { clear: vi.fn() } },
     dispose: vi.fn(),
     getAutoHideDelay: () => 0,

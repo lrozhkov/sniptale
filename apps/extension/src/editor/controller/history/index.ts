@@ -8,6 +8,7 @@ const HISTORY_BINARY_TOKEN_PREFIX = 'sniptale-history-asset:';
 const CANVAS_BINARY_FIELDS = new Set([
   'src',
   'sniptaleBackgroundImageData',
+  'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
 ]);
 const DOCUMENT_BINARY_FIELDS = new Set([
@@ -154,13 +155,23 @@ export function createEditorSnapshotHistory(document: EditorDocument): SnapshotH
     maxBytes: EDITOR_HISTORY_LIMITS.maxBytes,
     measureBytes: (snapshots) => {
       let bytes = 0;
+      let smallestBaseline = Number.POSITIVE_INFINITY;
       const retained = new Set<string>();
       for (const value of snapshots) {
-        bytes += assets.bytesBySnapshot.get(value) ?? new TextEncoder().encode(value).byteLength;
-        for (const token of assets.tokensBySnapshot.get(value) ?? []) retained.add(token);
+        const metadata =
+          assets.bytesBySnapshot.get(value) ?? new TextEncoder().encode(value).byteLength;
+        bytes += metadata;
+        let baseline = metadata;
+        for (const token of assets.tokensBySnapshot.get(value) ?? []) {
+          retained.add(token);
+          baseline += assets.bytesByToken.get(token) ?? 0;
+        }
+        smallestBaseline = Math.min(smallestBaseline, baseline);
       }
       for (const token of retained) bytes += assets.bytesByToken.get(token) ?? 0;
-      return bytes;
+      // Bound additional history at every possible cursor. Current content is mandatory,
+      // and a retained window must stay affordable in both Undo and Redo directions.
+      return bytes - smallestBaseline;
     },
   });
   historyAssets.set(history, assets);
@@ -269,4 +280,27 @@ export function pushEditorSnapshotHistory(options: {
   options.history.push(snapshot);
   if (assets) pruneEditorHistoryAssets(options.history, assets);
   return true;
+}
+
+/** Обновляет производный растр текущего действия без дополнительного шага Undo. */
+export function replaceCurrentEditorSnapshotHistory(options: {
+  history: SnapshotHistory<string> | null;
+  expectedRevision: number;
+  exportDocument: () => EditorDocument;
+}): boolean {
+  const history = options.history;
+  if (!history || history.getRevision() !== options.expectedRevision) return false;
+  const assets = historyAssets.get(history);
+  const tokens = new Set<string>();
+  const document = options.exportDocument();
+  const snapshot = assets
+    ? encodeEditorSnapshot(document, assets, tokens)
+    : JSON.stringify(document);
+  if (assets) {
+    assets.tokensBySnapshot.set(snapshot, tokens);
+    assets.bytesBySnapshot.set(snapshot, new TextEncoder().encode(snapshot).byteLength);
+  }
+  const replaced = history.replaceCurrent(options.expectedRevision, snapshot);
+  if (assets) pruneEditorHistoryAssets(history, assets);
+  return replaced !== null;
 }

@@ -136,3 +136,11 @@ it('creates a fresh browser-header layer when no previous object exists', async 
     uuidSpy.mockRestore();
   }
 });
+
+it('preserves fractional source width when mapping header pixels into scene coordinates', async () => {
+  const image = createRenderedImage();
+  await createLayer({ width: 1854.0772532176925, sourceHeight: 463.5193133044231 });
+  expect(image.set).toHaveBeenCalledWith(
+    expect.objectContaining({ scaleX: 1854.0772532176925 / 200 })
+  );
+});

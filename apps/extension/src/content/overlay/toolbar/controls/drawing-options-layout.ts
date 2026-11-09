@@ -17,7 +17,11 @@ export type DrawingMenuLayoutResolver = (args: {
   surfaceInset?: number;
 }) => { placement: ProductToolbarMenuPlacement; style: CSSProperties } | null;
 
-export type DrawingQuickOptionsTool = ConfigurableDrawingQuickOptionsTool | 'blur' | 'selection';
+export type DrawingQuickOptionsTool =
+  | ConfigurableDrawingQuickOptionsTool
+  | 'blur'
+  | 'simplify'
+  | 'selection';
 
 const DRAWING_OPTIONS_DIMENSIONS: Record<
   'horizontal' | 'vertical',
@@ -26,6 +30,7 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
   horizontal: {
     arrow: { height: 48, width: 600 },
     blur: { height: 48, width: 336 },
+    simplify: { height: 48, width: 720 },
     marker: { height: 48, width: 560 },
     pencil: { height: 48, width: 340 },
     shape: { height: 48, width: 694 },
@@ -35,6 +40,7 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
   vertical: {
     arrow: { height: 290, width: 190 },
     blur: { height: 174, width: 136 },
+    simplify: { height: 560, width: 190 },
     marker: { height: 250, width: 190 },
     pencil: { height: 170, width: 190 },
     shape: { height: 365, width: 190 },

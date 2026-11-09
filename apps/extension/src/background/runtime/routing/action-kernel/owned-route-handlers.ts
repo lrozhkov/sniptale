@@ -1,3 +1,11 @@
+import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
+import {
+  ensureOffscreenDocument,
+  waitForOffscreenReady,
+} from '../../../offscreen-document/service';
+import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
+import { createSimplifyRoute, routeSimplifyMessage } from '../../../simplify/route';
 import { routeSyncProductCommand } from '../../../sync-connection/product-route';
 import { routePageLaunchPreferencesMessage } from '../../page-access/page-launch-preferences';
 import {
@@ -49,6 +57,21 @@ type BackgroundOwnedRouteDispatcher = {
   readonly route: BackgroundOwnedRouteHandler;
 };
 
+const simplifyRoute = createSimplifyRoute({
+  async ensureDocument() {
+    await ensureOffscreenDocument('Compute Simplify image effects in a dedicated worker');
+    await waitForOffscreenReady();
+  },
+  send: (command) =>
+    getBackgroundRuntimeMessaging().sendRuntimeMessage(
+      attachOffscreenCommandCapability({ ...command, type: MessageType.OFFSCREEN_SIMPLIFY_COMMAND })
+    ),
+  createId: () => crypto.randomUUID(),
+});
+
+/** Releases this registered route instance's sessions when the native tab lifecycle ends. */
+export const retireSimplifySessionsForTab = simplifyRoute.retireTab;
+
 const keepOpen = (handled: boolean): ActionResult | null =>
   handled ? { handled: true, keepChannelOpen: true } : null;
 
@@ -62,6 +85,15 @@ export const backgroundOwnedHandlerBindings = {
   'annotation-fork-session': routeAnnotationForkSessionAction,
   'content-action-capability-issuance': routeContentActionCapabilityIssuance,
   'content-runtime-wakeup': routeContentRuntimeWakeupAction,
+  simplify: (action) =>
+    keepOpen(
+      routeSimplifyMessage(
+        simplifyRoute,
+        action.message,
+        action.context.sender,
+        action.context.sendResponse
+      )
+    ),
   'frame-annotation-raster': routeFrameAnnotationRasterAction,
   'llm-content-processing': routeLlmAction,
   'llm-scenario-editor-processing': routeScenarioEditorLlmAction,

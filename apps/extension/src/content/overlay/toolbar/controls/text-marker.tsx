@@ -82,7 +82,6 @@ function TextMarkerOptions(props: {
           >
             <DrawingColorOptions
               allowAlpha
-              preservePaletteAlpha
               colors={MARKER_PALETTE}
               floatingBoundaryRef={props.panelRef}
               floatingPlacement={props.vertical ? 'side' : 'auto'}

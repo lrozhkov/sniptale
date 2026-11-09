@@ -1,3 +1,4 @@
+import path from 'node:path';
 import ts from 'typescript';
 
 import { repoRoot } from '../../../analysis/repository/shared-paths.mjs';
@@ -15,6 +16,9 @@ const ANALYZER_PATH = 'tooling/qa/guards/security/network/verify-network-fetch-p
 const MESSAGE =
   'Anonymous public fetch must bind URL validation, session authority, anonymous credentials, ' +
   'pre-network redirect blocking, redirect policy, and final-URL revalidation to this sink.';
+const HEAD_MESSAGE =
+  'Guarded HEAD fetch must bind public HTTPS validation, anonymous HEAD/follow/no-referrer/no-store, ' +
+  'an AbortSignal, the awaited canonical imported default guard, and final-URL revalidation.';
 
 function callName(expression) {
   return ts.isIdentifier(expression) ? expression.text : null;
@@ -282,6 +286,187 @@ function hasBoundPolicy(call, sourceFile, imports, validators) {
   return hasBoundResponsePolicy(call, scope, declarations, sourceFile, validators);
 }
 
+const HEAD_OWNER = 'apps/extension/src/platform/network/https-redirects.ts';
+const HEAD_GUARD = 'apps/extension/src/platform/network/https-redirect-guard';
+
+function isProperty(node, object, property) {
+  return (
+    Boolean(node) &&
+    ts.isPropertyAccessExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === object &&
+    node.name.text === property
+  );
+}
+
+function isHeadValidator(node, imports) {
+  if (!ts.isFunctionDeclaration(node) || !node.body || !node.name) return false;
+  const declaration = node.body.statements[0];
+  if (!declaration || !ts.isVariableStatement(declaration)) return false;
+  const parsed = declaration.declarationList.declarations[0];
+  if (
+    !parsed ||
+    !ts.isIdentifier(parsed.name) ||
+    !parsed.initializer ||
+    !ts.isNewExpression(parsed.initializer) ||
+    callName(parsed.initializer.expression) !== 'URL'
+  )
+    return false;
+  const input = node.parameters[0]?.name;
+  const returned = node.body.statements.at(-1);
+  if (
+    !input ||
+    !ts.isIdentifier(input) ||
+    node.parameters.length !== 1 ||
+    parsed.initializer.arguments?.length !== 1 ||
+    !ts.isIdentifier(parsed.initializer.arguments[0]) ||
+    parsed.initializer.arguments[0].text !== input.text ||
+    !returned ||
+    !ts.isReturnStatement(returned) ||
+    !returned.expression ||
+    !ts.isIdentifier(returned.expression) ||
+    returned.expression.text !== parsed.name.text
+  )
+    return false;
+  const rejection = node.body.statements[1];
+  if (!rejection || !ts.isIfStatement(rejection) || !ts.isThrowStatement(rejection.thenStatement))
+    return false;
+  const terms = [];
+  function collectTerms(expression) {
+    if (
+      ts.isBinaryExpression(expression) &&
+      expression.operatorToken.kind === ts.SyntaxKind.BarBarToken
+    ) {
+      collectTerms(expression.left);
+      collectTerms(expression.right);
+    } else terms.push(expression);
+  }
+  collectTerms(rejection.expression);
+  const name = parsed.name.text;
+  return (
+    ['username', 'password'].every((property) =>
+      terms.some((term) => isProperty(term, name, property))
+    ) &&
+    terms.some(
+      (term) =>
+        ts.isBinaryExpression(term) &&
+        term.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken &&
+        isProperty(term.left, name, 'protocol') &&
+        ts.isStringLiteral(term.right) &&
+        term.right.text === 'https:'
+    ) &&
+    terms.some(
+      (term) =>
+        ts.isCallExpression(term) &&
+        imports.get(callName(term.expression))?.imported === 'isPrivateNetworkHost' &&
+        imports.get(callName(term.expression))?.module ===
+          '@sniptale/platform/security/private-network-host' &&
+        isProperty(term.arguments[0], name, 'hostname')
+    )
+  );
+}
+
+function hasHeadGuard(call, scope, imports, relativePath, sourceFile) {
+  const guardParameter = scope.parameters.find((parameter) => {
+    if (!parameter.initializer || !ts.isIdentifier(parameter.name)) return false;
+    const binding = imports.get(callName(parameter.initializer));
+    return (
+      binding?.imported === 'ensurePublicHttpsHeadGuard' &&
+      path.posix.normalize(path.posix.join(path.posix.dirname(relativePath), binding.module)) ===
+        HEAD_GUARD
+    );
+  });
+  if (!guardParameter || !scope.body || !ts.isBlock(scope.body)) return false;
+  return scope.body.statements.some((statement) => {
+    if (!ts.isExpressionStatement(statement) || !ts.isAwaitExpression(statement.expression))
+      return false;
+    const guard = statement.expression.expression;
+    return (
+      ts.isCallExpression(guard) &&
+      callName(guard.expression) === guardParameter.name.text &&
+      guard.arguments.length === 0 &&
+      statement.end < call.getStart(sourceFile)
+    );
+  });
+}
+
+function hasBoundHeadPolicy(call, sourceFile, imports, relativePath) {
+  if (relativePath !== HEAD_OWNER) return false;
+  const scope = functionScope(call);
+  if (!scope || !scope.body || !ts.isBlock(scope.body)) return false;
+  const validators = new Set(
+    sourceFile.statements
+      .filter((node) => isHeadValidator(node, imports))
+      .map((node) => node.name.text)
+  );
+  const declarations = variableInitializers(scope);
+  const target = call.arguments[0];
+  if (
+    !target ||
+    !ts.isPropertyAccessExpression(target) ||
+    target.name.text !== 'href' ||
+    !ts.isIdentifier(target.expression)
+  )
+    return false;
+  const validation = declarations.get(target.expression.text);
+  if (
+    !validation ||
+    !ts.isCallExpression(validation) ||
+    !validators.has(callName(validation.expression)) ||
+    validation.getStart(sourceFile) >= call.getStart(sourceFile)
+  )
+    return false;
+  const options = call.arguments[1];
+  const literals = {
+    method: 'HEAD',
+    credentials: 'omit',
+    redirect: 'follow',
+    referrerPolicy: 'no-referrer',
+    cache: 'no-store',
+  };
+  if (
+    !options ||
+    !ts.isObjectLiteralExpression(options) ||
+    options.properties.length !== 6 ||
+    !Object.entries(literals).every(([name, value]) => {
+      const option = propertyValue(options, name);
+      return option && ts.isStringLiteral(option) && option.text === value;
+    })
+  )
+    return false;
+  const signal = propertyValue(options, 'signal');
+  if (
+    !signal ||
+    !ts.isIdentifier(signal) ||
+    !scope.parameters.some(
+      (parameter) =>
+        ts.isIdentifier(parameter.name) &&
+        parameter.name.text === signal.text &&
+        parameter.type &&
+        ts.isTypeReferenceNode(parameter.type) &&
+        callName(parameter.type.typeName) === 'AbortSignal'
+    )
+  )
+    return false;
+  if (!hasHeadGuard(call, scope, imports, relativePath, sourceFile)) return false;
+  const responseName = declarationForCall(call);
+  if (!responseName) return false;
+  return scope.body.statements.some((statement) => {
+    if (statement.getStart(sourceFile) <= call.getStart(sourceFile)) return false;
+    const expression = ts.isVariableStatement(statement)
+      ? statement.declarationList.declarations[0]?.initializer
+      : ts.isExpressionStatement(statement)
+        ? statement.expression
+        : null;
+    return (
+      expression &&
+      ts.isCallExpression(expression) &&
+      validators.has(callName(expression.expression)) &&
+      isProperty(expression.arguments[0], responseName, 'url')
+    );
+  });
+}
+
 export function collectNetworkFetchPolicyViolations(
   files,
   { policyPath = POLICY_PATH, rootDir = repoRoot } = {}
@@ -293,7 +478,7 @@ export function collectNetworkFetchPolicyViolations(
     'anonymous-public-fetch',
     rootDir
   );
-  const owners = new Set(entries.map((entry) => entry.file));
+  const owners = new Map(entries.map((entry) => [entry.file, entry]));
   const seenOwners = new Set();
   const scannedPaths = new Set(files.map((file) => toRootRelativePath(rootDir, file)));
 
@@ -308,12 +493,17 @@ export function collectNetworkFetchPolicyViolations(
     visitSourceNodes(sourceFile, (node) => {
       if (!ts.isCallExpression(node) || !bindings.has(callName(node.expression))) return;
       sinkCount += 1;
-      if (!hasBoundPolicy(node, sourceFile, imports, validators)) {
+      const requestPolicy = owners.get(relativePath)?.requestPolicy;
+      const valid =
+        requestPolicy === 'guarded-head'
+          ? hasBoundHeadPolicy(node, sourceFile, imports, relativePath)
+          : requestPolicy === undefined && hasBoundPolicy(node, sourceFile, imports, validators);
+      if (!valid) {
         violations.push({
           rule: 'network-fetch-policy-missing',
           file: relativePath,
           line: getNodeLine(sourceFile, node),
-          message: MESSAGE,
+          message: requestPolicy === 'guarded-head' ? HEAD_MESSAGE : MESSAGE,
         });
       }
     });

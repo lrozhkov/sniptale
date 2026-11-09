@@ -26,7 +26,11 @@ vi.mock('../../../state/useEditorStore', () => ({
   },
 }));
 
-import { applyGridSnapForController, snapExternalEditorRectForController } from './viewport';
+import {
+  applyGridSnapForController,
+  snapExternalEditorRectForController,
+  snapExternalEditorResizeRectForController,
+} from './viewport';
 
 describe('editor controller viewport magnet fallback', () => {
   beforeEach(() => {
@@ -76,4 +80,16 @@ describe('editor controller viewport magnet fallback', () => {
     ).toEqual(snapped);
     expect(mocks.applyGridSnapMock).toHaveBeenCalledOnce();
   });
+});
+
+it('snaps resize edges when the grid is hidden and snapping remains enabled', () => {
+  storeState.workspace.gridEnabled = false;
+  storeState.workspace.gridSnapEnabled = true;
+  storeState.workspace.magnetEnabled = false;
+  const result = snapExternalEditorResizeRectForController({} as never, {
+    direction: 'se',
+    minimumSize: 4,
+    rect: { x: 0, y: 0, width: 43, height: 50 },
+  });
+  expect(result).toEqual({ x: 0, y: 0, width: 48, height: 48 });
 });

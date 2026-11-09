@@ -14,7 +14,7 @@ it('rejects nonpublic, credentialed and non-HTTPS addresses before network acces
     expect(await acquireWindowHeaderFavicon(address, new AbortController().signal)).toBeNull();
   expect(fetch).not.toHaveBeenCalled();
 });
-it('bounds discovery and omits credentials, redirects and referrers', async () => {
+it('bounds discovery and omits credentials, automatic GET redirects and referrers', async () => {
   const fetch = vi.fn(async () => new Response('missing', { status: 404 }));
   vi.stubGlobal('fetch', fetch);
   expect(await acquireWindowHeaderFavicon('example.test', new AbortController().signal)).toBeNull();
@@ -23,7 +23,7 @@ it('bounds discovery and omits credentials, redirects and referrers', async () =
     'https://example.test/favicon.ico',
     expect.objectContaining({
       credentials: 'omit',
-      redirect: 'error',
+      redirect: 'manual',
       referrerPolicy: 'no-referrer',
       cache: 'no-store',
     })

@@ -2,6 +2,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 
 export const handledOffscreenRuntimeMessageTypes = [
+  MessageType.OFFSCREEN_SIMPLIFY_COMMAND,
   MessageType.OFFSCREEN_PRIVACY_ERASURE_PAGE_STORAGE,
   MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
   MessageType.OFFSCREEN_QUICK_ACTION_HEADER,

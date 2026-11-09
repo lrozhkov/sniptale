@@ -9,6 +9,7 @@ export async function applyOpenedEditorDocument(options: {
   document: EditorDocument;
   faviconDataUrl?: string | null;
   pageTitle: string;
+  preserveInspector?: boolean;
   scheduleZoomToFit: () => void;
 }): Promise<void> {
   await options.applyDocument(options.document, {

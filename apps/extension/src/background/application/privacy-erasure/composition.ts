@@ -1,3 +1,4 @@
+import type { DesignReviewSessionService } from '../../design-review-session/service';
 import { pageRecoveryService } from '../../page-recovery/service';
 import type { AudioJobService } from '../../ai/audio/service';
 import type { LocalDataErasureMessage } from '../../../contracts/messaging/privacy-erasure';
@@ -94,6 +95,14 @@ export function configureAudioJobPrivacyErasurePort(
   };
 }
 
+let designReviewSessions: DesignReviewSessionService | undefined;
+/** Installs the runtime session owner before erasure can admit work. */
+export function configureDesignReviewSessionPrivacyErasurePort(
+  port: DesignReviewSessionService
+): void {
+  designReviewSessions = port;
+}
+
 const privacyErasureUseCase = new PrivacyErasureUseCase({
   audioJobs: {
     cancelActiveJob: () => (audioJobs ? audioJobs.cancelActiveJob() : Promise.resolve()),
@@ -134,7 +143,26 @@ const privacyErasureUseCase = new PrivacyErasureUseCase({
     cancelActiveJob: requestActivePagePackageJobCancellationForPrivacyErasure,
     reserveErasureExclusion: reservePopupExportErasureExclusion,
   },
-  pageRecovery: pageRecoveryService,
+  pageRecovery: {
+    async cleanup() {
+      const recovery = await pageRecoveryService.cleanup();
+      const review = (await designReviewSessions?.cleanup()) ?? [];
+      return [...recovery, ...review];
+    },
+    reserveErasureExclusion() {
+      const recovery = pageRecoveryService.reserveErasureExclusion();
+      const review = designReviewSessions?.reserveErasureExclusion();
+      return {
+        release() {
+          recovery.release();
+          review?.release();
+        },
+        async waitForActiveMutations() {
+          await Promise.all([recovery.waitForActiveMutations(), review?.waitForActiveMutations()]);
+        },
+      };
+    },
+  },
   runtime: backgroundRuntimeCleanupAdapter,
   storage: createPrivacyErasureStorageCleanupAdapter(extensionPageLocalStorageErasureAdapter),
 });

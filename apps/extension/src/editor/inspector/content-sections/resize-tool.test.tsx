@@ -131,6 +131,7 @@ function renderResizeTool(
 
 afterEach(() => {
   useEditorStore.getState().setCanvasCropMode('crop');
+  useEditorStore.getState().setCanvasCropAspectRatio(null);
   act(() => root?.unmount());
   root = null;
   container?.remove();
@@ -173,7 +174,7 @@ it.each(['image', 'canvas'] as const)('uses distinct dimension parameters in %s 
   const aspect = dimensions.querySelector('[data-ui="editor.size-controls.aspect-toggle"]');
   expect(aspect).not.toBeNull();
   expect(aspect?.closest('.sniptale-parameter-row')).toBeNull();
-  expect(aspect?.parentElement?.className).toContain('top-1/2');
+  expect(aspect?.parentElement?.className).toContain('editor-aspect-control');
 });
 
 it('keeps image resize free of mouse selection preview and applies a flattened image resize action', () => {
@@ -226,7 +227,7 @@ it('previews a crop area after the user changes its aspect ratio', () => {
   const controller = createController();
   renderResizeTool(controller);
 
-  const applyButton = getButton(translate('editor.compact.applyCropCanvas'));
+  const applyButton = getActionButton(translate('editor.compact.applyCropCanvas'));
   expect(applyButton.disabled).toBe(true);
   expect(controller.previewCanvasSize).not.toHaveBeenCalled();
 
@@ -271,7 +272,7 @@ it('settles oversized manual crop dimensions at the image limits', () => {
 
   editDimension(translate('editor.compact.heightDimension'), '1800');
   expect(getInput(translate('editor.compact.heightDimension')).value).toBe('900');
-  expect(getButton(translate('editor.compact.applyCropCanvas')).disabled).toBe(true);
+  expect(getActionButton(translate('editor.compact.applyCropCanvas')).disabled).toBe(true);
 });
 
 it('keeps both dimensions within the image when aspect lock is on', () => {
@@ -317,7 +318,7 @@ it('leaves crop mode from the secondary cancel action', () => {
   renderResizeTool(controller);
 
   const cancel = getButton(translate('common.actions.cancel'));
-  expect(cancel.parentElement?.className).toContain('flex-wrap');
+  expect(cancel.parentElement?.className).toContain('grid-cols-2');
   expect(cancel.className).toContain('border-none');
 
   act(() => {
@@ -334,8 +335,11 @@ it('applies a selected crop through the crop controller path', async () => {
     cropSelection: { height: 600, width: 800 },
   });
 
-  expect(container?.textContent).toContain(translate('editor.compact.cropReadyDescription'));
-  await act(async () => getButton(translate('editor.compact.applyCropCanvas')).click());
+  expect(container?.textContent).not.toContain(translate('editor.compact.cropReadyDescription'));
+  expect(getButton(translate('editor.compact.cropWithinCanvas')).title).toBe(
+    translate('editor.compact.cropWithinCanvasDescription')
+  );
+  await act(async () => getActionButton(translate('editor.compact.applyCropCanvas')).click());
   expect(controller.applyCropSelection).toHaveBeenCalledOnce();
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
 });
@@ -386,15 +390,15 @@ it('resolves size and aspect-ratio presets including custom branches', () => {
 
   expect(findPresetValue({ height: 1080, width: 1920 })).toBe('1920x1080');
   expect(findPresetValue({ height: 111, width: 222 })).toBeNull();
-  expect(buildSizePresetOptions('custom')[0]?.value).toBe('custom');
-  expect(buildSizePresetOptions('1920x1080')[0]?.value).toBe('3840x2160');
+  expect(buildSizePresetOptions().some((option) => option.value === 'custom')).toBe(false);
+  expect(buildSizePresetOptions()[0]?.value).toBe('3840x2160');
   applySizePreset(setDraft, '1280x720');
   applySizePreset(setDraft, 'missing');
   expect(setDraft).toHaveBeenCalledWith({ height: 720, width: 1280 });
 
   expect(findAspectRatioValue({ height: 900, width: 1600 })).toBe('16:9');
   expect(findAspectRatioValue({ height: 777, width: 1000 })).toBeNull();
-  expect(buildAspectRatioOptions('custom')[0]?.value).toBe('custom');
+  expect(buildAspectRatioOptions().some((option) => option.value === 'custom')).toBe(false);
   applySelectedAspectRatio(setDraft, '1:1');
   applyCurrentAspectRatio(setDraft, '9:16', 'short');
   applyCurrentAspectRatio(setDraft, 'missing', 'long');
@@ -456,4 +460,35 @@ it('keeps a selected preset ratio during locked dimension edits', () => {
   act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
   expect(getInput(translate('editor.compact.heightDimension')).value).toBe('540');
   expect(getSelect(translate('editor.compact.aspectRatioPreset')).value).toBe('16:9');
+});
+
+function getActionButton(label: string): HTMLButtonElement {
+  const buttons = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('[data-ui="editor.resize.actions"] button') ?? []
+  );
+  const button = buttons.find((button) => button.textContent?.trim() === label);
+  if (!button) throw new Error(`Missing action: ${label}`);
+  return button;
+}
+
+it('updates a locked ratio when crop mode explicitly resets the size to document dimensions', () => {
+  renderResizeTool(createController(), {
+    canvasSize: { width: 1600, height: 900 },
+    canvasSizeDraft: { width: 300, height: 225 },
+  });
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.size-controls.aspect-toggle"]')
+      ?.click()
+  );
+  useEditorStore.getState().setCanvasCropAspectRatio(4 / 3);
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.segmented-row"] button:nth-child(2)'
+      )
+      ?.click()
+  );
+  expect(useEditorStore.getState().canvasCropAspectRatio).toBe(16 / 9);
+  useEditorStore.getState().setCanvasCropAspectRatio(null);
 });

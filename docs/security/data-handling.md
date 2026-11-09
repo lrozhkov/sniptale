@@ -266,7 +266,11 @@ Quick-action presets can retain explicitly configured static text, website addre
 
 Settings transfer removes embedded background and icon bytes. The projected preset disables the removed image or icon and retains its other controls. Import refuses embedded artwork before storage admission. Preset artwork and text do not enter sync, diagnostics, or automatic exports.
 
-Favicon acquisition requires the configured option and an invoked capture. It uses the existing bounded anonymous public HTTPS policy with no redirects. Opening the Settings form does not fetch a favicon. Missing page data is omitted. Desktop decoration does not read a web page. Rendering checks encoded input, dimensions, and the combined raster budget before bitmap or canvas allocation.
+Favicon acquisition requires an explicit editor request or the configured option during capture. Requests omit credentials and use bounded public HTTPS resources. GET requests do not follow redirects. A guarded HEAD request can resolve a canonical public HTTPS address before the final GET request. The background installs the network guard before it dispatches favicon work to offscreen.
+
+An explicit icon request or configured capture can read the favicon URL of an open tab from the requested origin. An exact page match takes priority. Other pages supply a hint only when their icon URLs agree. Acquisition checks the hint with the same URL and request limits. Remote SVG icons pass through the existing icon sanitizer before raster conversion. Offscreen receives only the bounded hint and does not query tabs.
+
+Opening the Settings form does not fetch a favicon. Missing page data is omitted. Desktop decoration does not read a web page. Rendering checks encoded input, dimensions, and the combined raster budget before bitmap or canvas allocation.
 
 ## Experimental sync capture retention
 
@@ -440,3 +444,9 @@ Background issues disposable credential leases to the current offscreen executor
 Lock closes admission before it stops and drains the executor and response bodies. Failed containment cannot produce successful lock or privacy completion. Worker startup changes the durable epoch and drains a surviving executor before it grants replacement leases. The fixed `secrets-locked` result does not mean an incorrect server password. An explicit unlock resumes eligible blocked work. It preserves user pause and checkpoint intervals. A consumed sync unlock intent can request an interval bypass once for its exact current selection.
 
 Erasure reserves credential admission synchronously. It drains sync before it acquires the exclusive writer lock for cleanup. It removes native credentials, the journal and recovery keys even when preferences remain. If the user preserves enrolled AI secrets, erasure retains their shared profile. The service clears its unlocked key and disposable leases. Backup, Settings transfer and remote serializers exclude shared protection records and the native journal.
+
+## Local Design Review feedback
+
+Design Review retains authored feedback, page evidence and bounded PNG previews in local storage. Session-only bindings identify the native tab. A document lease and a revision reject stale writes after navigation or deletion. The session owner acknowledges a save only after storage accepts the write. Failed writes retain the last accepted data. Unavailable page elements never cause automatic feedback deletion. Explicit feedback deletion or Clear removes the selected authored records.
+
+Feedback actions accept native trusted clicks and the existing private mouse bridge. Synthetic page clicks cannot remove retained feedback. Preview images remain inside closed, non-clonable, non-serializable shadow roots. Public host attributes and children contain no raster URL. The user can explicitly export the complete session as text or PDF. Automatic sync, Library and backup omit these local records. Verified local-data erasure excludes new commands, drains accepted writes, revokes leases and removes local records and session bindings.

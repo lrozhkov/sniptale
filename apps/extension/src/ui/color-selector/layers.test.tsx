@@ -201,59 +201,65 @@ it('keeps color layers pointer-interactive and anchored to owning scroll parents
   expect(pickerLayer.style.top).toBe('154px');
 });
 
-it('places a side picker outside its owning panel boundary', () => {
-  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1_200 });
-  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-  const boundaryRef = { current: null as HTMLDivElement | null };
-  act(() => {
-    root!.render(
-      <div ref={(node) => void (boundaryRef.current = node)}>
-        <CompactColorSelector
-          floatingBoundaryRef={boundaryRef}
-          floatingPlacement="side"
-          label="Цвет"
-          title="Цвет"
-          value="#f8fafc"
-          onChange={() => undefined}
-        />
-      </div>
-    );
-  });
-  boundaryRef.current!.getBoundingClientRect = () =>
-    ({
-      bottom: 550,
-      height: 500,
-      left: 100,
-      right: 300,
-      top: 50,
-      width: 200,
-      x: 100,
-      y: 50,
-      toJSON: () => undefined,
-    }) as DOMRect;
-  const selector = container.querySelector<HTMLElement>('[data-ui="shared.ui.color-selector"]')!;
-  selector.getBoundingClientRect = () =>
-    ({
-      bottom: 188,
-      height: 28,
-      left: 220,
-      right: 248,
-      top: 160,
-      width: 28,
-      x: 220,
-      y: 160,
-      toJSON: () => undefined,
-    }) as DOMRect;
+it.each([false, true])(
+  'places a picker outside its explicit or automatic owner boundary (%s)',
+  (automatic) => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1_200 });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const boundaryRef = { current: null as HTMLDivElement | null };
+    act(() => {
+      root!.render(
+        <div
+          data-picker-boundary={automatic || undefined}
+          ref={(node) => void (boundaryRef.current = node)}
+        >
+          <CompactColorSelector
+            floatingBoundaryRef={boundaryRef}
+            floatingPlacement={automatic ? 'auto' : 'side'}
+            label="Цвет"
+            title="Цвет"
+            value="#f8fafc"
+            onChange={() => undefined}
+          />
+        </div>
+      );
+    });
+    boundaryRef.current!.getBoundingClientRect = () =>
+      ({
+        bottom: 550,
+        height: 500,
+        left: 100,
+        right: 300,
+        top: 50,
+        width: 200,
+        x: 100,
+        y: 50,
+        toJSON: () => undefined,
+      }) as DOMRect;
+    const selector = container.querySelector<HTMLElement>('[data-ui="shared.ui.color-selector"]')!;
+    selector.getBoundingClientRect = () =>
+      ({
+        bottom: 188,
+        height: 28,
+        left: 220,
+        right: 248,
+        top: 160,
+        width: 28,
+        x: 220,
+        y: 160,
+        toJSON: () => undefined,
+      }) as DOMRect;
 
-  act(() => getButton('shared.ui.colorSelectorChooseColor')?.click());
+    act(() => getButton('shared.ui.colorSelectorChooseColor')?.click());
 
-  const pickerLayer = document.body.querySelector<HTMLElement>(
-    '[data-ui="shared.ui.color-selector.picker-layer"]'
-  )!;
-  expect(pickerLayer.style.left).toBe('308px');
-  expect(pickerLayer.style.top).toBe('160px');
-  expect(pickerLayer.style.transform).toBe('');
-});
+    const pickerLayer = document.body.querySelector<HTMLElement>(
+      '[data-ui="shared.ui.color-selector.picker-layer"]'
+    )!;
+    expect(pickerLayer.style.left).toBe('308px');
+    expect(pickerLayer.style.top).toBe('160px');
+    expect(pickerLayer.style.transform).toBe('');
+  }
+);

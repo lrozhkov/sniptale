@@ -99,7 +99,6 @@ function createInspectorCommandOptions() {
     blurTypeOptions: [{ label: 'Gaussian', value: 'gaussian' as const }],
     browserAppearanceOptions: [{ label: 'Window', value: 'window' as const }],
     browserCanvasModeOptions: [{ label: 'Resize', value: 'resize' as const }],
-    browserContentModeOptions: [{ label: 'Fit', value: 'fit-content' as const }],
     fontOptions: [{ label: 'Sans', value: 'sans' as const }],
     frameBackgroundImageFitOptions: [{ label: 'Cover', value: 'cover' as const }],
     frameBackgroundModeOptions: [{ label: 'Color', value: 'color' as const }],

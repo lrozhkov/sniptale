@@ -30,6 +30,7 @@ export function createHydrateDefaultsAction(set: EditorStoreSet): EditorHydrateD
       const merged = mergeToolSettings(base, options.toolSettings);
       const toolSettings: EditorToolSettings = {
         ...merged,
+        simplify: options.toolSettings?.simplify ? merged.simplify : state.toolSettings.simplify,
         pencil: options.toolSettings?.pencil ? merged.pencil : state.toolSettings.pencil,
         marker: options.toolSettings?.marker ? merged.marker : state.toolSettings.marker,
         shape: options.toolSettings?.shape ? merged.shape : state.toolSettings.shape,
@@ -85,6 +86,7 @@ function mergeToolSettings(
   }
 
   return {
+    simplify: { ...base.simplify, ...overrides.simplify },
     pencil: { ...base.pencil, ...overrides.pencil },
     marker: { ...base.marker, ...overrides.marker },
     shape: { ...base.shape, ...overrides.shape },

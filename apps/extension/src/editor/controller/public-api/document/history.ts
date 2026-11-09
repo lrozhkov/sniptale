@@ -1,3 +1,4 @@
+import { cancelPendingEditorSimplify } from '../../../drawing/simplify-runtime';
 import type { EditorDocument } from '../../../../features/editor/document/types';
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import type { ApplyDocumentOptions } from '../../core/types';
@@ -52,6 +53,7 @@ export async function undoEditorControllerSnapshot(
 async function undoEditorControllerSnapshotInTurn(
   controller: EditorDocumentHistoryController
 ): Promise<void> {
+  if (controller.canvas && cancelPendingEditorSimplify(controller.canvas, false)) return;
   flushActiveFrameAnnotationDraft();
   const document = undoEditorSnapshot(controller.history);
   try {

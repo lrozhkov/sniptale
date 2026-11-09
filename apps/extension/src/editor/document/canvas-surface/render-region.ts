@@ -1,5 +1,5 @@
 import { Canvas, type FabricObject, type TPointerEvent } from 'fabric';
-import { isBackgroundObject, isUserObject } from '../model/index';
+import { isBackgroundObject, isEditableObject, isUserObject } from '../model/index';
 import {
   createEditorWorkspaceInsets,
   getEditorWorkspaceSurfaceSize,
@@ -9,6 +9,16 @@ import {
 
 type RenderRect = { x: number; y: number; width: number; height: number };
 type DocumentSize = { width: number; height: number };
+/** Visible bounds of a projected layer in Fabric scene coordinates. */
+export type EditorLayerPresentationBounds = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+type PresentationBoundsResolver = (
+  object: FabricObject
+) => EditorLayerPresentationBounds | null | undefined;
 const MAX_INTERACTIVE_BACKING_PIXELS = 4_000_000;
 const MAX_WORKSPACE_SIDE = 200_000;
 const WORKSPACE_EDGE_TRIGGER_PX = 160;
@@ -60,6 +70,85 @@ export class EditorCanvas extends Canvas {
     } finally {
       this.preserveObjectStacking = preserveObjectStacking;
     }
+  }
+
+  private presentationBounds: PresentationBoundsResolver | null = null;
+
+  /** Undefined retains native bounds; null excludes a projected layer until its surface exists. */
+  setLayerPresentationBoundsResolver(resolve: PresentationBoundsResolver | null): void {
+    this.presentationBounds = resolve;
+  }
+
+  /** Returns presentation bounds for a projected layer, without changing document geometry. */
+  getLayerPresentationBounds(
+    object: FabricObject
+  ): EditorLayerPresentationBounds | null | undefined {
+    return this.presentationBounds?.(object);
+  }
+
+  override collectObjects(
+    ...args: Parameters<Canvas['collectObjects']>
+  ): ReturnType<Canvas['collectObjects']> {
+    const native = super.collectObjects(...args);
+    if (!this.presentationBounds) return native;
+    const [rect, options] = args;
+    const includeIntersecting = options?.includeIntersecting ?? true;
+    const nativeObjects = new Set(native);
+    return this.getObjects()
+      .toReversed()
+      .filter((object) => {
+        const bounds = this.presentationBounds?.(object);
+        if (bounds === undefined) return nativeObjects.has(object);
+        if (bounds === null || !object.visible || !object.selectable) return false;
+        if (includeIntersecting)
+          return (
+            bounds.left <= rect.left + rect.width &&
+            bounds.left + bounds.width >= rect.left &&
+            bounds.top <= rect.top + rect.height &&
+            bounds.top + bounds.height >= rect.top
+          );
+        return (
+          bounds.left >= rect.left &&
+          bounds.top >= rect.top &&
+          bounds.left + bounds.width <= rect.left + rect.width &&
+          bounds.top + bounds.height <= rect.top + rect.height
+        );
+      });
+  }
+
+  /** Reads the current cursor or fully-contained marquee candidates without changing selection. */
+  getSelectionPreviewObjects(hoverTarget?: FabricObject): FabricObject[] {
+    if (!this.selection || this.skipTargetFind || this.isDrawingMode || this._currentTransform)
+      return [];
+    const marquee = this._groupSelector;
+    const eligible = (object: FabricObject) =>
+      object.visible &&
+      object.selectable &&
+      object.sniptaleLocked !== true &&
+      isEditableObject(object);
+    if (marquee) {
+      if (marquee.deltaX === 0 && marquee.deltaY === 0) return [];
+      const candidates = new Set(
+        this.collectObjects(
+          {
+            left: marquee.x + Math.min(0, marquee.deltaX),
+            top: marquee.y + Math.min(0, marquee.deltaY),
+            width: Math.abs(marquee.deltaX),
+            height: Math.abs(marquee.deltaY),
+          },
+          { includeIntersecting: false }
+        )
+      );
+      return this.getObjects()
+        .toReversed()
+        .filter((object) => candidates.has(object) && eligible(object));
+    }
+    return hoverTarget &&
+      eligible(hoverTarget) &&
+      this.getObjects().includes(hoverTarget) &&
+      !this.getActiveObjects().includes(hoverTarget)
+      ? [hoverTarget]
+      : [];
   }
 
   setRenderViewport(viewport: HTMLElement | null, stage?: HTMLElement): void {

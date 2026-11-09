@@ -89,6 +89,9 @@ export function normalizeBrowserFrameState(
     faviconDataUrl: header.faviconDataUrl ?? null,
     canvasMode: browserFrame?.canvasMode ?? DEFAULT_BROWSER_FRAME_STATE.canvasMode,
     contentMode: normalizeBrowserFrameContentMode(browserFrame?.contentMode),
+    ...(browserFrame?.compositionBase
+      ? { compositionBase: { ...browserFrame.compositionBase } }
+      : {}),
   };
 }
 

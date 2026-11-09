@@ -63,7 +63,7 @@ function mount() {
       frame: { kind: 'top-document' },
       locator: 'button',
       nodePosition: { x: 0, y: 0 },
-      pageUrl: 'https://example.test',
+      pageUrl: location.href,
       targetPath: 'button',
       targetSelector: 'button',
       targetText: 'Test',
@@ -130,3 +130,40 @@ it.each([
     expect(preview.style.top).toBe(`${expectedY}px`);
   }
 );
+
+it('keeps captured pixels in a closed root that cannot be cloned or serialized', () => {
+  mount();
+  const attachShadow = vi.spyOn(Element.prototype, 'attachShadow');
+  const record = browserAnnotationSession.getState().domRecords[0]!;
+  act(() =>
+    root.render(
+      <FeedbackPreview
+        anchor={anchor}
+        record={record}
+        summary="Review"
+        label="Button"
+        preview={{ dataUrl: 'data:image/png;base64,c2F2ZWQ=', width: 100, height: 50 }}
+      />
+    )
+  );
+  const host = document.querySelector<HTMLElement>(
+    '[data-ui="content.design-review.feedback-snapshot"]'
+  )!;
+  expect(attachShadow).toHaveBeenCalledWith({
+    mode: 'closed',
+    clonable: false,
+    serializable: false,
+  });
+  expect(host.shadowRoot).toBeNull();
+  expect(host.querySelector('img')).toBeNull();
+  expect(host.outerHTML).not.toContain('data:image');
+  expect((host.cloneNode(true) as HTMLElement).outerHTML).not.toContain('data:image');
+  const privateRoot = attachShadow.mock.results.find(
+    (result) => result.type === 'return' && result.value.host === host
+  )?.value;
+  const image = privateRoot?.querySelector('img');
+  expect(image?.src).toBe('data:image/png;base64,c2F2ZWQ=');
+  expect(image?.alt).toBe('Button');
+  expect(image?.width).toBe(100);
+  expect(image?.height).toBe(50);
+});

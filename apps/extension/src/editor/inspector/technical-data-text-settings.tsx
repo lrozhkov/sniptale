@@ -75,33 +75,6 @@ export function EditorTechnicalDataTextSettings() {
         </div>
       </InspectorParameterRow>
       <InspectorParameterRow
-        label={translate('content.toolbar.drawingTextColor')}
-        valueMinimum={184}
-      >
-        <DrawingColorOptions
-          colors={DEFAULT_DRAWING_COLORS}
-          floatingBoundaryRef={boundaryRef}
-          floatingPlacement="auto"
-          label={translate('content.toolbar.drawingTextColor')}
-          value={settings.color}
-          onSelect={(color) => updateSettings({ color })}
-          icon={Type}
-        />
-      </InspectorParameterRow>
-      <InspectorParameterRow
-        label={translate('content.toolbar.drawingTextBackground')}
-        valueMinimum={220}
-      >
-        <DrawingTextBackgroundOptions
-          colors={DEFAULT_DRAWING_COLORS}
-          floatingBoundaryRef={boundaryRef}
-          floatingPlacement="auto"
-          value={settings.backgroundColor}
-          vertical={false}
-          onChange={(backgroundColor) => updateSettings({ backgroundColor })}
-        />
-      </InspectorParameterRow>
-      <InspectorParameterRow
         label={translate('content.toolbar.drawingTextSize')}
         valueMinimum={112}
         dataUi="editor.technical-data.size-row"
@@ -127,6 +100,33 @@ export function EditorTechnicalDataTextSettings() {
             </ContentToolbarButton>
           ))}
         </div>
+      </InspectorParameterRow>
+      <InspectorParameterRow
+        label={translate('content.toolbar.drawingTextColor')}
+        valueMinimum={184}
+      >
+        <DrawingColorOptions
+          colors={DEFAULT_DRAWING_COLORS}
+          floatingBoundaryRef={boundaryRef}
+          floatingPlacement="auto"
+          label={translate('content.toolbar.drawingTextColor')}
+          value={settings.color}
+          onSelect={(color) => updateSettings({ color })}
+          icon={Type}
+        />
+      </InspectorParameterRow>
+      <InspectorParameterRow
+        label={translate('editor.compact.technicalDataBackground')}
+        valueMinimum={220}
+      >
+        <DrawingTextBackgroundOptions
+          colors={DEFAULT_DRAWING_COLORS}
+          floatingBoundaryRef={boundaryRef}
+          floatingPlacement="auto"
+          value={settings.backgroundColor}
+          vertical={false}
+          onChange={(backgroundColor) => updateSettings({ backgroundColor })}
+        />
       </InspectorParameterRow>
     </div>
   );

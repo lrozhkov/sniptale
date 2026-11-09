@@ -1,4 +1,5 @@
 export type PolicyStateId =
+  | 'simplify-compute-sessions'
   | 'ai-settings-mutation-queue'
   | 'ai-secret-unlock-requests'
   | 'annotation-fork-sessions'

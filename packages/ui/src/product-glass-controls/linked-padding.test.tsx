@@ -198,3 +198,46 @@ it('keeps the linked value beside its label and places the full-row control belo
     fields?.firstElementChild
   );
 });
+
+it('uses the same linkage for previews and commits while preserving an explicit split', async () => {
+  const commit = vi.fn();
+  const preview = vi.fn();
+  function LiveHarness() {
+    const [value, setValue] = useState({ top: 2, right: 2, bottom: 2, left: 2 });
+    return (
+      <ProductGlassLinkedPaddingFields
+        labels={labels}
+        padding={value}
+        onChange={(next) => {
+          commit(next);
+          setValue(next);
+        }}
+        onPreviewChange={(next) => {
+          preview(next);
+          setValue(next);
+        }}
+        renderValueField={({ side, onChange, onPreview }) => (
+          <button
+            data-padding-side={side}
+            onPointerMove={() => onPreview?.(8)}
+            onClick={() => onChange(8)}
+          />
+        )}
+      />
+    );
+  }
+  await act(async () => root.render(<LiveHarness />));
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('[data-padding-link="all"]')?.click()
+  );
+  const top = container.querySelector<HTMLButtonElement>('[data-padding-side="top"]')!;
+  await act(async () => top.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  expect(preview).toHaveBeenLastCalledWith({ top: 8, bottom: 8, left: 2, right: 2 });
+  expect(commit).not.toHaveBeenCalled();
+  expect(container.querySelector('[data-padding-link="all"]')?.getAttribute('aria-pressed')).toBe(
+    'false'
+  );
+  await act(async () => top.click());
+  expect(commit).toHaveBeenCalledTimes(1);
+  expect(commit).toHaveBeenLastCalledWith({ top: 8, bottom: 8, left: 2, right: 2 });
+});

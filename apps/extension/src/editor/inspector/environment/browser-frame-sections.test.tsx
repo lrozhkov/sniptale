@@ -49,7 +49,7 @@ vi.mock('./shared', () => ({
   panelButtonClassName: 'panel-button',
 }));
 
-import { BrowserFrameBehaviorSections, BrowserFrameResetSection } from './browser-frame-sections';
+import { BrowserFrameBehaviorSections } from './browser-frame-sections';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -71,43 +71,46 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('routes canvas and scene behavior changes through the async action boundary', async () => {
-  const syncBrowserFrame = vi.fn();
+it.each([false, true])(
+  'routes both composition directions through the async action boundary (fit: %s)',
+  async (fit) => {
+    const syncBrowserFrame = vi.fn();
 
-  act(() => {
-    root?.render(
-      <BrowserFrameBehaviorSections
-        browserCanvasModeOptions={[
-          { label: 'Resize', value: 'resize' },
-          { label: 'Keep', value: 'keep-size' },
-        ]}
-        browserContentModeOptions={[
-          { label: 'Push', value: 'push-down' },
-          { label: 'Fit', value: 'fit-content' },
-        ]}
-        browserFrame={{ canvasMode: 'resize', contentMode: 'push-down' }}
-        syncBrowserFrame={syncBrowserFrame}
-      />
-    );
-  });
+    act(() => {
+      root?.render(
+        <BrowserFrameBehaviorSections
+          browserCanvasModeOptions={[
+            { label: 'Resize', value: 'resize' },
+            { label: 'Keep', value: 'keep-size' },
+          ]}
+          browserFrame={{
+            canvasMode: fit ? 'keep-size' : 'resize',
+            contentMode: fit ? 'fit-content' : 'push-down',
+          }}
+          syncBrowserFrame={syncBrowserFrame}
+        />
+      );
+    });
 
-  await act(async () => {
-    container?.querySelectorAll('button').forEach((button) => button.click());
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+    await act(async () => {
+      container?.querySelectorAll('button').forEach((button) => button.click());
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
-  expect(syncBrowserFrame).toHaveBeenCalledWith({ canvasMode: 'keep-size' });
-  expect(syncBrowserFrame).toHaveBeenCalledWith({ contentMode: 'fit-content' });
-  expect(container?.querySelectorAll('[data-testid^="select-field-"]')).toHaveLength(2);
-});
+    expect(syncBrowserFrame).toHaveBeenCalledWith({
+      canvasMode: fit ? 'resize' : 'keep-size',
+      contentMode: fit ? 'push-down' : 'fit-content',
+    });
+    expect(container?.querySelectorAll('[data-testid^="select-field-"]')).toHaveLength(1);
+  }
+);
 
 it('renders alternate labels for keep-size and fit-content browser behavior', () => {
   act(() => {
     root?.render(
       <BrowserFrameBehaviorSections
         browserCanvasModeOptions={[{ label: 'Keep', value: 'keep-size' }]}
-        browserContentModeOptions={[{ label: 'Fit', value: 'fit-content' }]}
         browserFrame={{ canvasMode: 'keep-size', contentMode: 'fit-content' }}
         syncBrowserFrame={vi.fn()}
       />
@@ -115,52 +118,4 @@ it('renders alternate labels for keep-size and fit-content browser behavior', ()
   });
 
   expect(container?.textContent).toContain('Keep');
-  expect(container?.textContent).toContain('Fit');
-});
-
-it('routes insert or update through the async action boundary', async () => {
-  const resetBrowserFrame = vi.fn();
-
-  act(() => {
-    root?.render(<BrowserFrameResetSection resetBrowserFrame={resetBrowserFrame} />);
-  });
-
-  await act(async () => {
-    container?.querySelector('button')?.click();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-
-  expect(resetBrowserFrame).toHaveBeenCalledOnce();
-  expect(container?.textContent).not.toContain('editor.compact.browserFrameAction');
-  expect(container?.textContent).toContain('windowHeader.reset');
-});
-
-it('keeps disabled apply inert and exposes a localized async failure', async () => {
-  const resetBrowserFrame = vi.fn(async () => {
-    throw new Error('Frame failed');
-  });
-
-  act(() => {
-    root?.render(<BrowserFrameResetSection disabled resetBrowserFrame={resetBrowserFrame} />);
-  });
-
-  expect(container?.querySelector('button')?.disabled).toBe(true);
-  expect(container?.querySelector('[role="alert"]')).toBeNull();
-
-  act(() => {
-    root?.render(<BrowserFrameResetSection resetBrowserFrame={resetBrowserFrame} />);
-  });
-
-  await act(async () => {
-    container?.querySelector('button')?.click();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-
-  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
-    'editor.compact.browserFrameApplyFailed. common.errors.unexpectedDetail'
-  );
-  expect(container?.querySelector('[role="alert"]')?.textContent).not.toContain('boom');
-  expect(container?.querySelector('button')?.disabled).toBe(false);
 });

@@ -1,9 +1,11 @@
 import { expect, it } from 'vitest';
 import {
   getDrawingSelectionBounds,
+  getDrawingObjectSelectionBounds,
   translateDrawingObject,
   type DrawingObject,
 } from '../../features/drawing/public';
+import { createDefaultSimplifySettings } from '../../features/simplify/settings';
 import { resolveDrawingMoveAlignment } from './move-alignment';
 
 function shape(
@@ -97,7 +99,7 @@ it('uses rotated visual bounds and retains fractional alignment', () => {
   expect(resolveDrawingMoveAlignment({ moving: [moving], objects: [target] }).delta.x).toBe(-3.5);
 });
 
-it('aligns with DOM geometry and leaves unsupported drawing tools alone', () => {
+it('aligns with DOM geometry for blur objects', () => {
   const moving = shape('moving', 104, 103, 100, 60);
   expect(
     resolveDrawingMoveAlignment({
@@ -111,5 +113,105 @@ it('aligns with DOM geometry and leaves unsupported drawing tools alone', () => 
     kind: 'blur',
     bounds: { x: 104, y: 103, width: 100, height: 60 },
   };
-  expect(resolveDrawingMoveAlignment({ moving: [blur], objects: [moving] }).guides).toEqual([]);
+  expect(
+    resolveDrawingMoveAlignment({
+      moving: [blur],
+      objects: [],
+      domBounds: [{ x: 100, y: 100, width: 100, height: 60 }],
+    }).delta
+  ).toEqual({ x: -4, y: -3 });
+});
+
+it('marks the aligned source and target edge endpoints, using centers for center matches', () => {
+  const moving = shape('moving', 304, 80, 80, 60);
+  const target = shape('target', 300, 200, 100, 100);
+  const edge = resolveDrawingMoveAlignment({ moving: [moving], objects: [target] });
+  expect(edge.guides.find((guide) => guide.axis === 'x')?.points).toEqual([
+    { x: 300, y: 80 },
+    { x: 300, y: 140 },
+    { x: 300, y: 200 },
+    { x: 300, y: 300 },
+  ]);
+  const center = resolveDrawingMoveAlignment({
+    moving: [text(184, 173)],
+    objects: [shape('frame', 100, 100, 240, 160)],
+  });
+  expect(center.guides.find((guide) => guide.axis === 'x')?.points).toEqual([
+    { x: 220, y: 180 },
+    { x: 220, y: 180 },
+  ]);
+  expect(center.guides.find((guide) => guide.axis === 'y')?.points).toEqual([
+    { x: 220, y: 180 },
+    { x: 220, y: 180 },
+  ]);
+});
+
+const allKinds: DrawingObject[] = [
+  ...(['rectangle', 'ellipse', 'triangle', 'parallelogram'] as const).map((kind) => ({
+    ...shape(kind, 104, 103),
+    kind,
+  })),
+  {
+    id: 'pencil',
+    kind: 'pencil',
+    samples: [
+      { x: 104, y: 103, t: 0 },
+      { x: 204, y: 203, t: 1 },
+    ],
+    color: '#000',
+    width: 2,
+  },
+  {
+    id: 'marker',
+    kind: 'marker',
+    samples: [
+      { x: 104, y: 103, t: 0 },
+      { x: 204, y: 203, t: 1 },
+    ],
+    color: '#000',
+    width: 8,
+    opacity: 0.5,
+  },
+  {
+    id: 'arrow',
+    kind: 'arrow',
+    start: { x: 104, y: 103 },
+    end: { x: 204, y: 203 },
+    bendPoints: [{ x: 180, y: 90 }],
+    color: '#000',
+    width: 2,
+    dynamicWidth: false,
+  },
+  { id: 'blur', kind: 'blur', bounds: { x: 104, y: 103, width: 100, height: 100 } },
+  {
+    id: 'simplify',
+    kind: 'simplify',
+    bounds: { x: 104, y: 103, width: 100, height: 100 },
+    settings: createDefaultSimplifySettings(),
+  },
+  text(104, 103),
+];
+it.each(allKinds)('aligns $kind full selection bounds as both source and target', (object) => {
+  const bounds = getDrawingObjectSelectionBounds(object);
+  const target = { x: bounds.x - 4, y: bounds.y - 3, width: bounds.width, height: bounds.height };
+  expect(
+    resolveDrawingMoveAlignment({ moving: [object], objects: [object], domBounds: [target] }).delta
+  ).toEqual({ x: -4, y: -3 });
+  const moving = shape('other', bounds.x - 4, bounds.y - 3, bounds.width, bounds.height);
+  expect(
+    resolveDrawingMoveAlignment({ moving: [moving], objects: [moving, object] }).delta
+  ).toEqual({ x: 4, y: 3 });
+});
+it('aligns mixed selections by aggregate bounds and preserves relative geometry', () => {
+  const moving = allKinds.filter((object) => object.kind !== 'text');
+  const bounds = getDrawingSelectionBounds(moving)!;
+  const result = resolveDrawingMoveAlignment({
+    moving,
+    objects: moving,
+    domBounds: [{ ...bounds, x: bounds.x - 4, y: bounds.y - 3 }],
+  });
+  expect(result.delta).toEqual({ x: -4, y: -3 });
+  expect(
+    getDrawingSelectionBounds(moving.map((object) => translateDrawingObject(object, result.delta)))
+  ).toEqual({ ...bounds, x: bounds.x - 4, y: bounds.y - 3 });
 });

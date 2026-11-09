@@ -149,3 +149,51 @@ it('reveals the linked slider from the gap between label and value and keeps it 
   await enterValue('48');
   expect(current.paddingTop).toBe(48);
 });
+
+for (const split of [false, true]) {
+  it(`previews ${split ? 'independent' : 'linked'} padding before accepting once`, async () => {
+    const commit = vi.fn();
+    const preview = vi.fn();
+    function LiveHarness() {
+      const [frame, setFrame] = useState(DEFAULT_EDITOR_FRAME_SETTINGS);
+      current = frame;
+      return (
+        <FramePaddingSection
+          frameDraft={frame}
+          previewFrameDraft={(update) => {
+            preview();
+            setFrame(update);
+          }}
+          setFrameDraft={(update) => {
+            commit();
+            setFrame(update);
+          }}
+        />
+      );
+    }
+    await act(async () => root.render(<LiveHarness />));
+    if (split) {
+      for (const name of ['all', 'vertical', 'horizontal']) {
+        await act(async () =>
+          container.querySelector<HTMLButtonElement>(`[data-padding-link="${name}"]`)?.click()
+        );
+      }
+    }
+    const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(range, '73');
+      range.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(commit).not.toHaveBeenCalled();
+    expect(current).toMatchObject(
+      split
+        ? { paddingTop: 73, paddingBottom: 32, paddingLeft: 32, paddingRight: 32 }
+        : { paddingTop: 73, paddingBottom: 73, paddingLeft: 73, paddingRight: 73 }
+    );
+    await act(async () =>
+      range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }))
+    );
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+}

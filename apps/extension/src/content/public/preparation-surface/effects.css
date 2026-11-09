@@ -187,7 +187,10 @@
   .sniptale-interactive-frame-fill[data-hide-during-capture='true'],
 :host(.sniptale-capture-ui-hidden)
   .sniptale-interactive-frame-stroke[data-hide-during-capture='true'] {
-  display: none !important;
+  /* Conceal pixels without collapsing toolbar anchors during selection changes. */
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* Drawing owns page interaction while active; prepared annotations remain visual-only. */

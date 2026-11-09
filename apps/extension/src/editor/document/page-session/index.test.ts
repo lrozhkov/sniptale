@@ -32,6 +32,10 @@ vi.mock('@sniptale/platform/security/secure-random-id', async (original) => ({
   ...(await original()),
   createSecureRandomUuid: mocks.createId,
 }));
+vi.mock('../../../platform/navigation/extension-pages/editor', () => ({
+  buildEditorUrl: ({ assetId }: { assetId: string }) =>
+    new URL(`/editor?assetId=${assetId}`, window.location.origin).toString(),
+}));
 vi.mock('../../../platform/media-utils/data-url', async (original) => ({
   ...(await original()),
   blobToDataUrl: mocks.toDataUrl,
@@ -289,3 +293,25 @@ describe('editor aggregate restore', () => {
 vi.mock('../../../workflows/sync-transfer/editing-admission', () => ({
   ensureNativeEditingRootAvailable: vi.fn(async () => undefined),
 }));
+
+it('replaces the library URL without bootstrap state and can restore the exact source location', async () => {
+  const { replaceEditorPageImageLocation } = await import('./');
+  window.history.replaceState(
+    { retained: true },
+    '',
+    '/editor?assetId=old&editorBootstrap=boot&session=legacy#view'
+  );
+  const before = window.location.href;
+  const undo = replaceEditorPageImageLocation('selected');
+  expect(location.search).toBe('?assetId=selected');
+  undo();
+  expect(location.href).toBe(before);
+  expect(history.state).toEqual({ retained: true });
+});
+it('does not restore an older switch URL over a newer navigation owner', async () => {
+  const { replaceEditorPageImageLocation } = await import('./');
+  const undo = replaceEditorPageImageLocation('selected');
+  history.replaceState({}, '', '/editor?assetId=newer');
+  undo();
+  expect(location.search).toBe('?assetId=newer');
+});

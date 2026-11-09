@@ -45,6 +45,8 @@ export type ScreenshotType = 'visible' | 'full' | 'selection';
 export interface ScreenshotCaptureAdapter {
   captureSelection: () => Promise<string>;
   captureViewport: (type: 'visible' | 'full') => Promise<string>;
+  /** Maps the visible local raster to CSS viewport coordinates, including offset and scaling. */
+  getViewportBounds?: () => { x: number; y: number; width: number; height: number };
 }
 
 export interface ScreenshotControllerCapturePersistenceBridge {

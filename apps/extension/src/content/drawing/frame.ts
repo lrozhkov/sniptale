@@ -1,14 +1,20 @@
-import { getDrawingSelectionBounds, type DrawingObject } from '../../features/drawing/public';
+import {
+  getDrawingSelectionBounds,
+  hitTestDrawingDocument,
+  type DrawingObject,
+} from '../../features/drawing/public';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { PointerDraft, DrawingArrowHover } from './interaction';
-import { getDrawingViewportProjection } from './interaction';
+import { getDrawingViewportProjection, toDrawingScenePoint } from './interaction';
 import {
   renderDrawingMarquee,
   renderDrawingMultiSelection,
   renderDrawingObject,
   renderDrawingSelection,
+  renderDrawingHoverOutline,
 } from './render';
 import { resolveDrawingFrameRenderables } from './frame-renderables';
+import { clipDrawingObjectToRoot } from './layout';
 
 export function drawDrawingFrame(args: {
   canvas: HTMLCanvasElement;
@@ -19,10 +25,12 @@ export function drawDrawingFrame(args: {
   showChrome: boolean;
   bendOnly?: boolean;
   hoverBend?: DrawingArrowHover | null;
+  hoverPoint?: { clientX: number; clientY: number } | null;
   renderObjects?: boolean;
   suppressText?: boolean;
   pixelBudget?: number;
   getObjectOpacity?: (objectId: string) => number;
+  getObjectAnchor?: (object: DrawingObject) => Element | null;
 }): void {
   const {
     canvas,
@@ -68,13 +76,43 @@ export function drawDrawingFrame(args: {
         });
     });
   }
-  if (showChrome && !args.bendOnly && draft?.kind === 'marquee') {
+  if (showChrome && !args.bendOnly && draft?.kind === 'marquee' && !draft.clickObjectId) {
     renderDrawingMarquee(context, draft.start, draft.current, projection);
+  }
+  context.restore();
+  if (showChrome && !draft && !args.bendOnly && args.hoverPoint) {
+    const hovered = hitTestDrawingDocument(objects, toDrawingScenePoint(args.hoverPoint, root));
+    if (hovered && !selectedIds.includes(hovered.id)) {
+      context.save();
+      if (
+        root.kind === 'element' &&
+        clipDrawingObjectToRoot(hovered, root, args.getObjectAnchor?.(hovered))
+      ) {
+        const rect = root.element.getBoundingClientRect();
+        context.beginPath();
+        context.rect(rect.left, rect.top, rect.width, rect.height);
+        context.clip();
+      }
+      renderDrawingHoverOutline(context, hovered, projection);
+      context.restore();
+    }
   }
   if (showChrome && selectedIds.length > 0) {
     const selected = resolveDrawingFrameRenderables(objects, draft)
       .map(({ object }) => object)
       .filter((object) => selectedIds.includes(object.id));
+    context.save();
+    if (
+      root.kind === 'element' &&
+      selected.every((object) =>
+        clipDrawingObjectToRoot(object, root, args.getObjectAnchor?.(object))
+      )
+    ) {
+      const rect = root.element.getBoundingClientRect();
+      context.beginPath();
+      context.rect(rect.left, rect.top, rect.width, rect.height);
+      context.clip();
+    }
     if (selected.length === 1) {
       const hoverPoint =
         args.hoverBend && args.hoverBend.object === selected[0]
@@ -90,8 +128,8 @@ export function drawDrawingFrame(args: {
         projection,
         draft?.kind === 'rotate-selection' ? draft : undefined
       );
+    context.restore();
   }
-  context.restore();
 }
 
 type DrawingSnapshotSource = {
@@ -138,7 +176,10 @@ export function captureDrawingObjects(canvas: HTMLCanvasElement) {
   return source.objects.map((object, index) => ({
     object,
     projection,
-    clip,
+    clip:
+      clip && clipDrawingObjectToRoot(object, source.root, source.getObjectAnchor?.(object))
+        ? clip
+        : null,
     anchor: source.getObjectAnchor?.(object) ?? null,
     canvas:
       object.kind === 'text' || object.kind === 'blur'
@@ -190,7 +231,10 @@ function captureDrawingSource(
     height: `${height}px`,
     pointerEvents: 'none',
   });
-  if (source.root.kind === 'element') {
+  const viewportMask = objects.some(
+    (object) => !clipDrawingObjectToRoot(object, source.root, source.getObjectAnchor?.(object))
+  );
+  if (source.root.kind === 'element' && !viewportMask) {
     const clip = source.root.element.getBoundingClientRect();
     const x = left - projection.x;
     const y = top - projection.y;
@@ -200,6 +244,23 @@ function captureDrawingSource(
   if (!context) throw new Error('Drawing snapshot canvas is unavailable');
   context.setTransform(snapshot.width / width, 0, 0, snapshot.height / height, 0, 0);
   for (const object of objects) {
+    const clip =
+      viewportMask &&
+      source.root.kind === 'element' &&
+      clipDrawingObjectToRoot(object, source.root, source.getObjectAnchor?.(object))
+        ? source.root.element.getBoundingClientRect()
+        : null;
+    if (clip) {
+      context.save();
+      context.beginPath();
+      context.rect(
+        clip.left + projection.x - left,
+        clip.top + projection.y - top,
+        clip.width,
+        clip.height
+      );
+      context.clip();
+    }
     renderDrawingObject(
       context,
       object,
@@ -208,6 +269,7 @@ function captureDrawingSource(
         opacity: source.getObjectOpacity?.(object.id) ?? 1,
       }
     );
+    if (clip) context.restore();
   }
   return snapshot;
 }

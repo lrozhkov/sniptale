@@ -4,9 +4,10 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { CompactWorkspaceColorPanel } from './compact-workspace-content';
 import { createInspectorCommandParams } from '../../../../../../tooling/test/harness/editor/ownership/fixtures';
+import { DEFAULT_EDITOR_WORKSPACE_SETTINGS } from '../../../features/editor/document/constants';
 import { translate } from '../../../platform/i18n';
 
-it('places Make Default in the Background row and retains its existing save owner', () => {
+it('restores only the workspace background through the existing immediate color owner', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -18,6 +19,7 @@ it('places Make Default in the Background row and retains its existing save owne
           params={
             {
               ...params,
+              workspace: { ...params.workspace, backgroundColor: '#abcdef' },
               workspaceColorMatchesDefault: false,
               workspaceDefaultSavePending: false,
             } as never
@@ -28,11 +30,14 @@ it('places Make Default in the Background row and retains its existing save owne
     const row = host.querySelector('[data-ui="editor.workspace.background-default-row"]')!;
     expect(row.className).toContain('grid-cols-[minmax(0,1fr)_auto]');
     const button = Array.from(row.querySelectorAll('button')).find(
-      (node) => node.getAttribute('aria-label') === translate('editor.compact.workspaceMakeDefault')
+      (node) => node.getAttribute('aria-label') === translate('editor.compact.workspaceResetColor')
     )!;
     expect(button).toBeDefined();
     act(() => button.click());
-    expect(params.saveWorkspaceColorAsDefault).toHaveBeenCalledOnce();
+    expect(params.applyWorkspaceColor).toHaveBeenCalledExactlyOnceWith(
+      DEFAULT_EDITOR_WORKSPACE_SETTINGS.backgroundColor
+    );
+    expect(params.saveWorkspaceColorAsDefault).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

@@ -6,6 +6,10 @@ export interface QuickActionHeaderRasterInput {
   header: WindowHeader;
   source: { width: number; height: number };
   faviconWebsite?: string;
+  /** Advisory browser metadata; acquisition validates the URL before fetch. */
+  faviconHintUrl?: string;
+  /** Background installed the session HEAD guard before this admitted command. */
+  faviconRedirectGuardReady?: boolean;
 }
 export function isQuickActionHeaderRaster(value: unknown): value is string {
   return (

@@ -1,5 +1,9 @@
+import { cloneDrawingToolDefaults, parseDrawingToolPreferences } from './parser';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createDefaultDrawingToolDefaults } from '../../../../features/drawing/public';
+import {
+  createDefaultDrawingToolDefaults,
+  type DrawingToolDefaults,
+} from '../../../../features/drawing/public';
 import { browserStorage } from '../../infrastructure/browser-storage';
 import {
   DRAWING_TOOL_PREFERENCES_STORAGE_KEY,
@@ -237,4 +241,81 @@ it('observes only valid local changes for the drawing preference key', () => {
   expect(listener).toHaveBeenNthCalledWith(2, fallback);
   stop();
   expect(unsubscribe).toHaveBeenCalledOnce();
+});
+
+it('reads legacy preferences without simplify and preserves remembered inactive settings', () => {
+  const { simplify: omitted, ...legacy } = customized;
+  expect(omitted).toBeDefined();
+  const restored = parseDrawingToolPreferences({ schemaVersion: 1, defaults: legacy }, fallback);
+  expect(restored.unsafeForWrite).toBe(false);
+  expect(restored.defaults.simplify).toEqual(fallback.simplify);
+  const defaults = {
+    ...customized,
+    simplify: {
+      ...fallback.simplify,
+      automatic: false,
+      content: 'all' as const,
+      manualKind: 'image' as const,
+      sensitivity: 90 as const,
+      thickness: 0.65 as const,
+      lineSpacing: 2 as const,
+      textPattern: 'random' as const,
+      textAlign: 'right' as const,
+      color: '#123456',
+    },
+  };
+  const parsed = parseDrawingToolPreferences({ schemaVersion: 1, defaults }, fallback);
+  expect(parsed).toEqual({ defaults, unsafeForWrite: false });
+  const cloned = cloneDrawingToolDefaults(parsed.defaults);
+  expect(cloned).toEqual(defaults);
+  expect(cloned.simplify).not.toBe(parsed.defaults.simplify);
+});
+it.each([
+  null,
+  {},
+  { ...fallback.simplify, sensitivity: 100 },
+  { ...fallback.simplify, automatic: 'true' },
+])('refuses malformed supplied simplify preferences %j', (simplify) => {
+  const parsed = parseDrawingToolPreferences(
+    { schemaVersion: 1, defaults: { ...customized, simplify } },
+    fallback
+  );
+  expect(parsed.unsafeForWrite).toBe(true);
+  expect(parsed.defaults).toEqual(fallback);
+});
+
+it('serializes simplify patches over fresh defaults and preserves inactive branches', async () => {
+  let stored: { schemaVersion: number; defaults: DrawingToolDefaults } = {
+    schemaVersion: 1,
+    defaults: customized,
+  };
+  vi.spyOn(browserStorage.local, 'get').mockImplementation(async () => ({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: stored,
+  }));
+  const set = vi.spyOn(browserStorage.local, 'set').mockImplementation(async (items) => {
+    const parsed = parseDrawingToolPreferences(
+      items[DRAWING_TOOL_PREFERENCES_STORAGE_KEY],
+      fallback
+    );
+    expect(parsed.unsafeForWrite).toBe(false);
+    stored = { schemaVersion: 1, defaults: parsed.defaults };
+  });
+  const results = await Promise.all([
+    saveDrawingToolPreferences({ simplify: { automatic: false, manualKind: 'image' } }, fallback),
+    saveDrawingToolPreferences({ simplify: { sensitivity: 90, content: 'all' } }, fallback),
+  ]);
+  expect(results).toEqual(['applied', 'applied']);
+  expect(set).toHaveBeenCalledTimes(2);
+  expect(stored.defaults.simplify).toEqual({
+    ...fallback.simplify,
+    automatic: false,
+    manualKind: 'image',
+    sensitivity: 90,
+    content: 'all',
+  });
+  await expect(
+    saveDrawingToolPreferences({ simplify: { color: 'url(remote)' } }, fallback)
+  ).resolves.toBe('rejected');
+  expect(set).toHaveBeenCalledTimes(2);
+  expect(stored.defaults.pencil).toEqual(customized.pencil);
 });

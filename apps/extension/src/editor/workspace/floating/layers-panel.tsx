@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { EditorInspectorLayersPanel } from '../../inspector/layers';
 import { EditorInspectorContent } from '../../inspector/content';
@@ -92,7 +92,13 @@ function EditorFloatingLayersPanelBody(props: {
   activeMode: EditorLayersPanelMode;
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
+  scrollPositions: Map<EditorLayersPanelMode, number>;
 }) {
+  const scroller = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (scroller.current)
+      scroller.current.scrollTop = props.scrollPositions.get(props.activeMode) ?? 0;
+  }, [props.activeMode, props.scrollPositions]);
   if (props.documentController.inspector === 'layer-effects') {
     return (
       <EditorFloatingLayerEffectsPanel
@@ -110,6 +116,8 @@ function EditorFloatingLayersPanelBody(props: {
         expanded
         fillContainer
         maxExpandedHeightRatio={1}
+        initialScrollOffset={props.scrollPositions.get('layers') ?? 0}
+        onScrollOffsetChange={(offset) => props.scrollPositions.set('layers', offset)}
       />
     );
   }
@@ -120,8 +128,14 @@ function EditorFloatingLayersPanelBody(props: {
   );
   return (
     <div
+      ref={scroller}
+      data-ui="editor.floating.inspector-scroll"
+      onScroll={(event) =>
+        props.scrollPositions.set(props.activeMode, event.currentTarget.scrollTop)
+      }
       className={[
-        'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable]',
+        'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-2',
+        '[scrollbar-gutter:stable_both-edges] [scrollbar-width:thin]',
       ].join(' ')}
     >
       <EditorInspectorContent
@@ -143,6 +157,7 @@ function EditorFloatingExpandedLayersPanel(props: {
   onSelectMode: (mode: EditorLayersPanelMode) => void;
   preferenceError: string | null;
   startResize: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  scrollPositions: Map<EditorLayersPanelMode, number>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previousInspector = useRef(props.documentController.inspector);
@@ -162,6 +177,7 @@ function EditorFloatingExpandedLayersPanel(props: {
     <FloatingChromePanel
       ref={panelRef}
       dataUi="editor.floating.layers-panel"
+      data-picker-boundary
       className={LAYERS_PANEL_CLASS_NAME}
       style={{ height: props.height }}
     >
@@ -177,6 +193,7 @@ function EditorFloatingExpandedLayersPanel(props: {
         onSelectMode={props.onSelectMode}
       />
       <EditorFloatingLayersPanelBody
+        scrollPositions={props.scrollPositions}
         activeMode={props.activeMode}
         documentController={props.documentController}
         hasImage={props.hasImage}
@@ -205,6 +222,7 @@ export function EditorFloatingLayersPanel({
   onExpand: () => void;
   onHeightRatioChange: (heightRatio: number | null) => void;
 }) {
+  const scrollPositions = useRef(new Map<EditorLayersPanelMode, number>());
   const { height, startResize } = useResizableLayersPanelHeight({
     defaultHeight:
       documentController.inspector === 'layer-effects' ? 520 : LAYERS_PANEL_DEFAULT_HEIGHT,
@@ -242,6 +260,7 @@ export function EditorFloatingLayersPanel({
 
   return (
     <EditorFloatingExpandedLayersPanel
+      scrollPositions={scrollPositions.current}
       activeMode={activeMode}
       documentController={documentController}
       hasImage={hasImage}

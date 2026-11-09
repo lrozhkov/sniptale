@@ -5,7 +5,7 @@ import { WindowHeaderSettings } from '../../../workflows/browser-frame/settings'
 import { useEditorStore } from '../../state/useEditorStore';
 import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
 import { EditorInspectorDetails } from '../grouped';
-import { BrowserFrameBehaviorSections, BrowserFrameResetSection } from './browser-frame-sections';
+import { BrowserFrameBehaviorSections } from './browser-frame-sections';
 
 /** Layer presence owns activation; document identity owns pending favicon acquisition. */
 export function EditorWindowHeaderSettings(props: {
@@ -20,7 +20,20 @@ export function EditorWindowHeaderSettings(props: {
   return (
     <WindowHeaderSettings
       key={identity}
+      renderGroup={(kind, children) => (
+        <EditorInspectorDetails
+          preferenceId={`browser-frame:${kind}`}
+          label={translate(
+            kind === 'appearance' ? 'windowHeader.appearance' : 'windowHeader.content'
+          )}
+          level="section"
+          initiallyOpen
+        >
+          {children}
+        </EditorInspectorDetails>
+      )}
       header={hasHeader ? resolveEditorWindowHeader(props.browserFrame) : undefined}
+      rememberedHeader={resolveEditorWindowHeader(props.browserFrame)}
       onChange={(header) =>
         props.syncBrowserFrame(
           header
@@ -39,28 +52,27 @@ export function EditorWindowHeaderSettings(props: {
 
 export const EditorInspectorBrowserFramePanelContent: React.FC<{
   browserCanvasModeOptions: { label: string; value: 'resize' | 'keep-size' }[];
-  browserContentModeOptions: { label: string; value: 'push-down' | 'fit-content' }[];
   browserFrame: BrowserFrameState;
   insertOrUpdateBrowserFrame?: () => Promise<void> | void;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
-}> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => {
+}> = ({ browserCanvasModeOptions, browserFrame, syncBrowserFrame }) => {
   useAppLocale();
 
   return (
     <div className="sniptale-parameter-stack">
       <EditorWindowHeaderSettings browserFrame={browserFrame} syncBrowserFrame={syncBrowserFrame} />
-      <EditorInspectorDetails
-        preferenceId="browser-frame:layout"
-        label={translate('editor.compact.browserFrameLayout')}
-      >
-        <BrowserFrameBehaviorSections
-          browserCanvasModeOptions={browserCanvasModeOptions}
-          browserContentModeOptions={browserContentModeOptions}
-          browserFrame={browserFrame}
-          syncBrowserFrame={syncBrowserFrame}
-        />
-      </EditorInspectorDetails>
-      <BrowserFrameResetSection resetBrowserFrame={() => syncBrowserFrame({ enabled: false })} />
+      {browserFrame.enabled && (
+        <EditorInspectorDetails
+          preferenceId="browser-frame:layout"
+          label={translate('editor.scene.placementSection')}
+        >
+          <BrowserFrameBehaviorSections
+            browserCanvasModeOptions={browserCanvasModeOptions}
+            browserFrame={browserFrame}
+            syncBrowserFrame={syncBrowserFrame}
+          />
+        </EditorInspectorDetails>
+      )}
     </div>
   );
 };

@@ -24,6 +24,7 @@ const RESOURCE_SOURCE_KEYS = new Set([
   'href',
   'xlink:href',
   'backgroundImageData',
+  'sniptaleSimplifySourceData',
 ]);
 const POSITIVE_DIMENSION_KEYS = new Set(['fontSize', 'height', 'width']);
 const NON_NEGATIVE_DIMENSION_KEYS = new Set([
@@ -78,6 +79,15 @@ function assertDocumentGeometry(document: EditorDocument): void {
     [document.sourceWidth, document.sourceHeight],
     [document.sourceDisplayWidth, document.sourceDisplayHeight],
   ];
+  const commonBase = document.compositionBase;
+  // Shared canvas extents can be negative after a crop; the domain guard bounds them.
+  if (commonBase) dimensionPairs.push([commonBase.sourceWidth, commonBase.sourceHeight]);
+  const legacyBase = document.browserFrame?.compositionBase;
+  if (legacyBase)
+    dimensionPairs.push(
+      [legacyBase.sourceWidth, legacyBase.sourceHeight],
+      [legacyBase.canvasWidth, legacyBase.canvasHeight]
+    );
   if (
     !dimensionPairs.every(
       ([width, height]) =>

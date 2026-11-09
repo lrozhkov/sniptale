@@ -138,14 +138,14 @@ describe('toolbar-mode-controller manual editing transitions', () => {
     expect(toolbarEditingMocks.showToastMock).not.toHaveBeenCalled();
   });
 
-  it('starts Design Review picking with managed navigation blocking', () => {
+  it('starts Design Review picking without a separate navigation lock', () => {
     const params = createParams();
     const handlers = createToolbarEditingHandlers(params);
 
     handlers.handleToggleDesignReviewMode(true);
 
     expect(params.setNavigationLockEnabled).toHaveBeenCalledOnce();
-    expect(params.setNavigationLockEnabled).toHaveBeenCalledWith(true);
+    expect(params.setNavigationLockEnabled).toHaveBeenCalledWith(false);
     expect(toolbarEditingMocks.enableDesignReviewModeMock).toHaveBeenCalledOnce();
     expect(params.setDesignReviewMode).toHaveBeenCalledWith(true);
     expect(toolbarEditingMocks.enableDesignReviewModeMock.mock.invocationCallOrder[0]).toBeLessThan(

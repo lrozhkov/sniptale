@@ -40,6 +40,8 @@ export function CheckboxField(props: {
   label: string;
   value: boolean;
   indeterminate?: boolean | undefined;
+  shape?: 'square' | 'round';
+  dataUi?: string | undefined;
   disabled?: boolean | undefined;
   onChange(value: boolean): void;
 }) {
@@ -56,8 +58,12 @@ export function CheckboxField(props: {
     >
       <input
         ref={input}
+        data-ui={props.dataUi}
         type="checkbox"
-        className="sniptale-parameter-check"
+        className={cx(
+          'sniptale-parameter-check',
+          props.shape === 'round' && 'sniptale-parameter-check--round'
+        )}
         aria-label={props.label}
         checked={props.value}
         disabled={props.disabled}
@@ -158,6 +164,7 @@ export function ColorField({
 
 export function SelectField<T extends string>(props: {
   label: string;
+  placeholder?: string | undefined;
   value: T | '';
   options: readonly CompactSelectOption<T>[];
   onChange: (value: T) => void;
@@ -181,6 +188,7 @@ export function SelectField<T extends string>(props: {
         <CompactSelect
           aria-label={props.label}
           value={props.value}
+          {...(props.placeholder === undefined ? {} : { placeholder: props.placeholder })}
           options={props.options}
           onChange={props.onChange}
           disabled={props.disabled}
@@ -212,6 +220,7 @@ export function SelectField<T extends string>(props: {
       <CompactSelect
         aria-label={props.label}
         value={props.value}
+        {...(props.placeholder === undefined ? {} : { placeholder: props.placeholder })}
         options={props.options}
         onChange={props.onChange}
         disabled={props.disabled}
@@ -230,7 +239,13 @@ export function SegmentedRow<T extends string>(props: {
   columns?: 2 | 3 | 4 | 5;
   label?: React.ReactNode | undefined;
   layout?: 'inline' | 'stacked';
-  options: Array<{ disabled?: boolean; icon?: React.ReactNode; label: string; value: T }>;
+  options: Array<{
+    disabled?: boolean;
+    description?: string;
+    icon?: React.ReactNode;
+    label: string;
+    value: T;
+  }>;
   value: T;
   onChange: (value: T) => void;
 }) {

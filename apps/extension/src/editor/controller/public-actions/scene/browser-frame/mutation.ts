@@ -6,10 +6,9 @@ import { isBrowserFrameObject } from '../../../../document/model';
 import { readCurrentBrowserFrameSourceState } from '../../../browser-frame/source-state';
 
 import {
-  resolveBrowserFrameRelayoutOptions,
+  resolveBrowserFrameComposition,
   resolveBrowserFrameScene,
   resolveNextBrowserFramePosition,
-  resolveNextBrowserFrameWidth,
 } from './layout';
 import type { BrowserFrameActionOptions } from './types';
 
@@ -17,7 +16,6 @@ export async function applyEditorBrowserFrameSettings(
   options: BrowserFrameActionOptions & { browserFrame: BrowserFrameState }
 ): Promise<void> {
   const nextBrowserFrame = { ...options.store.getBrowserFrame(), ...options.browserFrame };
-  options.store.setBrowserFrame(nextBrowserFrame);
 
   const applied = await upsertBrowserFrameLayer(options, nextBrowserFrame);
   if (!applied) {
@@ -39,12 +37,33 @@ export async function removeEditorBrowserFrameSettings(
   const header = findBrowserFrameLayer(canvas);
   if (!header) return;
   const browserFrame = options.store.getBrowserFrame();
+  const currentSource = readCurrentBrowserFrameSourceState(canvas, options.source);
+  const composition = currentSource
+    ? resolveBrowserFrameComposition({
+        currentSource,
+        currentBrowserFrame: browserFrame,
+        nextBrowserFrame: browserFrame,
+        options,
+        hasHeader: true,
+      })
+    : null;
+  const relayoutOptions = { ...composition?.relayoutOptions, hasBrowserFrame: false };
+  const nextScene = currentSource
+    ? resolveBrowserFrameScene({
+        browserFrame,
+        currentSource,
+        options,
+        relayoutOptions,
+      })
+    : null;
+  const background = nextScene ? await prepareChangedBackground(options, nextScene.canvas) : null;
+  if (options.isMutationCurrent?.() === false) {
+    background?.dispose();
+    return;
+  }
   canvas.remove(header);
-  options.relayoutScene(browserFrame, {
-    hasBrowserFrame: false,
-    preserveCanvasSize: browserFrame.canvasMode === 'keep-size',
-    fitSourceToContent: false,
-  });
+  options.relayoutScene(browserFrame, relayoutOptions);
+  background?.apply();
   options.ensureBrowserFrameOnTop();
   canvas.requestRenderAll();
   options.commitHistory();
@@ -67,7 +86,15 @@ async function upsertBrowserFrameLayer(
   if (!currentSource) {
     return false;
   }
-  const relayoutOptions = resolveBrowserFrameRelayoutOptions(browserFrame);
+  const composition = resolveBrowserFrameComposition({
+    currentSource,
+    currentBrowserFrame: options.store.getBrowserFrame(),
+    nextBrowserFrame: browserFrame,
+    options,
+    hasHeader: existingLayer !== null,
+  });
+  browserFrame = composition.browserFrame;
+  const { relayoutOptions } = composition;
   const nextScene = resolveBrowserFrameScene({
     browserFrame,
     currentSource,
@@ -81,27 +108,53 @@ async function upsertBrowserFrameLayer(
     nextSource: nextScene.source,
   });
 
-  const nextLayer = await createBrowserFrameLayerObject({
-    browserFrame,
-    existingObject: existingLayer,
-    left: position.left,
-    nextLabelIndex: options.nextLabelIndex?.('browser-frame') ?? 1,
-    prepareObject: options.prepareObject ?? (() => undefined),
-    top: position.top,
-    sourceHeight: nextScene.source.height,
-    width: resolveNextBrowserFrameWidth({
-      currentSource,
-      existingLayer,
-      nextSource: nextScene.source,
-    }),
-  });
+  const background = await prepareChangedBackground(options, nextScene.canvas);
+  if (options.isMutationCurrent?.() === false) {
+    background?.dispose();
+    return false;
+  }
+  let nextLayer: FabricObject;
+  try {
+    nextLayer = await createBrowserFrameLayerObject({
+      browserFrame,
+      existingObject: existingLayer,
+      left: position.left,
+      nextLabelIndex: options.nextLabelIndex?.('browser-frame') ?? 1,
+      prepareObject: options.prepareObject ?? (() => undefined),
+      top: position.top,
+      sourceHeight: nextScene.source.height,
+      width: nextScene.source.width,
+    });
+  } catch (error) {
+    background?.dispose();
+    throw error;
+  }
+  if (options.isMutationCurrent?.() === false) {
+    background?.dispose();
+    nextLayer.dispose();
+    return false;
+  }
 
-  if (options.isMutationCurrent && !options.isMutationCurrent()) return false;
   options.relayoutScene(browserFrame, relayoutOptions);
+  background?.apply();
+  options.store.setBrowserFrame(browserFrame);
   replaceBrowserFrameLayer(canvas, existingLayer, nextLayer);
   options.ensureBrowserFrameOnTop();
   canvas.requestRenderAll();
   return true;
+}
+
+function prepareChangedBackground(
+  options: BrowserFrameActionOptions,
+  nextSize: { width: number; height: number }
+) {
+  if (
+    !options.prepareBackground ||
+    (nextSize.width === options.canvasDocumentSize.width &&
+      nextSize.height === options.canvasDocumentSize.height)
+  )
+    return Promise.resolve(null);
+  return options.prepareBackground(nextSize);
 }
 
 function findBrowserFrameLayer(canvas: Canvas): FabricObject | null {

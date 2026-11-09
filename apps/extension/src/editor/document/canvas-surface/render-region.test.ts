@@ -434,3 +434,46 @@ it('keeps export rendering independent of the visible viewport', () => {
     255, 0, 0, 255,
   ]);
 });
+
+it('previews only unselected editable hover targets without changing selection or controls', () => {
+  const canvas = new EditorCanvas(undefined, { renderOnAddRemove: false });
+  const object = new Rect({ left: 10, top: 10, width: 40, height: 30 });
+  object.sniptaleId = 'shape';
+  object.sniptaleType = 'shape';
+  canvas.add(object);
+  expect(canvas.getSelectionPreviewObjects(object)).toEqual([object]);
+  expect(canvas.getActiveObjects()).toEqual([]);
+  expect(object.hasControls).toBe(true);
+  canvas.setActiveObject(object);
+  expect(canvas.getSelectionPreviewObjects(object)).toEqual([]);
+  canvas.discardActiveObject();
+  object.sniptaleLocked = true;
+  expect(canvas.getSelectionPreviewObjects(object)).toEqual([]);
+  object.sniptaleLocked = false;
+  canvas.selection = false;
+  expect(canvas.getSelectionPreviewObjects(object)).toEqual([]);
+  canvas.dispose();
+});
+
+it('previews the same fully-contained marquee candidates in both drag directions', () => {
+  class MarqueeCanvas extends EditorCanvas {
+    marquee(x: number, y: number, deltaX: number, deltaY: number) {
+      this._groupSelector = { x, y, deltaX, deltaY };
+    }
+  }
+  const canvas = new MarqueeCanvas(undefined, { renderOnAddRemove: false });
+  const inside = new Rect({ left: 35, top: 35, width: 30, height: 20 });
+  const partial = new Rect({ left: 75, top: 20, width: 60, height: 30 });
+  const hidden = new Rect({ left: 20, top: 20, width: 10, height: 10, visible: false });
+  const locked = new Rect({ left: 20, top: 20, width: 10, height: 10 });
+  locked.sniptaleLocked = true;
+  canvas.add(inside, partial, hidden, locked);
+  canvas.marquee(10, 10, 90, 70);
+  expect(canvas.getSelectionPreviewObjects(partial)).toEqual([inside]);
+  canvas.marquee(100, 80, -90, -70);
+  expect(canvas.getSelectionPreviewObjects(partial)).toEqual([inside]);
+  canvas.marquee(10, 10, 0, 0);
+  expect(canvas.getSelectionPreviewObjects(inside)).toEqual([]);
+  expect(canvas.getActiveObjects()).toEqual([]);
+  canvas.dispose();
+});

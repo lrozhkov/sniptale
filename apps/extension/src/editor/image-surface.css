@@ -37,3 +37,12 @@
   > .sniptale-glass-toolbar-divider {
   margin-block: 0;
 }
+
+/* Extend the editor frame without moving its value or trailing unit. */
+.sniptale-image-workspace.sniptale-compact-workspace .sniptale-numeric-entry {
+  padding-inline-end: 10px;
+  margin-inline-end: -2px;
+}
+.sniptale-image-workspace [data-ui='shared.ui.compact-inspector.numeric-stepper'] > button {
+  justify-content: flex-end;
+}

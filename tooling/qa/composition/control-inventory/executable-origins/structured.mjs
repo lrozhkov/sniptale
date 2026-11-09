@@ -1,3 +1,6 @@
+import path from 'node:path';
+
+import { JSDOM } from 'jsdom';
 import { parse as parseYaml } from 'yaml';
 
 import {
@@ -194,4 +197,29 @@ export function collectCatalogOrigins({ authority, controls }) {
     );
   }
   return origins;
+}
+
+export function collectHtmlModuleOrigins({ authority, source, exists }) {
+  // Fragment parsing does not execute scripts or fetch linked resources.
+  const document = JSDOM.fragment(source);
+  if (document.querySelector('base[href]')) return [];
+  const targets = new Set();
+  for (const script of document.querySelectorAll('script[src]')) {
+    if (script.getAttribute('type')?.trim() !== 'module') continue;
+    const src = script.getAttribute('src').trim();
+    // Absolute URLs and URL transforms need a server-specific routing authority.
+    if (!src || /^(?:[a-z][a-z\d+.-]*:|[/\\])/iu.test(src) || /[?#%\\]/u.test(src)) continue;
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(authority), src));
+    if (target.startsWith('../') || path.posix.isAbsolute(target) || !/\.[cm]?js$/u.test(target))
+      continue;
+    if (exists(target)) targets.add(target);
+  }
+  return [...targets].sort().map((target) =>
+    makeOrigin({
+      authority,
+      id: `browser-module:${authority}#target.${target}`,
+      kind: 'browser-module',
+      target,
+    })
+  );
 }

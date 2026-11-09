@@ -5,6 +5,7 @@ import {
 } from '@sniptale/runtime-contracts/window-header';
 import { translate } from '../../platform/i18n';
 import { acquireWindowHeaderFavicon } from './favicon';
+import { findOpenPageFavicon } from './open-page-icon';
 import { importWindowHeaderIcon } from './local-icon';
 
 type Source = 'site' | 'file';
@@ -44,7 +45,12 @@ async function acquireIcon(
 ) {
   const icon = file
     ? await importWindowHeaderIcon(file, job.controller.signal)
-    : await acquireWindowHeaderFavicon(job.header.url, job.controller.signal);
+    : await acquireWindowHeaderFavicon(
+        job.header.url,
+        job.controller.signal,
+        undefined,
+        await findOpenPageFavicon(job.header.url, job.controller.signal)
+      );
   const header = current();
   if (job.controller.signal.aborted || !header || !sameIconTarget(header, job)) return true;
   if (!icon) return false;

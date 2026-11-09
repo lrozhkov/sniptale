@@ -6,35 +6,16 @@ function isEditableMagnetSibling(object: FabricObject): boolean {
   return isEditableObject(object) && !isSourceObject(object) && !isBackgroundObject(object);
 }
 
-function getTargetChildren(target: FabricObject): FabricObject[] {
-  if (target instanceof ActiveSelection || target instanceof Group) {
-    return target.getObjects();
-  }
-
-  return [target];
-}
-
-function collectEditableChildren(
-  targets: Set<FabricObject>,
-  group: Group,
-  selectedChildren: Set<FabricObject>
-) {
-  for (const child of group.getObjects()) {
-    if (child instanceof Group) {
-      collectEditableChildren(targets, child, selectedChildren);
-      continue;
-    }
-
-    if (child.visible && isEditableMagnetSibling(child) && !selectedChildren.has(child)) {
-      targets.add(child);
-    }
-  }
+function getTargetHierarchy(target: FabricObject): FabricObject[] {
+  return target instanceof Group
+    ? [target, ...target.getObjects().flatMap(getTargetHierarchy)]
+    : [target];
 }
 
 export function isMagnetTarget(target: FabricObject): boolean {
   if (target instanceof ActiveSelection || target instanceof Group) {
     const children = target.getObjects();
-    return children.length > 0 && children.every(isEditableMagnetSibling);
+    return children.length > 0 && isEditableMagnetSibling(target) && children.every(isMagnetTarget);
   }
 
   return isEditableMagnetSibling(target);
@@ -45,21 +26,18 @@ export function collectMagnetTargets(
   canvasSize: { width: number; height: number }
 ): Set<FabricObject> {
   const targets = new Set<FabricObject>();
-  const selectedChildren = new Set(getTargetChildren(target));
+  const selectedChildren = new Set(getTargetHierarchy(target));
 
   target.canvas?.forEachObject((candidate) => {
     if (!candidate.visible || !candidate.isOnScreen()) {
       return;
     }
 
-    if (candidate instanceof Group) {
-      collectEditableChildren(targets, candidate, selectedChildren);
-      return;
-    }
+    if (getTargetHierarchy(candidate).some((object) => selectedChildren.has(object))) return;
 
     if (target.sniptaleId && candidate.sniptaleId === target.sniptaleId) return;
 
-    if (isEditableMagnetSibling(candidate) && !selectedChildren.has(candidate)) {
+    if (isMagnetTarget(candidate)) {
       targets.add(candidate);
     }
   });

@@ -25,6 +25,9 @@ export interface EditorInspectorLayersPanelStateProps {
 
 export interface EditorInspectorLayersPanelProps extends EditorInspectorLayersPanelStateProps {
   fillContainer?: boolean;
+  /** The enclosing workspace retains this offset across tab and panel lifetimes. */
+  initialScrollOffset?: number;
+  onScrollOffsetChange?: (offset: number) => void;
   layers: EditorLayerItem[];
   maxExpandedHeightRatio?: number;
   onCollapsePanel?: () => void;

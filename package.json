@@ -105,7 +105,9 @@
     "qa:e2e:webdav": "playwright test --config tooling/test/e2e/providers/playwright.config.ts",
     "qa:e2e:webdav:lab": "node tooling/test/e2e/providers/nextcloud/run.mjs",
     "qa:e2e:live": "node tooling/test/e2e/live/run-live.mjs",
-    "qa:e2e:preview-performance": "node tooling/test/e2e/run-e2e.mjs --suite preview-performance"
+    "qa:e2e:preview-performance": "node tooling/test/e2e/run-e2e.mjs --suite preview-performance",
+    "simplify:lab": "node tooling/simplify-lab/server.mjs",
+    "simplify:check": "node tooling/simplify-lab/run.mjs"
   },
   "dependencies": {
     "@fontsource/marck-script": "5.3.0",

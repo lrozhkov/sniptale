@@ -264,3 +264,48 @@ it('rejects and rolls back a delayed final enable when all-sites authority is re
   await expect(cleanup).resolves.toBeUndefined();
   await expect(restore).resolves.toBe(false);
 });
+
+it('restores an active review with origin access and no user pin or all-sites permission', async () => {
+  restoreMocks.readPinToTabSessionStorageState.mockResolvedValue(false);
+  restoreMocks.hasPinnedToolbarAllSitesAccess.mockResolvedValue(false);
+  const state = createRestoreState();
+  await expect(restorePinnedToolbarAfterNavigation(7, state, true)).resolves.toBe(true);
+  expect(restoreMocks.hasActivePageAccess).toHaveBeenCalledWith(7);
+  expect(restoreMocks.ensureActivePageAccessRuntime).toHaveBeenCalledWith(7);
+  expect(restoreMocks.readPinToTabSessionStorageState).not.toHaveBeenCalled();
+  expect(restoreMocks.hasPinnedToolbarAllSitesAccess).not.toHaveBeenCalled();
+});
+
+it('keeps an active review dormant when the navigated origin lacks page access', async () => {
+  restoreMocks.hasActivePageAccess.mockResolvedValue(false);
+  await expect(restorePinnedToolbarAfterNavigation(7, createRestoreState(), true)).resolves.toBe(
+    false
+  );
+  expect(restoreMocks.ensureActivePageAccessRuntime).not.toHaveBeenCalled();
+  expect(restoreMocks.enableScreenshotModeGuarded).not.toHaveBeenCalled();
+});
+
+it('refuses a delayed active review commit after origin access is revoked', async () => {
+  const entered = createDeferred<void>();
+  const finish = createDeferred<void>();
+  restoreMocks.enableScreenshotModeGuarded.mockImplementationOnce(
+    async (
+      _tabId: number,
+      _screenshotModeState: unknown,
+      _viewportState: unknown,
+      _viewportOwnerState: unknown,
+      _ports: unknown,
+      options: { commitGuard(): Promise<boolean> }
+    ) => {
+      entered.resolve();
+      await finish.promise;
+      return options.commitGuard();
+    }
+  );
+  const restoring = restorePinnedToolbarAfterNavigation(7, createRestoreState(), true);
+  await entered.promise;
+  restoreMocks.hasActivePageAccess.mockResolvedValue(false);
+  finish.resolve();
+  await expect(restoring).resolves.toBe(false);
+  expect(restoreMocks.hasPinnedToolbarAllSitesAccess).not.toHaveBeenCalled();
+});

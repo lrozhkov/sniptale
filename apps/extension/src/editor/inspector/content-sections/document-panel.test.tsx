@@ -15,7 +15,6 @@ it.each(modes)('shows only the selected %s category', (inspector) => {
     inspector,
     browserFrame: normalizeBrowserFrameState({ title: 'Page title' }),
     browserCanvasModeOptions: [{ value: 'resize', label: 'Resize' }],
-    browserContentModeOptions: [{ value: 'push-down', label: 'Push down' }],
     syncBrowserFrame: vi.fn(),
     imageSizeText: '320 × 180',
     canvasSizeText: '320 × 180',

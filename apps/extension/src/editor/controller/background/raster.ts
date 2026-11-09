@@ -10,13 +10,17 @@ import type { BackgroundCanvasSize } from './geometry';
 
 const MAX_BACKGROUND_RASTER_EDGE = 2048;
 const MAX_BACKGROUND_RASTER_PIXELS = 4_194_304;
+const MAX_PREVIEW_RASTER_EDGE = 768;
+const MAX_PREVIEW_RASTER_PIXELS = 589_824;
 
-export function resolveBackgroundRasterSize(size: BackgroundCanvasSize): BackgroundCanvasSize {
-  const edgeScale = Math.min(1, MAX_BACKGROUND_RASTER_EDGE / Math.max(size.width, size.height));
-  const pixelScale = Math.min(
-    1,
-    Math.sqrt(MAX_BACKGROUND_RASTER_PIXELS / (size.width * size.height))
-  );
+export function resolveBackgroundRasterSize(
+  size: BackgroundCanvasSize,
+  preview = false
+): BackgroundCanvasSize {
+  const maximumEdge = preview ? MAX_PREVIEW_RASTER_EDGE : MAX_BACKGROUND_RASTER_EDGE;
+  const maximumPixels = preview ? MAX_PREVIEW_RASTER_PIXELS : MAX_BACKGROUND_RASTER_PIXELS;
+  const edgeScale = Math.min(1, maximumEdge / Math.max(size.width, size.height));
+  const pixelScale = Math.min(1, Math.sqrt(maximumPixels / (size.width * size.height)));
   const scale = Math.min(edgeScale, pixelScale);
   return {
     width: Math.max(1, Math.round(size.width * scale)),
@@ -178,7 +182,8 @@ function paintGradientRaster(
 /** Render complete linear gradients within the existing background raster budget. */
 export function createAdvancedBackgroundImage(
   size: BackgroundCanvasSize,
-  frame: EditorFrameSettings
+  frame: EditorFrameSettings,
+  preview = false
 ): FabricImage | null {
   const gradient = frame.backgroundGradient;
   if (
@@ -188,7 +193,7 @@ export function createAdvancedBackgroundImage(
       gradient.stops.every((stop) => stop.midpoint === 0.5))
   )
     return null;
-  const raster = resolveBackgroundRasterSize(size);
+  const raster = resolveBackgroundRasterSize(size, preview);
   const source = document.createElement('canvas');
   source.width = raster.width;
   source.height = raster.height;

@@ -272,6 +272,22 @@ export function renderDrawingObject(
   context.restore();
 }
 
+/** Draws disposable hover chrome without resize or rotation controls. */
+export function renderDrawingHoverOutline(
+  context: CanvasRenderingContext2D,
+  object: DrawingObject,
+  projection: DrawingViewportProjection
+): void {
+  const bounds = getDrawingObjectBounds(object);
+  context.save();
+  applyDrawingObjectTransform(context, object, projection);
+  context.strokeStyle = '#2563eb';
+  context.lineWidth = 1;
+  context.setLineDash([4, 3]);
+  context.strokeRect(bounds.x - projection.x, bounds.y - projection.y, bounds.width, bounds.height);
+  context.restore();
+}
+
 export function renderDrawingSelection(
   context: CanvasRenderingContext2D,
   object: DrawingObject,

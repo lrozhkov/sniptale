@@ -31,3 +31,13 @@ it('falls back image shadow geometry when shape defaults omit optional shadow fi
   vi.resetModules();
   vi.doUnmock('./highlighter-projection');
 });
+
+it('scales source glow with image extent with a stronger full-size range', async () => {
+  const { resolveEditorSourceImageGlowBlur, DEFAULT_EDITOR_IMAGE_SETTINGS } =
+    await import('./image-types');
+  const settings = { ...DEFAULT_EDITOR_IMAGE_SETTINGS, shadow: 100 };
+  expect(resolveEditorSourceImageGlowBlur(settings, 1000)).toBe(150);
+  expect(resolveEditorSourceImageGlowBlur(settings, 4000)).toBe(600);
+  expect(resolveEditorSourceImageGlowBlur({ ...settings, shadow: 0 }, 4000)).toBe(0);
+  expect(resolveEditorSourceImageGlowBlur(settings, Infinity)).toBe(150);
+});

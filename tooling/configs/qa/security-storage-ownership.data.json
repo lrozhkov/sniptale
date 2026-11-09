@@ -506,6 +506,16 @@
       ]
     },
     {
+      "file": "apps/extension/src/background/storage/design-review-session/index.ts",
+      "owner": "design-review-session",
+      "justification": "Retains bounded opaque authored Design Review sessions and saved previews locally.",
+      "reviewNote": "Local authoritative records survive tab close and browser restart. Session-only native tab bindings isolate tabs. Open is read-only; resume is explicit. Never expire or evict authored records; refuse creation at capacity. Clear retains the empty session and fences old leases. Erasure excludes and drains producers, revokes connections, and deletes local records and session bindings even when preferences remain. Exclude payloads and native bindings from sync, Library, backup, logs and diagnostics.",
+      "storageWrites": [
+        { "sink": "this.local.set", "keys": ["DESIGN_REVIEW_SESSION_STORAGE_KEY"] },
+        { "sink": "this.session.set", "keys": ["DESIGN_REVIEW_SESSION_BINDINGS_KEY"] }
+      ]
+    },
+    {
       "file": "apps/extension/src/background/storage/page-recovery/index.ts",
       "owner": "page-recovery",
       "justification": "Retains private authored page text, sanitized HTML, drawings, frame annotations, and design notes for explicit recovery.",

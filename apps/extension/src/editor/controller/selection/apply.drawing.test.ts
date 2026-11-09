@@ -207,4 +207,22 @@ describe('drawing selection settings', () => {
     expect(insertAt).toHaveBeenNthCalledWith(2, 2, secondReplacement);
     expect(surface.getObjects()).toEqual([firstReplacement, between, secondReplacement, after]);
   });
+
+  it('preserves a selected Simplify layer when generic tool settings are applied', () => {
+    const object = new Rect();
+    const surface = new Canvas(document.createElement('canvas'));
+    surface.add(object);
+    surface.setActiveObject(object);
+    const original = object.toObject();
+    const prepareObject = vi.fn();
+
+    applySelectionToolSettingsToObjects(surface, [object], 'simplify', settings, prepareObject);
+
+    expect(surface.getObjects()).toEqual([object]);
+    expect(surface.getActiveObject()).toBe(object);
+    expect(object.toObject()).toEqual(original);
+    expect(prepareObject).not.toHaveBeenCalled();
+    expect(mocks.replaceEditorDrawingFabricGeometry).not.toHaveBeenCalled();
+    surface.dispose();
+  });
 });

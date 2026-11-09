@@ -1,6 +1,6 @@
 import {
   createDrawingSession,
-  type DrawingDocumentV1,
+  type DrawingDocument,
   type DrawingDocumentCommit,
   type DrawingSession,
   type DrawingObjectProjection,
@@ -8,14 +8,14 @@ import {
 /** Drawing supplies reversible effects to the page's existing history owner. */
 export interface DrawingHistoryCommitPort {
   registerDrawingRecovery?(
-    replay: (document: DrawingDocumentV1) => boolean,
+    replay: (document: DrawingDocument) => boolean,
     hasChanges: () => boolean,
-    captureDocument: () => DrawingDocumentV1
+    captureDocument: () => DrawingDocument
   ): () => void;
   commitEntry(entry: {
     scope: 'drawing';
     domEffect: {
-      recovery?: { before: DrawingDocumentV1; after: DrawingDocumentV1 };
+      recovery?: { before: DrawingDocument; after: DrawingDocument };
       hasChanges: boolean;
       hasCurrentChanges: () => boolean;
       apply(direction: 'undo' | 'redo'): { failures: string[]; success: boolean };
@@ -24,7 +24,7 @@ export interface DrawingHistoryCommitPort {
   subscribeToClear(listener: () => void): () => void;
 }
 
-const EMPTY_DRAWING_DOCUMENT: DrawingDocumentV1 = { version: 1, objects: [] };
+const EMPTY_DRAWING_DOCUMENT: DrawingDocument = { version: 1, objects: [] };
 
 function createDrawingHistoryEffect(
   commit: DrawingDocumentCommit,

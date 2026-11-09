@@ -6,6 +6,7 @@ export function isStickyAnnotationTool(tool: EditorTool): boolean {
     case 'marker':
     case 'frame-annotation':
     case 'shape':
+    case 'simplify':
     case 'blur':
     case 'arrow':
     case 'text':

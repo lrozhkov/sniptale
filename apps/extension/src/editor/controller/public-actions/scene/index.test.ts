@@ -137,11 +137,10 @@ function expectInsertedBrowserHeaderMutation(args: {
     url: 'https://next.example',
   });
   expect(args.options.relayoutScene).toHaveBeenCalledWith(
-    args.options.browserFrame,
+    expect.objectContaining(args.options.browserFrame),
     expect.objectContaining({
       hasBrowserFrame: true,
-      fitSourceToContent: true,
-      preserveCanvasSize: true,
+      compositionBase: expect.objectContaining({ sourceWidth: 320, sourceHeight: 180 }),
     })
   );
   expect(args.canvas.add).toHaveBeenCalledWith(args.nextLayer);
@@ -159,7 +158,7 @@ function runInsertBrowserHeaderLayerSuite() {
 
     expect(mocks.createBrowserFrameLayerObjectMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        browserFrame: mutation.options.browserFrame,
+        browserFrame: expect.objectContaining(mutation.options.browserFrame),
         left: 48,
         nextLabelIndex: 3,
         top: expect.closeTo(48, 8),
@@ -215,7 +214,7 @@ function runExistingBrowserHeaderLayerSuite() {
 }
 
 function runStableSourceSizeBrowserHeaderSuite() {
-  it('keeps the current browser-header width when relayout only shifts the source', async () => {
+  it('keeps the browser-header width attached to the source when relayout shifts it', async () => {
     const existingLayer = {
       getScaledWidth: vi.fn(() => 480),
       left: 30,
@@ -243,7 +242,7 @@ function runStableSourceSizeBrowserHeaderSuite() {
     expect(mocks.createBrowserFrameLayerObjectMock).toHaveBeenCalledWith(
       expect.objectContaining({
         existingObject: existingLayer,
-        width: 480,
+        width: 320,
       })
     );
   });

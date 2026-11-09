@@ -7,6 +7,10 @@ import {
   browserAnnotationSession,
   createBrowserAnnotationTargetEvidence,
 } from '../../../parser/page-preparation/annotations';
+import {
+  createReviewSessionRuntime,
+  type ReviewSessionRuntime,
+} from '../../../application/design-review-session/runtime';
 import type { DesignReviewTool } from '../../../selection/design-review';
 import type { PageStyleSelectionSnapshot } from '../../../selection/design-review/snapshot';
 
@@ -155,8 +159,8 @@ let host: HTMLDivElement;
 let latest: ReturnType<typeof useDesignReviewController> | null = null;
 let root: Root | null = null;
 
-function Harness() {
-  latest = useDesignReviewController({ enabled: true });
+function Harness(props: { session?: ReviewSessionRuntime } = {}) {
+  latest = useDesignReviewController({ enabled: true, ...props });
   return null;
 }
 
@@ -444,3 +448,62 @@ it.each(['inspect', 'compare'] as const)(
     expect(latest?.tool).toBe(tool);
   }
 );
+
+it('binds feedback panel visibility and selected-record deletion to the persistent session', async () => {
+  act(() => browserAnnotationSession.resetForDocument());
+  let revision = 0;
+  const lease = crypto.randomUUID();
+  const removeTarget = vi.fn();
+  const session = createReviewSessionRuntime({
+    request: async (message) => ({
+      requestId: message.requestId,
+      status: 'ready',
+      lease,
+      revision: message.kind === 'open' ? revision : ++revision,
+      available: false,
+    }),
+    annotations: browserAnnotationSession,
+    pageUrl: () => location.href,
+    resolve: () => target,
+    openTarget: () => true,
+    navigate: vi.fn(),
+    removeTarget,
+    clearTargets: async () => undefined,
+    capture: async () => null,
+    restoreMode: vi.fn(),
+  });
+  await act(async () => {
+    await session.open();
+    session.setMode(true, 'comment');
+    browserAnnotationSession.setComment({
+      target,
+      comment: 'Persistent selected feedback',
+      evidence: createBrowserAnnotationTargetEvidence(target),
+    });
+    session.changed();
+    session.setPanelOpen(true);
+    await session.flush();
+    root?.render(<Harness session={session} />);
+  });
+  expect(latest?.panel.open).toBe(true);
+  await act(async () => {
+    latest?.panel.close();
+    await session.flush();
+  });
+  expect(session.getSnapshot().panelOpen).toBe(false);
+  expect(latest?.panel.open).toBe(false);
+  await act(async () => {
+    latest?.panel.toggle();
+    await session.flush();
+  });
+  expect(session.getSnapshot().panelOpen).toBe(true);
+  expect(latest?.panel.open).toBe(true);
+  await act(async () => {
+    latest?.actions.delete();
+    await session.flush();
+  });
+  expect(removeTarget).toHaveBeenCalledWith(target);
+  expect(session.getSnapshot().records).toHaveLength(0);
+  session.dispose();
+  act(() => browserAnnotationSession.resetForDocument());
+});

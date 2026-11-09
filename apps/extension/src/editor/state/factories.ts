@@ -26,6 +26,7 @@ export type EditorStoreSetters = Pick<
   | 'setViewportPreviewOpenFromSync'
   | 'setShowOutsideCanvas'
   | 'setCanvasCropMode'
+  | 'setCanvasCropAspectRatio'
   | 'setSaveErrorMessage'
   | 'setSaveState'
   | 'setSessionId'
@@ -79,6 +80,7 @@ export function createEditorStoreSetterActions(set: EditorStoreSet): EditorStore
     setViewportPreviewOpenFromSync: (viewportPreviewOpen) => set({ viewportPreviewOpen }),
     setShowOutsideCanvas: (showOutsideCanvas) => set({ showOutsideCanvas }),
     setCanvasCropMode: (canvasCropMode) => set({ canvasCropMode }),
+    setCanvasCropAspectRatio: (canvasCropAspectRatio) => set({ canvasCropAspectRatio }),
     setSaveErrorMessage: (saveErrorMessage) => set({ saveErrorMessage }),
     setSaveState: (saveState) => set({ saveState }),
     setSessionId: (sessionId) =>

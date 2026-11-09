@@ -358,7 +358,14 @@ async function expectScreenshotQuickEditDisableResetsDocumentMode() {
 async function expectDrawingModeWiring() {
   const modeState = await renderHarness();
 
-  expect(mocks.useContentDrawingController).toHaveBeenCalledExactlyOnceWith(pagePreparationHistory);
+  expect(mocks.useContentDrawingController).toHaveBeenCalledExactlyOnceWith(
+    pagePreparationHistory,
+    expect.objectContaining({
+      acquire: expect.any(Function),
+      send: expect.any(Function),
+      decode: expect.any(Function),
+    })
+  );
   expect(mocks.useDrawingModeIntegration).toHaveBeenCalledWith({
     baseModeController: { kind: 'mode-controller' },
     controller: mocks.drawingController,
