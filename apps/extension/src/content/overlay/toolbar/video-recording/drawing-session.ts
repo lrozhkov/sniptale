@@ -1,3 +1,4 @@
+import { setUIHidden } from '../../../selection/locker';
 import {
   createContentSimplifyDependencies,
   type ContentSimplifyDependencies,
@@ -177,6 +178,7 @@ export function createRecordingDrawingOwner(options?: {
 export function createRecordingSurfaceDrawingOwner(): RecordingDrawingOwner {
   return createRecordingDrawingOwner({
     simplifyDependencies: createContentSimplifyDependencies({
+      setUIHidden,
       services: getContentRuntimeServices(),
       getBounds: () => ({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }),
     }),

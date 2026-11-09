@@ -1,10 +1,10 @@
+// @vitest-environment jsdom
 import { replaceEditorDrawingObjectWithCanonicalGeometry } from '../../../../drawing/object/canonicalize';
 import { syncSourceStateFromObject } from '../../../document/source';
 import { runEditorCropSelection } from '../../../crop-workflow/apply/scene';
 import { resizeEditorCanvasScene, resizeEditorSourceScene } from '../resize/dimensions';
 import { createEditorDrawingFabricObject } from '../../../../drawing/object/vector';
 import { readEditorDrawingObject } from '../../../../drawing/object/metadata';
-// @vitest-environment jsdom
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
 import { resolveEditorWindowHeader } from '../../../../../features/editor/document/constants';
 import { Canvas, Rect } from 'fabric';

@@ -1,5 +1,5 @@
-import { createDefaultSimplifySettings } from '../../../features/simplify/settings';
 // @vitest-environment jsdom
+import { createDefaultSimplifySettings } from '../../../features/simplify/settings';
 
 import {
   ActiveSelection,

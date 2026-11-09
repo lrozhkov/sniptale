@@ -81,9 +81,12 @@ function getLayoutToggle() {
 }
 
 function selectTechnicalDataInColumnOrder(options: HTMLInputElement[]) {
-  options[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  options[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  options[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  for (const index of [2, 0, 1]) {
+    options[index]
+      ?.closest('.sniptale-parameter-row')
+      ?.querySelector<HTMLElement>('.sniptale-parameter-name')
+      ?.click();
+  }
 }
 
 describe('meta panel content', () => {
@@ -99,12 +102,16 @@ describe('meta panel content', () => {
     expect(container?.textContent).not.toContain('editor.compact.technicalDataDescription');
     expect(getExactTextNodeCount('editor.compact.technicalData')).toBe(0);
     expect(container?.textContent).not.toContain('editor.compact.technicalDataLayoutColumn');
-    expect(container?.textContent).toContain('editor.compact.technicalDataPreviewEmpty');
+    expect(options.every((option) => !option.checked)).toBe(true);
     expect(addButton?.hasAttribute('disabled')).toBe(true);
     expectTechnicalDataRowsToBeFlat(options);
 
+    await act(async () => addButton?.click());
+    expect(insertMetaStampMock).not.toHaveBeenCalled();
+
     act(() => selectTechnicalDataInColumnOrder(options));
 
+    expect(options.every((option) => option.checked)).toBe(true);
     expect(addButton?.hasAttribute('disabled')).toBe(false);
     expect(container?.textContent).toContain('editor.compact.pageUrl');
     expect(container?.textContent).toContain('editor.compact.dateTime');
@@ -146,6 +153,11 @@ function getExactTextNodeCount(text: string): number {
 function expectTechnicalDataRowsToBeFlat(options: HTMLInputElement[]) {
   for (const option of options) {
     expect(option.type).toBe('checkbox');
-    expect(option.closest('label')?.className).toContain('cursor-pointer');
+    const row = option.closest('.sniptale-parameter-row');
+    expect(row?.getAttribute('data-layout')).toBe('inline');
+    expect(row?.getAttribute('data-activates')).toBe('true');
+    expect(option.getAttribute('aria-label')).toBe(
+      row?.querySelector('.sniptale-parameter-name')?.textContent
+    );
   }
 }

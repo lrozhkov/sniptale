@@ -1,10 +1,6 @@
+import { traceClearedMediaComponent } from './media-components.mjs';
+import { colorDistanceAt } from './control-shapes.mjs';
 // Local and compound texture evidence follows the original component membership and sampling grids.
-const CARDINAL_LEFT = [
-  [-1, 0],
-  [1, 0],
-  [0, -1],
-  [0, 1],
-];
 
 export function detectLocalTexturedObjects(image, queue) {
   const { width, height } = image,
@@ -16,7 +12,7 @@ export function detectLocalTexturedObjects(image, queue) {
     silhouettes = [];
   for (let k = 0; k < mask.length; k++) {
     if (!mask[k]) continue;
-    const { tail, left, right, top, bottom } = traceLocalTextureComponent(
+    const { tail, left, right, top, bottom } = traceClearedMediaComponent(
       mask,
       width,
       height,
@@ -183,36 +179,6 @@ function createLocalTextureMask(image, backgrounds, size, columns) {
   return mask;
 }
 
-function traceLocalTextureComponent(mask, width, height, k, queue) {
-  let head = 0,
-    tail = 1,
-    left = width,
-    right = 0,
-    top = height,
-    bottom = 0;
-  queue[0] = k;
-  mask[k] = 0;
-  while (head < tail) {
-    const p = queue[head++],
-      x = p % width,
-      y = Math.floor(p / width);
-    left = Math.min(left, x);
-    right = Math.max(right, x);
-    top = Math.min(top, y);
-    bottom = Math.max(bottom, y);
-    for (const [dx, dy] of CARDINAL_LEFT) {
-      const xx = x + dx,
-        yy = y + dy,
-        n = yy * width + xx;
-      if (xx >= 0 && yy >= 0 && xx < width && yy < height && mask[n]) {
-        mask[n] = 0;
-        queue[tail++] = n;
-      }
-    }
-  }
-  return { tail, left, right, top, bottom };
-}
-
 function measureLocalTexture(image, bounds) {
   const { data, width } = image;
   const { left, right, top, bottom } = bounds;
@@ -330,30 +296,14 @@ function hasCompoundPerimeterSupport(image, bounds, bg) {
     n = 0;
   for (let x = l; x <= r; x++) {
     for (const y of [t - 1, b + 1]) {
-      let i = (y * width + x) * 4;
       n++;
-      if (
-        Math.max(
-          Math.abs(bg[0] - data[i]),
-          Math.abs(bg[1] - data[i + 1]),
-          Math.abs(bg[2] - data[i + 2])
-        ) <= 12
-      )
-        supported++;
+      if (colorDistanceAt(data, (y * width + x) * 4, bg) <= 12) supported++;
     }
   }
   for (let y = t; y <= b; y++) {
     for (const x of [l - 1, r + 1]) {
-      let i = (y * width + x) * 4;
       n++;
-      if (
-        Math.max(
-          Math.abs(bg[0] - data[i]),
-          Math.abs(bg[1] - data[i + 1]),
-          Math.abs(bg[2] - data[i + 2])
-        ) <= 12
-      )
-        supported++;
+      if (colorDistanceAt(data, (y * width + x) * 4, bg) <= 12) supported++;
     }
   }
   return !(supported / n < 0.95);

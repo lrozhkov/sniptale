@@ -1223,7 +1223,10 @@ unchanged project admission.',
     exclusive: true,
     reason:
       'The feedback-panel surface suite proves list, preview, summary, and empty-result states.',
-    testFiles: ['apps/extension/src/content/overlay/design-review/feedback-panel/view.test.tsx'],
+    testFiles: [
+      'apps/extension/src/content/overlay/design-review/feedback-panel/view.test.tsx',
+      'apps/extension/src/content/overlay/design-review/feedback-panel/list.privacy.test.tsx',
+    ],
   },
   {
     owner: 'content-design-review-appearance',

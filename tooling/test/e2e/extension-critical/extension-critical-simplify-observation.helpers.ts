@@ -3,7 +3,7 @@ import type { BrowserContext } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import { evaluateInTarget } from '../support/recording-action';
+import { evaluateInTarget, sendRuntimeMessage } from '../support/recording-action';
 
 export async function observeSimplifyWorker(
   context: BrowserContext,
@@ -17,7 +17,7 @@ export async function observeSimplifyWorker(
   await probe.goto(
     `chrome-extension://${extensionId}/apps/extension/src/web-snapshot-viewer/index.html`
   );
-  await probe.evaluate(async (type) => {
+  const dataUrl = await probe.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 64;
     canvas.height = 64;
@@ -25,32 +25,20 @@ export async function observeSimplifyWorker(
     if (!pixels) throw new Error('Probe canvas unavailable');
     pixels.fillStyle = '#ffffff';
     pixels.fillRect(0, 0, 64, 64);
-    const response: unknown = await chrome.runtime.sendMessage({
-      type,
-      operation: 'prepare',
-      __sniptaleRuntimeFreshness: {
-        issuedAtEpochMs: Date.now(),
-        nonce: crypto.randomUUID(),
-      },
-      dataUrl: canvas.toDataURL('image/png'),
-    });
-    if (
-      typeof response !== 'object' ||
-      response === null ||
-      !('sessionId' in response) ||
-      typeof response.sessionId !== 'string'
-    )
-      throw new Error(`Offscreen probe failed: ${JSON.stringify(response)}`);
-    await chrome.runtime.sendMessage({
-      type,
-      operation: 'dispose',
-      __sniptaleRuntimeFreshness: {
-        issuedAtEpochMs: Date.now(),
-        nonce: crypto.randomUUID(),
-      },
-      sessionId: response.sessionId,
-    });
-  }, MessageType.SIMPLIFY_COMMAND);
+    return canvas.toDataURL('image/png');
+  });
+  const response: unknown = await sendRuntimeMessage(probe, {
+    type: MessageType.SIMPLIFY_COMMAND,
+    operation: 'prepare',
+    dataUrl,
+  });
+  if (!isPlainRecord(response) || typeof response['sessionId'] !== 'string')
+    throw new Error(`Offscreen probe failed: ${JSON.stringify(response)}`);
+  await sendRuntimeMessage(probe, {
+    type: MessageType.SIMPLIFY_COMMAND,
+    operation: 'dispose',
+    sessionId: response['sessionId'],
+  });
   await probe.close();
   await page.bringToFront();
   const browser = context.browser();

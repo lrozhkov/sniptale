@@ -44,28 +44,12 @@
       "debtId": "noise.codeql.catalog-refresh-flight-identity"
     },
     {
-      "contentHash": "88ba3700c4af5da36e8a9f67053af2510220849726b2c8ac2fd3f55535df5010",
-      "debtId": "noise.codeql.archive-source-transformer",
-      "file": "apps/extension/src/composition/archive-transfer/writer.ts",
-      "line": 38,
-      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-      "rule": "js/superfluous-trailing-arguments"
-    },
-    {
-      "contentHash": "0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705",
-      "debtId": "noise.codeql.remote-integrity-transformer",
-      "file": "apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts",
-      "line": 16,
-      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-      "rule": "js/superfluous-trailing-arguments"
-    },
-    {
-      "contentHash": "199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4",
-      "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
-      "line": 288,
-      "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-      "rule": "js/superfluous-trailing-arguments",
-      "debtId": "noise.codeql.transform-stream-webdav"
+      "contentHash": "e65d1c1a7aa488d07068360b4cdc86b0507ec4765282d446566b4c68c80b781b",
+      "debtId": "noise.codeql.simplify-private-worker-message",
+      "file": "apps/extension/src/offscreen/simplify/worker.ts",
+      "line": 84,
+      "messageHash": "69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1",
+      "rule": "js/missing-origin-check"
     }
   ]
 }

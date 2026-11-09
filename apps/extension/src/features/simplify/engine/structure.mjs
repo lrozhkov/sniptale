@@ -1,3 +1,15 @@
+import {
+  median,
+  peakContrast,
+  centerY,
+  bounds,
+  unique,
+  inkParts,
+  confirmedText,
+  graphicTopology,
+  staggeredGraphic,
+} from './structure-topology.mjs';
+import { colorDistanceAt } from './control-shapes.mjs';
 import { fitsTextFlow } from './structure-fragments.mjs';
 import { continuationGlyphParts } from './structure-fragments.mjs';
 import {
@@ -6,14 +18,6 @@ import {
   collectAttachedStructureSymbols,
   collectStandaloneStructureSymbols,
 } from './structure-refinement.mjs';
-import {
-  bounds,
-  unique,
-  inkParts,
-  confirmedText,
-  graphicTopology,
-  staggeredGraphic,
-} from './structure-topology.mjs';
 import { splitTextBands } from './structure-refinement.mjs';
 // Separate text decoration from glyph connectivity. The original image stays intact.
 export function detachTextUnderlines(mask, width, height) {
@@ -73,9 +77,6 @@ export function detachTextUnderlines(mask, width, height) {
   }
   return decorations;
 }
-
-const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-const centerY = (b) => b.y + b.h / 2;
 
 // Offset contours overlap in two dimensions; ordinary adjacent glyphs do not.
 export function hasLayeredContours(image, box) {
@@ -202,26 +203,14 @@ export function repairTextFragments(image, input, measure, obstacles = []) {
 
 export function isDirectionalArrow(image, box) {
   if (box.w < 6 || box.h < 8 || box.w > 20 || box.h > 24) return false;
-  let peak = 0;
-  for (let y = box.y; y < box.y + box.h; y++)
-    for (let x = box.x; x < box.x + box.w; x++) {
-      const i = (y * image.width + x) * 4;
-      peak = Math.max(peak, ...box.bg.map((v, c) => Math.abs(v - image.data[i + c])));
-    }
+  const peak = peakContrast(image, box);
   const threshold = Math.max(12, peak * 0.3),
     rows = [];
   for (let y = box.y; y < box.y + box.h; y++) {
     const xs = [];
     for (let x = box.x; x < box.x + box.w; x++) {
       const i = (y * image.width + x) * 4;
-      if (
-        Math.max(
-          Math.abs(box.bg[0] - image.data[i]),
-          Math.abs(box.bg[1] - image.data[i + 1]),
-          Math.abs(box.bg[2] - image.data[i + 2])
-        ) > threshold
-      )
-        xs.push(x);
+      if (colorDistanceAt(image.data, i, box.bg) > threshold) xs.push(x);
     }
     if (xs.length) rows.push({ span: xs.at(-1) - xs[0] + 1, center: (xs[0] + xs.at(-1)) / 2 });
   }
@@ -324,14 +313,7 @@ export function isCheckMark(image, box) {
     const ys = [];
     for (let y = box.y; y < box.y + box.h; y++) {
       const i = (y * image.width + x) * 4;
-      if (
-        Math.max(
-          Math.abs(box.bg[0] - image.data[i]),
-          Math.abs(box.bg[1] - image.data[i + 1]),
-          Math.abs(box.bg[2] - image.data[i + 2])
-        ) > 60
-      )
-        ys.push(y - box.y);
+      if (colorDistanceAt(image.data, i, box.bg) > 60) ys.push(y - box.y);
     }
     if (ys.length) cols.push({ x: x - box.x, y: median(ys) });
   }

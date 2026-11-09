@@ -1,5 +1,19 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'editor-frame-annotation-projection',
+    productionFile: 'apps/extension/src/editor/frame-annotation/projection-read-only.tsx',
+    reason:
+      'Mounted crop and interactive projections prove comment visibility and badge fill and shadow settings.',
+    testFiles: ['apps/extension/src/editor/frame-annotation/projection.test.tsx'],
+  },
+  {
+    owner: 'editor-frame-annotation-projection',
+    productionFile: 'apps/extension/src/editor/frame-annotation/step-badge-appearance.ts',
+    reason:
+      'Mounted crop and interactive projections prove comment visibility and badge fill and shadow settings.',
+    testFiles: ['apps/extension/src/editor/frame-annotation/projection.test.tsx'],
+  },
+  {
     owner: 'gallery-camera-preview-gestures',
     productionFile: 'apps/extension/src/gallery/video-review/camera-gesture.ts',
     reason:

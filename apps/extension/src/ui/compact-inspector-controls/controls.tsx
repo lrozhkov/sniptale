@@ -177,6 +177,17 @@ export function SelectField<T extends string>(props: {
   const rowRef = useRef<HTMLDivElement | null>(null);
   const inspector = useInspectorLayout();
 
+  const selectProps = {
+    'aria-label': props.label,
+    value: props.value,
+    ...(props.placeholder === undefined ? {} : { placeholder: props.placeholder }),
+    options: props.options,
+    onChange: props.onChange,
+    disabled: props.disabled,
+    onOpenChange: setOpen,
+    ...(props.menuClassName === undefined ? {} : { menuClassName: props.menuClassName }),
+  };
+
   if (inspector)
     return (
       <InspectorParameterRow
@@ -185,18 +196,7 @@ export function SelectField<T extends string>(props: {
         dataUi="shared.ui.compact-inspector.select-field"
         className={props.className}
       >
-        <CompactSelect
-          aria-label={props.label}
-          value={props.value}
-          {...(props.placeholder === undefined ? {} : { placeholder: props.placeholder })}
-          options={props.options}
-          onChange={props.onChange}
-          disabled={props.disabled}
-          onOpenChange={setOpen}
-          appearance="plain"
-          className={props.selectClassName}
-          {...(props.menuClassName === undefined ? {} : { menuClassName: props.menuClassName })}
-        />
+        <CompactSelect {...selectProps} appearance="plain" className={props.selectClassName} />
       </InspectorParameterRow>
     );
 
@@ -218,17 +218,10 @@ export function SelectField<T extends string>(props: {
         {props.label}
       </span>
       <CompactSelect
-        aria-label={props.label}
-        value={props.value}
-        {...(props.placeholder === undefined ? {} : { placeholder: props.placeholder })}
-        options={props.options}
-        onChange={props.onChange}
-        disabled={props.disabled}
-        onOpenChange={setOpen}
+        {...selectProps}
         className={cx(SELECT_FIELD_TRIGGER_CLASS_NAME, props.selectClassName)}
         containerClassName={SELECT_FIELD_CONTAINER_CLASS_NAME}
         menuAnchorRef={rowRef}
-        {...(props.menuClassName === undefined ? {} : { menuClassName: props.menuClassName })}
       />
     </div>
   );

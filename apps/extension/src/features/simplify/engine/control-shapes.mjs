@@ -1,3 +1,6 @@
+/** Compare the three RGB channels at an RGBA byte offset. */
+export const colorDistanceAt = (data, i, bg) =>
+  Math.max(Math.abs(bg[0] - data[i]), Math.abs(bg[1] - data[i + 1]), Math.abs(bg[2] - data[i + 2]));
 export const colorDistance = (a, b) =>
   Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
 export const luminance = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];

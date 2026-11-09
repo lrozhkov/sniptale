@@ -1,12 +1,5 @@
+import { intersects, centerX, centerY, median } from './structure-topology.mjs';
 import { inkParts } from './structure.mjs';
-const intersects = (a, b) =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-const centerX = (b) => b.x + b.w / 2;
-const centerY = (b) => b.y + b.h / 2;
-const median = (a) => {
-  const s = [...a].sort((x, y) => x - y);
-  return s[Math.floor(s.length / 2)];
-};
 
 export function compact(b) {
   return (

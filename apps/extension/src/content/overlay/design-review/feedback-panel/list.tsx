@@ -5,7 +5,7 @@ import type { ReviewSessionEntry } from '../../../application/design-review-sess
 import { translate } from '../../../../platform/i18n';
 import type { BrowserDomAnnotationRecord } from '../../../parser/page-preparation/annotations';
 import { getDesignReviewActionOption, getDesignReviewActionTone } from '../action-catalog';
-import { getDesignReviewRecordAction } from '../records';
+import { getDesignReviewRecordAction, isDesignReviewRecordFromCurrentOrigin } from '../records';
 import { FeedbackEvidenceText, FeedbackPreview } from './preview';
 import type { FeedbackActionFilter } from './filter';
 
@@ -26,6 +26,7 @@ function getRecordSummary(record: BrowserDomAnnotationRecord): string {
 
 function matchesQuery(record: BrowserDomAnnotationRecord, query: string): boolean {
   if (!query) return true;
+  if (!isDesignReviewRecordFromCurrentOrigin(record)) return false;
   const action = getDesignReviewActionOption(getDesignReviewRecordAction(record));
   return [
     record.comment,

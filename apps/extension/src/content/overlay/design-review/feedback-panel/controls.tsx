@@ -3,6 +3,8 @@ import { ArrowLeft, Search } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { InspectorFieldClear } from '../../../../ui/compact-inspector-controls/text-field';
 import { translate } from '../../../../platform/i18n';
+import { isTrustedDomEvent } from '../../../platform/trusted-events';
+import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 
 export function FeedbackPanelSearch(props: {
   onClose: () => void;
@@ -22,7 +24,18 @@ export function FeedbackPanelSearch(props: {
       >
         <ArrowLeft size={16} />
       </ContentToolbarButton>
-      <label className="relative min-w-0 flex-1 cursor-text">
+      <label
+        className="relative min-w-0 flex-1 cursor-text"
+        onClickCapture={(event) => {
+          // The shared clear emits synthetic input; its authorized click owns this transition.
+          if (
+            event.target instanceof Element &&
+            event.target.closest('.sniptale-field-clear') &&
+            (isTrustedDomEvent(event.nativeEvent) || isBridgedMouseEvent(event.nativeEvent))
+          )
+            props.onQueryChange('');
+        }}
+      >
         <Search className="absolute left-2 top-2 text-[var(--sniptale-color-text-dim)]" size={16} />
         <span className="sr-only">{translate('content.designReview.panelSearch')}</span>
         <input
@@ -36,7 +49,13 @@ export function FeedbackPanelSearch(props: {
           ].join(' ')}
           placeholder={translate('content.designReview.panelSearch')}
           value={props.query}
-          onChange={(event) => props.onQueryChange(event.target.value)}
+          onChange={(event) => {
+            if (!isTrustedDomEvent(event.nativeEvent)) {
+              event.currentTarget.value = props.query;
+              return;
+            }
+            props.onQueryChange(event.currentTarget.value);
+          }}
         />
         {props.query ? (
           <InspectorFieldClear

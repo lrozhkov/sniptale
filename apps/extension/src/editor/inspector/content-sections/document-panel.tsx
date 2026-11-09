@@ -14,7 +14,8 @@ export type DocumentInspectorMode = Extract<
   'browser-frame' | 'meta' | 'image-size' | 'canvas-size'
 >;
 
-interface EditorInspectorDocumentPanelProps {
+/** Inputs for the active document inspector section. */
+export interface EditorInspectorDocumentPanelProps {
   inspector: DocumentInspectorMode;
   browserFrame: BrowserFrameState;
   browserCanvasModeOptions: CompactSelectOption<BrowserFrameState['canvasMode']>[];

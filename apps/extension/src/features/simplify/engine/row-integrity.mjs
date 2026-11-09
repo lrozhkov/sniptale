@@ -1,12 +1,14 @@
+import { intersects, bottom, right } from './structure-topology.mjs';
 // Preserve a row when a source fragment and a competing owner make its extent uncertain.
 // This pass does not infer text from colour, a bounding-box overlap, or proximity alone.
 import { inkParts } from './structure.mjs';
-import { continuousTextureClaim, preserveTextureClaim, texturedRow } from './row-texture.mjs';
+import {
+  continuousTextureClaim,
+  preserveTextureClaim,
+  texturedRow,
+  scanBrightColumn,
+} from './row-texture.mjs';
 
-const intersects = (a, b) =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-const bottom = (b) => b.y + b.h;
-const right = (b) => b.x + b.w;
 const compatible = (a, b) =>
   Math.abs(bottom(a) - bottom(b)) <= Math.max(3, a.h * 0.25) &&
   Math.abs(a.h - b.h) <= Math.max(4, a.h * 0.35);
@@ -22,24 +24,7 @@ function brightColumns(image, box, text) {
     x < Math.min(image.width, Math.ceil(right(box)));
     x++
   ) {
-    let count = 0,
-      top = y1,
-      low = y0;
-    for (let y = y0; y < y1; y++) {
-      const i = (y * image.width + x) * 4;
-      if (
-        image.data[i + 3] >= 128 &&
-        Math.max(
-          Math.abs(bg[0] - image.data[i]),
-          Math.abs(bg[1] - image.data[i + 1]),
-          Math.abs(bg[2] - image.data[i + 2])
-        ) >= threshold
-      ) {
-        count++;
-        top = Math.min(top, y);
-        low = Math.max(low, y);
-      }
-    }
+    const { count, top, low } = scanBrightColumn(image, bg, x, y0, y1, threshold);
     columns.push({ x, count, top, low });
   }
   const groups = [];

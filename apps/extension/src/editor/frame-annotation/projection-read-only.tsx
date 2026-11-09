@@ -7,7 +7,7 @@ import { FrameStepBadgeInteractiveSurface } from '../../features/highlighter/fra
 import type { FrameAnnotationSnapshotV1 } from '../../features/highlighter/frame-annotation';
 import type { resolveFrameAnnotationVisualScene } from '../../features/highlighter/frame-annotation';
 import type { FrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
-import { getRepresentativeColor } from '@sniptale/foundation/paint';
+import { getFrameStepBadgeAppearance } from './step-badge-appearance';
 
 /** Renders frame content without editing controls. */
 export function FrameProjectionReadOnlyOverlays(props: {
@@ -45,12 +45,7 @@ export function FrameProjectionReadOnlyOverlays(props: {
           settings={badge}
           showSettingsHandle={false}
           surfacePortalTarget={props.sceneRoot}
-          {...(props.snapshot.borderSettings?.fillPaint
-            ? { fillColor: getRepresentativeColor(props.snapshot.borderSettings.fillPaint) }
-            : {})}
-          {...(props.snapshot.borderSettings?.shadow === undefined
-            ? {}
-            : { shadow: props.snapshot.borderSettings.shadow })}
+          {...getFrameStepBadgeAppearance(props.snapshot)}
         />
       ) : null}
     </>

@@ -485,19 +485,22 @@ async function prepareNestedSimplifySource(page: Page) {
     fixture.style.cssText = 'position:fixed;inset:0;background:white;z-index:1';
     const header = document.createElement('div');
     header.style.cssText =
-      'position:absolute;left:420px;top:104px;width:700px;height:60px;background:white;color:#173b63;font:24px/32px sans-serif';
+      'position:absolute;left:420px;top:104px;width:700px;height:60px;background:white;' +
+      'color:#173b63;font:24px/32px sans-serif';
     const title = document.createElement('div');
     title.textContent = 'Account settings';
     title.style.cssText = 'position:absolute;left:40px;top:8px';
     const button = document.createElement('button');
     button.textContent = 'Apply changes';
     button.style.cssText =
-      'position:absolute;left:420px;top:8px;width:160px;height:40px;border:0;background:#1b68b3;color:white;font:18px sans-serif';
+      'position:absolute;left:420px;top:8px;width:160px;height:40px;border:0;background:#1b68b3;' +
+      'color:white;font:18px sans-serif';
     header.append(title, button);
     const scroll = document.createElement('div');
     scroll.id = 'simplify-internal-scroll-proof';
     scroll.style.cssText =
-      'position:absolute;left:60px;top:180px;width:calc(100% - 120px);height:calc(100% - 200px);overflow:auto;background:#f4f7fa';
+      'position:absolute;left:60px;top:180px;width:calc(100% - 120px);height:calc(100% - 200px);' +
+      'overflow:auto;background:#f4f7fa';
     const content = document.createElement('div');
     content.style.cssText = 'height:3000px;position:relative';
     for (const top of [60, 340, 620, 900]) {
@@ -734,7 +737,8 @@ export async function assertNativeSimplifyAfterStoppedScroll(page: Page, info: T
     document.documentElement.style.scrollBehavior = 'auto';
     const target = document.createElement('section');
     target.style.cssText =
-      'position:absolute;left:450px;top:960px;width:340px;height:120px;padding:16px;background:#f4f7fa;color:#173b63;font:24px/28px sans-serif;white-space:pre;z-index:1';
+      'position:absolute;left:450px;top:960px;width:340px;height:120px;padding:16px;' +
+      'background:#f4f7fa;color:#173b63;font:24px/28px sans-serif;white-space:pre;z-index:1';
     target.textContent = 'Fresh viewport source\nCaptured after scrolling';
     document.body.append(target);
   });

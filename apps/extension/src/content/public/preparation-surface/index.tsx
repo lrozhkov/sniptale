@@ -1,3 +1,4 @@
+import { setUIHidden } from '../../selection/locker';
 import { createContentSimplifyDependencies } from '../../drawing/simplify';
 import { getContentRuntimeServices } from '../../application/runtime-services/services';
 import { getDrawingViewportProjection } from '../../drawing/interaction';
@@ -350,6 +351,7 @@ export function PreparationSurface(props: PreparationSurfaceProps) {
   const simplifyDependencies = useMemo(
     () =>
       createContentSimplifyDependencies({
+        setUIHidden,
         services: getContentRuntimeServices(),
         getBounds: () => {
           const rect = captureAdapterRef.current.getViewportBounds?.();

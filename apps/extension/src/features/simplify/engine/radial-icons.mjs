@@ -1,15 +1,6 @@
+import { bounds } from './structure-topology.mjs';
 import { inkParts } from './structure.mjs';
 
-const bounds = (parts) => {
-  const x = Math.min(...parts.map((p) => p.x)),
-    y = Math.min(...parts.map((p) => p.y));
-  return {
-    x,
-    y,
-    w: Math.max(...parts.map((p) => p.x + p.w)) - x,
-    h: Math.max(...parts.map((p) => p.y + p.h)) - y,
-  };
-};
 const overlap = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 // A filled central disk and rays in all four cardinal directions form a sun.
 // Diagonal rays may touch the disk at small raster sizes. They still must put
@@ -252,27 +243,13 @@ function componentRuns(image, parts, bg) {
     const core = new Set();
     for (let y = p.y; y < p.y + p.h; y++)
       for (let x = p.x; x < p.x + p.w; x++) {
-        const i = (y * image.width + x) * 4,
-          d = bg.map((v, c) => image.data[i + c] - v),
-          alpha = d.reduce((n, v, c) => n + v * direction[c], 0) / length;
-        if (
-          alpha >= 0.5 &&
-          alpha <= 1.3 &&
-          Math.max(...d.map((v, c) => Math.abs(v - alpha * direction[c]))) <= 15
-        )
-          core.add(y * image.width + x);
+        const { alpha, residual } = componentProjection(image, x, y, bg, direction, length);
+        if (alpha >= 0.5 && alpha <= 1.3 && residual <= 15) core.add(y * image.width + x);
       }
     for (let y = Math.max(0, p.y - 1); y < Math.min(image.height, p.y + p.h + 1); y++)
       for (let x = Math.max(0, p.x - 1); x < Math.min(image.width, p.x + p.w + 1); x++) {
-        const i = (y * image.width + x) * 4,
-          d = bg.map((v, c) => image.data[i + c] - v),
-          alpha = d.reduce((n, v, c) => n + v * direction[c], 0) / length;
-        if (
-          alpha < 0.025 ||
-          alpha > 1.3 ||
-          Math.max(...d.map((v, c) => Math.abs(v - alpha * direction[c]))) > 15
-        )
-          continue;
+        const { alpha, residual } = componentProjection(image, x, y, bg, direction, length);
+        if (alpha < 0.025 || alpha > 1.3 || residual > 15) continue;
         let adjacent = false;
         for (let dy = -1; dy <= 1; dy++)
           for (let dx = -1; dx <= 1; dx++)
@@ -479,4 +456,11 @@ function radialProposal(p) {
     (['unknown', 'text'].includes(p.shape) && !p.roleEvidence) ||
     (p.shape === 'icon' && p.roleEvidence === 'structured-symbol')
   );
+}
+
+function componentProjection(image, x, y, bg, direction, length) {
+  const i = (y * image.width + x) * 4,
+    d = bg.map((v, c) => image.data[i + c] - v),
+    alpha = d.reduce((n, v, c) => n + v * direction[c], 0) / length;
+  return { alpha, residual: Math.max(...d.map((v, c) => Math.abs(v - alpha * direction[c]))) };
 }

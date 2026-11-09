@@ -1,4 +1,4 @@
-import { denseTextErase } from './dense-text-erase.mjs';
+import { denseTextErase, textErasePalette } from './dense-text-erase.mjs';
 import { orderStatistic } from './order-statistic.mjs';
 const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
 const median = (a) => orderStatistic([...a], Math.floor(a.length / 2));
@@ -142,10 +142,7 @@ function legacyTextErase(image, box, bounds, plane) {
       for (let c = 0; c < 3; c++) b.color[c] += p.rgb[c];
       bins.set(key, b);
     }
-  const palette = [...bins.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
-    .map((b) => b.color.map((v) => v / b.count));
+  const palette = textErasePalette(bins);
   const core = new Uint8Array(bounds.w * bounds.h),
     mask = new Uint8Array(core.length);
   seedLegacyTextCore(samples, box, bounds, palette, core);

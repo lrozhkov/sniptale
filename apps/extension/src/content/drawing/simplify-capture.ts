@@ -1,13 +1,13 @@
 import { isTrustedPointerEvent } from '../platform/trusted-events';
 import { queryAllContentUiElements, resolveContentShadowRoot } from '../platform/dom-host';
-import { setUIHidden } from '../selection/locker';
 import { CaptureMessageType } from '@sniptale/runtime-contracts/messaging/message-types';
-import type { ContentRuntimeServices } from '../application/runtime-services/services';
+import type { ContentRuntimeServices } from '../platform/runtime-services/services';
 import { readSimplifyPngDimensions } from '../../contracts/messaging/contracts/runtime-message/simplify.types';
 import type { DrawingBounds, DrawingSimplifySource } from '../../features/drawing/public';
 
 export interface SimplifySourceCaptureOptions {
   services: ContentRuntimeServices;
+  setUIHidden(hidden: boolean): void;
   getBounds(): DrawingBounds;
   getRetainedSource?: () => DrawingSimplifySource | null;
   captureViewport?: () => Promise<string>;
@@ -74,6 +74,7 @@ function waitForCapture<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
 
 async function captureWithoutChrome<T>(
   capture: () => Promise<T>,
+  setUIHidden: (hidden: boolean) => void,
   signal?: AbortSignal
 ): Promise<T> {
   signal?.throwIfAborted();
@@ -123,14 +124,18 @@ export function createSimplifySourceCapture(
         intent
       );
       capture = captureTail.then(() =>
-        captureWithoutChrome(async () => {
-          const work = options.services.messaging.sendRuntimeMessage(request);
-          nativeWork = work;
-          const response = await work;
-          if (!response?.success || typeof response.dataUrl !== 'string')
-            throw new Error('Source acquisition failed.');
-          return response.dataUrl;
-        }, signal)
+        captureWithoutChrome(
+          async () => {
+            const work = options.services.messaging.sendRuntimeMessage(request);
+            nativeWork = work;
+            const response = await work;
+            if (!response?.success || typeof response.dataUrl !== 'string')
+              throw new Error('Source acquisition failed.');
+            return response.dataUrl;
+          },
+          options.setUIHidden,
+          signal
+        )
       );
     }
     captureTail = capture

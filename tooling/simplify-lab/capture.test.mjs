@@ -14,7 +14,8 @@ test('live capture creates current viewport pixels and records unavailable targe
   const server = createServer((_request, response) => {
     response.setHeader('Content-Type', 'text/html');
     response.end(
-      '<!doctype html><html><title>Capture proof</title><main><h1>Current source</h1><p>Text and numbers 1 2 3.</p></main></html>'
+      '<!doctype html><html><title>Capture proof</title><main><h1>Current source</h1>' +
+        '<p>Text and numbers 1 2 3.</p></main></html>'
     );
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));

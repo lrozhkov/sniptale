@@ -1,20 +1,7 @@
-export const bounds = (parts) => {
-  const x = Math.min(...parts.map((p) => p.x)),
-    y = Math.min(...parts.map((p) => p.y));
-  return {
-    x,
-    y,
-    w: Math.max(...parts.map((p) => p.x + p.w)) - x,
-    h: Math.max(...parts.map((p) => p.y + p.h)) - y,
-  };
-};
-export const contains = (a, b, pad = 0) =>
-  b.x >= a.x - pad &&
-  b.y >= a.y - pad &&
-  b.x + b.w <= a.x + a.w + pad &&
-  b.y + b.h <= a.y + a.h + pad;
-export const intersect = (a, b) =>
-  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+function contourInk(image, bg, x, y) {
+  const i = (y * image.width + x) * 4;
+  return Math.max(...bg.map((v, c) => Math.abs(v - image.data[i + c]))) > 40;
+}
 
 // Four similar, separated, rectangular marks must form both rows and columns.
 export function grid(image, parts, bg) {
@@ -88,10 +75,6 @@ export function grid(image, parts, bg) {
 
 export function arrowBracket(image, parts, bg) {
   if (parts.length !== 2) return false;
-  const ink = (x, y) => {
-    const i = (y * image.width + x) * 4;
-    return Math.max(...bg.map((v, c) => Math.abs(v - image.data[i + c]))) > 40;
-  };
   for (const bracket of parts) {
     const arrow = parts.find((p) => p !== bracket);
     if (
@@ -111,11 +94,13 @@ export function arrowBracket(image, parts, bg) {
     )
       continue;
     const row = (y) =>
-      Array.from({ length: bracket.w }, (_, x) => ink(bracket.x + x, bracket.y + y)).filter(Boolean)
-        .length;
+      Array.from({ length: bracket.w }, (_, x) =>
+        contourInk(image, bg, bracket.x + x, bracket.y + y)
+      ).filter(Boolean).length;
     const col = (x) =>
-      Array.from({ length: bracket.h }, (_, y) => ink(bracket.x + x, bracket.y + y)).filter(Boolean)
-        .length;
+      Array.from({ length: bracket.h }, (_, y) =>
+        contourInk(image, bg, bracket.x + x, bracket.y + y)
+      ).filter(Boolean).length;
     const edge = Math.max(col(bracket.w - 1), col(bracket.w - 2));
     if (
       Math.max(row(0), row(1)) < bracket.w * 0.7 ||
@@ -126,7 +111,8 @@ export function arrowBracket(image, parts, bg) {
     const columns = [];
     for (let x = 0; x < arrow.w; x++) {
       const ys = [];
-      for (let y = 0; y < arrow.h; y++) if (ink(arrow.x + x, arrow.y + y)) ys.push(y);
+      for (let y = 0; y < arrow.h; y++)
+        if (contourInk(image, bg, arrow.x + x, arrow.y + y)) ys.push(y);
       if (!ys.length) {
         columns.length = 0;
         break;
@@ -168,22 +154,21 @@ export function stackedArrows(image, parts, bg) {
     lower.y > upper.y + upper.h + 2
   )
     return false;
-  const ink = (x, y) => {
-    const i = (y * image.width + x) * 4;
-    return Math.max(...bg.map((v, c) => Math.abs(v - image.data[i + c]))) > 40;
-  };
   const arrows = (p) => {
     const result = [];
     for (let y = p.y + 1; y < p.y + p.h - 2; y++)
       for (let x = p.x; x < p.x + p.w;) {
-        if (!ink(x, y)) {
+        if (!contourInk(image, bg, x, y)) {
           x++;
           continue;
         }
         const start = x;
-        while (x < p.x + p.w && ink(x, y)) x++;
+        while (x < p.x + p.w && contourInk(image, bg, x, y)) x++;
         const length = x - start;
-        if (length < 5 || !Array.from({ length }, (_, i) => ink(start + i, y + 1)).every(Boolean))
+        if (
+          length < 5 ||
+          !Array.from({ length }, (_, i) => contourInk(image, bg, start + i, y + 1)).every(Boolean)
+        )
           continue;
         const headStart = start + Math.floor(length * 0.5),
           headEnd = x;
@@ -191,7 +176,7 @@ export function stackedArrows(image, parts, bg) {
           let n = 0,
             left = x;
           for (let xx = start; xx < x; xx++)
-            if (ink(xx, yy)) {
+            if (contourInk(image, bg, xx, yy)) {
               n++;
               left = Math.min(left, xx);
             }
@@ -228,7 +213,7 @@ export function stackedArrows(image, parts, bg) {
         aboveArrow = 0;
       for (let y = upper.y; y < upper.y + upper.h; y++)
         for (let x = upper.x; x < a.x - 1; x++)
-          if (ink(x, y)) {
+          if (contourInk(image, bg, x, y)) {
             left++;
             if (y < a.y) aboveArrow++;
           }

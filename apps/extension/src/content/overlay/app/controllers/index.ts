@@ -1,3 +1,4 @@
+import { setUIHidden } from '../../../selection/locker';
 import { createContentSimplifyDependencies } from '../../../drawing/simplify';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import { getDrawingViewportProjection } from '../../../drawing/interaction';
@@ -212,6 +213,7 @@ function usePageDrawingSimplifyDependencies() {
   return useMemo(
     () =>
       createContentSimplifyDependencies({
+        setUIHidden,
         services: getContentRuntimeServices(),
         getBounds: () => ({
           ...getDrawingViewportProjection(resolvePageScrollRoot()),

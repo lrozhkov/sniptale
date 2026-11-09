@@ -4,17 +4,7 @@ export function resemblesTextList(image, box) {
     bands = [];
   let start = -1;
   for (let y = box.y; y < box.y + box.h; y++) {
-    let edges = 0;
-    for (let x = box.x; x < box.x + box.w - 1; x++) {
-      const i = (y * width + x) * 4;
-      if (
-        Math.abs(data[i] - data[i + 4]) +
-          Math.abs(data[i + 1] - data[i + 5]) +
-          Math.abs(data[i + 2] - data[i + 6]) >
-        45
-      )
-        edges++;
-    }
+    const edges = horizontalEdgeCount(data, width, y, box.x, box.x + box.w - 1);
     const active = edges > Math.max(3, box.w * 0.012);
     if (active && start < 0) start = y;
     if (!active && start >= 0) {
@@ -581,4 +571,20 @@ export function alignMediaSurfaceSides(image, surfaces) {
       box.w = right - left;
     }
   }
+}
+
+/** Count adjacent RGB edges over the specified half-open horizontal sample range. */
+export function horizontalEdgeCount(data, width, y, from, to) {
+  let edges = 0;
+  for (let x = from; x < to; x++) {
+    const i = (y * width + x) * 4;
+    if (
+      Math.abs(data[i] - data[i + 4]) +
+        Math.abs(data[i + 1] - data[i + 5]) +
+        Math.abs(data[i + 2] - data[i + 6]) >
+      45
+    )
+      edges++;
+  }
+  return edges;
 }

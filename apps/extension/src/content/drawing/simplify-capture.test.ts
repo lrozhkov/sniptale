@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { createDrawingSession, type DrawingSimplifySource } from '../../features/drawing/public';
 import { createDefaultSimplifySettings } from '../../features/simplify/settings';
 import { createContentSimplifyRuntime, createContentSimplifyDependencies } from './simplify';
-import { createContentRuntimeServices } from '../application/runtime-services/services';
+import { createContentRuntimeServices } from '../platform/runtime-services/services';
 import { createRuntimeMessagingTransport } from '../../platform/runtime-messaging';
 import type { SimplifyComputeRequest } from '../../workflows/simplify/compute-client';
 
@@ -23,10 +23,9 @@ function deferred<T>() {
   });
   return { promise, resolve, reject };
 }
-vi.mock('../selection/locker', () => ({
-  setUIHidden: (hidden: boolean) =>
-    document.body.classList.toggle('sniptale-capture-ui-hidden', hidden),
-}));
+function setUIHidden(hidden: boolean): void {
+  document.body.classList.toggle('sniptale-capture-ui-hidden', hidden);
+}
 vi.mock('../platform/dom-host', async (original) => ({
   ...(await original<typeof import('../platform/dom-host')>()),
   queryAllContentUiElements: (selector: string) => [...document.querySelectorAll(selector)],
@@ -62,6 +61,7 @@ function captureHarness(bounds = { x: 0, y: 0, width: 100, height: 100 }) {
   overlay.style.visibility = 'visible';
   document.body.append(overlay);
   const runtime = createContentSimplifyDependencies({
+    setUIHidden,
     services,
     getBounds: () => bounds,
   });
@@ -122,6 +122,7 @@ it('reuses a frozen source without requesting capture or changing chrome', async
     bounds: { x: 0, y: 0, width: 100, height: 100 },
   };
   const runtime = createContentSimplifyDependencies({
+    setUIHidden,
     services: h.services,
     getBounds: () => source.bounds,
     getRetainedSource: () => source,
@@ -148,6 +149,7 @@ it('reads an injected local viewport raster without native authority or chrome m
   const local = vi.fn(async () => image.dataUrl);
   const bounds = { x: 40, y: 60, width: 100, height: 100 };
   const runtime = createContentSimplifyDependencies({
+    setUIHidden,
     services: h.services,
     getBounds: () => bounds,
     captureViewport: local,

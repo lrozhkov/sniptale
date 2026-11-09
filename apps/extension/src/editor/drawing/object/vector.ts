@@ -15,6 +15,7 @@ import {
   resolveDrawingTextMeasuredNaturalWidth,
   resolveDrawingTextHeight,
   traceDrawingTextBackground,
+  transformDrawingPoint,
   resolveDrawingTextFontFamily,
   type DrawingObject,
   type DrawingPoint,
@@ -220,10 +221,7 @@ function renderEditorDrawingTextStencil(
     { x: halfWidth, y: -halfHeight },
     { x: halfWidth, y: halfHeight },
     { x: -halfWidth, y: halfHeight },
-  ].map((point) => ({
-    x: transform.a * point.x + transform.c * point.y + transform.e,
-    y: transform.b * point.x + transform.d * point.y + transform.f,
-  }));
+  ].map((point) => transformDrawingPoint(point, transform));
   const left = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.x))));
   const top = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.y))));
   const right = Math.min(

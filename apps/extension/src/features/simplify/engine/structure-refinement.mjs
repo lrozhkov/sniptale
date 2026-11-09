@@ -1,4 +1,6 @@
 import {
+  median,
+  centerY,
   bounds,
   inkParts,
   partBox,
@@ -7,8 +9,7 @@ import {
   rectangularGrid,
   opposedStrokes,
 } from './structure-topology.mjs';
-const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-const centerY = (b) => b.y + b.h / 2;
+import { colorDistanceAt } from './control-shapes.mjs';
 function hasTextEvidence(image, box, measure, input = []) {
   const m = measure(image, box, 1);
   if (!confirmedText(m)) return false;
@@ -171,14 +172,7 @@ export function splitTextBands(image, box, measure) {
     let ink = 0;
     for (let x = Math.max(0, box.x); x < Math.min(image.width, box.x + box.w); x++) {
       const i = (y * image.width + x) * 4;
-      if (
-        Math.max(
-          Math.abs(box.bg[0] - image.data[i]),
-          Math.abs(box.bg[1] - image.data[i + 1]),
-          Math.abs(box.bg[2] - image.data[i + 2])
-        ) > 40
-      )
-        ink++;
+      if (colorDistanceAt(image.data, i, box.bg) > 40) ink++;
     }
     if (ink < 2) {
       active = null;

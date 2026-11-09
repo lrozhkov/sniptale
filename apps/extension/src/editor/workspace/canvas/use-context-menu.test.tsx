@@ -50,6 +50,11 @@ function createCanvasContextMenuEmitter() {
         if (eventName === 'contextmenu') {
           contextMenuListener = listener;
         }
+        return () => {
+          if (eventName === 'contextmenu' && contextMenuListener === listener) {
+            contextMenuListener = null;
+          }
+        };
       }),
     },
     fireContextMenu(event: MouseEvent) {
@@ -97,13 +102,8 @@ it('delegates loaded-image surface right-click to the fabric seam', async () => 
 
 it('blocks loaded-image viewport margins while keeping the menu closed', async () => {
   const controller = createControllerMock();
-  Object.assign(controller, {
-    canvas: {
-      findTarget: vi.fn(() => null),
-      getActiveObject: vi.fn(() => null),
-      getActiveObjects: vi.fn(() => []),
-    },
-  });
+  const emitter = createCanvasContextMenuEmitter();
+  Object.assign(controller, { canvas: emitter.canvas });
 
   resetEditorStore({ viewportPreviewOpen: false });
   await renderCanvasWrapper(controller);

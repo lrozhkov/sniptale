@@ -4,24 +4,37 @@ import type { EditorFrameSettings } from '../../../features/editor/document/type
 import type { CompactSelectOption } from '../../chrome/ui';
 import { renderEditorInspectorFrameSection } from './size';
 import { EditorInspectorResizeToolSection } from './resize-tool';
-import { EditorInspectorDocumentPanel, type DocumentInspectorMode } from './document-panel';
+import {
+  EditorInspectorDocumentPanel,
+  type DocumentInspectorMode,
+  type EditorInspectorDocumentPanelProps,
+} from './document-panel';
 import {
   renderEditorInspectorContentSurfaceSections,
   type EditorInspectorContentSurfaceSectionsProps,
 } from './surface';
 import type { BackgroundGradientPreset } from '../sidebar-shared';
 
-export interface EditorInspectorContentBodyProps extends EditorInspectorContentSurfaceSectionsProps {
-  imageSizeText: string;
-  canvasSizeText: string;
-  canvasSize: { width: number; height: number };
-  cropSelection: { width: number; height: number } | null;
-  imageSizeDraft: { width: number; height: number };
-  canvasSizeDraft: { width: number; height: number };
-  imageSizeLocked: boolean;
-  canvasSizeLocked: boolean;
-  imageAspectRatio: number | null;
-  canvasAspectRatio: number | null;
+export interface EditorInspectorContentBodyProps
+  extends
+    EditorInspectorContentSurfaceSectionsProps,
+    Pick<
+      EditorInspectorDocumentPanelProps,
+      | 'imageSizeText'
+      | 'canvasSizeText'
+      | 'canvasSize'
+      | 'cropSelection'
+      | 'imageSizeDraft'
+      | 'canvasSizeDraft'
+      | 'imageSizeLocked'
+      | 'canvasSizeLocked'
+      | 'imageAspectRatio'
+      | 'canvasAspectRatio'
+      | 'setImageSizeDraft'
+      | 'setCanvasSizeDraft'
+      | 'setImageSizeLocked'
+      | 'setCanvasSizeLocked'
+    > {
   frameDraft: EditorFrameSettings;
   lastFillModeRef: React.RefObject<'color' | 'gradient'>;
   framePaddingSummary: string;
@@ -34,10 +47,6 @@ export interface EditorInspectorContentBodyProps extends EditorInspectorContentS
   frameGradientPresets: BackgroundGradientPreset[];
   frameLayoutModeOptions: CompactSelectOption<EditorFrameSettings['layoutMode']>[];
   frameBackgroundPalette: readonly string[];
-  setImageSizeDraft: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
-  setCanvasSizeDraft: React.Dispatch<React.SetStateAction<{ width: number; height: number }>>;
-  setImageSizeLocked: React.Dispatch<React.SetStateAction<boolean>>;
-  setCanvasSizeLocked: React.Dispatch<React.SetStateAction<boolean>>;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
   previewFrameDraft?: React.Dispatch<React.SetStateAction<EditorFrameSettings>> | undefined;
   setUniformPadding: (value: number) => void;

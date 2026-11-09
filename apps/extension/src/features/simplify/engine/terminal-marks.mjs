@@ -1,3 +1,4 @@
+import { orderedPairBounds } from './structure-topology.mjs';
 import { inkParts } from './structure.mjs';
 
 const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -335,12 +336,7 @@ function recoverTerminalQuote(
       difference(a.rgb, b.rgb) <= 35 &&
       difference(b.rgb, reference) <= 65
     ) {
-      mark = {
-        x: a.x,
-        y: Math.min(a.y, b.y),
-        w: b.x + b.w - a.x,
-        h: Math.max(a.y + a.h, b.y + b.h) - Math.min(a.y, b.y),
-      };
+      mark = orderedPairBounds(a, b);
     } else if (a.w >= 3 && a.w <= Math.max(4, m.stroke * 3.5)) {
       // Antialiased quote strokes can form one connected component. Require two
       // dark column peaks with an intervening lighter column.

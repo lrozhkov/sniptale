@@ -17,9 +17,9 @@ import {
   ProductToolbarMenuGroupLabel,
 } from '@sniptale/ui/product-menus/toolbar';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
-import { resolveToolbarDropdownState, ToolbarMenuDropdown } from '../menu/dropdown';
+import { ToolbarMenuDropdown } from '../menu/dropdown';
 import { useToolbarFloatingMenuDismissal } from '../menu/floating.helpers';
-import { getToolbarMenuPosition } from '../menu/position';
+import { resolveRecordingToolbarMenuLayout } from '../menu/position';
 import { useToolbarMenuDirection } from '../menu/direction';
 import type { ToolbarMenuState, ToolbarPopoverMenu } from '../state/menu';
 import { translate } from '../../../../platform/i18n';
@@ -159,19 +159,15 @@ function useRecordingMediaControl(props: RecordingMediaSplitControlProps) {
     open,
     triggerRef,
   });
-  const resolveLayout = () => {
-    const dropdown = resolveToolbarDropdownState({
+  const resolveLayout = () =>
+    resolveRecordingToolbarMenuLayout({
       anchorRef: triggerRef,
       displayMode: props.displayMode,
-      getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
       menuHeight:
         Math.max(96, devices.length * 48 + 48) +
         (props.cameraPlacement ? 480 : props.microphoneGain ? 56 : 0),
       menuWidth: props.cameraPlacement ? 280 : 260,
-      preferredAlign: 'end',
     });
-    return { placement: dropdown.menuPlacement, style: dropdown.style };
-  };
   const dropdown = resolveLayout();
   const menuSide = useToolbarMenuDirection(resolveLayout);
   const toggleMenu = () => {

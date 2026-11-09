@@ -139,15 +139,9 @@ button.sniptale-glass-switch[data-command-press]:enabled[data-pressing='true'] {
       --sniptale-command-selected-foreground,
       var(--sniptale-color-text-primary)
     ) !important;
-  }
-
-  button[data-command-press]:is(:enabled, :disabled):is(
-      [data-command-tone='toggle'][data-command-active='true'],
-      [data-command-property='true'][data-active='true'],
-      .review-command[aria-pressed='true']
-    )
-    svg:is(.lucide, .tabler-icon) {
-    stroke-width: var(--sniptale-control-icon-stroke-active) !important;
+    & svg:is(.lucide, .tabler-icon) {
+      stroke-width: var(--sniptale-control-icon-stroke-active) !important;
+    }
   }
 
   button[data-command-press]:focus-visible:not([data-focus-restoration='pointer']) {

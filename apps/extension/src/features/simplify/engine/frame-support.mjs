@@ -1,3 +1,4 @@
+import { peakContrast } from './structure-topology.mjs';
 import { inkParts } from './structure.mjs';
 const distance = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
 /** Preserve a mixed icon claim when its source includes a complete key frame. */
@@ -188,12 +189,7 @@ export function constrainFrameChildren(image, boxes, frames) {
 }
 
 function caretGeometry(image, box) {
-  let peak = 0;
-  for (let y = box.y; y < box.y + box.h; y++)
-    for (let x = box.x; x < box.x + box.w; x++) {
-      const i = (y * image.width + x) * 4;
-      peak = Math.max(peak, ...box.bg.map((v, c) => Math.abs(v - image.data[i + c])));
-    }
+  const peak = peakContrast(image, box);
   const rows = [];
   let left = image.width,
     right = 0,

@@ -1,7 +1,5 @@
-const intersects = (a, b) =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-const bottom = (b) => b.y + b.h;
-const right = (b) => b.x + b.w;
+import { intersects, bottom, right } from './structure-topology.mjs';
+import { colorDistanceAt } from './control-shapes.mjs';
 
 // An unproven dense claim that joins the same texture on all four sides is
 // surface variation, so preserve its original pixels with the uncertain row.
@@ -147,24 +145,7 @@ function darkRowBackground(image, seed, nominal, x0, x1, y0, y1) {
 function textureColumns(image, bg, x0, x1, threshold, from, to) {
   const groups = [];
   for (let x = x0; x < x1; x++) {
-    let n = 0,
-      t = to,
-      b = from;
-    for (let y = from; y < to; y++) {
-      const i = (y * image.width + x) * 4;
-      if (
-        image.data[i + 3] >= 128 &&
-        Math.max(
-          Math.abs(bg[0] - image.data[i]),
-          Math.abs(bg[1] - image.data[i + 1]),
-          Math.abs(bg[2] - image.data[i + 2])
-        ) >= threshold
-      ) {
-        n++;
-        t = Math.min(t, y);
-        b = Math.max(b, y);
-      }
-    }
+    const { count: n, top: t, low: b } = scanBrightColumn(image, bg, x, from, to, threshold);
     if (!n) continue;
     const last = groups.at(-1);
     if (last && x === last.r + 1) {
@@ -345,4 +326,20 @@ function textureRowMembers(image, boxes, seed, area, structured, left, end, supp
   )
     return null;
   return members;
+}
+
+/** Count foreground pixels and their inclusive vertical extent in one column. */
+export function scanBrightColumn(image, bg, x, from, to, threshold) {
+  let count = 0,
+    top = to,
+    low = from;
+  for (let y = from; y < to; y++) {
+    const i = (y * image.width + x) * 4;
+    if (image.data[i + 3] >= 128 && colorDistanceAt(image.data, i, bg) >= threshold) {
+      count++;
+      top = Math.min(top, y);
+      low = Math.max(low, y);
+    }
+  }
+  return { count, top, low };
 }

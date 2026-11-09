@@ -30,7 +30,7 @@ import { createDefaultFrameCallout } from '../../features/highlighter/frame-anno
 import { translate } from '../../platform/i18n';
 import { FrameProjectionSettings, type ProjectionSettingsMenu } from './projection-settings';
 import { resolveFrameAnnotationToolbarPlacement } from './toolbar-placement';
-import { getRepresentativeColor } from '@sniptale/foundation/paint';
+import { getFrameStepBadgeAppearance } from './step-badge-appearance';
 
 export function FrameProjection(props: {
   coordinateSpace: FrameAnnotationCoordinateSpace;
@@ -321,12 +321,7 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       settingsAnchorRef={anchorRef}
       showSettingsHandle
       surfacePortalTarget={props.sceneRoot}
-      {...(props.snapshot.borderSettings?.fillPaint
-        ? { fillColor: getRepresentativeColor(props.snapshot.borderSettings.fillPaint) }
-        : {})}
-      {...(props.snapshot.borderSettings?.shadow === undefined
-        ? {}
-        : { shadow: props.snapshot.borderSettings.shadow })}
+      {...getFrameStepBadgeAppearance(props.snapshot)}
     />
   );
 }

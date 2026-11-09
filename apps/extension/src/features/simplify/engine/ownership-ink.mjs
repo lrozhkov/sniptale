@@ -1,10 +1,4 @@
-const intersects = (a, b) =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-const contains = (a, b, pad = 0) =>
-  b.x >= a.x - pad &&
-  b.y >= a.y - pad &&
-  b.x + b.w <= a.x + a.w + pad &&
-  b.y + b.h <= a.y + a.h + pad;
+import { intersects, contains } from './structure-topology.mjs';
 
 export function inkRuns(image, bounds, bg, seed = null) {
   const left = Math.max(0, Math.floor(bounds.x)),

@@ -1,7 +1,6 @@
+import { intersects } from './structure-topology.mjs';
 import { inkParts, isDirectionalArrow } from './structure.mjs';
 import { inkRuns, runBounds, inkOverlap, mergeRuns } from './ownership-ink.mjs';
-const intersects = (a, b) =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
 // A late boundary row can include a distinct direction indicator.
 export function separateBoundaryDirection(image, input, measure) {

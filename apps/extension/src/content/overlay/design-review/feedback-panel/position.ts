@@ -49,7 +49,6 @@ export function useFeedbackPanelPosition(
   const positionRef = useRef(position);
   const gestureRef = useRef<{
     pointerId: number;
-    target: HTMLElement;
     origin: PanelPosition;
   } | null>(null);
   const persistRef = useRef(persisted?.setPosition);
@@ -99,9 +98,6 @@ export function useFeedbackPanelPosition(
     gestureRef.current = null;
     cancelDrag();
     if (!gesture) return;
-    if (gesture.target.hasPointerCapture?.(gesture.pointerId)) {
-      gesture.target.releasePointerCapture(gesture.pointerId);
-    }
     updatePosition(clampPanelPosition(panelRef.current, gesture.origin, uiScale));
   }, [cancelDrag, panelRef, uiScale, updatePosition]);
   useLayoutEffect(() => {
@@ -113,16 +109,6 @@ export function useFeedbackPanelPosition(
     if (open) window.addEventListener('resize', clampCurrent);
     return () => window.removeEventListener('resize', clampCurrent);
   }, [open, uiScale, panelRef, updatePosition, cancelPointerDrag]);
-  useLayoutEffect(
-    () => () => {
-      const gesture = gestureRef.current;
-      gestureRef.current = null;
-      if (gesture?.target.hasPointerCapture?.(gesture.pointerId)) {
-        gesture.target.releasePointerCapture(gesture.pointerId);
-      }
-    },
-    []
-  );
 
   return {
     position,
@@ -137,7 +123,6 @@ export function useFeedbackPanelPosition(
       drag.onPointerDown(event);
       gestureRef.current = {
         pointerId: event.pointerId,
-        target: event.currentTarget,
         origin: positionRef.current,
       };
     },

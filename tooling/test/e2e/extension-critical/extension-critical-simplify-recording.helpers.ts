@@ -1,3 +1,4 @@
+import { sendRuntimeMessage } from '../support/recording-action';
 import type { Page, TestInfo } from '@playwright/test';
 import { expect } from '../support/extension-fixture';
 import type { BrowserContext } from '@playwright/test';
@@ -163,52 +164,33 @@ export async function assertSavedSimplifyRecording(page: Page, popup: Page, info
   await page.locator('[data-ui="content.toolbar.video-recording.stop"]').click();
   await expect
     .poll(
-      () =>
-        popup.evaluate(async () => {
-          const response: unknown = await chrome.runtime.sendMessage({
-            type: 'GET_RECORDING_STATE',
-            __sniptaleRuntimeFreshness: {
-              issuedAtEpochMs: Date.now(),
-              nonce: crypto.randomUUID(),
-            },
-          });
-          if (
-            typeof response !== 'object' ||
-            response === null ||
-            !('postRecordResult' in response)
-          )
-            return false;
-          const result = response.postRecordResult;
-          return (
-            typeof result === 'object' &&
-            result !== null &&
-            'recordingId' in result &&
-            typeof result.recordingId === 'string'
-          );
-        }),
+      async () => {
+        const response: unknown = await sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' });
+        if (typeof response !== 'object' || response === null || !('postRecordResult' in response))
+          return false;
+        const result = response.postRecordResult;
+        return (
+          typeof result === 'object' &&
+          result !== null &&
+          'recordingId' in result &&
+          typeof result.recordingId === 'string'
+        );
+      },
       { timeout: 30_000 }
     )
     .toBe(true);
-  const recordingId = await popup.evaluate(async () => {
-    const value: unknown = await chrome.runtime.sendMessage({
-      type: 'GET_RECORDING_STATE',
-      __sniptaleRuntimeFreshness: {
-        issuedAtEpochMs: Date.now(),
-        nonce: crypto.randomUUID(),
-      },
-    });
-    if (typeof value !== 'object' || value === null || !('postRecordResult' in value))
-      throw new Error('Recording result missing');
-    const result = value.postRecordResult;
-    if (
-      typeof result !== 'object' ||
-      result === null ||
-      !('recordingId' in result) ||
-      typeof result.recordingId !== 'string'
-    )
-      throw new Error('Recording identity missing');
-    return result.recordingId;
-  });
+  const value: unknown = await sendRuntimeMessage(popup, { type: 'GET_RECORDING_STATE' });
+  if (typeof value !== 'object' || value === null || !('postRecordResult' in value))
+    throw new Error('Recording result missing');
+  const result = value.postRecordResult;
+  if (
+    typeof result !== 'object' ||
+    result === null ||
+    !('recordingId' in result) ||
+    typeof result.recordingId !== 'string'
+  )
+    throw new Error('Recording identity missing');
+  const recordingId = result.recordingId;
   const recorded = await inspectRecordedSimplify(popup, recordingId);
   expect(recorded.coral, 'Saved recording must contain actual Simplify pixels').toBeGreaterThan(
     1000

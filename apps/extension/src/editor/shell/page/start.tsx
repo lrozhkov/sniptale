@@ -7,7 +7,11 @@ import {
 import { translate } from '../../../platform/i18n';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
-import { EditorStart, useEditorStartItems } from '../../../ui/editor-start';
+import {
+  EditorStart,
+  getEditorStartCommonLabels,
+  useEditorStartItems,
+} from '../../../ui/editor-start';
 import { openLocalImageAsEditorDraft } from '../../workflows/open-local-image-draft';
 import { listRecentEditorImages, readRecentEditorThumbnail } from '../../workflows/recent-images';
 import { useEditorStore } from '../../state/useEditorStore';
@@ -92,12 +96,7 @@ export function ImageEditorStart(props: {
         createLabel={translate('editor.page.startCreate')}
         openLabel={translate('editor.canvas.openImage')}
         recentLabel={translate('editor.page.startRecent')}
-        emptyLabel={translate('shared.editorStart.empty')}
-        loadingLabel={translate('shared.editorStart.loading')}
-        errorLabel={translate('shared.editorStart.error')}
-        retryLabel={translate('shared.editorStart.retry')}
-        searchLabel={translate('shared.editorStart.search')}
-        unavailableLabel={translate('shared.editorStart.unavailable')}
+        {...getEditorStartCommonLabels(translate)}
         items={items}
         status={status}
         actionError={actionError}

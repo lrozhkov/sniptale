@@ -170,7 +170,7 @@ for (const locale of ['en', 'ru'] as const) {
         .elementHandle();
       await trigger.click();
       await popup.locator(`[data-asset-id="${prefix}-1"]`).click();
-      await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-1$`));
+      await expect(page).toHaveURL((url) => url.searchParams.get('assetId') === `${prefix}-1`);
       await expect(page.locator('[data-ui="editor.floating.document-bar.title"]')).toContainText(
         'Recent image 1'
       );
@@ -190,7 +190,7 @@ for (const locale of ['en', 'ru'] as const) {
       await backgroundTab.click();
       await trigger.click();
       await popup.locator(`[data-asset-id="${prefix}-0"]`).click();
-      await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-0$`));
+      await expect(page).toHaveURL((url) => url.searchParams.get('assetId') === `${prefix}-0`);
       await expect(backgroundTab).toHaveAttribute('aria-pressed', 'true');
       await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
       await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(2);
@@ -221,10 +221,10 @@ for (const locale of ['en', 'ru'] as const) {
         await page.mouse.up();
         await trigger.click();
         await popup.locator(`[data-asset-id="${prefix}-1"]`).click();
-        await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-1$`));
+        await expect(page).toHaveURL((url) => url.searchParams.get('assetId') === `${prefix}-1`);
         await trigger.click();
         await popup.locator(`[data-asset-id="${prefix}-0"]`).click();
-        await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-0$`));
+        await expect(page).toHaveURL((url) => url.searchParams.get('assetId') === `${prefix}-0`);
         await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(3);
         await page.locator('[data-ui="autosave-control"] > button').click();
         await page.getByRole('switch').locator('..').click();
@@ -263,7 +263,7 @@ for (const locale of ['en', 'ru'] as const) {
         await trigger.click();
         await popup.locator(`[data-asset-id="${prefix}-broken"]`).click();
         await expect(popup.getByRole('alert')).toBeVisible();
-        await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-0$`));
+        await expect(page).toHaveURL((url) => url.searchParams.get('assetId') === `${prefix}-0`);
         await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(3);
         await page.keyboard.press('Escape');
         const restoredCanvas = (await page
@@ -276,7 +276,7 @@ for (const locale of ['en', 'ru'] as const) {
         await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(4);
         await trigger.click();
         await popup.locator(`[data-asset-id="${prefix}-1"]`).click();
-        await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-1$`));
+        await expect(page).toHaveURL((url) => url.searchParams.get('assetId') === `${prefix}-1`);
         await trigger.click();
         await popup.locator(`[data-asset-id="${prefix}-0"]`).click();
         await expect(page.locator('[data-ui="editor.layers.list-viewport"] > div')).toHaveCount(4);
@@ -384,7 +384,7 @@ for (const viewport of [
       fullPage: false,
     });
     await fresh.click();
-    await expect(page).toHaveURL(new RegExp(`assetId=${prefix}-15$`));
+    await expect(page).toHaveURL((url) => url.searchParams.get('assetId') === `${prefix}-15`);
     await expect(popup).toHaveCount(0);
     await expect(page.locator('[data-ui="editor.floating.document-bar.title"]')).toContainText(
       'Recent image 15'

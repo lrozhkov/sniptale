@@ -2,6 +2,17 @@ import { buildDrawingStrokeOutline } from './freehand';
 import { buildDrawingArrowOutline, buildDrawingFreehandArrowLines } from './arrow';
 import type { DrawingBounds, DrawingObject, DrawingPoint, DrawingShapeObject } from './model';
 
+/** Projects a drawing point through an affine canvas transform. */
+export function transformDrawingPoint(
+  point: DrawingPoint,
+  transform: Pick<DOMMatrixReadOnly, 'a' | 'b' | 'c' | 'd' | 'e' | 'f'>
+): DrawingPoint {
+  return {
+    x: transform.a * point.x + transform.c * point.y + transform.e,
+    y: transform.b * point.x + transform.d * point.y + transform.f,
+  };
+}
+
 export type DrawingResizeHandle =
   | 'nw'
   | 'n'

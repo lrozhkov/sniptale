@@ -1,5 +1,5 @@
 import { inkParts } from './structure.mjs';
-import { intersect } from './compact-contours.mjs';
+import { intersects as intersect } from './structure-topology.mjs';
 
 // Require a repeated, lower-contrast separator between three independent labels.
 // This context distinguishes the marks from angle operators in ordinary text.

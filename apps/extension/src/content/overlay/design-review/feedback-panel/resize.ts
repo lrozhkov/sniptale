@@ -27,7 +27,6 @@ export function useFeedbackPanelResize(
   const heightRef = useRef(height);
   const gestureRef = useRef<{
     pointerId: number;
-    target: HTMLElement;
     origin: number;
     resized: boolean;
   } | null>(null);
@@ -66,9 +65,6 @@ export function useFeedbackPanelResize(
     gestureRef.current = null;
     cancelDrag();
     if (!gesture) return;
-    if (gesture.target.hasPointerCapture?.(gesture.pointerId)) {
-      gesture.target.releasePointerCapture(gesture.pointerId);
-    }
     setResized(gesture.resized);
     updateHeight(gesture.origin);
   }, [cancelDrag, updateHeight]);
@@ -101,16 +97,6 @@ export function useFeedbackPanelResize(
       window.removeEventListener('resize', measure);
     };
   }, [open, panelRef, cancelResize, updateHeight]);
-  useLayoutEffect(
-    () => () => {
-      const gesture = gestureRef.current;
-      gestureRef.current = null;
-      if (gesture?.target.hasPointerCapture?.(gesture.pointerId)) {
-        gesture.target.releasePointerCapture(gesture.pointerId);
-      }
-    },
-    []
-  );
   return {
     height,
     ariaHeight,
@@ -122,7 +108,6 @@ export function useFeedbackPanelResize(
       drag.onPointerDown(event);
       gestureRef.current = {
         pointerId: event.pointerId,
-        target: event.currentTarget,
         origin: panelRef.current?.offsetHeight || heightRef.current,
         resized,
       };

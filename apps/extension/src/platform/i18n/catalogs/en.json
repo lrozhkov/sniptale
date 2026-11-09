@@ -5402,7 +5402,7 @@
       "hideFeedbackPanel": "Hide feedback list",
       "panelTitle": "Feedback",
       "panelClose": "Close feedback list",
-      "panelSearch": "Find feedback",
+      "panelSearch": "Find feedback on this site",
       "panelFilter": "Filter by action",
       "panelFilterAll": "All actions",
       "panelEmpty": "Select a page element and add the first feedback item.",

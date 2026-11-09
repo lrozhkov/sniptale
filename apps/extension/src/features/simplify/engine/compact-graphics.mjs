@@ -1,8 +1,6 @@
 import { inkParts } from './structure.mjs';
+import { bounds, contains, intersects as intersect } from './structure-topology.mjs';
 import {
-  bounds,
-  contains,
-  intersect,
   grid,
   arrowBracket,
   listDiagram,
@@ -20,14 +18,7 @@ import {
 import { splitRepeatedChevron } from './compact-separators.mjs';
 
 function splitGraphicPrefix(image, box, input, measure, protectedRects) {
-  if (
-    box.shape !== 'text' ||
-    !box.textConfidence ||
-    box.w < box.h * 3 ||
-    box.eraseFragments ||
-    box.textDecorations
-  )
-    return null;
+  if (!canSplitCaptionGraphic(box)) return null;
   const parts = inkParts(image, { ...box, atoms: null }).sort((a, b) => a.x - b.x || a.y - b.y);
   if (parts.length < 4) return null;
   const selection = graphicPrefixParts(image, box, parts);
@@ -57,12 +48,7 @@ function splitGraphicPrefix(image, box, input, measure, protectedRects) {
   if (unit < m.xHeight * 0.8 || Math.max(...selected.map((p) => p.h)) > m.xHeight * 1.8)
     return null;
   installCaptionMeasurement(remainder, m);
-  const sourceBounds = {
-    x: Math.max(box.x, tight.x - 1),
-    y: Math.max(box.y, tight.y - 1),
-    w: tight.w + 2,
-    h: tight.h + 2,
-  };
+  const sourceBounds = paddedGraphicSource(box, tight);
   const icon = {
     ...sourceBounds,
     bg: box.bg,
@@ -81,14 +67,7 @@ function splitGraphicPrefix(image, box, input, measure, protectedRects) {
 // A separate horizontal foot and an outlined diagonal shaft can form a compact
 // graphic after a coherent label. Both features must come from source pixels.
 function splitDiagonalSuffix(image, box, input, measure, protectedRects) {
-  if (
-    box.shape !== 'text' ||
-    !box.textConfidence ||
-    box.w < box.h * 3 ||
-    box.eraseFragments ||
-    box.textDecorations
-  )
-    return null;
+  if (!canSplitCaptionGraphic(box)) return null;
   const parts = inkParts(image, { ...box, atoms: null });
   for (const foot of parts)
     for (const shaft of parts) {
@@ -123,12 +102,7 @@ function splitDiagonalSuffix(image, box, input, measure, protectedRects) {
       )
         continue;
       installCaptionMeasurement(remainder, m);
-      const sourceBounds = {
-        x: Math.max(box.x, tight.x - 1),
-        y: Math.max(box.y, tight.y - 1),
-        w: tight.w + 2,
-        h: tight.h + 2,
-      };
+      const sourceBounds = paddedGraphicSource(box, tight);
       return [
         {
           ...sourceBounds,
@@ -202,14 +176,7 @@ function separateVerticalPointer(image, box, input, measure, protectedRects) {
 
 // A compact filled vertical pointer after a coherent caption has its own owner.
 function splitVerticalPointerSuffix(image, box, input, measure, protectedRects) {
-  if (
-    box.shape !== 'text' ||
-    !box.textConfidence ||
-    box.w < box.h * 3 ||
-    box.eraseFragments ||
-    box.textDecorations
-  )
-    return null;
+  if (!canSplitCaptionGraphic(box)) return null;
   const parts = inkParts(image, { ...box, atoms: null }).sort((a, b) => a.x - b.x),
     p = parts.at(-1);
   if (!p || parts.length < 4 || !filledVerticalPointer(image, p, box.bg)) return null;
@@ -567,4 +534,23 @@ function claimContourCandidate(image, input, used, i, candidates, measure, prote
     };
   }
   return null;
+}
+
+function canSplitCaptionGraphic(box) {
+  return !(
+    box.shape !== 'text' ||
+    !box.textConfidence ||
+    box.w < box.h * 3 ||
+    box.eraseFragments ||
+    box.textDecorations
+  );
+}
+
+function paddedGraphicSource(box, tight) {
+  return {
+    x: Math.max(box.x, tight.x - 1),
+    y: Math.max(box.y, tight.y - 1),
+    w: tight.w + 2,
+    h: tight.h + 2,
+  };
 }

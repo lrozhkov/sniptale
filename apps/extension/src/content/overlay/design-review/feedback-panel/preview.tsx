@@ -6,7 +6,7 @@ import { ensureContentUiMountTarget, useContentUiScale } from '../../../platform
 import { translate } from '../../../../platform/i18n';
 import type { BrowserDomAnnotationRecord } from '../../../parser/page-preparation/annotations';
 import { getDesignReviewActionOption, getDesignReviewActionTone } from '../action-catalog';
-import { getDesignReviewRecordAction } from '../records';
+import { getDesignReviewRecordAction, isDesignReviewRecordFromCurrentOrigin } from '../records';
 
 function positionPreview(anchor: HTMLElement, layer: HTMLElement, scale: number): void {
   const rect = anchor.getBoundingClientRect();
@@ -46,12 +46,7 @@ function positionPreview(anchor: HTMLElement, layer: HTMLElement, scale: number)
 export function FeedbackEvidenceText(props: { record: BrowserDomAnnotationRecord; text: string }) {
   const hostRef = useRef<HTMLSpanElement>(null);
   const privateRootRef = useRef<ShadowRoot | null>(null);
-  let foreign = true;
-  try {
-    foreign = new URL(props.record.evidence.pageUrl).origin !== location.origin;
-  } catch {
-    /* Unparseable saved origins do not grant page-readable access. */
-  }
+  const foreign = !isDesignReviewRecordFromCurrentOrigin(props.record);
   useLayoutEffect(() => {
     const host = hostRef.current;
     if (!foreign || !host) return;

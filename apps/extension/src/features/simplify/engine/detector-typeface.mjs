@@ -1,3 +1,4 @@
+import { colorDistanceAt } from './control-shapes.mjs';
 function measureTypefaceRows(image, boxes, final, glyphMetrics) {
   // The observed height of one line depends on its letters. Measure the ink
   // first, then share a scale where the source glyph evidence matches.
@@ -144,13 +145,7 @@ function createSkeletonMask(image, box) {
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++) {
       const i = ((box.y + y) * image.width + box.x + x) * 4;
-      if (
-        Math.max(
-          Math.abs(box.bg[0] - image.data[i]),
-          Math.abs(box.bg[1] - image.data[i + 1]),
-          Math.abs(box.bg[2] - image.data[i + 2])
-        ) > 90
-      ) {
+      if (colorDistanceAt(image.data, i, box.bg) > 90) {
         mask[y * w + x] = 1;
         ink++;
       }

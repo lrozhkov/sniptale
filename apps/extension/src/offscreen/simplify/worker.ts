@@ -1,4 +1,5 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { dataUrlToBlob } from '../../platform/media-utils/data-url';
 import { createSimplifyRaster, type SimplifyRaster } from '../../features/simplify/raster';
 import { parseSimplifySettings } from '../../features/simplify/settings';
 import { isSimplifyCommand } from '../../contracts/messaging/contracts/runtime/actions/simplify';
@@ -29,7 +30,7 @@ async function execute(command: OffscreenSimplifyCommand): Promise<SimplifyCompl
   if (command.operation === 'prepare') {
     const dimensions = readSimplifyPngDimensions(command.dataUrl);
     if (!dimensions || source) throw new Error('Invalid simplify source');
-    const blob = await (await fetch(command.dataUrl)).blob();
+    const blob = await dataUrlToBlob(command.dataUrl);
     const bitmap = await createImageBitmap(blob);
     try {
       if (bitmap.width !== dimensions.width || bitmap.height !== dimensions.height)

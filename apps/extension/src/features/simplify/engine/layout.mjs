@@ -1,3 +1,4 @@
+import { intersects, centerX, centerY, median } from './structure-topology.mjs';
 import {
   columnRuns,
   textBands,
@@ -9,14 +10,6 @@ import { compact, markRepeatedIcons, recoverMediaPeer } from './layout-peers.mjs
 import { inkParts, isDirectionalArrow } from './structure.mjs';
 // Refine already detected regions using local geometry and repeated visual peers.
 // Rectangle coordinates use image pixels. Inputs are never mutated.
-const intersects = (a, b) =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-const centerX = (b) => b.x + b.w / 2;
-const centerY = (b) => b.y + b.h / 2;
-const median = (a) => {
-  const s = [...a].sort((x, y) => x - y);
-  return s[Math.floor(s.length / 2)];
-};
 
 function clipText(box, obstacles) {
   let result = { ...box };

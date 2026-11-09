@@ -160,7 +160,8 @@ function safeHeadSource() {
     "import { ensurePublicHttpsHeadGuard } from './https-redirect-guard';",
     'function validatePublicHttpsUrl(value: string): URL {',
     '  const url = new URL(value);',
-    "  if (url.protocol !== 'https:' || url.username || url.password || isPrivateNetworkHost(url.hostname)) throw new Error('blocked');",
+    "  if (url.protocol !== 'https:' || url.username || url.password || " +
+      "isPrivateNetworkHost(url.hostname)) throw new Error('blocked');",
     '  return url;',
     '}',
     'export async function resolvePublicHttpsRedirect(address: URL, signal: AbortSignal,',

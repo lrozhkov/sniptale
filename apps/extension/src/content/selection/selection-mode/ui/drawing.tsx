@@ -1,3 +1,4 @@
+import { setUIHidden } from '../../locker';
 import { createContentSimplifyDependencies } from '../../../drawing/simplify';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import { readSimplifyPngDimensions } from '../../../../contracts/messaging/contracts/runtime-message/simplify.types';
@@ -72,6 +73,7 @@ export function createSelectionDrawingRuntime(options: {
 }) {
   const history = createCropDrawingHistory();
   const dependencies = createContentSimplifyDependencies({
+    setUIHidden,
     services: getContentRuntimeServices(),
     getBounds: () => ({
       ...getDrawingViewportProjection({ kind: 'viewport', element: null }),

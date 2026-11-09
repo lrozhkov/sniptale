@@ -5,7 +5,7 @@ import type {
 } from '../../../../document/canvas-surface/render-region';
 import { readFrameAnnotationSnapshot } from '../../../../frame-annotation/proxy';
 
-const geometryKeys = new Set([
+const geometryKeys: readonly string[] = [
   'transform',
   'translate',
   'scale',
@@ -14,7 +14,7 @@ const geometryKeys = new Set([
   'top',
   'width',
   'height',
-]);
+];
 
 function hasActiveGeometryAnimation(element: HTMLElement): boolean {
   return element
@@ -25,7 +25,7 @@ function hasActiveGeometryAnimation(element: HTMLElement): boolean {
         animation.effect instanceof KeyframeEffect &&
         animation.effect
           .getKeyframes()
-          .some((frame) => Object.keys(frame).some((key) => geometryKeys.has(key)))
+          .some((frame) => Object.keys(frame).some((key) => geometryKeys.includes(key)))
     );
 }
 

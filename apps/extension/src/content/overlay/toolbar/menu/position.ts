@@ -1,3 +1,5 @@
+import { resolveToolbarDropdownState } from './dropdown';
+
 import {
   projectClientRectToContentUi,
   readContentUiScaleCompensation,
@@ -31,4 +33,19 @@ export function getToolbarMenuPosition(
   return spaceBelow < menuHeight + TOOLBAR_MENU_VERTICAL_CLEARANCE_PX && spaceAbove > spaceBelow
     ? 'up'
     : 'down';
+}
+
+/** Resolves the shared end-aligned layout for recording toolbar menus. */
+export function resolveRecordingToolbarMenuLayout(
+  args: Pick<
+    Parameters<typeof resolveToolbarDropdownState>[0],
+    'anchorRef' | 'displayMode' | 'menuHeight' | 'menuWidth'
+  >
+) {
+  const dropdown = resolveToolbarDropdownState({
+    ...args,
+    getMenuPosition: (ref, height = 280) => getToolbarMenuPosition(ref.current, height),
+    preferredAlign: 'end',
+  });
+  return { placement: dropdown.menuPlacement, style: dropdown.style };
 }

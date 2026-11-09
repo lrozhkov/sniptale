@@ -2,6 +2,7 @@ import { createDefaultSimplifySettings } from '../simplify/settings';
 import { expect, it } from 'vitest';
 import {
   createDrawingBounds,
+  transformDrawingPoint,
   findDrawingObjectsIntersectingPath,
   getDrawingObjectBounds,
   getDrawingShapePoints,
@@ -387,3 +388,19 @@ it(
     });
   }
 );
+
+it('projects drawing points with translation, scale and skew', () => {
+  expect(
+    transformDrawingPoint(
+      { x: 4, y: 7 },
+      {
+        a: 2,
+        b: -1,
+        c: 3,
+        d: 0.5,
+        e: 11,
+        f: -6,
+      }
+    )
+  ).toEqual({ x: 40, y: -6.5 });
+});

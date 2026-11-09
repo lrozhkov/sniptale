@@ -1,5 +1,5 @@
-import { translate } from '../../../platform/i18n';
 // @vitest-environment jsdom
+import { translate } from '../../../platform/i18n';
 
 import type React from 'react';
 import { act } from 'react';

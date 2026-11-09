@@ -1,3 +1,4 @@
+import { horizontalEdgeCount } from './media-surfaces.mjs';
 // Light panels need a contrasting surround and a connected dark object.
 // Clipped frames need both sides to continue to the raster edge.
 const CARDINAL_LEFT = [
@@ -292,17 +293,7 @@ function hasRepeatedFrameTextBands(image, y, left, right, boxWidth) {
   const bands = [];
   let bandStart = -1;
   for (let yy = y; yy < height; yy++) {
-    let edges = 0;
-    for (let xx = left; xx < right - 1; xx++) {
-      const i = (yy * width + xx) * 4;
-      if (
-        Math.abs(data[i] - data[i + 4]) +
-          Math.abs(data[i + 1] - data[i + 5]) +
-          Math.abs(data[i + 2] - data[i + 6]) >
-        45
-      )
-        edges++;
-    }
+    const edges = horizontalEdgeCount(data, width, yy, left, right - 1);
     if (edges > Math.max(3, boxWidth * 0.012)) {
       if (bandStart < 0) bandStart = yy;
     } else if (bandStart >= 0) {

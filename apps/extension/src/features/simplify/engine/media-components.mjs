@@ -57,32 +57,14 @@ export function darkComponents(image, queue) {
     if (data[i * 4 + 3] > 128 && Math.min(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]) < 225)
       mask[i] = 1;
   for (let k = mask.indexOf(1); k !== -1; k = mask.indexOf(1, k + 1)) {
-    let head = 0,
-      tail = 1,
-      left = width,
-      right = 0,
-      top = height,
-      bottom = 0;
-    queue[0] = k;
-    mask[k] = 0;
-    while (head < tail) {
-      const p = queue[head++],
-        x = p % width,
-        y = Math.floor(p / width);
-      left = Math.min(left, x);
-      right = Math.max(right, x);
-      top = Math.min(top, y);
-      bottom = Math.max(bottom, y);
-      for (const [dx, dy] of CARDINAL_RIGHT) {
-        const xx = x + dx,
-          yy = y + dy,
-          j = yy * width + xx;
-        if (xx >= 0 && xx < width && yy >= 0 && yy < height && mask[j]) {
-          mask[j] = 0;
-          queue[tail++] = j;
-        }
-      }
-    }
+    const { tail, left, right, top, bottom } = traceClearedMediaComponent(
+      mask,
+      width,
+      height,
+      k,
+      queue,
+      true
+    );
     const w = right - left + 1,
       h = bottom - top + 1;
     // Neither consumer can accept a component smaller than this support.
@@ -335,4 +317,35 @@ function appendSmallImageComponent(image, part, components, merged) {
     circle,
     textured,
   });
+}
+
+/** Trace one cardinal component, clearing visits and preserving the requested queue order. */
+export function traceClearedMediaComponent(mask, width, height, k, queue, rightFirst = false) {
+  let head = 0,
+    tail = 1,
+    left = width,
+    right = 0,
+    top = height,
+    bottom = 0;
+  queue[0] = k;
+  mask[k] = 0;
+  while (head < tail) {
+    const p = queue[head++],
+      x = p % width,
+      y = Math.floor(p / width);
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+    top = Math.min(top, y);
+    bottom = Math.max(bottom, y);
+    for (const [dx, dy] of rightFirst ? CARDINAL_RIGHT : CARDINAL_LEFT) {
+      const xx = x + dx,
+        yy = y + dy,
+        n = yy * width + xx;
+      if (xx >= 0 && yy >= 0 && xx < width && yy < height && mask[n]) {
+        mask[n] = 0;
+        queue[tail++] = n;
+      }
+    }
+  }
+  return { tail, left, right, top, bottom };
 }

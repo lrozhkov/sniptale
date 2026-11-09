@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=3, tool-noise=70.
-- Enforced source: codeql=8, gitleaks=62, license=1, scc=2.
+- Classification: accepted-architecture=3, tool-noise=68.
+- Enforced source: codeql=6, gitleaks=62, license=1, scc=2.
 
 ## Active decisions
 
@@ -25,7 +25,7 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `accepted.license.eslint-plugin-sonarjs` — repository-owner: A copyleft development dependency could be mistaken for shipped artifact content if packaging boundaries drift. Action: Remove the exception when eslint-plugin-sonarjs is removed, relicensed, or included in a distributed artifact. Review: 2027-07-12.
 - `accepted.scc.editor-document-annotation-import` — apps/extension/src/editor: A broader owner allowance could conceal controller back-dependencies or real module/authority cycles; only these two exact composition edges are accepted. Action: Keep only the exact document import/annotation validation composition. Remove or review the record when those edges or their authority change. Review: 2027-09-01.
 - `noise.codeql.snapshot-literal-fragment-href` — web-snapshot: A broader exception could conceal executable URL or raw HTML sinks; only this exact rule, location, source and message are admitted. Action: Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification. Review: 2027-08-23.
-- `accepted.scc.content-crop-drawing-controls` — content-selection-overlay: A broad SCC allowance could conceal new controller back-dependencies or module and authority cycles. Only the exact two reviewed owner edges are accepted. Action: Keep the shared crop drawing controls and caller-owned interaction contract. Remove or review the decision when these edges or their authority change. Review: 2027-09-01.
+- `accepted.scc.content-review-selection-composition` — content-review-selection-overlay: A broad component allowance could hide new dependency or authority cycles. This record accepts only these exact three owners and six edges. Action: Keep workflow composition and selection interaction ownership explicit. Recheck the exact graph when these edges or their authority change. Review: 2027-02-09.
 - `noise.codeql.catalog-refresh-flight-identity` — background-ai-catalog: Awaiting the comparison operand would leave completed work registered and prevent later refresh attempts. Action: Retain only the recorded rule, location, source hash, and message hash. Review any drift before retaining this entry. Review: 2027-04-29.
 - `noise.gitleaks.webdav-clone-pair.40` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
 - `noise.gitleaks.webdav-clone-pair.77` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
@@ -79,6 +79,4 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `noise.gitleaks.webdav-clone-pair.1853` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
 - `noise.gitleaks.webdav-clone-pair.1890` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
 - `noise.gitleaks.webdav-clone-pair.1927` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
-- `noise.codeql.archive-source-transformer` — archive-transfer: Removing the transformer would remove stream validation. The exception must stay limited to this exact source, location, rule and message. Action: Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception. Review: 2027-05-02.
-- `noise.codeql.remote-integrity-transformer` — sync-transfer: Removing the transformer would remove stream validation. The exception must stay limited to this exact source, location, rule and message. Action: Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception. Review: 2027-05-02.
-- `noise.codeql.transform-stream-webdav` — sync-transfer-webdav: Removing this transformer would remove byte-limit or source-integrity enforcement. Action: Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking. Review: 2027-05-02.
+- `noise.codeql.simplify-private-worker-message` — offscreen-simplify: A Window origin comparison would reject valid dedicated-worker port delivery. A broader allowance could hide a future public message ingress. Action: Keep only this exact reviewed private-worker finding. Recheck scope and source evidence on any drift. Review: 2027-02-09.

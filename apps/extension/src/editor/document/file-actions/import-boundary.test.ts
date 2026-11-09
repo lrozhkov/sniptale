@@ -1,5 +1,5 @@
-import { parseImportedEditorDocument } from './import-session';
 // @vitest-environment jsdom
+import { parseImportedEditorDocument } from './import-session';
 
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import {

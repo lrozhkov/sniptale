@@ -793,6 +793,6 @@ it('does not expose foreign page metadata through synthetic search probes', () =
     ).map((element) => element.getAttribute('data-annotation-id'));
   };
   const unmatched = probe('unmatched-probe-c63d');
-  expect(probe('private-session-7e9c')).toEqual(unmatched);
-  expect(probe('Private capture label f8a2')).toEqual(unmatched);
+  for (const value of Object.values({ ...evidence, comment: 'Keep this feedback' }))
+    if (typeof value === 'string') expect(probe(value)).toEqual(unmatched);
 });

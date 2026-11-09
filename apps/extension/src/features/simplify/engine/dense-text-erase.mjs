@@ -29,10 +29,7 @@ export function denseTextErase(image, box, bounds, plane) {
       bin.color[2] += b;
       bins.set(key, bin);
     }
-  const palette = [...bins.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
-    .map((b) => b.color.map((v) => v / b.count));
+  const palette = textErasePalette(bins);
   const core = new Uint8Array(size),
     mask = new Uint8Array(size);
   seedDenseTextCore(pixels, count, inside, delta, offsets, red, green, blue, slots, palette, core);
@@ -193,4 +190,12 @@ function completeDenseTextFringe(
       fringe[k] = 1;
   }
   mask.set(fringe);
+}
+
+/** Return the six most populated text-ink bins as mean RGB colors. */
+export function textErasePalette(bins) {
+  return [...bins.values()]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
+    .map((b) => b.color.map((v) => v / b.count));
 }

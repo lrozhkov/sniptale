@@ -14,6 +14,7 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => {
     translate: (key: string) =>
       ({
         'editor.scene.placementSection': 'Placement',
+        'editor.compact.canvasSize': 'Canvas size',
       })[key] ?? key,
   };
 });
@@ -133,7 +134,7 @@ it('renders placement controls without a duplicated header value and forwards la
   );
 
   expect(container?.querySelector('[data-testid="select-field"]')?.textContent).toContain(
-    'Placement'
+    'Canvas size'
   );
   expect(container?.querySelector('[data-testid="select-field"]')?.textContent).toContain(
     'Fit image'
@@ -141,7 +142,7 @@ it('renders placement controls without a duplicated header value and forwards la
   expect(container?.querySelector('[data-testid="mode-buttons"]')).toBeNull();
   expect(
     container?.querySelector('[data-testid="select-field-trigger"]')?.getAttribute('aria-label')
-  ).toBe('Placement');
+  ).toBe('Canvas size');
   expect(container?.querySelector('[data-testid="select-field"]')?.textContent).not.toContain(
     'current canvas'
   );
@@ -225,7 +226,7 @@ it('omits only the section header when embedded beside additional scene paramete
   expect(container!.querySelector('[data-testid="panel-section"] > span')).toBeNull();
   expect(
     container!.querySelector('[data-testid="select-field-trigger"]')!.getAttribute('aria-label')
-  ).toBe('Placement');
+  ).toBe('Canvas size');
   expect(container!.querySelector('[data-testid="adjacent-parameter"]')!.textContent).toBe(
     'Padding'
   );

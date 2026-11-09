@@ -1,5 +1,5 @@
-import { prepareAppliedDocument } from './prepare-applied';
 // @vitest-environment jsdom
+import { prepareAppliedDocument } from './prepare-applied';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultRichShapeObject } from '../../../features/editor/document/rich-shape';

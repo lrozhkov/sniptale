@@ -1,7 +1,12 @@
-import { bounds, inkParts, confirmedText } from './structure-topology.mjs';
-const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
-const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-const centerY = (b) => b.y + b.h / 2;
+import {
+  median,
+  centerY,
+  intersects as overlaps,
+  bounds,
+  inkParts,
+  confirmedText,
+} from './structure-topology.mjs';
+import { colorDistanceAt } from './control-shapes.mjs';
 
 export function continuationGlyphParts(image, a, b, boxes, measure, obstacles) {
   const roi = continuationGutter(a, b, boxes, obstacles);
@@ -82,13 +87,7 @@ function hasBadgeCapsule(image, box, glyph) {
   const similar = (x, y) => {
     if (x < 0 || y < 0 || x >= image.width || y >= image.height) return false;
     const i = (y * image.width + x) * 4;
-    return (
-      Math.max(
-        Math.abs(box.bg[0] - image.data[i]),
-        Math.abs(box.bg[1] - image.data[i + 1]),
-        Math.abs(box.bg[2] - image.data[i + 2])
-      ) <= 7
-    );
+    return colorDistanceAt(image.data, i, box.bg) <= 7;
   };
   let start = null;
   for (let y = glyph.y; y < glyph.y + glyph.h && !start; y++)

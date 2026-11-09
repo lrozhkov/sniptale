@@ -342,26 +342,27 @@
       "targetAction": "Retain the exact reviewed behavior and deterministic proof; any source, location or message drift requires renewed classification."
     },
     {
-      "id": "accepted.scc.content-crop-drawing-controls",
+      "id": "accepted.scc.content-review-selection-composition",
       "classification": "accepted-architecture",
-      "owner": "content-selection-overlay",
-      "risk": "A broad SCC allowance could conceal new controller back-dependencies or module and authority cycles. Only the exact two reviewed owner edges are accepted.",
-      "reason": "Allowed composition: overlay composes selection workflows. Crop selection UI reuses toolbar drawing controls through ToolbarDrawingControlsOwner and borrows floating menu geometry. These exact two owner edges have no module cycle and introduce no second mode, persistence, or runtime authority.",
-      "removalCondition": "Remove when either exact owner edge disappears. Reassess added owner edges, module cycles, or changed interaction and state authority before retaining this composition.",
-      "reviewBy": "2027-09-01",
+      "owner": "content-review-selection-overlay",
+      "risk": "A broad component allowance could hide new dependency or authority cycles. This record accepts only these exact three owners and six edges.",
+      "reason": "Allowed composition: Application workflows compose review projection, finalization and selection mode. Overlay and selection UI consume those workflows; crop selection reuses overlay drawing controls. These exact six owner edges have no module cycle and retain the existing session, navigation-lock and persistence authorities.",
+      "removalCondition": "Remove when any exact edge disappears. Reassess added owner edges, module cycles, or changed workflow and state authority before retaining this composition.",
+      "reviewBy": "2027-02-09",
       "source": {
         "kind": "scc",
-        "key": "content-crop-drawing-controls"
+        "key": "content-review-selection-composition"
       },
       "scope": {
-        "edgeDigest": "34e380f5de3ff8a51bfde355d1b6ff3781b9acaea18604ade604cb159e5793f6",
-        "id": "content-crop-drawing-controls",
+        "edgeDigest": "074f12e37e8718ff2f9d284a30d2d41d1e32e12b0cace6ad632af9c0507ff961",
+        "id": "content-review-selection-composition",
         "owners": [
+          "apps/extension/src/content/application",
           "apps/extension/src/content/overlay",
           "apps/extension/src/content/selection"
         ]
       },
-      "targetAction": "Keep the shared crop drawing controls and caller-owned interaction contract. Remove or review the decision when these edges or their authority change."
+      "targetAction": "Keep workflow composition and selection interaction ownership explicit. Recheck the exact graph when these edges or their authority change."
     },
     {
       "id": "noise.codeql.catalog-refresh-flight-identity",
@@ -1477,67 +1478,25 @@
       "targetAction": "Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings."
     },
     {
-      "id": "noise.codeql.archive-source-transformer",
+      "id": "noise.codeql.simplify-private-worker-message",
       "classification": "tool-noise",
-      "owner": "archive-transfer",
-      "risk": "Removing the transformer would remove stream validation. The exception must stay limited to this exact source, location, rule and message.",
-      "reason": "The pinned CodeQL extern web/streamsapi.js:43 declares TransformStream with no parameters. The pinned TypeScript DOM declaration accepts a transformer object. This call passes one transformer argument. archive.test.ts proves successful byte-preserving copy and rejects a streamed source with a mismatched declared size. The 148 focused archive, WebDAV and residency-copy tests passed.",
-      "removalCondition": "Remove when the pinned CodeQL extern declares the constructor parameters or this exact transformer call changes.",
-      "reviewBy": "2027-05-02",
+      "owner": "offscreen-simplify",
+      "risk": "A Window origin comparison would reject valid dedicated-worker port delivery. A broader allowance could hide a future public message ingress.",
+      "reason": "Offscreen constructs and privately retains the bundled dedicated Worker. Its implicit entangled MessagePort receives only creator-handle messages, not Window postMessage traffic. Port delivery leaves origin empty. Worker tests prove valid empty-origin delivery and reject malformed or external image commands before decoding; the native product Worker flow verifies the bundled runtime. The receiver retains exact command and session validation.",
+      "removalCondition": "Remove when CodeQL models dedicated-worker ports, this exact finding disappears, or transport changes to a public Window or shared-worker receiver. Reassess any creator-handle exposure or command authority change.",
+      "reviewBy": "2027-02-09",
       "source": {
         "kind": "codeql",
-        "key": "js/superfluous-trailing-arguments:apps/extension/src/composition/archive-transfer/writer.ts:38:88ba3700c4af5da36e8a9f67053af2510220849726b2c8ac2fd3f55535df5010:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
+        "key": "js/missing-origin-check:apps/extension/src/offscreen/simplify/worker.ts:84:e65d1c1a7aa488d07068360b4cdc86b0507ec4765282d446566b4c68c80b781b:69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1"
       },
       "scope": {
-        "contentHash": "88ba3700c4af5da36e8a9f67053af2510220849726b2c8ac2fd3f55535df5010",
-        "file": "apps/extension/src/composition/archive-transfer/writer.ts",
-        "line": 38,
-        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-        "rule": "js/superfluous-trailing-arguments"
+        "contentHash": "e65d1c1a7aa488d07068360b4cdc86b0507ec4765282d446566b4c68c80b781b",
+        "file": "apps/extension/src/offscreen/simplify/worker.ts",
+        "line": 84,
+        "messageHash": "69516df2e0eea00d6d2a9703efd669880aab7bf5852bf7c23728240773eb63c1",
+        "rule": "js/missing-origin-check"
       },
-      "targetAction": "Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception."
-    },
-    {
-      "id": "noise.codeql.remote-integrity-transformer",
-      "classification": "tool-noise",
-      "owner": "sync-transfer",
-      "risk": "Removing the transformer would remove stream validation. The exception must stay limited to this exact source, location, rule and message.",
-      "reason": "The pinned CodeQL extern web/streamsapi.js:43 declares TransformStream with no parameters. The pinned TypeScript DOM declaration accepts a transformer object. This call passes one transformer argument. residency-copy.test.ts refuses corrupt, short and oversized remote bytes. The 148 focused archive, WebDAV and residency-copy tests passed.",
-      "removalCondition": "Remove when the pinned CodeQL extern declares the constructor parameters or this exact transformer call changes.",
-      "reviewBy": "2027-05-02",
-      "source": {
-        "kind": "codeql",
-        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts:16:0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
-      },
-      "scope": {
-        "contentHash": "0fe363810f9724cef256b6f667ddfb153c1339427cac93dfda0135c2295a3705",
-        "file": "apps/extension/src/workflows/sync-transfer/remote-object-integrity.ts",
-        "line": 16,
-        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-        "rule": "js/superfluous-trailing-arguments"
-      },
-      "targetAction": "Keep the validated transformer and its byte-limit tests. Review source, location, message and model changes before retaining this exact exception."
-    },
-    {
-      "id": "noise.codeql.transform-stream-webdav",
-      "classification": "tool-noise",
-      "owner": "sync-transfer-webdav",
-      "risk": "Removing this transformer would remove byte-limit or source-integrity enforcement.",
-      "reason": "The CodeQL streamsapi.js extern declares TransformStream with zero parameters. The standard constructor accepts the transformer argument used here. Existing stream tests exercise its callbacks and rejection paths.",
-      "removalCondition": "Remove when CodeQL models the standard transformer parameter or this exact constructor call changes.",
-      "reviewBy": "2027-05-02",
-      "source": {
-        "kind": "codeql",
-        "key": "js/superfluous-trailing-arguments:apps/extension/src/workflows/sync-transfer/webdav.ts:288:199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4:6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b"
-      },
-      "scope": {
-        "contentHash": "199cd281dddb6a1d543c5566ecc3a3ad30faf1befa711efcbfdba61d30ecebd4",
-        "file": "apps/extension/src/workflows/sync-transfer/webdav.ts",
-        "line": 288,
-        "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",
-        "rule": "js/superfluous-trailing-arguments"
-      },
-      "targetAction": "Retain only this exact rule, location, source hash and message hash. Keep all other findings blocking."
+      "targetAction": "Keep only this exact reviewed private-worker finding. Recheck scope and source evidence on any drift."
     }
   ]
 }

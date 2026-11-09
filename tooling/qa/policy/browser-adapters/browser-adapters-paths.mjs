@@ -16,6 +16,10 @@ const BROWSER_ADAPTER_ALLOWED_FILES = new Set([
   // adapters are unavailable. It grants and observes the real browser tab/message contract.
   // Remove when this fixture no longer performs browser-context setup directly.
   'tooling/test/e2e/extension-critical/extension-critical-page-toolbar.helpers.ts',
+  // Exact tool-noise: popup.evaluate seeds captureAction in the real browser settings mirror.
+  // Product storage adapters cannot execute in this browser test context.
+  // Remove when native Simplify capture no longer requires this setup.
+  'tooling/test/e2e/extension-critical/extension-critical-simplify-native.helpers.ts',
 ]);
 
 export function normalizeBrowserAdapterPath(relativePath) {

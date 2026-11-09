@@ -1,8 +1,4 @@
 import React from 'react';
-import type {
-  StepBadgeManualPlacement,
-  StepBadgeSettings,
-} from '../../../features/highlighter/contracts';
 import type { StepBadgeFrameRect } from '../../../features/highlighter/frame-annotation/step-badge/placement';
 import { FrameStepBadgeInteractiveSurface } from '../../../features/highlighter/frame-annotation/step-badge/interactive-surface';
 import { FrameStepBadgeSurface } from '../../../features/highlighter/frame-annotation/step-badge-surface';
@@ -13,24 +9,25 @@ import {
 } from '../interactive-frame/layout/portal';
 import { useContentUiScale } from '../../platform/dom-host';
 
-interface StepBadgeProps {
-  settings: StepBadgeSettings;
-  borderColor: string;
-  borderWidth: number;
-  fillColor?: string;
-  shadow?: number;
+type StepBadgeProps = Pick<
+  React.ComponentProps<typeof FrameStepBadgeInteractiveSurface>,
+  | 'settings'
+  | 'borderColor'
+  | 'borderWidth'
+  | 'fillColor'
+  | 'shadow'
+  | 'isSettingsOpen'
+  | 'onClick'
+  | 'onPositionChange'
+  | 'onFramePositionChange'
+  | 'onSettingsClick'
+  | 'onValueChange'
+  | 'onDelete'
+  | 'settingsAnchorRef'
+> & {
   frameRect?: StepBadgeFrameRect;
-  isSettingsOpen?: boolean;
-  onClick?: () => void;
-  onPositionChange?: (placement: StepBadgeManualPlacement) => void;
-  onFramePositionChange?: (point: { x: number; y: number }) => void;
-  onSettingsClick?: () => void;
-  onValueChange?: (value: string) => void;
-  onDelete?: () => void;
-  settingsAnchorRef?: React.RefObject<HTMLButtonElement | null>;
   showSettingsHandle?: boolean;
-}
-
+};
 /** Content adapter for the shared badge surface and page-owned portal. */
 export const StepBadge: React.FC<StepBadgeProps> = (props) => {
   const portalTheme = useContentPortalTheme();

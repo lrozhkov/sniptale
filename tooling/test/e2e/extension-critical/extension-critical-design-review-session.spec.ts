@@ -4,6 +4,7 @@ import { expect, test as extensionTest } from '../support/extension-fixture';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
+import { proveFeedbackSearchInputOwnership } from './extension-critical-design-review-search.helpers';
 
 const test = extensionTest.extend({
   launchedExtension: [
@@ -139,7 +140,8 @@ async function proveFooterUndo(args: {
   await expect(undo).toHaveCount(0);
   const iconSizes = await footer
     .locator(
-      '[data-ui="content.design-review.feedback-export.download"], [data-ui="content.design-review.feedback-export.pdf"]'
+      '[data-ui="content.design-review.feedback-export.download"], ' +
+        '[data-ui="content.design-review.feedback-export.pdf"]'
     )
     .evaluateAll((buttons) =>
       buttons.map((button) => {
@@ -458,6 +460,7 @@ with more detail kept in the preview.`
   );
   await input.fill('Compact feedback 1');
   await expect(rows).toHaveCount(1);
+  await proveFeedbackSearchInputOwnership(panel);
   await page.screenshot({ path: info.outputPath('compact-panel-search.png'), fullPage: false });
   await input.press('Escape');
   await expect(input).toHaveCount(0);

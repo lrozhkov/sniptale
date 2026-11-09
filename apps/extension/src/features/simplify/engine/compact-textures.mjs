@@ -1,4 +1,4 @@
-import { bounds, intersect } from './compact-contours.mjs';
+import { bounds, intersects as intersect } from './structure-topology.mjs';
 
 function componentForeground(image, box, points) {
   const colors = points.map((p) => {
@@ -442,35 +442,7 @@ function orthogonalParts(image, box) {
     }
   for (let i = 0; i < mask.length; i++) {
     if (!mask[i]) continue;
-    const q = [i];
-    mask[i] = 0;
-    let left = w,
-      right = 0,
-      top = h,
-      bottom = 0;
-    for (let n = 0; n < q.length; n++) {
-      const p = q[n],
-        x = p % w,
-        y = Math.floor(p / w);
-      left = Math.min(left, x);
-      right = Math.max(right, x);
-      top = Math.min(top, y);
-      bottom = Math.max(bottom, y);
-      for (const [dx, dy] of [
-        [0, -1],
-        [0, 1],
-        [-1, 0],
-        [1, 0],
-      ]) {
-        const xx = x + dx,
-          yy = y + dy,
-          j = yy * w + xx;
-        if (xx >= 0 && xx < w && yy >= 0 && yy < h && mask[j]) {
-          mask[j] = 0;
-          q.push(j);
-        }
-      }
-    }
+    const { q, left, right, top, bottom } = textureComponent(mask, w, h, i);
     if (q.length >= 3)
       parts.push({
         x: box.x + left,

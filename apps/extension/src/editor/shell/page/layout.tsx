@@ -25,6 +25,15 @@ const editorOpenLoadingCardClassName = [
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
+function EditorOpenLoadingCard() {
+  return (
+    <div className={editorOpenLoadingCardClassName}>
+      <LoaderCircle aria-hidden="true" className="size-5 animate-spin motion-reduce:animate-none" />
+      <span>{translate('editor.page.loadingImage')}</span>
+    </div>
+  );
+}
+
 const editorOpenErrorClassName = [
   'absolute inset-x-4 top-4 z-50 mx-auto max-w-lg',
   'rounded-[4px] border border-[var(--sniptale-color-border-soft)] p-4 shadow-lg',
@@ -116,13 +125,7 @@ export function EditorPageLayout(props: {
           role="status"
           aria-live="polite"
         >
-          <div className={editorOpenLoadingCardClassName}>
-            <LoaderCircle
-              aria-hidden="true"
-              className="size-5 animate-spin motion-reduce:animate-none"
-            />
-            <span>{translate('editor.page.loadingImage')}</span>
-          </div>
+          <EditorOpenLoadingCard />
         </div>
       ) : null}
       {props.openStatus === 'loading' ? (
@@ -132,13 +135,7 @@ export function EditorPageLayout(props: {
           role="status"
           aria-live="polite"
         >
-          <div className={editorOpenLoadingCardClassName}>
-            <LoaderCircle
-              aria-hidden="true"
-              className="size-5 animate-spin motion-reduce:animate-none"
-            />
-            <span>{translate('editor.page.loadingImage')}</span>
-          </div>
+          <EditorOpenLoadingCard />
         </div>
       ) : null}
       {props.openStatus === 'error' ? (

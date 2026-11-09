@@ -143,20 +143,8 @@ function extendIllustrationRight(image, region, core, padding, limit) {
   ) {
     const reference = originalEndX + limit;
     if (reference >= width) continue;
-    const j = (yy * width + reference) * 4;
-    if (Math.min(data[j], data[j + 1], data[j + 2]) < 240) continue;
-    const differs = (xx) => {
-      const i = (yy * width + xx) * 4;
-      return (
-        Math.abs(data[i] - data[j]) +
-          Math.abs(data[i + 1] - data[j + 1]) +
-          Math.abs(data[i + 2] - data[j + 2]) >
-        15
-      );
-    };
-    let support = 0;
-    for (let xx = x; xx < endX; xx++) if (differs(xx)) support++;
-    if (support < w * 0.3) continue;
+    const differs = supportedIllustrationRow(data, width, yy, reference, x, endX, w);
+    if (!differs) continue;
     let candidate = originalEndX;
     for (let xx = originalEndX; xx < Math.min(width, originalEndX + limit); xx++) {
       if (!differs(xx)) break;
@@ -182,20 +170,8 @@ function extendIllustrationLeft(image, region, core, padding, limit) {
   ) {
     const reference = originalX - limit;
     if (reference < 0) continue;
-    const j = (yy * width + reference) * 4;
-    if (Math.min(data[j], data[j + 1], data[j + 2]) < 240) continue;
-    const differs = (xx) => {
-      const i = (yy * width + xx) * 4;
-      return (
-        Math.abs(data[i] - data[j]) +
-          Math.abs(data[i + 1] - data[j + 1]) +
-          Math.abs(data[i + 2] - data[j + 2]) >
-        15
-      );
-    };
-    let support = 0;
-    for (let xx = x; xx < endX; xx++) if (differs(xx)) support++;
-    if (support < w * 0.3) continue;
+    const differs = supportedIllustrationRow(data, width, yy, reference, x, endX, w);
+    if (!differs) continue;
     let candidate = originalX;
     for (let xx = originalX - 1; xx >= Math.max(0, originalX - limit); xx--) {
       if (!differs(xx)) break;
@@ -204,4 +180,21 @@ function extendIllustrationLeft(image, region, core, padding, limit) {
     x = Math.min(x, candidate);
   }
   return x;
+}
+
+function supportedIllustrationRow(data, width, y, reference, x, endX, w) {
+  const j = (y * width + reference) * 4;
+  if (Math.min(data[j], data[j + 1], data[j + 2]) < 240) return null;
+  const differs = (xx) => {
+    const i = (y * width + xx) * 4;
+    return (
+      Math.abs(data[i] - data[j]) +
+        Math.abs(data[i + 1] - data[j + 1]) +
+        Math.abs(data[i + 2] - data[j + 2]) >
+      15
+    );
+  };
+  let support = 0;
+  for (let xx = x; xx < endX; xx++) if (differs(xx)) support++;
+  return support < w * 0.3 ? null : differs;
 }

@@ -1,4 +1,44 @@
-const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+import { colorDistanceAt } from './control-shapes.mjs';
+/** Return the upper middle value without changing the input. */
+export const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+/** Test strict rectangle overlap in image coordinates. */
+export const intersects = (a, b) =>
+  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+/** Test containment with an optional outward margin. */
+export const contains = (a, b, pad = 0) =>
+  b.x >= a.x - pad &&
+  b.y >= a.y - pad &&
+  b.x + b.w <= a.x + a.w + pad &&
+  b.y + b.h <= a.y + a.h + pad;
+/** Return the lower and right rectangle edges. */
+export const bottom = (b) => b.y + b.h;
+export const right = (b) => b.x + b.w;
+/** Return the horizontal rectangle center. */
+export const centerX = (b) => b.x + b.w / 2;
+/** Return the vertical rectangle center. */
+export const centerY = (b) => b.y + b.h / 2;
+/** Bound a left-to-right pair without changing its horizontal endpoints. */
+export function orderedPairBounds(a, b) {
+  const y = Math.min(a.y, b.y);
+  return {
+    x: a.x,
+    y,
+    w: b.x + b.w - a.x,
+    h: Math.max(a.y + a.h, b.y + b.h) - y,
+  };
+}
+/** Measure peak background contrast over the original rectangle and channels. */
+export function peakContrast(image, box) {
+  let peak = 0;
+  for (let y = box.y; y < box.y + box.h; y++)
+    for (let x = box.x; x < box.x + box.w; x++) {
+      const i = (y * image.width + x) * 4;
+      peak = Math.max(peak, ...box.bg.map((v, c) => Math.abs(v - image.data[i + c])));
+    }
+  return peak;
+}
+
+/** Bound all source rectangles. */
 export function bounds(parts) {
   const x = Math.min(...parts.map((p) => p.x)),
     y = Math.min(...parts.map((p) => p.y));
@@ -282,14 +322,7 @@ function graphicInteriorHoles(image, box) {
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const i = ((box.y + y) * image.width + box.x + x) * 4;
-      if (
-        image.data[i + 3] >= 128 &&
-        Math.max(
-          Math.abs(box.bg[0] - image.data[i]),
-          Math.abs(box.bg[1] - image.data[i + 1]),
-          Math.abs(box.bg[2] - image.data[i + 2])
-        ) > 40
-      )
+      if (image.data[i + 3] >= 128 && colorDistanceAt(image.data, i, box.bg) > 40)
         mask[y * width + x] = 1;
     }
   for (let k = 0; k < mask.length; k++) {

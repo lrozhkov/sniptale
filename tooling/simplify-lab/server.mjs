@@ -67,21 +67,7 @@ async function bundleCurrent() {
   });
   const adapter = await build({
     ...common,
-    stdin: {
-      resolveDir: root,
-      sourcefile: 'simplify-lab-adapter.ts',
-      contents: `
-import {createSimplifyComputeClient} from './apps/extension/src/workflows/simplify/compute-client';
-import {createSimplifyService} from './apps/extension/src/offscreen/simplify/service';
-const service = createSimplifyService({createWorker: () => new Worker('/generated/worker.mjs', {type: 'module'})});
-export const compute = createSimplifyComputeClient({async send(request) {
-try { const command = request.operation === 'prepare' ? {...request, sessionId: crypto.randomUUID()} : request;
-return {success: true, ...await service.execute(command)};
-} catch {return {success: false};}
-}});
-window.addEventListener('pagehide', () => {compute.dispose();service.dispose();});
-`,
-    },
+    entryPoints: ['tooling/simplify-lab/adapter.mjs'],
     outfile: join(generated, 'adapter.mjs'),
   });
   const sources = {};
@@ -89,7 +75,6 @@ window.addEventListener('pagehide', () => {compute.dispose();service.dispose();}
     ...Object.keys(worker.metafile.inputs),
     ...Object.keys(adapter.metafile.inputs),
   ])) {
-    if (name === 'simplify-lab-adapter.ts') continue;
     sources[name] = sha256(await readFile(resolve(root, name)));
   }
   const sourceDigest = sha256(JSON.stringify(sources));

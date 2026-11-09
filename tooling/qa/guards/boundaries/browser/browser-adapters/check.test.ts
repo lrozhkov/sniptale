@@ -22,6 +22,19 @@ it('recognizes the exact native page-toolbar harness without allowing adjacent h
   ).toBe(false);
 });
 
+it('recognizes only the exact native Simplify storage setup helper', () => {
+  expect(
+    isBrowserAdapterAllowedPath(
+      'tooling/test/e2e/extension-critical/extension-critical-simplify-native.helpers.ts'
+    )
+  ).toBe(true);
+  expect(
+    isBrowserAdapterAllowedPath(
+      'tooling/test/e2e/extension-critical/extension-critical-simplify-other.helpers.ts'
+    )
+  ).toBe(false);
+});
+
 function expectBrowserGlobalViolations(root: string, files: string[]) {
   expect(collectBrowserAdapterViolations(files, { root })).toEqual([
     expect.objectContaining({

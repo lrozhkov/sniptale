@@ -1,3 +1,4 @@
+import { horizontalEdgeCount } from './media-surfaces.mjs';
 // A clipped frame can enclose a flat navigation surface. Require both a
 // dominant surface color and several independent, coherent glyph rows before
 // allowing its contents to participate in ordinary detection.
@@ -131,17 +132,7 @@ function panelEdgeBands(data, width, x0, y0, w, h) {
   const bands = [];
   let start = -1;
   for (let y = y0; y < y0 + h; y++) {
-    let edges = 0;
-    for (let x = x0 + 2; x < x0 + w - 3; x++) {
-      const i = (y * width + x) * 4;
-      if (
-        Math.abs(data[i] - data[i + 4]) +
-          Math.abs(data[i + 1] - data[i + 5]) +
-          Math.abs(data[i + 2] - data[i + 6]) >
-        45
-      )
-        edges++;
-    }
+    const edges = horizontalEdgeCount(data, width, y, x0 + 2, x0 + w - 3);
     if (edges > Math.max(3, w * 0.012)) {
       if (start < 0) start = y;
     } else if (start >= 0) {

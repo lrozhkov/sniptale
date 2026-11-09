@@ -1,5 +1,5 @@
-import { EditorInspectorFramePanel } from '../../scene/panel';
 // @vitest-environment jsdom
+import { EditorInspectorFramePanel } from '../../scene/panel';
 
 import React from 'react';
 import { act } from 'react';

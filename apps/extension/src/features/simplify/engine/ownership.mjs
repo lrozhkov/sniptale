@@ -1,3 +1,4 @@
+import { contains } from './structure-topology.mjs';
 import {
   resolveAtomCaptionConflicts,
   resolveConnectedCaptionClaims,
@@ -86,11 +87,6 @@ export function resolveSurfaceClaims(image, media, controls, measure) {
       ) ||
       boundedFill(b)
   );
-  const contains = (outer, inner, pad = 0) =>
-    inner.x >= outer.x - pad &&
-    inner.y >= outer.y - pad &&
-    inner.x + inner.w <= outer.x + outer.w + pad &&
-    inner.y + inner.h <= outer.y + outer.h + pad;
   const labels = controls.labels.filter((b) =>
     frames.some((f) => f.kind === 'control' && contains(f, b, 1))
   );
@@ -138,12 +134,6 @@ export function resolveSurfaceClaims(image, media, controls, measure) {
   });
   return { media: acceptedMedia, controls: { ...controls, boundaries: frames, labels } };
 }
-
-const contains = (a, b, pad = 0) =>
-  b.x >= a.x - pad &&
-  b.y >= a.y - pad &&
-  b.x + b.w <= a.x + a.w + pad &&
-  b.y + b.h <= a.y + a.h + pad;
 
 /** Resolve leaf ink ownership after proposal classification, on original pixels. */
 export function resolveForegroundClaims(

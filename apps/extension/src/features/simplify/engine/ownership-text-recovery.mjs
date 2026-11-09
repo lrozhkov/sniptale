@@ -1,7 +1,6 @@
+import { intersects, orderedPairBounds } from './structure-topology.mjs';
 import { extendedDescenderRow } from './ownership-ink.mjs';
 import { inkParts } from './structure.mjs';
-const intersects = (a, b) =>
-  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
 // Repeated numeric-status labels can precede independent direction symbols.
 export function recoverRepeatedNumericText(image, input, measure) {
@@ -116,13 +115,7 @@ export function recoverBridgedFontRows(image, input, measure, protectedRects) {
       const row = {
         ...a,
         ...area,
-        kind: 'source-font-row',
-        roleEvidence: 'text-flow',
-        typeMetrics: m,
-        textConfidence: true,
-        textSize: Math.max(4, 2 * Math.round(m.xHeight * 0.8)),
-        textCenterY: m.glyphBounds.y + m.glyphBounds.h / 2,
-        contrast: m.foregroundContrast,
+        ...recoveredTextMetrics(m),
       };
       clearRecoveredRowSource(row);
       for (const p of protectedInside) {
@@ -249,13 +242,7 @@ export function recoverWeakMediaText(image, input, measure, protectedRects) {
       r = {
         ...b,
         shape: 'text',
-        kind: 'source-font-row',
-        roleEvidence: 'text-flow',
-        typeMetrics: m,
-        textConfidence: true,
-        textSize: Math.max(4, 2 * Math.round(m.xHeight * 0.8)),
-        textCenterY: m.glyphBounds.y + m.glyphBounds.h / 2,
-        contrast: m.foregroundContrast,
+        ...recoveredTextMetrics(m),
       };
     delete r.sourceBounds;
     delete r.sourceRuns;
@@ -736,13 +723,7 @@ function bridgeAnchorArea(a, b) {
     Math.abs(a.y + a.h / 2 - b.y - b.h / 2) > Math.max(a.h, b.h) * 0.25
   )
     return null;
-  const area = {
-    x: a.x,
-    y: Math.min(a.y, b.y),
-    w: b.x + b.w - a.x,
-    h: Math.max(a.y + a.h, b.y + b.h) - Math.min(a.y, b.y),
-    bg: a.bg,
-  };
+  const area = { ...orderedPairBounds(a, b), bg: a.bg };
   return area;
 }
 
@@ -760,4 +741,16 @@ function descenderFontProfile(image, label) {
     last = parts.at(-1);
   const color = [0, 1, 2].map((c) => median(parts.map((p) => p.rgb[c])));
   return { m, baseline, top, last, color };
+}
+
+function recoveredTextMetrics(m) {
+  return {
+    kind: 'source-font-row',
+    roleEvidence: 'text-flow',
+    typeMetrics: m,
+    textConfidence: true,
+    textSize: Math.max(4, 2 * Math.round(m.xHeight * 0.8)),
+    textCenterY: m.glyphBounds.y + m.glyphBounds.h / 2,
+    contrast: m.foregroundContrast,
+  };
 }
