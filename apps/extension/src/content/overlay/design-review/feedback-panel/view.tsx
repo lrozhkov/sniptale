@@ -127,6 +127,7 @@ export function DesignReviewFeedbackPanel(props: {
         }}
       />
       <SessionFeedbackActions
+        recordCount={records.length}
         runtime={runtime}
         session={session}
         confirmClear={confirmClear}

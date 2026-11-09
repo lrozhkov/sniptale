@@ -4,6 +4,7 @@ import { ensureContentUiMountTarget } from '../../../platform/dom-host';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
+import { FeedbackPanelFooter } from './footer';
 import type {
   ReviewSessionRuntime,
   ReviewSessionState,
@@ -16,6 +17,7 @@ export function SessionFeedbackActions(props: {
   confirmClear: boolean;
   onConfirmClearChange: (open: boolean) => void;
   children: ReactNode;
+  recordCount: number;
 }) {
   const { runtime, session, confirmClear, onConfirmClearChange, children } = props;
   return (
@@ -49,16 +51,7 @@ export function SessionFeedbackActions(props: {
         </div>
       ) : null}
       {children}
-      {session?.canUndo ? (
-        <div className="border-t border-[color:var(--sniptale-color-border-soft)] px-4 py-2">
-          <ContentToolbarButton
-            disabled={session.pending}
-            onClick={() => void runtime?.undoDelete().catch(() => undefined)}
-          >
-            {translate('content.designReview.panelUndoDelete')}
-          </ContentToolbarButton>
-        </div>
-      ) : null}
+      <FeedbackPanelFooter runtime={runtime} session={session} recordCount={props.recordCount} />
       {confirmClear
         ? createPortal(
             <ProductConfirmDialog

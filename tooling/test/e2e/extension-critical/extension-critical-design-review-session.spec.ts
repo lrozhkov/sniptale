@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import type { Locator, Page, TestInfo, ViewportSize } from '@playwright/test';
 import { expect, test as extensionTest } from '../support/extension-fixture';
 import { launchExtensionBrowser, closeExtensionBrowser } from '../support/extension-browser-launch';
@@ -117,6 +118,46 @@ async function proveFeedbackCommandAccess(
   await panel.getByRole('button', { name: /Find feedback|Найти замечание/u }).focus();
 }
 
+async function proveFooterUndo(args: {
+  page: Page;
+  panel: Locator;
+  rows: Locator;
+  viewport: ViewportSize;
+  info: TestInfo;
+}): Promise<void> {
+  const { page, panel, rows, viewport, info } = args;
+  await page.locator('#review-b-target').evaluate((element) => element.remove());
+  const missing = rows.filter({ hasText: COMMENT_B });
+  await missing.getByRole('button').first().click();
+  await page.mouse.move(20, viewport.height - 20);
+  await missing.hover();
+  await expect(page.locator('[data-ui="content.design-review.feedback-preview"]')).toContainText(
+    /Target unavailable on this page|Элемент недоступен на этой странице/u
+  );
+  const footer = panel.locator('[data-ui="content.design-review.feedback-footer"]');
+  const undo = footer.getByRole('button', { name: /Undo deletion|Отменить удаление/u });
+  await expect(undo).toHaveCount(0);
+  const footerBefore = (await footer.boundingBox())!;
+  const copyBefore = (await footer
+    .locator('[data-ui="content.design-review.feedback-export.copy"]')
+    .boundingBox())!;
+  await missing.getByRole('button', { name: /Delete feedback|Удалить отзыв/u }).click();
+  await expect(undo).toBeVisible();
+  expect(await undo.textContent()).toBe('');
+  expect((await footer.boundingBox())!.height).toBe(footerBefore.height);
+  expect(
+    (await footer.locator('[data-ui="content.design-review.feedback-export.copy"]').boundingBox())!
+      .x
+  ).toBe(copyBefore.x);
+  await page.screenshot({ path: info.outputPath('footer-undo.png'), fullPage: false });
+  await expect(rows).toHaveCount(1);
+  await expect(panel).not.toContainText(COMMENT_B);
+  await undo.click();
+  await expect(undo).toHaveCount(0);
+  await expect(rows).toHaveCount(2);
+  await expect(missing).toContainText(COMMENT_B);
+}
+
 async function proveAggregateReportExport(args: {
   page: Page;
   popup: Page;
@@ -127,8 +168,7 @@ async function proveAggregateReportExport(args: {
   const { page, popup, hostOrigin, viewport, info } = args;
   const panel = page.locator('[data-ui="content.design-review.feedback-panel"]');
   const rows = panel.locator('[data-ui="content.design-review.feedback-item"]');
-  await page.locator('[data-ui="content.toolbar.annotation-export-button"]').click();
-  await page.locator('[data-ui="content.toolbar.annotation-export.copy"]').click();
+  await panel.locator('[data-ui="content.design-review.feedback-export.copy"]').click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(COMMENT_A);
   const report = await page.evaluate(() => navigator.clipboard.readText());
   expect(report).toContain(COMMENT_B);
@@ -165,8 +205,21 @@ async function proveAggregateReportExport(args: {
   expect(bounds.y).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
-  await page.locator('[data-ui="content.toolbar.annotation-export-button"]').click();
-  await page.locator('[data-ui="content.toolbar.annotation-export.pdf"]').click();
+  const previousDownloads = await popup.evaluate(async () =>
+    (await chrome.downloads.search({})).map((item) => item.id)
+  );
+  await panel.locator('[data-ui="content.design-review.feedback-export.download"]').click();
+  const reportDownload = () =>
+    popup.evaluate(async (previous) => {
+      const files = await chrome.downloads.search({ orderBy: ['-startTime'] });
+      return files.find((file) => !previous.includes(file.id));
+    }, previousDownloads);
+  await expect.poll(async () => (await reportDownload())?.state).toBe('complete');
+  const downloaded = await readFile((await reportDownload())!.filename, 'utf8');
+  expect(downloaded).toContain(COMMENT_A);
+  expect(downloaded).toContain(COMMENT_B);
+  expect(downloaded).toContain(`${hostOrigin}/review-b`);
+  await panel.locator('[data-ui="content.design-review.feedback-export.pdf"]').click();
   await expect
     .poll(() => page.frames().filter((frame) => frame.url() === 'about:blank').length)
     .toBe(1);
@@ -556,20 +609,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect(navigate).toHaveAttribute('aria-pressed', 'true');
       await expect(rows).toHaveCount(2);
 
-      await page.locator('#review-b-target').evaluate((element) => element.remove());
-      const missing = rows.filter({ hasText: COMMENT_B });
-      await missing.getByRole('button').first().click();
-      await page.mouse.move(20, viewport.size.height - 20);
-      await missing.hover();
-      await expect(
-        page.locator('[data-ui="content.design-review.feedback-preview"]')
-      ).toContainText(/Target unavailable on this page|Элемент недоступен на этой странице/u);
-      await missing.getByRole('button', { name: /Delete feedback|Удалить отзыв/u }).click();
-      await expect(rows).toHaveCount(1);
-      await expect(panel).not.toContainText(COMMENT_B);
-      await panel.getByRole('button', { name: /Undo deletion|Отменить удаление/u }).click();
-      await expect(rows).toHaveCount(2);
-      await expect(missing).toContainText(COMMENT_B);
+      await proveFooterUndo({ page, panel, rows, viewport: viewport.size, info });
 
       const assertSession = async () => {
         await expect(panel).toBeVisible();

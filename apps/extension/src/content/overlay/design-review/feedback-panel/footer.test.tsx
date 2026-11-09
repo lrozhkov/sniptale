@@ -1,0 +1,277 @@
+// @vitest-environment jsdom
+
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import type { ReviewSessionState } from '../../../application/design-review-session/runtime';
+import {
+  annotationSnapshot,
+  deferred,
+  pageA,
+  pageB,
+  record,
+  setup,
+} from '../../../application/design-review-session/runtime.test-support';
+import type { executeToolbarAnnotationExportAction } from '../../toolbar/design-review/export-actions';
+
+const mocks = vi.hoisted(() => ({
+  createIntentSource: vi.fn<() => { kind: 'trusted-content-event' } | null>(),
+  executeAction: vi.fn<typeof executeToolbarAnnotationExportAction>(),
+  showToast: vi.fn(),
+}));
+
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+  translate: (key: string) => key,
+}));
+vi.mock('@sniptale/ui/product-feedback/toast-service', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/ui/product-feedback/toast-service')>()),
+  showToast: mocks.showToast,
+}));
+vi.mock('../../../application/privileged-action-intent', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../application/privileged-action-intent')>()),
+  createTrustedContentActionIntentSource: mocks.createIntentSource,
+}));
+vi.mock('../../toolbar/design-review/export-actions', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../toolbar/design-review/export-actions')>()),
+  executeToolbarAnnotationExportAction: mocks.executeAction,
+}));
+
+import { FeedbackPanelFooter } from './footer';
+
+const actions = [
+  ['download', 'Download', '.lucide-download'],
+  ['copy', 'Copy', '.lucide-copy'],
+  ['pdf', 'Pdf', '.lucide-file-down'],
+] as const;
+let container: HTMLDivElement;
+let root: Root;
+let fixture: ReturnType<typeof setup>;
+let session: ReviewSessionState;
+
+function renderFooter(options: { recordCount?: number; withoutRuntime?: boolean } = {}) {
+  act(() => {
+    root.render(
+      <FeedbackPanelFooter
+        runtime={options.withoutRuntime ? null : fixture.runtime}
+        session={options.withoutRuntime ? null : session}
+        recordCount={options.recordCount ?? 2}
+      />
+    );
+  });
+}
+
+function exportButton(action: (typeof actions)[number][0]) {
+  const button = container.querySelector<HTMLButtonElement>(
+    `[data-ui="content.design-review.feedback-export.${action}"]`
+  );
+  if (!button) throw new Error(`Missing ${action} report action`);
+  return button;
+}
+
+function undoButton() {
+  return container.querySelector<HTMLButtonElement>(
+    '[aria-label="content.designReview.panelUndoDelete"]'
+  );
+}
+
+beforeEach(() => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  mocks.createIntentSource.mockReset();
+  mocks.createIntentSource.mockReturnValue({ kind: 'trusted-content-event' });
+  mocks.executeAction.mockReset();
+  mocks.executeAction.mockResolvedValue(undefined);
+  mocks.showToast.mockReset();
+  fixture = setup();
+  session = { ...fixture.runtime.getSnapshot(), active: true, records: fixture.initial.entries };
+  vi.spyOn(fixture.runtime, 'getSnapshot').mockImplementation(() => session);
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+});
+
+afterEach(() => {
+  act(() => root.unmount());
+  fixture.runtime.dispose();
+  container.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+it('keeps the footer mounted with three ordered, named icon actions when feedback is empty', () => {
+  renderFooter({ recordCount: 0, withoutRuntime: true });
+  const footer = container.querySelector('footer');
+  expect(footer?.dataset['ui']).toBe('content.design-review.feedback-footer');
+  expect(footer?.classList.contains('h-10')).toBe(true);
+  expect(footer?.classList.contains('shrink-0')).toBe(true);
+  expect(
+    Array.from(footer?.querySelectorAll('button') ?? [], (button) => button.dataset['ui'])
+  ).toEqual(actions.map(([action]) => `content.design-review.feedback-export.${action}`));
+  for (const [action, label, icon] of actions) {
+    const button = exportButton(action);
+    expect(button.getAttribute('aria-label')).toBe(`content.toolbar.annotationExport${label}Label`);
+    expect(button.title).toBe(button.getAttribute('aria-label'));
+    expect(button.textContent).toBe('');
+    expect(button.querySelector(icon)?.getAttribute('aria-hidden')).toBe('true');
+    expect(button.disabled).toBe(true);
+    act(() => button.click());
+  }
+  expect(undoButton()).toBeNull();
+  expect(mocks.createIntentSource).not.toHaveBeenCalled();
+  expect(mocks.executeAction).not.toHaveBeenCalled();
+});
+
+it.each(actions)(
+  'runs the %s command with the active aggregate session snapshot',
+  async (action, label) => {
+    const aggregate = {
+      snapshot: annotationSnapshot([record(pageA), { ...record(pageB), annotationId: 2 }]),
+      previews: new Map(),
+    };
+    const snapshot = vi.spyOn(fixture.runtime, 'exportSnapshot').mockReturnValue(aggregate);
+    mocks.executeAction.mockImplementation(async (_action, _source, captureSnapshot) => {
+      expect(captureSnapshot?.()).toBe(aggregate);
+    });
+    renderFooter();
+    await act(async () => exportButton(action).click());
+    expect(mocks.createIntentSource).toHaveBeenCalledWith(expect.any(MouseEvent));
+    expect(mocks.executeAction).toHaveBeenCalledExactlyOnceWith(
+      action,
+      { kind: 'trusted-content-event' },
+      snapshot
+    );
+    expect(snapshot).toHaveBeenCalledOnce();
+    expect(aggregate.snapshot.domRecords.map((entry) => entry.evidence.pageUrl)).toEqual([
+      pageA,
+      pageB,
+    ]);
+    expect(mocks.showToast).toHaveBeenCalledWith(
+      `content.toolbar.annotationExport${label}${action === 'pdf' ? 'Opened' : 'Success'}`,
+      'success'
+    );
+    expect(exportButton(action).disabled).toBe(false);
+  }
+);
+
+it.each([false, true])(
+  'uses the document fallback when runtime is absent: %s',
+  async (withoutRuntime) => {
+    session = { ...session, active: false };
+    const snapshot = vi.spyOn(fixture.runtime, 'exportSnapshot');
+    renderFooter({ withoutRuntime });
+    await act(async () => exportButton('copy').click());
+    expect(mocks.executeAction).toHaveBeenCalledExactlyOnceWith(
+      'copy',
+      { kind: 'trusted-content-event' },
+      undefined
+    );
+    expect(snapshot).not.toHaveBeenCalled();
+  }
+);
+
+it.each(actions)(
+  'refuses %s without a trusted action intent and leaves controls usable',
+  (action) => {
+    mocks.createIntentSource.mockReturnValue(null);
+    renderFooter();
+    act(() => exportButton(action).click());
+    expect(mocks.executeAction).not.toHaveBeenCalled();
+    expect(mocks.showToast).not.toHaveBeenCalled();
+    expect(exportButton(action).disabled).toBe(false);
+    expect(exportButton(action).getAttribute('aria-busy')).toBe('false');
+  }
+);
+
+it('disables report and Undo actions during pending session work', () => {
+  session = { ...session, pending: true, canUndo: true };
+  const undo = vi.spyOn(fixture.runtime, 'undoDelete').mockResolvedValue(undefined);
+  renderFooter();
+  for (const [action] of actions) {
+    expect(exportButton(action).disabled).toBe(true);
+    act(() => exportButton(action).click());
+  }
+  expect(undoButton()?.disabled).toBe(true);
+  act(() => undoButton()?.click());
+  expect(undo).not.toHaveBeenCalled();
+  expect(mocks.executeAction).not.toHaveBeenCalled();
+});
+
+it('rejects duplicate clicks before React commits and disables all controls until export settles', async () => {
+  session = { ...session, canUndo: true };
+  const completion = deferred<void>();
+  mocks.executeAction.mockReturnValue(completion.promise);
+  const undo = vi.spyOn(fixture.runtime, 'undoDelete').mockResolvedValue(undefined);
+  renderFooter();
+  act(() => {
+    exportButton('download').click();
+    exportButton('download').click();
+    exportButton('copy').click();
+  });
+  expect(mocks.executeAction).toHaveBeenCalledOnce();
+  expect(mocks.createIntentSource).toHaveBeenCalledOnce();
+  expect(exportButton('download').getAttribute('aria-busy')).toBe('true');
+  expect(exportButton('download').querySelector('.animate-spin')).not.toBeNull();
+  for (const [action] of actions) expect(exportButton(action).disabled).toBe(true);
+  expect(undoButton()?.disabled).toBe(true);
+  act(() => undoButton()?.click());
+  expect(undo).not.toHaveBeenCalled();
+  await act(async () => completion.resolve());
+  for (const [action] of actions) expect(exportButton(action).disabled).toBe(false);
+  expect(undoButton()?.disabled).toBe(false);
+  expect(exportButton('download').getAttribute('aria-busy')).toBe('false');
+});
+
+it.each(['rejected promise', 'synchronous throw'])(
+  'keeps feedback and enables retry after a %s',
+  async (failure) => {
+    const feedback = [...session.records];
+    if (failure === 'synchronous throw') {
+      mocks.executeAction.mockImplementationOnce(() => {
+        throw new Error('Export failed');
+      });
+    } else {
+      mocks.executeAction.mockRejectedValueOnce(new Error('Export failed'));
+    }
+    const clear = vi.spyOn(fixture.runtime, 'clear').mockResolvedValue(undefined);
+    renderFooter();
+    await act(async () => exportButton('copy').click());
+    expect(mocks.showToast).toHaveBeenCalledWith(
+      'content.toolbar.annotationExportCopyError',
+      'error'
+    );
+    expect(session.records).toEqual(feedback);
+    expect(clear).not.toHaveBeenCalled();
+    expect(container.querySelector('footer')).not.toBeNull();
+    for (const [action] of actions) expect(exportButton(action).disabled).toBe(false);
+    await act(async () => exportButton('copy').click());
+    expect(mocks.executeAction).toHaveBeenCalledTimes(2);
+    expect(mocks.showToast).toHaveBeenLastCalledWith(
+      'content.toolbar.annotationExportCopySuccess',
+      'success'
+    );
+  }
+);
+
+it('shows icon-only Undo when deletion is available and keeps the same footer after restoration', async () => {
+  renderFooter();
+  const footer = container.querySelector('footer');
+  expect(undoButton()).toBeNull();
+  session = { ...session, canUndo: true };
+  renderFooter({ recordCount: 0 });
+  const undo = undoButton();
+  expect(undo?.title).toBe('content.designReview.panelUndoDelete');
+  expect(undo?.textContent).toBe('');
+  expect(undo?.querySelector('.lucide-undo-2')?.getAttribute('aria-hidden')).toBe('true');
+  expect(undo?.disabled).toBe(false);
+  const restore = vi.spyOn(fixture.runtime, 'undoDelete').mockImplementation(async () => {
+    session = { ...session, canUndo: false };
+  });
+  await act(async () => undo?.click());
+  expect(restore).toHaveBeenCalledOnce();
+  renderFooter();
+  expect(undoButton()).toBeNull();
+  expect(container.querySelector('footer')).toBe(footer);
+  expect(
+    container.querySelectorAll('[data-ui^="content.design-review.feedback-export."]')
+  ).toHaveLength(3);
+});

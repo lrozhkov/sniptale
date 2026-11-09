@@ -418,7 +418,11 @@ it('retains records during a save failure and offers retry, undo, and explicit c
     Array.from(container.querySelectorAll('button')).find((button) => button.textContent === key);
   await act(async () => buttonWithText('content.designReview.sessionRetry')?.click());
   expect(runtime.retry).toHaveBeenCalledOnce();
-  await act(async () => buttonWithText('content.designReview.panelUndoDelete')?.click());
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelUndoDelete"]')
+      ?.click()
+  );
   expect(runtime.undoDelete).toHaveBeenCalledOnce();
   act(() =>
     container
@@ -558,7 +562,9 @@ it('rejects untrusted archive row and toolbar commands before they reach their a
       .querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelClearAll"]')
       ?.click();
     Array.from(container.querySelectorAll('button'))
-      .find((button) => button.textContent === 'content.designReview.panelUndoDelete')
+      .find(
+        (button) => button.getAttribute('aria-label') === 'content.designReview.panelUndoDelete'
+      )
       ?.click();
   });
   expect(runtime.openRecord).not.toHaveBeenCalled();
