@@ -1,4 +1,11 @@
-import { useLayoutEffect, useState, type RefObject } from 'react';
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+  type RefObject,
+} from 'react';
 import { useDesignReviewPointerDrag } from '../pointer-drag';
 import { resolveContentUiViewport } from '@sniptale/ui/floating-interactions/scale';
 
@@ -31,35 +38,44 @@ function clampPanelPosition(
   };
 }
 
+/** Preview movement locally; commit a changed position only when the pointer is released. */
 export function useFeedbackPanelPosition(
   panelRef: RefObject<HTMLElement | null>,
   open: boolean,
   uiScale = 1,
   persisted?: { position: PanelPosition; setPosition: (position: PanelPosition) => void }
 ) {
-  const [localPosition, setLocalPosition] = useState<PanelPosition>({ x: 24, y: 72 });
-  const position = persisted?.position ?? localPosition;
-  const persistPosition = persisted?.setPosition;
-  const updatePosition = (next: PanelPosition) => {
-    if (persistPosition) persistPosition(next);
-    else setLocalPosition(next);
-  };
+  const [position, setPosition] = useState<PanelPosition>(persisted?.position ?? { x: 24, y: 72 });
+  const positionRef = useRef(position);
+  const gestureRef = useRef<{
+    pointerId: number;
+    target: HTMLElement;
+    origin: PanelPosition;
+  } | null>(null);
+  const persistRef = useRef(persisted?.setPosition);
+  persistRef.current = persisted?.setPosition;
+  const updatePosition = useCallback((next: PanelPosition) => {
+    positionRef.current = next;
+    setPosition(next);
+  }, []);
+  const persistedX = persisted?.position.x;
+  const persistedY = persisted?.position.y;
 
   useLayoutEffect(() => {
-    if (!open) return;
-    const clampCurrent = () => {
-      const next = clampPanelPosition(panelRef.current, position, uiScale);
-      if (next.x === position.x && next.y === position.y) return;
-      if (persistPosition) persistPosition(next);
-      else setLocalPosition(next);
-    };
-    clampCurrent();
-    window.addEventListener('resize', clampCurrent);
-    return () => window.removeEventListener('resize', clampCurrent);
-  }, [open, panelRef, uiScale, position, persistPosition]);
+    if (!open || gestureRef.current) return;
+    const next = clampPanelPosition(
+      panelRef.current,
+      persistedX === undefined || persistedY === undefined
+        ? positionRef.current
+        : { x: persistedX, y: persistedY },
+      uiScale
+    );
+    if (next.x !== positionRef.current.x || next.y !== positionRef.current.y) updatePosition(next);
+  }, [open, panelRef, uiScale, persistedX, persistedY, updatePosition]);
 
   const drag = useDesignReviewPointerDrag({
-    canStart: (event) => !(event.target as Element).closest('button, input, select'),
+    canStart: (event) =>
+      !(event.target instanceof Element && event.target.closest('button, input, select')),
     move: (origin, deltaX, deltaY) => {
       updatePosition(
         clampPanelPosition(
@@ -76,5 +92,73 @@ export function useFeedbackPanelPosition(
     uiScale,
   });
 
-  return { ...drag, position };
+  // Cancellation restores the pre-gesture position and never writes a draft to storage.
+  const cancelDrag = drag.cancelPointerDrag;
+  const cancelPointerDrag = useCallback(() => {
+    const gesture = gestureRef.current;
+    gestureRef.current = null;
+    cancelDrag();
+    if (!gesture) return;
+    if (gesture.target.hasPointerCapture?.(gesture.pointerId)) {
+      gesture.target.releasePointerCapture(gesture.pointerId);
+    }
+    updatePosition(clampPanelPosition(panelRef.current, gesture.origin, uiScale));
+  }, [cancelDrag, panelRef, uiScale, updatePosition]);
+  useLayoutEffect(() => {
+    if (!open) cancelPointerDrag();
+    const clampCurrent = () => {
+      const next = clampPanelPosition(panelRef.current, positionRef.current, uiScale);
+      updatePosition(next);
+    };
+    if (open) window.addEventListener('resize', clampCurrent);
+    return () => window.removeEventListener('resize', clampCurrent);
+  }, [open, uiScale, panelRef, updatePosition, cancelPointerDrag]);
+  useLayoutEffect(
+    () => () => {
+      const gesture = gestureRef.current;
+      gestureRef.current = null;
+      if (gesture?.target.hasPointerCapture?.(gesture.pointerId)) {
+        gesture.target.releasePointerCapture(gesture.pointerId);
+      }
+    },
+    []
+  );
+
+  return {
+    position,
+    cancelPointerDrag,
+    onPointerDown: (event: PointerEvent<HTMLElement>) => {
+      if (
+        gestureRef.current ||
+        event.button !== 0 ||
+        (event.target instanceof Element && event.target.closest('button, input, select'))
+      )
+        return;
+      drag.onPointerDown(event);
+      gestureRef.current = {
+        pointerId: event.pointerId,
+        target: event.currentTarget,
+        origin: positionRef.current,
+      };
+    },
+    onPointerMove: drag.onPointerMove,
+    onPointerUp: (event: PointerEvent<HTMLElement>) => {
+      const gesture = gestureRef.current;
+      if (gesture?.pointerId !== event.pointerId) return;
+      gestureRef.current = null;
+      drag.onPointerUp(event);
+      if (
+        positionRef.current.x !== gesture.origin.x ||
+        positionRef.current.y !== gesture.origin.y
+      ) {
+        persistRef.current?.(positionRef.current);
+      }
+    },
+    onPointerCancel: (event: PointerEvent<HTMLElement>) => {
+      if (gestureRef.current?.pointerId === event.pointerId) cancelPointerDrag();
+    },
+    onLostPointerCapture: (event: PointerEvent<HTMLElement>) => {
+      if (gestureRef.current?.pointerId === event.pointerId) cancelPointerDrag();
+    },
+  };
 }

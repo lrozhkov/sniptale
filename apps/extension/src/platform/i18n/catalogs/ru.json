@@ -5203,6 +5203,8 @@
       "targetUnavailable": "Элемент недоступен на этой странице",
       "panelDelete": "Удалить отзыв",
       "panelUndoDelete": "Отменить удаление",
+      "panelSearchClose": "Закрыть поиск",
+      "panelResize": "Изменить высоту панели отзывов",
       "panelClearAll": "Удалить все отзывы",
       "panelClearConfirm": "Удалить все отзывы и сохранённые снимки этой сессии проверки?",
       "sessionResume": "Продолжить последнюю проверку",

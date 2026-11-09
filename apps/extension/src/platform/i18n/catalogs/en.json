@@ -5203,6 +5203,8 @@
       "targetUnavailable": "Target unavailable on this page",
       "panelDelete": "Delete feedback",
       "panelUndoDelete": "Undo deletion",
+      "panelSearchClose": "Close search",
+      "panelResize": "Resize feedback panel height",
       "panelClearAll": "Clear all feedback",
       "panelClearConfirm": "Delete all feedback and saved snapshots in this review session?",
       "sessionResume": "Resume last review",

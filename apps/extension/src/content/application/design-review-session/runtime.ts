@@ -191,7 +191,7 @@ class ReviewSessionRuntimeOwner {
   setPosition = (position: { x: number; y: number }) => {
     this.controller.document = { ...this.controller.document, position };
     this.publish();
-    void this.persistence.persist().catch(() => undefined);
+    void this.persistence.persist('save', true).catch(() => undefined);
   };
   changed = () => {
     if (

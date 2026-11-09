@@ -16,15 +16,6 @@ function getElementLabel(record: BrowserDomAnnotationRecord): string {
   return name ? `${tag} · ${name}` : tag;
 }
 
-function getPageLabel(record: BrowserDomAnnotationRecord): string {
-  try {
-    const url = new URL(record.evidence.pageUrl);
-    return url.pathname === '/' ? url.hostname : url.pathname;
-  } catch {
-    return record.evidence.fileLabel;
-  }
-}
-
 function getRecordSummary(record: BrowserDomAnnotationRecord): string {
   if (record.comment) return record.comment;
   if (record.propertyChanges.length > 0) {
@@ -71,7 +62,10 @@ export function FeedbackList(props: {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+    <div
+      data-ui="content.design-review.feedback-list"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2"
+    >
       {visibleRecords.length === 0 ? (
         <div className="px-3 py-8 text-center text-xs text-[var(--sniptale-color-text-dim)]">
           {records.length === 0
@@ -88,7 +82,7 @@ export function FeedbackList(props: {
             <div
               key={entry?.id ?? record.annotationId}
               className={[
-                'group/feedback-item flex w-full items-start rounded-[4px] border-l text-left',
+                'group/feedback-item flex h-14 w-full items-center rounded-[4px] border-l text-left',
                 'border-transparent hover:bg-[var(--sniptale-color-surface-input)]',
                 'focus-visible:border-[color:var(--sniptale-color-accent)] focus-visible:outline-none',
               ].join(' ')}
@@ -102,7 +96,7 @@ export function FeedbackList(props: {
               <button
                 type="button"
                 className={[
-                  'min-w-0 flex-1 rounded-[4px] px-3 py-3 text-left',
+                  'min-w-0 flex-1 rounded-[4px] px-2 py-2 text-left',
                   'focus-visible:outline focus-visible:outline-1',
                   'focus-visible:outline-[var(--sniptale-color-accent)]',
                 ].join(' ')}
@@ -117,38 +111,25 @@ export function FeedbackList(props: {
                 <span className="flex items-center gap-2">
                   <Icon className={getDesignReviewActionTone(action)} size={17} />
                   <strong className={`text-xs ${getDesignReviewActionTone(action)}`}>
+                    {record.markerNumber !== undefined ? `${record.markerNumber} · ` : ''}
                     {translate(option.labelKey)}
                   </strong>
-                  <span className="ml-auto truncate text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
-                    <FeedbackEvidenceText record={record} text={getElementLabel(record)} />
-                  </span>
                 </span>
                 <span
-                  className="sniptale-design-review-authored-text mt-2 block overflow-hidden pl-6 text-xs leading-5"
+                  className={[
+                    'sniptale-design-review-authored-text mt-1 block truncate pl-6 text-xs leading-4',
+                    'text-[var(--sniptale-color-text-secondary)]',
+                  ].join(' ')}
                   data-ui="content.design-review.feedback-summary"
-                  style={{
-                    WebkitBoxOrient: 'vertical',
-                    WebkitLineClamp: 3,
-                    display: '-webkit-box',
-                  }}
                 >
                   <FeedbackEvidenceText record={record} text={getRecordSummary(record)} />
                 </span>
-                <span className="mt-1 block pl-6 text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
-                  {translate('content.designReview.panelPage')}{' '}
-                  <FeedbackEvidenceText record={record} text={getPageLabel(record)} />
-                </span>
-                {entry?.unavailable ? (
-                  <span className="mt-1 block pl-6 text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
-                    {translate('content.designReview.targetUnavailable')}
-                  </span>
-                ) : null}
               </button>
               {entry && props.onDeleteEntry ? (
                 <ContentToolbarButton
                   type="button"
                   className={[
-                    'mt-2 mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]',
+                    'mr-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px]',
                     'invisible group-hover/feedback-item:visible group-focus-within/feedback-item:visible',
                     'opacity-0 group-hover/feedback-item:opacity-100',
                     'group-focus-within/feedback-item:opacity-100 focus-visible:opacity-100',

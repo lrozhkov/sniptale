@@ -37,10 +37,10 @@ export class ReviewSessionPersistence {
     if (reply.sessionId !== undefined) this.sessionId = reply.sessionId;
     return reply;
   }
-  private enqueue(operation: () => Promise<void>) {
+  private enqueue(operation: () => Promise<void>, quiet = false) {
     const result = this.queue.then(async () => {
       if (this.ports.disposed()) return;
-      this.ports.publish({ pending: true });
+      if (!quiet) this.ports.publish({ pending: true });
       try {
         await operation();
         this.ports.publish({ error: false });
@@ -48,7 +48,7 @@ export class ReviewSessionPersistence {
         this.ports.publish({ error: true });
         throw error;
       } finally {
-        this.ports.publish({ pending: false });
+        if (!quiet) this.ports.publish({ pending: false });
       }
     });
     this.queue = result.catch(() => undefined);
@@ -93,7 +93,7 @@ export class ReviewSessionPersistence {
     this.ports.applyAdmission('reconnect', adopted);
     this.ports.publish({ available: reply.available });
   }
-  persist(kind: 'save' | 'clear' = 'save'): Promise<void> {
+  persist(kind: 'save' | 'clear' = 'save', quiet = false): Promise<void> {
     this.dirty = true;
     if (!this.opened) return Promise.resolve();
     return this.enqueue(async () => {
@@ -116,7 +116,7 @@ export class ReviewSessionPersistence {
       );
       this.savedPayload = payload;
       this.dirty = this.ports.serialize() !== payload;
-    });
+    }, quiet);
   }
   open = async () =>
     this.enqueue(async () => {

@@ -347,3 +347,64 @@ it('preserves marker allocation after failed Clear and resets only after success
     runtime.dispose();
   }
 });
+
+it('saves panel position without announcing a pending feedback mutation', async () => {
+  const ctx = setup();
+  await ctx.runtime.open();
+  const started = deferred<void>();
+  const acknowledge = deferred<void>();
+  const server = ctx.ports.request.getMockImplementation()!;
+  ctx.ports.request.mockImplementationOnce(async (request) => {
+    started.resolve();
+    await acknowledge.promise;
+    return server(request);
+  });
+  ctx.runtime.setPosition({ x: 120, y: 90 });
+  await started.promise;
+  expect(ctx.runtime.getSnapshot().pending).toBe(false);
+  expect(ctx.runtime.getSnapshot().records).toHaveLength(1);
+  acknowledge.resolve();
+  await ctx.runtime.flush();
+  expect(JSON.parse(ctx.saved()).position).toEqual({ x: 120, y: 90 });
+});
+
+it('keeps deletion pending and cannot restore feedback through a queued position save', async () => {
+  const ctx = setup();
+  await ctx.runtime.open();
+  const started = deferred<void>();
+  const acknowledge = deferred<void>();
+  const server = ctx.ports.request.getMockImplementation()!;
+  ctx.ports.request.mockImplementationOnce(async (request) => {
+    started.resolve();
+    await acknowledge.promise;
+    return server(request);
+  });
+  const deletion = ctx.runtime.deleteRecord(lease);
+  await started.promise;
+  ctx.runtime.setPosition({ x: 130, y: 100 });
+  expect(ctx.runtime.getSnapshot().pending).toBe(true);
+  acknowledge.resolve();
+  await deletion;
+  await ctx.runtime.flush();
+  expect(JSON.parse(ctx.saved()).entries).toEqual([]);
+  expect(JSON.parse(ctx.saved()).position).toEqual({ x: 130, y: 100 });
+});
+
+it('retains feedback after a quiet position save fails and supports explicit retry', async () => {
+  const ctx = setup();
+  await ctx.runtime.open();
+  const server = ctx.ports.request.getMockImplementation()!;
+  let refused = true;
+  ctx.ports.request.mockImplementation(async (request) => {
+    if (refused && request.kind === 'save') throw new Error('Storage refused');
+    return server(request);
+  });
+  ctx.runtime.setPosition({ x: 140, y: 110 });
+  await expect(ctx.runtime.flush()).rejects.toThrow('Storage refused');
+  expect(ctx.runtime.getSnapshot().records).toHaveLength(1);
+  expect(ctx.runtime.getSnapshot().error).toBe(true);
+  refused = false;
+  await ctx.runtime.retry();
+  expect(JSON.parse(ctx.saved()).entries).toHaveLength(1);
+  expect(JSON.parse(ctx.saved()).position).toEqual({ x: 140, y: 110 });
+});

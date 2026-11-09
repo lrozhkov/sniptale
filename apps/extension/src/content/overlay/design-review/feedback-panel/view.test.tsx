@@ -122,16 +122,19 @@ it('lists only Design Review feedback and opens the live element from the row or
   expect(items).toHaveLength(1);
   expect(items[0]?.textContent).toContain('content.designReview.actionFix');
   expect(items[0]?.textContent).toContain('Check the narrow layout');
-  expect(items[0]?.textContent).toContain('BUTTON · Save changes');
+  expect(items[0]?.textContent).not.toContain('BUTTON · Save changes');
+  expect(items[0]?.textContent).toContain('1 · content.designReview.actionFix');
   expect(items[0]?.textContent).not.toContain('Changed live page copy');
   expect(
-    items[0]?.querySelector<HTMLElement>('[data-ui="content.design-review.feedback-summary"]')
-      ?.style.webkitLineClamp
-  ).toBe('3');
+    items[0]
+      ?.querySelector('[data-ui="content.design-review.feedback-summary"]')
+      ?.classList.contains('truncate')
+  ).toBe(true);
 
   act(() => items[0]?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
   const preview = document.querySelector('[data-ui="content.design-review.feedback-preview"]');
   expect(preview).not.toBeNull();
+  expect(preview?.textContent).toContain('BUTTON · Save changes');
   expect(preview?.closest('[data-ui="content.design-review.feedback-panel"]')).toBeNull();
 
   act(() => items[0]?.querySelector<HTMLButtonElement>('button')?.click());
@@ -267,7 +270,14 @@ it('searches feedback and drags the panel by its header', () => {
     );
   });
 
+  expect(container.querySelector('input')).toBeNull();
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelSearch"]')
+      ?.click()
+  );
   const input = container.querySelector<HTMLInputElement>('input');
+  expect(document.activeElement).toBe(input);
   const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   act(() => {
     valueSetter?.call(input, 'missing');
@@ -368,13 +378,16 @@ it('keeps unavailable saved feedback and snapshots visible and separates open fr
   const row = container.querySelector<HTMLElement>(
     '[data-ui="content.design-review.feedback-item"]'
   )!;
-  expect(row.textContent).toContain('content.designReview.targetUnavailable');
+  expect(row.textContent).not.toContain('content.designReview.targetUnavailable');
   expect(row.querySelector('button button')).toBeNull();
   act(() => row.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
   const image = document.querySelector<HTMLElement>(
     '[data-ui="content.design-review.feedback-snapshot"]'
   );
   expect(image).not.toBeNull();
+  expect(
+    document.querySelector('[data-ui="content.design-review.feedback-preview"]')?.textContent
+  ).toContain('content.designReview.targetUnavailable');
   expect(image?.shadowRoot).toBeNull();
   expect(image?.outerHTML).not.toContain('data:image');
   expect(image?.querySelector('img')).toBeNull();
@@ -461,7 +474,9 @@ it('offers the last saved review and uses persisted panel position', async () =>
       <DesignReviewFeedbackPanel open onClose={vi.fn()} onOpenRecord={vi.fn(() => true)} />
     )
   );
-  expect(runtime.setPosition).toHaveBeenCalledWith({ x: 860, y: 188 });
+  expect(panel?.style.left).toBe('860px');
+  expect(panel?.style.top).toBe('188px');
+  expect(runtime.setPosition).not.toHaveBeenCalled();
 });
 
 it('keeps foreign-origin authored evidence private in rows, previews, and DOM clones', () => {
@@ -619,4 +634,136 @@ it('accepts the canonical private mouse bridge while rejecting unbranded script 
   expect(runtime.deleteRecord).toHaveBeenCalledWith('saved-entry');
   await act(async () => remove.click());
   expect(runtime.deleteRecord).toHaveBeenCalledTimes(1);
+});
+
+it('replaces the header with search and restores focus with a reset query before closing', async () => {
+  const target = document.createElement('button');
+  document.body.append(target);
+  browserAnnotationSession.setComment({
+    comment: 'Review spacing',
+    evidence: createEvidence('button'),
+    target,
+  });
+  const onClose = vi.fn();
+  const render = (open: boolean) =>
+    root.render(
+      <DesignReviewFeedbackPanel onClose={onClose} onOpenRecord={vi.fn(() => true)} open={open} />
+    );
+  act(() => render(true));
+  const search = () =>
+    container.querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelSearch"]');
+  act(() => search()?.click());
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  expect(document.activeElement).toBe(input);
+  expect(container.querySelector('[aria-label="content.designReview.panelFilter"]')).toBeNull();
+  expect(container.querySelector('[aria-label="content.designReview.panelClose"]')).toBeNull();
+  expect(input.closest('header')).not.toBeNull();
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  act(() => {
+    setValue.call(input, 'missing');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(container.textContent).toContain('content.designReview.panelNoResults');
+  await act(async () =>
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' })
+    )
+  );
+  expect(container.querySelector('input')).toBeNull();
+  expect(document.activeElement).toBe(search());
+  expect(container.textContent).toContain('Review spacing');
+  expect(onClose).not.toHaveBeenCalled();
+  act(() => search()?.click());
+  expect(container.querySelector<HTMLInputElement>('input')?.value).toBe('');
+  await act(async () =>
+    container
+      .querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelSearchClose"]')
+      ?.click()
+  );
+  expect(document.activeElement).toBe(search());
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' }))
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+it('removes search state when the panel is externally closed', () => {
+  const render = (open: boolean) =>
+    root.render(
+      <DesignReviewFeedbackPanel onClose={vi.fn()} onOpenRecord={vi.fn(() => true)} open={open} />
+    );
+  act(() => render(true));
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelSearch"]')
+      ?.click()
+  );
+  act(() => render(false));
+  act(() => render(true));
+  expect(container.querySelector('input')).toBeNull();
+  expect(container.querySelector('[aria-label="content.designReview.panelSearch"]')).not.toBeNull();
+});
+
+it('searches comments and target evidence hidden from compact rows', () => {
+  const target = document.createElement('button');
+  document.body.append(target);
+  const evidence = createEvidence('button.primary');
+  evidence.fileLabel = 'Settings capture';
+  browserAnnotationSession.setComment({ comment: 'Review spacing', evidence, target });
+  act(() =>
+    root.render(
+      <DesignReviewFeedbackPanel onClose={vi.fn()} onOpenRecord={vi.fn(() => true)} open />
+    )
+  );
+  const row = container.querySelector('[data-ui="content.design-review.feedback-item"]')!;
+  expect(row.textContent).not.toContain('Settings capture');
+  expect(row.textContent).not.toContain('Save changes');
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelSearch"]')
+      ?.click()
+  );
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  for (const query of ['Review spacing', 'Save changes', 'button.primary']) {
+    act(() => {
+      setValue.call(input, query);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(
+      container.querySelectorAll('[data-ui="content.design-review.feedback-item"]')
+    ).toHaveLength(1);
+  }
+});
+
+it('does not expose foreign page metadata through synthetic search probes', () => {
+  configureSavedReview();
+  const evidence = review.snapshot!.records[0]!.record.evidence;
+  evidence.pageUrl = 'https://foreign.example.test/private-session-7e9c';
+  evidence.fileLabel = 'Private capture label f8a2';
+  act(() =>
+    root.render(
+      <DesignReviewFeedbackPanel onClose={vi.fn()} onOpenRecord={vi.fn(() => true)} open />
+    )
+  );
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[aria-label="content.designReview.panelSearch"]')
+      ?.click()
+  );
+  trustedEventMocks.isTrustedDomEvent.mockReturnValue(false);
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  const probe = (query: string) => {
+    act(() => {
+      setValue.call(input, query);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    return Array.from(
+      container.querySelectorAll('[data-ui="content.design-review.feedback-item"]')
+    ).map((element) => element.getAttribute('data-annotation-id'));
+  };
+  const unmatched = probe('unmatched-probe-c63d');
+  expect(probe('private-session-7e9c')).toEqual(unmatched);
+  expect(probe('Private capture label f8a2')).toEqual(unmatched);
 });

@@ -151,7 +151,7 @@ export function FeedbackPreview(props: {
         'sniptale-design-review-chrome sniptale-compact-workspace',
         'pointer-events-none fixed z-[2147483647] rounded-[4px] border p-4 shadow-2xl',
         'border-[color:var(--sniptale-color-border-soft)]',
-        'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
+        'bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)] text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}
       data-ui="content.design-review.feedback-preview"
       style={{ scale, transformOrigin: 'top left', overflow: 'hidden' }}
@@ -167,6 +167,10 @@ export function FeedbackPreview(props: {
       </div>
       <div className="mt-1 truncate font-mono text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
         <FeedbackEvidenceText record={props.record} text={props.record.evidence.targetPath} />
+      </div>
+      <div className="mt-2 break-all text-xs leading-4 text-[var(--sniptale-color-text-dim)]">
+        {translate('content.designReview.panelPage')}{' '}
+        <FeedbackEvidenceText record={props.record} text={props.record.evidence.pageUrl} />
       </div>
       {props.preview ? (
         <CapturedFeedbackPreview preview={props.preview} label={props.label} />

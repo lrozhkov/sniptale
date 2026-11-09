@@ -114,7 +114,7 @@ async function proveFeedbackCommandAccess(
   await expect(firstOpen).toBeEnabled();
   await firstOpen.focus();
   await expect(firstDelete).toHaveCSS('opacity', '1');
-  await panel.locator('input').focus();
+  await panel.getByRole('button', { name: /Find feedback|Найти замечание/u }).focus();
 }
 
 async function proveAggregateReportExport(args: {
@@ -203,11 +203,13 @@ async function proveResumedReview(page: Page, info: TestInfo): Promise<void> {
   await expect(resumedPanel).toContainText(COMMENT_A);
   await expect(resumedPanel).toContainText(COMMENT_B);
   await expect(page.locator('#review-b-target')).toHaveCount(0);
-  await expect(
-    resumedPanel
-      .locator('[data-ui="content.design-review.feedback-item"]')
-      .filter({ hasText: COMMENT_B })
-  ).toContainText(/Target unavailable on this page|Элемент недоступен на этой странице/u);
+  await resumedPanel
+    .locator('[data-ui="content.design-review.feedback-item"]')
+    .filter({ hasText: COMMENT_B })
+    .hover();
+  await expect(page.locator('[data-ui="content.design-review.feedback-preview"]')).toContainText(
+    /Target unavailable on this page|Элемент недоступен на этой странице/u
+  );
   await page.screenshot({
     path: info.outputPath('resumed-last-session.png'),
     fullPage: false,
@@ -245,6 +247,115 @@ async function proveClearRestartsMarkers(
   await expect(rows).toHaveCount(1);
   await expect(marker).toHaveAttribute('aria-label', /(?:Feedback|Замечание|Отзыв) 1:/u);
   await page.screenshot({ path: info.outputPath('clear-restarts-markers.png'), fullPage: false });
+}
+
+async function proveCompactPanel(page: Page, popup: Page, info: TestInfo): Promise<void> {
+  const panel = page.locator('[data-ui="content.design-review.feedback-panel"]');
+  for (let index = 0; index < 2; index++) {
+    await page.evaluate((number) => {
+      const target = document.createElement('button');
+      target.id = `compact-target-${number}`;
+      target.textContent = `Compact target ${number}`;
+      target.style.top = `${330 + number * 90}px`;
+      document.body.append(target);
+    }, index);
+    await addComment(
+      page,
+      `#compact-target-${index}`,
+      `Compact feedback ${index}: a long summary
+with more detail kept in the preview.`
+    );
+  }
+  const rows = panel.locator('[data-ui="content.design-review.feedback-item"]');
+  await expect(rows).toHaveCount(3);
+  await expect
+    .poll(
+      async () =>
+        ((await savedSession(popup, page)).match(/data:image\/png;base64,/gu) ?? []).length
+    )
+    .toBe(3);
+  await expect
+    .poll(() =>
+      panel.evaluate((element) => {
+        let current: Element | null = element;
+        while (current) {
+          if (getComputedStyle(current).opacity !== '1') return false;
+          const root = current.getRootNode();
+          current = current.parentElement ?? (root instanceof ShadowRoot ? root.host : null);
+        }
+        return true;
+      })
+    )
+    .toBe(true);
+  await expect(panel.locator('input')).toHaveCount(0);
+  const search = panel.getByRole('button', { name: /Find feedback|Найти замечание/u });
+  await search.click();
+  const input = panel.getByRole('textbox', { name: /Find feedback|Найти замечание/u });
+  await expect(input).toBeFocused();
+  await input.fill('Compact feedback 1');
+  await expect(rows).toHaveCount(1);
+  await page.screenshot({ path: info.outputPath('compact-panel-search.png'), fullPage: false });
+  await input.press('Escape');
+  await expect(input).toHaveCount(0);
+  await expect(search).toBeFocused();
+  await expect(rows).toHaveCount(3);
+  await panel.getByRole('button', { name: /Filter by action|Фильтр по действию/u }).click();
+  await panel.getByRole('menuitemradio', { name: /Refine|Доработать/u }).click();
+  await expect(rows).toHaveCount(3);
+  const resize = panel.getByRole('separator', {
+    name: /Resize feedback panel height|Изменить высоту панели отзывов/u,
+  });
+  await resize.focus();
+  await resize.press('Home');
+  await expect(panel).toHaveCSS('height', '180px');
+  const list = panel.locator('[data-ui="content.design-review.feedback-list"]');
+  expect(await list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await list.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await rows.last().hover();
+  const preview = page.locator('[data-ui="content.design-review.feedback-preview"]');
+  await expect(preview).toContainText('with more detail kept in the preview.');
+  await expect(preview).toContainText('Compact target 1');
+  await page.screenshot({ path: info.outputPath('compact-panel-short.png'), fullPage: false });
+  const before = (await panel.boundingBox())!;
+  const handle = (await resize.boundingBox())!;
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2 + 72, {
+    steps: 4,
+  });
+  await page.mouse.up();
+  expect((await panel.boundingBox())!.height).toBeGreaterThan(before.height + 40);
+  const clearName = /Clear all feedback|Удалить все отзывы/u;
+  await panel.getByRole('button', { name: clearName }).click();
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation).toBeVisible();
+  const modalBox = (await confirmation.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(Math.abs(modalBox.x + modalBox.width / 2 - viewport.width / 2)).toBeLessThan(2);
+  expect(Math.abs(modalBox.y + modalBox.height / 2 - viewport.height / 2)).toBeLessThan(2);
+  expect(
+    await confirmation.evaluate((element) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = getComputedStyle(element).backgroundColor;
+      context.fillRect(0, 0, 1, 1);
+      return context.getImageData(0, 0, 1, 1).data[3];
+    })
+  ).toBe(255);
+  await expect(confirmation.locator('.sniptale-modal-header-sm')).toHaveCSS(
+    'border-bottom-width',
+    '0px'
+  );
+  await expect(confirmation.locator('.sniptale-modal-footer-sm')).toHaveCSS(
+    'border-top-width',
+    '0px'
+  );
+  await page.screenshot({ path: info.outputPath('clear-feedback-dialog.png'), fullPage: false });
+  await confirmation.getByRole('button', { name: /Cancel|Отмена/u, exact: true }).click();
+  await expect(rows).toHaveCount(3);
 }
 
 async function captureSessionFailure(args: {
@@ -363,7 +474,13 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.mouse.move(handleBox.x + 20, handleBox.y + 16);
       await page.mouse.down();
       await page.mouse.move(handleBox.x + 170, handleBox.y + 76, { steps: 4 });
+      await expect(
+        panel.getByRole('status').filter({ hasText: /Saving review|Сохранение/u })
+      ).toHaveCount(0);
       await page.mouse.up();
+      await expect(
+        panel.getByRole('status').filter({ hasText: /Saving review|Сохранение/u })
+      ).toHaveCount(0);
       const position = await panel.evaluate((element) => ({
         left: (element as HTMLElement).style.left,
         top: (element as HTMLElement).style.top,
@@ -442,9 +559,11 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await page.locator('#review-b-target').evaluate((element) => element.remove());
       const missing = rows.filter({ hasText: COMMENT_B });
       await missing.getByRole('button').first().click();
-      await expect(missing).toContainText(
-        /Target unavailable on this page|Элемент недоступен на этой странице/u
-      );
+      await page.mouse.move(20, viewport.size.height - 20);
+      await missing.hover();
+      await expect(
+        page.locator('[data-ui="content.design-review.feedback-preview"]')
+      ).toContainText(/Target unavailable on this page|Элемент недоступен на этой странице/u);
       await missing.getByRole('button', { name: /Delete feedback|Удалить отзыв/u }).click();
       await expect(rows).toHaveCount(1);
       await expect(panel).not.toContainText(COMMENT_B);
@@ -506,6 +625,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         await proveResumedReview(resumedPage, info);
       }
       await proveClearRestartsMarkers(resumedPage ?? page, hostOrigin, info);
+      await proveCompactPanel(resumedPage ?? page, resumedPopup ?? popup, info);
     } catch (error) {
       await captureSessionFailure({
         page: resumedPage ?? page,

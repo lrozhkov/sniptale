@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { ensureContentUiMountTarget } from '../../../platform/dom-host';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
@@ -57,21 +59,31 @@ export function SessionFeedbackActions(props: {
           </ContentToolbarButton>
         </div>
       ) : null}
-      <ProductConfirmDialog
-        isOpen={confirmClear}
-        title={translate('content.designReview.panelClearAll')}
-        message={translate('content.designReview.panelClearConfirm')}
-        confirmText={translate('content.designReview.panelClearAll')}
-        cancelText={translate('common.actions.cancel')}
-        confirmDisabled={session?.pending ?? false}
-        onCancel={() => onConfirmClearChange(false)}
-        onConfirm={async () => {
-          await runtime?.clear();
-          onConfirmClearChange(false);
-        }}
-        dialogClassName="sniptale-compact-workspace"
-        backdropClassName="!z-[2147483648]"
-      />
+      {confirmClear
+        ? createPortal(
+            <ProductConfirmDialog
+              isOpen
+              title={translate('content.designReview.panelClearAll')}
+              message={translate('content.designReview.panelClearConfirm')}
+              confirmText={translate('content.designReview.panelClearAll')}
+              cancelText={translate('common.actions.cancel')}
+              confirmDisabled={session?.pending ?? false}
+              onCancel={() => onConfirmClearChange(false)}
+              onConfirm={async () => {
+                await runtime?.clear();
+                onConfirmClearChange(false);
+              }}
+              dialogClassName={[
+                'sniptale-compact-workspace !bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]',
+                '[&_.sniptale-modal-header-sm]:!border-b-0 [&_.sniptale-modal-header-sm]:!bg-transparent',
+                '[&_.sniptale-modal-header-sm]:!pb-2 [&_.sniptale-modal-body-sm]:!py-2',
+                '[&_.sniptale-modal-footer-sm]:!border-t-0 [&_.sniptale-modal-footer-sm]:!bg-transparent',
+              ].join(' ')}
+              backdropClassName="!z-[2147483648]"
+            />,
+            ensureContentUiMountTarget()
+          )
+        : null}
     </>
   );
 }
