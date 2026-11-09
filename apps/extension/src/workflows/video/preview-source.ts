@@ -107,6 +107,30 @@ const unavailable = (cause?: unknown) =>
   new Error('Preview source frame is unavailable.', cause === undefined ? undefined : { cause });
 const aborted = () => new DOMException('Preview source request was cancelled.', 'AbortError');
 
+/** Resolves ordinary source lookup without changing the authored target or endpoint intent. */
+export function resolvePreviewSourceOrdinaryTime(
+  target: number,
+  end: number,
+  leadingSampleTime?: number
+) {
+  if (!Number.isFinite(target) || target < 0 || !Number.isFinite(end) || end <= 0 || target >= end)
+    throw unavailable();
+  const effectiveTime =
+    leadingSampleTime !== undefined &&
+    Number.isFinite(leadingSampleTime) &&
+    leadingSampleTime > 0 &&
+    target < leadingSampleTime
+      ? leadingSampleTime
+      : target;
+  if (effectiveTime >= end) throw unavailable();
+  const rounded = effectiveTime + ROUNDING_SECONDS;
+  return {
+    target,
+    effectiveTime,
+    lookupTime: rounded < end ? rounded : beforeEndpoint(end),
+  };
+}
+
 /** Returns the verified bounded first PTS. Callers retain the original requested time separately. */
 export async function readPreviewSourceLeadingSampleTime(
   track: InputVideoTrack,
@@ -428,7 +452,8 @@ class PreviewSourceOwner implements PreviewSourceProvider {
           item.nextTimestamp !== null &&
           item.nextTimestamp >= retainedEnd
       );
-    const entry = state.ring.findLast((item) => item.sample.timestamp <= target + ROUNDING_SECONDS);
+    const lookup = resolvePreviewSourceOrdinaryTime(target, state.stream!.end);
+    const entry = state.ring.findLast((item) => item.sample.timestamp <= lookup.lookupTime);
     return entry?.nextTimestamp !== null &&
       entry?.nextTimestamp !== undefined &&
       target < entry.nextTimestamp + ROUNDING_SECONDS
@@ -597,11 +622,12 @@ class PreviewSourceOwner implements PreviewSourceProvider {
         const strictEnd =
           retainedEnd ??
           (demand.holdSourceEnd === true && terminalTime !== undefined ? stream.end : undefined);
-        const leading = stream.leadingSampleTime;
-        const sampleTime =
-          leading !== undefined && Number.isFinite(leading) && leading > 0 && demand.time < leading
-            ? leading
+        const ordinary =
+          demand.time < stream.end
+            ? resolvePreviewSourceOrdinaryTime(demand.time, stream.end, stream.leadingSampleTime)
             : undefined;
+        const sampleTime =
+          ordinary && ordinary.effectiveTime !== demand.time ? ordinary.effectiveTime : undefined;
         if (
           sampleTime !== undefined &&
           (sampleTime >= stream.end ||

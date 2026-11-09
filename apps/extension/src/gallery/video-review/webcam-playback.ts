@@ -4,6 +4,7 @@ import {
 } from '../../features/video/review/advanced/webcam';
 
 type Frame = NonNullable<ReturnType<typeof quickEditWebcamFrameAt>>;
+type Alignment = { time: number; seekTime: number; offsetSeconds: number };
 
 /** Decoder evidence accompanying the mapped authored webcam frame. */
 export type ReviewWebcamAdmission = Frame & {
@@ -21,6 +22,8 @@ type PlaybackArgs = {
   settings(): QuickEditWebcam;
   paint(frame: ReviewWebcamAdmission | null): void;
   failed(): void;
+  registerAlignment?(request: ((target: Alignment | null) => void) | null): void;
+  onFrame?(): void;
 };
 
 /**
@@ -30,8 +33,12 @@ type PlaybackArgs = {
  */
 export function createReviewWebcamPlayback(args: PlaybackArgs) {
   const playback = new ReviewWebcamPlayback(args);
+  args.registerAlignment?.(playback.requestAlignment);
   playback.start();
-  return () => playback.dispose();
+  return () => {
+    args.registerAlignment?.(null);
+    playback.dispose();
+  };
 }
 
 /** One session owns decoder evidence, alignment policy and transport lifetime. */
@@ -43,6 +50,8 @@ class ReviewWebcamPlayback {
   private decoded: number | null = null;
   private seeking = false;
   private requestedTime: number | null = null;
+  private requestedSeekTime: number | null = null;
+  private alignmentRequest: Alignment | null = null;
   private alignmentNeeded = true;
   private initialAlignment = true;
   private visible = false;
@@ -89,6 +98,18 @@ class ReviewWebcamPlayback {
     this.clock.dispose();
     this.transport.dispose();
   }
+  readonly requestAlignment = (target: Alignment | null) => {
+    if (target === null) {
+      this.alignmentRequest = null;
+      return;
+    }
+    if (
+      this.disposed ||
+      (this.requestedTime === target.time && this.requestedSeekTime === target.seekTime)
+    )
+      return;
+    this.alignmentRequest = target;
+  };
   private requestFrame = () => {
     if (!this.hasFrameCallback || this.disposed) return;
     const expected = this.generation;
@@ -96,9 +117,10 @@ class ReviewWebcamPlayback {
       if (this.disposed || expected !== this.generation) return;
       this.decoded = metadata.mediaTime;
       this.requestFrame();
+      this.args.onFrame?.();
     });
   };
-  private seek = (time: number) => {
+  private seek = (time: number, logicalTime = time) => {
     this.args.camera.playbackRate = this.args.main.playbackRate;
     this.transport.pause();
     this.decoded = null;
@@ -108,10 +130,21 @@ class ReviewWebcamPlayback {
     this.alignmentNeeded = false;
     this.initialAlignment = false;
     this.holdingAhead = false;
-    this.requestedTime = time;
+    this.requestedTime = logicalTime;
+    this.requestedSeekTime = time;
     this.args.camera.currentTime = time;
     this.requestFrame();
   };
+  private applyPacketAlignment(frame: Frame | null, offsetSeconds: number) {
+    if (this.alignmentRequest && frame && !this.seeking && !this.args.camera.seeking) {
+      const target = this.alignmentRequest;
+      this.alignmentRequest = null;
+      if (target.offsetSeconds === offsetSeconds) {
+        this.raster.clear();
+        this.seek(Math.max(frame.time, target.seekTime), frame.time);
+      }
+    }
+  }
   private reconcile = () => {
     if (this.disposed) return;
     const now = performance.now();
@@ -120,6 +153,7 @@ class ReviewWebcamPlayback {
     const running = this.clock.running(now);
     const tolerance = this.frameDuration * 2;
     this.updateAlignment(frame, settings, tolerance);
+    this.applyPacketAlignment(frame, settings.offsetSeconds);
     const bridge =
       running && frame && this.raster.canRetain(frame, settings, now, this.args.main.playbackRate);
     if (!running) this.transport.pause();
@@ -162,6 +196,7 @@ class ReviewWebcamPlayback {
   private onSeeked = () => {
     this.seeking = false;
     if (!this.hasFrameCallback) this.decoded = this.args.camera.currentTime;
+    this.args.onFrame?.();
   };
   private onPause = () => {
     this.holdingAhead = false;
@@ -169,6 +204,9 @@ class ReviewWebcamPlayback {
     this.transport.pause();
   };
   private onSeeking = () => {
+    this.alignmentRequest = null;
+    this.requestedTime = null;
+    this.requestedSeekTime = null;
     this.initialAlignment = false;
     this.alignmentNeeded = true;
     this.holdingAhead = false;
@@ -196,8 +234,10 @@ class ReviewWebcamPlayback {
     if (
       settings.offsetSeconds !== this.previousOffset ||
       this.args.main.currentTime < this.previousSourceTime
-    )
+    ) {
+      this.alignmentRequest = null;
       this.initialAlignment = false;
+    }
     this.previousOffset = settings.offsetSeconds;
     this.previousSourceTime = this.args.main.currentTime;
     this.visible = !!frame;

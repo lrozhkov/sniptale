@@ -47,7 +47,11 @@ type PresentationSnapshot = {
   placement: QuickEditWebcamPlacement | null;
 };
 type CameraSource = ReturnType<typeof createReviewWebcamPreviewSource>;
-class PendingPresentation extends Error {}
+class PendingPresentation extends Error {
+  constructor(readonly retryAfterCapture = false) {
+    super();
+  }
+}
 type Publication = {
   completed: PresentedFrame;
   prepared: Prepared;
@@ -76,6 +80,7 @@ class ManualPresentationSession {
   private resultTime = 0;
   private front: PresentedFrame | null = null;
   private cameraSource: CameraSource | null = null;
+  private cameraEvidence = 0;
   private cameraState: PresentationCameraState = { phase: 'loading', duration: 0, ready: false };
   private readonly publications: number[] = [];
   private readonly video: HTMLVideoElement | null;
@@ -304,6 +309,7 @@ class ManualPresentationSession {
     return (async () => {
       let captured = primary;
       let camera: Awaited<ReturnType<typeof capturePresentationCamera>>;
+      const evidence = this.cameraEvidence;
       try {
         camera = await capturePresentationCamera(
           snapshot,
@@ -324,6 +330,15 @@ class ManualPresentationSession {
         const result = attachReviewPreviewCamera(primaryFrame, cameraFrame);
         this.cancelSourceFrameCallback();
         return result;
+      } catch (error) {
+        if (
+          error instanceof PendingPresentation &&
+          !this.disposed &&
+          this.cameraSource === cameraSource &&
+          evidence !== this.cameraEvidence
+        )
+          throw new PendingPresentation(true);
+        throw error;
       } finally {
         camera?.release();
         captured?.release();
@@ -515,6 +530,7 @@ class ManualPresentationSession {
       this.diagnosed = true;
     }
     this.status(this.waiting ? 'pending' : 'failed');
+    if (error instanceof PendingPresentation && error.retryAfterCapture) this.ready();
   };
 
   readonly ready = () => {
@@ -550,6 +566,11 @@ class ManualPresentationSession {
       webcam.settings.assetId,
       () => this.latest().input.webcam!.settings,
       {
+        evidenceChanged: () => {
+          if (this.disposed) return;
+          this.cameraEvidence++;
+          this.ready();
+        },
         ready: (visible) => {
           if (this.disposed) return;
           this.cameraState = { ...this.cameraState, ready: visible };

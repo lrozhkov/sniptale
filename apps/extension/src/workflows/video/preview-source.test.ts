@@ -4,10 +4,41 @@ import { createReviewExportDiagnostics } from '../video-review/export-diagnostic
 import {
   createPreviewSourceProvider,
   PreviewSourceSupersededError,
+  resolvePreviewSourceOrdinaryTime,
   type PreviewSourceDemand,
   type PreviewSourceLease,
   type PreviewSourceStream,
 } from './preview-source';
+
+it('shares ordinary rounded lookup while preserving logical, leading and EOF times', () => {
+  expect(resolvePreviewSourceOrdinaryTime(0.1, 1)).toEqual({
+    target: 0.1,
+    effectiveTime: 0.1,
+    lookupTime: 0.10000200000000001,
+  });
+  expect(resolvePreviewSourceOrdinaryTime(0, 1, 1 / 60)).toMatchObject({
+    target: 0,
+    effectiveTime: 1 / 60,
+  });
+  const edge = resolvePreviewSourceOrdinaryTime(0.999999, 1);
+  expect(edge.lookupTime).toBeLessThan(1);
+  expect(edge.lookupTime).toBeGreaterThan(edge.target);
+});
+
+it.each([NaN, Infinity, -1, 1])('rejects invalid ordinary target%s', (target) => {
+  expect(() => resolvePreviewSourceOrdinaryTime(target, 1)).toThrow();
+});
+
+it('selects the common rounded future packet and a negative first PTS without shifting targets', async () => {
+  const f = fixture([-0.1, 0.100001, 0.2], 1);
+  const first = await f.provider.acquire([demand(0)], signal());
+  expect(binding(first)).toMatchObject({ target: 0, timestamp: -0.1, nextTimestamp: 0.100001 });
+  first?.release();
+  const next = await f.provider.acquire([demand(0.1)], signal());
+  expect(binding(next)).toMatchObject({ target: 0.1, timestamp: 0.100001, nextTimestamp: 0.2 });
+  next?.release();
+  f.provider.dispose();
+});
 
 const signal = () => new AbortController().signal;
 const demand = (time: number, id = 'frame', url = 'blob:source'): PreviewSourceDemand => ({

@@ -11,6 +11,29 @@ import { classifyReviewExportFailure, reviewExportPhase } from './export-diagnos
 
 type ReviewSampleSink = Pick<VideoSampleSink, 'getSample' | 'samples' | 'samplesAtTimestamps'>;
 
+/** Aligns VP8 inferred color with SDK defaults while retaining explicit source metadata. */
+export function resolveReviewDecodedColorPatch(
+  config?: VideoDecoderConfig | null,
+  actual?: { format: VideoPixelFormat | null; colorSpace: VideoColorSpaceInit }
+): VideoColorSpaceInit | undefined {
+  if (config?.codec !== 'vp8') return undefined;
+  if (!actual) return config.colorSpace?.matrix ? undefined : { matrix: 'smpte170m' };
+  const source = config.colorSpace;
+  const primaries = source?.primaries ?? 'bt709';
+  const transfer = source?.transfer ?? 'bt709';
+  const matrix = source?.matrix ?? 'smpte170m';
+  const fullRange = source?.fullRange ?? false;
+  // RGB planes already carry converted channel values; YUV matrix/range no longer apply.
+  const rgb = actual.format?.includes('RGB') || actual.format?.includes('BGR');
+  const patch = {
+    ...(actual.colorSpace.primaries !== primaries ? { primaries } : {}),
+    ...(actual.colorSpace.transfer !== transfer ? { transfer } : {}),
+    ...(!rgb && actual.colorSpace.matrix !== matrix ? { matrix } : {}),
+    ...(!rgb && actual.colorSpace.fullRange !== fullRange ? { fullRange } : {}),
+  };
+  return Object.keys(patch).length ? patch : undefined;
+}
+
 /** Normalizes moving and transition endpoint frames at the shared export decode boundary. */
 export function createReviewDecodedSampleSink(
   sink: ReviewSampleSink,
@@ -19,10 +42,7 @@ export function createReviewDecodedSampleSink(
   conversion: 'canvas' | 'native' = 'canvas'
 ) {
   // VP8 defaults to BT.601. The SDK assumes BT.709 when container metadata is absent.
-  const colorSpace =
-    config?.codec === 'vp8' && !config.colorSpace?.matrix
-      ? { matrix: 'smpte170m' as const }
-      : undefined;
+  const colorSpace = resolveReviewDecodedColorPatch(config);
   const prepare = (sample: VideoSample) => {
     if (signal.aborted) {
       sample.close();

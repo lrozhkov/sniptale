@@ -427,8 +427,8 @@ async function cameraRectangleColors(
 }
 
 /** The camera fixture has a uniform colour field whose red channel advances with source PTS. */
-function cameraReferenceColors(time: number) {
-  const source = new URL('../fixtures/review-webcam-clock.webm', import.meta.url);
+function cameraReferenceColors(time: number, filename = 'review-webcam-clock.webm') {
+  const source = new URL(`../fixtures/${filename}`, import.meta.url);
   const bytes = execFileSync(
     '/usr/bin/ffmpeg',
     [
@@ -644,3 +644,216 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     }
   });
 }
+
+/** Native capture identity remains observable when WebCodecs declines a source up front. */
+test('Gallery unsupported camera admits actual VFR source in GPU and Standard', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await page.addInitScript(() => {
+    const NativeFrame = globalThis.VideoFrame;
+    const records: { timestamp: number; currentTime: number; duration: number }[] = [];
+    Object.defineProperty(globalThis, 'VideoFrame', {
+      configurable: true,
+      value: new Proxy(NativeFrame, {
+        construct(target, args) {
+          const frame: unknown = Reflect.construct(target, args, target);
+          if (!(frame instanceof NativeFrame)) throw new Error('Invalid native frame result');
+          const input: unknown = args[0];
+          if (input instanceof HTMLVideoElement && records.length < 512)
+            records.push({
+              timestamp: frame.timestamp,
+              currentTime: input.currentTime,
+              duration: input.duration,
+            });
+          return frame;
+        },
+      }),
+    });
+    VideoDecoder.isConfigSupported = async (config) => ({ supported: false, config });
+    Reflect.set(window, 'sniptaleManualCameraSourceFrames', records);
+  });
+  const host = await startHostServer();
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const dialog = page.locator('dialog');
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+  const cameraFacts = () =>
+    page.evaluate(() => {
+      const value: unknown = Reflect.get(window, 'sniptaleManualCameraSourceFrames');
+      if (!Array.isArray(value)) throw new Error('Native camera facts are unavailable');
+      const result: { timestamp: number; currentTime: number; duration: number }[] = [];
+      const entries: unknown[] = value;
+      for (const item of entries) {
+        if (
+          !item ||
+          typeof item !== 'object' ||
+          !('timestamp' in item) ||
+          !('currentTime' in item) ||
+          !('duration' in item) ||
+          typeof item.timestamp !== 'number' ||
+          typeof item.currentTime !== 'number' ||
+          typeof item.duration !== 'number' ||
+          ![item.timestamp, item.currentTime, item.duration].every(Number.isFinite)
+        )
+          throw new Error('Native camera facts are invalid');
+        if (item.duration === 6)
+          result.push({
+            timestamp: item.timestamp,
+            currentTime: item.currentTime,
+            duration: item.duration,
+          });
+      }
+      return result;
+    });
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'light' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewWebcamBundle(page, 'review-cut-vfr.webm');
+    await page.reload();
+    await page.getByRole('button', { name: /: Screen$/ }).click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    await dialog
+      .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+      .click();
+    expect(await page.evaluate(() => [typeof VideoFrame, typeof VideoDecoder])).toEqual([
+      'function',
+      'function',
+    ]);
+    const main = dialog.locator(
+      '[data-ui="gallery.videoReview.manualPreview"] canvas[data-preview-front="true"]'
+    );
+    await expect(main).toBeVisible();
+    await dialog.locator('[data-review-header-track="webcam"] [data-review-track-select]').click();
+    await dialog
+      .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
+      .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
+      .click();
+    await expect(dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]')).toBeVisible();
+    const camera = await currentCameraSettings(page);
+    const initial = await readWebcamWorkspace(page);
+    if (!initial) throw new Error('Camera workspace is unavailable');
+    const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+    const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+    const box = await ruler.boundingBox();
+    const duration = Number(await plane.getAttribute('aria-valuemax'));
+    if (!box || !Number.isFinite(duration) || duration <= 0)
+      throw new Error('Camera source timeline is unavailable');
+    const error = (expected: number[][], actual: number[][]) =>
+      Math.max(
+        ...expected.flatMap((color, index) =>
+          color.map((value, channel) => Math.abs(value - actual[index]![channel]!))
+        )
+      );
+    const samples = [];
+    for (const [target, pts] of [
+      [1.02, 0.9],
+      [1.21, 1.2],
+    ] as const) {
+      const before = await main.elementHandle();
+      if (!before) throw new Error('Previous camera publication is unavailable');
+      const count = (await cameraFacts()).length;
+      try {
+        await ruler.click({ position: { x: (box.width * target!) / duration, y: 8 } });
+        await expect
+          .poll(() => main.evaluate((canvas, previous) => canvas !== previous, before))
+          .toBe(true);
+      } finally {
+        await before.dispose();
+      }
+      await expect
+        .poll(async () =>
+          (await cameraFacts()).slice(count).some((frame) => frame.timestamp === pts! * 1e6)
+        )
+        .toBe(true);
+      const reference = cameraReferenceColors(pts!, 'review-cut-vfr.webm');
+      await expect
+        .poll(async () =>
+          error(reference, (await cameraRectangleColors(main, camera.placement)).colors)
+        )
+        .toBeLessThan(4);
+      samples.push({
+        target,
+        expectedPTS: pts,
+        reference,
+        actual: await cameraRectangleColors(main, camera.placement),
+      });
+    }
+    const acceptedTime = Number(await plane.getAttribute('aria-valuenow'));
+    const gpuFront = await main.elementHandle();
+    if (!gpuFront) throw new Error('Accepted GPU camera publication is unavailable');
+    await dialog.locator('[data-ui="gallery.videoReview.previewSettings"]').click();
+    const panel = dialog.locator('[data-ui="gallery.videoReview.previewInspector"]');
+    await panel
+      .getByRole('button', { name: label('editor.scene.previewRenderer'), exact: true })
+      .click();
+    await page
+      .getByRole('option', { name: label('editor.scene.previewRendererLegacy'), exact: true })
+      .click();
+    await panel.press('Escape');
+    try {
+      await expect
+        .poll(() => main.evaluate((canvas, previous) => canvas !== previous, gpuFront))
+        .toBe(true);
+    } finally {
+      await gpuFront.dispose();
+    }
+    await expect
+      .poll(() =>
+        main.evaluate((canvas: HTMLCanvasElement) => {
+          try {
+            return canvas.getContext('2d') !== null;
+          } catch (error) {
+            if (error instanceof DOMException && error.name === 'InvalidStateError') return false;
+            throw error;
+          }
+        })
+      )
+      .toBe(true);
+    const reference = cameraReferenceColors(1.2, 'review-cut-vfr.webm');
+    await expect
+      .poll(async () =>
+        error(reference, (await cameraRectangleColors(main, camera.placement)).colors)
+      )
+      .toBeLessThan(4);
+    expect(Number(await plane.getAttribute('aria-valuenow'))).toBe(acceptedTime);
+    const final = await readWebcamWorkspace(page);
+    expect(final?.history).toEqual(initial.history);
+    expect(final?.cursor).toBe(initial.cursor);
+    expect(await currentCameraSettings(page)).toEqual(camera);
+    expect(errors).toEqual([]);
+    await writeFile(
+      info.outputPath('manual-camera-vfr-source.json'),
+      JSON.stringify(
+        {
+          viewport: page.viewportSize(),
+          sourceRaster: { width: 160, height: 90 },
+          sourceSHA256: createHash('sha256')
+            .update(await readFile(new URL('../fixtures/review-cut-vfr.webm', import.meta.url)))
+            .digest('hex'),
+          samples,
+          nativeFrames: await cameraFacts(),
+          standard: await cameraRectangleColors(main, camera.placement),
+          acceptedTime,
+          errors,
+          limitation:
+            'Forced upfront WebCodecs rejection with native APIs present. Actual VFR camera captures and independent raw RGB references; controlled tests prove mismatch recovery and resource ownership. No FPS claim or genuine unsupported codec claim.',
+        },
+        null,
+        2
+      )
+    );
+    await page.screenshot({
+      path: info.outputPath('manual-camera-vfr-source.png'),
+      fullPage: false,
+    });
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      host.server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});

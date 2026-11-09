@@ -4,6 +4,7 @@ import { VideoSample } from 'mediabunny';
 import {
   createReviewDecodedSampleSink,
   createCompositionCutSampleSource,
+  resolveReviewDecodedColorPatch,
 } from './decoded-video-sample';
 import {
   createProject,
@@ -99,6 +100,81 @@ beforeEach(() => {
   vi.stubGlobal('VideoFrame', TestFrame);
 });
 afterEach(() => vi.unstubAllGlobals());
+
+it('aligns inferred VP8 native color with canonical defaults without changing its matrix', () => {
+  expect(
+    resolveReviewDecodedColorPatch(
+      { codec: 'vp8' },
+      {
+        format: 'I420',
+        colorSpace: {
+          primaries: 'smpte170m',
+          transfer: 'smpte170m',
+          matrix: 'smpte170m',
+          fullRange: false,
+        },
+      }
+    )
+  ).toEqual({ primaries: 'bt709', transfer: 'bt709' });
+});
+
+it.each(['bt709', 'smpte170m'] as const)(
+  'preserves explicit VP8 %s color and avoids an extra native copy',
+  (color) => {
+    const colorSpace = { primaries: color, transfer: color, matrix: color, fullRange: true };
+    expect(
+      resolveReviewDecodedColorPatch({ codec: 'vp8', colorSpace }, { format: 'I420', colorSpace })
+    ).toBeUndefined();
+    expect(
+      resolveReviewDecodedColorPatch(
+        { codec: 'vp8', colorSpace },
+        {
+          format: 'I420',
+          colorSpace: { primaries: null, transfer: null, matrix: null, fullRange: null },
+        }
+      )
+    ).toEqual(colorSpace);
+  }
+);
+
+it('leaves already conforming VP8 native fields and non-VP8 bitstream interpretation unchanged', () => {
+  const actual = {
+    format: 'I420' as const,
+    colorSpace: {
+      primaries: 'bt709' as const,
+      transfer: 'bt709' as const,
+      matrix: 'smpte170m' as const,
+      fullRange: false,
+    },
+  };
+  expect(resolveReviewDecodedColorPatch({ codec: 'vp8' }, actual)).toBeUndefined();
+  expect(
+    resolveReviewDecodedColorPatch(
+      { codec: 'avc1.42001e' },
+      { ...actual, colorSpace: { matrix: 'bt709' } }
+    )
+  ).toBeUndefined();
+});
+
+it.each(['RGBA', 'RGBX', 'BGRA', 'BGRX'] as const)(
+  'retains converted %s matrix/range representation while aligning missing gamut defaults',
+  (format) => {
+    expect(
+      resolveReviewDecodedColorPatch(
+        { codec: 'vp8' },
+        {
+          format,
+          colorSpace: {
+            primaries: 'smpte170m',
+            transfer: 'smpte170m',
+            matrix: 'rgb',
+            fullRange: true,
+          },
+        }
+      )
+    ).toEqual({ primaries: 'bt709', transfer: 'bt709' });
+  }
+);
 
 function setup(
   format: VideoPixelFormat = 'NV12',

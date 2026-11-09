@@ -221,6 +221,7 @@ function cameraBinding() {
         loaded(duration: number): void;
         ready(visible: boolean): void;
         failed(): void;
+        evidenceChanged(): void;
       },
   };
 }
@@ -513,4 +514,97 @@ it('retains camera and primary through active rendering after owner disposal', a
   expect(camera.released).toHaveBeenCalledOnce();
   expect(closed).toHaveBeenCalledOnce();
   expect(props.host.current!.querySelector('[data-preview-front="true"]')).toBeNull();
+});
+
+it('retains the complete accepted publication until camera alignment wakes a retry', async () => {
+  const draw = io.render.getMockImplementation()!;
+  io.render.mockImplementation((prepared, frame) => ({
+    ...draw(prepared, frame),
+    sourceTime: frame.sourceTime,
+  }));
+  const camera = cameraBinding();
+  const geometry = vi.fn();
+  props.onGeometry = geometry;
+  await render();
+  act(() => {
+    camera.events().loaded(20);
+    camera.events().ready(true);
+  });
+  await step(0);
+  const front = props.host.current!.querySelector('[data-preview-front="true"]');
+  expect(front).not.toBeNull();
+  expect(result.status.phase).toBe('ready');
+  expect(geometry).toHaveBeenCalledOnce();
+  expect(geometry.mock.lastCall?.slice(1)).toEqual([1.234567, 'source']);
+  const oldRelease = releases[0]!;
+  const captured = closed.mock.calls.length;
+  camera.captureFrame.mockReturnValue({ status: 'unavailable' });
+  props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75 };
+  await render();
+  await step(50);
+  expect(result.status.phase).toBe('pending');
+  expect(props.host.current!.querySelector('[data-preview-front="true"]')).toBe(front);
+  expect(oldRelease).not.toHaveBeenCalled();
+  expect(geometry).toHaveBeenCalledOnce();
+  expect(io.render).toHaveBeenCalledOnce();
+  expect(closed.mock.calls.length).toBe(captured + 1);
+  camera.captureFrame.mockReturnValue({ status: 'ready', frame: camera.frame });
+  act(() => camera.events().evidenceChanged());
+  expect(result.webcamManual.ready).toBe(true);
+  await step(100);
+  expect(result.status.phase).toBe('ready');
+  expect(props.host.current!.querySelector('[data-preview-front="true"]')).not.toBe(front);
+  expect(oldRelease).toHaveBeenCalledOnce();
+  expect(geometry).toHaveBeenCalledTimes(2);
+  expect(geometry.mock.lastCall?.slice(1)).toEqual([2, 'source']);
+  expect(io.render.mock.lastCall![1]).toMatchObject({
+    sourceTime: 2,
+    resultTime: 1.75,
+    camera: { representedMediaTime: 1.2 },
+  });
+});
+
+it('retries when decoder evidence arrives before the rejected capture enters pending', async () => {
+  const draw = io.render.getMockImplementation()!;
+  io.render.mockImplementation((prepared, frame) => ({
+    ...draw(prepared, frame),
+    sourceTime: frame.sourceTime,
+  }));
+  const camera = cameraBinding();
+  const geometry = vi.fn();
+  props.onGeometry = geometry;
+  await render();
+  act(() => {
+    camera.events().loaded(20);
+    camera.events().ready(true);
+  });
+  await step(0);
+  const front = props.host.current!.querySelector('[data-preview-front="true"]');
+  expect(front).not.toBeNull();
+  const oldRelease = releases[0]!;
+  const gate = Promise.withResolvers<{ status: 'unavailable' }>();
+  camera.captureFrame.mockReturnValue(gate.promise);
+  props = { ...props, pausedSourceTime: 2, pausedResultTime: 1.75 };
+  await render();
+  await step(50);
+  expect(camera.captureFrame).toHaveBeenCalledTimes(2);
+  expect(io.render).toHaveBeenCalledOnce();
+  expect(geometry).toHaveBeenCalledOnce();
+  expect(oldRelease).not.toHaveBeenCalled();
+  expect(props.host.current!.querySelector('[data-preview-front="true"]')).toBe(front);
+  await act(async () => {
+    camera.events().evidenceChanged();
+    camera.captureFrame.mockReturnValue({ status: 'ready', frame: camera.frame });
+    gate.resolve({ status: 'unavailable' });
+  });
+  await step(100);
+  expect(result.status.phase).toBe('ready');
+  expect(camera.captureFrame).toHaveBeenCalledTimes(3);
+  expect(io.render).toHaveBeenCalledTimes(2);
+  expect(props.host.current!.querySelector('[data-preview-front="true"]')).not.toBe(front);
+  expect(oldRelease).toHaveBeenCalledOnce();
+  expect(geometry).toHaveBeenCalledTimes(2);
+  expect(geometry.mock.lastCall?.slice(1)).toEqual([2, 'source']);
+  expect(camera.released).toHaveBeenCalledTimes(2);
+  expect(closed).toHaveBeenCalledTimes(3);
 });

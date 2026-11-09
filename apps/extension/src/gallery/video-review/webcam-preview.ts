@@ -1,9 +1,15 @@
-import { VideoSample } from 'mediabunny';
+import { ALL_FORMATS, BlobSource, EncodedPacketSink, Input, VideoSample } from 'mediabunny';
 import {
   createPreviewSourceProvider,
+  readPreviewSourceLeadingSampleTime,
+  resolvePreviewSourceOrdinaryTime,
   type PreviewSourceProvider,
 } from '../../workflows/video/preview-source';
-import { prepareDecodedVideoSample } from '../../features/video/composition/draw/decoded-sample';
+import {
+  prepareDecodedVideoFrame,
+  prepareDecodedVideoSample,
+} from '../../features/video/composition/draw/decoded-sample';
+import { resolveReviewDecodedColorPatch } from '../../workflows/video-review/decoded-video-sample';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { quickEditWebcamFrameAt } from '../../features/video/review/advanced/webcam';
@@ -27,6 +33,8 @@ type PreviewView = {
 };
 type PreviewEvents = {
   ready(visible: boolean): void;
+  /** New decoder evidence permits a pending capture retry without changing visible readiness. */
+  evidenceChanged?(): void;
   loaded(duration: number): void;
   failed(): void;
 };
@@ -104,12 +112,35 @@ function createWebcamSource(
   let disposed = false;
   const canonical =
     !hybridView && typeof VideoDecoder !== 'undefined' && typeof VideoFrame !== 'undefined';
+  const nativeCompatibility = !hybridView && typeof VideoFrame !== 'undefined';
   let unsupported = false;
   let provider: PreviewSourceProvider | undefined;
   const abort = new AbortController();
   let metadata = { duration: 0, frameDuration: 1 / 30 };
   let url: string | null = null;
   let stop: (() => void) | undefined;
+  let blob: Blob | undefined;
+  let packetInput: Input | undefined;
+  let packetMetadata:
+    | Promise<{
+        sink: EncodedPacketSink;
+        leadingSampleTime: number | undefined;
+        config: VideoDecoderConfig | null;
+      }>
+    | undefined;
+  let captureRevision = 0;
+  let align: Parameters<
+    NonNullable<Parameters<typeof createReviewWebcamPlayback>[0]['registerAlignment']>
+  >[0] = null;
+  let pendingAlignment: { time: number; seekTime: number; offsetSeconds: number } | null = null;
+  main.addEventListener(
+    'seeking',
+    () => {
+      captureRevision++;
+      pendingAlignment = null;
+    },
+    { signal: abort.signal }
+  );
   const listeners = new Set<(frame: ReviewWebcamAdmission | null) => void>();
   const video = document.createElement('video');
   video.preload = 'auto';
@@ -120,7 +151,7 @@ function createWebcamSource(
     if (disposed) return;
     capture.accept(frame);
     if (paint) paint(frame);
-    else if (!canonical || unsupported) events.ready(!!frame);
+    else if (!nativeCompatibility) events.ready(!!frame);
     for (const listener of listeners) listener(frame);
   };
   const fail = () => {
@@ -150,6 +181,17 @@ function createWebcamSource(
       settings,
       failed: fail,
       paint: publish,
+      registerAlignment: (request) => {
+        align = request;
+        if (request && pendingAlignment) {
+          request(pendingAlignment);
+          pendingAlignment = null;
+        }
+      },
+      onFrame: () => {
+        if (!disposed && nativeCompatibility && (!canonical || unsupported))
+          events.evidenceChanged?.();
+      },
     });
   };
   video.addEventListener('loadedmetadata', loaded);
@@ -157,19 +199,152 @@ function createWebcamSource(
     if (!canonical || unsupported) fail();
   };
   video.addEventListener('error', htmlFailed);
-  const acquired = resolveReviewAssetBytes(assetId).then(async (blob) => {
+  const acquired = resolveReviewAssetBytes(assetId).then(async (bytes) => {
     if (disposed) return;
-    if (!blob) {
+    if (!bytes) {
       throw new Error('Camera source is unavailable.');
     }
-    metadata = await inspectReviewWebcamMetadata(blob, abort.signal);
+    metadata = await inspectReviewWebcamMetadata(bytes, abort.signal);
     if (disposed) return;
-    url = URL.createObjectURL(blob);
+    blob = bytes;
+    url = URL.createObjectURL(bytes);
     video.src = url;
     video.load();
     if (canonical) events.loaded(metadata.duration);
   });
   void acquired.catch(fail);
+
+  const readPacketMetadata = () =>
+    (packetMetadata ??= (async () => {
+      await acquired;
+      abort.signal.throwIfAborted();
+      if (!blob) throw new Error('Camera source is unavailable.');
+      packetInput = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
+      const track = await packetInput.getPrimaryVideoTrack();
+      abort.signal.throwIfAborted();
+      if (!track) throw new Error('Camera video track is unavailable.');
+      const leadingSampleTime = await readPreviewSourceLeadingSampleTime(
+        track,
+        metadata.duration,
+        abort.signal
+      );
+      const config = await track.getDecoderConfig();
+      abort.signal.throwIfAborted();
+      return { sink: new EncodedPacketSink(track), leadingSampleTime, config };
+    })());
+
+  const captureHtmlFrame = async (
+    request: CaptureRequest & { sourceTime: number; settings: QuickEditWebcam },
+    resources: RenderResources,
+    signal: AbortSignal
+  ): Promise<CaptureResult> => {
+    const revision = ++captureRevision;
+    const acceptsRequest = () => {
+      const latest = settings();
+      return (
+        revision === captureRevision &&
+        latest.assetId === assetId &&
+        latest.offsetSeconds === request.settings.offsetSeconds
+      );
+    };
+    let raw: VideoFrame | undefined;
+    let snapshot: { release(): void } | undefined;
+    let normalization: { release(): void } | undefined;
+    let admitted: ReviewWebcamFrameLease | undefined;
+    try {
+      await acquired;
+      signal.throwIfAborted();
+      if (!acceptsRequest()) return { status: 'unavailable' };
+      const mapped = quickEditWebcamFrameAt(
+        request.settings,
+        request.sourceTime,
+        metadata.duration
+      );
+      if (!mapped) {
+        events.ready(false);
+        return { status: 'hidden' };
+      }
+      if (!video.seeking && video.readyState >= 2) {
+        try {
+          raw = new VideoFrame(video);
+          const bytes = raw.allocationSize();
+          if (!Number.isSafeInteger(bytes) || bytes <= 0)
+            throw new Error('Invalid camera source frame.');
+          snapshot = resources.bytes('webcam.active', bytes);
+        } catch (error) {
+          if (!(error instanceof DOMException && error.name === 'InvalidStateError')) throw error;
+        }
+      }
+      const index = await readPacketMetadata();
+      signal.throwIfAborted();
+      const selection = resolvePreviewSourceOrdinaryTime(
+        mapped.time,
+        metadata.duration,
+        index.leadingSampleTime
+      );
+      const packet = await index.sink.getPacket(selection.lookupTime, { metadataOnly: true });
+      signal.throwIfAborted();
+      if (!acceptsRequest()) return { status: 'unavailable' };
+      if (
+        !packet ||
+        !Number.isFinite(packet.timestamp) ||
+        packet.timestamp >= metadata.duration ||
+        packet.timestamp > selection.lookupTime ||
+        !Number.isSafeInteger(Math.round(packet.timestamp * 1_000_000))
+      )
+        throw new Error('Camera packet timestamp is unavailable.');
+      // Chrome presents native frame timestamps at the nearest microsecond, unlike SDK truncation.
+      if (!raw || raw.timestamp !== Math.round(packet.timestamp * 1_000_000)) {
+        const target = {
+          time: mapped.time,
+          seekTime: Math.max(selection.effectiveTime, packet.timestamp),
+          offsetSeconds: request.settings.offsetSeconds,
+        };
+        if (align) align(target);
+        else pendingAlignment = target;
+        return { status: 'unavailable' };
+      }
+      const colorPatch = resolveReviewDecodedColorPatch(index.config, raw);
+      if (colorPatch) {
+        normalization = resources.bytes('webcam.active', raw.allocationSize() * 2);
+        const input = raw;
+        raw = undefined;
+        raw = await prepareDecodedVideoFrame(input, signal, colorPatch);
+        signal.throwIfAborted();
+        if (!acceptsRequest()) return { status: 'unavailable' };
+      }
+      const frame = raw;
+      raw = undefined;
+      snapshot?.release();
+      snapshot = undefined;
+      normalization?.release();
+      normalization = undefined;
+      admitted = retainCameraFrame(
+        frame,
+        frame.timestamp / 1_000_000,
+        undefined,
+        () => {},
+        request,
+        mapped,
+        resources,
+        packet.timestamp
+      );
+      pendingAlignment = null;
+      align?.(null);
+      events.ready(true);
+      return { status: 'ready', frame: admitted };
+    } catch (error) {
+      admitted?.release();
+      signal.throwIfAborted();
+      if (!acceptsRequest()) return { status: 'unavailable' };
+      fail();
+      throw error;
+    } finally {
+      raw?.close();
+      snapshot?.release();
+      normalization?.release();
+    }
+  };
 
   return {
     captureAccepted: capture.captureAccepted,
@@ -189,7 +364,10 @@ function createWebcamSource(
       const discontinuity = main.paused;
       const interest = AbortSignal.any([signal, abort.signal]);
       interest.throwIfAborted();
-      if (!canonical || unsupported) return capture.captureAccepted(frozen, resources);
+      if (!canonical || unsupported)
+        return nativeCompatibility
+          ? captureHtmlFrame(frozen, resources, interest)
+          : capture.captureAccepted(frozen, resources);
       await acquired;
       interest.throwIfAborted();
       const mapped = quickEditWebcamFrameAt(frozen.settings, frozen.sourceTime, metadata.duration);
@@ -216,11 +394,19 @@ function createWebcamSource(
         if (lease === null) {
           unsupported = true;
           if (video.readyState >= 1) loaded();
-          return capture.captureAccepted(frozen, resources);
+          return captureHtmlFrame(frozen, resources, interest);
         }
         const binding = lease.bindings.get('camera');
         if (!binding) throw new Error('Camera source frame is unavailable.');
-        admitted = retainCanonicalCamera(binding, lease.release, frozen, mapped, resources);
+        admitted = retainCameraFrame(
+          binding.source.toVideoFrame?.(),
+          binding.timestamp,
+          binding.source.orientation,
+          lease.release,
+          frozen,
+          mapped,
+          resources
+        );
         events.ready(true);
         return { status: 'ready', frame: admitted };
       } catch (error) {
@@ -245,6 +431,8 @@ function createWebcamSource(
       stop?.();
       capture.dispose();
       provider?.dispose();
+      packetInput?.dispose();
+      blob = undefined;
       listeners.clear();
       video.removeEventListener('loadedmetadata', loaded);
       video.removeEventListener('error', htmlFailed);
@@ -257,14 +445,16 @@ function createWebcamSource(
 }
 
 /** One canonical camera lease owns its native and Canvas views through the render completion. */
-function retainCanonicalCamera(
-  binding: import('../../workflows/video/preview-source').PreviewSourceBinding,
+function retainCameraFrame(
+  raw: VideoFrame | undefined,
+  timestamp: number,
+  orientation: VideoCompositionFrameSource['orientation'],
   releaseSource: () => void,
   request: CaptureRequest,
   mapped: NonNullable<ReturnType<typeof quickEditWebcamFrameAt>>,
-  resources: RenderResources
+  resources: RenderResources,
+  representedMediaTime = timestamp
 ): ReviewWebcamFrameLease {
-  let raw: VideoFrame | undefined;
   let sample: VideoSample | undefined;
   let gpu: VideoFrame | undefined;
   let reservation: { release(): void } | undefined;
@@ -279,16 +469,15 @@ function retainCanonicalCamera(
     releaseSource();
   };
   try {
-    raw = binding.source.toVideoFrame?.();
     if (!raw) throw new Error('Camera source frame is unavailable.');
     const bytes = raw.allocationSize();
-    if (!Number.isSafeInteger(bytes) || bytes <= 0 || !Number.isFinite(binding.timestamp))
+    if (!Number.isSafeInteger(bytes) || bytes <= 0 || !Number.isFinite(timestamp))
       throw new Error('Invalid camera source frame.');
     reservation = resources.bytes('webcam.active', bytes * 3);
     sample = new VideoSample(raw, {
-      timestamp: binding.timestamp,
-      rotation: binding.source.orientation?.rotation ?? 0,
-      flip: binding.source.orientation?.flip ?? false,
+      timestamp,
+      rotation: orientation?.rotation ?? 0,
+      flip: orientation?.flip ?? false,
     });
     raw = undefined;
     const current = () => {
@@ -297,13 +486,13 @@ function retainCanonicalCamera(
     };
     return {
       allocationBytes: bytes * 3,
-      representedMediaTime: binding.timestamp,
+      representedMediaTime,
       generation: request.generation ?? 0,
       source: { width: sample.displayWidth, height: sample.displayHeight },
       placement: request.placement ?? mapped.placement,
       crop: request.crop ?? mapped.crop,
       drawable: {
-        ...(binding.source.orientation ? { orientation: binding.source.orientation } : {}),
+        ...(orientation ? { orientation } : {}),
         videoFrame: () => (gpu ??= current().toVideoFrame()),
         prepare: async (signal) => {
           const previous = current();

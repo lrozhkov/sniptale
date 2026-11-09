@@ -6507,11 +6507,11 @@
       "file": "apps/extension/src/gallery/video-review/webcam-preview.ts",
       "symbol": "createWebcamSource",
       "owner": "extension:gallery:video-review",
-      "astHash": "a658f7df0e9ee6e3af2d7d9cc6cdb89a88d4e882a7d21d5dbcce524cb2caf699",
+      "astHash": "decef7e3c75390ed95ceb953a970158ee4c6e7ea2ced1fafa875d004b53611c3",
       "signatureHash": "5511a7eae61eb7c6e13b1f781cc42e3b2d1a6251bbf329e1334e35cf9fd38292",
       "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One camera asset owns its URL, metadata, provider and compatibility element. One disposal signal ends this lifetime. Canonical capture freezes source time and settings. Native and Canvas views retain their own lease. A second state owner would duplicate this asset lifetime. Independent diagnosis found no separate authority. Fresh architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent asset, fixture, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary."
+      "reason": "tool-noise: One camera asset owns metadata, URL, abort and disposal. Canonical and compatibility routes use that lifetime. Metadata lookup has no independent consumer or retirement owner. Independent diagnosis found that extraction would divide this resource authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent metadata lifetime, consumer or retirement owner. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-file-risk",
@@ -6551,11 +6551,11 @@
       "file": "apps/extension/src/workflows/video/preview-source.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "astHash": "fbf7acc5a2f91e208990ab47c68682e721b6cad32d623bc33e3c4b0322237950",
+      "astHash": "fa8735afd2f166b03ecc3c26e2333503c04eab0ced18bb78655f9737a2d49eaf",
       "signatureHash": "1e3d2d3be52d4180519b46ed0393af3f5fb9afc2f6f463671999bdea74e846c5",
       "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One fixture tests the existing source provider. Separate open and decode cases preserve transient causes. Their controlled summaries exclude private error details. Each case disposes its provider. Independent diagnosis found no new queue or diagnostic writer. Fresh architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess changes to queue ownership, error classification, diagnostic output or decoder lifetime. Remove when the analyzer models this cohesive boundary."
+      "reason": "tool-noise: One fixture tests canonical selection and source retirement. New resolver cases connect arithmetic to the actual provider. Existing stream fixtures retain their setup and cleanup. Independent diagnosis found no separate policy service. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independently owned resolver or source policy. Remove when the analyzer models this cohesive boundary."
     },
     {
       "rule": "structural-file-risk",
@@ -6567,6 +6567,61 @@
       "reviewDate": "2026-11-09",
       "reason": "tool-noise: One fixture tests Gallery bookend intake and presentation. The packet inventory verifies twenty source timestamps. Independent decoded frames provide red and blue references. The same preview proves changed publication and preserves history and transport. Temporary files and the HTTP host retire independently. Independent diagnosis found no production decoder authority. Fresh architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess changes to packet correspondence, references, fixture lifetime, admission, publication, history or transport. Remove when the analyzer models this cohesive boundary."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/webcam-playback.ts",
+      "symbol": "<anonymous>#5",
+      "owner": "extension:gallery:video-review",
+      "astHash": "79162ae3132997aefe99214cd3c2a0f9761e0a61b932efd629b8a11a938720a5",
+      "signatureHash": "631e5a7b8330cbc9720eaa6efd983e9976c4e4444d79ad4c531c3439811747ef",
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: The matcher compares different class fields after insertion of a new arrow field. Baseline reconcile has score6, cyclomatic20 and cognitive37. Current reconcile has the same metrics. Its only added statement calls the named packet alignment phase. Independent diagnosis confirms one existing ordered transport loop. Tooling QA owns the ordinal comparison. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Remove when lineage uses the reconcile field identity. Reassess new inline decisions or independent responsibilities. Remove when the analyzer models this cohesive boundary."
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/webcam-preview.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "astHash": "99a2d164c363dd486b55ec75ba596737da587fa0c14cd2911cc1c980e3b9db88",
+      "signatureHash": "f2876dd6f438b8bea968188414da9f1255e2f9c1226547eaf431cfa990c1e4e4",
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One fixture tests the existing source factory. Native frames, resource reservations, playback signals and cleanup share that fixture. Compatibility cases exercise the same acquisition lifetime. Independent diagnosis found no separate service or fixture authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independently owned adapter or fixture lifetime. Remove when the analyzer models this cohesive boundary."
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/webcam-preview.ts",
+      "symbol": "createWebcamSource.captureHtmlFrame",
+      "owner": "extension:gallery:video-review",
+      "astHash": "63ab1c69d28ad5ddf23ab147c5305b2dc5df102c3d59246bd34599f74f63c949",
+      "signatureHash": "27ed8fb9930008a5e4011da74c3751b2dff808c7e9d506aaa98c2830ecd8c9fa",
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One acquisition owns its frozen frame, reservation, metadata query and packet identity. Stale interest rejects publication. Charge transfer and failure cleanup remain in this transaction. Shared arithmetic belongs to the existing source provider. Independent diagnosis supports this boundary. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent membership policy or resource transfer lifetime. Remove when the analyzer models this cohesive boundary."
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-webcam-gpu.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "astHash": "08d90f9616898463330bf46b718c985b7afa82859ff87587a3d1f237bc7de413",
+      "signatureHash": "05d9fada7b14622cd2e2d39b182bf1763d9af182cd366554f2b82eaea02b5e67",
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One workflow tests Gallery camera acquisition and presentation. The compatibility case reuses existing settings, source references and rectangle readback. Browser, server and observer effects belong to this fixture. Independent diagnosis found no production clock or decoder authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess another workflow or independently configured fixture. Remove when the analyzer models this cohesive boundary."
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/webcam-preview.ts",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "astHash": "7cbf7dba1fb14d87f2d368dd0b228156e92d23c5d1ac733eaf8102490024b7dd",
+      "signatureHash": "670f1e4e4d63a04b1ae026ed0c3ba0d9c49bb1c5a0c448f5444dc61f345c6070",
+      "reviewDate": "2026-11-09",
+      "reason": "tool-noise: One camera source lifetime owns asset acquisition, compatible capture, admission and frame leases. Shared color policy remains in its existing workflow owner. Native normalization and rollback stay within the same resource transaction. Independent diagnosis found no responsibility split at the file length threshold. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess a route with an independent lifecycle or consumer contract. Remove when the analyzer models this cohesive boundary."
     }
   ]
 }
