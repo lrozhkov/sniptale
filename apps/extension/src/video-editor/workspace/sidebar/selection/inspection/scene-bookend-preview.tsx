@@ -37,6 +37,7 @@ export function SceneBookendPreview(props: {
   const stage = useRef<HTMLDivElement>(null),
     fallback = useRef<HTMLDivElement>(null),
     gpuHost = useRef<HTMLDivElement>(null);
+  const fallbackCanvas = useRef<HTMLCanvasElement>(null);
   const queue = useRef<ReturnType<typeof createBookendPreviewFrameQueue> | null>(null);
   const renderer = useContext(WorkspacePreviewContext)?.preferences.preferences.renderer ?? 'gpu';
   const assetRef = useRef(props.asset);
@@ -49,11 +50,15 @@ export function SceneBookendPreview(props: {
   ]);
   const url = loaded?.key === sourceKey ? loaded.url : null;
   const trimStart = 'trim' in props.settings ? props.settings.trim.start : 0;
+  const trimEnd = 'trim' in props.settings ? props.settings.trim.end : undefined;
+  const managedVideo = props.asset.type !== 'IMAGE' && typeof VideoFrame !== 'undefined';
   const ready =
     !failed &&
-    readySource?.key === sourceKey &&
-    readySource.url === url &&
-    readySource.time === trimStart;
+    !!url &&
+    (managedVideo ||
+      (readySource?.key === sourceKey &&
+        readySource.url === url &&
+        readySource.time === trimStart));
   const sourceIdentity = useRef({ key: sourceKey, url });
   sourceIdentity.current = { key: sourceKey, url };
   const latest = useRef<BookendPreviewFrameInput>({
@@ -63,6 +68,7 @@ export function SceneBookendPreview(props: {
       key: sourceKey,
       url,
       time: trimStart,
+      rangeEnd: trimEnd,
       size: { width: props.asset.metadata.width ?? 0, height: props.asset.metadata.height ?? 0 },
       ready,
     },
@@ -77,6 +83,7 @@ export function SceneBookendPreview(props: {
       key: sourceKey,
       url,
       time: trimStart,
+      rangeEnd: trimEnd,
       ready,
       size: { width: props.asset.metadata.width ?? 0, height: props.asset.metadata.height ?? 0 },
     },
@@ -101,6 +108,7 @@ export function SceneBookendPreview(props: {
     const owner = createBookendPreviewFrameQueue({
       stage: frame,
       presenter,
+      fallbackCanvas: () => fallbackCanvas.current,
       read: () => latest.current,
       onPresented: (input) => setPaintedKey(input.source.key),
       onError: () => setFailed(true),
@@ -175,6 +183,7 @@ export function SceneBookendPreview(props: {
     sourceKey,
     url,
     trimStart,
+    trimEnd,
     renderer,
     props.asset.metadata.width,
     props.asset.metadata.height,
@@ -252,15 +261,20 @@ export function SceneBookendPreview(props: {
                   playsInline
                   preload="auto"
                   aria-label={props.asset.name}
-                  style={style}
+                  style={managedVideo ? { ...style, opacity: 0 } : style}
                   onLoadedMetadata={(event) => {
                     event.currentTarget.currentTime = trimStart;
                   }}
                   onLoadedData={(event) => markReady(event.currentTarget)}
                   onSeeked={(event) => markReady(event.currentTarget)}
-                  onError={() => setFailed(true)}
+                  onError={() => {
+                    if (!managedVideo) setFailed(true);
+                  }}
                 />
               ))}
+            {managedVideo && (
+              <canvas ref={fallbackCanvas} className="absolute inset-0 h-full w-full" />
+            )}
           </div>
           <div
             ref={gpuHost}

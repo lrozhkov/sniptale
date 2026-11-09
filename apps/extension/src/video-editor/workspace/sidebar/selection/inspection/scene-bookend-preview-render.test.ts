@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
+import * as sourceProvider from '../../../../../workflows/video/preview-source';
+import * as htmlProvider from '../../../../../workflows/video/preview-html-source';
+import * as decoded from '../../../../../features/video/composition/draw/decoded-sample';
 import {
   createBookendPreviewFrameQueue,
   type BookendPreviewFrameInput,
@@ -48,6 +51,7 @@ function fixture() {
   });
   vi.stubGlobal('createImageBitmap', capture);
   const stage = document.createElement('div');
+  const fallbackCanvas = document.createElement('canvas');
   const bounds = vi
     .spyOn(stage, 'getBoundingClientRect')
     .mockReturnValue(new DOMRect(0, 0, 320, 180));
@@ -92,6 +96,7 @@ function fixture() {
     onError = vi.fn();
   const queue = createBookendPreviewFrameQueue({
     stage,
+    fallbackCanvas: () => fallbackCanvas,
     presenter,
     read: () => input,
     onPresented,
@@ -118,6 +123,7 @@ function fixture() {
   });
   return {
     queue,
+    fallbackCanvas,
     set,
     read: () => input,
     capture,
@@ -414,3 +420,219 @@ it.each(['capture', 'gpu'] as const)(
     expect(f.onError).not.toHaveBeenCalled();
   }
 );
+
+function managedFixture(renderer: 'gpu' | 'legacy' = 'gpu') {
+  const f = fixture();
+  class Frame {
+    format = 'RGBA';
+    codedWidth = 640;
+    codedHeight = 360;
+    displayWidth = 640;
+    displayHeight = 360;
+    timestamp = 900000;
+    duration = 100000;
+    colorSpace = {};
+    close = vi.fn();
+  }
+  vi.stubGlobal('VideoFrame', Frame);
+  vi.stubGlobal('VideoDecoder', class {});
+  const raw = new Frame();
+  const lease = {
+    bindings: new Map([
+      [
+        'bookend',
+        {
+          timestamp: 0.9,
+          nextTimestamp: 1.4,
+          target: 1.02,
+          url: 'blob:video',
+          source: {
+            sourceWidth: 640,
+            sourceHeight: 360,
+            toVideoFrame: () => raw as unknown as VideoFrame,
+            draw: vi.fn(),
+          },
+        },
+      ],
+    ]),
+    release: vi.fn(),
+  };
+  const acquire = vi.fn().mockResolvedValue(lease);
+  const canonical = { acquire, retainSources: vi.fn(), dispose: vi.fn() };
+  vi.spyOn(sourceProvider, 'createPreviewSourceProvider').mockReturnValue(canonical);
+  const compatible = {
+    acquire: vi.fn().mockResolvedValue(lease),
+    retainSources: vi.fn(),
+    dispose: vi.fn(),
+  };
+  vi.spyOn(htmlProvider, 'createPreviewHtmlSourceProvider').mockReturnValue(compatible);
+  const normalize = vi
+    .spyOn(decoded, 'prepareDecodedVideoSample')
+    .mockImplementation(async (sample) => {
+      vi.spyOn(sample, 'draw').mockImplementation(() => {});
+      return sample;
+    });
+  const rgb = f.pixels();
+  const transferred = vi.fn(() => rgb.bitmap);
+  vi.stubGlobal(
+    'OffscreenCanvas',
+    class {
+      constructor(
+        public width: number,
+        public height: number
+      ) {}
+      getContext() {
+        return {};
+      }
+      transferToImageBitmap = transferred;
+    }
+  );
+  const draw = vi.fn();
+  vi.spyOn(f.fallbackCanvas, 'getContext').mockReturnValue({
+    clearRect: vi.fn(),
+    fillRect: vi.fn(),
+    drawImage: draw,
+  } as unknown as CanvasRenderingContext2D);
+  f.set({
+    renderer,
+    source: {
+      ...f.read().source,
+      kind: 'video',
+      element: null,
+      url: 'blob:video',
+      time: 1.02,
+      rangeEnd: 3,
+      ready: true,
+    },
+  });
+  return { ...f, acquire, compatible, canonical, lease, raw, normalize, rgb, transferred, draw };
+}
+
+it('selects canonical bookend pixels without DOM decoder readiness and retains RGB across framing', async () => {
+  const f = managedFixture();
+  f.queue.request();
+  await settle();
+  expect(f.acquire).toHaveBeenCalledWith(
+    [{ id: 'bookend', url: 'blob:video', time: 1.02, rangeEnd: 3 }],
+    expect.any(AbortSignal),
+    { discontinuity: true }
+  );
+  expect(f.capture).not.toHaveBeenCalled();
+  expect(f.normalize).toHaveBeenCalledOnce();
+  expect(f.lease.release).toHaveBeenCalledOnce();
+  expect(f.jobs[0]!.input.source).toBe(f.rgb.bitmap);
+  f.jobs[0]!.completion.resolve(f.output());
+  await settle();
+  f.set({ framing: { ...f.read().framing, fit: 'cover' } });
+  f.queue.request();
+  await settle();
+  expect(f.jobs[1]!.input.source).toBe(f.rgb.bitmap);
+  expect(f.acquire).toHaveBeenCalledOnce();
+  expect(f.rgb.close).not.toHaveBeenCalled();
+  f.queue.dispose();
+  expect(f.rgb.close).not.toHaveBeenCalled();
+  f.jobs[1]!.completion.resolve(f.output());
+  await settle();
+  expect(f.rgb.close).toHaveBeenCalledOnce();
+});
+it.each(['legacy', 'device-failed'] as const)(
+  'paints the same normalized RGB through %s fallback',
+  async (mode) => {
+    const f = managedFixture(mode === 'legacy' ? 'legacy' : 'gpu');
+    f.queue.request();
+    await settle();
+    if (mode === 'device-failed') {
+      f.fallback('device-failed');
+      f.jobs[0]!.completion.resolve(undefined);
+      await settle();
+    }
+    expect(f.acquire).toHaveBeenCalledOnce();
+    expect(f.presenter.publish).toHaveBeenLastCalledWith(null, expect.any(Function));
+    expect(f.draw).toHaveBeenCalledWith(f.rgb.bitmap, 0, 0, 320, 180);
+    expect(f.rgb.close).not.toHaveBeenCalled();
+    expect(f.capture).not.toHaveBeenCalled();
+  }
+);
+it('uses verified HTML only after upfront canonical decline', async () => {
+  const f = managedFixture();
+  f.acquire.mockResolvedValueOnce(null);
+  f.queue.request();
+  await settle();
+  expect(f.compatible.acquire).toHaveBeenCalledWith(
+    [{ id: 'bookend', url: 'blob:video', time: 1.02, rangeEnd: 3 }],
+    expect.any(AbortSignal)
+  );
+  expect(f.jobs[0]!.input.source).toBe(f.rgb.bitmap);
+  expect(f.capture).not.toHaveBeenCalled();
+  f.jobs[0]!.completion.resolve(f.output());
+  await settle();
+});
+
+it.each(['cancel', 'dispose'] as const)(
+  'releases a late canonical lease after %s without publishing',
+  async (action) => {
+    const f = managedFixture();
+    const gate = deferred<typeof f.lease>();
+    f.acquire.mockReturnValueOnce(gate.promise);
+    f.queue.request();
+    await settle();
+    expect(f.presenter.publish).not.toHaveBeenCalled();
+    f.queue[action]();
+    gate.resolve(f.lease);
+    await settle();
+    expect(f.lease.release).toHaveBeenCalledOnce();
+    expect(f.normalize).not.toHaveBeenCalled();
+    expect(f.onError).not.toHaveBeenCalled();
+    expect(f.presenter.publish).not.toHaveBeenCalled();
+  }
+);
+it('holds the borrowed sample through delayed normalization cancellation', async () => {
+  const f = managedFixture();
+  const gate = deferred<void>();
+  f.normalize.mockImplementationOnce(async (sample) => {
+    await gate.promise;
+    return sample;
+  });
+  f.queue.request();
+  await settle();
+  f.queue.cancel();
+  expect(f.raw.close).not.toHaveBeenCalled();
+  expect(f.lease.release).not.toHaveBeenCalled();
+  gate.resolve();
+  await settle();
+  expect(f.raw.close).toHaveBeenCalledOnce();
+  expect(f.lease.release).toHaveBeenCalledOnce();
+  expect(f.presenter.publish).not.toHaveBeenCalled();
+  expect(f.onError).not.toHaveBeenCalled();
+});
+it('reports a genuine canonical failure without raw or compatible capture and permits retry', async () => {
+  const f = managedFixture();
+  f.acquire.mockRejectedValueOnce(new Error('decode failed'));
+  f.queue.request();
+  await settle();
+  expect(f.onError).toHaveBeenCalledOnce();
+  expect(f.compatible.acquire).not.toHaveBeenCalled();
+  expect(f.capture).not.toHaveBeenCalled();
+  expect(f.presenter.publish).not.toHaveBeenCalled();
+  f.queue.reset();
+  f.queue.request();
+  await settle();
+  expect(f.jobs[0]!.input.source).toBe(f.rgb.bitmap);
+  f.jobs[0]!.completion.resolve(f.output());
+  await settle();
+  expect(f.presenter.publish).toHaveBeenCalledOnce();
+});
+it('reuses the admitted video RGB when Standard replaces GPU', async () => {
+  const f = managedFixture();
+  f.queue.request();
+  await settle();
+  f.jobs[0]!.completion.resolve(f.output());
+  await settle();
+  f.set({ renderer: 'legacy' });
+  f.queue.request();
+  await settle();
+  expect(f.acquire).toHaveBeenCalledOnce();
+  expect(f.normalize).toHaveBeenCalledOnce();
+  expect(f.draw).toHaveBeenCalledWith(f.rgb.bitmap, 0, 0, 320, 180);
+  expect(f.rgb.close).not.toHaveBeenCalled();
+});

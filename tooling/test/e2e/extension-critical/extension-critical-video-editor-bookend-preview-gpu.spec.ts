@@ -1,4 +1,9 @@
-import { readFile } from 'node:fs/promises';
+import { hydrateVideoProject } from '../../../../apps/extension/src/features/video/project/hydration';
+import { applyVideoProjectMutationPatch } from '../../../../apps/extension/src/features/video/project/mutation';
+import { readFile, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { createBookendVideoPresentation } from '../../../../apps/extension/src/features/video/project/scene/bookend-media';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { createVideoProjectFromRecording } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -399,6 +404,291 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       });
     } finally {
       await page.mouse.up().catch(() => {});
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
+
+function vfrBookendReference(time: number) {
+  const bytes = execFileSync(
+    '/usr/bin/ffmpeg',
+    [
+      '-v',
+      'error',
+      '-ss',
+      String(time),
+      '-i',
+      fileURLToPath(new URL('../fixtures/review-cut-vfr.webm', import.meta.url)),
+      '-frames:v',
+      '1',
+      '-f',
+      'rawvideo',
+      '-pix_fmt',
+      'rgba',
+      'pipe:1',
+    ],
+    { timeout: 10_000, maxBuffer: 160 * 90 * 4 + 1024 }
+  );
+  expect(bytes.length).toBe(160 * 90 * 4);
+  return [40, 80, 120].map((x) => [...bytes.subarray((45 * 160 + x) * 4, (45 * 160 + x) * 4 + 3)]);
+}
+
+async function bookendColors(canvas: Locator) {
+  const pixels = await previewPixels(canvas);
+  return [8, 16, 24].map((x) => pixels.slice((16 * 32 + x) * 4, (16 * 32 + x) * 4 + 3));
+}
+function bookendColorError(expected: number[][], actual: number[][]) {
+  expect(actual).toHaveLength(expected.length);
+  return Math.max(
+    ...expected.flatMap((color, index) =>
+      color.map((channel, c) => Math.abs(channel - actual[index]![c]!))
+    )
+  );
+}
+
+async function bookendSourceFacts(page: Page) {
+  return page.evaluate(() => {
+    const facts: unknown = Reflect.get(window, 'sniptaleBookendSourceFacts');
+    if (
+      !facts ||
+      typeof facts !== 'object' ||
+      !('rawSnapshots' in facts) ||
+      typeof facts.rawSnapshots !== 'number' ||
+      !('frames' in facts) ||
+      !Array.isArray(facts.frames)
+    )
+      throw new Error('Bookend source evidence is unavailable.');
+    const entries: unknown[] = facts.frames;
+    return {
+      rawSnapshots: facts.rawSnapshots,
+      frames: entries.map((entry) => {
+        if (
+          !entry ||
+          typeof entry !== 'object' ||
+          !('timestamp' in entry) ||
+          typeof entry.timestamp !== 'number' ||
+          !('time' in entry) ||
+          typeof entry.time !== 'number'
+        )
+          throw new Error('Bookend source evidence is invalid.');
+        return { timestamp: entry.timestamp, time: entry.time };
+      }),
+    };
+  });
+}
+
+for (const declined of [false, true]) {
+  test(`Native bookend ${declined ? 'declined' : 'canonical'} VFR source and Standard`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 1920, height: 900 });
+    await page.addInitScript((declined) => {
+      const facts: { rawSnapshots: number; frames: { timestamp: number; time: number }[] } = {
+        rawSnapshots: 0,
+        frames: [],
+      };
+      Reflect.set(window, 'sniptaleBookendSourceFacts', facts);
+      const bitmap = globalThis.createImageBitmap;
+      globalThis.createImageBitmap = new Proxy(bitmap, {
+        apply(target, receiver, args: unknown[]) {
+          const source = args[0];
+          if (
+            source instanceof HTMLVideoElement &&
+            source.closest('[data-ui="video-editor.scene-bookends.preview"]')
+          )
+            facts.rawSnapshots++;
+          return Reflect.apply(target, receiver, args);
+        },
+      });
+      const NativeFrame = globalThis.VideoFrame;
+      globalThis.VideoFrame = new Proxy(NativeFrame, {
+        construct(target, args) {
+          const frame: unknown = Reflect.construct(target, args, target);
+          if (!(frame instanceof NativeFrame)) throw new Error('Invalid native source frame.');
+          const source: unknown = args[0];
+          if (source instanceof HTMLVideoElement && facts.frames.length < 512)
+            facts.frames.push({ timestamp: frame.timestamp, time: source.currentTime });
+          return frame;
+        },
+      });
+      if (declined)
+        VideoDecoder.isConfigSupported = async (config) => ({ supported: false, config });
+    }, declined);
+    const host = await startHostServer();
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    try {
+      const filename = 'review-cut-vfr.webm';
+      const bytes = await readFile(new URL(`../fixtures/${filename}`, import.meta.url));
+      const project = createVideoProjectFromRecording({
+        recordingId: 'beta-v1-recording',
+        filename,
+        width: 160,
+        height: 90,
+        duration: 6,
+        size: bytes.length,
+        mimeType: 'video/webm',
+        hasAudio: false,
+      });
+      const asset = project.assets.find((asset) => asset.type === 'RECORDING');
+      if (!asset) throw new Error('Bookend source asset is unavailable.');
+      project.bookendPresets = {
+        intro: {
+          mode: 'video',
+          video: {
+            ...createBookendVideoPresentation(6),
+            assetId: asset.id,
+            trim: { start: 1.02, end: 6 },
+          },
+        },
+        outro: { mode: 'none' },
+      };
+      Object.assign(
+        project,
+        applyVideoProjectMutationPatch(project, { bookendPresets: project.bookendPresets })
+      );
+      Object.assign(project, hydrateVideoProject(project));
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        videoProjects: [project],
+        storage: {
+          'sniptale-locale-preference': 'en',
+          'sniptale-theme-preference': 'light',
+          sniptale_video_editor_preview_preferences: {
+            renderer: 'gpu',
+            frameRate: 'project',
+            showFrameRate: false,
+            mode: 'live',
+            rasterPreset: '720p',
+            zoom: 'fit',
+          },
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, filename, { width: 160, height: 90, duration: 6 });
+      await page.goto(
+        `${host.origin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=light`
+      );
+      await expect(page.locator('[data-ui="video-editor.timeline.surface"]')).toBeVisible();
+      const clock = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+      await expect(clock).toHaveAttribute('aria-valuenow', '0');
+      await page
+        .getByRole('button', { name: label('videoEditor.sidebar.sceneProperties'), exact: true })
+        .click();
+      await page
+        .getByRole('button', { name: label('videoEditor.sidebar.sceneEdges'), exact: true })
+        .click();
+      const intro = page.locator('[data-ui="video-editor.scene-bookends.intro"]');
+      await intro
+        .getByRole('button', { name: label('videoEditor.sidebar.bookendPreset'), exact: true })
+        .click();
+      const preset = intro.locator('[data-ui="video-editor.scene-bookends.preset"]');
+      const mini = preset.locator('[data-ui="video-editor.scene-bookends.preview"]');
+      const gpu = mini.locator(
+        '[data-ui="video-editor.scene-bookends.preview.gpu-host"] [data-preview-inspector-canvas]'
+      );
+      const initial = await savedProject(page);
+      const red = vfrBookendReference(0.9),
+        blue = vfrBookendReference(2.1);
+      await expect(gpu).toBeVisible();
+      await expect
+        .poll(async () => bookendColorError(red, await bookendColors(gpu)))
+        .toBeLessThan(4);
+      // A matching image alone does not establish that preparation follows the shared source contract.
+      expect((await bookendSourceFacts(page)).rawSnapshots).toBe(0);
+      const first = await bookendColors(gpu);
+      const trim = preset
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.presentationTrim') });
+      if ((await trim.locator('..').getAttribute('open')) === null) await trim.click();
+      const start = preset.getByRole('textbox', {
+        name: label('gallery.videoReview.presentationTrimStart'),
+        exact: true,
+      });
+      await start.fill('2.2');
+      await start.press('Enter');
+      await expect
+        .poll(async () => (await savedProject(page)).bookendPresets?.intro.video?.trim.start)
+        .toBe(2.2);
+      await expect
+        .poll(async () => bookendColorError(blue, await bookendColors(gpu)))
+        .toBeLessThan(4);
+      const changed = await bookendColors(gpu);
+      if (declined) {
+        await expect
+          .poll(async () => {
+            const frames = (await bookendSourceFacts(page)).frames;
+            return (
+              frames.some(
+                (frame) => frame.timestamp === 900000 && Math.abs(frame.time - 1.02) < 0.001
+              ) &&
+              frames.some(
+                (frame) => frame.timestamp === 2100000 && Math.abs(frame.time - 2.2) < 0.001
+              )
+            );
+          })
+          .toBe(true);
+      }
+      await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+      await expect
+        .poll(async () => (await savedProject(page)).bookendPresets?.intro.video?.trim.start)
+        .toBe(1.02);
+      await expect
+        .poll(async () => bookendColorError(red, await bookendColors(gpu)))
+        .toBeLessThan(4);
+      await page.locator('[data-ui="video.preview.display-settings"]').click();
+      const panel = page.locator('[data-ui="video.preview.display-settings.panel"]');
+      await panel
+        .getByRole('radio', { name: label('editor.scene.previewRendererLegacy'), exact: true })
+        .check();
+      await panel.press('Escape');
+      await expect(gpu).toHaveCount(0);
+      const standard = mini.locator(
+        '[data-ui="video-editor.scene-bookends.preview.fallback"] canvas'
+      );
+      await expect(standard).toBeVisible();
+      await expect
+        .poll(async () => bookendColorError(red, await bookendColors(standard)))
+        .toBeLessThan(4);
+      expect(await clock.getAttribute('aria-valuenow')).toBe('0');
+      const final = await savedProject(page);
+      expect(final.clips).toEqual(initial.clips);
+      expect(final.assets).toEqual(initial.assets);
+      expect(final.bookendPresets).toEqual(initial.bookendPresets);
+      expect(errors).toEqual([]);
+      await writeFile(
+        info.outputPath('bookend-source-contract.json'),
+        JSON.stringify(
+          {
+            viewport: page.viewportSize(),
+            sourceRaster: { width: 160, height: 90 },
+            declined,
+            first,
+            changed,
+            standard: await bookendColors(standard),
+            raster: await standard.evaluate((canvas: HTMLCanvasElement) => ({
+              width: canvas.width,
+              height: canvas.height,
+            })),
+            facts: await bookendSourceFacts(page),
+            errors,
+            limit:
+              'Bounded Native bookend source, framing edit and Undo. No FPS or all-metadata acceptance.',
+          },
+          null,
+          2
+        )
+      );
+      await mini.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('bookend-source-contract.png'),
+        fullPage: false,
+      });
+    } finally {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))
       );

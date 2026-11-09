@@ -1,3 +1,14 @@
+import { VideoSample } from 'mediabunny';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceProvider,
+} from '../../../../../workflows/video/preview-source';
+import {
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+} from '../../../../../workflows/video/preview-html-source';
+import { prepareDecodedVideoSample } from '../../../../../features/video/composition/draw/decoded-sample';
+import { resolveMediaFitFrame } from '../../../../../features/video/project/window-geometry';
 import { createBookendPreviewGpuRenderer } from '../../../../../features/video/composition/canvas/bookend-preview-gpu';
 import type {
   GpuPreviewFramePresenter,
@@ -18,6 +29,7 @@ export interface BookendPreviewFrameInput {
     key: string;
     url: string | null;
     time: number;
+    rangeEnd?: number | undefined;
     size: Size;
     ready: boolean;
   };
@@ -26,16 +38,22 @@ export interface BookendPreviewFrameInput {
   renderer: VideoPreviewRenderer;
 }
 interface Snapshot {
-  element: Media;
+  element: Media | null;
   key: string;
   url: string;
   time: number;
+  rangeEnd?: number | undefined;
+  managed: boolean;
   pixels: ImageBitmap;
 }
 
+function managed(source: BookendPreviewFrameInput['source']) {
+  return source.kind === 'video' && typeof VideoFrame !== 'undefined';
+}
 function ready(
   source: BookendPreviewFrameInput['source']
-): source is BookendPreviewFrameInput['source'] & { element: Media; url: string } {
+): source is BookendPreviewFrameInput['source'] & { url: string } {
+  if (managed(source)) return source.ready && !!source.url;
   const media = source.element;
   if (!source.ready || !media || !source.url || (media.currentSrc || media.src) !== source.url)
     return false;
@@ -46,10 +64,11 @@ function ready(
 function matches(snapshot: Snapshot, input: BookendPreviewFrameInput) {
   return (
     ready(input.source) &&
-    snapshot.element === input.source.element &&
+    (snapshot.managed || snapshot.element === input.source.element) &&
     snapshot.key === input.source.key &&
     snapshot.url === input.source.url &&
-    snapshot.time === input.source.time
+    snapshot.time === input.source.time &&
+    snapshot.rangeEnd === input.source.rangeEnd
   );
 }
 function frameKey(input: BookendPreviewFrameInput) {
@@ -57,6 +76,7 @@ function frameKey(input: BookendPreviewFrameInput) {
     input.source.key,
     input.source.url,
     input.source.time,
+    input.source.rangeEnd,
     input.source.size,
     input.framing,
     input.logical,
@@ -64,10 +84,80 @@ function frameKey(input: BookendPreviewFrameInput) {
   ]);
 }
 
+/** A detached RGB snapshot owns its pixels independently of the decoder and borrowed sample. */
+async function normalizedVideoSnapshot(
+  lease: PreparedPreviewSourceLease,
+  source: BookendPreviewFrameInput['source'],
+  signal: AbortSignal
+): Promise<ImageBitmap> {
+  let raw: VideoFrame | undefined;
+  let sample: VideoSample | undefined;
+  let canvas: OffscreenCanvas | undefined;
+  let pixels: ImageBitmap | undefined;
+  try {
+    signal.throwIfAborted();
+    const binding = lease.bindings.get('bookend');
+    if (!binding?.source.toVideoFrame) throw new Error('Bookend preview source is unavailable.');
+    raw = binding.source.toVideoFrame();
+    const borrowed = new VideoSample(raw, {
+      timestamp: binding.timestamp,
+      rotation: binding.source.orientation?.rotation ?? 0,
+      flip: binding.source.orientation?.flip ?? false,
+    });
+    raw = undefined;
+    sample = await prepareDecodedVideoSample(borrowed, signal);
+    signal.throwIfAborted();
+    canvas = new OffscreenCanvas(source.size.width, source.size.height);
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Bookend preview source is unavailable.');
+    sample.draw(context, 0, 0, source.size.width, source.size.height);
+    pixels = canvas.transferToImageBitmap();
+    signal.throwIfAborted();
+    const completed = pixels;
+    pixels = undefined;
+    return completed;
+  } finally {
+    pixels?.close();
+    raw?.close();
+    sample?.close();
+    lease.release();
+    if (canvas) canvas.width = canvas.height = 0;
+  }
+}
+
+function paintStandardBookend(
+  canvas: HTMLCanvasElement | null | undefined,
+  snapshot: Snapshot,
+  input: BookendPreviewFrameInput,
+  size: Size
+) {
+  const context = canvas?.getContext('2d');
+  if (!canvas || !context) throw new Error('Bookend preview canvas is unavailable.');
+  const fit = resolveMediaFitFrame({
+    source: input.source.size,
+    output: input.logical,
+    fit: input.framing.fit,
+    crop: input.framing.crop,
+  });
+  canvas.width = size.width;
+  canvas.height = size.height;
+  context.clearRect(0, 0, size.width, size.height);
+  context.fillStyle = input.framing.fillColor;
+  context.fillRect(0, 0, size.width, size.height);
+  context.drawImage(
+    snapshot.pixels,
+    (fit.x * size.width) / input.logical.width,
+    (fit.y * size.height) / input.logical.height,
+    (fit.width * size.width) / input.logical.width,
+    (fit.height * size.height) / input.logical.height
+  );
+}
+
 /** Serial GPU work retains one source snapshot while framing changes, plus one latest request. */
 export function createBookendPreviewFrameQueue(options: {
   stage: HTMLDivElement;
   presenter: GpuPreviewFramePresenter;
+  fallbackCanvas?(): HTMLCanvasElement | null;
   read(): BookendPreviewFrameInput;
   onPresented(input: BookendPreviewFrameInput, status: PreviewRendererStatus): void;
   onError(): void;
@@ -75,6 +165,16 @@ export function createBookendPreviewFrameQueue(options: {
 }) {
   let gpu: ReturnType<typeof createBookendPreviewGpuRenderer> | null = null;
   let cached: Snapshot | null = null;
+  let canonical: PreviewSourceProvider | undefined;
+  let html: ReturnType<typeof createPreviewHtmlSourceProvider> | undefined;
+  const unsupported = new Set<string>();
+  const retireProviders = () => {
+    canonical?.dispose();
+    canonical = undefined;
+    html?.dispose();
+    html = undefined;
+    unsupported.clear();
+  };
   let controller: AbortController | null = null;
   let disposed = false,
     running = false,
@@ -103,24 +203,56 @@ export function createBookendPreviewFrameQueue(options: {
     pending = false;
     retireSource = true;
     controller?.abort();
+    canonical?.retainSources(new Set());
+    html?.retainSources(new Set());
     if (!running) retire();
   };
-  const capture = async (input: BookendPreviewFrameInput): Promise<Snapshot | undefined> => {
+  const capture = async (
+    input: BookendPreviewFrameInput,
+    signal: AbortSignal
+  ): Promise<Snapshot | undefined> => {
     if (cached && matches(cached, input)) return cached;
     closeSource();
     const source = input.source;
     if (!ready(source)) return undefined;
-    if (typeof createImageBitmap === 'undefined') return undefined;
-    // This paused source becomes one retained RGB material, rather than a YUV pass per framing edit.
-    const pixels = await createImageBitmap(source.element);
+    let pixels: ImageBitmap;
+    if (managed(source)) {
+      const demands = [
+        {
+          id: 'bookend',
+          url: source.url,
+          time: source.time,
+          ...(source.rangeEnd === undefined ? {} : { rangeEnd: source.rangeEnd }),
+        },
+      ];
+      canonical ??= createPreviewSourceProvider();
+      canonical.retainSources(new Set([source.url]));
+      let lease: PreparedPreviewSourceLease | null =
+        typeof VideoDecoder === 'undefined' || unsupported.has(source.url)
+          ? null
+          : await canonical.acquire(demands, signal, { discontinuity: true });
+      if (!lease) {
+        unsupported.add(source.url);
+        html ??= createPreviewHtmlSourceProvider();
+        html.retainSources(new Set([source.url]));
+        lease = await html.acquire(demands, signal);
+      }
+      pixels = await normalizedVideoSnapshot(lease, source, signal);
+    } else {
+      if (typeof createImageBitmap === 'undefined' || !source.element) return undefined;
+      // API-absent recovery preserves the existing unverified paused HTML snapshot.
+      pixels = await createImageBitmap(source.element);
+    }
     const snapshot = {
       element: source.element,
       key: source.key,
       url: source.url,
       time: source.time,
+      rangeEnd: source.rangeEnd,
+      managed: managed(source),
       pixels,
     };
-    if (disposed || !matches(snapshot, options.read())) {
+    if (disposed || signal.aborted || !matches(snapshot, options.read())) {
       pixels.close();
       return undefined;
     }
@@ -132,7 +264,7 @@ export function createBookendPreviewFrameQueue(options: {
     const current = options.read();
     return (
       ready(current.source) &&
-      current.source.element === input.source.element &&
+      (managed(current.source) || current.source.element === input.source.element) &&
       frameKey(current) === key
     );
   };
@@ -149,17 +281,19 @@ export function createBookendPreviewFrameQueue(options: {
     let accepted = false;
     let fallback: PreviewRendererStatus['fallback'];
     try {
+      controller = new AbortController();
+      const prepared = managed(input.source) ? await capture(input, controller.signal) : undefined;
+      if (disposed || ticket !== version) return;
       if (input.renderer === 'legacy') {
         gpu?.dispose();
         gpu = null;
-        closeSource();
+        if (!managed(input.source)) closeSource();
       } else if (gpu?.fallbackReason) {
         fallback = gpu.fallbackReason;
       } else {
-        const source = await capture(input);
+        const source = prepared ?? (await capture(input, controller.signal));
         if (disposed || ticket !== version) return;
         if (source) {
-          controller = new AbortController();
           gpu ??= (options.createRenderer ?? createBookendPreviewGpuRenderer)();
           output = await gpu.render({
             source: source.pixels,
@@ -175,13 +309,15 @@ export function createBookendPreviewFrameQueue(options: {
       }
       if (controller?.signal.aborted || !isCurrent(input, ticket, key)) return;
       if (output === false) return;
-      if (!output) closeSource();
-      options.presenter.publish(output ?? null, () =>
+      if (!output && !managed(input.source)) closeSource();
+      options.presenter.publish(output ?? null, () => {
+        if (!output && prepared)
+          paintStandardBookend(options.fallbackCanvas?.(), prepared, input, size);
         options.onPresented(
           input,
           output ? { backend: 'gpu' } : { backend: 'legacy', ...(fallback ? { fallback } : {}) }
-        )
-      );
+        );
+      });
       accepted = true;
     } finally {
       if (output && !accepted) output.release();
@@ -227,12 +363,14 @@ export function createBookendPreviewFrameQueue(options: {
     reset() {
       cancel();
       resetGpu = true;
+      retireProviders();
       if (!running) retire();
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       cancel();
+      retireProviders();
       gpu?.dispose();
       gpu = null;
     },

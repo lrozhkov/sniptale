@@ -9,7 +9,10 @@ import {
 import { getVideoClipSourceTime, isVideoClip } from '../../../../features/video/project/timeline';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { resolveActivePreviewClips } from '../runtime/index';
-import { createNativeHtmlSourceProvider, type NativePreviewSourceLease } from './html-source';
+import {
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+} from '../../../../workflows/video/preview-html-source';
 
 /** One immutable Native request context borrows the mounted source provider. */
 export interface NativePreviewSourceRuntime {
@@ -18,7 +21,7 @@ export interface NativePreviewSourceRuntime {
     demands: readonly PreviewSourceDemand[],
     signal: AbortSignal,
     options?: PreviewSourceAcquireOptions
-  ): Promise<NativePreviewSourceLease | null>;
+  ): Promise<PreparedPreviewSourceLease | null>;
   prepare(time: number, signal: AbortSignal): Promise<'ready' | 'retry'>;
 }
 
@@ -105,7 +108,7 @@ function createNativeSourceReadiness(
     demands: readonly PreviewSourceDemand[],
     signal: AbortSignal,
     options?: PreviewSourceAcquireOptions
-  ) => Promise<NativePreviewSourceLease | null>
+  ) => Promise<PreparedPreviewSourceLease | null>
 ) {
   let scene: SceneSourceInterest | undefined;
   let readiness: SourceReadinessInterest | undefined;
@@ -186,7 +189,7 @@ function createNativeSourceOwner() {
   let unsupportedKey: string | undefined;
   let provider: { projectId: string; value: PreviewSourceProvider } | undefined;
   let html:
-    | { projectId: string; value: ReturnType<typeof createNativeHtmlSourceProvider> }
+    | { projectId: string; value: ReturnType<typeof createPreviewHtmlSourceProvider> }
     | undefined;
   const retire = () => {
     const previous = provider;
@@ -208,7 +211,7 @@ function createNativeSourceOwner() {
     if (provider && provider.projectId !== context.project.id) retire();
     provider ??= { projectId: context.project.id, value: createPreviewSourceProvider() };
     provider.value.retainSources(new Set(Object.values(context.assetUrls)));
-    let lease: NativePreviewSourceLease | null =
+    let lease: PreparedPreviewSourceLease | null =
       unsupportedKey === context.key
         ? null
         : await provider.value.acquire(demands, signal, options);
@@ -219,7 +222,7 @@ function createNativeSourceOwner() {
     }
     if (!lease) {
       unsupportedKey = context.key;
-      html ??= { projectId: context.project.id, value: createNativeHtmlSourceProvider() };
+      html ??= { projectId: context.project.id, value: createPreviewHtmlSourceProvider() };
       html.value.retainSources(new Set(Object.values(context.assetUrls)));
       lease = await html.value.acquire(demands, signal);
     }

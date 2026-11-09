@@ -13,6 +13,7 @@ import {
 } from '../../../../../features/video/project/scene/bookend-media';
 import { loadVideoEditorAssetBlob } from '../../../../runtime/session/asset-urls';
 import { SceneBookendPreview } from './scene-bookend-preview';
+import * as previewQueue from './scene-bookend-preview-render';
 
 const gpu = vi.hoisted(() => ({
   create:
@@ -38,7 +39,7 @@ let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 const createUrl = vi.fn(() => 'blob:source-preview');
 const revokeUrl = vi.fn();
-function asset(id: string, type: 'IMAGE' | 'VIDEO' = 'IMAGE') {
+function asset(id: string, type: 'IMAGE' | 'VIDEO' | 'RECORDING' = 'IMAGE') {
   return createVideoProjectAsset(
     id,
     type,
@@ -46,9 +47,9 @@ function asset(id: string, type: 'IMAGE' | 'VIDEO' = 'IMAGE') {
     {
       width: 641,
       height: 359,
-      duration: type === 'VIDEO' ? 6 : null,
+      duration: type !== 'IMAGE' ? 6 : null,
       hasAudio: true,
-      mimeType: type === 'VIDEO' ? 'video/webm' : 'image/png',
+      mimeType: type !== 'IMAGE' ? 'video/webm' : 'image/png',
       size: 100,
       audioPeaks: null,
     }
@@ -387,9 +388,11 @@ it.each(['legacy', 'unavailable'] as const)(
   }
 );
 
-it('captures video only after the actual authored trim is ready and never publishes a stale trim frame', async () => {
+it('keeps API-absent capture at the authored trim and refuses stale frames', async () => {
+  vi.stubGlobal('VideoFrame', undefined);
   const f = gpuFixture(),
     source = asset('trimmed', 'VIDEO');
+  vi.stubGlobal('VideoFrame', undefined);
   let props = {
     asset: source,
     settings: { ...createBookendVideoPresentation(6), trim: { start: 1.137, end: 4.5 } },
@@ -495,3 +498,36 @@ it('shows fixed retry UI for an ordinary GPU error and preserves authored framin
   expect(captures[0]!.close).toHaveBeenCalledOnce();
   expect(gpu.create).toHaveBeenCalledTimes(2);
 });
+
+it.each(['VIDEO', 'RECORDING'] as const)(
+  'admits managed %s without private DOM readiness or errors',
+  async (kind) => {
+    vi.stubGlobal('VideoFrame', class {});
+    vi.mocked(loadVideoEditorAssetBlob).mockResolvedValue(new Blob(['source']));
+    const owner = { request: vi.fn(), cancel: vi.fn(), reset: vi.fn(), dispose: vi.fn() };
+    let options: Parameters<typeof previewQueue.createBookendPreviewFrameQueue>[0] | undefined;
+    vi.spyOn(previewQueue, 'createBookendPreviewFrameQueue').mockImplementation((value) => {
+      options = value;
+      return owner;
+    });
+    const settings = { ...createBookendVideoPresentation(6), trim: { start: 1.02, end: 4.5 } };
+    await renderMounted(
+      { asset: asset('managed', kind), settings, output: { width: 321, height: 181 } },
+      'legacy'
+    );
+    const input = options!.read();
+    expect(input.source).toMatchObject({ kind: 'video', ready: true, time: 1.02, rangeEnd: 4.5 });
+    expect(owner.request).toHaveBeenCalled();
+    expect(options!.fallbackCanvas?.()).toBe(
+      host.querySelector('[data-ui="video-editor.scene-bookends.preview.fallback"] canvas')
+    );
+    const video = host.querySelector('video')!;
+    expect(video.readyState).toBe(0);
+    expect(video.style.opacity).toBe('0');
+    await act(async () => video.dispatchEvent(new Event('error')));
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+    expect(options!.read().source.ready).toBe(true);
+    await act(async () => video.dispatchEvent(new Event('loadedmetadata')));
+    expect(video.currentTime).toBe(1.02);
+  }
+);

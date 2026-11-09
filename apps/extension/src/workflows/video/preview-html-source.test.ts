@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { createNativeHtmlSourceProvider } from './html-source';
+import { createPreviewHtmlSourceProvider } from './preview-html-source';
 
 const metadata = vi.hoisted(() => ({
   floor: vi.fn(async (time: number) => ({ timestamp: time < 0.5 ? 0.1000006 : 0.6000006 })),
@@ -93,7 +93,7 @@ afterEach(() => {
 });
 it('snapshots distinct pass packets with native rounded PTS and no invented coverage', async () => {
   const video = decoder();
-  const provider = createNativeHtmlSourceProvider();
+  const provider = createPreviewHtmlSourceProvider();
   const lease = await provider.acquire(
     [
       { id: 'nominal', url: 'blob:test', time: 0.2 },
@@ -117,7 +117,7 @@ it('snapshots distinct pass packets with native rounded PTS and no invented cove
 });
 it('rejects a stale native frame instead of manufacturing membership', async () => {
   decoder(true);
-  const provider = createNativeHtmlSourceProvider();
+  const provider = createPreviewHtmlSourceProvider();
   await expect(
     provider.acquire([{ id: 'a', url: 'blob:test', time: 0.2 }], new AbortController().signal)
   ).rejects.toThrow('Preview source frame is unavailable.');
@@ -141,7 +141,7 @@ it.each(['metadata', 'load'] as const)(
         entered.resolve();
         return { timestamp: 0.1000006 };
       });
-    const provider = createNativeHtmlSourceProvider();
+    const provider = createPreviewHtmlSourceProvider();
     const controller = new AbortController();
     const pending = provider.acquire([{ id: 'a', url: 'blob:test', time: 0.2 }], controller.signal);
     await entered.promise;
@@ -165,7 +165,7 @@ it('closes earlier pass snapshots after a later pass metadata failure and permit
   metadata.floor
     .mockResolvedValueOnce({ timestamp: 0.1000006 })
     .mockRejectedValueOnce(new Error('read failed'));
-  const provider = createNativeHtmlSourceProvider();
+  const provider = createPreviewHtmlSourceProvider();
   await expect(
     provider.acquire(
       [
@@ -187,7 +187,7 @@ it('closes earlier pass snapshots after a later pass metadata failure and permit
 
 it('reserves normalization scratch temporarily and restores exact lease storage after release', async () => {
   decoder();
-  const provider = createNativeHtmlSourceProvider();
+  const provider = createPreviewHtmlSourceProvider();
   metadata.bytes = 32 * 1024 * 1024;
   const first = await provider.acquire(
     [{ id: 'a', url: 'blob:test', time: 0.2 }],

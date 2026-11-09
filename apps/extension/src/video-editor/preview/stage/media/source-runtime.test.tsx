@@ -12,7 +12,7 @@ import { createPreviewEffectRuntimeFeedbackTestStub } from '../scene/test-suppor
 import { usePreviewStageMediaRuntime } from './runtime';
 import { useNativePreviewSourceRuntime, type NativePreviewSourceRuntime } from './source-runtime';
 import * as sourceProvider from '../../../../workflows/video/preview-source';
-import * as htmlSource from './html-source';
+import * as htmlSource from '../../../../workflows/video/preview-html-source';
 import type {
   PreviewSourceLease,
   PreviewSourceProvider,
@@ -222,7 +222,7 @@ it('keeps the managed bank empty through pending HTML admission after upfront de
     entered.resolve();
     return admission.promise;
   });
-  vi.spyOn(htmlSource, 'createNativeHtmlSourceProvider').mockReturnValue({
+  vi.spyOn(htmlSource, 'createPreviewHtmlSourceProvider').mockReturnValue({
     acquire: htmlAcquire,
     retainSources: vi.fn(),
     dispose: vi.fn(),
@@ -625,7 +625,7 @@ it.each(['edit', 'unmount'] as const)('does not publish readiness after Scene %s
 it('shares HTML admission with matching Scene readiness after canonical decline', async () => {
   const htmlLease = sourceLease();
   const htmlAcquire = vi.fn().mockResolvedValue(htmlLease);
-  vi.spyOn(htmlSource, 'createNativeHtmlSourceProvider').mockReturnValue({
+  vi.spyOn(htmlSource, 'createPreviewHtmlSourceProvider').mockReturnValue({
     acquire: htmlAcquire,
     retainSources: vi.fn(),
     dispose: vi.fn(),

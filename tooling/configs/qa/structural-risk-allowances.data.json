@@ -6285,24 +6285,24 @@
     {
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview-render.ts",
       "symbol": "createBookendPreviewFrameQueue",
-      "astHash": "89be73b1ebc0fa393e11a6e96cbac55f13ab103d92b47eb23e86b87a0c16fe84",
-      "signatureHash": "fb13a3dbf82075dca3e25026f119b93eead3fa78bc6c933683230e6bc6c31926",
+      "astHash": "ce7156274929c85ee829117f331c67f313aac5d43f816d2ab1972023e3e34138",
+      "signatureHash": "30d680f833a9056543a149734a361f2d085f88b8aec2eb477745eb08de978f66",
       "rule": "structural-function-risk",
       "owner": "extension:video-editor:workspace",
-      "reason": "tool-noise: One serial source snapshot and latest-request lifetime owns capture, cancellation, GPU completion, stale output rejection and retirement. Borrowed pixels cannot close before completion. Splitting these transitions would distribute this invariant. GPU composition and destination visibility are already separate owners. The measured cohesion is one; the closure length causes this finding. Independent read-only structural diagnosis confirmed Keep. Controlled completion proof covers replacement, cancellation, disposal, reuse, retry and stale errors. Fresh candidate review must validate this exact binding. Review correction applies the same current-input admission to success and failure; source, queue and retirement authority remain unchanged. Fresh corrected-candidate review is required.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any separate source, queue, completion, publication, retirement, failure/retry or authoring authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-08"
+      "reason": "tool-noise: One serial owner controls source acquisition, retained RGB, cancellation, publication and retirement. Stateless normalization and Standard painting already have named boundaries. Independent diagnosis found no separate state authority or change reason. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, publication, recovery or resource authority. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09"
     },
     {
       "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inspection/scene-bookend-preview.tsx",
       "symbol": "SceneBookendPreview",
-      "astHash": "4e94e4ed84106fc25da80d014776309f08d8b22cf881ac5acf89843c2b8bf8f3",
+      "astHash": "b2522f6e939753e484c4b85daad7139b27ef55ff0b1c670816885228a305c9e1",
       "signatureHash": "c1b179b0a7171c4ce71357d0495e9187860329d5d923cded058167067f8dc925",
       "rule": "structural-function-risk",
       "owner": "extension:video-editor:workspace",
-      "reason": "tool-noise: One mounted disposable media surface owns source URL/readiness, DOM refs, queue and presenter binding, resize and fixed failure/retry UI. The current-prop refs bridge one asynchronous preview rather than independent project writers. Source fingerprint policy, GPU composition, queue lifetime and publication already have separate concrete owners. Another extraction would pass the same media refs and readiness across an extra boundary. Independent read-only structural diagnosis confirmed Keep. Mounted and real inspector proof check selection, edits, failure and source isolation. Fresh candidate review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any separate source, queue, completion, publication, retirement, failure/retry or authoring authority. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-08"
+      "reason": "tool-noise: One mounted preview owns its disposable URL, readiness, refs, queue binding and retry controls. The adjacent queue owns rendering and resource policy. Independent diagnosis found no separate project writer or reusable surface authority. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess additional authoring, persistence, transport or independent surface authority. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09"
     },
     {
       "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-bookend-preview-gpu.spec.ts",
@@ -6625,14 +6625,14 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/media/html-source.ts",
+      "file": "apps/extension/src/workflows/video/preview-html-source.ts",
       "symbol": "captureHtmlSource",
-      "owner": "extension:video-editor:preview",
-      "astHash": "6c53add5a91398e2f0dd7e550ed273088ea3b0575f076097ca73c9062c998e94",
-      "signatureHash": "0124f2796f9de646d0ab613c0c9ecbb7f29edd2ecf58118867f2babbb445b6b1",
+      "owner": "extension:app-core:workflows",
+      "astHash": "651399ab00fd03fdc8d1036adf0d30c4079e0047918807c46301e4e5028fcad9",
+      "signatureHash": "e76d3ba91f007a5cbdb21e20622f7eb74e4d7457fe68d36d0baea69c2cd954c3",
       "reviewDate": "2026-11-09",
-      "reason": "tool-noise: One sampling transaction owns decoder evidence, native frame admission and resource reservation. Shared resolvers retain source and color policy. One cleanup boundary releases resources before admission. The returned lease owns resources after admission. Independent diagnosis found no separate change reason or state authority. Fresh architecture review must assess this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent sampling policy, recovery workflow, persistence effect, transport effect or state authority. Remove when the analyzer models this cohesive transaction."
+      "reason": "tool-noise: One sampling transaction owns decoder evidence, native frame admission and resource reservation. Shared resolvers retain source and color policy. Cleanup transfers ownership to one immutable lease. Independent diagnosis confirms unchanged sampling semantics after the approved owner move. Fresh architecture review must assess this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent sampling policy, recovery workflow, persistence effect, transport effect or state authority. Remove when the analyzer models this cohesive boundary."
     }
   ]
 }

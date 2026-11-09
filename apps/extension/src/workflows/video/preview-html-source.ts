@@ -4,16 +4,16 @@ import {
   resolvePreviewSourceOrdinaryTime,
   type PreviewSourceBinding,
   type PreviewSourceDemand,
-} from '../../../../workflows/video/preview-source';
-import { prepareDecodedVideoFrame } from '../../../../features/video/composition/draw/decoded-sample';
-import { resolveReviewDecodedColorPatch } from '../../../../workflows/video-review/decoded-video-sample';
+} from './preview-source';
+import { prepareDecodedVideoFrame } from '../../features/video/composition/draw/decoded-sample';
+import { resolveReviewDecodedColorPatch } from '../video-review/decoded-video-sample';
 import {
   EFFECT_RUNTIME_RESOURCE_LIMITS,
   EffectRuntimeResourceError,
-} from '../../../../features/video/composition/effect-runtime/runtime/resource-limits';
+} from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 
 /** Metadata presentation-floor membership does not establish a successor timestamp. */
-export interface NativeHtmlSourceBinding {
+export interface PreviewHtmlSourceBinding {
   readonly membership: 'packet-floor';
   readonly source: PreviewSourceBinding['source'];
   readonly timestamp: number;
@@ -23,8 +23,8 @@ export interface NativeHtmlSourceBinding {
 }
 
 /** Native consumers need immutable pixels; canonical interval evidence remains unchanged. */
-export interface NativePreviewSourceLease {
-  readonly bindings: ReadonlyMap<string, PreviewSourceBinding | NativeHtmlSourceBinding>;
+export interface PreparedPreviewSourceLease {
+  readonly bindings: ReadonlyMap<string, PreviewSourceBinding | PreviewHtmlSourceBinding>;
   release(): void;
 }
 
@@ -148,7 +148,7 @@ async function captureHtmlSource(
   state: ReturnType<typeof openHtmlSource>,
   signal: AbortSignal,
   reserve: (bytes: number) => { commit(bytes: number): void; release(): void }
-): Promise<{ binding: NativeHtmlSourceBinding; release(): void }> {
+): Promise<{ binding: PreviewHtmlSourceBinding; release(): void }> {
   const interest = AbortSignal.any([signal, state.signal]);
   let raw: VideoFrame | undefined;
   let sample: VideoSample | undefined;
@@ -217,7 +217,7 @@ async function captureHtmlSource(
     });
     let released = false;
     const result = {
-      binding: Object.freeze<NativeHtmlSourceBinding>({
+      binding: Object.freeze<PreviewHtmlSourceBinding>({
         membership: 'packet-floor',
         source,
         timestamp: packet.timestamp,
@@ -244,7 +244,7 @@ async function captureHtmlSource(
 }
 
 /** Owns private paused decoders and metadata. Returned samples survive decoder retirement. */
-export function createNativeHtmlSourceProvider() {
+export function createPreviewHtmlSourceProvider() {
   const sources = new Map<string, ReturnType<typeof openHtmlSource>>();
   const lifetime = new AbortController();
   let tail: Promise<unknown> = Promise.resolve();
@@ -283,7 +283,7 @@ export function createNativeHtmlSourceProvider() {
   const execute = async (demands: readonly PreviewSourceDemand[], requestSignal: AbortSignal) => {
     const signal = AbortSignal.any([lifetime.signal, requestSignal]);
     signal.throwIfAborted();
-    const bindings = new Map<string, NativeHtmlSourceBinding>();
+    const bindings = new Map<string, PreviewHtmlSourceBinding>();
     const releases: (() => void)[] = [];
     const release = () => {
       for (const close of releases.splice(0)) close();
@@ -318,7 +318,7 @@ export function createNativeHtmlSourceProvider() {
     acquire(
       demands: readonly PreviewSourceDemand[],
       signal: AbortSignal
-    ): Promise<NativePreviewSourceLease> {
+    ): Promise<PreparedPreviewSourceLease> {
       const frozen = demands.map((demand) => ({ ...demand }));
       const result = tail.then(() => execute(frozen, signal));
       tail = result.catch(() => undefined);
