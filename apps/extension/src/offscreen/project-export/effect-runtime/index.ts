@@ -17,6 +17,7 @@ export interface RenderOffscreenProjectEffectFramesInput {
   sourceSampling?: ProjectExportSourceSampling;
   sourceSamplingFallback?: 'first' | 'last';
   compositionIndex?: VideoCompositionTimelineIndex;
+  renderPasses?: ReturnType<typeof resolveVideoCompositionRenderPasses>;
   clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>;
   currentTime: number;
   loadedImages: LoadedImagesMap;
@@ -44,11 +45,13 @@ export function createOffscreenProjectEffectRuntime(
     },
     async renderProjectFrames(projectArgs) {
       if (!projectArgs.project.effectInstances?.some(({ enabled }) => enabled)) return undefined;
-      const renderPasses = resolveVideoCompositionRenderPasses(
-        projectArgs.project,
-        projectArgs.currentTime,
-        projectArgs.compositionIndex ? { timelineIndex: projectArgs.compositionIndex } : undefined
-      );
+      const renderPasses =
+        projectArgs.renderPasses ??
+        resolveVideoCompositionRenderPasses(
+          projectArgs.project,
+          projectArgs.currentTime,
+          projectArgs.compositionIndex ? { timelineIndex: projectArgs.compositionIndex } : undefined
+        );
       if (!hasEffectRuntimePlans(renderPasses)) return undefined;
       executor ??= createEffectRuntimeSandboxExecutor({
         ...((projectArgs.ownerDocument ?? args.ownerDocument)

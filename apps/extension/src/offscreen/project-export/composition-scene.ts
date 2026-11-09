@@ -1,3 +1,4 @@
+import { resolveVideoCompositionRenderPasses } from '../../features/video/composition/timeline/render';
 import { hasCursorFollowingCameraAt } from '../../features/video/composition/motion/camera-interval';
 import { disposeEffectRuntimeComposition } from '../../features/video/composition/effect-runtime';
 import type { VideoCompositionTimelineIndex } from '../../features/video/composition/timeline/frame/index';
@@ -90,7 +91,19 @@ export async function renderProjectCompositionScene(
     (typeof HTMLCanvasElement !== 'undefined' && context.canvas instanceof HTMLCanvasElement
       ? context.canvas.ownerDocument
       : undefined);
+  const renderPasses = job.sourceSampling?.managesSources
+    ? resolveVideoCompositionRenderPasses(renderProject, currentTime, {
+        includeSubtitles: settings.burnInSubtitles === true,
+        cameraViewport: {
+          width: settings.width,
+          height: settings.height,
+          ...(settings.resolution ? { resolution: settings.resolution } : {}),
+        },
+        ...(args.compositionIndex ? { timelineIndex: args.compositionIndex } : {}),
+      })
+    : undefined;
   const frameArgs = {
+    ...(renderPasses ? { renderPasses } : {}),
     ...(args.compositionIndex ? { compositionIndex: args.compositionIndex } : {}),
     clipMediaElements: args.clipMediaElements,
     currentTime,
@@ -116,6 +129,7 @@ export async function renderProjectCompositionScene(
       args.loadedImages,
       args.clipMediaElements,
       {
+        ...(renderPasses ? { renderPasses } : {}),
         spatialRenderer: frameArgs.spatialRenderer,
         ...(args.sourceSamplingFallback
           ? { sourceSamplingFallback: args.sourceSamplingFallback }

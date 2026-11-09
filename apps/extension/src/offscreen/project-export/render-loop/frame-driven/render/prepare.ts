@@ -8,7 +8,8 @@ export async function prepareFrameDrivenCompositeFrame(
   const { currentTime, job, project, signal, throwIfPipelineFailed } = args;
   if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
   throwIfPipelineFailed();
-  await syncVideoClipFrame(job, project, currentTime, signal);
+  if (!job.sourceSampling?.managesSources)
+    await syncVideoClipFrame(job, project, currentTime, signal);
   await renderProjectCompositionFrame({
     ...args,
     ownerDocument: args.canvas.ownerDocument,

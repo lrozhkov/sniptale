@@ -3567,17 +3567,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/offscreen/project-export/composition-joins.ts",
-      "symbol": "createProjectExportCompositionJoinRenderer.renderSample",
-      "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: This operation prepares borrowed media, renders one composition sample and transfers its canvas lease. Held and cut branches share the same render and cancellation authority. Local maps and leases do not create another state owner. Success, failure and abort tests prove cleanup. A forwarding helper would distribute this one sample transaction.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess any new authority, result, resource lifetime or recovery. Remove when analysis models this operation. Independent architecture review must assess this exact classification.",
-      "reviewDate": "2026-10-22",
-      "astHash": "5e2504d8f1afaa82405d7cc47dd4974c1820e187fc3b026aa5d193f277d7c967",
-      "signatureHash": "71f7c078ce51931df6cd667851770c93b20ffbfa2eed1886a1a308e61f8bbbc2"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/offscreen/recording/cursor-trajectory/writer.ts",
       "symbol": "createBrowserCursorTrajectoryWriter",
       "owner": "extension:offscreen:recording",
@@ -5539,10 +5528,10 @@
       "file": "apps/extension/src/offscreen/project-export/composition-joins.ts",
       "symbol": "createProjectExportCompositionJoinRenderer",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One endpoint transaction owns media acquisition, cached endpoints, cancellation and cleanup. Its structural score delta is zero. The added field carries the existing retained endpoint policy through the same renderer. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
-      "reviewDate": "2026-11-04",
-      "astHash": "e710fbfb6dcde714766c67889557ee9d240e4d5775cd539295a6d49a752f20a6",
+      "reason": "tool-noise: One endpoint renderer retains its cache, cancellation, resources, nested renderer and teardown. Managed sources bypass nominal synchronization. Explicit first/last policy applies only to cutPlan. No additional lifetime or authority enters this operation. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-09",
+      "astHash": "92d20c2d0abe35bcd4919a53e40df944da3c46a2cfc9a0118c11dad4aeb360de",
       "signatureHash": "3e3aac676fafdc23b6a94224f2aea7ccf3955812b51827e6a6018f6f0e1b0775"
     },
     {
@@ -5583,21 +5572,21 @@
       "file": "apps/extension/src/offscreen/project-export/renderer/frame.ts",
       "symbol": "drawProjectFrame",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One frame operation owns composition order and final cleanup. Narrow drawing adapters retain their existing responsibilities. Layer, overlay and transition fences share the same output frame and release boundary. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
-      "reviewDate": "2026-11-04",
-      "astHash": "428f2ab42ff3ced376d4c51157e4e4be00d4ea2bb5bf7b42ed548020ca39f7d0",
-      "signatureHash": "177e4fc0d360c6d70763971da0b25764587bde796d12005df57743037a008148"
+      "reason": "tool-noise: One frame operation retains composition order, shared context, sharp stages and final disposal. The candidate accepts resolved passes so preparation and drawing use the same physical source context. No new authority enters this operation. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-09",
+      "astHash": "17a6ffd6a7fc9fe6c729085e93485a7dbc55b195296b1046e1ca58f90968de25",
+      "signatureHash": "6f4b71983f259fb128a6b0bc2f1e369d4a7c6a69ac311b8292a86ef47a5460fa"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling-plan.ts",
       "symbol": "resolveNativeSourceSamplingDemands",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One pure source-plan calculation combines source identity, projection and required density. The counted receiver is a newly allocated result record. Independent aperture calculations have private pure helpers. One append fold owns ROI merging and the guarded header replan. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
-      "reviewDate": "2026-11-04",
-      "astHash": "7bc8248a0971ff10e14782e349c1e5e1ae15c263cfa6d8b3435f141fd392e8e6",
+      "reason": "tool-noise: One pure calculation includes visual, effect-input and attached video owners. Local maps contain calculated outputs. The existing append fold retains ROI merging, density and header replan. No acquisition or publication enters the planner. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-09",
+      "astHash": "d5190583606814d3aff74cbc4e3447b9c3d1e68bec248b2632504e5a9580fb8b",
       "signatureHash": "91fbb130b953a633102179433471700bdb3b3f4f5670cad0d3b0ee1032f338cc"
     },
     {
@@ -5605,32 +5594,32 @@
       "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.test.ts",
       "symbol": "<file>",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: This suite proves one sampling, admission and release boundary with existing fixtures. The candidate adapts sample-result doubles to the concrete source contract. It changes no offscreen production behavior or fixture authority. Independent inspection found no separate responsibility. Fresh architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, fixture, scheduling, publication, recovery or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: One suite proves the same source admission, preparation and release contract. New cases cover canonical and declined acquisition, strict failure, endpoint intent, late abort, disposal and attached inputs. Tests isolate local maps, promises and spies in each fixture. They do not establish separate product authorities. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
       "reviewDate": "2026-11-09",
-      "astHash": "43315f0626a2c12546bdd9dd4ad7d46b12164bf6f2cbacdd5c9b90b3c94afde3",
-      "signatureHash": "d69b99c50c34f704bd24e99d2f724cdc2ea794c5d012a6c95bb85e0dcb6f3ff7"
+      "astHash": "827c2190e77356e0b0b699b339c8458b8652ba07070e5d30721d059c399346f1",
+      "signatureHash": "c949c5476c3899723953b773450a1d589bb1b473fd607362078199b2f685f436"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.ts",
       "symbol": "createProjectExportSourceSampling",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One job owns the enhancer, decoder, active operation, current pass, shared budget and drain. Private helpers separate normalization and scoped view construction. Splitting the remaining authority would separate acquisition from cancellation and cleanup. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
-      "reviewDate": "2026-11-04",
-      "astHash": "153d4c976471ad93964fac38ca62f1483cbb6b5bc6a5438dd5f752fac3e652be",
-      "signatureHash": "b5f5a27e025177ff30ac340de1cf0da1a8a9f74bf6b5b0188fbefeda79fadf33"
+      "reason": "tool-noise: One job owns lazy source providers, enhancer, active request, current pass, budget and teardown. Providers remain subordinate to this lifetime. Prepare refuses overlap. Dispose drains active work and releases current resources and providers. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-09",
+      "astHash": "1ad32dd04c26ab6fa66ff44f8b9244996a942c90a893961bdf31ecd4a2aa8947",
+      "signatureHash": "07234c11246bc362845b80ca75bbc6862359d6164759007caac72725a8f3fdf7"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.ts",
       "symbol": "createProjectExportSourceSampling.prepare",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One prepared-pass transaction owns input admission, source acquisition, preparation and lease adoption. Abort and disposal checks precede publication. All failure paths use the same release closure and provider budget. Private helpers own raw display normalization and scoped view construction. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent lifecycle, state authority, geometry contract or publication owner enters this operation.",
-      "reviewDate": "2026-11-04",
-      "astHash": "f72e59d25e4c472d7e33b6f52f7e349bc4ae619894f6e152d7dd0a43da14bb87",
+      "reason": "tool-noise: One prepared-pass transaction retains admission, acquisition, optional enhancement, lease adoption and release. Ordinary mode creates no enhancer. Abort and disposal checks precede adoption. Failure releases acquired media. Physical identity and actual timestamps remain paired. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-09",
+      "astHash": "03f5d4069be41b433b6ef71e2c360d3e0fcac2873a7dfb91fa15b155a84001bc",
       "signatureHash": "8742661b09c0b6151ef020c9b7d8ca77168a8d581056c85de0c331b45f53c92c"
     },
     {
@@ -6611,6 +6600,39 @@
       "reviewDate": "2026-11-09",
       "astHash": "1667957182c5c1390b62fa8d835aa99bd3aa55e5d25873a2d9d8c4f82cdebd44",
       "signatureHash": "f2c2e7fa2938c0934d488fe7a39a43754dac375bd9e754a8d4b201987a958d4d"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.ts",
+      "symbol": "createProjectExportSourceSampling.acquireSources",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: One acquisition transaction binds physical owners to canonical demands or explicit endpoint intent. Only an upfront unsupported result permits HTML acquisition. Thrown failures propagate. Samples and the acquired lease share one idempotent release closure. Failure releases them before rethrow. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-09",
+      "astHash": "4cb7839681470c1bfd5808960154798f6c79cc749da468f51968217ee762af55",
+      "signatureHash": "1011e11808fff1c207f7134439cca4e638076ea2295a34b86dc5a668e2ba6cb8"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-gallery-leading-source.spec.ts",
+      "symbol": "test callback#2",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One acceptance scenario prepares one camera source and project. It compares ordinary and presentation exports in both formats against one oracle. Process, DOM and file effects are proof adapters for the same result. Host teardown remains in finally. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-09",
+      "astHash": "776a3a08ec3819fbef22cc644a0087cadd46775c696e2b704e1c9499ba929f74",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-video-editor-export-source-contract.spec.ts",
+      "symbol": "test callback",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: One acceptance scenario compares Native ordinary and enhanced exports in both formats against one VFR exposure oracle. It checks raw and encoded output and every output timestamp. Browser, decoder and file effects are proof adapters for the same result. Host teardown remains in finally. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
+      "reviewDate": "2026-11-09",
+      "astHash": "5d465871f95a24f18e5c766766c798857843d0f1cde89b5ed29f21095459c22a",
+      "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     }
   ]
 }

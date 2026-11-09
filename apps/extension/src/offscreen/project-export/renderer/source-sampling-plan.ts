@@ -153,8 +153,18 @@ function centerScale(rect: Rect, scale: number): QuickEditHomography {
 }
 export function nativeSamplingTargetIncludes(
   plan: EffectRuntimeFramePlan,
-  clipId: string
+  clipId: string,
+  frame?: VideoCompositionFrame
 ): boolean {
+  if (
+    [...(frame?.visualLayers ?? []), ...(frame?.effectInputLayers ?? [])].some(
+      (layer) =>
+        layer.kind === 'effect' &&
+        layer.clip.effectInstanceId === plan.effectInstanceId &&
+        layer.sourceAttachment?.owner.clipId === clipId
+    )
+  )
+    return true;
   const target = plan.target;
   if (target.kind === 'clip') return target.clipId === clipId;
   if (target.kind === 'track' || target.kind === 'video-group')
@@ -348,8 +358,24 @@ export function resolveNativeSourceSamplingDemands(args: {
       }).map((lens) => ({ state, lens }))
     ) ?? [];
   const result: NativeSamplingSourcePlan[] = [];
-  for (const layer of frame.visualLayers) {
-    if (layer.kind !== 'video' || layer.opacity <= 0) continue;
+  const sourceLayers = [
+    ...frame.visualLayers.flatMap((layer) =>
+      layer.kind === 'video'
+        ? [{ layer, inputOnly: false }]
+        : layer.kind === 'effect' && layer.sourceAttachment
+          ? [{ layer: layer.sourceAttachment.owner, inputOnly: true }]
+          : []
+    ),
+    ...frame.effectInputLayers.flatMap((layer) =>
+      layer.kind === 'video'
+        ? [{ layer, inputOnly: true }]
+        : layer.kind === 'effect' && layer.sourceAttachment
+          ? [{ layer: layer.sourceAttachment.owner, inputOnly: true }]
+          : []
+    ),
+  ];
+  for (const { layer, inputOnly } of sourceLayers) {
+    if (layer.opacity <= 0 && !inputOnly) continue;
     const metadata = project.assets.find((a) => a.id === layer.clip.assetId)?.metadata;
     if (!metadata || !(metadata.width > 0 && metadata.height > 0))
       throw new Error('Export source dimensions are unavailable.');
@@ -519,7 +545,7 @@ export function resolveNativeSourceSamplingDemands(args: {
       append(...candidate);
     if (
       (frame.effectRuntimePlans ?? []).some((plan) =>
-        nativeSamplingTargetIncludes(plan, layer.clipId)
+        nativeSamplingTargetIncludes(plan, layer.clipId, frame)
       )
     ) {
       const density = Math.max(

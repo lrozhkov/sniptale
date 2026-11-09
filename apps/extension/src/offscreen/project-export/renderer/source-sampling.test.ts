@@ -1088,3 +1088,414 @@ it('releases failed scratch allocation, explicit scratch leases and unreleased j
   expect([pendingScratch.canvas.width, pendingScratch.canvas.height]).toEqual([0, 0]);
   expect(f.clones[0]!.close).toHaveBeenCalledOnce();
 });
+
+class ManagedFrame {
+  colorSpace = {};
+  format = 'RGBA';
+  timestamp = 2200000;
+  duration = 100000;
+  codedWidth = 640;
+  codedHeight = 360;
+  displayWidth = 640;
+  displayHeight = 360;
+  close = vi.fn();
+  clone() {
+    return new ManagedFrame();
+  }
+}
+
+it.each(['canonical', 'declined'] as const)(
+  'prepares %s ordinary physical sources with enhancement off and no endpoint fallback',
+  async (route) => {
+    const f = fixture();
+    vi.stubGlobal('VideoFrame', ManagedFrame);
+    const frame = resolveVideoCompositionRenderPasses(f.project, 1.21).overlayFrame;
+    const layer = frame.visualLayers[0]!;
+    if (layer.kind !== 'video') throw new Error('Expected video');
+    frame.visualLayers = [];
+    frame.effectInputLayers = [
+      { ...layer, clip: { ...layer.clip, sourceStart: 1, sourceDuration: 3 } },
+    ];
+    const release = vi.fn();
+    const source = {
+      sourceWidth: 640,
+      sourceHeight: 360,
+      draw: vi.fn(),
+      toVideoFrame: vi.fn(() => new ManagedFrame() as unknown as VideoFrame),
+    };
+    const acquire = vi.fn(async (demands: readonly { id: string; time: number }[]) => ({
+      bindings: new Map(
+        demands.map((d) => [
+          d.id,
+          { source, timestamp: 2.2, nextTimestamp: 2.3, target: d.time, url: 'blob:physical' },
+        ])
+      ),
+      release,
+    }));
+    const createSamples = vi.fn();
+    const owner = createProjectExportSourceSampling({
+      ...f,
+      settings: { ...f.settings, detailEnhancement: 'off' },
+      sourceUrl: () => 'blob:physical',
+      createSourceProvider: () => ({
+        acquire: route === 'declined' ? vi.fn(async () => null) : acquire,
+        retainSources: vi.fn(),
+        dispose: vi.fn(),
+      }),
+      createHtmlProvider: () => ({ acquire, retainSources: vi.fn(), dispose: vi.fn() }),
+      createSamples,
+    });
+    try {
+      const pass = await owner.prepare({ project: f.project, frame, time: 1.21, media: new Map() });
+      expect(acquire).toHaveBeenCalledWith(
+        [expect.objectContaining({ url: 'blob:physical', time: 2.21 })],
+        expect.any(AbortSignal)
+      );
+      expect(pass.media.get(layer.clipId)).toBeDefined();
+      expect(createSamples).not.toHaveBeenCalled();
+      pass.release();
+      expect(release).toHaveBeenCalledOnce();
+    } finally {
+      await owner.dispose();
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
+it('keeps an ordinary source rejection strict rather than using first/last samples', async () => {
+  const f = fixture();
+  vi.stubGlobal('VideoFrame', class {});
+  const error = new Error('ordinary gap is unavailable');
+  const acquire = vi.fn(async () => {
+    throw error;
+  });
+  const createSamples = vi.fn();
+  const owner = createProjectExportSourceSampling({
+    ...f,
+    settings: { ...f.settings, detailEnhancement: 'off' },
+    sourceUrl: () => 'blob:physical',
+    createSourceProvider: () => ({ acquire, retainSources: vi.fn(), dispose: vi.fn() }),
+    createSamples,
+  });
+  try {
+    await expect(
+      owner.prepare({
+        project: f.project,
+        frame: resolveVideoCompositionRenderPasses(f.project, 0).overlayFrame,
+        time: 0,
+        media: new Map(),
+      })
+    ).rejects.toBe(error);
+    expect(createSamples).not.toHaveBeenCalled();
+  } finally {
+    await owner.dispose();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('uses resolved explicit endpoint context without applying that fallback to ordinary requests', async () => {
+  const f = fixture();
+  vi.stubGlobal('VideoFrame', class {});
+  const frame = resolveVideoCompositionRenderPasses(f.project, 1.2).overlayFrame;
+  const media = new Map<string, VideoCompositionFrameSource>([
+    ['source', { sourceWidth: 640, sourceHeight: 360, draw: vi.fn() }],
+  ]);
+  const release = vi.fn();
+  const sample = vi.fn(async () => ({
+    media,
+    bindings: new Map<string, never>(),
+    forFrame: () => media,
+    release,
+  }));
+  const acquire = vi.fn();
+  const owner = createProjectExportSourceSampling({
+    ...f,
+    settings: { ...f.settings, detailEnhancement: 'off' },
+    sourceUrl: () => 'physical',
+    createSamples: () => ({ sample, dispose: vi.fn() }),
+    createSourceProvider: () => ({ acquire, dispose: vi.fn(), retainSources: vi.fn() }),
+  });
+  try {
+    const prepared = await owner.prepare({
+      project: f.project,
+      frame,
+      time: 1.2,
+      fallback: 'last',
+      media: new Map(),
+    });
+    expect(sample).toHaveBeenCalledWith(1.2, expect.any(AbortSignal), 'last', f.project, [
+      { frame, time: 1.2 },
+    ]);
+    expect(acquire).not.toHaveBeenCalled();
+    expect(prepared.media.get('source')).toBeDefined();
+    prepared.release();
+    prepared.release();
+    expect(release).toHaveBeenCalledOnce();
+  } finally {
+    await owner.dispose();
+    vi.unstubAllGlobals();
+  }
+});
+
+it.each(['abort', 'dispose'] as const)(
+  'closes late managed frames and leases after %s',
+  async (condition) => {
+    const f = fixture();
+    vi.stubGlobal('VideoFrame', ManagedFrame);
+    const controller = new AbortController();
+    const entered = Promise.withResolvers<void>();
+    const gate = Promise.withResolvers<void>();
+    const raw = new ManagedFrame();
+    const release = vi.fn(),
+      dispose = vi.fn();
+    const acquire = vi.fn(async (demands: readonly { id: string; time: number }[]) => {
+      entered.resolve();
+      await gate.promise;
+      return {
+        bindings: new Map(
+          demands.map((d) => [
+            d.id,
+            {
+              target: d.time,
+              timestamp: 1,
+              nextTimestamp: 2,
+              url: 'physical',
+              source: {
+                sourceWidth: 640,
+                sourceHeight: 360,
+                draw: vi.fn(),
+                toVideoFrame: () => raw as unknown as VideoFrame,
+              },
+            },
+          ])
+        ),
+        release,
+      };
+    });
+    const owner = createProjectExportSourceSampling({
+      ...f,
+      settings: { ...f.settings, detailEnhancement: 'off' },
+      sourceUrl: () => 'physical',
+      createSourceProvider: () => ({ acquire, dispose, retainSources: vi.fn() }),
+    });
+    const pending = owner.prepare({
+      project: f.project,
+      frame: resolveVideoCompositionRenderPasses(f.project, 1).overlayFrame,
+      time: 1,
+      media: new Map(),
+      signal: controller.signal,
+    });
+    await entered.promise;
+    if (condition === 'abort') controller.abort();
+    const retiring = condition === 'dispose' ? owner.dispose() : undefined;
+    gate.resolve();
+    if (condition === 'abort') await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    else await expect(pending).rejects.toThrow('disposed');
+    await (retiring ?? owner.dispose());
+    expect(raw.close).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+    expect(dispose).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  }
+);
+
+it('prepares full original input for an attached effect whose video body is absent', async () => {
+  const { createEffectHostClip } =
+    await import('../../../features/video/project/factories/overlay-clip');
+  const f = fixture(),
+    frame = resolveVideoCompositionRenderPasses(f.project, 1).overlayFrame;
+  const owner = frame.visualLayers[0]!;
+  if (owner.kind !== 'video') throw new Error('Expected video');
+  const clip = createEffectHostClip({
+    duration: 4,
+    effectInstanceId: 'attached',
+    name: 'Attached',
+    startTime: 0,
+    trackId: owner.clip.trackId,
+    projectWidth: 640,
+    projectHeight: 360,
+  });
+  frame.visualLayers = [
+    {
+      ...owner,
+      kind: 'effect',
+      clip,
+      clipId: clip.id,
+      sourceAttachment: {
+        owner: { ...owner, opacity: 0 },
+        mapping: {
+          frame: owner.clip.transform,
+          fitMode: owner.clip.fitMode,
+          sourceWidth: 640,
+          sourceHeight: 360,
+          renderState: owner.renderState,
+        },
+      },
+    },
+  ];
+  frame.effectRuntimePlans = [
+    {
+      assets: [],
+      controls: {},
+      dimensions: { width: 640, height: 360 },
+      renderDimensions: { width: 640, height: 360 },
+      documentSha256: 'a'.repeat(64),
+      documentSource: '{}',
+      duration: 4,
+      effectInstanceId: 'attached',
+      fps: 30,
+      frameIndex: 30,
+      kind: 'standalone',
+      progress: 0.25,
+      snapshotId: 'snapshot',
+      time: 1,
+      target: {
+        kind: 'clip',
+        clipId: clip.id,
+        chainIndex: 0,
+        placement: { x: 0, y: 0, width: 640, height: 360, rotation: 0, opacity: 1 },
+      },
+    },
+  ];
+  const plans = resolveNativeSourceSamplingDemands({
+    project: f.project,
+    settings: f.settings,
+    frame,
+    time: 1,
+  });
+  expect(plans).toHaveLength(1);
+  expect(plans[0]!.demands.find((d) => d.id === 'effectInput')?.originalPixelROI).toEqual({
+    x: 0,
+    y: 0,
+    width: 640,
+    height: 360,
+  });
+});
+
+it.each(['ordinary', 'held-end'] as const)(
+  'deduplicates shared visual/effect source demands for %s and releases the acquired frame once',
+  async (intent) => {
+    const f = fixture();
+    vi.stubGlobal('VideoFrame', ManagedFrame);
+    const time = intent === 'held-end' ? 5 : 1;
+    if (intent === 'held-end') {
+      f.clip.duration = f.project.duration = 6;
+      f.clip.playbackWindow = { offset: 0, holdAt: 4 };
+    }
+    const frame = resolveVideoCompositionRenderPasses(f.project, time).overlayFrame;
+    frame.effectInputLayers = [...frame.visualLayers];
+    const raw = new ManagedFrame(),
+      release = vi.fn();
+    const acquire = vi.fn(async (demands: readonly { id: string; time: number }[]) => ({
+      bindings: new Map(
+        demands.map((d) => [
+          d.id,
+          {
+            target: d.time,
+            timestamp: 1,
+            nextTimestamp: 2,
+            url: 'physical',
+            source: {
+              sourceWidth: 640,
+              sourceHeight: 360,
+              draw: vi.fn(),
+              toVideoFrame: () => raw as unknown as VideoFrame,
+            },
+          },
+        ])
+      ),
+      release,
+    }));
+    const owner = createProjectExportSourceSampling({
+      ...f,
+      settings: { ...f.settings, detailEnhancement: 'off' },
+      sourceUrl: () => 'physical',
+      createSourceProvider: () => ({ acquire, retainSources: vi.fn(), dispose: vi.fn() }),
+    });
+    try {
+      const pass = await owner.prepare({ project: f.project, frame, time, media: new Map() });
+      expect(acquire).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            time: intent === 'held-end' ? 4 : 1,
+            ...(intent === 'held-end' ? { endpoint: 'retained-end' } : {}),
+          }),
+        ],
+        expect.any(AbortSignal)
+      );
+      expect(pass.media.has(f.clip.id)).toBe(true);
+      pass.release();
+      pass.release();
+      owner.releasePass();
+      expect(raw.close).toHaveBeenCalledOnce();
+      expect(release).toHaveBeenCalledOnce();
+    } finally {
+      await owner.dispose();
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
+it('fails a missing physical source URL before opening a decoder or substituting media', async () => {
+  const f = fixture();
+  vi.stubGlobal('VideoFrame', ManagedFrame);
+  const createSourceProvider = vi.fn();
+  const owner = createProjectExportSourceSampling({
+    ...f,
+    settings: { ...f.settings, detailEnhancement: 'off' },
+    sourceUrl: () => undefined,
+    createSourceProvider,
+  });
+  try {
+    await expect(
+      owner.prepare({
+        project: f.project,
+        frame: resolveVideoCompositionRenderPasses(f.project, 1).overlayFrame,
+        time: 1,
+        media: new Map(),
+      })
+    ).rejects.toThrow('Original export source is unavailable.');
+    expect(createSourceProvider).not.toHaveBeenCalled();
+  } finally {
+    await owner.dispose();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('does not acquire video for an unattached procedural effect frame', async () => {
+  const { createEffectHostClip } =
+    await import('../../../features/video/project/factories/overlay-clip');
+  const f = fixture(),
+    frame = resolveVideoCompositionRenderPasses(f.project, 1).overlayFrame;
+  const layer = frame.visualLayers[0]!;
+  const clip = createEffectHostClip({
+    duration: 4,
+    effectInstanceId: 'procedural',
+    name: 'Procedural',
+    startTime: 0,
+    trackId: f.clip.trackId,
+    projectWidth: 640,
+    projectHeight: 360,
+  });
+  frame.visualLayers = [{ ...layer, kind: 'effect', clip, clipId: clip.id }];
+  frame.effectInputLayers = [];
+  vi.stubGlobal('VideoFrame', ManagedFrame);
+  const createSourceProvider = vi.fn(),
+    sourceUrl = vi.fn();
+  const owner = createProjectExportSourceSampling({
+    ...f,
+    settings: { ...f.settings, detailEnhancement: 'off' },
+    sourceUrl,
+    createSourceProvider,
+  });
+  try {
+    const pass = await owner.prepare({ project: f.project, frame, time: 1, media: new Map() });
+    expect(pass.media.size).toBe(0);
+    expect(createSourceProvider).not.toHaveBeenCalled();
+    expect(sourceUrl).not.toHaveBeenCalled();
+    pass.release();
+  } finally {
+    await owner.dispose();
+    vi.unstubAllGlobals();
+  }
+});

@@ -356,3 +356,21 @@ it('keeps the default and explicit off ETA profile and render path identical', a
   );
   expect(historyReadMock.mock.calls[1]![0]).toBe(baseline);
 });
+
+it('owns source preparation for an unenhanced export until completion', async () => {
+  const { renderCompositeExport } = await import('./render');
+  const job = createJob();
+  vi.stubGlobal('document', createDocumentStub({}));
+  vi.stubGlobal('VideoFrame', class {});
+  renderCompositeToMp4Mock.mockImplementationOnce(async () => {
+    expect(job.sourceSampling?.managesSources).toBe(true);
+    return new Blob(['owned'], { type: 'video/mp4' });
+  });
+  await renderCompositeExport(
+    job,
+    createEmptyVideoProject('Ordinary'),
+    { ...createSettings(), detailEnhancement: 'off' },
+    {}
+  );
+  expect(job.sourceSampling).toBeUndefined();
+});

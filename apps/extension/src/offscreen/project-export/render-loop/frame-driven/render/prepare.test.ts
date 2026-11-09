@@ -298,3 +298,25 @@ it('paints scene edge presentation after the complete frame and watermark', asyn
   await prepareFrameDrivenCompositeFrame(fixture.args);
   expect(order).toEqual(['scene', 'captions', 'watermark', 'scene edge']);
 });
+
+it('does not seek nominal HTML when the source owner prepares the resolved composition', async () => {
+  const f = createIndexedEffectRuntimeFrameFixture();
+  const sourceSampling = { managesSources: true, releasePass: vi.fn() } as unknown as NonNullable<
+    typeof f.job.sourceSampling
+  >;
+  f.job.sourceSampling = sourceSampling;
+  await prepareFrameDrivenCompositeFrame(f.args);
+  expect(syncVideoClipFrameMock).not.toHaveBeenCalled();
+  expect(f.effectRuntime.renderProjectFrames).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceSampling, renderPasses: expect.any(Object) })
+  );
+  expect(drawProjectFrameMock).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.anything(),
+    expect.anything(),
+    2.5,
+    expect.anything(),
+    expect.anything(),
+    expect.objectContaining({ sourceSampling, renderPasses: expect.any(Object) })
+  );
+});

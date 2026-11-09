@@ -14,6 +14,7 @@ import {
 } from '../../features/video/review/advanced/webcam';
 import { createReviewDecodedSampleSink } from './decoded-video-sample';
 import { QuickEditExportUnavailable } from './export-unavailable';
+import { readPreviewSourceLeadingSampleTime } from '../video/preview-source';
 
 type Size = { width: number; height: number };
 type WebcamDrawable = {
@@ -162,6 +163,12 @@ export async function createReviewWebcamRenderer(
     )
       throw new QuickEditExportUnavailable(['asset-missing']);
     signal.throwIfAborted();
+    const leadingSampleTime = await readPreviewSourceLeadingSampleTime(
+      track,
+      duration,
+      signal,
+      resolution
+    );
     const sink = createReviewDecodedSampleSink(
       new VideoSampleSink(track),
       signal,
@@ -173,7 +180,14 @@ export async function createReviewWebcamRenderer(
       const frames = sourceTimes.map((time) => quickEditWebcamFrameAt(webcam, time, duration));
       const lastTick = (Math.ceil(duration * resolution) - 1) / resolution;
       const timestamps = frames.flatMap((frame) =>
-        frame ? [Math.min(lastTick, Math.round(frame.time * resolution) / resolution)] : []
+        frame
+          ? [
+              Math.max(
+                leadingSampleTime ?? 0,
+                Math.min(lastTick, Math.round(frame.time * resolution) / resolution)
+              ),
+            ]
+          : []
       );
       const decoded = sink.samplesAtTimestamps(timestamps);
       try {

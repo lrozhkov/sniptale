@@ -1,3 +1,15 @@
+import { VideoSample } from 'mediabunny';
+import { prepareDecodedVideoSample } from '../../../features/video/composition/draw/decoded-sample';
+import {
+  createPreviewSourceProvider,
+  type PreviewSourceDemand,
+} from '../../../workflows/video/preview-source';
+import {
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+} from '../../../workflows/video/preview-html-source';
+import { getVideoClipSourceTime } from '../../../features/video/project/timeline';
+import { getClipPlaybackOffset } from '../../../features/video/project/timeline/rate';
 import type {
   RenderResources,
   RenderCanvasLease,
@@ -44,6 +56,7 @@ interface NativePreparedSourcePass {
   release(): void;
 }
 export interface ProjectExportSourceSampling {
+  readonly managesSources: boolean;
   prepare(args: {
     project: VideoProject;
     frame: VideoCompositionFrame;
@@ -143,9 +156,14 @@ export function createProjectExportSourceSampling(args: {
   sourceUrl(clip: VideoProjectVideoClip): string | undefined;
   enhancer?: ExportEnhancer;
   createSamples?: typeof createCompositionCutSampleSource;
+  createSourceProvider?: typeof createPreviewSourceProvider;
+  createHtmlProvider?: typeof createPreviewHtmlSourceProvider;
   ownerDocument?: Document;
 }): ProjectExportSourceSampling {
   const mode = parseEnhancementMode(args.settings.detailEnhancement);
+  const managesSources = typeof VideoFrame !== 'undefined';
+  let provider: ReturnType<typeof createPreviewSourceProvider> | undefined;
+  let html: ReturnType<typeof createPreviewHtmlSourceProvider> | undefined;
   let enhancer: ExportEnhancer | undefined = args.enhancer;
   let samples: ReturnType<typeof createCompositionCutSampleSource> | undefined;
   let current: NativePreparedSourcePass | undefined;
@@ -222,6 +240,112 @@ export function createProjectExportSourceSampling(args: {
   };
   const resourceMedia = (media: ReadonlyMap<string, VideoCompositionMediaSource>) =>
     new Map([...media].map(([id, source]) => [id, withResources(source)]));
+  const acquireSources = async (input: Parameters<ProjectExportSourceSampling['prepare']>[0]) => {
+    const signal = input.signal ?? new AbortController().signal;
+    if (input.fallback) {
+      samples ??= (args.createSamples ?? createCompositionCutSampleSource)({
+        project: args.project,
+        sourceUrl: args.sourceUrl,
+        conversion: 'canvas',
+      });
+      const lease = await samples.sample(input.time, signal, input.fallback, input.project, [
+        { frame: input.frame, time: input.time },
+      ]);
+      return {
+        media: new Map([
+          ...input.media,
+          ...lease.forFrame(input.frame, input.time, [
+            ...input.frame.visualLayers,
+            ...input.frame.effectInputLayers,
+          ]),
+        ]),
+        release: lease.release,
+      };
+    }
+    const layers = [...input.frame.visualLayers, ...input.frame.effectInputLayers].flatMap(
+      (layer) =>
+        layer.kind === 'video'
+          ? [layer]
+          : layer.kind === 'effect' && layer.sourceAttachment
+            ? [layer.sourceAttachment.owner]
+            : []
+    );
+    const demands: PreviewSourceDemand[] = [];
+    const ids = new Map<string, string>();
+    for (const layer of layers) {
+      if (ids.has(layer.clipId)) continue;
+      const clip = layer.clip;
+      const url = args.sourceUrl(clip);
+      if (!url) throw new Error('Original export source is unavailable.');
+      const time = getVideoClipSourceTime(clip, input.time);
+      const offset = clip.cameraTiming?.offsetSeconds ?? 0;
+      const rangeEnd = clip.sourceStart + clip.sourceDuration - offset;
+      const held =
+        clip.playbackWindow?.holdAt !== undefined &&
+        getClipPlaybackOffset(clip, input.time) >= clip.playbackWindow.holdAt &&
+        time === rangeEnd;
+      const id = String(demands.length);
+      ids.set(layer.clipId, id);
+      demands.push({
+        id,
+        url,
+        time,
+        rangeStart: clip.sourceStart - offset,
+        rangeEnd,
+        ...(held ? { endpoint: 'retained-end' as const } : {}),
+      });
+    }
+    if (!demands.length) return { media: input.media, release() {} };
+    provider ??= (args.createSourceProvider ?? createPreviewSourceProvider)();
+    let lease: PreparedPreviewSourceLease | null = await provider.acquire(demands, signal);
+    if (!lease) {
+      html ??= (args.createHtmlProvider ?? createPreviewHtmlSourceProvider)();
+      lease = await html.acquire(demands, signal);
+    }
+    const acquired = lease;
+    const owned: VideoSample[] = [];
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      for (const sample of owned) sample.close();
+      acquired.release();
+    };
+    try {
+      const media = new Map(input.media);
+      for (const [clipId, id] of ids) {
+        const binding = acquired.bindings.get(id);
+        if (!binding?.source.toVideoFrame)
+          throw new Error('Original export sample is unavailable.');
+        let raw: VideoFrame | undefined = binding.source.toVideoFrame();
+        let sample: VideoSample;
+        try {
+          const borrowed = new VideoSample(raw, {
+            timestamp: binding.timestamp,
+            rotation: binding.source.orientation?.rotation ?? 0,
+            flip: binding.source.orientation?.flip ?? false,
+          });
+          raw = undefined;
+          sample = await prepareDecodedVideoSample(borrowed, signal);
+        } finally {
+          raw?.close();
+        }
+        owned.push(sample);
+        signal.throwIfAborted();
+        media.set(clipId, {
+          sourceWidth: sample.displayWidth,
+          sourceHeight: sample.displayHeight,
+          orientation: { rotation: sample.rotation, flip: sample.flip },
+          toVideoFrame: () => sample.toVideoFrame(),
+          draw: (context, x, y, width, height) => sample.draw(context, x, y, width, height),
+        });
+      }
+      return { media, release };
+    } catch (error) {
+      release();
+      throw error;
+    }
+  };
   const prepare = async (
     input: Parameters<ProjectExportSourceSampling['prepare']>[0]
   ): Promise<NativePreparedSourcePass> => {
@@ -241,7 +365,7 @@ export function createProjectExportSourceSampling(args: {
     current?.release();
     current = undefined;
     key = undefined;
-    if (mode === 'off')
+    if (mode === 'off' && !managesSources)
       return {
         media: input.media,
         sourceRasterScale: 1,
@@ -251,7 +375,10 @@ export function createProjectExportSourceSampling(args: {
         renderDimensions: (p) => p.renderDimensions,
         release() {},
       };
-    const plans = resolveNativeSourceSamplingDemands({ ...input, settings: args.settings });
+    const plans =
+      mode === 'off'
+        ? []
+        : resolveNativeSourceSamplingDemands({ ...input, settings: args.settings });
     const rasterScaleForDemand = (id: string) =>
       Math.max(
         resolveProjectOutputTransform(input.project, args.settings).scale,
@@ -261,7 +388,7 @@ export function createProjectExportSourceSampling(args: {
       Math.max(
         1,
         ...plans
-          .filter((p) => nativeSamplingTargetIncludes(plan, p.clipId))
+          .filter((p) => nativeSamplingTargetIncludes(plan, p.clipId, input.frame))
           .map((p) => p.sourceRasterScale)
       );
     const physical = (plan: EffectRuntimeFramePlan) => {
@@ -275,35 +402,62 @@ export function createProjectExportSourceSampling(args: {
     };
     // Refuse an impossible FX output before starting source inference.
     for (const plan of input.frame.effectRuntimePlans ?? []) physical(plan);
-    if (!hasMagnificationDemand(plans.flatMap((p) => p.demands)))
-      return {
-        media: resourceMedia(input.media),
-        sourceRasterScale: rasterScaleForDemand('body'),
-        rasterScaleForDemand,
-        effectMedia: () => resourceMedia(input.media),
-        forDemand: () => resourceMedia(input.media),
-        renderDimensions: physical,
-        release() {},
-      };
-    enhancer ??= createExportEnhancer({
-      mode,
-      ...(args.ownerDocument ? { document: args.ownerDocument } : {}),
-    });
+    const magnified = mode !== 'off' && hasMagnificationDemand(plans.flatMap((p) => p.demands));
     const signal = input.signal ?? new AbortController().signal;
-    const retained =
-      input.time === (input.sceneTime ?? input.time) &&
-      plans.every((plan) => isVideoCompositionFrameSource(input.media.get(plan.clipId)));
     let decoded: { media: ReadonlyMap<string, VideoCompositionMediaSource>; release(): void };
-    if (retained) decoded = { media: input.media, release() {} };
+    if (managesSources) decoded = await acquireSources(input);
+    else if (
+      !magnified ||
+      (input.time === (input.sceneTime ?? input.time) &&
+        plans.every((plan) => isVideoCompositionFrameSource(input.media.get(plan.clipId))))
+    )
+      decoded = { media: input.media, release() {} };
     else {
       samples ??= (args.createSamples ?? createCompositionCutSampleSource)({
         project: args.project,
         sourceUrl: args.sourceUrl,
         conversion: 'native',
       });
-      // A retained sample at/before the requested clock is used first. If none lies in the active
-      // retained range, ordinary sampling takes its first frame; held-last remains reader-owned.
       decoded = await samples.sample(input.time, signal, input.fallback ?? 'first', input.project);
+    }
+    if (!magnified) {
+      try {
+        signal.throwIfAborted();
+        if (disposed) throw new Error('Export sampling is disposed.');
+      } catch (error) {
+        decoded.release();
+        throw error;
+      }
+      const media = resourceMedia(decoded.media);
+      let released = false;
+      const pass: NativePreparedSourcePass = {
+        media,
+        sourceRasterScale: mode === 'off' ? 1 : rasterScaleForDemand('body'),
+        rasterScaleForDemand: mode === 'off' ? () => 1 : rasterScaleForDemand,
+        effectMedia: () => media,
+        forDemand: () => media,
+        renderDimensions: mode === 'off' ? (p) => p.renderDimensions : physical,
+        release() {
+          if (released) return;
+          released = true;
+          if (current === pass) {
+            current = undefined;
+            key = undefined;
+          }
+          decoded.release();
+        },
+      };
+      current = pass;
+      key = {
+        time: input.time,
+        frame: input.frame,
+        lensFrame: input.lensFrame,
+        sceneTime: input.sceneTime,
+        fallback: input.fallback,
+        project: input.project,
+        media: input.media,
+      };
+      return pass;
     }
     const leases: Array<{ dispose(): void }> = [];
     const owned: VideoFrame[] = [];
@@ -324,7 +478,11 @@ export function createProjectExportSourceSampling(args: {
       decoded.release();
     };
     try {
-      const media = resourceMedia(input.media);
+      enhancer ??= createExportEnhancer({
+        mode,
+        ...(args.ownerDocument ? { document: args.ownerDocument } : {}),
+      });
+      const media = resourceMedia(decoded.media);
       for (const plan of plans) {
         if (!plan.demands.length) continue;
         const source = decoded.media.get(plan.clipId);
@@ -348,6 +506,7 @@ export function createProjectExportSourceSampling(args: {
         const identity = {
           sourceKey: {
             clipId: plan.clipId,
+            physicalSource: plan.demands[0]!.sourceKey,
             sampleTimestamp: frame.timestamp,
             orientation: source.orientation,
           },
@@ -389,8 +548,8 @@ export function createProjectExportSourceSampling(args: {
         sourceRasterScale: rasterScaleForDemand('body'),
         rasterScaleForDemand,
         effectMedia(plan) {
-          return nativeSamplingTargetIncludes(plan, plans[0]?.clipId ?? '') ||
-            plans.some((p) => nativeSamplingTargetIncludes(plan, p.clipId))
+          return nativeSamplingTargetIncludes(plan, plans[0]?.clipId ?? '', input.frame) ||
+            plans.some((p) => nativeSamplingTargetIncludes(plan, p.clipId, input.frame))
             ? this.forDemand('effectInput')
             : media;
         },
@@ -417,6 +576,7 @@ export function createProjectExportSourceSampling(args: {
     }
   };
   return {
+    managesSources,
     prepare(input) {
       if (active) return Promise.reject(new Error('Export sampling is busy.'));
       const pending = prepare(input);
@@ -441,12 +601,17 @@ export function createProjectExportSourceSampling(args: {
       } catch {
         // The frame caller receives the failure; teardown must still drain and release the source.
       }
-      await enhancer?.dispose();
-      current?.release();
-      current = undefined;
-      for (const lease of [...scratch]) lease.release();
-      for (const release of [...byteLeases]) release();
-      samples?.dispose();
+      try {
+        await enhancer?.dispose();
+      } finally {
+        current?.release();
+        current = undefined;
+        for (const lease of [...scratch]) lease.release();
+        for (const release of [...byteLeases]) release();
+        samples?.dispose();
+        provider?.dispose();
+        html?.dispose();
+      }
     },
   };
 }

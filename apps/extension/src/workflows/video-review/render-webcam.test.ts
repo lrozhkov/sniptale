@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
   declaredDuration: 3,
   actualDuration: 3,
   duration: vi.fn<() => Promise<number>>(),
+  firstTimestamp: vi.fn<() => Promise<number>>(),
+  decodeError: false,
 }));
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
@@ -30,6 +32,7 @@ vi.mock('mediabunny', () => ({
         getDisplayHeight: async () => 480,
         getTimeResolution: async () => 1000,
         computePacketStats: state.stats,
+        getFirstTimestamp: state.firstTimestamp,
       };
     }
     async getDurationFromMetadata() {
@@ -40,7 +43,8 @@ vi.mock('mediabunny', () => ({
     async *samplesAtTimestamps(times: readonly number[]) {
       for (const time of times) {
         state.times.push(time);
-        if (state.missing) {
+        if (state.decodeError) throw new Error('camera decoder failed');
+        if (state.missing || time < (await state.firstTimestamp())) {
           yield null;
           continue;
         }
@@ -85,7 +89,98 @@ beforeEach(() => {
   state.declaredDuration = 3;
   state.actualDuration = 3;
   state.duration.mockImplementation(async () => state.actualDuration);
+  state.firstTimestamp.mockResolvedValue(0);
+  state.decodeError = false;
   state.stats.mockResolvedValue({ averagePacketRate: 10 });
+});
+
+it.each(['frames', 'sourceFrames'] as const)(
+  'admits bounded positive first PTS in %s without shifting authored camera coverage',
+  async (route) => {
+    state.firstTimestamp.mockResolvedValue(0.033);
+    state.stats.mockResolvedValue({ averagePacketRate: 30 });
+    const camera = { ...webcam(), offsetSeconds: 2, hiddenRanges: [{ id: 'h', start: 3, end: 4 }] };
+    const before = structuredClone(camera);
+    const renderer = await createReviewWebcamRenderer(camera, read, new AbortController().signal);
+    const visible: boolean[] = [];
+    for await (const frame of renderer[route]([1, 2, 2.01, 3, 4, 5])) visible.push(!!frame);
+    expect(visible).toEqual([false, true, true, false, true, false]);
+    expect(state.times).toEqual([0.033, 0.033, 2]);
+    expect(state.stats).toHaveBeenCalledWith(256, { metadataOnly: true });
+    expect(camera).toEqual(before);
+    expect(renderer.duration).toBe(3);
+    expect(state.samples.every((sample) => sample.close.mock.calls.length === 1)).toBe(true);
+    renderer.dispose();
+  }
+);
+
+it.each(['frames', 'sourceFrames'] as const)(
+  'rejects an excessive first PTS gap in %s without a first-frame fallback',
+  async (route) => {
+    state.firstTimestamp.mockResolvedValue(0.2);
+    state.stats.mockResolvedValue({ averagePacketRate: 30 });
+    const renderer = await createReviewWebcamRenderer(webcam(), read, new AbortController().signal);
+    await expect(renderer[route]([0]).next()).rejects.toMatchObject({ reasons: ['asset-missing'] });
+    expect(state.times).toEqual([0]);
+    expect(state.samples).toHaveLength(0);
+    renderer.dispose();
+  }
+);
+
+it('preserves physical endpoint exclusion and actual sample time for an admitted leading frame', async () => {
+  state.firstTimestamp.mockResolvedValue(0.033);
+  state.stats.mockResolvedValue({ averagePacketRate: 30 });
+  const camera = webcam();
+  camera.positions = [
+    {
+      id: 'after-first',
+      time: 0.02,
+      placement: { ...camera.placement, x: 0.5 },
+      crop: { zoom: 2, panX: 0.5, panY: 0 },
+      transition: { type: 'none', duration: 0 },
+    },
+  ];
+  const renderer = await createReviewWebcamRenderer(camera, read, new AbortController().signal);
+  const frames = renderer.sourceFrames([0, 2.9999, 3]);
+  const first = (await frames.next()).value;
+  expect(first).toMatchObject({ representedMediaTime: 0.033, placement: camera.placement });
+  expect(first!.crop).toEqual({ zoom: 1, panX: 0, panY: 0 });
+  await frames.next();
+  expect((await frames.next()).value).toBeNull();
+  await frames.return(undefined);
+  expect(state.times).toEqual([0.033, 2.999]);
+  expect(state.samples.every((sample) => sample.close.mock.calls.length === 1)).toBe(true);
+  renderer.dispose();
+});
+
+it.each(['frames', 'sourceFrames'] as const)(
+  'propagates decoder errors after leading admission in %s without retry',
+  async (route) => {
+    state.firstTimestamp.mockResolvedValue(0.033);
+    state.stats.mockResolvedValue({ averagePacketRate: 30 });
+    state.decodeError = true;
+    const renderer = await createReviewWebcamRenderer(webcam(), read, new AbortController().signal);
+    await expect(renderer[route]([0]).next()).rejects.toThrow();
+    expect(state.times).toEqual([0.033]);
+    expect(state.samples).toHaveLength(0);
+    renderer.dispose();
+  }
+);
+
+it('releases camera input after leading metadata failure or cancellation without decoding', async () => {
+  state.firstTimestamp.mockRejectedValueOnce(new Error('metadata failed'));
+  await expect(
+    createReviewWebcamRenderer(webcam(), read, new AbortController().signal)
+  ).rejects.toMatchObject({ reasons: ['asset-missing'] });
+  const abort = new AbortController();
+  state.firstTimestamp.mockResolvedValue(0.033);
+  state.stats.mockImplementationOnce(async () => {
+    abort.abort();
+    return { averagePacketRate: 30 };
+  });
+  await expect(createReviewWebcamRenderer(webcam(), read, abort.signal)).rejects.toThrow();
+  expect(state.times).toEqual([]);
+  expect(state.disposed).toHaveBeenCalled();
 });
 
 it('seeds native seek tolerance from bounded metadata without decoding the camera', async () => {
@@ -193,6 +288,8 @@ it('rejects unavailable bytes and missing frames instead of exporting without th
 });
 
 it('aborts outstanding camera work and rejects subsequent frames', async () => {
+  state.firstTimestamp.mockResolvedValue(0.033);
+  state.stats.mockResolvedValue({ averagePacketRate: 30 });
   const abort = new AbortController();
   const renderer = await createReviewWebcamRenderer(webcam(), read, abort.signal);
   const frames = renderer.frames([0, 1]);

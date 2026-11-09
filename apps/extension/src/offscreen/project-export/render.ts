@@ -131,18 +131,19 @@ export async function renderCompositeExport(
 
   const timing = createProjectExportTiming(project, settings, abortController.signal);
   job.timeEstimator = timing.estimator;
-  const sampling =
-    settings.detailEnhancement && settings.detailEnhancement !== 'off'
-      ? createProjectExportSourceSampling({
-          project,
-          settings,
-          sourceUrl: (clip) => {
-            const media = job.clipMediaElements.get(clip.id);
-            return media?.currentSrc || media?.src;
-          },
-        })
-      : undefined;
-  if (sampling) job.sourceSampling = sampling;
+  const sampling = createProjectExportSourceSampling({
+    project,
+    settings,
+    sourceUrl: (clip) => {
+      const physicalClip = project.clips.find(
+        (candidate) => candidate.type === 'VIDEO' && candidate.assetId === clip.assetId
+      );
+      if (!physicalClip) return undefined;
+      const media = job.clipMediaElements.get(physicalClip.id);
+      return media?.currentSrc || media?.src;
+    },
+  });
+  job.sourceSampling = sampling;
   try {
     const outputBlob =
       settings.format === VideoExportFormat.MP4

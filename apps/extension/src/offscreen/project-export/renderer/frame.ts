@@ -511,6 +511,7 @@ export async function drawProjectFrame(
     backgroundCache?: ExportSceneBackgroundCache;
     spatialRenderer?: () => ReviewSpatialRenderer;
     compositionIndex?: VideoCompositionTimelineIndex;
+    renderPasses?: RenderPasses;
     effectRuntimeFrames?: EffectRuntimeRenderedComposition;
     sourceSampling?: ProjectExportSourceSampling;
     sourceSamplingFallback?: 'first' | 'last';
@@ -518,15 +519,17 @@ export async function drawProjectFrame(
   } = {}
 ): Promise<void> {
   const { offsetX, offsetY, scale } = resolveProjectOutputTransform(project, settings);
-  const renderPasses = resolveVideoCompositionRenderPasses(project, currentTime, {
-    includeSubtitles: settings.burnInSubtitles === true,
-    cameraViewport: {
-      width: settings.width,
-      height: settings.height,
-      ...(settings.resolution ? { resolution: settings.resolution } : {}),
-    },
-    ...(options.compositionIndex ? { timelineIndex: options.compositionIndex } : {}),
-  });
+  const renderPasses =
+    options.renderPasses ??
+    resolveVideoCompositionRenderPasses(project, currentTime, {
+      includeSubtitles: settings.burnInSubtitles === true,
+      cameraViewport: {
+        width: settings.width,
+        height: settings.height,
+        ...(settings.resolution ? { resolution: settings.resolution } : {}),
+      },
+      ...(options.compositionIndex ? { timelineIndex: options.compositionIndex } : {}),
+    });
 
   const sharpStages = options.sourceSampling
     ? createNativeSharpStages({
