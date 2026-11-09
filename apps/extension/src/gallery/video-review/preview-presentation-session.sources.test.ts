@@ -11,7 +11,14 @@ import type {
   PreviewSourceLease,
 } from '../../workflows/video/preview-source';
 
+type HtmlSourceProvider = ReturnType<
+  typeof import('../../workflows/video/preview-html-source').createPreviewHtmlSourceProvider
+>;
 const io = vi.hoisted(() => ({
+  htmlProvider:
+    vi.fn<
+      typeof import('../../workflows/video/preview-html-source').createPreviewHtmlSourceProvider
+    >(),
   provider:
     vi.fn<typeof import('../../workflows/video/preview-source').createPreviewSourceProvider>(),
   scheduler: vi.fn<typeof import('./preview-presentation').createReviewPreviewPresentation>(),
@@ -22,6 +29,9 @@ const io = vi.hoisted(() => ({
 vi.mock('../../workflows/video/preview-source', async (original) => ({
   ...(await original<typeof import('../../workflows/video/preview-source')>()),
   createPreviewSourceProvider: io.provider,
+}));
+vi.mock('../../workflows/video/preview-html-source', () => ({
+  createPreviewHtmlSourceProvider: io.htmlProvider,
 }));
 vi.mock('./preview-presentation', () => ({
   createReviewPresentationPaintClock: () => ({}),
@@ -89,6 +99,21 @@ function sourceSession(
   const acquire = vi.fn<PreviewSourceProvider['acquire']>().mockResolvedValue(lease);
   const provider: PreviewSourceProvider = { acquire, retainSources: vi.fn(), dispose: vi.fn() };
   io.provider.mockImplementation(createProvider ?? (() => provider));
+  const htmlBinding = {
+    membership: 'packet-floor' as const,
+    source: binding.source,
+    target: binding.target,
+    timestamp: binding.timestamp,
+    url: binding.url,
+  };
+  const htmlLease = { bindings: new Map([['source', htmlBinding]]), release: vi.fn() };
+  const htmlAcquire = vi.fn<HtmlSourceProvider['acquire']>().mockResolvedValue(htmlLease);
+  const htmlProvider: HtmlSourceProvider = {
+    acquire: htmlAcquire,
+    retainSources: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.htmlProvider.mockReturnValue(htmlProvider);
   const video = document.createElement('video');
   Object.defineProperty(video, 'readyState', { configurable: true, value: 2 });
   video.currentTime = 1.25;
@@ -144,6 +169,11 @@ function sourceSession(
     lease,
     acquire,
     provider,
+    htmlProvider,
+    htmlAcquire,
+    htmlBinding,
+    htmlLease,
+    captured,
     signal,
     prepare,
   };
@@ -197,6 +227,7 @@ it.each(['gpu', 'legacy'] as const)(
       failure
     );
     expect(io.legacy).not.toHaveBeenCalled();
+    expect(f.htmlAcquire).not.toHaveBeenCalled();
   }
 );
 
@@ -217,18 +248,18 @@ it('retires the precise owner on retry and reacquires across a Standard renderer
   expect(io.provider).toHaveBeenCalledTimes(2);
 });
 
-it.each(['unsupported', 'unavailable'] as const)(
-  'restores synchronous HTML capture after source decoding is %s',
+it.each(['decoder-absent', 'frame-absent'] as const)(
+  'preserves synchronous HTML recovery when source decoding is %s',
   async (reason) => {
     const f = sourceSession();
-    if (reason === 'unsupported') f.acquire.mockResolvedValueOnce(null);
-    else vi.stubGlobal('VideoDecoder', undefined);
+    vi.stubGlobal(reason === 'decoder-absent' ? 'VideoDecoder' : 'VideoFrame', undefined);
     const prepared = await f.prepare();
     const capture = f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
     expect(capture).not.toBeInstanceOf(Promise);
     expect(io.legacy).toHaveBeenCalledOnce();
     expect(io.decoded).not.toHaveBeenCalled();
-    expect(f.acquire).toHaveBeenCalledTimes(reason === 'unsupported' ? 1 : 0);
+    expect(f.acquire).not.toHaveBeenCalled();
+    expect(f.htmlAcquire).not.toHaveBeenCalled();
   }
 );
 
@@ -423,4 +454,145 @@ it('keeps primary decoding strict and independent of pending camera acquisition'
   expect(camera.release).toHaveBeenCalledOnce();
   expect(io.legacy).not.toHaveBeenCalled();
   expect(io.provider).toHaveBeenCalledOnce();
+});
+
+it.each(['gpu', 'legacy'] as const)(
+  'prepares verified HTML binding after upfront configuration decline for %s',
+  async (renderer) => {
+    const f = sourceSession();
+    f.acquire.mockResolvedValueOnce(null);
+    f.input.preferences = { ...f.input.preferences, renderer };
+    f.description.renderer = renderer;
+    const prepared = await f.prepare();
+    expect(f.htmlAcquire).toHaveBeenCalledOnce();
+    expect(f.htmlLease.release).toHaveBeenCalledOnce();
+    vi.mocked(f.htmlLease.release).mockClear();
+    const sampled = f.hooks.sampleTime();
+    f.video.currentTime = 99;
+    await f.hooks.capture(prepared.value, sampled, f.signal);
+    expect(f.htmlAcquire.mock.lastCall?.[0]).toEqual([
+      expect.objectContaining({
+        id: 'source',
+        url: f.input.sourceIdentity,
+        time: 1.25,
+        rangeStart: 0,
+      }),
+    ]);
+    expect(io.decoded.mock.lastCall?.[0]).toMatchObject({ binding: f.htmlBinding, time: 1 });
+    expect(io.decoded.mock.lastCall?.[0].binding).not.toHaveProperty('nextTimestamp');
+    expect(io.legacy).not.toHaveBeenCalled();
+    expect(f.acquire).toHaveBeenCalledOnce();
+  }
+);
+
+it('does not replace a genuine initial canonical failure with HTML compatibility', async () => {
+  const f = sourceSession();
+  const failure = new Error('canonical decode failed');
+  f.acquire.mockRejectedValueOnce(failure);
+  await expect(f.prepare()).rejects.toBe(failure);
+  expect(f.htmlAcquire).not.toHaveBeenCalled();
+  expect(io.htmlProvider).not.toHaveBeenCalled();
+  expect(io.legacy).not.toHaveBeenCalled();
+});
+it.each(['prepare', 'capture'] as const)(
+  'keeps a real verified HTML %s failure managed and resets on retry',
+  async (phase) => {
+    const f = sourceSession();
+    f.acquire.mockResolvedValueOnce(null);
+    const failure = new Error('verified source failed');
+    if (phase === 'prepare') {
+      f.htmlAcquire.mockRejectedValueOnce(failure);
+      await expect(f.prepare()).rejects.toBe(failure);
+    } else {
+      const prepared = await f.prepare();
+      f.htmlAcquire.mockRejectedValueOnce(failure);
+      await expect(f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal)).rejects.toBe(
+        failure
+      );
+    }
+    expect(io.legacy).not.toHaveBeenCalled();
+    expect(io.decoded).not.toHaveBeenCalled();
+    f.session.retry();
+    expect(f.htmlProvider.dispose).toHaveBeenCalledOnce();
+    await f.prepare();
+    expect(f.acquire).toHaveBeenCalledTimes(2);
+    expect(io.legacy).not.toHaveBeenCalled();
+  }
+);
+it.each(['abort', 'dispose', 'retry'] as const)(
+  'releases a late compatible probe after %s without capturing raw',
+  async (kind) => {
+    const f = sourceSession();
+    f.acquire.mockResolvedValueOnce(null);
+    const gate = Promise.withResolvers<typeof f.htmlLease>();
+    f.htmlAcquire.mockReturnValueOnce(gate.promise);
+    const controller = new AbortController();
+    const pending = f.hooks.prepare(
+      { scene: f.description, generation: '1', quality: 'selected', time: 1 },
+      controller.signal
+    );
+    await vi.waitFor(() => expect(f.htmlAcquire).toHaveBeenCalledOnce());
+    if (kind === 'abort') controller.abort();
+    if (kind === 'dispose') f.session.dispose();
+    if (kind === 'retry') f.session.retry();
+    gate.resolve(f.htmlLease);
+    await expect(pending).rejects.toBeInstanceOf(Error);
+    expect(f.htmlLease.release).toHaveBeenCalledOnce();
+    expect(io.decoded).not.toHaveBeenCalled();
+    expect(io.legacy).not.toHaveBeenCalled();
+  }
+);
+it.each(['abort', 'dispose', 'retry'] as const)(
+  'releases a late compatible frame after %s before a renderer borrows it',
+  async (kind) => {
+    const f = sourceSession();
+    f.acquire.mockResolvedValueOnce(null);
+    const prepared = await f.prepare();
+    f.htmlLease.release.mockClear();
+    const gate = Promise.withResolvers<typeof f.htmlLease>();
+    f.htmlAcquire.mockReturnValueOnce(gate.promise);
+    const controller = new AbortController();
+    const pending = f.hooks.capture(prepared.value, f.hooks.sampleTime(), controller.signal);
+    if (kind === 'abort') controller.abort();
+    if (kind === 'dispose') f.session.dispose();
+    if (kind === 'retry') f.session.retry();
+    gate.resolve(f.htmlLease);
+    await expect(pending).rejects.toBeInstanceOf(Error);
+    expect(f.htmlLease.release).toHaveBeenCalledOnce();
+    expect(io.decoded).not.toHaveBeenCalled();
+    expect(io.legacy).not.toHaveBeenCalled();
+  }
+);
+it('retains the compatible lease through frame release and resets it for Standard', async () => {
+  const f = sourceSession();
+  f.acquire.mockResolvedValue(null);
+  const prepared = await f.prepare();
+  f.htmlLease.release.mockClear();
+  io.decoded.mockImplementationOnce((args) => ({
+    value: {
+      generation: 1,
+      fps: 60,
+      sourceTime: args.binding.target,
+      resultTime: args.time,
+      source: {
+        timestamp: args.binding.timestamp,
+        backing: { width: 2, height: 2 },
+        draw: vi.fn(),
+      },
+    },
+    release: args.releaseSource,
+  }));
+  const borrowed = await f.hooks.capture(prepared.value, f.hooks.sampleTime(), f.signal);
+  expect(f.htmlLease.release).not.toHaveBeenCalled();
+  f.session.retry();
+  expect(f.htmlProvider.dispose).toHaveBeenCalledOnce();
+  expect(f.htmlLease.release).not.toHaveBeenCalled();
+  borrowed.release();
+  expect(f.htmlLease.release).toHaveBeenCalledOnce();
+  f.input.preferences = { ...f.input.preferences, renderer: 'legacy' };
+  f.description.renderer = 'legacy';
+  const legacy = await f.prepare();
+  await f.hooks.capture(legacy.value, f.hooks.sampleTime(), f.signal);
+  expect(io.htmlProvider).toHaveBeenCalledTimes(2);
+  expect(io.legacy).not.toHaveBeenCalled();
 });

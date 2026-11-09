@@ -6631,7 +6631,7 @@
       "reason": "tool-noise: One Gallery source preparation suite covers the changed loader and its consumers. Existing fixtures and independent references support focus, crop, retry and renderer cases. Browser, injection, decoding and artifact effects belong to those cases. The private refusal helper owns one concrete protocol with two consumers. Independent diagnosis found no separate production or reusable support authority. Fresh architecture review must assess this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess an unrelated product contract or independently reusable fixture responsibility. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-09",
-      "astHash": "959de0ebb96766bf245eb30e197ecdc07113f7870eb92f5b8189ae536fae378e",
+      "astHash": "93be515173c9703f1ca5ade675ea026ad318a8b2d45c912dbfca3ee6a03b07d6",
       "signatureHash": "4d3b761d8b8cc12263423b8783aabe1904806c7ec62dfda3f08dc44220c642b2"
     }
   ]

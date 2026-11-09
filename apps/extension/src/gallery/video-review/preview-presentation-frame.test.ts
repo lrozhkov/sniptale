@@ -167,52 +167,74 @@ function decodedFixture() {
   return { args, frames, source, raw, releaseSource, reservation, reserveSource, copy };
 }
 
-it('captures original decoded PTS and orientation without copying GPU pixels or changing composition clocks', () => {
-  const f = decodedFixture();
-  const captured = captures.captureDecodedReviewPreviewFrame(f.args);
-  expect(captured.value).toMatchObject({
-    generation: 3,
-    sourceTime: 15.009,
-    resultTime: 12,
-    source: { timestamp: 14.95, orientation: { rotation: 90, flip: true } },
-  });
-  const gpu = captured.value.source.videoFrame!();
-  expect(captured.value.source.videoFrame!()).toBe(gpu);
-  expect(f.source.toVideoFrame).toHaveBeenCalledOnce();
-  expect(f.frames.every((frame) => frame.copyTo.mock.calls.length === 0)).toBe(true);
-  expect(f.raw.close).not.toHaveBeenCalled();
-  expect(f.releaseSource).not.toHaveBeenCalled();
-  captured.release();
-  captured.release();
-  expect(f.frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
-  expect(f.releaseSource).toHaveBeenCalledOnce();
-  expect(f.reservation.release).toHaveBeenCalledOnce();
-});
+function packetFloorBinding(f: ReturnType<typeof decodedFixture>) {
+  return {
+    membership: 'packet-floor' as const,
+    source: f.source,
+    target: f.args.binding.target,
+    timestamp: f.args.binding.timestamp,
+    url: f.args.binding.url,
+  };
+}
 
-it('packs padded planes only for Canvas fallback and preserves sample draw orientation', async () => {
-  const f = decodedFixture();
-  const drawn: { rotation: number; flip: boolean }[] = [];
-  const draw = vi.spyOn(VideoSample.prototype, 'draw').mockImplementation(function (
-    this: VideoSample
-  ) {
-    drawn.push({ rotation: this.rotation, flip: this.flip });
-  });
-  try {
-    const captured = captures.captureDecodedReviewPreviewFrame(f.args);
-    captured.value.source.videoFrame!();
-    await captured.value.source.prepare!(new AbortController().signal);
-    captured.value.source.draw({} as CanvasRenderingContext2D, 0, 0, 20, 40);
-    expect(drawn).toEqual([{ rotation: 90, flip: true }]);
-    expect(f.copy).toHaveBeenCalledOnce();
-    expect(f.reserveSource).toHaveBeenCalledWith(36);
+it.each(['canonical', 'packet-floor'] as const)(
+  'captures original %s PTS and orientation without copying GPU pixels or changing composition clocks',
+  (route) => {
+    const f = decodedFixture();
+    const captured = captures.captureDecodedReviewPreviewFrame({
+      ...f.args,
+      binding: route === 'canonical' ? f.args.binding : packetFloorBinding(f),
+    });
+    expect(captured.value).toMatchObject({
+      generation: 3,
+      sourceTime: 15.009,
+      resultTime: 12,
+      source: { timestamp: 14.95, orientation: { rotation: 90, flip: true } },
+    });
+    const gpu = captured.value.source.videoFrame!();
+    expect(captured.value.source.videoFrame!()).toBe(gpu);
+    expect(f.source.toVideoFrame).toHaveBeenCalledOnce();
+    expect(f.frames.every((frame) => frame.copyTo.mock.calls.length === 0)).toBe(true);
+    expect(f.raw.close).not.toHaveBeenCalled();
+    expect(f.releaseSource).not.toHaveBeenCalled();
     captured.release();
     captured.release();
     expect(f.frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
     expect(f.releaseSource).toHaveBeenCalledOnce();
-  } finally {
-    draw.mockRestore();
+    expect(f.reservation.release).toHaveBeenCalledOnce();
   }
-});
+);
+
+it.each(['canonical', 'packet-floor'] as const)(
+  'packs padded %s planes only for Canvas fallback and preserves sample draw orientation',
+  async (route) => {
+    const f = decodedFixture();
+    const drawn: { rotation: number; flip: boolean }[] = [];
+    const draw = vi.spyOn(VideoSample.prototype, 'draw').mockImplementation(function (
+      this: VideoSample
+    ) {
+      drawn.push({ rotation: this.rotation, flip: this.flip });
+    });
+    try {
+      const captured = captures.captureDecodedReviewPreviewFrame({
+        ...f.args,
+        binding: route === 'canonical' ? f.args.binding : packetFloorBinding(f),
+      });
+      captured.value.source.videoFrame!();
+      await captured.value.source.prepare!(new AbortController().signal);
+      captured.value.source.draw({} as CanvasRenderingContext2D, 0, 0, 20, 40);
+      expect(drawn).toEqual([{ rotation: 90, flip: true }]);
+      expect(f.copy).toHaveBeenCalledOnce();
+      expect(f.reserveSource).toHaveBeenCalledWith(36);
+      captured.release();
+      captured.release();
+      expect(f.frames.every((frame) => frame.close.mock.calls.length === 1)).toBe(true);
+      expect(f.releaseSource).toHaveBeenCalledOnce();
+    } finally {
+      draw.mockRestore();
+    }
+  }
+);
 
 it.each(['source', 'reservation', 'camera'] as const)(
   'rolls decoded source ownership back on %s capture failure',

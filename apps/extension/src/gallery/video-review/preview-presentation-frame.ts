@@ -171,7 +171,7 @@ export function captureReviewPreviewFrame(args: {
 
 /** Takes ownership of a decoded source lease, including every failed capture attempt. */
 export function captureDecodedReviewPreviewFrame(args: {
-  binding: PreviewSourceBinding;
+  binding: Pick<PreviewSourceBinding, 'source' | 'target' | 'timestamp'>;
   releaseSource(): void;
   description: Description;
   sequence: number;

@@ -23,8 +23,11 @@ import {
   createPreviewSourceProvider,
   type PreviewSourceProvider,
   type PreviewSourceDemand,
-  type PreviewSourceLease,
 } from '../../workflows/video/preview-source';
+import {
+  createPreviewHtmlSourceProvider,
+  type PreparedPreviewSourceLease,
+} from '../../workflows/video/preview-html-source';
 import { createPresentationAdmission } from './preview-presentation-admission';
 import {
   createReviewExportDiagnostics,
@@ -89,6 +92,7 @@ class ManualPresentationSession {
   private readonly admission: ReturnType<typeof createPresentationAdmission>;
   private contextLost = false;
   private sourceProvider: PreviewSourceProvider | null = null;
+  private htmlSourceProvider: ReturnType<typeof createPreviewHtmlSourceProvider> | null = null;
   private sourceReady = false;
   private sourceUnsupported = false;
   private sourceDiscontinuity = true;
@@ -232,7 +236,7 @@ class ManualPresentationSession {
         : request.time;
     if (!this.video || this.video.seeking || this.video.readyState < 2)
       throw new PendingPresentation();
-    if (this.canDecodeSource() && !this.sourceReady && !this.sourceUnsupported)
+    if (this.canDecodeSource() && !this.sourceReady)
       await this.prepareSource(
         this.latest().input.playing ? this.video.currentTime : request.scene.sourceTime,
         signal
@@ -289,8 +293,7 @@ class ManualPresentationSession {
       captureCamera: () => undefined,
     };
     // Compatibility pixels freeze before camera acquisition can yield to another HTML tick.
-    const primary =
-      this.sourceReady && this.canDecodeSource() ? undefined : captureReviewPreviewFrame(args);
+    const primary = this.canDecodeSource() ? undefined : captureReviewPreviewFrame(args);
     if (primary === null) {
       if (
         this.sourceFrameCallback === null &&
@@ -353,6 +356,8 @@ class ManualPresentationSession {
   private resetSource() {
     this.sourceProvider?.dispose();
     this.sourceProvider = null;
+    this.htmlSourceProvider?.dispose();
+    this.htmlSourceProvider = null;
     this.sourceReady = this.sourceUnsupported = false;
     this.sourceDiscontinuity = true;
     this.clockSample = null;
@@ -373,14 +378,22 @@ class ManualPresentationSession {
 
   private async prepareSource(time: number, signal: AbortSignal) {
     const provider = (this.sourceProvider ??= createPreviewSourceProvider());
-    const lease = await provider.acquire([this.sourceDemand(time)], signal, {
-      discontinuity: true,
-    });
+    let lease: PreparedPreviewSourceLease | null = null;
+    const demand = this.sourceDemand(time);
     try {
+      if (!this.sourceUnsupported)
+        lease = await provider.acquire([demand], signal, { discontinuity: true });
       signal.throwIfAborted();
       if (this.disposed || this.sourceProvider !== provider) throw new PendingPresentation();
-      this.sourceReady = lease !== null;
-      this.sourceUnsupported = lease === null;
+      if (!lease) {
+        this.sourceUnsupported = true;
+        const html = (this.htmlSourceProvider ??= createPreviewHtmlSourceProvider());
+        lease = await html.acquire([demand], signal);
+        signal.throwIfAborted();
+        if (this.disposed || this.sourceProvider !== provider || this.htmlSourceProvider !== html)
+          throw new PendingPresentation();
+      }
+      this.sourceReady = true;
     } finally {
       lease?.release();
     }
@@ -394,13 +407,23 @@ class ManualPresentationSession {
     const provider = this.sourceProvider;
     if (!provider) throw new PendingPresentation();
     signal.throwIfAborted();
-    let lease: PreviewSourceLease | null = null;
+    let lease: PreparedPreviewSourceLease | null = null;
+    const html = this.htmlSourceProvider;
     const discontinuity = this.sourceDiscontinuity || !this.latest().input.playing;
     this.sourceDiscontinuity = false;
     try {
-      lease = await provider.acquire([this.sourceDemand(sourceTime)], signal, { discontinuity });
+      if (this.sourceUnsupported) {
+        if (!html) throw new PendingPresentation();
+        lease = await html.acquire([this.sourceDemand(sourceTime)], signal);
+      } else
+        lease = await provider.acquire([this.sourceDemand(sourceTime)], signal, { discontinuity });
       signal.throwIfAborted();
-      if (this.disposed || this.sourceProvider !== provider) throw new PendingPresentation();
+      if (
+        this.disposed ||
+        this.sourceProvider !== provider ||
+        (this.sourceUnsupported && this.htmlSourceProvider !== html)
+      )
+        throw new PendingPresentation();
       const binding = lease?.bindings.get('source');
       if (!binding || !lease) throw new Error('Preview source frame is unavailable.');
       const ownedSource = lease;
