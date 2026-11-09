@@ -253,3 +253,42 @@ it('accepts immutable queue arrays and rejects runtime factory calls', async () 
       .sort()
   );
 });
+
+it('limits the GPU probe noise record to the exact finding', async () => {
+  const root = createTempRoot('architecture-guardrails-gpu-probe-noise-');
+  writeRuntimeTopology(root);
+  writePolicyStateRegistry(root);
+  const directory =
+    'apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/';
+  const probe = `${directory}runtimeCapabilities.js`;
+  const neighbor = `${directory}runtimeCapabilitiesPeer.js`;
+  for (const file of [probe, neighbor]) {
+    writeFile(root, file, 'export const available = true;\n');
+  }
+  const module = await loadModule(root);
+  const collect = () =>
+    module.collectPolicyStateDescriptorViolations([probe, neighbor], { root, enforceAll: true });
+
+  expect(collect()).toEqual([
+    expect.objectContaining({ file: neighbor, rule: 'policy-state-descriptor-required' }),
+  ]);
+
+  const changedRoot = createTempRoot('architecture-guardrails-gpu-probe-authority-');
+  writeRuntimeTopology(changedRoot);
+  writePolicyStateRegistry(changedRoot);
+  writeFile(changedRoot, probe, 'export const sessions = new Map();\n');
+  writeFile(changedRoot, neighbor, 'export const available = true;\n');
+  expect(
+    module.collectPolicyStateDescriptorViolations([probe, neighbor], {
+      root: changedRoot,
+      enforceAll: true,
+    })
+  ).toEqual([
+    expect.objectContaining({
+      file: probe,
+      message: expect.stringContaining('top-level-map-or-set'),
+      rule: 'policy-state-descriptor-required',
+    }),
+    expect.objectContaining({ file: neighbor, rule: 'policy-state-descriptor-required' }),
+  ]);
+});

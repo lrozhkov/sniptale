@@ -294,7 +294,8 @@ export function runI18nCheck(options = {}) {
 if (isExecutedAsScript(import.meta.url)) {
   const { failures, usage } = runI18nReport();
   console.log(
-    `i18n usage advisory: ${usage.candidates.length} unreferenced candidates; ${usage.unresolved.length} unresolved dynamic accesses`
+    `i18n usage advisory: ${usage.candidates.length} unreferenced candidates; ` +
+      `${usage.unresolved.length} unresolved dynamic accesses`
   );
   if (usage.candidates.length > 0)
     console.log(`Candidates (not proof of dead keys): ${usage.candidates.join(', ')}`);

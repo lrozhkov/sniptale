@@ -1,5 +1,5 @@
-import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 // @vitest-environment jsdom
+import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 
 import { beforeEach, expect, it, vi } from 'vitest';
 

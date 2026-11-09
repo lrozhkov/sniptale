@@ -86,7 +86,12 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
     const fields = inspector.locator('[data-ui="gallery.videoReview.presentationInspector"]');
     const slot = index === 0 ? 'intro' : 'outro';
     const section = fields.locator(
-      `section[aria-label="${label(slot === 'intro' ? 'gallery.videoReview.presentationIntro' : 'gallery.videoReview.presentationOutro')}"]`
+      `section[aria-label="` +
+        `${label(
+          slot === 'intro'
+            ? 'gallery.videoReview.presentationIntro'
+            : 'gallery.videoReview.presentationOutro'
+        )}"]`
     );
     const showScene = () =>
       inspector

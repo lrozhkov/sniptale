@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { createEffectRuntimeFailure } from '../../../../contracts/effect-runtime/identity';
 import type {
   EffectRuntimeSceneResult,
@@ -6,7 +7,6 @@ import type {
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
 import * as timeline from '../../../../features/video/composition/timeline/render';
-// @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { parseEffectRuntimeSnapshotDocument } from '../../../../features/video/composition/effect-runtime/runtime/snapshot-document';

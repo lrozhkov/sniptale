@@ -345,7 +345,9 @@ test('Native main and camera recover when VideoFrame is absent', async ({ page }
           inspector: await sourceColors(preview),
           errors,
           limitation:
-            'Functional recovery and changed camera image only. HTML source PTS, successor intervals and canonical color equivalence remain separate acceptance.',
+            'Functional recovery and changed camera image only. HTML source PTS, ' +
+            'successor intervals and canonical color equivalence remain separate ' +
+            'acceptance.',
         },
         null,
         2
@@ -476,7 +478,8 @@ test('Gallery main and webcam recover when VideoFrame is absent', async ({ page 
           firstVisibleSourceTime: 1.02,
           errors,
           limitation:
-            'Functional source/camera recovery, seek and Undo only. HTML PTS, successor and canonical color equivalence remain separate acceptance.',
+            'Functional source/camera recovery, seek and Undo only. HTML PTS, successor ' +
+            'and canonical color equivalence remain separate acceptance.',
         },
         null,
         2

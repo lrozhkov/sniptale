@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import type {
   GpuPreviewOutput,
   GpuPreviewTargetFactory,
@@ -6,7 +7,6 @@ import * as inspectorPresentation from '../../../../../features/video/compositio
 
 import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 import type { MaterializedPreviewFrame } from '../../../../preview/cache/materializer';
-// @vitest-environment jsdom
 import { DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES } from '../../../../../composition/persistence/video-editor-preview-preferences/model';
 import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
 import * as previewRevision from '../../../../preview/cache/revision';

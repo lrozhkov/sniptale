@@ -1,5 +1,4 @@
-import type { NativePreviewSourceRuntime } from '../media/source-runtime';
-import type { PreviewSceneSourceFrames } from './source-frames';
+import type { NativePreviewSourceRuntime } from '../types';
 import type {
   GpuPreviewOutput,
   GpuPreviewFramePresenter,
@@ -8,7 +7,10 @@ import type {
 import type { EffectRuntimeGpuPreparedComposition } from '../../../../features/video/composition/effect-runtime/runtime/types';
 import type { EffectRuntimeInputComposer } from '../../../../features/video/composition/effect-runtime/frame/inputs';
 import type { EffectRuntimeRenderedComposition } from '../../../../features/video/composition/effect-runtime';
-import type { VideoCompositionFrame } from '../../../../features/video/composition/types';
+import type {
+  VideoCompositionFrame,
+  VideoCompositionVisualLayer,
+} from '../../../../features/video/composition/types';
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import type { VideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
 import type { VideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
@@ -35,6 +37,25 @@ import type {
   PreviewRendererStatus,
   VideoPreviewRenderer,
 } from '../../../../features/video/preview/preferences';
+
+/** Exact source bindings belong to this resolved composition, never presentation metadata. */
+export interface PreviewSceneSourceFrames {
+  readonly nominal: ReadonlyMap<string, VideoCompositionFrameSource>;
+  readonly bindings: ReadonlyMap<
+    string,
+    {
+      readonly source: VideoCompositionFrameSource;
+      readonly target: number;
+      readonly timestamp: number;
+    }
+  >;
+  media(
+    frame: Pick<VideoCompositionFrame, 'visualLayers'>,
+    time: number,
+    layers?: readonly VideoCompositionVisualLayer[]
+  ): Map<string, VideoCompositionFrameSource>;
+  release(): void;
+}
 
 export interface PreviewStageCanvasSceneParams {
   sourceRuntime?: NativePreviewSourceRuntime;

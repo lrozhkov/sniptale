@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 334,
-  "findingDigest": "sha256:bb0d29d30fd69821a1ae9bdfe895e7bca7ea8a936454b1bcfd9af440568aa9dc",
+  "findingCount": 335,
+  "findingDigest": "sha256:356c84194b4be39886997785132433ed7ee67926117a046769d39780ef3e4497",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -261,6 +261,13 @@
       "owner": "effect-v1-contract-validation",
       "reason": "The private GROUP_KEYS set supplies fixed field membership to rejectUnknownKeys. Parent maps and cycle sets are invocation-local validation data. They create no runtime authority or stored group state.",
       "removalCondition": "Remove this exact entry when the triggering declaration disappears or this file acquires policy or capability state authority.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.export-enhancement.clark-x2.gpu-probe",
+      "owner": "export-enhancement:clark-x2",
+      "reason": "This exact capability-path signal names a GPU availability probe and its advisory cache. Source review found no authorization, identity, permission, or privileged admission state.",
+      "removalCondition": "Remove if this signal disappears or the owner gains authorization, identity, permission, privileged admission, persistence authority, or cross-runtime authority.",
       "classification": "tool-noise"
     }
   ],
@@ -1638,6 +1645,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: capability-path.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.export-enhancement.clark-x2.gpu-probe"
     },
     {
       "file": "apps/extension/src/features/video/project/annotation-engine/legacy-constants.ts",

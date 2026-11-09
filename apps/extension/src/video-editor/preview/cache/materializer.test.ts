@@ -1,5 +1,5 @@
-import type { GpuPreviewTargetFactory } from '../../../features/video/composition/canvas/preview-presentation';
 // @vitest-environment jsdom
+import type { GpuPreviewTargetFactory } from '../../../features/video/composition/canvas/preview-presentation';
 import * as nativeGpu from '../stage/scene/gpu-preview';
 import { createVideoEditorEffectPreparationExecutor } from '../../runtime/effect-runtime';
 import type { PreviewScenePresentation } from '../stage/scene/types';

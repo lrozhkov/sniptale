@@ -1,5 +1,5 @@
-import * as canonicalProvider from '../../workflows/video/preview-source';
 // @vitest-environment jsdom
+import * as canonicalProvider from '../../workflows/video/preview-source';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 import type { createReviewWebcamPlayback } from './webcam-playback';

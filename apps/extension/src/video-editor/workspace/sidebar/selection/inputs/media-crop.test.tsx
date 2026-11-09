@@ -1,5 +1,5 @@
-import type { VideoEditorPlaybackTimeSource } from '../../../../contracts/controller-store';
 // @vitest-environment jsdom
+import type { VideoEditorPlaybackTimeSource } from '../../../../contracts/controller-store';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';

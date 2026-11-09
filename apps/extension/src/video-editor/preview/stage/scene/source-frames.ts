@@ -6,29 +6,12 @@ import type {
 } from '../../../../features/video/composition/types';
 import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
 import { getVideoClipSourceTime } from '../../../../features/video/project/timeline';
-import type { PreviewSceneRenderInput } from './types';
+import type { PreviewSceneRenderInput, PreviewSceneSourceFrames } from './types';
+export type { PreviewSceneSourceFrames } from './types';
 import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 
 type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;
 type VideoLayer = Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
-/** Exact source bindings belong to this resolved composition, never presentation metadata. */
-export interface PreviewSceneSourceFrames {
-  readonly nominal: ReadonlyMap<string, VideoCompositionFrameSource>;
-  readonly bindings: ReadonlyMap<
-    string,
-    {
-      readonly source: VideoCompositionFrameSource;
-      readonly target: number;
-      readonly timestamp: number;
-    }
-  >;
-  media(
-    frame: Pick<VideoCompositionFrame, 'visualLayers'>,
-    time: number,
-    layers?: readonly VideoCompositionVisualLayer[]
-  ): Map<string, VideoCompositionFrameSource>;
-  release(): void;
-}
 function videoLayers(layers: readonly VideoCompositionVisualLayer[]): VideoLayer[] {
   return layers
     .flatMap((layer) =>

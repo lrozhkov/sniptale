@@ -27,7 +27,8 @@ const examples = [
     tab: 'effects',
     file: fileURLToPath(
       new URL(
-        '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+        '../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/neutra' +
+          'l-target-effect.sniptale-effect.json',
         import.meta.url
       )
     ),

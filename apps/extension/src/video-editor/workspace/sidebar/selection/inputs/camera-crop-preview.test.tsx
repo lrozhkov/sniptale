@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { VideoSample } from 'mediabunny';
 import { translate } from '../../../../../platform/i18n';
 import * as normalization from '../../../../../features/video/composition/draw/decoded-sample';
@@ -29,7 +30,6 @@ const gpu = vi.hoisted(() => ({ create: vi.fn() }));
 vi.mock('../../../../../features/video/composition/canvas/camera-crop-gpu', () => ({
   createCameraCropGpuRenderer: gpu.create,
 }));
-// @vitest-environment jsdom
 import { act, useLayoutEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';

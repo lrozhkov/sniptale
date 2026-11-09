@@ -331,7 +331,9 @@ for (const theme of ['light', 'dark'] as const) {
                   publishedNativePTS: [...published],
                   pausedNativePTS: await currentInspectorFrame(sourceCanvas),
                   limitation:
-                    'Single active inspector device. Native PTS prove content publication. Controlled consumer tests prove provider selection and source/result mapping. Canvas-only fallback is outside this observer.',
+                    'Single active inspector device. Native PTS prove content publication. ' +
+                    'Controlled consumer tests prove provider selection and source/result ' +
+                    'mapping. Canvas-only fallback is outside this observer.',
                 },
                 null,
                 2

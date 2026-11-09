@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import type { NativePreviewSourceRuntime } from '../media/source-runtime';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -5,7 +6,6 @@ import * as schedulerOwner from './render-scheduler';
 import { usePreviewStageCanvasRender } from './render';
 import { createPreviewEffectRuntimeFeedbackTestStub } from './test-support';
 import { createVideoClip } from '../../../../features/video/project/timeline/project-meta.test.helpers';
-// @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createProject } from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';

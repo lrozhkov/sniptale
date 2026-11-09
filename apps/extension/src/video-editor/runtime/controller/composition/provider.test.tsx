@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import {
   VideoProjectTrackRole,
   VideoProjectActionEventKind,
@@ -5,7 +6,6 @@ import {
   type VideoProject,
   type VideoProjectActionEvent,
 } from '../../../../features/video/project/types';
-// @vitest-environment jsdom
 
 import { RuntimePlaybackContext } from './contexts';
 import { useVideoEditorOverlayPlayback } from '../overlay-playback';

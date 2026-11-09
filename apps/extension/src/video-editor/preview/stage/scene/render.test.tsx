@@ -1,5 +1,5 @@
-import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 // @vitest-environment jsdom
+import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 import { createVideoEditorEffectPreparationExecutor } from '../../../runtime/effect-runtime';
 import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
 import { useCursorTrajectoryProject } from '../runtime/cursor-trajectory';

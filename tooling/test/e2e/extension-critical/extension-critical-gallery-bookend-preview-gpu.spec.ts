@@ -894,7 +894,9 @@ for (const leading of [0, 0.017]) {
             },
             maximumRGBDifference: Math.max(error(red, held), error(blue, changed)),
             limitation:
-              'Independent FFmpeg pixels and actual accepted GPU publication. Controlled provider/owner proof establishes source intervals and lifetime. No FPS claim.',
+              'Independent FFmpeg pixels and actual accepted GPU publication. Controlled ' +
+              'provider/owner proof establishes source intervals and lifetime. No FPS ' +
+              'claim.',
           },
           null,
           2

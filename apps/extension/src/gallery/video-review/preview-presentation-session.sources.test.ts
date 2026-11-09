@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import * as cameraSources from './webcam-preview';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
-// @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
 import { createManualPresentationOwner } from './preview-presentation-session';

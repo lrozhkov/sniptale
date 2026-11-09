@@ -570,7 +570,8 @@ for (const variant of [undefined, 'overlapping-scene-lenses'] satisfies (
         seeks: LATE_SEEKS,
         roi: { x: 480, y: 180, width: 960, height: 720 },
         geometryPolicy:
-          'Paired same-source-time actual panel boundary alignment; enhancement geometry, not an independent effect algorithm oracle.',
+          'Paired same-source-time actual panel boundary alignment; enhancement ' +
+          'geometry, not an independent effect algorithm oracle.',
       });
       for (const control of controls) {
         const off = await native(page, host.origin, fixture, 'off', false, false, control.window, {

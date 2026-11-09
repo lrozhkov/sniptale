@@ -1,5 +1,5 @@
-import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 // @vitest-environment jsdom
+import type { VideoCompositionCameraState } from '../../../../../features/video/composition/types';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';

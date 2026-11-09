@@ -1,5 +1,5 @@
-import { ReviewPreviewRendererContext } from './use-preview-preferences';
 // @vitest-environment jsdom
+import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

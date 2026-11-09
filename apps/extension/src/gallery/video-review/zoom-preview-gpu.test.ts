@@ -1,8 +1,8 @@
+// @vitest-environment jsdom
 import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { VideoSample } from 'mediabunny';
 import type { PreviewSourceLease } from '../../workflows/video/preview-source';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
-// @vitest-environment jsdom
 import { createZoomPreviewPaintOwner } from './zoom-preview-paint-owner';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import * as React from 'react';

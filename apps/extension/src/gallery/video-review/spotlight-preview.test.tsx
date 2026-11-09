@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import * as canvasModule from './zoom-preview-canvas';
 import * as blurModule from './motion-blur-preview';
 import type { ZoomPreviewGpuInput } from './zoom-preview-gpu';
-// @vitest-environment jsdom
 import {
   createQuickEditBorder,
   createQuickEditSpotlight,

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import {
   createImageClip,
@@ -9,7 +10,6 @@ import {
   arePreviewImageResourcesReady,
 } from '../scene/image-resources';
 import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-// @vitest-environment jsdom
 
 import { act } from 'react';
 import { projectWindowHeaderImages } from '../../../../features/video/composition/draw/window-header';

@@ -1,7 +1,7 @@
+// @vitest-environment jsdom
 import * as timeline from '../../../../features/video/composition/timeline/render';
 import * as gpuComposition from '../../../../features/video/composition/effect-runtime/render/gpu-wave';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-// @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createProject,

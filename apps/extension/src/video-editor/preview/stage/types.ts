@@ -1,4 +1,8 @@
-import type { NativePreviewSourceRuntime } from './media/source-runtime';
+import type {
+  PreviewSourceAcquireOptions,
+  PreviewSourceDemand,
+} from '../../../workflows/video/preview-source';
+import type { PreparedPreviewSourceLease } from '../../../workflows/video/preview-html-source';
 import type { VideoEditorMotionPreview } from '../../contracts/workspace';
 import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/patches';
 import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
@@ -36,6 +40,17 @@ import type { VideoEditorPreviewRasterSize } from './sizing/raster';
 import type { VideoPreviewExactFrameCache } from '../cache/exact-frame-cache';
 import type { PreparedCachedVideoPreview } from '../cache/types';
 import type { VideoEditorPreviewStatus } from '../../contracts/preview-runtime';
+/** One immutable Native request context borrows the mounted source provider. */
+export interface NativePreviewSourceRuntime {
+  readonly selected: boolean;
+  acquire(
+    demands: readonly PreviewSourceDemand[],
+    signal: AbortSignal,
+    options?: PreviewSourceAcquireOptions
+  ): Promise<PreparedPreviewSourceLease | null>;
+  prepare(time: number, signal: AbortSignal): Promise<'ready' | 'retry'>;
+}
+
 export type PreviewStageInteractionMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 export type VideoPreviewCanvasInsertKind = 'arrow' | 'line' | 'shape' | 'text';
 export type PreviewStageAudioBankClip = VideoProjectAudioClip | VideoProjectVideoClip;

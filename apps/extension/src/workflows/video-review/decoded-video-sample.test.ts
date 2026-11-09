@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createEffectHostClip } from '../../features/video/project/factories/overlay-clip';
 import { resolveVideoCompositionFrame } from '../../features/video/composition/timeline/frame';
-// @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
 import {

@@ -1,3 +1,5 @@
+import type { NativePreviewSourceRuntime } from '../types';
+export type { NativePreviewSourceRuntime } from '../types';
 import { useEffect, useMemo, useReducer, useRef } from 'react';
 import {
   createPreviewSourceProvider,
@@ -13,17 +15,6 @@ import {
   createPreviewHtmlSourceProvider,
   type PreparedPreviewSourceLease,
 } from '../../../../workflows/video/preview-html-source';
-
-/** One immutable Native request context borrows the mounted source provider. */
-export interface NativePreviewSourceRuntime {
-  readonly selected: boolean;
-  acquire(
-    demands: readonly PreviewSourceDemand[],
-    signal: AbortSignal,
-    options?: PreviewSourceAcquireOptions
-  ): Promise<PreparedPreviewSourceLease | null>;
-  prepare(time: number, signal: AbortSignal): Promise<'ready' | 'retry'>;
-}
 
 interface SourceContext {
   project: VideoProject;

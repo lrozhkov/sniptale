@@ -499,12 +499,12 @@ function readFilter(value: string): EffectRuntimeGpuFilter {
   if (value === 'none') return noFilter;
   const result = { ...noFilter };
   let rest = value.trim();
-  for (const [key, unit] of [
-    ['blur', 'px'],
-    ['brightness', ''],
-    ['saturate', ''],
+  for (const [key, pattern] of [
+    ['blur', /^blur\(([0-9.eE+\-]+)px\)\s*/],
+    ['brightness', /^brightness\(([0-9.eE+\-]+)\)\s*/],
+    ['saturate', /^saturate\(([0-9.eE+\-]+)\)\s*/],
   ] as const) {
-    const match = new RegExp(`^${key}\\(([0-9.eE+\\-]+)${unit}\\)\\s*`).exec(rest);
+    const match = pattern.exec(rest);
     if (!match) continue;
     const number = Number(match[1]);
     if (!Number.isFinite(number) || number < 0) throw new Error('GPU_DRAW_FILTER_INVALID');

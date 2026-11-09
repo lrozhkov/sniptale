@@ -206,7 +206,8 @@ test('Native unsupported source preserves VFR identity and color in GPU and Stan
           acceptedTime,
           errors,
           limitation:
-            'Forced upfront configuration refusal. This proves the native sampling adapter, not a genuinely unsupported codec or FPS acceptance.',
+            'Forced upfront configuration refusal. This proves the native sampling ' +
+            'adapter, not a genuinely unsupported codec or FPS acceptance.',
         },
         null,
         2

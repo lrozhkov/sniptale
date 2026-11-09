@@ -568,8 +568,8 @@ history and persistence.',
   {
     owner: 'camera-window-link-admission',
     productionFile: 'apps/extension/src/features/video/composition/motion/project-follow.ts',
-    reason:
-      'Native follow admission serves full projects and exported fragments. Both paths must apply the same expansion policy and conflict interval.',
+    reason: `Native follow admission serves full projects and exported fragments.
+Both paths must apply the same expansion policy and conflict interval.`,
     testFiles: [
       'apps/extension/src/features/video/composition/motion/project-follow.test.ts',
       'apps/extension/src/features/video/composition/motion/source-window.test.ts',

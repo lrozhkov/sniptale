@@ -191,7 +191,9 @@ gpuTest.describe('authored GPU queue', () => {
         await page.route(url, (route) =>
           route.fulfill({
             contentType: 'text/html',
-            body: '<!doctype html><meta charset="utf-8"><title>GPU direct output proof</title><style>body{margin:0;background:black}</style>',
+            body:
+              '<!doctype html><meta charset="utf-8"><title>GPU direct output ' +
+              'proof</title><style>body{margin:0;background:black}</style>',
           })
         );
         await page.goto(url);

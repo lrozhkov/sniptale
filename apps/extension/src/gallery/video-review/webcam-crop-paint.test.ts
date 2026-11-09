@@ -1,5 +1,5 @@
-import * as normalization from '../../features/video/composition/draw/decoded-sample';
 // @vitest-environment jsdom
+import * as normalization from '../../features/video/composition/draw/decoded-sample';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createWebcamCropPaintOwner } from './webcam-crop-paint';
 import { createCameraCropGpuRenderer } from '../../features/video/composition/canvas/camera-crop-gpu';
