@@ -18,6 +18,7 @@ vi.mock('../../../features/video/composition/canvas/gpu-preview', async (origina
   createGpuPreviewRenderer: vi.fn(),
 }));
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.mocked(createGpuPreviewRenderer).mockReset();
 });
@@ -240,10 +241,10 @@ it('borrows cached pixels through GPU use without Canvas publication or a fresh 
   f.presentation.output.release();
 });
 
-function cachedGpuProducerFixture() {
+function cachedGpuProducerFixture(time = 1) {
   const f = gpuCacheFixture();
   const bitmap = new FakeImageBitmap(2, 2);
-  const metadata = { camera: f.presentation.camera, time: 1 };
+  const metadata = { camera: f.presentation.camera, time };
   f.cache.set('preview-frame-v1:revision:30:2x2:30', bitmap, metadata);
   const present = vi.fn(async (_request: Parameters<GpuPreviewRenderer['render']>[0]) => {});
   const backend: GpuPreviewRenderer = {
@@ -272,6 +273,7 @@ function cachedGpuProducerFixture() {
 }
 
 it('publishes cached GPU pixels with the stored camera and keeps the provider until frontend release', async () => {
+  vi.stubGlobal('VideoFrame', undefined);
   const f = cachedGpuProducerFixture();
   const draw = vi.spyOn(f.job.canvas.getContext('2d')!, 'drawImage');
   const result = await f.owner.render({ cache: f.cache, job: f.job, render: f.render });
@@ -326,6 +328,7 @@ it.each(['unavailable', 'legacy', 'device-failed'] as const)(
   'retains Canvas cache presentation for %s without fresh source rendering',
   async (kind) => {
     const f = cachedGpuProducerFixture();
+    const frames = kind === 'unavailable' ? composedFrames() : [];
     if (kind === 'device-failed')
       f.present.mockRejectedValueOnce(new GpuPreviewDeviceError('Device lost'));
     else vi.mocked(createGpuPreviewRenderer).mockResolvedValueOnce(null);
@@ -348,6 +351,7 @@ it.each(['unavailable', 'legacy', 'device-failed'] as const)(
     expect(f.bitmap.close).not.toHaveBeenCalled();
     expect(f.render).not.toHaveBeenCalled();
     expect(createGpuPreviewRenderer).toHaveBeenCalledTimes(kind === 'legacy' ? 0 : 1);
+    if (kind === 'unavailable') expect(frames[0]!.close).toHaveBeenCalledOnce();
     f.owner.dispose();
     f.cache.clear();
   }
@@ -442,4 +446,128 @@ it('releases an untransferred cached GPU result when cancellation arrives at cal
   expect(f.release).toHaveBeenCalledOnce();
   expect(bitmap.close).toHaveBeenCalledOnce();
   expect(render).not.toHaveBeenCalled();
+});
+
+function composedFrames() {
+  const frames: ComposedFrame[] = [];
+  class ComposedFrame {
+    readonly close = vi.fn();
+    readonly timestamp: number;
+    constructor(
+      readonly source: ImageBitmap,
+      init: VideoFrameInit
+    ) {
+      this.timestamp = init.timestamp ?? 0;
+      frames.push(this);
+    }
+  }
+  vi.stubGlobal('VideoFrame', ComposedFrame);
+  return frames;
+}
+
+it('submits an owned composed frame at the stored presentation time without a bitmap texture key', async () => {
+  const f = cachedGpuProducerFixture(1.0000006);
+  const frames = composedFrames();
+  const result = await f.owner.render({ cache: f.cache, job: f.job, render: f.render });
+  expect(frames).toHaveLength(1);
+  expect(frames[0]!.source).toBe(f.bitmap);
+  expect(frames[0]!.timestamp).toBe(1000001);
+  expect(f.present.mock.calls[0]![0].layers[0]!.source).toBe(frames[0]);
+  expect(f.present.mock.calls[0]![0].layers[0]!).not.toHaveProperty('cache');
+  expect(frames[0]!.close).toHaveBeenCalledOnce();
+  expect([f.bitmap.width, f.bitmap.height]).toEqual([2, 2]);
+  expect(f.bitmap.close).not.toHaveBeenCalled();
+  if (result) result.output?.release();
+  f.owner.dispose();
+  f.cache.clear();
+});
+
+it.each(['complete', 'cancel', 'scene-error', 'device-error'] as const)(
+  'retains composed frame and cached reader through the final GPU fence on %s',
+  async (outcome) => {
+    const f = cachedGpuProducerFixture();
+    const frames = composedFrames();
+    const controller = new AbortController();
+    const fence = Promise.withResolvers<void>();
+    const failure =
+      outcome === 'device-error'
+        ? new GpuPreviewDeviceError('Device lost')
+        : new Error('Scene failed');
+    f.present.mockReturnValueOnce(fence.promise);
+    vi.spyOn(f.job.canvas.getContext('2d')!, 'drawImage').mockImplementation(() => {});
+    const pending = f.owner.render({
+      cache: f.cache,
+      job: { ...f.job, signal: controller.signal },
+      render: f.render,
+    });
+    const settled =
+      outcome === 'cancel'
+        ? expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+        : outcome === 'scene-error'
+          ? expect(pending).rejects.toBe(failure)
+          : undefined;
+    await vi.waitFor(() => expect(f.present).toHaveBeenCalledOnce());
+    expect(frames).toHaveLength(1);
+    f.cache.clear();
+    if (outcome === 'cancel') {
+      controller.abort();
+      f.owner.dispose();
+    }
+    expect(frames[0]!.close).not.toHaveBeenCalled();
+    expect(f.bitmap.close).not.toHaveBeenCalled();
+    expect(f.release).not.toHaveBeenCalled();
+    if (outcome === 'scene-error' || outcome === 'device-error') fence.reject(failure);
+    else fence.resolve();
+    if (settled) await settled;
+    else {
+      const result = await pending;
+      expect(result && result.renderer?.backend).toBe(
+        outcome === 'device-error' ? 'legacy' : 'gpu'
+      );
+      if (result) result.output?.release();
+    }
+    expect(frames[0]!.close).toHaveBeenCalledOnce();
+    expect(f.bitmap.close).toHaveBeenCalledOnce();
+    expect(f.release).toHaveBeenCalledOnce();
+    expect(f.render).not.toHaveBeenCalled();
+    f.owner.dispose();
+  }
+);
+
+it.each(['legacy', 'no-target'] as const)(
+  'does not construct a frame for %s cache presentation',
+  async (route) => {
+    const f = cachedGpuProducerFixture();
+    const frames = composedFrames();
+    vi.spyOn(f.job.canvas.getContext('2d')!, 'drawImage').mockImplementation(() => {});
+    const { acquireGpuOutput: _target, ...withoutTarget } = f.job;
+    const job =
+      route === 'legacy' ? { ...f.job, previewRenderer: 'legacy' as const } : withoutTarget;
+    await f.owner.render({ cache: f.cache, job, render: f.render });
+    expect(frames).toEqual([]);
+    expect(createGpuPreviewRenderer).not.toHaveBeenCalled();
+    f.owner.dispose();
+    f.cache.clear();
+  }
+);
+
+it('propagates a composed-frame constructor failure while releasing the cache reader', async () => {
+  const f = cachedGpuProducerFixture();
+  const failure = new Error('Composed frame constructor failed');
+  vi.stubGlobal(
+    'VideoFrame',
+    class {
+      constructor() {
+        throw failure;
+      }
+    }
+  );
+  await expect(f.owner.render({ cache: f.cache, job: f.job, render: f.render })).rejects.toBe(
+    failure
+  );
+  expect(f.present).not.toHaveBeenCalled();
+  expect(f.render).not.toHaveBeenCalled();
+  f.owner.dispose();
+  f.cache.clear();
+  expect(f.bitmap.close).toHaveBeenCalledOnce();
 });

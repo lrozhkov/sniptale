@@ -65,19 +65,30 @@ export function createVideoPreviewExactFrameRenderer() {
       };
     }
     const current = session;
-    const output = await current.composer.present(
-      [
-        {
-          source: bitmap,
-          rect: { x: 0, y: 0, ...size },
-          inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-          clampSourceEdges: ['left', 'top', 'right', 'bottom'],
-          cache: { key: 'native-exact-frame', revision: bitmap },
-        },
-      ],
-      job.signal ?? new AbortController().signal,
-      job.acquireGpuOutput
-    );
+    const frame =
+      typeof VideoFrame === 'undefined'
+        ? undefined
+        : new VideoFrame(bitmap, {
+            timestamp: Math.round(presentation.time * 1_000_000),
+          });
+    let output: GpuPreviewOutput | undefined;
+    try {
+      output = await current.composer.present(
+        [
+          {
+            source: frame ?? bitmap,
+            rect: { x: 0, y: 0, ...size },
+            inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+            clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+            ...(frame ? {} : { cache: { key: 'native-exact-frame', revision: bitmap } }),
+          },
+        ],
+        job.signal ?? new AbortController().signal,
+        job.acquireGpuOutput
+      );
+    } finally {
+      frame?.close();
+    }
     return output
       ? { ...presentation, output, renderer: { backend: 'gpu' } }
       : {
