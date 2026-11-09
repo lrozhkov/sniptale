@@ -858,3 +858,56 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     }
   });
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`page toolbar remains interactive through native modal lifecycle ${name}`, async ({}, info) => {
+    const host = await startHostServer();
+    const launched = await launchExtensionBrowser({ viewport: size });
+    try {
+      const { page, popup } = await openDesignReview(
+        launched.context,
+        launched.extensionId,
+        host.origin,
+        size
+      );
+      const toolbar = ui(page, 'root');
+      const handle = await toolbar.elementHandle();
+      await page.evaluate(() => {
+        const dialog = document.createElement('dialog');
+        dialog.id = 'native-modal-proof';
+        dialog.style.cssText = 'width:70vw;height:65vh';
+        const input = document.createElement('input');
+        input.setAttribute('aria-label', 'Modal editor input');
+        dialog.append(input);
+        document.body.append(dialog);
+        dialog.showModal();
+      });
+      await ui(page, 'settings-button').click();
+      await expect(ui(page, 'settings.customize-buttons')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(toolbar).toBeVisible();
+      await page.getByRole('textbox', { name: 'Modal editor input' }).fill('editor stays usable');
+      await page.screenshot({ path: info.outputPath('modal-toolbar.png'), fullPage: false });
+      await page.locator('#native-modal-proof').evaluate((node: HTMLDialogElement) => node.close());
+      await ui(page, 'mode-selector-button').click();
+      await expect(ui(page, 'mode-option.cursor')).toBeVisible();
+      await page.keyboard.press('Escape');
+      expect(await toolbar.evaluate((node, original) => node === original, handle)).toBe(true);
+      await page
+        .locator('#native-modal-proof')
+        .evaluate((node: HTMLDialogElement) => node.showModal());
+      await ui(page, 'settings-button').click();
+      await expect(ui(page, 'settings.customize-buttons')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.locator('#native-modal-proof').evaluate((node) => node.remove());
+      await ui(page, 'settings-button').click();
+      await expect(ui(page, 'settings.customize-buttons')).toBeVisible();
+      expect(await toolbar.evaluate((node, original) => node === original, handle)).toBe(true);
+      await popup.close();
+      await page.close();
+    } finally {
+      await closeExtensionBrowser(launched);
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

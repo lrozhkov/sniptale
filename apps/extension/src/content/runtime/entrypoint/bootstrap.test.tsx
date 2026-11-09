@@ -206,11 +206,16 @@ it('keeps the content host mounted when top-layer promotion fails', async () => 
       throw new DOMException('Popover is unavailable', 'NotSupportedError');
     }),
   });
+  const dialog = document.createElement('dialog');
+  dialog.setAttribute('open', '');
+  vi.spyOn(dialog, 'matches').mockReturnValue(true);
+  document.body.append(dialog);
   const { initializeTopLevelContentEntry } = await import('./bootstrap');
 
   expect(() => initializeTopLevelContentEntry()).not.toThrow();
 
   const host = document.getElementById(CONTENT_ROOT_ID);
+  expect(host?.parentElement).toBe(dialog);
   expect(host).toBeTruthy();
   expect(host?.hasAttribute('popover')).toBe(false);
   expect(createRootMock).toHaveBeenCalledOnce();
@@ -360,4 +365,54 @@ it('starts without waiting for fonts and retries failed installation on same-ver
   expect(installContentInterfaceFontsMock).toHaveBeenCalledTimes(2);
   expect(installContentInterfaceFontsMock).toHaveBeenLastCalledWith(root);
   expect(createRootMock).toHaveBeenCalledOnce();
+});
+
+it('keeps the live content host interactive inside a page modal and restores it after close', async () => {
+  const { initializeTopLevelContentEntry } = await import('./bootstrap');
+  const { resolveContentShadowRoot } = await import('../../platform/dom-host');
+  initializeTopLevelContentEntry();
+  const host = document.getElementById(CONTENT_ROOT_ID)!;
+  const shadow = host.shadowRoot;
+  const dialog = document.createElement('dialog');
+  dialog.tabIndex = -1;
+  const matches = dialog.matches.bind(dialog);
+  vi.spyOn(dialog, 'matches').mockImplementation((selector) =>
+    selector === ':modal' ? dialog.open : matches(selector)
+  );
+  document.body.append(dialog);
+  dialog.setAttribute('open', '');
+  dialog.focus();
+
+  await vi.waitFor(() => expect(host.parentElement).toBe(dialog));
+  expect(resolveContentShadowRoot()).toBe(shadow);
+  dialog.removeAttribute('open');
+  await vi.waitFor(() => expect(host.parentElement).toBe(document.body));
+  expect(resolveContentShadowRoot()).toBe(shadow);
+});
+
+it('restores the registered host when its containing modal is removed', async () => {
+  const { initializeTopLevelContentEntry } = await import('./bootstrap');
+  const { resolveContentShadowRoot } = await import('../../platform/dom-host');
+  const dialog = document.createElement('dialog');
+  dialog.setAttribute('open', '');
+  vi.spyOn(dialog, 'matches').mockReturnValue(true);
+  document.body.append(dialog);
+  initializeTopLevelContentEntry();
+  const host = document.getElementById(CONTENT_ROOT_ID)!;
+  const shadow = host.shadowRoot;
+  expect(host.parentElement).toBe(dialog);
+  dialog.remove();
+  await vi.waitFor(() => expect(host.parentElement).toBe(document.body));
+  expect(resolveContentShadowRoot()).toBe(shadow);
+});
+
+it('does not authorize an external host move through modal placement', async () => {
+  const { initializeTopLevelContentEntry } = await import('./bootstrap');
+  const { resolveContentShadowRoot } = await import('../../platform/dom-host');
+  initializeTopLevelContentEntry();
+  const host = document.getElementById(CONTENT_ROOT_ID)!;
+  const parent = document.createElement('div');
+  document.body.append(parent);
+  parent.append(host);
+  expect(resolveContentShadowRoot()).toBeNull();
 });

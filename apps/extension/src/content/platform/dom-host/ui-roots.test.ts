@@ -3,7 +3,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { CONTENT_APP_CONTAINER_ID, CONTENT_OVERLAY_ROOT_ID } from '@sniptale/ui/branding';
-import { initializeContentUiRoots, resolveInitializedContentShadowRoot } from './ui-roots';
+import {
+  initializeContentUiRoots,
+  mountContentUiHost,
+  resolveInitializedContentShadowRoot,
+} from './ui-roots';
 
 function createShadowRoot(): ShadowRoot {
   const host = document.createElement('div');
@@ -87,4 +91,20 @@ describe('initializeContentUiRoots', () => {
 
     expect(resolveInitializedContentShadowRoot()).toBe(secondShadowRoot);
   });
+});
+
+it('stops modal placement after its owner disposes the mounted host', async () => {
+  const host = document.createElement('div');
+  const shadow = host.attachShadow({ mode: 'open' });
+  initializeContentUiRoots(shadow);
+  const dispose = mountContentUiHost(host);
+  dispose();
+  const dialog = document.createElement('dialog');
+  dialog.tabIndex = -1;
+  document.body.append(dialog);
+  dialog.setAttribute('open', '');
+  dialog.focus();
+  await Promise.resolve();
+  expect(host.parentElement).toBe(document.body);
+  expect(resolveInitializedContentShadowRoot()).toBe(shadow);
 });

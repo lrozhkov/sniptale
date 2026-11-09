@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import {
   initializeContentUiRoots,
+  mountContentUiHost,
   getContentUiPageZoomRevision,
   installContentUiScaleCompensation,
   setContentUiPageZoomAtRevision,
@@ -88,25 +89,6 @@ function installPageZoomSynchronization(): () => void {
   };
 }
 
-function mountContentHost(host: HTMLElement): void {
-  const canUseTopLayer = typeof host.showPopover === 'function';
-  if (canUseTopLayer) {
-    host.setAttribute('popover', 'manual');
-  }
-
-  document.body.appendChild(host);
-
-  if (!canUseTopLayer) {
-    return;
-  }
-
-  try {
-    host.showPopover();
-  } catch {
-    host.removeAttribute('popover');
-  }
-}
-
 /**
  * Boots the top-level content UI and wires its runtime ownership seams.
  */
@@ -138,7 +120,7 @@ export function initializeTopLevelContentEntry(): void {
   const shadow = createShadowRootWithStyles(host, createContentEntrypointStyles());
   const { appContainer } = initializeContentUiRoots(shadow);
   const disposeContentUiActivationBridge = installContentUiActivationBridge(shadow);
-  mountContentHost(host);
+  const disposeContentHostPlacement = mountContentUiHost(host);
   void installContentInterfaceFonts(shadow).catch(() => undefined);
   const disposeContentUiScaleCompensation = installContentUiScaleCompensation(host);
 
@@ -152,6 +134,7 @@ export function initializeTopLevelContentEntry(): void {
       disposeContentRuntime();
     } finally {
       try {
+        disposeContentHostPlacement();
         disposeContentUiActivationBridge();
         disposeContentUiScaleCompensation();
         disposePageZoomSynchronization();
