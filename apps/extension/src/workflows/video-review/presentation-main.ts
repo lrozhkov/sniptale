@@ -1,5 +1,6 @@
 import type { ReviewRecordingRenderSource } from './recording-render';
 import { createPresentationDecoder } from './presentation-decoder';
+import { readPreviewSourceLeadingSampleTime } from '../video/preview-source';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink, type InputAudioTrack } from 'mediabunny';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -86,7 +87,7 @@ class PresentationMain {
   private decoder: ReturnType<typeof createPresentationDecoder> | null = null;
   private camera: Camera | null = null;
   private resolution = 0;
-  private firstTimestamp = 0;
+  private leadingSampleTime: number | undefined;
   private disposed = false;
   private busy = false;
   private frameGeneration = 0;
@@ -148,14 +149,18 @@ class PresentationMain {
       throw new QuickEditExportUnavailable(['video-encoder']);
     const source = { width: await video.getDisplayWidth(), height: await video.getDisplayHeight() };
     this.resolution = await video.getTimeResolution();
-    this.firstTimestamp = await video.getFirstTimestamp();
     if (
-      !Number.isFinite(this.firstTimestamp) ||
       ![source.width, source.height, this.resolution].every(
         (value) => Number.isFinite(value) && value > 0
       )
     )
       throw new Error('Invalid main source dimensions or time resolution');
+    this.leadingSampleTime = await readPreviewSourceLeadingSampleTime(
+      video,
+      this.args.index.duration,
+      signal,
+      this.resolution
+    );
     signal.throwIfAborted();
     const audio = await this.input.getPrimaryAudioTrack();
     signal.throwIfAborted();
@@ -299,13 +304,11 @@ class PresentationMain {
     if (firstTick > lastTick) throw new Error('Main source interval has no representable tick');
     // Capture encoders can place the first video sample one frame after the media origin.
     // Decode that sample only inside the retained interval; scene and audio clocks keep their origin.
-    const frameRate = this.args.index.frameRate ?? this.args.fps ?? 30;
-    const leadingLimit = 1 / frameRate + 1 / this.resolution;
     const sampleTime =
-      sourceTime < this.firstTimestamp &&
-      this.firstTimestamp <= leadingLimit &&
-      this.firstTimestamp < segment.sourceEnd
-        ? this.firstTimestamp
+      this.leadingSampleTime !== undefined &&
+      sourceTime < this.leadingSampleTime &&
+      this.leadingSampleTime < segment.sourceEnd
+        ? this.leadingSampleTime
         : sourceTime;
     return {
       sampleTime,

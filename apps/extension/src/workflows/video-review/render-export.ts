@@ -1,5 +1,6 @@
 import type { ReviewRecordingRenderSource } from './recording-render';
 import { ownReviewOutputCancellation } from './render-output-lifetime';
+import { readPreviewSourceLeadingSampleTime } from '../video/preview-source';
 import { paintReviewExportScene, type ReviewRenderScene } from './render-export-scene';
 import type { ReviewFrameExportInput } from './render-export-input';
 import { quickEditRegionNeedsSpatialRenderer } from '../../features/video/review/advanced/spatial';
@@ -159,7 +160,18 @@ export async function writeReviewFrames(
         ),
         args.signal
       );
-    const sourceTimeResolution = await source.video.getTimeResolution();
+    const sourceVideo = source.video;
+    const sourceTimeResolution = await sourceVideo.getTimeResolution();
+    const leadingSampleTime = main
+      ? undefined
+      : await reviewExportPhase(args.signal, 'decode', () =>
+          readPreviewSourceLeadingSampleTime(
+            sourceVideo,
+            args.index.duration,
+            args.signal,
+            sourceTimeResolution
+          )
+        );
     const timeTracking = createReviewRenderTimeTracking(
       {
         duration: receipt.resultDuration,
@@ -237,6 +249,7 @@ export async function writeReviewFrames(
           image: visual.image,
           frameSink,
           sourceTimeResolution,
+          ...(leadingSampleTime !== undefined ? { leadingSampleTime } : {}),
           transitions,
           transitionFrames,
           webcam,
@@ -516,6 +529,7 @@ export async function renderRenderWindowFrames(
     context: CanvasRenderingContext2D;
     frameSink: Pick<VideoSampleSink, 'samplesAtTimestamps'>;
     sourceTimeResolution?: number;
+    leadingSampleTime?: number;
     transitions?: readonly ReviewCutTransitionPlan[];
     transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
     webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
@@ -548,9 +562,14 @@ export async function renderRenderWindowFrames(
   // Quantize lookups to that clock, but never sample a frame belonging to the next edit.
   const resolution = args.sourceTimeResolution ?? 1_000_000;
   const lastTick = (Math.ceil(window.segment.sourceEnd * resolution) - 1) / resolution;
-  const sampleTimes = window.sourceTimes.map((time) =>
-    Math.min(lastTick, Math.round(time * resolution) / resolution)
-  );
+  const sampleTimes = window.sourceTimes.map((time) => {
+    const lookup = Math.min(lastTick, Math.round(time * resolution) / resolution);
+    return args.leadingSampleTime !== undefined &&
+      lookup < args.leadingSampleTime &&
+      args.leadingSampleTime < window.segment.sourceEnd
+      ? args.leadingSampleTime
+      : lookup;
+  });
   const blurEnabled = hasQuickEditMotionBlur(args.zoomRegions);
   const spatialRenderer = args.zoomRegions.some(quickEditRegionNeedsSpatialRenderer)
     ? createReviewSpatialSession()

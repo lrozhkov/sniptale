@@ -1271,11 +1271,11 @@
       "file": "apps/extension/src/workflows/video-review/render-export.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when frame-export decoder/output fixture, cadence or muxed cleanup contract gains a separate state receiver. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "6bdb419e9a1deadd5803622fd62bcdde0854fb4733cd3c5d4eedfa550a96721d",
-      "signatureHash": "73d38cdece704fb98cfaf833ff3ba22461ebf6a00ce0686e6216bd70f67b02fc",
-      "reason": "tool-noise: The file tests writeReviewFrames with the existing decoder/output fixture. The annotation route proves no extra legacy decode, exact fractional cadence and shared painter; existing transition/window/audio cases are variants of the same muxed-frame contract. Fixtures reset before tests. Splitting only to satisfy the file cap would duplicate decoder/output mocks or introduce a fixture-only forwarding boundary. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent fixture, consumer contract, decoder, policy, queue, publication or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
+      "astHash": "3c7fd06c76447d87c27dc49335fef6c3feddc3e6162228b7bfda1c9cfc942595",
+      "signatureHash": "325957bcf85bbc33170819a704135f5f0f4636fe6a75c19de3ddcb41dae42936",
+      "reason": "tool-noise: These tests share the existing decoder and output fixture. They prove one frame-export contract. Leading selection, exhaustive ticks, retained bounds and failure cases use that owner. Another split would add fixture navigation without a separate responsibility. Fresh complete-candidate architecture review must validate this exact binding.",
+      "reviewDate": "2026-11-09"
     },
     {
       "rule": "structural-file-risk",
@@ -4227,17 +4227,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/workflows/video-review/render-export.ts",
-      "symbol": "writeReviewFrames",
-      "owner": "extension:app-core:workflows",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess when main/legacy rendering, muxer finalization/cancellation or resource cleanup no longer share one output transaction. Remove when the analyzer models this documented cohesive owner/proof boundary. Fresh independent complete-candidate architecture review must validate it before closeout.",
-      "astHash": "04db6c0dcaf13c083ff9f5015bb9749de8b75ca78f0a5b437ab0f74a68126ec3",
-      "signatureHash": "79016a60f2ec3726e5fa668fb35d99fdc7bea027440b8bc86c6296cf45df5de2",
-      "reason": "tool-noise: This function owns one input/output cancellation/finalization lifetime and receipt. The annotation main path and legacy frame path converge on the same window loop, audio drain, clock, close/finalize and catch/finally cleanup. All prepared renderers dispose there; destination publication is external. Factoring independent geometry/decoder/composition already occurs through narrow adapters; further splitting the transaction solely for line/cyclomatic pressure would distribute output cleanup. Independently inspected by fresh read-only annotation_structural_prewrite, including Retry correction reinspection and exact body bindings; mandatory final complete-candidate architecture review remains required before closeout.",
-      "reviewDate": "2026-10-11"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "createReviewPreviewRenderer",
       "owner": "extension:app-core:workflows",
@@ -5671,22 +5660,22 @@
       "file": "apps/extension/src/workflows/video-review/render-export.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: 853 lines, delta score0, cohesion.98. existing ordinary export owner holds input/output lifetimes, audio/window loop and finalization. New model sampling is already substantive separate owner export-source-sampling.ts. new pure demand geometry is export-source-plan.ts. No independent model or UI authority added here. Only writeReviewFrames creates/disposes job enhancer. disposal awaited before source/input cleanup. No helper should acquire that owner. Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
-      "reviewDate": "2026-11-04",
-      "astHash": "5db84d62663bfed288d69a83955a65914dbcd79f5d0c768bccba23110e98906a",
-      "signatureHash": "b9b7780145cf2865cbb9846f1f2a05d038cb2b34b5862dcccdc30dc2fd4ecdb6"
+      "reason": "tool-noise: One export workflow owns input and output lifetime, window and audio sequencing, and finalization. Named boundaries separate source setup, composition and frame writing. The leading metadata read uses existing shared policy. The change adds no decoder, queue, sampling policy or publication owner. Independent inspection found no separate responsibility. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent fixture, consumer contract, decoder, policy, queue, publication or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "07d3e6a404003d7a06f987d23149fed54441c8fb682f8f1d434559b8c7431286",
+      "signatureHash": "768669b5e06c70d873e9ef96155cc86387c63a058bb6058f0d877e192535656f"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/render-export.ts",
       "symbol": "renderRenderWindowFrames",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: Same frame/window transaction: timestamp/source-clock quantization, original endpoint selection, camera-history sampling, source normalization/prepared lease, composition, webcam/keys/captions, adaptive encoding. sample.close is outer finally. Prepared lease is inner finally before writer.add. dissolve calls same draw operation sequentially. Splitting an endpoint branch or paint closure to a new module would pass the same writer/resources/scene/source lifetimes across a broad contract.  Metrics remain advisory. Source inspection found no concrete ownership or topology blocker.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess if an independent decoder, model, queue, publication owner or unrelated UI operation enters this scope.",
-      "reviewDate": "2026-11-04",
-      "astHash": "17af4127b1504bbe55a5c19817751c097a9df459a262b0ce05ced840e41b1ab7",
-      "signatureHash": "36f7666a44835d9022fd4673d43e32abbcbdeac78b9770ace39bfdfe3b173f81"
+      "reason": "tool-noise: One exhaustive window transaction couples source samples, composition, output timestamps and cleanup. Leading admission changes decoder lookup times only. Output, history, camera and writer clocks retain their inputs. Samples close per iteration. Window resources retire together. Splitting resource branches would distribute the same transaction. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent fixture, consumer contract, decoder, policy, queue, publication or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "7bdab04532cf517b67839b8ef08fcd3fedc0899a72ed00ea779ea0dce45c77cc",
+      "signatureHash": "f9e52a2320b7cc0e5ece824c658ae25f8c44967debe676741050564b06463444"
     },
     {
       "rule": "structural-file-risk",
@@ -6633,6 +6622,17 @@
       "reviewDate": "2026-11-09",
       "astHash": "93be515173c9703f1ca5ade675ea026ad318a8b2d45c912dbfca3ee6a03b07d6",
       "signatureHash": "4d3b761d8b8cc12263423b8783aabe1904806c7ec62dfda3f08dc44220c642b2"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/presentation-main.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One PresentationMain fixture observes source requests, scene clocks, renderer resources and cleanup. New leading, metadata and cancellation cases use that owner. Fixture controls are not production state authorities. Independent inspection found no separate responsibility. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent fixture, consumer contract, decoder, policy, queue, publication or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-09",
+      "astHash": "bfc4aa644015e5da3d86c01a888aeb59679be4c033fbe5746583c240cdb45665",
+      "signatureHash": "a43f86fc182f558814e9ca55d6c42fc44aee0cfef9320c11c4f6a4772afd570e"
     }
   ]
 }

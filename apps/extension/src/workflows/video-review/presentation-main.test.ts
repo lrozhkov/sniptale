@@ -32,6 +32,7 @@ const io = vi.hoisted(() => ({
   retainedSpatialBytes: 0,
   resolution: 1000,
   firstTimestamp: 0,
+  packetStats: vi.fn(),
   missingTrack: false,
   decode: true,
   missingSample: false,
@@ -74,6 +75,7 @@ vi.mock('mediabunny', () => ({
             getDisplayHeight: async () => 36,
             getTimeResolution: async () => io.resolution,
             getFirstTimestamp: async () => io.firstTimestamp,
+            computePacketStats: (...args: unknown[]) => io.packetStats(...args),
             computeDuration: async () => 3,
           };
     }
@@ -192,6 +194,7 @@ beforeEach(() => {
   io.retainedSpatialBytes = 0;
   io.resolution = 1000;
   io.firstTimestamp = 0;
+  io.packetStats.mockResolvedValue({ averagePacketRate: 30 });
   io.missingTrack = false;
   io.decode = true;
   io.missingSample = false;
@@ -770,3 +773,80 @@ it('borrows an owned GPU source clone with SDK orientation until render settleme
   expect(source.close).toHaveBeenCalledOnce();
   expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
 });
+
+it.each(['ordinary', 'planned'] as const)(
+  'uses bounded-prefix metadata rather than index average for %s leading admission',
+  async (route) => {
+    io.firstTimestamp = 0.025;
+    io.packetStats.mockResolvedValue({ averagePacketRate: 30 });
+    const make = io.sample.getMockImplementation()!;
+    io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+    const args = fixture();
+    args.index.frameRate = 60;
+    const candidates = [0, 1 / 60, 2 / 60].map((time, index) => ({
+      ...candidate(time),
+      tick: 90 + index,
+    }));
+    if (route === 'planned') args.plannedCandidates = () => candidates;
+    const owner = await open(args);
+    for (const item of candidates) {
+      const output = await (route === 'planned'
+        ? owner.render(item)
+        : owner.renderAtTime(item.mapping.kind === 'main' ? item.mapping.mainLocalTime : 0));
+      output.release();
+    }
+    expect(io.packetStats).toHaveBeenCalledExactlyOnceWith(256, { metadataOnly: true });
+    expect(io.times).toEqual([0.025, 0.025, 0.033]);
+    expect(io.render.mock.calls.map(([frame]) => [frame.sourceTime, frame.resultTime])).toEqual([
+      [0, 7],
+      [0.017, 7 + 1 / 60],
+      [0.033, 7 + 2 / 60],
+    ]);
+    for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+  }
+);
+
+it('rejects a leading gap that only the whole-file average would admit', async () => {
+  io.firstTimestamp = 0.025;
+  io.packetStats.mockResolvedValue({ averagePacketRate: 60 });
+  const make = io.sample.getMockImplementation()!;
+  io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+  const args = fixture();
+  args.index.frameRate = 30;
+  const owner = await open(args);
+  await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+  expect(io.render).not.toHaveBeenCalled();
+});
+
+it.each([0, NaN, Infinity])(
+  'does not admit a leading gap from invalid prefix rate %s',
+  async (rate) => {
+    io.firstTimestamp = 0.025;
+    io.packetStats.mockResolvedValue({ averagePacketRate: rate });
+    const make = io.sample.getMockImplementation()!;
+    io.sample.mockImplementation((time: number) => (time < io.firstTimestamp ? null : make(time)));
+    const args = fixture();
+    args.index.frameRate = 30;
+    const owner = await open(args);
+    await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+  }
+);
+
+it.each(['error', 'abort'] as const)(
+  'retires Main input after leading metadata %s',
+  async (failure) => {
+    io.firstTimestamp = 0.025;
+    const controller = new AbortController();
+    const error = new Error('leading-metadata-failed');
+    io.packetStats.mockImplementation(async () => {
+      if (failure === 'error') throw error;
+      controller.abort();
+      return { averagePacketRate: 30 };
+    });
+    const request = open({ ...fixture(), signal: controller.signal });
+    if (failure === 'error') await expect(request).rejects.toBe(error);
+    else await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+    expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
+    expect(io.render).not.toHaveBeenCalled();
+  }
+);
