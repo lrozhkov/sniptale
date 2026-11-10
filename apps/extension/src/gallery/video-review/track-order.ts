@@ -7,6 +7,7 @@ export const REVIEW_TRACK_ORDER: readonly QuickEditTrack[] = [
   'source',
   'webcam',
   'zoom',
+  'cursorMotion',
   'originalAudio',
   'annotationEffects',
   'text',

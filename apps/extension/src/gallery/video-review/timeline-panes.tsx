@@ -124,7 +124,6 @@ export function ReviewTimelinePanes(props: {
             onScroll={() => sync('labels')}
             inert={props.busy}
             className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
-            style={{ scrollbarGutter: 'stable' }}
           >
             <div
               ref={controls}
@@ -152,6 +151,7 @@ function observeReviewPaneLayout(
   rows: Set<Row>,
   onClamp: (value: { labels: number; time: number }) => void
 ) {
+  let labelWidth = 0;
   const measure = () => {
     const ordered = [...rows].sort((a, b) =>
       a.body.compareDocumentPosition(b.body) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
@@ -194,7 +194,11 @@ function observeReviewPaneLayout(
       );
     }
     const scrollbar = Math.max(0, left.offsetWidth - left.clientWidth);
-    const width = Math.min(root.clientWidth * 0.4 || 260, Math.ceil(natural + scrollbar));
+    const width = Math.min(
+      root.clientWidth * 0.4 || 260,
+      Math.max(labelWidth, Math.ceil(natural + scrollbar))
+    );
+    labelWidth = width;
     root.style.setProperty('--review-label-width', `${width}px`);
     const top = Math.max(
       0,

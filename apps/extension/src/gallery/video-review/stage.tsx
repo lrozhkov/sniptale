@@ -1,3 +1,4 @@
+import { ReviewCursorMotionOverlay } from './cursor-motion-overlay';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import {
   reviewPresentedStageProjection,
@@ -89,6 +90,7 @@ type ReviewStageCommentBinding = {
 };
 
 type ReviewStageProps = {
+  cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
   cursorPath?: Omit<Parameters<typeof ReviewCursorPathOverlay>[0], 'width' | 'height'> | undefined;
   annotationEditing?: ReviewAnnotationEditing | undefined;
   onAnnotationGeometry?: ReviewAnnotationEditing['editor']['setGeometry'] | undefined;
@@ -628,7 +630,7 @@ function ReviewStageContent({
             video={computeQuickEditSourceWindowTransform(sceneLayout)}
           />
         ) : null}
-        {props.cursorPath && sceneLayout && !projection ? (
+        {props.cursorPath && !props.cursorPath.authoredMotion && sceneLayout && !projection ? (
           <div
             className="pointer-events-none absolute"
             style={{
@@ -666,6 +668,14 @@ function ReviewStageContent({
         ) : null}
         {windowFocus ? null : focus}
       </div>
+      {props.cursorPath?.authoredMotion && sceneLayout ? (
+        <ReviewCursorMotionOverlay
+          {...props.cursorPath}
+          output={size}
+          video={sceneLayout.videoTransform}
+          projection={projection}
+        />
+      ) : null}
       {windowFocus ? (
         <div
           className="pointer-events-none absolute inset-0"

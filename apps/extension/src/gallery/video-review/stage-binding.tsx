@@ -34,6 +34,7 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
  * exclude disabled lanes. The paused framing midpoint shows the full selected target.
  */
 type ReviewStageBindingProps = {
+  cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
   cursorPath?: Parameters<typeof ReviewStage>[0]['cursorPath'];
   captions?: Parameters<typeof ReviewStage>[0]['captions'];
   annotationEffects?: Parameters<typeof ReviewStage>[0]['annotationEffects'];
@@ -293,6 +294,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         webcam={props.webcam}
         focusPicker={props.focusPicker}
         cursorPath={props.cursorPath}
+        cursorMotions={props.cursorMotions}
         backgroundImageUrl={image.url}
         backgroundPending={props.backgroundPending}
         cutPreview={props.cutPreview}

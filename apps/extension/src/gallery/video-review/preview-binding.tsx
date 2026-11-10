@@ -45,6 +45,7 @@ type PreviewState = Pick<
   | 'onMediaError'
   | 'recovering'
 > & {
+  cursorMotion?: EditorState['cursorMotion'];
   history?: EditorState['history'];
   setCursorFocusPath?: EditorState['setCursorFocusPath'];
   selectCursorFocusKey?: EditorState['selectCursorFocusKey'];
@@ -55,6 +56,7 @@ type PreviewState = Pick<
   text: Pick<EditorState['text'], 'jump'>;
   features: Pick<
     EditorState['features'],
+    | 'cursorMotions'
     | 'webcam'
     | 'canvas'
     | 'windowHeader'
@@ -266,11 +268,20 @@ function ReviewPreviewStage({
   return (
     <ReviewStageBinding
       {...captionPreview}
-      cursorPath={reviewCursorPathOverlayBinding(
-        state,
-        state.history?.telemetry ?? resource.telemetry,
-        sceneEditable
-      )}
+      cursorMotions={features.cursorMotions}
+      cursorPath={
+        sceneEditable &&
+        state.advanced.ui.mode === 'advanced' &&
+        state.advanced.ui.tracks.cursorMotion !== false &&
+        state.advanced.cursorMotionEnabled !== false &&
+        state.activeSelection?.kind === 'cursor-motion'
+          ? state.cursorMotion?.overlay
+          : reviewCursorPathOverlayBinding(
+              state,
+              state.history?.telemetry ?? resource.telemetry,
+              sceneEditable
+            )
+      }
       annotationEffects={
         features.annotationEffects
           ? {

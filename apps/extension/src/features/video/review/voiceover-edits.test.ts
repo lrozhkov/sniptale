@@ -455,3 +455,50 @@ it.each(['start', 'end'] as const)(
     }
   }
 );
+
+it('keeps exact source boundaries when a text-sized take ends one ULP after a Speed boundary', () => {
+  const edits: ReviewEdit[] = [
+    {
+      id: 'early',
+      kind: 'speed',
+      start: 0.11496873836120566,
+      end: 13.106436173177446,
+      requestedStart: 0.11496873836120566,
+      requestedEnd: 13.106436173177446,
+      rate: 2,
+      audio: 'speed',
+    },
+    {
+      id: 'later',
+      kind: 'speed',
+      start: 39.16601686838407,
+      end: 56.33468179699078,
+      requestedStart: 39.16601686838407,
+      requestedEnd: 56.33468179699078,
+      rate: 2,
+      audio: 'speed',
+    },
+  ];
+  const recording = {
+    ...clip,
+    timelineStart: 25.984308908076937,
+    duration: 41.25461561527931 - 25.984308908076937,
+  };
+  const anchored = anchorReviewVoiceover(recording, buildReviewTimeMap(70, edits));
+  expect(
+    parseVoiceoverAnchors(anchored.sourceAnchor, anchored.timelineStart, anchored.duration)
+  ).not.toBeNull();
+  const before = edits[1]!;
+  const normalized = normalizeReviewVoiceoverTempo(anchored, before, {
+    ...before,
+    start: before.start + 1,
+    end: before.end + 1,
+  });
+  expect(
+    parseVoiceoverAnchors(normalized.sourceAnchor, normalized.timelineStart, normalized.duration)
+  ).not.toBeNull();
+  expect(normalized.sourceAnchor!.reduce((sum, span) => sum + span.duration, 0)).toBeCloseTo(
+    recording.duration,
+    12
+  );
+});

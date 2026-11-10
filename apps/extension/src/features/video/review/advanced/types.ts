@@ -20,7 +20,7 @@ export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 28;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 29;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -28,6 +28,7 @@ export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
 export type QuickEditTrack =
   | 'source'
   | 'actions'
+  | 'cursorMotion'
   | 'zoom'
   | 'text'
   | 'annotationEffects'
@@ -37,6 +38,7 @@ export type QuickEditTrack =
   | 'music';
 
 export interface QuickEditTrackVisibility {
+  cursorMotion?: boolean;
   text?: boolean;
   originalAudio?: boolean;
   voiceover?: boolean;
@@ -136,6 +138,8 @@ export interface QuickEditZoomRegion {
   linkTo?: string;
   /** Link easing; absent on legacy payloads applies the smooth default. */
   linkEasing?: QuickEditZoomLinkEasing;
+  /** Camera copies yield to existing intervals and remain editable during a conflict. */
+  overlapPolicy?: 'suppress';
   /** Kept but not applied: its interval could not be proven in result time. */
   dormant?: boolean;
 }
@@ -266,6 +270,8 @@ export interface QuickEditAdvancedState extends QuickEditAdvancedContent {
  * zoom/background/audio changes join the same undo timeline as cuts.
  */
 export interface QuickEditAdvancedContent {
+  cursorMotionEnabled?: boolean;
+  cursorMotions?: import('../../project/cursor-motion').CursorMotion[];
   cameraFollowDefaults?: import('../../project/camera/cursor-policy').CameraFollowSettings;
   cursorFocusPath?: import('../../project/cursor-focus-path/types').CursorFocusPath;
   text?: import('../text-types').ReviewTextDocument;

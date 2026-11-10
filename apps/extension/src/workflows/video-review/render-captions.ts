@@ -151,6 +151,7 @@ export async function prepareReviewFinalCaptions(args: {
   >;
   effective: Pick<
     ReturnType<typeof resolveQuickEditEffectiveState>,
+    | 'cursorMotions'
     | 'canvas'
     | 'background'
     | 'windowHeader'
@@ -176,6 +177,7 @@ export async function prepareReviewFinalCaptions(args: {
     watermark: effective.watermark,
     webcam: effective.webcam,
     webcamDuration: args.webcamDuration,
+    cursorMotions: effective.cursorMotions,
     zoomRegions: effective.zoomRegions,
     comments: input.comments ?? [],
     keys: input.keyCues ?? [],

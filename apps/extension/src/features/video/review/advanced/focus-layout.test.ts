@@ -83,3 +83,42 @@ it('lets the nearer neighbor replace a blocked incoming link without deleting th
   expect(resolveQuickEditFocusLink(updated, 'a')).toBeNull();
   expect(updated.find((region) => region.id === 'a')?.linkTo).toBe('b');
 });
+
+it('retains overlapping camera copies but excludes them from the shared composition until moved clear', async () => {
+  const { resolveQuickEditActiveFocusRegions, packQuickEditFocusRows } =
+    await import('./focus-layout');
+  const { projectReviewFocus } = await import('../focus-edits');
+  const { createQuickEditAdvancedState } = await import('./defaults');
+  const { loadQuickEditAdvancedState } = await import('./validation');
+  const { moveQuickEditZoomRegion } = await import('./zoom');
+  const original = { ...focus('original', 1, 3, 'zoom'), sourceAnchor: { start: 1, end: 3 } };
+  const copy = { ...original, id: 'copy', overlapPolicy: 'suppress' as const };
+  const state = createQuickEditAdvancedState();
+  state.zoom = { enabled: true, regions: [original, copy] };
+  const restored = loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)));
+  expect(restored?.zoom.regions).toEqual([original, copy]);
+  expect(projectReviewFocus(restored!.zoom.regions).map((r) => r.id)).toEqual(['original']);
+  expect(packQuickEditFocusRows([original, copy]).get('copy')).toBe(1);
+  const moved = moveQuickEditZoomRegion({
+    regions: [original, copy],
+    id: 'copy',
+    requestedStart: 4,
+    timelineDuration: 10,
+  });
+  expect(moved).toEqual({ start: 4, end: 6 });
+  const free = { ...copy, ...moved, sourceAnchor: moved };
+  expect(projectReviewFocus([original, free]).map((r) => r.id)).toEqual(['original', 'copy']);
+  expect(resolveQuickEditActiveFocusRegions([copy]).map((r) => r.id)).toEqual(['copy']);
+  expect(
+    loadQuickEditAdvancedState({
+      ...state,
+      zoom: { enabled: true, regions: [original, { ...copy, overlapPolicy: undefined }] },
+    })
+  ).toBeNull();
+  expect(
+    loadQuickEditAdvancedState({
+      ...state,
+      zoom: { enabled: true, regions: [original, { ...copy, overlapPolicy: 'unknown' }] },
+    })
+  ).toBeNull();
+});

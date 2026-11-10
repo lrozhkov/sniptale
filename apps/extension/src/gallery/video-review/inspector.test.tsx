@@ -600,7 +600,7 @@ it('opens the track document in the third context and closes it on selection or 
   }
 });
 
-it('keeps the same take mounted when temporary header navigation switches recorder, scene and notes', async () => {
+it('uses a plain recording heading and an enabled Back while retaining the take during navigation', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -630,33 +630,18 @@ it('keeps the same take mounted when temporary header navigation switches record
       )
     );
     expect(host.querySelector('[data-ui="gallery.videoReview.inspectorNavigation"]')).toBeNull();
-    const navigation = host.querySelector('[data-ui="gallery.videoReview.recordingNavigation"]');
-    expect(navigation).not.toBeNull();
-    const choose = async (key: string) => {
-      await act(async () => navigation!.querySelector<HTMLButtonElement>('button')!.click());
-      const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-        (item) => item.textContent === `gallery.videoReview.${key}`
-      );
-      expect(option).toBeDefined();
-      await act(async () => option!.click());
-    };
-
-    expect(navigation?.textContent).toContain('gallery.videoReview.recordVoiceover');
+    expect(host.querySelector('[data-ui="gallery.videoReview.recordingNavigation"]')).toBeNull();
+    expect(host.querySelector('header h2')?.textContent).toBe(
+      'gallery.videoReview.recordVoiceover'
+    );
     const take = host.querySelector<HTMLInputElement>('[aria-label="retained take"]')!;
-    expect(take.value).toBe('draft');
-    expect(take.closest('[hidden]')).toBeNull();
     take.value = 'retained edited take';
-    await choose('scene');
-    expect(host.querySelector('[aria-label="retained take"]')).toBe(take);
+    const back = host.querySelector<HTMLButtonElement>('header button')!;
+    expect(back.disabled).toBe(false);
+    act(() => currentNavigation.setSection('scene'));
     expect(take.closest('[hidden]')).not.toBeNull();
-    expect(host.textContent).toContain('scene parameters');
-    expect(host.querySelector('.review-inspector-scroll')?.hasAttribute('inert')).toBe(true);
-    await choose('recordVoiceover');
+    act(() => currentNavigation.openRecording());
     expect(take.closest('[hidden]')).toBeNull();
-    expect(take.value).toBe('retained edited take');
-    await choose('comments');
-    expect(take.closest('[hidden]')).not.toBeNull();
-    await choose('recordVoiceover');
     expect(host.querySelector('[aria-label="retained take"]')).toBe(take);
     expect(take.value).toBe('retained edited take');
 
@@ -719,6 +704,35 @@ it('offers full editor transfer with the existing export actions and disables it
       host.querySelector<HTMLButtonElement>('[data-ui="gallery.videoReview.openVideoEditor"]')!
         .disabled
     ).toBe(true);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('does not let a repeated track-root command hide the next selected item', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  let selection: ReviewSelection = { kind: 'none' };
+  function Harness() {
+    const nav = useReviewInspectorNavigation({
+      contextKey: selection.kind,
+      contextSelection: selection,
+      selectionLabel: selection.kind === 'none' ? undefined : 'Selected effect',
+      settingsAvailable: true,
+      exportAvailable: true,
+    });
+    currentNavigation = nav;
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => currentNavigation.setSection('track'));
+    expect(currentNavigation.shown).toBe('track');
+    act(() => currentNavigation.setSection('track'));
+    selection = { kind: 'zoom', id: 'created' };
+    act(() => root.render(<Harness />));
+    expect(currentNavigation.shown).toBe('selected');
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

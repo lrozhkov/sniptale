@@ -13,8 +13,13 @@ import {
 } from '../../features/video/review/voiceover-edits';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
-import { Trash2, AudioLines, Waves } from 'lucide-react';
-import { ReviewInterval, ReviewButton, reviewDeleteButtonClassName } from './controls';
+import { Trash2, AudioLines, Waves, VolumeX } from 'lucide-react';
+import {
+  ReviewInterval,
+  ReviewButton,
+  reviewDeleteButtonClassName,
+  reviewTextButtonClassName,
+} from './controls';
 import type { useReviewAudio } from './use-review-audio';
 
 /** Editor for the selected audio clip: level, fades, and the delete action. */
@@ -58,15 +63,26 @@ export function ReviewAudioClipEditor(props: {
     },
   ];
   const actions = reviewInspectorActions(
-    <ReviewButton
-      label={translate('gallery.videoReview.audioClipDelete')}
-      disabled={props.busy}
-      className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-      onClick={props.onDelete}
-    >
-      <Trash2 size={15} aria-hidden="true" />
-      <span>{translate('gallery.videoReview.audioClipDelete')}</span>
-    </ReviewButton>
+    <>
+      <ReviewButton
+        label={translate('gallery.videoReview.audioClipMute')}
+        disabled={props.busy || props.clip.volume === 0}
+        className={`${reviewTextButtonClassName} !w-full justify-start`}
+        onClick={() => props.onPatch({ volume: 0 })}
+      >
+        <VolumeX size={15} aria-hidden="true" />
+        <span>{translate('gallery.videoReview.audioClipMute')}</span>
+      </ReviewButton>
+      <ReviewButton
+        label={translate('gallery.videoReview.audioClipDelete')}
+        disabled={props.busy}
+        className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+        onClick={props.onDelete}
+      >
+        <Trash2 size={15} aria-hidden="true" />
+        <span>{translate('gallery.videoReview.audioClipDelete')}</span>
+      </ReviewButton>
+    </>
   );
   return (
     <div data-ui="gallery.videoReview.audioInspector" className="min-w-0 space-y-3">

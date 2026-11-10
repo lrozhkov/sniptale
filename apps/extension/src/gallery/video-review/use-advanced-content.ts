@@ -1,3 +1,4 @@
+import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../features/video/review/advanced/types';
 import { authoredCursorFocusPath } from '../../features/video/project/cursor-focus-path/authoring';
 import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
 import { useRecoveryLifecycle } from './use-recovery-lifecycle';
@@ -274,6 +275,18 @@ function reviewContentCommands(
         const { presentation: _previous, ...rest } = content;
         return presentation ? { ...rest, presentation } : rest;
       }),
+    setCursorMotionEnabled: (cursorMotionEnabled: boolean) =>
+      stage((content) => ({
+        ...content,
+        schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+        cursorMotionEnabled,
+      })),
+    setCursorMotions: (cursorMotions: NonNullable<QuickEditAdvancedContent['cursorMotions']>) =>
+      stage((content) => ({
+        ...content,
+        schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+        cursorMotions,
+      })),
     setWindowHeader: (windowHeader: QuickEditAdvancedState['windowHeader']) =>
       stage((content) => {
         const { windowHeader: _previous, ...rest } = content;

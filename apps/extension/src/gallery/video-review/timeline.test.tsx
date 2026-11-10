@@ -73,7 +73,8 @@ it('keeps the archived history row and timeline height budget across empty windo
   expect(
     host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.historyStrip"]')!.style.height
   ).toBe(height);
-  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(2);
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(1);
+  expect(host.querySelector('[data-history-family="cursor"]')).toBeNull();
   renderTimeline({ sourceId: 'recording-b', cursorArchiveAvailable: false });
   expect(host.querySelector('[data-ui="gallery.videoReview.historyTrack"]')).toBeNull();
 });

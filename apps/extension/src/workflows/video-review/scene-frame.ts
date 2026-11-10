@@ -486,6 +486,7 @@ function drawReviewSceneSample(
     backgroundOnly?: boolean;
     deferComments?: boolean;
     comments?: readonly CanvasCommentExport[];
+    cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
     sourceTime?: number;
     currentTime?: number | undefined;
     cameraScale?: number;

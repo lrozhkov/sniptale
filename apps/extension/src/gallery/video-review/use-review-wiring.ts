@@ -158,6 +158,10 @@ export function useReviewEditorWiring(args: {
     cursorFocusPath,
     cursorFocusKeys,
     historyPending: args.historyPending ?? false,
+    deleteCursorMotion: (id) =>
+      args.advancedState.setCursorMotions(
+        (args.advanced.cursorMotions ?? []).filter((m) => m.id !== id)
+      ),
     deleteCursorFocus: (id) =>
       args.advancedState.setCursorFocusPath(deleteCursorFocusKey(cursorFocusPath, id)),
     setSelection: args.setActiveSelection,

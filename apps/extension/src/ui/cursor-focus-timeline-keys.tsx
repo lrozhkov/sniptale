@@ -93,6 +93,8 @@ export function CursorFocusTimelineKeys(props: CursorFocusTimelineProps) {
             key={key.timelineId}
             type="button"
             data-cursor-focus-key={key.id}
+            data-review-snap-start={key.sourceTime}
+            data-review-snap-end={key.sourceTime}
             data-authored={authored ? 'true' : 'false'}
             aria-label={cursorKeyLabel(key)}
             aria-pressed={key.id === props.selectedId}

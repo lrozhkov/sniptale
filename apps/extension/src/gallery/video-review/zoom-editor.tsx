@@ -186,6 +186,7 @@ function resetFocusSettings(zoom: ZoomState, id: string): ZoomState {
   );
   const reset = fitQuickEditZoomTransitions({
     ...defaults,
+    ...(selected.overlapPolicy ? { overlapPolicy: selected.overlapPolicy } : {}),
     ...(selected.followCursor === undefined ? {} : { followCursor: selected.followCursor }),
     ...(selected.dormant !== undefined ? { dormant: selected.dormant } : {}),
     ...(selected.linkTo ? { linkTo: selected.linkTo } : {}),
@@ -381,9 +382,13 @@ function addZoomAt(
 /** Copies authored overlay content through the same history/autosave mutation as other edits. */
 function duplicateFocus(args: ZoomEditorArgs, id: string): string | null {
   const original = args.zoom.regions.find((item) => item.id === id);
-  if (!original || original.dormant || (!original.border && !original.spotlight)) return null;
+  if (!original || original.dormant) return null;
   const { linkTo: _link, linkEasing: _easing, borderClock: _clock, ...values } = original;
-  const copy = { ...structuredClone(values), id: `zoom-${crypto.randomUUID()}` };
+  const copy: QuickEditZoomRegion = {
+    ...structuredClone(values),
+    id: `zoom-${crypto.randomUUID()}`,
+    ...(!original.border && !original.spotlight ? { overlapPolicy: 'suppress' as const } : {}),
+  };
   args.setZoom((zoom) => ({
     ...zoom,
     regions: insertQuickEditZoomRegion(zoom.regions, copy),
@@ -579,6 +584,7 @@ function focusRevision(region: QuickEditZoomRegion | undefined): string {
     region.end,
     region.sourceAnchor,
     region.dormant,
+    region.overlapPolicy,
     region.motionBlur,
     region.border,
     region.perspective,

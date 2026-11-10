@@ -1,4 +1,8 @@
-import type { SharedProjectExportComposition } from './shared-composition';
+import type { VideoCompositionTimelineIndex } from '../../features/video/composition/timeline/frame/index';
+import type { VideoCompositionMediaSource } from '../../features/video/composition/draw/media-source';
+import type { OffscreenProjectEffectRuntime } from './effect-runtime';
+import type { LoadedImagesMap } from './renderer/types';
+import type { ExportSceneBackgroundCache } from './renderer/background';
 import type { ProjectExportSourceSampling } from './renderer/source-sampling';
 import type { VideoProject } from '../../features/video/project/types/model';
 import type { VideoProjectExportSettings } from '../../features/video/project/types/export';
@@ -52,4 +56,40 @@ export interface ExportJobState extends ProjectExportRuntimeState {
   cancelled: boolean;
   timeEstimator?: ExportTimeEstimator;
   renderProgressRange?: { start: number; end: number };
+}
+
+export interface ProjectCompositionSceneInput {
+  context: CanvasRenderingContext2D;
+  currentTime: number;
+  captionSampleTime?: number;
+  sourceSamplingFallback?: 'first' | 'last';
+  job: Pick<
+    ExportJobState,
+    | 'sourceSampling'
+    | 'cancelled'
+    | 'cameraSpatialRenderer'
+    | 'captionRenderer'
+    | 'watermarkRenderer'
+    | 'cursorTrajectoryRenderer'
+    | 'recordingEventsRenderer'
+  >;
+  loadedImages: LoadedImagesMap;
+  clipMediaElements: ReadonlyMap<string, VideoCompositionMediaSource>;
+  project: VideoProject;
+  settings: VideoProjectExportSettings;
+  signal?: AbortSignal;
+  ownerDocument?: Document;
+  compositionIndex?: VideoCompositionTimelineIndex;
+  effectRuntime?: OffscreenProjectEffectRuntime;
+  backgroundCache?: ExportSceneBackgroundCache;
+}
+
+export type SharedProjectCompositionInput = ProjectCompositionSceneInput & {
+  job: ProjectCompositionSceneInput['job'] & Pick<ProjectExportRuntimeState, 'sharedComposition'>;
+};
+export interface SharedProjectExportComposition {
+  readonly project: SharedProjectCompositionInput['project'];
+  readonly settings: SharedProjectCompositionInput['settings'];
+  render(input: SharedProjectCompositionInput): Promise<void>;
+  dispose(): void;
 }

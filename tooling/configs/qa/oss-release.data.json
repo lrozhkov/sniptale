@@ -426,7 +426,7 @@
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "ade08a2bd7861ecb97ff23fd36df0d187422d2576f08b42d0f37003c911ba2f2",
+      "sha256": "eaf8908f6e322dafe9dc8b54facc4c9c2bff124d8ecb516bd169be9a71b50747",
       "source": "THIRD_PARTY_NOTICES.md"
     },
     {
@@ -443,6 +443,21 @@
       "archivePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json",
       "sha256": "27425919296cb19185ab1de022f9a5016c3bf4911cdd25b65f006a0c5c93c53e",
       "source": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/identity.json"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/project/cursor-motion/apple/LICENSE",
+      "sha256": "b506d1619aaec697f71d1230af32190c46777bf541e68f0fa6bf54d48f72c935",
+      "source": "apps/extension/src/features/video/project/cursor-motion/apple/LICENSE"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt",
+      "sha256": "252d495836fccc8ccca2037c38356c27b73242962a332dca6a0b32bbf8a91fb6",
+      "source": "apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/src/features/video/project/cursor-motion/apple/identity.json",
+      "sha256": "da5facca6df3558e5a9d9c18e55089f5923ebe4e8ff3ef62aebe40e94eed50a8",
+      "source": "apps/extension/src/features/video/project/cursor-motion/apple/identity.json"
     }
   ],
   "bundledAssets": [
@@ -606,6 +621,64 @@
             "sha256": "d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6",
             "sourceUrl": "https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/runtimeCapabilities.js",
             "sourceSha256": "d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6"
+          }
+        ]
+      },
+      {
+        "id": "apple-cursor",
+        "name": "Apple Cursor artwork",
+        "attribution": "ful1e5 and Apple Cursor contributors",
+        "license": "GPL-3.0-only",
+        "sourceUrl": "https://github.com/ful1e5/apple_cursor/tree/fe044a42b4e9cea16ea762d2ed9004f6d7b35543",
+        "licensePath": "apps/extension/src/features/video/project/cursor-motion/apple/LICENSE",
+        "licenseSha256": "b506d1619aaec697f71d1230af32190c46777bf541e68f0fa6bf54d48f72c935",
+        "noticePath": "apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt",
+        "noticeSha256": "252d495836fccc8ccca2037c38356c27b73242962a332dca6a0b32bbf8a91fb6",
+        "provenancePath": "apps/extension/src/features/video/project/cursor-motion/apple/identity.json",
+        "provenanceSha256": "da5facca6df3558e5a9d9c18e55089f5923ebe4e8ff3ef62aebe40e94eed50a8",
+        "modifications": "Extract SVG path attributes and hotspots into apple-shapes.json. Apply runtime fill, outline, scale and shadow. The generated artifact source hash identifies the source set in identity.json.",
+        "artifacts": [
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/left_ptr.svg",
+            "sha256": "1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/left_ptr.svg",
+            "sourceSha256": "1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/hand2.svg",
+            "sha256": "1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/hand2.svg",
+            "sourceSha256": "1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/hand1.svg",
+            "sha256": "dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/hand1.svg",
+            "sourceSha256": "dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/xterm.svg",
+            "sha256": "81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/xterm.svg",
+            "sourceSha256": "81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg",
+            "sha256": "dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/crosshair.svg",
+            "sourceSha256": "dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple/x.build.toml",
+            "sha256": "a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/configs/x.build.toml",
+            "sourceSha256": "a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997"
+          },
+          {
+            "path": "apps/extension/src/features/video/project/cursor-motion/apple-shapes.json",
+            "sha256": "d3180d9ecfc0471a9f3bb281a34f3befcadf5b15f63e2d95ff3107fc87f15f3e",
+            "sourceUrl": "https://github.com/ful1e5/apple_cursor/tree/fe044a42b4e9cea16ea762d2ed9004f6d7b35543",
+            "sourceSha256": "f307941ba096017f0b6a62b7bfcff94d1f3171e5376415aed934ee29d0ff2237"
           }
         ]
       }

@@ -190,11 +190,12 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     expect(host.textContent).not.toContain('Edited note');
     await click('undo');
     expect(host.textContent).toContain('Edited note');
-    await act(async () =>
-      host
-        .querySelector<HTMLButtonElement>('[title^="gallery.videoReview.eventCursorIdle"]')!
-        .click()
-    );
+    await click('telemetry');
+    const capturedAction = Array.from(
+      host.querySelectorAll<HTMLButtonElement>('.review-history-row button')
+    ).find((button) => button.textContent?.includes('gallery.videoReview.eventCursorIdle'))!;
+    expect(capturedAction).not.toBeNull();
+    await act(async () => capturedAction.click());
     expect(host.querySelector('textarea')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.actionProperties"]')).not.toBeNull();
     await click('telemetry');

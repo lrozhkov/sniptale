@@ -1,3 +1,4 @@
+import type { ProjectCompositionSceneInput } from './types';
 import { renderSharedProjectComposition } from './shared-composition';
 import { createCompositionCutSampleSource } from '../../workflows/video-review/decoded-video-sample';
 import { createCompositionJoinEndpoints } from '../../features/video/composition/canvas/join-endpoints';
@@ -14,10 +15,7 @@ import {
 import type { VideoProjectCompositionJoinPlan } from '../../features/video/project/scene/joins-types';
 import { isClipActiveAtTime } from '../../features/video/project/timeline/basics';
 import { createPreviewRenderResources } from '../../workflows/video-review/preview-render-resources';
-import {
-  renderProjectCompositionScene,
-  type ProjectCompositionSceneInput,
-} from './composition-scene';
+import { renderProjectCompositionScene } from './composition-scene';
 import { createOffscreenProjectEffectRuntime } from './effect-runtime';
 import { syncVideoClipFrame } from './media-playback/frame';
 import { waitForMediaElementReady } from './media-loading/ready';

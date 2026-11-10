@@ -30,7 +30,6 @@ import type { VideoProjectCaptionRenderer } from '../../video-review/project-cap
 import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import type { EffectRuntimeSandboxExecutor } from '../../../contracts/effect-runtime/types';
 import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
-import type { PreparedPreviewSceneCanvas } from './canvas';
 
 import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
 
@@ -222,4 +221,11 @@ export interface PreviewScenePresentation {
   time: number;
   renderer?: PreviewRendererStatus;
   output?: GpuPreviewOutput;
+}
+
+export interface PreparedPreviewSceneCanvas {
+  bounds: PreviewSceneBounds;
+  context: CanvasRenderingContext2D;
+  dpr: number;
+  viewport: PreviewSceneViewport;
 }

@@ -26,6 +26,12 @@ export function useReviewTrackSelection(input: {
   const track = reset || input.editing ? 'source' : selection.track;
   const latest = useRef(input);
   latest.current = input;
+  const notified = useRef<QuickEditTrack | null>(null);
+  const notify = (next: QuickEditTrack) => {
+    if (notified.current === next) return;
+    notified.current = next;
+    latest.current.onChange?.(next);
+  };
   useEffect(() => {
     if (
       track === selection.track &&
@@ -37,13 +43,14 @@ export function useReviewTrackSelection(input: {
     setSelection({ sourceId: input.sourceId, mode: input.mode, track });
   }, [track, selection, input.sourceId, input.mode, reset]);
   useEffect(() => {
-    latest.current.onChange?.(track);
+    notify(track);
   }, [track]);
   // Item handlers own edit admission. This capture only changes the transient lane and tools.
   const focusItem = (next: QuickEditTrack) => {
     const current = latest.current;
     if (!current.selectable[next] || current.blocked || next === track) return;
     current.clearTools();
+    notify(next);
     setSelection({ sourceId: current.sourceId, mode: current.mode, track: next });
   };
   const select = (next: QuickEditTrack) => {
@@ -61,6 +68,7 @@ export function useReviewTrackSelection(input: {
         current.clearTools();
         setSelection({ sourceId: input.sourceId, mode: input.mode, track: next });
       }
+      notify(next);
       current.activate(next);
     });
   };

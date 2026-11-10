@@ -56,7 +56,7 @@ it('opens a themed disclosure, toggles the setting and restores focus on Escape'
 });
 it('does not flash a spinner for short saves and respects reduced motion', () => {
   draw({ state: 'saving' });
-  expect(host.querySelector('.lucide-cloud-sync')).not.toBeNull();
+  expect(host.querySelector('.lucide-cloud-sync')).toBeNull();
   act(() => vi.advanceTimersByTime(200));
   expect(host.querySelector('.lucide-cloud-sync path[class]')).toBeNull();
   draw({ state: 'saved' });

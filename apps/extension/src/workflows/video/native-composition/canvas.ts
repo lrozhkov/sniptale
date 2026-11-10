@@ -1,3 +1,4 @@
+import type { PreparedPreviewSceneCanvas } from './types';
 import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
 import {
   drawSceneBackground,
@@ -11,15 +12,8 @@ import {
   resolveProjectOutputTransform,
   type CameraOutputViewport,
 } from '../../../features/video/project/export/output-dimensions';
-import type { PreviewSceneBounds, PreviewSceneViewport } from './types';
+import type { PreviewSceneBounds } from './types';
 import type { VideoEditorPreviewRasterSize } from './types';
-
-export interface PreparedPreviewSceneCanvas {
-  bounds: PreviewSceneBounds;
-  context: CanvasRenderingContext2D;
-  dpr: number;
-  viewport: PreviewSceneViewport;
-}
 
 function syncCanvasResolution(
   canvas: HTMLCanvasElement,

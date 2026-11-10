@@ -105,6 +105,8 @@ export function useReviewAdvanced(session: Session) {
   const advanced = useMemo<QuickEditAdvancedState>(() => {
     const {
       cursorFocusPath: _baselineCursorFocusPath,
+      cursorMotions: _baselineCursorMotions,
+      cursorMotionEnabled: _baselineCursorMotionEnabled,
       annotationEffects: _baselineAnnotationEffects,
       actionsEnabled: _baselineActionsEnabled,
       keyAnimations: _baselineKeys,

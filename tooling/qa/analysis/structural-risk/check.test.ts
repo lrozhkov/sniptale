@@ -85,20 +85,27 @@ describe('structural function profiles', () => {
     ['react', 'apps/extension/src/popup/components/example.tsx', 'Example'],
     ['pure', 'apps/extension/src/content/parser/example.ts', 'parse'],
     ['test', 'apps/extension/src/content/example.test.ts', 'run'],
-  ])('hard-fails the %s profile above its line cap', (profile, file, symbol) => {
-    const hardLines = FUNCTION_PROFILES[profile].lines[1];
-    const body = Array.from({ length: hardLines }, (_, index) => `const value${index} = ${index};`);
-    const returned = profile === 'react' ? 'return <div />;' : 'return value0;';
-    const report = createStructuralRiskReport({
-      files: [file],
-      getCurrentSource: () => `export function ${symbol}() {\n${body.join('\n')}\n${returned}\n}`,
-      getPreviousSource: () => null,
-    });
-    expect(report.functions[0]?.profile).toBe(profile);
-    expect(report.violations).toContainEqual(
-      expect.objectContaining({ rule: 'structural-function-risk', symbol })
-    );
-  });
+  ])(
+    'retains the %s line-cap metric as advisory without inventing an ownership defect',
+    (profile, file, symbol) => {
+      const hardLines = FUNCTION_PROFILES[profile].lines[1];
+      const body = Array.from(
+        { length: hardLines },
+        (_, index) => `const value${index} = ${index};`
+      );
+      const returned = profile === 'react' ? 'return <div />;' : 'return value0;';
+      const report = createStructuralRiskReport({
+        files: [file],
+        getCurrentSource: () => `export function ${symbol}() {\n${body.join('\n')}\n${returned}\n}`,
+        getPreviousSource: () => null,
+      });
+      expect(report.functions[0]?.profile).toBe(profile);
+      expect(report.violations).toEqual([]);
+      expect(report.advisories).toContainEqual(
+        expect.objectContaining({ rule: 'structural-function-risk', symbol, profile })
+      );
+    }
+  );
 });
 
 describe('structural file scoring', () => {

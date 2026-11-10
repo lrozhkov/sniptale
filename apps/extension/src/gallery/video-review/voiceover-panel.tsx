@@ -32,6 +32,7 @@ export function ReviewVoiceoverLayer(props: {
   return (
     <ReviewVoiceoverRecording
       isOpen={voiceover.recording}
+      requestCloseRef={voiceover.requestClose}
       opener={voiceover.opener}
       playhead={voiceover.takeStart ?? 0}
       onClose={voiceover.close}
@@ -49,6 +50,7 @@ export function ReviewVoiceoverLayer(props: {
  */
 export function ReviewVoiceoverRecording(props: {
   isOpen: boolean;
+  requestCloseRef?: import('react').RefObject<(() => void) | null>;
   opener?: import('react').RefObject<HTMLElement | null>;
   playhead: number;
   onClose(): void;
@@ -82,6 +84,14 @@ export function ReviewVoiceoverRecording(props: {
     },
     captureLimitSeconds: durationLimit.seconds,
   });
+  useLayoutEffect(() => {
+    const owner = props.requestCloseRef;
+    if (!owner || !props.isOpen) return;
+    owner.current = session.requestClose;
+    return () => {
+      owner.current = null;
+    };
+  }, [props.requestCloseRef, props.isOpen, session.requestClose]);
   const titleId = useId();
   const panel = useRef<HTMLElement>(null);
   const returnFocus = useRef<Element | null>(null);

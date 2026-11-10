@@ -1,4 +1,3 @@
-import { CursorFocusTimelineKeys } from '../../ui/cursor-focus-timeline-keys';
 import type { CursorFocusTimelineKey } from '../../features/video/project/cursor-focus-path/timeline';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone } from './controls';
@@ -90,7 +89,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   const retainedLanes = useRef<{ sourceId: string | undefined; lanes: number[] } | null>(null);
   const lanes = useMemo(
     () =>
-      [0, 1, 2].filter(
+      [0, 1].filter(
         (lane) =>
           layout.items.some((item) => item.lane === lane) ||
           (lane === 2 && (!!props.cursorFocusKeys?.length || props.cursorArchiveAvailable)) ||
@@ -106,8 +105,6 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
       ? { sourceId: props.sourceId, lanes }
       : null;
   }, [props.cursorArchiveAvailable, props.sourceId, lanes]);
-  const cursorRow = lanes.indexOf(2);
-  const cursorTop = Math.max(0, cursorRow) * ACTION_LANE_PITCH_PX;
   const height = Math.max(1, lanes.length) * ACTION_LANE_PITCH_PX - ACTION_LANE_GAP_PX;
   const eventRows = useMemo(
     () =>
@@ -182,27 +179,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
       data-ui="gallery.videoReview.historyStrip"
       className="relative overflow-hidden"
       style={{ height }}
-      onDoubleClick={(event) => {
-        if (cursorRow < 0 && lanes.length > 0 && event.target !== event.currentTarget) return;
-        const rect = event.currentTarget.getBoundingClientRect();
-        if ((cursorRow >= 0 && event.clientY - rect.top < cursorTop) || !props.onAddCursorFocusKey)
-          return;
-        event.preventDefault();
-        event.stopPropagation();
-        props.onAddCursorFocusKey(
-          Math.max(
-            0,
-            Math.min(
-              props.duration,
-              ((event.clientX - rect.left) * props.duration) / Math.max(1, props.width * props.zoom)
-            )
-          )
-        );
-      }}
     >
-      {cursorRow >= 0 || lanes.length === 0 ? (
-        <ReviewCursorKeyRow props={props} top={cursorTop} />
-      ) : null}
       {eventRows}
     </div>
   );
@@ -258,6 +235,7 @@ function ReviewHistoryCluster(props: {
   );
   return (
     <div
+      data-review-snap-priority="none"
       className={`absolute ${props.members.every((marker) => marker.eventType === 'typing') ? 'z-0' : 'z-10'}`}
       title={
         reviewActionLane(props.members[0]!) === 0
@@ -323,50 +301,6 @@ function ReviewHistoryCluster(props: {
   );
 }
 
-function ReviewCursorKeyRow({ props, top }: { props: TelemetryStripProps; top: number }) {
-  const coverage = useMemo(
-    () =>
-      new Map(
-        (props.cursorFocusKeys ?? [])
-          .filter((key) => (key.anchor === 'manual' || key.authored) && key.sourceCoverage)
-          .map((key) => [key.segmentId, key.sourceCoverage!])
-      ),
-    [props.cursorFocusKeys]
-  );
-  const ratio = Math.max(1, props.width * props.zoom) / Math.max(0.000001, props.duration);
-  const coverageNodes = useMemo(
-    () =>
-      [...coverage].map(([id, span]) => (
-        <span
-          key={id}
-          aria-hidden="true"
-          data-ui="cursorFocusPath.authoredCoverage"
-          className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-[var(--sniptale-color-border-soft)]"
-          style={{ left: span.start * ratio, width: Math.max(0, span.end - span.start) * ratio }}
-        />
-      )),
-    [coverage, ratio]
-  );
-  return props.onCursorFocusKey && props.onAddCursorFocusKey ? (
-    <CursorFocusTimelineKeys
-      top={top}
-      height={20}
-      keys={props.cursorFocusKeys ?? []}
-      {...(props.selectedCursorFocusId ? { selectedId: props.selectedCursorFocusId } : {})}
-      time={props.time}
-      duration={props.duration}
-      pixelsPerSecond={ratio}
-      onSelect={props.onCursorFocusKey}
-      playing={props.playing}
-      {...(props.onNavigateCursorFocus ? { onNavigate: props.onNavigateCursorFocus } : {})}
-      {...(props.onMoveCursorFocus ? { onMove: props.onMoveCursorFocus } : {})}
-      onAdd={props.onAddCursorFocusKey}
-    >
-      {coverageNodes}
-    </CursorFocusTimelineKeys>
-  ) : null;
-}
-
 const CURSOR_MOVEMENT_BACKGROUND =
   'linear-gradient(var(--sniptale-color-border-soft),var(--sniptale-color-border-soft)) center/100% 2px no-repeat';
 
@@ -422,6 +356,9 @@ function ReviewHistoryItem({
       key={`${marker.ref.kind}:${marker.ref.id}`}
       type="button"
       data-review-action-key={`telemetry:${marker.ref.kind}:${marker.ref.id}`}
+      data-review-snap-priority={cursorLine ? 'none' : 'history'}
+      data-review-snap-start={marker.start}
+      data-review-snap-end={marker.end}
       aria-pressed={selected}
       data-animated={animated ? 'true' : 'false'}
       aria-label={`${translate('gallery.videoReview.telemetry')} · ${description}`}

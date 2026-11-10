@@ -1,3 +1,4 @@
+import { resolveQuickEditActiveFocusRegions } from '../../features/video/review/advanced/focus-layout';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { ReviewButton, ReviewDetails } from './controls';
 import { ReviewPresentationBinding } from './presentation-binding';
@@ -83,6 +84,12 @@ export function ReviewAdvancedPanels(input: ReviewAdvancedPanelsProps) {
       ) : zoomRegion ? (
         <ReviewZoomInspector
           region={zoomRegion}
+          conflictSuppressed={
+            !zoomRegion.dormant &&
+            !resolveQuickEditActiveFocusRegions(args.advanced.zoom.regions).some(
+              (region) => region.id === zoomRegion.id
+            )
+          }
           cameraFollowDefaults={args.advanced.cameraFollowDefaults}
           cursorPath={args.cursorPath}
           cursorAvailable={args.cursorAvailable}
@@ -123,6 +130,7 @@ export function ReviewSceneProperties(props: {
   presentation?: ComponentProps<typeof ReviewPresentationBinding>;
   watermark?: Omit<ComponentProps<typeof WatermarkInspector>, 'Disclosure' | 'dataUi'>;
   windowHeader?: QuickEditAdvancedState['windowHeader'];
+  headerIdentity?: string | undefined;
   onWindowHeader?(header: QuickEditAdvancedState['windowHeader']): void;
   source: { width: number; height: number };
   audio: QuickEditAdvancedState['audio'];
@@ -172,6 +180,7 @@ export function ReviewSceneProperties(props: {
               icon: PanelTop,
               content: (
                 <ReviewWindowHeaderSettings
+                  identity={props.headerIdentity}
                   header={props.windowHeader}
                   onChange={props.onWindowHeader}
                 />

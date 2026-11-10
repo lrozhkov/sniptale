@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, LocateFixed, Merge, Scissors, Trash2 } from 'lucide-react';
 import { TextareaField } from '../../ui/compact-inspector-controls';
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
@@ -171,6 +171,37 @@ export function ReviewTextPhrase(props: {
       textarea.current?.scrollIntoView({ block: 'nearest' });
     }
   }, [props.focus, props.expanded, props.focusRevision]);
+  useLayoutEffect(() => {
+    const field = textarea.current;
+    const scroll = field?.closest<HTMLElement>('.review-inspector-scroll');
+    if (!field || !scroll || !props.expanded || props.documentView) return;
+    let frame = 0;
+    const resize = () => {
+      const rect = field.getBoundingClientRect();
+      const bottom = scroll.getBoundingClientRect().bottom;
+      const contentBottom = scroll.lastElementChild?.getBoundingClientRect().bottom ?? rect.bottom;
+      const following = Math.max(0, contentBottom - rect.bottom);
+      const budget = Math.max(128, bottom - rect.top - following - 12);
+      field.style.height = '0px';
+      const content = field.scrollHeight + 2;
+      const height = Math.max(128, Math.min(content, budget));
+      field.style.height = `${height}px`;
+      field.style.overflowY = content > height + 1 ? 'auto' : 'hidden';
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(resize);
+    };
+    resize();
+    const observer = new ResizeObserver(schedule);
+    observer.observe(scroll);
+    window.addEventListener('resize', schedule);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [props.expanded, props.documentView, fragment.id, fragment.text]);
   if (props.visible === false && !props.expanded) return null;
   return (
     <article

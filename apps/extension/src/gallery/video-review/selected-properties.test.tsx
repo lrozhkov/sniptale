@@ -183,7 +183,10 @@ function mount(transition?: CompositionJoinSettings) {
   );
   const props = {
     selection: { kind: 'edit', id: edit.id },
-    advanced: { ui: { mode: 'advanced' } },
+    advanced: {
+      ...createQuickEditAdvancedState(),
+      ui: { ...createQuickEditAdvancedState().ui, mode: 'advanced' },
+    },
     editing: {
       selected: edit,
       exporter: { phase: 'idle', index: null },

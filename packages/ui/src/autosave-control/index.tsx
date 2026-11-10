@@ -31,7 +31,7 @@ function useSavingIndicator(saving: boolean) {
   useEffect(() => {
     setSpinning(false);
     if (!saving) return;
-    const timer = window.setTimeout(() => setSpinning(true), 350);
+    const timer = window.setTimeout(() => setSpinning(true), 300);
     return () => window.clearTimeout(timer);
   }, [saving]);
   return saving && spinning;
@@ -47,8 +47,8 @@ function statusPresentation(props: AutosaveControlProps, spinning: boolean) {
   if (props.state === 'saving') {
     return {
       label: props.labels.saving,
-      Icon: CloudSync,
-      tone: spinning ? ('sync' as const) : ('neutral' as const),
+      Icon: spinning ? CloudSync : CloudCheck,
+      tone: spinning ? ('sync' as const) : ('success' as const),
     };
   }
   return { label: props.labels[props.state], Icon: CloudCheck, tone: 'success' as const };

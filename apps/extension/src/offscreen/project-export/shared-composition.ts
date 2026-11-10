@@ -6,20 +6,11 @@ import { createNativeCompositionMaterializer } from '../../workflows/video/nativ
 import { resolveProjectExportRange } from '../../features/video/project/export/range';
 import { parseEnhancementMode } from '../../features/video/composition/export-enhancement/mode';
 import { loadBlobForAsset } from './media-loading/blob';
-import type { ProjectCompositionSceneInput } from './composition-scene';
-import type { ProjectExportRuntimeState } from './types';
+import type { SharedProjectCompositionInput, SharedProjectExportComposition } from './types';
 
-type Input = ProjectCompositionSceneInput & {
-  job: ProjectCompositionSceneInput['job'] & Pick<ProjectExportRuntimeState, 'sharedComposition'>;
-};
+type Input = SharedProjectCompositionInput;
 
 /** Export owns mandatory frame order and admission; the common materializer builds the image. */
-export interface SharedProjectExportComposition {
-  readonly project: Input['project'];
-  readonly settings: Input['settings'];
-  render(input: Input): Promise<void>;
-  dispose(): void;
-}
 
 /** Enhanced sources retain their existing route until their shared GPU adapter is admitted. */
 export async function renderSharedProjectComposition(input: Input): Promise<boolean> {

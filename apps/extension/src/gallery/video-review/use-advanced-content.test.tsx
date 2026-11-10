@@ -272,3 +272,39 @@ it('retries an older failed capture before a later closed command group', async 
   expect(content.saveFailed).toBe(false);
   expect(commit).toHaveBeenCalledTimes(3);
 });
+
+it('persists cursor motion visibility with the path and preserves unrelated content', async () => {
+  const { session, commit } = setup();
+  const motion = {
+    id: 'motion',
+    start: 0,
+    end: 3,
+    enabled: true,
+    shape: 'arrow' as const,
+    size: 48,
+    color: '#000000',
+    outline: '#ffffff',
+    shadow: true,
+    easing: 'smooth' as const,
+    points: [
+      { id: 'a', at: 0, x: 0.2, y: 0.3 },
+      { id: 'b', at: 1, x: 0.8, y: 0.6 },
+    ],
+  };
+  act(() => content.commands.setCursorMotions([motion]));
+  await act(async () => content.flush());
+  act(() => content.commands.setCursorMotionEnabled(false));
+  await act(async () => content.flush());
+  expect(content.content.cursorMotionEnabled).toBe(false);
+  expect(content.content.cursorMotions).toEqual([motion]);
+  expect(commit.mock.calls[1]?.[0].operation).toMatchObject({
+    before: { cursorMotions: [motion] },
+    after: { cursorMotionEnabled: false, cursorMotions: [motion] },
+  });
+  const snapshot = session.getSnapshot();
+  expect(snapshot.document.advancedContent.audio.original).toEqual({ muted: false, volume: 1 });
+  act(() => content.commands.setCursorMotionEnabled(true));
+  await act(async () => content.flush());
+  expect(content.content.cursorMotions).toEqual([motion]);
+  expect(content.content.cursorMotionEnabled).toBe(true);
+});

@@ -1,8 +1,10 @@
+import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import {
   packQuickEditFocusRows,
+  resolveQuickEditActiveFocusRegions,
   quickEditFocusType,
   resolveQuickEditFocusLink,
 } from '../../features/video/review/advanced/focus-layout';
@@ -100,6 +102,7 @@ function zoomDragRange(args: {
   region: QuickEditZoomRegion;
   duration: number;
   widthPx: number;
+  snap?: ReviewTimelineSnap | undefined;
   bypass: boolean;
   /** Result-time candidates: projected edit/boundary edges plus the playhead. */
   snapEdges: readonly number[];
@@ -107,6 +110,7 @@ function zoomDragRange(args: {
   projection?: FocusAxis | undefined;
 }): { start: number; end: number; guide: number | null } {
   const { region, duration } = args;
+  const snap = args.snap ?? snapTimelineTime;
   const threshold = args.bypass ? 0 : (SNAP_THRESHOLD_PX * duration) / args.widthPx;
   const candidates = args.bypass
     ? []
@@ -118,8 +122,8 @@ function zoomDragRange(args: {
       });
   if (args.edge === 'move') {
     const freeStart = Math.max(0, Math.min(duration - args.length, region.start + args.delta));
-    const snappedStart = snapTimelineTime(freeStart, candidates, threshold);
-    const snappedEnd = snapTimelineTime(freeStart + args.length, candidates, threshold);
+    const snappedStart = snap(freeStart, candidates, threshold);
+    const snappedEnd = snap(freeStart + args.length, candidates, threshold);
     const startDistance =
       snappedStart.candidate === null ? Infinity : Math.abs(snappedStart.time - freeStart);
     const endDistance =
@@ -142,18 +146,18 @@ function zoomDragRange(args: {
   }
   if (args.edge === 'start') {
     const requested = region.start + args.delta;
-    const snap = snapTimelineTime(requested, candidates, threshold);
+    const snapped = snap(requested, candidates, threshold);
     const range = trimQuickEditZoomRegion({
       regions: args.regions,
       id: region.id,
       edge: 'start',
-      time: Math.min(snap.time, region.end - zoomTrimMinimum(args, 'start')),
+      time: Math.min(snapped.time, region.end - zoomTrimMinimum(args, 'start')),
       timelineDuration: duration,
     });
-    return { ...range, guide: snap.candidate === range.start ? snap.candidate : null };
+    return { ...range, guide: snapped.candidate === range.start ? snapped.candidate : null };
   }
   const requestedEnd = region.end + args.delta;
-  const snapEnd = snapTimelineTime(requestedEnd, candidates, threshold);
+  const snapEnd = snap(requestedEnd, candidates, threshold);
   const rangeEnd = trimQuickEditZoomRegion({
     regions: args.regions,
     id: region.id,
@@ -193,6 +197,7 @@ function zoomTrimMinimum(
 /** Camera stays on row zero; overlapping overlays pack from their current source ranges. */
 export function ReviewZoomTrack(props: ZoomTrackProps) {
   const sourceDuration = props.projection?.duration ?? props.duration;
+  const snap = useReviewTimelineSnap();
   const [guide, setGuide] = useState<number | null>(null);
   const [preview, setPreview] = useState<(FocusRange & { id: string }) | null>(null);
   const drag = useRef<ZoomDragState | null>(null);
@@ -219,6 +224,8 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : region;
   const shownRegions = props.regions.map((region) => ({ ...region, ...shownRange(region) }));
+  const activeRegions = resolveQuickEditActiveFocusRegions(shownRegions);
+  const activeIds = new Set(activeRegions.map((region) => region.id));
   const rows = packQuickEditFocusRows(shownRegions);
   const rowCount = Math.max(1, ...Array.from(rows.values(), (row) => row + 1));
   const { edits, time, toOutputTime, duration } = props;
@@ -263,7 +270,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
         style={{ height: rowCount * reviewTrackMetrics(props.compact).step }}
       >
         {shownRegions
-          .filter((region) => !region.dormant)
+          .filter((region) => activeIds.has(region.id))
           .map((region) => (
             <ReviewZoomGapLink
               key={`link:${region.id}`}
@@ -272,7 +279,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
               linkSelectedId={props.linkSelectedId}
               row={rows.get(region.id) ?? 0}
               compact={props.compact}
-              next={nextFocusLink(shownRegions, region)}
+              next={nextFocusLink(activeRegions, region)}
               projection={props.projection}
               region={region}
               onLink={props.onLink}
@@ -291,8 +298,10 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
             })}
             row={rows.get(region.id) ?? 0}
             region={region}
+            snap={snap}
             range={shownRange(region)}
             selected={props.selectedId === region.id}
+            conflict={!region.dormant && !activeIds.has(region.id)}
             drag={drag}
             onPreview={(value) => setPreview(value && { id: region.id, ...value })}
             onGuide={setGuide}
@@ -423,6 +432,7 @@ function reviewZoomBlockPresentation(
   props: ZoomTrackProps & {
     region: QuickEditZoomRegion;
     range: FocusRange;
+    snap?: ReviewTimelineSnap | undefined;
   }
 ) {
   const { region, range, projection, duration } = props;
@@ -466,6 +476,7 @@ function projectFocusDrag(
     region: QuickEditZoomRegion;
     snapEdges: readonly number[];
     sourceSnapEdges: readonly number[];
+    snap?: ReviewTimelineSnap | undefined;
   },
   current: ZoomDragState,
   pixels: number,
@@ -484,6 +495,7 @@ function projectFocusDrag(
   const region = anchored(props.region);
   const next = zoomDragRange({
     edge: current.edge,
+    snap: props.snap,
     delta:
       axis?.delta(current.sourceAtPointer, pixels, current.width) ??
       (pixels / current.width) * props.duration,
@@ -516,7 +528,9 @@ function ReviewZoomRegionBlock(
     row: number;
     region: QuickEditZoomRegion;
     range: FocusRange;
+    snap?: ReviewTimelineSnap | undefined;
     selected: boolean;
+    conflict: boolean;
     drag: React.RefObject<ZoomDragState | null>;
     snapEdges: readonly number[];
     sourceSnapEdges: readonly number[];
@@ -567,8 +581,19 @@ function ReviewZoomRegionBlock(
   return (
     <div
       role="button"
+      data-focus-conflict={props.conflict ? 'true' : undefined}
       data-cut-suppressed={cutOverlap ? 'true' : 'false'}
       data-review-removal-key={`focus:${region.id}`}
+      data-review-snap-start={
+        props.range.sourceAnchor?.start ??
+        props.projection?.source(props.range.start) ??
+        props.range.start
+      }
+      data-review-snap-end={
+        props.range.sourceAnchor?.end ??
+        props.projection?.source(props.range.end, 'end') ??
+        props.range.end
+      }
       tabIndex={0}
       aria-label={label}
       title={`${label}${region.spotlight || region.border ? '' : ` · ${scaleLabel}`}`}

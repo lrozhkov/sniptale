@@ -1,3 +1,4 @@
+import { withCursorMotionPath } from '../../project/cursor-motion';
 import { reviewTrackEnabled } from './track-controls';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
 import { windowHeaderGeometry } from '@sniptale/runtime-contracts/window-header';
@@ -109,6 +110,7 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   text: QuickEditAdvancedState['text'];
   presentation: QuickEditAdvancedState['presentation'];
   annotationEffects: QuickEditAdvancedState['annotationEffects'];
+  cursorMotions?: QuickEditAdvancedState['cursorMotions'];
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -138,6 +140,10 @@ export function resolveQuickEditEffectiveState(
   const features = resolveQuickEditEffectiveFeatures(state);
   return {
     ...features,
+    cursorMotions:
+      advanced && state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+        ? state.cursorMotions
+        : undefined,
     zoomRegions: resolveCursorRegions(state, features, cursorFacts),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
@@ -187,6 +193,10 @@ function resolveCursorRegions(
     );
   const key = JSON.stringify({
     needsCursor,
+    cursorMotions:
+      state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+        ? state.cursorMotions
+        : undefined,
     defaults: state.cameraFollowDefaults,
     applied: features.zoomApplied,
     path: state.cursorFocusPath,
@@ -221,6 +231,10 @@ function resolveCursorRegions(
     needsCursor,
     source: cursorFacts?.source,
     segments: state.cursorFocusPath?.segments,
+    cursorMotions:
+      state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+        ? state.cursorMotions
+        : undefined,
   });
   const paths =
     previous?.paths ??
@@ -246,16 +260,31 @@ function createCursorPaths(
   needsCursor: boolean,
   key: string
 ) {
-  const cursorPath = needsCursor
+  const basePath = needsCursor
     ? cursorFacts
       ? resolveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, state.cursorFocusPath)
       : state.cursorFocusPath
     : undefined;
+  const cursorPath = withCursorMotionPath(
+    basePath,
+    state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+      ? state.cursorMotions
+      : undefined
+  );
   const observed =
     cursorFacts && cursorPath
       ? deriveReviewCursorFocusPath(cursorFacts.facts, cursorFacts.source, true)
       : undefined;
-  return { key, cursorPath, observed };
+  return {
+    key,
+    cursorPath,
+    observed: withCursorMotionPath(
+      observed,
+      state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
+        ? state.cursorMotions
+        : undefined
+    ),
+  };
 }
 
 /** A neighboring overlay edit does not replace native facts or unchanged camera plan receivers. */
@@ -328,6 +357,7 @@ export type QuickEditExportReason =
   | 'webcam'
   | 'watermark'
   | 'captions'
+  | 'cursor-motion'
   | 'annotation-effects'
   | 'caption-layout'
   | 'camera-follow'
@@ -427,6 +457,7 @@ export function resolveQuickEditExportPlan(args: {
   if (effective.webcam) visual.push('webcam');
   if (features.watermarkApplied) visual.push('watermark');
   if (features.captionsApplied) visual.push('captions');
+  if (effective.cursorMotions?.some((m) => m.enabled)) visual.push('cursor-motion');
   if (features.annotationEffectsApplied) visual.push('annotation-effects');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (features.backgroundApplied) visual.push('background');
@@ -468,6 +499,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     !!state.keyAnimations?.some((item) => item.enabled) ||
     !!state.clickAnimations?.some((item) => item.effect !== 'off') ||
     !!state.actionAudio?.some((item) => item.enabled && item.presetId && item.volume > 0) ||
+    !!state.cursorMotions?.length ||
     !!state.canvas ||
     !!state.windowHeader ||
     !!state.webcam?.enabled ||

@@ -68,7 +68,7 @@ export function reviewKeySections(props: {
         onClick={() => props.onChange(null)}
       >
         <RotateCcw size={15} aria-hidden="true" />
-        {translate('gallery.videoReview.keyReset')}
+        <span>{translate('gallery.videoReview.keyReset')}</span>
       </ReviewButton>
     )
   );

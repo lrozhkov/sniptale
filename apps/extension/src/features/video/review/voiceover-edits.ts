@@ -62,8 +62,14 @@ export function anchorReviewVoiceover(
     const end = Math.min(clip.timelineStart + clip.duration / tempo, segment.resultEnd);
     if (end <= start) continue;
     anchors.push({
-      start: segment.sourceStart + (start - segment.resultStart) * segment.rate,
-      end: segment.sourceStart + (end - segment.resultStart) * segment.rate,
+      start:
+        start === segment.resultStart
+          ? segment.sourceStart
+          : segment.sourceStart + (start - segment.resultStart) * segment.rate,
+      end:
+        end === segment.resultEnd
+          ? segment.sourceEnd
+          : segment.sourceStart + (end - segment.resultStart) * segment.rate,
       offset: (start - clip.timelineStart) * tempo,
       duration: (end - start) * tempo,
     });

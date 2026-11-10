@@ -1,3 +1,4 @@
+import type { PreparedPreviewSceneCanvas } from './types';
 import type { CameraOutputViewport } from '../../../features/video/project/export/output-dimensions';
 import type { PreviewSceneSourceFrames } from './source-frames';
 import type { VideoCompositionMediaSource } from '../../../features/video/composition/draw/media-source';
@@ -30,7 +31,6 @@ import {
   beginPreviewCameraPass,
   beginPreviewViewportClip,
   resolvePreparedPreviewSceneCanvas,
-  type PreparedPreviewSceneCanvas,
 } from './canvas';
 import { drawPreviewTransitionOverlays, resolvePreviewEffectDrawState } from './render-effects';
 import { resolvePreviewPassTarget } from './render-pass-target';

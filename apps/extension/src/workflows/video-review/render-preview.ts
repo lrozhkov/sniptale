@@ -657,6 +657,7 @@ async function drawPreparedCanvasFrame(
           .map((comment) =>
             scene.showEditorComments ? { ...comment, renderToVideo: true } : comment
           ),
+        cursorMotions: scene.cursorMotions,
         sourceTime: frame.sourceTime,
         currentTime: frame.resultTime,
         cameraScale: request.camera.scale,

@@ -26,6 +26,7 @@ export function useReviewVoiceoverRecording(args: {
   onOpenChange?(open: boolean): void;
 }) {
   const [recording, setRecording] = useState(false);
+  const requestClose = useRef<(() => void) | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const [takeStart, setTakeStart] = useState<number | null>(null);
   const takeSegments = useRef(args.segments);
@@ -37,6 +38,7 @@ export function useReviewVoiceoverRecording(args: {
     video: args.video,
     opener,
     recording,
+    requestClose,
     takeStart,
     open: () => {
       if (!args.guard()) return;

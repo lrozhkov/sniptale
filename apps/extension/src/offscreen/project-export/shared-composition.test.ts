@@ -4,7 +4,7 @@ import { createVideoProjectCaptionRenderer } from '../../workflows/video-review/
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import { VideoExportFormat, VideoExportQualityPreset } from '../../features/video/project/types';
-import type { ProjectCompositionSceneInput } from './composition-scene';
+import type { ProjectCompositionSceneInput } from './types';
 import type { ProjectExportRuntimeState } from './types';
 import { renderSharedProjectComposition } from './shared-composition';
 import { createNativeCompositionMaterializer } from '../../workflows/video/native-composition/materializer';

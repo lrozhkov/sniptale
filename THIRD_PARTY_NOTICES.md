@@ -30,6 +30,29 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 
 The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by the font license.
 
+## Apple Cursor artwork
+
+- Attribution: ful1e5 and Apple Cursor contributors
+- Source: https://github.com/ful1e5/apple_cursor/tree/fe044a42b4e9cea16ea762d2ed9004f6d7b35543
+- License: `GPL-3.0-only`
+- License text: [`apps/extension/src/features/video/project/cursor-motion/apple/LICENSE`](apps/extension/src/features/video/project/cursor-motion/apple/LICENSE)
+- License SHA-256: `b506d1619aaec697f71d1230af32190c46777bf541e68f0fa6bf54d48f72c935`
+- Notice text: [`apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt`](apps/extension/src/features/video/project/cursor-motion/apple/NOTICE.txt)
+- Notice SHA-256: `252d495836fccc8ccca2037c38356c27b73242962a332dca6a0b32bbf8a91fb6`
+- Provenance record: [`apps/extension/src/features/video/project/cursor-motion/apple/identity.json`](apps/extension/src/features/video/project/cursor-motion/apple/identity.json)
+- Provenance SHA-256: `da5facca6df3558e5a9d9c18e55089f5923ebe4e8ff3ef62aebe40e94eed50a8`
+- Local changes: Extract SVG path attributes and hotspots into apple-shapes.json. Apply runtime fill, outline, scale and shadow. The generated artifact source hash identifies the source set in identity.json.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/src/features/video/project/cursor-motion/apple-shapes.json` | https://github.com/ful1e5/apple_cursor/tree/fe044a42b4e9cea16ea762d2ed9004f6d7b35543 | `f307941ba096017f0b6a62b7bfcff94d1f3171e5376415aed934ee29d0ff2237` | `d3180d9ecfc0471a9f3bb281a34f3befcadf5b15f63e2d95ff3107fc87f15f3e` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/crosshair.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/crosshair.svg | `dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5` | `dd41110cc30dd228f59e5acdcd091a5c01454d9ca86d574dcc1896197ef514c5` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/hand1.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/hand1.svg | `dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b` | `dcb385764c2414870d1216f4c937bb21ff853a0a2e4519cc98913b622b0eb76b` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/hand2.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/hand2.svg | `1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab` | `1059f09b64ebe72946523d625fe1c4802ce1523f39c9519fb4620c66972bf5ab` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/left_ptr.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/left_ptr.svg | `1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682` | `1ed0122e8247c483374ebb0ab42895a890eebe0fb0c99824e3b56359f40be682` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/x.build.toml` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/configs/x.build.toml | `a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997` | `a1995c40a5621b3f5eeea016784f0aee0643632fae8bb2a4ef2a5e0b967fd997` |
+| `apps/extension/src/features/video/project/cursor-motion/apple/xterm.svg` | https://github.com/ful1e5/apple_cursor/blob/fe044a42b4e9cea16ea762d2ed9004f6d7b35543/svg/xterm.svg | `81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e` | `81ccdbbbd3d3b9a65678b37096e2d12b93d7b3cbbfd1719ebb759a2c322c475e` |
+
 ## Clark Realtime UI Video Upscaler x2
 
 - Attribution: Clark Labs

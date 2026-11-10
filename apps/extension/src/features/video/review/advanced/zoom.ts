@@ -12,6 +12,7 @@ import {
 import {
   quickEditFocusType,
   quickEditFocusConflicts,
+  resolveQuickEditActiveFocusRegions,
   resolveQuickEditFocusLink,
 } from './focus-layout';
 import type {
@@ -206,7 +207,7 @@ export function resolveQuickEditZoomLink(
   regions: readonly QuickEditZoomRegion[],
   id: string
 ): { source: QuickEditZoomRegion; target: QuickEditZoomRegion } | null {
-  return resolveQuickEditFocusLink(regions, id);
+  return resolveQuickEditFocusLink(resolveQuickEditActiveFocusRegions(regions), id);
 }
 
 /**
@@ -225,6 +226,8 @@ export function clampQuickEditZoomRegion(
       (region) =>
         region.id === id ||
         (selected &&
+          !selected.overlapPolicy &&
+          !region.overlapPolicy &&
           quickEditFocusType(selected) === 'zoom' &&
           quickEditFocusType(region) === 'zoom' &&
           !region.dormant)
@@ -263,7 +266,7 @@ export function availableQuickEditZoomRange(args: {
   type?: 'zoom' | 'spotlight' | 'border';
 }): { start: number; end: number } | null {
   const preferredLength = args.preferredLength ?? DEFAULT_REGION_SECONDS;
-  const active = args.regions
+  const active = resolveQuickEditActiveFocusRegions(args.regions)
     .filter(
       (region) =>
         !region.dormant && (args.type ?? 'zoom') === 'zoom' && quickEditFocusType(region) === 'zoom'
@@ -348,6 +351,8 @@ function activeQuickEditZoomWindow(regions: readonly QuickEditZoomRegion[], id: 
       (region) =>
         region.id === id ||
         (!region.dormant &&
+          !region.overlapPolicy &&
+          !selected?.overlapPolicy &&
           selected &&
           quickEditFocusType(selected) === 'zoom' &&
           quickEditFocusType(region) === 'zoom')

@@ -1,3 +1,6 @@
+import type { ReviewCursorMotionEditor } from './cursor-motion-editor';
+import { ReviewCursorMotionTrack, ReviewCursorMotionAdd } from './cursor-motion-editor';
+import { ReviewTimelineMagnets } from './timeline-magnets';
 import { useFocusPlacement } from './focus-placement';
 import type { ReviewFocusType } from './zoom-editor';
 import { ReviewModeControl } from './review-toolbar';
@@ -60,6 +63,7 @@ type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
 type TimelineBindingProps = {
+  cursorMotion?: ReviewCursorMotionEditor;
   onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
   cursorArchiveAvailable?: boolean | undefined;
   navigationRevision?: number | undefined;
@@ -74,6 +78,7 @@ type TimelineBindingProps = {
   selectedTextId?: string | undefined;
   onOpenText?(): void;
   onOpenProject?(): void;
+  onOpenTrack?(track: QuickEditTrack): void;
   onTrackChange?: ((track: QuickEditTrack) => void) | undefined;
   onToggleCaptions?(): void;
   onSelectText?(id: string): void;
@@ -275,195 +280,210 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     onOpenAudio: props.onOpenMusic,
   });
   return (
-    <ReviewTrackControlsProvider
-      value={{
-        ui: props.advanced.ui,
-        selectedTrack,
-        selectable,
-        selectTrack,
-        focusItemTrack,
-        order: trackOrder,
-        configuring: configurationVisible,
-        busy: blocked,
-        unavailable: {
-          webcam: !props.webcam?.available,
-          originalAudio:
-            props.editing.exporter.index !== null && !props.editing.exporter.index.audioCodec,
-        },
-        setEnabled: trackCommands.setEnabled,
-      }}
-    >
-      <ReviewTimeline
-        onHistoryRange={props.onHistoryRange}
-        cursorArchiveAvailable={props.cursorArchiveAvailable}
-        trackOrder={trackOrder.order}
-        actionsTrackVisible={configurationVisible || features.actionsTrackVisible}
-        sourceId={props.annotationSourceId}
-        snapTimes={reviewLoopSnapTimes(props)}
-        annotationTool={annotation.tool.active}
-        annotationDrawing={annotation.drawing}
-        annotationEffectsTrack={
-          features.mode === 'advanced' && props.annotationEffects ? (
-            <ReviewAnnotationLane
-              sourceId={props.annotationSourceId}
-              tool={annotation.tool.value}
-              editor={props.annotationEffects}
-              advanced={props.advanced}
-              snapshots={props.effectSnapshots ?? []}
-              duration={props.source.duration}
-              time={props.time}
+    <ReviewTimelineMagnets>
+      <ReviewTrackControlsProvider
+        value={{
+          ui: props.advanced.ui,
+          selectedTrack,
+          selectable,
+          selectTrack,
+          focusItemTrack,
+          order: trackOrder,
+          configuring: configurationVisible,
+          busy: blocked,
+          unavailable: {
+            webcam: !props.webcam?.available,
+            originalAudio:
+              props.editing.exporter.index !== null && !props.editing.exporter.index.audioCodec,
+          },
+          setEnabled: trackCommands.setEnabled,
+        }}
+      >
+        <ReviewTimeline
+          onHistoryRange={props.onHistoryRange}
+          cursorArchiveAvailable={props.cursorArchiveAvailable}
+          trackOrder={trackOrder.order}
+          cursorMotionTrack={
+            features.mode === 'advanced' && props.cursorMotion ? (
+              <ReviewCursorMotionTrack
+                editor={props.cursorMotion}
+                busy={blocked}
+                projection={projection}
+              />
+            ) : null
+          }
+          actionsTrackVisible={configurationVisible || features.actionsTrackVisible}
+          sourceId={props.annotationSourceId}
+          snapTimes={reviewLoopSnapTimes(props)}
+          annotationTool={annotation.tool.active}
+          annotationDrawing={annotation.drawing}
+          annotationEffectsTrack={
+            features.mode === 'advanced' && props.annotationEffects ? (
+              <ReviewAnnotationLane
+                sourceId={props.annotationSourceId}
+                tool={annotation.tool.value}
+                editor={props.annotationEffects}
+                advanced={props.advanced}
+                snapshots={props.effectSnapshots ?? []}
+                duration={props.source.duration}
+                time={props.time}
+                busy={blocked}
+                compact={compact}
+                projection={projection}
+                selectedId={props.selectedAnnotationEffectId ?? null}
+                snapTimes={[
+                  ...props.edits.flatMap((edit) => [edit.start, edit.end]),
+                  ...reviewLoopSnapTimes(props),
+                ]}
+                beforeAction={props.beforeAction}
+                drawing={annotation.drawing}
+                onPlace={annotation.place}
+                onSelect={props.onSelectAnnotationEffect}
+              />
+            ) : null
+          }
+          textTrack={
+            <ReviewTextLane
+              compact={compact}
+              editor={props.text}
+              mode={features.mode}
               busy={blocked}
-              compact={compact}
-              projection={projection}
-              selectedId={props.selectedAnnotationEffectId ?? null}
-              snapTimes={[
-                ...props.edits.flatMap((edit) => [edit.start, edit.end]),
-                ...reviewLoopSnapTimes(props),
-              ]}
+              selectedId={props.selectedTextId}
               beforeAction={props.beforeAction}
-              drawing={annotation.drawing}
-              onPlace={annotation.place}
-              onSelect={props.onSelectAnnotationEffect}
+              onOpen={props.onOpenText}
+              onToggleCaptions={props.onToggleCaptions}
+              onSelect={props.onSelectText}
             />
-          ) : null
-        }
-        textTrack={
-          <ReviewTextLane
-            compact={compact}
-            editor={props.text}
-            mode={features.mode}
-            busy={blocked}
-            selectedId={props.selectedTextId}
-            beforeAction={props.beforeAction}
-            onOpen={props.onOpenText}
-            onToggleCaptions={props.onToggleCaptions}
-            onSelect={props.onSelectText}
-          />
-        }
-        fillHeight={props.fillHeight}
-        sourceCompact={compact}
-        playbackRange={props.playbackRange}
-        onPlaybackRange={props.onPlaybackRange}
-        sourceRangeTool={!!props.editing.mode}
-        sourceRangeKind={props.editing.mode ?? undefined}
-        placementHints={reviewCursorPlacementHints(props, focus.tool.hint)}
-        zoomAnchor={props.zoomAnchor}
-        beforeAction={props.beforeAction}
-        onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}
-        exportActive={props.exportActive}
-        historyControls={props.historyControls}
-        utilityControls={props.utilityControls}
-        inspectorControls={props.inspectorControls}
-        modeControl={
-          <ReviewModeControl
-            advanced={props.advanced}
-            busy={blocked}
-            setMode={(mode) =>
-              (props.beforeAction ?? ((action) => action()))(() => props.setMode(mode))
-            }
-          />
-        }
-        expandedTools={props.editing.mode === 'speed'}
-        busy={blocked}
-        duration={props.source.duration}
-        tools={
-          <ReviewTimelineToolsBinding
-            {...props}
-            selectedTrack={selectedTrack}
-            trackHasActions={selectable[selectedTrack]}
-            trackTools={
-              ['text', 'voiceover', 'music'].includes(selectedTrack) ? creation.tools : undefined
-            }
-            focusTool={{
-              ...focus.tool,
-              onToggle: (type) => {
-                annotation.clear();
-                focus.tool.onToggle(type);
-              },
-            }}
-            clearFocusTool={focus.clear}
-            clearAnnotationTool={annotation.clear}
-            {...(props.annotationEffects && props.source.width && props.source.height
-              ? { annotationTool: annotation.tool }
-              : {})}
-          />
-        }
-        onFocusRangeCommit={focus.tool.active ? focus.commit : undefined}
-        onFocusRangePreview={focus.setPreview}
-        originalRangeTool={props.audio.originalTool}
-        snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
-        trackControls={
-          <ReviewTimelineTrackControls
-            settings={{ active: configuring, toggle: () => setConfiguring((value) => !value) }}
-            props={props}
-            webcamVisible={features.webcamTrackVisible}
-            density={{ compact, onToggle: () => setCompact((value) => !value) }}
-          />
-        }
-        webcamTrack={
-          features.mode === 'advanced' && props.webcam ? (
-            <ReviewWebcamTrack
-              compact={compact}
-              editor={props.webcam}
-              projection={projection}
-              beforeAction={props.beforeAction}
-            />
-          ) : null
-        }
-
-        zoomTrack={
-          features.mode === 'advanced' ? (
-            <ReviewZoomLane
-              compact={compact}
-              beforeAction={props.beforeAction}
-              projection={projection}
-              sourceSelection={focus.tool.active ? (focus.preview ?? undefined) : undefined}
+          }
+          fillHeight={props.fillHeight}
+          sourceCompact={compact}
+          playbackRange={props.playbackRange}
+          onPlaybackRange={props.onPlaybackRange}
+          sourceRangeTool={!!props.editing.mode}
+          sourceRangeKind={props.editing.mode ?? undefined}
+          placementHints={reviewCursorPlacementHints(props, focus.tool.hint)}
+          zoomAnchor={props.zoomAnchor}
+          beforeAction={props.beforeAction}
+          onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}
+          exportActive={props.exportActive}
+          historyControls={props.historyControls}
+          utilityControls={props.utilityControls}
+          inspectorControls={props.inspectorControls}
+          modeControl={
+            <ReviewModeControl
               advanced={props.advanced}
-              resultDuration={props.resultDuration}
-              outputTime={props.outputTime}
-              edits={props.edits}
-              snapTimes={reviewLoopSnapTimes(props)}
-              zoom={props.zoom}
-              toOutputTime={props.toOutputTime}
+              busy={blocked}
+              setMode={(mode) =>
+                (props.beforeAction ?? ((action) => action()))(() => props.setMode(mode))
+              }
             />
-          ) : undefined
-        }
-        {...(props.advanced.ui.mode !== 'advanced' && props.editing.exporter.index
-          ? { boundaries: props.editing.exporter.index.boundaries }
-          : {})}
-        {...reviewTimelineAudioTrack(props, features, projection, compact)}
-        onTextRangeCommit={creation.active ? creation.commitText : undefined}
-        onTrackRangeCommit={(range) => {
-          props.onPlaybackRange?.(range);
-          props.onSeek(range.start);
-        }}
-        onRangeCommit={(range) => {
-          if (props.editing.mode) void props.editing.commitRange(range);
-        }}
-        onChangeEdit={async (edit, range) => {
-          await props.editing.commitRange(range, edit);
-        }}
-        time={props.time}
-        playing={props.playing}
-        navigationRevision={props.navigationRevision}
-        selection={reviewTimelineSourceSelection(props)}
-        edits={props.edits}
-        onEdit={props.editing.select}
-        selectedEditId={props.editing.selected?.id}
-        annotations={props.annotations}
-        {...reviewTimelineHistoryBinding(props)}
-        onSeek={props.onSeek}
-        onSelect={(range) => {
-          props.audio.setOriginalRangeSelected(false);
-          props.setSelection(range);
-        }}
-        onPlay={props.onPlay}
-        onClearSelection={props.onClearSelection}
-        onComment={(note) =>
-          (props.beforeAction ?? ((action) => action()))(() => props.onComment(note))
-        }
-      />
-    </ReviewTrackControlsProvider>
+          }
+          expandedTools={props.editing.mode === 'speed'}
+          busy={blocked}
+          duration={props.source.duration}
+          tools={
+            <ReviewTimelineToolsBinding
+              {...props}
+              selectedTrack={selectedTrack}
+              trackHasActions={selectable[selectedTrack]}
+              trackTools={
+                selectedTrack === 'cursorMotion' && props.cursorMotion ? (
+                  <ReviewCursorMotionAdd editor={props.cursorMotion} busy={blocked} />
+                ) : ['text', 'voiceover', 'music'].includes(selectedTrack) ? (
+                  creation.tools
+                ) : undefined
+              }
+              focusTool={{
+                ...focus.tool,
+                onToggle: (type) => {
+                  annotation.clear();
+                  focus.tool.onToggle(type);
+                },
+              }}
+              clearFocusTool={focus.clear}
+              clearAnnotationTool={annotation.clear}
+              {...(props.annotationEffects && props.source.width && props.source.height
+                ? { annotationTool: annotation.tool }
+                : {})}
+            />
+          }
+          onFocusRangeCommit={focus.tool.active ? focus.commit : undefined}
+          onFocusRangePreview={focus.setPreview}
+          originalRangeTool={props.audio.originalTool}
+          snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
+          trackControls={
+            <ReviewTimelineTrackControls
+              settings={{ active: configuring, toggle: () => setConfiguring((value) => !value) }}
+              props={props}
+              webcamVisible={features.webcamTrackVisible}
+              density={{ compact, onToggle: () => setCompact((value) => !value) }}
+            />
+          }
+          webcamTrack={
+            features.mode === 'advanced' && props.webcam ? (
+              <ReviewWebcamTrack
+                compact={compact}
+                editor={props.webcam}
+                projection={projection}
+                beforeAction={props.beforeAction}
+              />
+            ) : null
+          }
+
+          zoomTrack={
+            features.mode === 'advanced' ? (
+              <ReviewZoomLane
+                compact={compact}
+                beforeAction={props.beforeAction}
+                projection={projection}
+                sourceSelection={focus.tool.active ? (focus.preview ?? undefined) : undefined}
+                advanced={props.advanced}
+                resultDuration={props.resultDuration}
+                outputTime={props.outputTime}
+                edits={props.edits}
+                snapTimes={reviewLoopSnapTimes(props)}
+                zoom={props.zoom}
+                toOutputTime={props.toOutputTime}
+              />
+            ) : undefined
+          }
+          {...(props.advanced.ui.mode !== 'advanced' && props.editing.exporter.index
+            ? { boundaries: props.editing.exporter.index.boundaries }
+            : {})}
+          {...reviewTimelineAudioTrack(props, features, projection, compact)}
+          onTextRangeCommit={creation.active ? creation.commitText : undefined}
+          onTrackRangeCommit={(range) => {
+            props.onPlaybackRange?.(range);
+            props.onSeek(range.start);
+          }}
+          onRangeCommit={(range) => {
+            if (props.editing.mode) void props.editing.commitRange(range);
+          }}
+          onChangeEdit={async (edit, range) => {
+            await props.editing.commitRange(range, edit);
+          }}
+          time={props.time}
+          playing={props.playing}
+          navigationRevision={props.navigationRevision}
+          selection={reviewTimelineSourceSelection(props)}
+          edits={props.edits}
+          onEdit={props.editing.select}
+          selectedEditId={props.editing.selected?.id}
+          annotations={props.annotations}
+          {...reviewTimelineHistoryBinding(props)}
+          onSeek={props.onSeek}
+          onSelect={(range) => {
+            props.audio.setOriginalRangeSelected(false);
+            props.setSelection(range);
+          }}
+          onPlay={props.onPlay}
+          onClearSelection={props.onClearSelection}
+          onComment={(note) =>
+            (props.beforeAction ?? ((action) => action()))(() => props.onComment(note))
+          }
+        />
+      </ReviewTrackControlsProvider>
+    </ReviewTimelineMagnets>
   );
 }
 
@@ -475,6 +495,7 @@ function reviewSelectableTracks(
 ): Record<QuickEditTrack, boolean> {
   return {
     source: true,
+    cursorMotion: features.mode === 'advanced' && !!props.cursorMotion,
     actions:
       features.actionsTrackVisible && (!!props.markers.length || !!props.onAddCursorFocusKey),
     zoom: features.zoomTrackVisible,
@@ -903,6 +924,7 @@ function reviewTrackCommands(
     | 'onOpenHistory'
     | 'webcam'
     | 'onOpenProject'
+    | 'onOpenTrack'
     | 'beforeAction'
     | 'advanced'
     | 'setTrackVisibility'
@@ -913,6 +935,7 @@ function reviewTrackCommands(
       if (track === 'text') props.onOpenText?.();
       else if (track === 'originalAudio') props.onOpenSpeech?.();
       else if (track === 'actions') props.onOpenHistory?.();
+      else if (props.onOpenTrack) props.onOpenTrack(track);
       else if (track === 'webcam') props.webcam?.select({ kind: 'webcam' });
       else props.onOpenProject?.();
     },

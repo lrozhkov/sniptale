@@ -41,6 +41,7 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   webcam: 'gallery.videoReview.webcam',
   watermark: 'gallery.videoReview.watermark',
   captions: 'gallery.videoReview.captions',
+  'cursor-motion': 'gallery.videoReview.cursorMotionTrack',
   'annotation-effects': 'gallery.videoReview.annotationEffects',
   'caption-layout': 'gallery.videoReview.captionConflict',
   'camera-follow': 'gallery.videoReview.cameraFollowConflict',

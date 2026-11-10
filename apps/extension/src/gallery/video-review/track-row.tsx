@@ -1,3 +1,4 @@
+import { ReviewTimelineMultiSelectionContext } from './selection-actions';
 import { createPortal } from 'react-dom';
 import { useReviewTrackHeader } from './timeline-panes';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
@@ -67,6 +68,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
     !!(track && controls && reviewTrackEnabled(controls.ui, track)) &&
     !unavailable &&
     !props.placeholder;
+  const multiSelection = useContext(ReviewTimelineMultiSelectionContext);
   const muted = !!props.muted || !!(track && controls && !enabled);
   const visible =
     !(props.placeholder && !controls?.configuring) &&
@@ -85,6 +87,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
     <div
       ref={placement.body}
       data-review-track={track}
+      data-review-track-selected={!!track && controls?.selectedTrack === track ? 'true' : 'false'}
       data-review-track-muted={muted ? 'true' : 'false'}
       className={[
         placement.header
@@ -119,6 +122,7 @@ export function ReviewTrackRow(props: TrackRowProps) {
             event.target.closest('[data-review-removal-key],button,[role="button"]')
           ) {
             controls?.focusItemTrack?.(track);
+            multiSelection?.captureModified(event);
             return;
           }
           if (

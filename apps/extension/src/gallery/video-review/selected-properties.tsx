@@ -1,3 +1,4 @@
+import { withCursorMotionPath } from '../../features/video/project/cursor-motion';
 import { createRecordingCursorAvailabilityReader } from '../../workflows/video-review/cursor-trajectory';
 import {
   sameCursorAvailabilitySource,
@@ -141,13 +142,26 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
   const cursorPath = useMemo(
     () =>
       cameraSelected
-        ? resolveReviewCursorFocusPath(
-            selectedHistory.telemetry ?? null,
-            resource.source,
-            advanced.cursorFocusPath
+        ? withCursorMotionPath(
+            resolveReviewCursorFocusPath(
+              selectedHistory.telemetry ?? null,
+              resource.source,
+              advanced.cursorFocusPath
+            ),
+            advanced.cursorMotionEnabled !== false && advanced.ui.tracks.cursorMotion !== false
+              ? advanced.cursorMotions
+              : undefined
           )
         : undefined,
-    [cameraSelected, selectedHistory.telemetry, resource.source, advanced.cursorFocusPath]
+    [
+      cameraSelected,
+      selectedHistory.telemetry,
+      resource.source,
+      advanced.cursorFocusPath,
+      advanced.cursorMotions,
+      advanced.ui.tracks.cursorMotion,
+      advanced.cursorMotionEnabled,
+    ]
   );
   const edits = resource.session.getSnapshot().document.edits;
   const regionId = selectedRegion?.id,
@@ -180,7 +194,12 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
   const cursor = useSelectedCursorAvailability(
     resource.historyProject,
     sourceInterval,
-    inlineCursorPath,
+    withCursorMotionPath(
+      inlineCursorPath,
+      advanced.cursorMotionEnabled !== false && advanced.ui.tracks.cursorMotion !== false
+        ? advanced.cursorMotions
+        : undefined
+    ),
     regionId
   );
   return (
@@ -565,6 +584,7 @@ export function reviewSelectionLabel(
   state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
 ): string | undefined {
   const selection = state.selection;
+  if (selection.kind === 'cursor-motion') return translate('gallery.videoReview.cursorMotionTrack');
   if (selection.kind === 'cursor-focus')
     return translate('videoEditor.sidebar.cursorFocusPathTitle');
   if (selection.kind === 'annotation-effect')
@@ -678,6 +698,20 @@ export function ReviewSelectedTextProperties(props: {
             </>
           )
         }
+      />
+      <ReviewInspectorSections
+        sections={[
+          reviewInspectorActions(
+            <ReviewButton
+              label={translate('gallery.videoReview.textFragmentDelete')}
+              className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+              onClick={() => props.editor.remove([fragment.id])}
+            >
+              <Trash2 size={15} aria-hidden="true" />
+              <span>{translate('gallery.videoReview.textFragmentDelete')}</span>
+            </ReviewButton>
+          ),
+        ]}
       />
     </fieldset>
   );

@@ -1,3 +1,4 @@
+import { reviewTrackTitleKeys } from './track-items';
 import type { RefObject } from 'react';
 import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import { translate } from '../../platform/i18n';
@@ -7,6 +8,7 @@ import type { ReviewSelection } from '../../features/video/review/types';
 
 type Section =
   | 'project'
+  | 'track'
   | 'scene'
   | 'selected'
   | 'comments'
@@ -77,8 +79,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     (props.beforeAction ?? ((action) => action()))(() => {
       previewReturn.current = null;
       if (props.recordingAvailable) showRecording(false);
-      explicitSection.current = value;
-      if (value === 'project') updateContext(null);
+      explicitSection.current = value === section ? null : value;
+      if (value === 'project' || value === 'track') updateContext(null);
       else if (
         value === 'export' ||
         value === 'selected' ||
@@ -133,7 +135,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       exportRequested && exportAvailable
         ? 'export'
         : (explicit ??
-          ((current === 'project' &&
+          (((current === 'project' || current === 'track') &&
             props.contextSelection?.kind === 'none' &&
             !contextKey.startsWith('comments:')) ||
           (preserveExport && current === 'export') ||
@@ -238,7 +240,7 @@ export function useReviewInspectorTrackNavigation(props: {
     props.setCutting(false);
     props.setAudioTool(false);
     props.setAudioRange(false);
-    props.select({ kind: 'none' });
+    if (props.selection.kind !== 'none') props.select({ kind: 'none' });
   };
   const openProject = () =>
     props.beforeAction(() => {
@@ -252,31 +254,24 @@ export function useReviewInspectorTrackNavigation(props: {
         ? 'text'
         : inspectorTrack === 'actions'
           ? 'history'
-          : inspectorTrack === 'webcam'
-            ? 'selected'
-            : 'project';
-  const atTrackRoot =
-    navigation.shown === trackSection &&
-    (inspectorTrack !== 'webcam' || props.selection.kind === 'webcam');
+          : 'track';
+  const atTrackRoot = navigation.shown === trackSection;
   const backLabel = translate(
-    atTrackRoot || trackSection === 'project'
-      ? 'gallery.videoReview.aboutProject'
-      : inspectorTrack === 'originalAudio'
-        ? 'gallery.videoReview.audioOriginal'
-        : inspectorTrack === 'text'
-          ? 'gallery.videoReview.textTrack'
-          : inspectorTrack === 'actions'
-            ? 'gallery.videoReview.telemetry'
-            : 'gallery.videoReview.webcam'
+    atTrackRoot ? 'gallery.videoReview.aboutProject' : reviewTrackTitleKeys[inspectorTrack]
   );
   const backToTrack = () =>
     props.beforeAction(() => {
       resetSelection();
       if (atTrackRoot) navigation.setSection('project');
       else {
-        if (inspectorTrack === 'webcam') props.select({ kind: 'webcam' });
         navigation.setSection(trackSection);
       }
     });
-  return { setTrack, back: backToTrack, backLabel, openProject };
+  const openTrack = (track: QuickEditTrack) =>
+    props.beforeAction(() => {
+      setTrack(track);
+      resetSelection();
+      navigation.setSection('track');
+    });
+  return { track: inspectorTrack, setTrack, openTrack, back: backToTrack, backLabel, openProject };
 }

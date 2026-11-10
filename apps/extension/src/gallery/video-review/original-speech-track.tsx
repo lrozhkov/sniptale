@@ -1,3 +1,4 @@
+import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
 import {
   reviewTrackMetrics,
@@ -87,6 +88,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
               aria-disabled={props.busy}
               data-text-id={fragment.id}
               data-review-removal-key={`text:${fragment.id}`}
+              data-review-snap-start={range.start}
+              data-review-snap-end={range.end}
               data-dragging={gesture.draggingId === fragment.id ? 'true' : undefined}
               className={[
                 'absolute min-w-px touch-none select-none overflow-hidden rounded border px-3 text-left text-[11px]',
@@ -136,10 +139,10 @@ export function ReviewTextTrack(props: TextTrackProps) {
 
 /** One pointer capture owns the disposable preview, admission, Escape and final timing commit. */
 function useReviewTextTrackGesture(props: TextTrackProps) {
+  const snap = useReviewTimelineSnap();
   const drag = useRef<{
     base: ReviewTextFragment;
     x: number;
-    sourceAt: number;
     width: number;
     edge: 'start' | 'end' | 'move';
     node: HTMLElement;
@@ -187,7 +190,6 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     drag.current = {
       base: fragment,
       x: event.clientX,
-      sourceAt: ((event.clientX - bounds.left) / bounds.width) * duration,
       width: bounds.width,
       edge: edge === 'start' || edge === 'end' ? edge : 'move',
       node: event.currentTarget,
@@ -203,11 +205,13 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     if (!current) return;
     const base = current.base;
     const limit = base.timeDomain === 'source' ? duration : props.editor.projection.resultDuration;
+    const sourceRange = props.editor.sourceInterval(base);
+    const sourceAnchor = current.edge === 'end' ? sourceRange.end : sourceRange.start;
     const freeDelta =
       base.timeDomain === 'source'
         ? ((event.clientX - current.x) / current.width) * duration
-        : props.editor.projection.delta(current.sourceAt, event.clientX - current.x, current.width);
-    const delta = textResizeDelta(props.editor, current, freeDelta, event.altKey);
+        : props.editor.projection.delta(sourceAnchor, event.clientX - current.x, current.width);
+    const delta = textResizeDelta(props.editor, current, freeDelta, event.altKey, snap);
     const shift = Math.max(-base.start, Math.min(limit - base.end, delta));
     const start =
       current.edge === 'move'
@@ -251,13 +255,12 @@ function textResizeDelta(
   editor: TextTrackProps['editor'],
   gesture: { base: ReviewTextFragment; edge: 'start' | 'end' | 'move'; width: number },
   delta: number,
-  bypass: boolean
+  bypass: boolean,
+  snapTime: ReviewTimelineSnap = snapTimelineTime
 ) {
-  if (bypass || gesture.edge === 'move') return delta;
+  if (bypass) return delta;
   const { base, edge, width } = gesture;
   const sourceClock = base.timeDomain === 'source';
-  const requested = base[edge] + delta;
-  const time = sourceClock ? requested : editor.projection.source(requested, edge);
   const playhead = editor.playhead(base);
   const candidates = [
     0,
@@ -270,11 +273,21 @@ function textResizeDelta(
         return [span.start, span.end];
       }),
   ];
-  const snap = snapTimelineTime(
-    time,
-    candidates,
-    (SNAP_THRESHOLD_PX * editor.projection.duration) / Math.max(1, width)
-  );
-  if (snap.candidate === null) return delta;
-  return (sourceClock ? snap.time : editor.projection.output(snap.time)) - base[edge];
+  const threshold = (SNAP_THRESHOLD_PX * editor.projection.duration) / Math.max(1, width);
+  const snappedDelta = (boundary: 'start' | 'end') => {
+    const requested = base[boundary] + delta;
+    const time = sourceClock ? requested : editor.projection.source(requested, boundary);
+    const snap = snapTime(time, candidates, threshold);
+    return {
+      delta:
+        snap.candidate === null
+          ? delta
+          : (sourceClock ? snap.time : editor.projection.output(snap.time)) - base[boundary],
+      distance: snap.candidate === null ? Infinity : Math.abs(snap.time - time),
+    };
+  };
+  if (edge !== 'move') return snappedDelta(edge).delta;
+  const start = snappedDelta('start'),
+    end = snappedDelta('end');
+  return start.distance <= end.distance ? start.delta : end.delta;
 }

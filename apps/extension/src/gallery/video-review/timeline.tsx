@@ -70,6 +70,7 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   tools?: ReactNode;
   trackControls?: ReactNode;
   expandedTools?: boolean;
+  cursorMotionTrack?: ReactNode;
   zoomTrack?: ReactNode;
   webcamTrack?: ReactNode;
   audioTracks?: Partial<Record<'originalAudio' | 'voiceover' | 'music', ReactNode>>;
@@ -167,6 +168,7 @@ export function ReviewTimeline(props: TimelineProps) {
     ),
     webcam: props.webcamTrack,
     zoom: props.zoomTrack,
+    cursorMotion: props.cursorMotionTrack,
     text: props.textTrack,
     annotationEffects: props.annotationEffectsTrack,
     ...props.audioTracks,

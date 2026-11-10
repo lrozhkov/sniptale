@@ -8,7 +8,7 @@ import {
 import { createVideoProjectSceneEdges } from '../../features/video/project/scene/edge-fades';
 import { VideoExportFormat, VideoExportQualityPreset } from '../../features/video/project/types';
 import { renderProjectCompositionFrame } from './composition-joins';
-import type { ProjectCompositionSceneInput } from './composition-scene';
+import type { ProjectCompositionSceneInput } from './types';
 const owners = vi.hoisted(() => ({
   cutSample: vi.fn(),
   cutRelease: vi.fn(),

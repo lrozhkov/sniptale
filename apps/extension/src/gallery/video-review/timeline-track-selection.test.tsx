@@ -30,6 +30,7 @@ it('retains a drawing tool on its active lane and focuses another item before it
       editing: false,
       selectable: {
         source: true,
+        cursorMotion: true,
         zoom: true,
         text: true,
         actions: true,
@@ -109,6 +110,7 @@ it('does not apply an admitted old track request to a different source', async (
       editing: false,
       selectable: {
         source: true,
+        cursorMotion: true,
         zoom: true,
         text: true,
         actions: true,
@@ -137,6 +139,47 @@ it('does not apply an admitted old track request to a different source', async (
     expect(activate).not.toHaveBeenCalled();
     expect(selection.track).toBe('source');
     expect(clearTools).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('notifies the inspector within the admitted selection handler before activation', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  const events: string[] = [];
+  let selection!: ReturnType<typeof useReviewTrackSelection>;
+  function Fixture() {
+    selection = useReviewTrackSelection({
+      sourceId: 'same',
+      mode: 'advanced',
+      editing: false,
+      selectable: {
+        source: true,
+        cursorMotion: true,
+        zoom: true,
+        text: true,
+        actions: true,
+        originalAudio: true,
+        voiceover: true,
+        music: true,
+        webcam: true,
+        annotationEffects: true,
+      },
+      blocked: false,
+      beforeAction: undefined,
+      clearTools: () => {},
+      onChange: (track) => events.push(`notify:${track}`),
+      activate: (track) => events.push(`activate:${track}`),
+    });
+    return null;
+  }
+  try {
+    await act(async () => root.render(<Fixture />));
+    events.length = 0;
+    await act(async () => selection.select('zoom'));
+    expect(events).toEqual(['notify:zoom', 'activate:zoom']);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

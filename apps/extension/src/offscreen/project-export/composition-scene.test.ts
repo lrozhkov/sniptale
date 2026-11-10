@@ -1,3 +1,4 @@
+import type { ProjectCompositionSceneInput } from './types';
 // @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from 'vitest';
 import fixture from '../../features/video/project/recording-events/fixtures.json';
@@ -17,10 +18,7 @@ import { createQuickEditWatermark } from '../../features/video/project/scene/wat
 import { normalizeVideoProjectCursorSkin } from '../../features/video/project/cursor';
 import type { VideoProject } from '../../features/video/project/types';
 import { VideoExportFormat, VideoExportQualityPreset } from '../../features/video/project/types';
-import {
-  renderProjectCompositionScene,
-  type ProjectCompositionSceneInput,
-} from './composition-scene';
+import { renderProjectCompositionScene } from './composition-scene';
 const owners = vi.hoisted(() => ({
   captions: vi.fn(),
   assert: vi.fn(),

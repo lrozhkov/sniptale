@@ -1,4 +1,7 @@
-import { hasExactKeys, isRecord } from './identity';
+import {
+  hasExactKeys,
+  isPlainRecord as isRecord,
+} from '@sniptale/runtime-contracts/validation/primitives';
 
 /** Evaluated drawing operands. The sandbox broker does not interpret EffectV1 expressions. */
 export type EffectRuntimeGpuBlend =

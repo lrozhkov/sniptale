@@ -1,3 +1,4 @@
+import { useReviewTimelineSnap, type ReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewGestureCancellation } from './timeline-drag';
@@ -40,7 +41,7 @@ import { reviewTrackStatusButtonClassName } from './controls';
 import { reviewAudioClipRows, type ReviewTrackProjection } from './track-projection';
 import { ReviewAudioWaveform } from './audio-waveform';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
-import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
+import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
 import type { ReviewAudioLane, ReviewAudioAsset } from './use-review-audio';
 
 const percent = (time: number, duration: number) => `${(time / duration) * 100}%`;
@@ -302,6 +303,7 @@ type ReviewAudioClipBlockProps = {
 };
 
 function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
+  const snap = useReviewTimelineSnap(props.projection);
   const clip = props.clip;
   const asset = props.assets?.get(clip.assetId);
   const assetDuration = asset?.duration ?? props.waveforms?.get(clip.assetId)?.duration;
@@ -338,7 +340,7 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
           reviewTrackMetrics(props.compact).inset,
         height: reviewTrackMetrics(props.compact).body,
       }}
-      {...reviewAudioClipGesture(props, assetDuration)}
+      {...reviewAudioClipGesture(props, assetDuration, snap)}
     >
       {props.pieces.map((piece, index) => {
         const left = piece
@@ -350,6 +352,16 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
         return (
           <div
             key={index}
+            data-review-snap-start={
+              piece?.sourceStart ??
+              props.projection?.source(props.shown.timelineStart) ??
+              start * (props.projection?.duration ?? props.duration)
+            }
+            data-review-snap-end={
+              piece?.sourceEnd ??
+              props.projection?.source(props.shown.timelineStart + props.shown.duration, 'end') ??
+              end * (props.projection?.duration ?? props.duration)
+            }
             data-music-offset={
               piece ? props.shown.sourceOffset + piece.start - props.shown.timelineStart : undefined
             }
@@ -380,7 +392,11 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
 }
 
 /** Owns admission, capture, source-time trim/move preview and completion for one clip gesture. */
-function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?: number) {
+function reviewAudioClipGesture(
+  props: ReviewAudioClipBlockProps,
+  assetDuration: number | undefined,
+  snapTimelineTime: ReviewTimelineSnap
+) {
   const clip = props.clip;
   return {
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {

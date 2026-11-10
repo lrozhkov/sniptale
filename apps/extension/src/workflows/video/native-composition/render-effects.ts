@@ -9,7 +9,7 @@ import {
   type EffectRuntimeRenderedComposition,
 } from '../../../features/video/composition/effect-runtime';
 import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
-import type { PreparedPreviewSceneCanvas } from './canvas';
+import type { PreparedPreviewSceneCanvas } from './types';
 import { resolvePreviewPassTarget } from './render-pass-target';
 
 type VisualPasses = ReturnType<typeof resolveVideoCompositionRenderPasses>['visualPasses'];

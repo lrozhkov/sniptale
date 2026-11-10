@@ -1,3 +1,4 @@
+import { resolveQuickEditActiveFocusRegions } from './advanced/focus-layout';
 import { projectSourceFocusPhases } from '../project/motion/source-phase-projection';
 import { fitQuickEditZoomTransitions } from './advanced/zoom';
 import type { QuickEditZoomRegion } from './advanced/types';
@@ -101,9 +102,9 @@ export function projectReviewFocus(
   regions: readonly QuickEditZoomRegion[],
   map?: readonly ReviewTimeSegment[]
 ): QuickEditZoomRegion[] {
-  const active = regions
-    .filter((region) => !region.dormant)
-    .map((region) => fitQuickEditZoomTransitions(region));
+  const active = resolveQuickEditActiveFocusRegions(regions).map((region) =>
+    fitQuickEditZoomTransitions(region)
+  );
   if (!map) return active;
   const sourceSpans = map.flatMap((part) =>
     part.kind === 'cut'

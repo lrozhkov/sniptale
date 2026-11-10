@@ -1,3 +1,5 @@
+import { useReviewTimelineSnap } from './timeline-magnets';
+import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
 import { useEffect, useRef, useState } from 'react';
 import { Diamond } from 'lucide-react';
 import { translate, formatNumber } from '../../platform/i18n';
@@ -23,6 +25,7 @@ export function ReviewWebcamPositionMarker(props: {
   duration: number;
   admit: ReviewBeforeAction;
 }) {
+  const snap = useReviewTimelineSnap();
   const { editor, index, duration, admit } = props;
   const position = editor.camera!.positions[index]!;
   const drag = useRef<Drag | null>(null);
@@ -54,6 +57,8 @@ export function ReviewWebcamPositionMarker(props: {
       type="button"
       data-ui="gallery.videoReview.webcamPosition"
       data-review-action-key={`webcam-position:${position.id}`}
+      data-review-snap-start={position.time}
+      data-review-snap-end={position.time}
       aria-label={label}
       title={label}
       aria-pressed={selected}
@@ -96,7 +101,12 @@ export function ReviewWebcamPositionMarker(props: {
         if (current.moved)
           setPreview(
             bounded(
-              current.time + ((event.clientX - current.x) / Math.max(1, current.width)) * duration
+              snap(
+                current.time +
+                  ((event.clientX - current.x) / Math.max(1, current.width)) * duration,
+                [],
+                event.altKey ? 0 : (SNAP_THRESHOLD_PX * duration) / Math.max(1, current.width)
+              ).time
             )
           );
       }}

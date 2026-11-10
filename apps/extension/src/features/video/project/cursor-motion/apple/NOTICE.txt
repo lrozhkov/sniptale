@@ -1,0 +1,7 @@
+Apple Cursor by ful1e5 and contributors
+Source: https://github.com/ful1e5/apple_cursor
+License: GNU General Public License version 3 (see LICENSE).
+
+Included SVG source artwork and hotspot configuration retain their upstream origin.
+The adjacent generated apple-shapes.json contains path data extracted from these SVG files.
+Sniptale applies the selected fill, outline, size and shadow at runtime.

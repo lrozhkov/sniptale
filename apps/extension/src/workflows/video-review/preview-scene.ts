@@ -13,6 +13,7 @@ type Size = { width: number; height: number };
 
 export type PreviewSceneDimensions = { canonical: Size; backing: Size };
 export type PreviewScene = {
+  cursorMotions?: QuickEditAdvancedState['cursorMotions'];
   annotationEffects?: Omit<ReviewAnnotationScene, 'planes'> | undefined;
   captions?:
     | {

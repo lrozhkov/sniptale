@@ -1,3 +1,4 @@
+import { useReviewTimelineSnap } from './timeline-magnets';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
@@ -97,6 +98,7 @@ function ReviewEditBlock(
   props: SelectionProps & { edit: ReviewEdit; onSnap(guide: number | null): void }
 ) {
   const { edit, duration, onSnap } = props;
+  const snap = useReviewTimelineSnap();
   const [preview, setPreview] = useState<{ start: number; end: number } | null>(null);
   const [dragEdge, setDragEdge] = useState<'start' | 'end' | 'move' | null>(null);
   const drag = useRef<EditDrag | null>(null);
@@ -128,6 +130,8 @@ function ReviewEditBlock(
     <div
       data-ui="gallery.videoReview.editBlock"
       data-review-removal-key={`edit:${edit.id}`}
+      data-review-snap-start={edit.start}
+      data-review-snap-end={edit.end}
       data-cut-suppressed={covered.length ? 'true' : 'false'}
       title={caption}
       className={`absolute rounded border text-xs ${position} ${reviewTimelineItemTone(selected, edit.kind)}`}
@@ -163,6 +167,7 @@ function ReviewEditBlock(
         if (!current || current.width <= 0) return;
         current.moved ||= Math.abs(event.clientX - current.x) > 3;
         const snapped = snapReviewEditDrag({
+          snap,
           edge: current.edge,
           deltaPx: event.clientX - current.x,
           duration,

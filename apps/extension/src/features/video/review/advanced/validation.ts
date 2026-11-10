@@ -1,3 +1,4 @@
+import { parseCursorMotions } from '../../project/cursor-motion';
 import { parseReviewAudioClip } from '../audio-clip-validation';
 import { parseSceneBackgroundMotion } from '../../project/scene/background-motion';
 import {
@@ -109,7 +110,7 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
     typeof value['actions'] !== 'boolean' ||
     typeof value['zoom'] !== 'boolean' ||
     typeof value['audio'] !== 'boolean' ||
-    ['text', 'originalAudio', 'voiceover', 'music'].some(
+    ['text', 'originalAudio', 'voiceover', 'music', 'cursorMotion'].some(
       (key) => value[key] !== undefined && typeof value[key] !== 'boolean'
     ) ||
     (value['webcam'] !== undefined && typeof value['webcam'] !== 'boolean') ||
@@ -123,6 +124,7 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
       : {}),
     ...(typeof value['voiceover'] === 'boolean' ? { voiceover: value['voiceover'] } : {}),
     ...(typeof value['music'] === 'boolean' ? { music: value['music'] } : {}),
+    ...(typeof value['cursorMotion'] === 'boolean' ? { cursorMotion: value['cursorMotion'] } : {}),
     actions: value['actions'],
     zoom: value['zoom'],
     audio: value['audio'],
@@ -270,6 +272,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     value['linkEasing'] !== 'ease-in-out'
   )
     return null;
+  if (value['overlapPolicy'] !== undefined && value['overlapPolicy'] !== 'suppress') return null;
   return {
     ...(cameraFollow ? { cameraFollow } : {}),
     ...(typeof value['followCursor'] === 'boolean' ? { followCursor: value['followCursor'] } : {}),
@@ -294,6 +297,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     ...(value['linkEasing'] === 'linear' || value['linkEasing'] === 'ease-in-out'
       ? { linkEasing: value['linkEasing'] }
       : {}),
+    ...(value['overlapPolicy'] === 'suppress' ? { overlapPolicy: 'suppress' as const } : {}),
     ...(typeof value['dormant'] === 'boolean' ? { dormant: value['dormant'] } : {}),
   };
 }
@@ -512,6 +516,19 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     (cameraFollowDefaults && !supportsAdvancedSchema(raw['schemaVersion'], 20))
   )
     return null;
+  const cursorMotionEnabled = raw['cursorMotionEnabled'];
+  if (
+    cursorMotionEnabled !== undefined &&
+    (typeof cursorMotionEnabled !== 'boolean' || !supportsAdvancedSchema(raw['schemaVersion'], 29))
+  )
+    return null;
+  const cursorMotions =
+    raw['cursorMotions'] === undefined ? undefined : parseCursorMotions(raw['cursorMotions']);
+  if (
+    cursorMotions === null ||
+    (cursorMotions && !supportsAdvancedSchema(raw['schemaVersion'], 29))
+  )
+    return null;
   const cursorFocusPath =
     raw['cursorFocusPath'] === undefined ? undefined : parseCursorFocusPath(raw['cursorFocusPath']);
   if (
@@ -618,6 +635,8 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
     ...(cameraFollowDefaults ? { cameraFollowDefaults } : {}),
     ...(cursorFocusPath ? { cursorFocusPath } : {}),
+    ...(cursorMotions ? { cursorMotions } : {}),
+    ...(cursorMotionEnabled === undefined ? {} : { cursorMotionEnabled }),
     zoom,
     background,
     audio,
@@ -694,7 +713,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27,
+      27, 28,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

@@ -18,6 +18,7 @@ import type {
 type PreviewInput = Parameters<typeof useReviewPreviewPresentation>[0];
 /** Presentation input is independent of the stage component that consumes this adapter. */
 type PresentationProps = {
+  cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
   captions?: PreviewInput['scene']['captions'];
   annotationEffects?: PreviewInput['scene']['annotationEffects'];
   readAsset?: PreviewInput['readAsset'];
@@ -56,6 +57,7 @@ type PresentationProps = {
 function stagePresentationScene(
   props: Pick<
     PresentationProps,
+    | 'cursorMotions'
     | 'source'
     | 'captions'
     | 'annotationEffects'
@@ -69,6 +71,7 @@ function stagePresentationScene(
   >
 ): Parameters<typeof useReviewPreviewPresentation>[0]['scene'] {
   return {
+    ...(props.cursorMotions ? { cursorMotions: props.cursorMotions } : {}),
     ...(props.captions ? { captions: props.captions } : {}),
     ...(props.annotationEffects ? { annotationEffects: props.annotationEffects } : {}),
     outerFadePlan: props.outerFadePlan,

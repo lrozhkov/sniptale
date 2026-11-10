@@ -127,7 +127,10 @@ async function dragRange(
     );
 }
 
-async function selectTrack(host: HTMLElement, track: 'source' | 'zoom' | 'originalAudio') {
+async function selectTrack(
+  host: HTMLElement,
+  track: 'source' | 'zoom' | 'originalAudio' | 'actions'
+) {
   await act(async () =>
     host
       .querySelector<HTMLButtonElement>(
@@ -305,10 +308,8 @@ it('keeps Volume unavailable without source audio and drops the tool on leaving 
       audible.root.render(<VideoReview aggregateId="recording:r" onBack={audible.back} />)
     );
     await audible.click('advancedEditing');
-    const marker = audible.host.querySelector<HTMLButtonElement>(
-      '[aria-label^="gallery.videoReview.telemetry ·"]'
-    )!;
-    await act(async () => marker.click());
+    expect(audible.host.querySelector('[data-history-family="cursor"]')).toBeNull();
+    await selectTrack(audible.host, 'actions');
     await selectTrack(audible.host, 'originalAudio');
     await audible.click('originalAudioRange');
     expect(audible.button('originalAudioRange').getAttribute('aria-pressed')).toBe('true');
@@ -413,7 +414,9 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
     const inspector = fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]');
     expect(inspector).not.toBeNull();
     expect(
-      inspector?.querySelector('[data-ui="gallery.videoReview.interval"]')?.textContent
+      fixture.host
+        .querySelector('[data-ui="gallery.videoReview.inspector"] header h2')
+        ?.getAttribute('title')
     ).toContain('1.0 – 2.0');
     await waitForContentCommit(fixture, 3);
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
@@ -466,7 +469,9 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
     const inspector = fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]');
     expect(inspector).not.toBeNull();
     expect(
-      inspector?.querySelector('[data-ui="gallery.videoReview.interval"]')?.textContent
+      fixture.host
+        .querySelector('[data-ui="gallery.videoReview.inspector"] header h2')
+        ?.getAttribute('title')
     ).toContain('0.3 – 0.8');
   } finally {
     await fixture.cleanup();
@@ -549,7 +554,7 @@ it('isolates editing controls while the voiceover tab is open and restores them 
     expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
     expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).toBeNull();
     expect(
-      host.querySelector('[data-ui="gallery.videoReview.recordingNavigation"]')?.textContent
+      host.querySelector('[data-ui="gallery.videoReview.inspector"] header h2')?.textContent
     ).toContain('gallery.videoReview.recordVoiceover');
     expect(host.querySelector('[inert]')).not.toBeNull();
     await act(async () =>

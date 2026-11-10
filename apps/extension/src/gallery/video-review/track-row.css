@@ -198,3 +198,83 @@
     pointer-events: auto;
   }
 }
+
+/* Paint selection once on the visible lane, not also on a wrapper behind its translucent fill. */
+[data-ui='gallery.videoReview.timelinePanes'] {
+  --review-selected-track-surface: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 5%,
+    var(--sniptale-color-surface-hover)
+  );
+}
+[data-ui='gallery.videoReview.trackHeader'][data-review-header-selected='true']:not(
+    [data-review-header-muted='true']
+  ),
+[data-review-track-selected='true']:not([data-review-track-muted='true'])
+  [data-review-track-content]
+  > :first-child:not(
+    :has(
+      [data-ui='gallery.videoReview.sourceLane'],
+      [data-ui='gallery.videoReview.zoomLane'],
+      [data-ui='gallery.videoReview.audioLane'],
+      [data-ui='gallery.videoReview.annotationEffectsLane'],
+      [data-ui='gallery.videoReview.textTrack'],
+      [data-ui='gallery.videoReview.webcamTrack']
+    )
+  ),
+[data-review-track-selected='true']:not([data-review-track-muted='true'])
+  [data-review-track-content]
+  :is(
+    [data-ui='gallery.videoReview.sourceLane'],
+    [data-ui='gallery.videoReview.zoomLane'],
+    [data-ui='gallery.videoReview.audioLane'],
+    [data-ui='gallery.videoReview.annotationEffectsLane'],
+    [data-ui='gallery.videoReview.textTrack'],
+    [data-ui='gallery.videoReview.webcamTrack']
+  ) {
+  background-color: var(--review-selected-track-surface);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+[data-ui='gallery.videoReview.trackHeader'][data-review-header-selected='true'][data-review-header-muted='true'] {
+  background-color: var(--sniptale-color-surface-input);
+}
+[data-review-multi-selected='true'],
+[data-review-multi-selected='true'] .review-timeline-item {
+  border-color: var(--sniptale-color-accent);
+  --review-item-foreground: var(--sniptale-color-text-primary);
+  --review-label-weight: 600;
+}
+[data-review-multi-selected='true'] .review-timeline-resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Modifier mouse clicks do not acquire the keyboard ring; Tab navigation restores it. */
+[data-ui='gallery.videoReview.workspaceScroll'][data-review-pointer-selection='true']
+  [data-ui='gallery.videoReview.timeline']
+  :focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* The destination endpoint is visible as long as the current gesture is snapped to it. */
+[data-review-magnet-edge]::after {
+  content: '';
+  position: absolute;
+  z-index: 40;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--sniptale-color-accent);
+  pointer-events: none;
+}
+[data-review-magnet-edge='end']::after {
+  left: auto;
+  right: 0;
+}
+[data-review-magnet-edge='point']::after {
+  left: 50%;
+  transform: translateX(-50%);
+}

@@ -79,13 +79,11 @@ it('packs populated families in semantic order without empty rows', () => {
     { ref: { kind: 'cursor', id: 'cursor' }, eventType: 'cursor', start: 2, end: 3 },
   ]);
   expect(host.querySelector('[data-history-family="keyboard"]')).toBeNull();
-  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
   expect(host.querySelector<HTMLElement>('[data-history-family="mouse"] button')!.style.top).toBe(
     '0px'
   );
-  expect(host.querySelector<HTMLElement>('[data-history-family="cursor"] button')!.style.top).toBe(
-    '24px'
-  );
+  expect(host.querySelector('[data-history-family="cursor"]')).toBeNull();
 });
 
 it('retains archived semantic rows while bounded history windows refresh without retaining markers', () => {
@@ -94,17 +92,17 @@ it('retains archived semantic rows while bounded history windows refresh without
     { ref: { kind: 'cursor', id: 'cursor' }, eventType: 'cursor', start: 2, end: 3 },
   ];
   render(markers, true);
-  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
   render([], true);
-  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(2);
-  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
-  expect(host.querySelector('[data-history-family="cursor"]')).not.toBeNull();
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(1);
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
+  expect(host.querySelector('[data-history-family="cursor"]')).toBeNull();
   expect(host.querySelector('[data-history-family="mouse"] button')).toBeNull();
   render(markers, true);
-  expect((host.firstElementChild as HTMLElement).style.height).toBe('44px');
+  expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
   render([], true, 'recording-b');
-  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(1);
-  expect(host.querySelector('[data-history-family="cursor"]')).not.toBeNull();
+  expect(host.querySelectorAll('[data-history-family]')).toHaveLength(0);
+  expect(host.querySelector('[data-history-family="cursor"]')).toBeNull();
   expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
   render([], false, 'recording-b');
   expect(host.querySelectorAll('[data-history-family]')).toHaveLength(0);
@@ -292,14 +290,13 @@ it('keeps commands separately selectable above typing coverage and shows their s
   expect(command.style.top).toBe(buttons[0]!.style.top);
 });
 
-it('shows a brief cursor gap without a competing text label', () => {
+it('hides technical cursor gaps from history lanes', () => {
   render([{ ref: { kind: 'cursor', id: 'gap' }, eventType: 'cursor-gap', start: 1, end: 1.025 }]);
-  const gap = host.querySelector('[data-history-family="cursor"] button')!;
-  expect(gap.textContent).toBe('');
-  expect(gap.getAttribute('aria-label')).toContain('1');
+  expect(host.querySelector('[data-history-family="cursor"]')).toBeNull();
+  expect(host.querySelectorAll('button')).toHaveLength(0);
 });
 
-it('keeps focus keys on the packed cursor row and adds keys from an empty history', () => {
+it('keeps technical focus keys hidden and does not author keys from history', () => {
   const onAdd = vi.fn();
   const onSelect = vi.fn();
   const key = {
@@ -332,9 +329,7 @@ it('keeps focus keys on the packed cursor row and adds keys from an empty histor
     );
   show([key]);
   expect((host.firstElementChild as HTMLElement).style.height).toBe('20px');
-  expect(
-    host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.timelineKeys"]')!.style.top
-  ).toBe('0px');
+  expect(host.querySelector('[data-ui="cursorFocusPath.timelineKeys"]')).toBeNull();
   show([]);
   expect(host.querySelectorAll('[data-history-family]')).toHaveLength(0);
   act(() =>
@@ -342,7 +337,8 @@ it('keeps focus keys on the packed cursor row and adds keys from an empty histor
       new MouseEvent('dblclick', { bubbles: true, clientX: 500, clientY: 10 })
     )
   );
-  expect(onAdd).toHaveBeenCalledWith(5);
+  expect(onAdd).not.toHaveBeenCalled();
+  expect(onSelect).not.toHaveBeenCalled();
 });
 
 it('does not add a focus key when a packed mouse event receives a double click', () => {
@@ -367,7 +363,7 @@ it('does not add a focus key when a packed mouse event receives a double click',
   expect(onAdd).not.toHaveBeenCalled();
 });
 
-it('continues the cursor line through deliberately authored empty coverage', () => {
+it('keeps authored technical coverage hidden without modifying its keys', () => {
   act(() =>
     root.render(
       <ReviewTelemetryStrip
@@ -397,10 +393,8 @@ it('continues the cursor line through deliberately authored empty coverage', () 
       />
     )
   );
-  const line = host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.authoredCoverage"]')!;
-  expect(line.style.left).toBe('300px');
-  expect(line.style.width).toBe('400px');
-  expect(host.querySelector('[data-cursor-focus-key="manual"]')).not.toBeNull();
+  expect(host.querySelector('[data-ui="cursorFocusPath.authoredCoverage"]')).toBeNull();
+  expect(host.querySelector('[data-cursor-focus-key="manual"]')).toBeNull();
 });
 
 it('keeps static cursor coverage unread across playhead ticks and uses the latest marker command', () => {
@@ -543,9 +537,7 @@ it('refreshes memoized telemetry labels, selection, capability and coverage geom
   expect(
     host.querySelector('[data-history-family="mouse"] button')!.getAttribute('aria-pressed')
   ).toBe('true');
-  expect(
-    host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.authoredCoverage"]')!.style.width
-  ).toBe('200px');
+  expect(host.querySelector('[data-ui="cursorFocusPath.authoredCoverage"]')).toBeNull();
   act(() =>
     root.render(
       <ReviewTelemetryStrip
@@ -554,10 +546,6 @@ it('refreshes memoized telemetry labels, selection, capability and coverage geom
       />
     )
   );
-  expect(
-    host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.authoredCoverage"]')!.style.left
-  ).toBe('100px');
-  expect(
-    host.querySelector<HTMLElement>('[data-ui="cursorFocusPath.authoredCoverage"]')!.style.width
-  ).toBe('100px');
+  expect(host.querySelector('[data-ui="cursorFocusPath.authoredCoverage"]')).toBeNull();
+  expect(host.querySelector('[data-ui="cursorFocusPath.authoredCoverage"]')).toBeNull();
 });

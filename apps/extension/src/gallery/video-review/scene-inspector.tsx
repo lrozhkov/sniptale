@@ -213,12 +213,17 @@ export function ReviewSceneAudio(props: {
 
 /** A source-window decoration, independent of the background and selected effect. */
 export function ReviewWindowHeaderSettings(props: {
+  identity?: string | undefined;
   header: QuickEditWindowHeader | undefined;
   onChange?: ((header: QuickEditWindowHeader | undefined) => void) | undefined;
 }) {
   return (
     <section data-ui="gallery.videoReview.windowHeader">
-      <WindowHeaderSettings header={props.header} onChange={(header) => props.onChange?.(header)} />
+      <WindowHeaderSettings
+        key={props.identity}
+        header={props.header}
+        onChange={(header) => props.onChange?.(header)}
+      />
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import type { PreparedPreviewSceneCanvas } from './types';
 import { scaleEffectRuntimeFramePlan } from '../../../features/video/composition/effect-runtime/render/wave';
 import { preparePreviewImageResources } from './image-resources';
 import { canPrepareEffectRuntimeGpuComposition } from '../../../features/video/composition/effect-runtime/render/gpu-wave';
@@ -14,11 +15,7 @@ import {
   type VideoCompositionMediaSource,
   type VideoCompositionFrameSource,
 } from '../../../features/video/composition/draw/media-source';
-import {
-  beginPreviewViewportClip,
-  publishCompletedPreviewFrame,
-  type PreparedPreviewSceneCanvas,
-} from './canvas';
+import { beginPreviewViewportClip, publishCompletedPreviewFrame } from './canvas';
 import {
   drawDeferredCameraSplitSpotlights,
   paintCameraSplitScreen,

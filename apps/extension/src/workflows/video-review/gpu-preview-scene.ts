@@ -1,3 +1,4 @@
+import { cursorMotionArtwork } from '../../features/video/project/cursor-motion/paint';
 import { resolveGpuPreviewGroupRasters } from '../../features/video/composition/canvas/gpu-preview-plan';
 import { preparedSourceGpuLayers } from '../../features/video/composition/export-enhancement/prepared-source';
 import type { ReviewExportSamplingFrame } from './export-source-sampling';
@@ -159,6 +160,12 @@ export async function buildReviewGpuScene(args: {
       ? {}
       : { cache: { key: 'background', revision: artwork.backgroundRevision } }),
   };
+  const cursor = cursorMotionArtwork(
+    currentScene.cursorMotions,
+    sourceTime,
+    base.videoRect,
+    currentScene.source.height
+  );
   const originalLayers: GpuPreviewLayer[] = [
     ...(artwork.decoration
       ? [
@@ -195,6 +202,14 @@ export async function buildReviewGpuScene(args: {
       clip: { rect: base.windowRect, radius },
     },
   ];
+  if (cursor)
+    originalLayers.push({
+      source: cursor.canvas,
+      rect: cursor.rect,
+      inverse: identity,
+      clip: { rect: base.windowRect, radius },
+      cache: { key: 'authored-cursor', revision: cursor.canvas },
+    });
   const sourceExposures = new WeakMap<GpuPreviewLayer, number>();
   const original: GpuPreviewGroup = {
     kind: 'group',
@@ -222,6 +237,17 @@ export async function buildReviewGpuScene(args: {
     );
     const plane = reviewGpuSourcePlane(pose.layout, currentScene.background);
     const planeLayers = originalLayers.map((layer) => {
+      if (cursor && layer.source === cursor.canvas)
+        return {
+          ...layer,
+          rect: cursorMotionArtwork(
+            currentScene.cursorMotions,
+            sourceTime,
+            plane.video,
+            currentScene.source.height
+          )!.rect,
+          clip: { rect: plane.clip, radius: radius * plane.clipScale },
+        };
       if (layer.source === artwork.decoration)
         return { ...layer, rect: plane.shadowRect(artwork.rect) };
       if (layer.source === source)

@@ -530,7 +530,7 @@ it('previews Border width without history writes, commits once, and cancels with
   expect(onPreview).toHaveBeenLastCalledWith(null);
 });
 
-it('explains why cameras and unresolved placements cannot be copied', () => {
+it('allows camera copies and explains why unresolved placements cannot be copied', () => {
   const duplicate = vi.fn();
   for (const dormant of [false, true]) {
     act(() =>
@@ -547,15 +547,13 @@ it('explains why cameras and unresolved placements cannot be copied', () => {
     const button = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.focusDuplicate"]'
     )!;
-    expect(button.disabled).toBe(true);
+    expect(button.disabled).toBe(dormant);
     expect(button.title).toBe(
-      dormant
-        ? 'gallery.videoReview.focusDuplicateDormant'
-        : 'gallery.videoReview.focusDuplicateZoom'
+      dormant ? 'gallery.videoReview.focusDuplicateDormant' : 'gallery.videoReview.focusDuplicate'
     );
     act(() => button.click());
   }
-  expect(duplicate).not.toHaveBeenCalled();
+  expect(duplicate).toHaveBeenCalledTimes(1);
 });
 
 it('configures entrance and exit blur separately, starts disabled and retains the other phase', async () => {

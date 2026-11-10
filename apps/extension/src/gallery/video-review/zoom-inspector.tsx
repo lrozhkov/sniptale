@@ -43,7 +43,7 @@ import {
   fitQuickEditZoomTransitions,
   type QuickEditZoomRegionPatch,
 } from '../../features/video/review/advanced/zoom';
-import { Trash2, Copy, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
+import { Trash2, Copy, RotateCcw, Scan, Waves } from 'lucide-react';
 import { SegmentedRow, SelectField, ToggleField } from '../../ui/compact-inspector-controls';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import {
@@ -123,6 +123,7 @@ export function ReviewZoomInspector(props: {
   cursorPending?: boolean | undefined;
   spatialPreview?: QuickEditZoomRegion;
   cutSuppressed?: boolean;
+  conflictSuppressed?: boolean;
   zoomConversionBlocked?: boolean;
   onPreview?(patch: QuickEditZoomRegionPatch | null): void;
   onChange(patch: QuickEditZoomRegionPatch): void;
@@ -154,6 +155,16 @@ export function ReviewZoomInspector(props: {
           end={sourceRange?.end ?? region.end}
           timeBasis={sourceRange ? 'source' : 'result'}
         />
+        {props.conflictSuppressed ? (
+          <p
+            role="status"
+            data-ui="gallery.videoReview.focusConflict"
+            className="rounded border border-[var(--sniptale-color-border-soft)]
+              bg-[var(--sniptale-color-surface-hover)] p-2 text-xs text-[var(--sniptale-color-text-secondary)]"
+          >
+            {translate('gallery.videoReview.focusOverlapConflict')}
+          </p>
+        ) : null}
         {props.cutSuppressed ? (
           <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
             {translate('gallery.videoReview.cutOverlapHint')}{' '}
@@ -457,11 +468,9 @@ function ReviewFocusActions(props: {
           title={translate(
             region.dormant
               ? 'gallery.videoReview.focusDuplicateDormant'
-              : !region.border && !region.spotlight
-                ? 'gallery.videoReview.focusDuplicateZoom'
-                : 'gallery.videoReview.focusDuplicate'
+              : 'gallery.videoReview.focusDuplicate'
           )}
-          disabled={!!region.dormant || (!region.border && !region.spotlight)}
+          disabled={!!region.dormant}
           className={`${reviewTextButtonClassName} !w-full justify-start`}
           onClick={props.onDuplicate}
         >
@@ -605,7 +614,7 @@ export function ReviewZoomLinkInspector(props: {
               className={`${reviewDeleteButtonClassName} !w-full justify-start`}
               onClick={props.onRemove}
             >
-              <Unlink size={15} aria-hidden="true" />
+              <Trash2 size={15} aria-hidden="true" />
               <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
             </ReviewButton>
           ),

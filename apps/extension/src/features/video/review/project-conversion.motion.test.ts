@@ -618,3 +618,21 @@ it.each([
   expect(isHydratableVideoProject({ ...reopened, version: 47 })).toBe(false);
   expect(input).toEqual(before);
 });
+
+it('omits a conflicting camera copy from Native composition without changing its retained Gallery content', () => {
+  const input = motionFixture();
+  const original = input.document.advancedContent.zoom.regions[0]!;
+  const copy = {
+    ...structuredClone(original),
+    id: 'conflicting-copy',
+    overlapPolicy: 'suppress' as const,
+  };
+  input.document.advancedContent.zoom.regions.push(copy);
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(result.project.motionRegions!.some((region) => region.id.includes(copy.id))).toBe(false);
+  expect(result.project.motionRegions!.some((region) => region.id.includes(original.id))).toBe(
+    true
+  );
+  expect(input.document.advancedContent.zoom.regions).toContainEqual(copy);
+});

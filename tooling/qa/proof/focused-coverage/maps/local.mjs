@@ -1,5 +1,98 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-history-row-presentation',
+    reason: 'History rows preserve selection, navigation and displayed action details.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/action-history.test.tsx',
+      'apps/extension/src/gallery/video-review/action-history-rendering.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/action-history-list.tsx',
+  },
+  {
+    owner: 'review-authored-cursor-ui',
+    reason: 'Authored cursor controls use the existing content journal and inspector selection.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/cursor-motion-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/cursor-motion-editor.tsx',
+  },
+  {
+    owner: 'review-authored-cursor-ui',
+    reason: 'Authored cursor controls use the existing content journal and inspector selection.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/cursor-motion-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/use-advanced-content.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/cursor-motion-overlay.tsx',
+  },
+  {
+    owner: 'review-track-collection-actions',
+    reason:
+      'Collection actions preserve batch identities, clone placement and selected-item navigation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-batch-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-batch-selection.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-clone.test.ts',
+      'apps/extension/src/gallery/video-review/track-items.test.ts',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-batch-inspector.tsx',
+  },
+  {
+    owner: 'review-track-collection-actions',
+    reason:
+      'Collection actions preserve batch identities, clone placement and selected-item navigation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-batch-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-batch-selection.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-clone.test.ts',
+      'apps/extension/src/gallery/video-review/track-items.test.ts',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-clone-action.tsx',
+  },
+  {
+    owner: 'review-track-collection-actions',
+    reason:
+      'Collection actions preserve batch identities, clone placement and selected-item navigation.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-batch-inspector.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-batch-selection.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-clone.test.ts',
+      'apps/extension/src/gallery/video-review/track-items.test.ts',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/inspector.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/track-items-inspector.tsx',
+  },
+  {
+    owner: 'review-edit-snap-consumers',
+    reason: 'Edit snapping is exercised by source-axis magnets and timeline gestures.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/timeline-magnets.test.ts',
+      'apps/extension/src/gallery/video-review/timeline-drag.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-selection.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/timeline-edit-snap.ts',
+  },
+  {
+    owner: 'review-webcam-position-gesture',
+    reason: 'Webcam position editing preserves source-axis placement and selection.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/webcam-ui.test.tsx',
+      'apps/extension/src/gallery/video-review/webcam-editor.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-binding.test.tsx',
+    ],
+    productionFile: 'apps/extension/src/gallery/video-review/webcam-position-marker.tsx',
+  },
+  {
     owner: 'i18n-catalog-data-proof',
     productionDataFiles: [
       'apps/extension/src/platform/i18n/catalogs/en.json',

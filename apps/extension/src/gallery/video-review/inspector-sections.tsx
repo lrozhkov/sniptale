@@ -1,8 +1,11 @@
 import { createPortal } from 'react-dom';
-import { ReviewSelectionActionsContext } from './selection-actions';
+import {
+  ReviewSelectionActionsContext,
+  ReviewTimelineMultiSelectionContext,
+} from './selection-actions';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { Ellipsis, Info, type LucideIcon } from 'lucide-react';
+import { EllipsisVertical, Layers2, Info, type LucideIcon } from 'lucide-react';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { translate } from '../../platform/i18n';
 import { ReviewDetails } from './controls';
@@ -18,6 +21,7 @@ export function ReviewInspectorPresentation(props: {
   value: 'all' | 'sections';
   section?:
     | 'project'
+    | 'track'
     | 'scene'
     | 'selected'
     | 'comments'
@@ -60,13 +64,25 @@ export type ReviewInspectorSection = {
   content: ReactNode;
 };
 
+export const ReviewInspectorCloneContext = createContext<ReactNode>(null);
+
+function ReviewInspectorActionContents({ children }: { children: ReactNode }) {
+  const clone = useContext(ReviewInspectorCloneContext);
+  return (
+    <div className="review-inspector-actions">
+      {clone}
+      {children}
+    </div>
+  );
+}
+
 /** Selected-object commands share metadata and local geometry in either presentation mode. */
 export function reviewInspectorActions(content: ReactNode): ReviewInspectorSection {
   return {
     id: 'actions',
     label: translate('gallery.videoReview.actionActions'),
-    icon: Ellipsis,
-    content: <div className="review-inspector-actions">{content}</div>,
+    icon: EllipsisVertical,
+    content: <ReviewInspectorActionContents>{content}</ReviewInspectorActionContents>,
   };
 }
 
@@ -80,13 +96,37 @@ export function ReviewInspectorSections({
   leadingSectionColumn?: boolean;
 }) {
   const actionTarget = useContext(ReviewSelectionActionsContext);
+  const selectionCount = useContext(ReviewTimelineMultiSelectionContext)?.keys.length ?? 0;
   const actions = actionTarget?.commandHost
     ? suppliedSections.find((section) => section.id === 'actions')
     : undefined;
   const sections = suppliedSections;
   const actionPanel =
     actions && actionTarget?.commandHost
-      ? createPortal(actions.content, actionTarget.commandHost)
+      ? createPortal(
+          <>
+            {selectionCount > 1 ? (
+              <span
+                className="review-selection-count"
+                title={translate('gallery.videoReview.timelineSelectionCount').replace(
+                  '{count}',
+                  String(selectionCount)
+                )}
+              >
+                <Layers2 size={14} aria-hidden="true" />
+                <span aria-hidden="true">{selectionCount}</span>
+                <span className="sr-only">
+                  {translate('gallery.videoReview.timelineSelectionCount').replace(
+                    '{count}',
+                    String(selectionCount)
+                  )}
+                </span>
+              </span>
+            ) : null}
+            {actions.content}
+          </>,
+          actionTarget.commandHost
+        )
       : null;
   const context = useContext(PresentationContext);
   const presentation = context.value;

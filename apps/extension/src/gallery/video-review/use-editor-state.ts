@@ -1,3 +1,4 @@
+import { useReviewCursorMotions } from './cursor-motion-editor';
 import { useReviewRecordingHistory } from './use-recording-history';
 import {
   addReviewCursorFocusKey,
@@ -109,7 +110,20 @@ export function useReviewEditorState(resource: LoadedReview) {
       ),
     [wiring.projected.markers, actionsApplied, advanced.keyAnimations, core.timeline.timeMap]
   );
-  return { ...assembleReviewEditorState(core, wiring), clickCues, keyCues };
+  const state = assembleReviewEditorState(core, wiring);
+  const cursorMotion = useReviewCursorMotions({
+    advanced: state.advanced,
+    time: state.time,
+    duration: source.duration,
+    selection: state.activeSelection,
+    onChange: state.setCursorMotions,
+    onEnabledChange: state.setCursorMotionEnabled,
+    select: state.setActiveSelection,
+    seek: state.seek,
+    canStart: state.canStart,
+    setMessage: state.setMessage,
+  });
+  return { ...state, cursorMotion, clickCues, keyCues };
 }
 
 /** Combines session state with the timeline transport and editing controls. */
@@ -618,6 +632,8 @@ function reviewAdvancedControls(
     previewBackground: advancedState.previewBackground,
     setCanvas: advancedState.setCanvas,
     setWindowHeader: advancedState.setWindowHeader,
+    setCursorMotions: advancedState.setCursorMotions,
+    setCursorMotionEnabled: advancedState.setCursorMotionEnabled,
     setText: advancedState.setText,
     setCaptions: advancedState.setCaptions,
     resetAdvanced: advancedState.reset,

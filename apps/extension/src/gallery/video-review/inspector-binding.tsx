@@ -1,3 +1,10 @@
+import { ReviewCursorMotionInspector } from './cursor-motion-editor';
+import { ReviewTimelineCloneScope } from './timeline-clone-action';
+import { ReviewTimelineMultiSelectionContext } from './selection-actions';
+import { ReviewTimelineBatchInspector } from './timeline-batch-inspector';
+import { ReviewTrackItemsInspector } from './track-items-inspector';
+import { reviewTrackTitleKeys } from './track-items';
+import type { QuickEditTrack } from '../../features/video/review/advanced/types';
 import { ReviewProjectInfo } from './project-info';
 import { prepareLibraryBackup } from '../../workflows/sync-transfer/retained-library';
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
@@ -36,7 +43,15 @@ import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio } from './use-review-audio';
 import { reviewErrorMessage } from './feedback';
-import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import {
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import { translate } from '../../platform/i18n';
 import type { LoadedReview } from './use-session';
 import type { useReviewEditorState } from './use-editor-state';
@@ -51,6 +66,7 @@ type InspectorState = Pick<
   | 'advancedFailed'
   | 'retryAdvanced'
   | 'setCursorFocusPath'
+  | 'cursorMotion'
   | 'cursorFocusPath'
   | 'cursorFocusKeys'
   | 'selectCursorFocusKey'
@@ -137,6 +153,7 @@ function ReviewInspectorFragment({ state }: { state: InspectorState }) {
 
 type ReviewInspectorBindingProps = {
   recording?: ReactNode;
+  inspectorTrack?: QuickEditTrack;
   onProject?: (() => void) | undefined;
   backLabel?: string | undefined;
   onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
@@ -156,6 +173,7 @@ type ReviewInspectorBindingProps = {
 
 export function ReviewInspectorBinding({
   onRenameProject,
+  inspectorTrack = 'source',
   resource,
   state,
   canvasComments,
@@ -173,6 +191,8 @@ export function ReviewInspectorBinding({
   backLabel,
 }: ReviewInspectorBindingProps) {
   const { editing, snapshot, composer, busy, run } = state;
+  const multiSelection = useContext(ReviewTimelineMultiSelectionContext);
+  const batch = (multiSelection?.keys.length ?? 0) > 1;
   const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
   const active = useRef(true);
   const live = useRef({ session: state.session, resource });
@@ -190,7 +210,23 @@ export function ReviewInspectorBinding({
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
         recording={recording}
-        onProject={onProject}
+        trackTitle={translate(reviewTrackTitleKeys[inspectorTrack])}
+        trackItems={
+          inspectorTrack !== 'text' && inspectorTrack !== 'actions' ? (
+            <ReviewTrackItemsInspector
+              key={`${resource.filename}:${inspectorTrack}`}
+              track={inspectorTrack}
+              state={state}
+              resource={resource}
+              audio={audio}
+              navigation={navigation}
+            />
+          ) : undefined
+        }
+        onProject={() => {
+          multiSelection?.clear();
+          onProject?.();
+        }}
         backLabel={backLabel}
         project={
           <ReviewProjectInfo
@@ -258,12 +294,19 @@ export function ReviewInspectorBinding({
             <ReviewCommentComposer state={state} annotation={composer.annotation} />
           ) : null
         }
-        selectionLabel={reviewSelectionLabel({
-          selection: state.activeSelection,
-          markers: state.projected.markers,
-          advanced: state.advanced,
-          editing: state.editing,
-        })}
+        selectionLabel={
+          batch
+            ? translate('gallery.videoReview.timelineSelectionCount').replace(
+                '{count}',
+                String(multiSelection!.keys.length)
+              )
+            : reviewSelectionLabel({
+                selection: state.activeSelection,
+                markers: state.projected.markers,
+                advanced: state.advanced,
+                editing: state.editing,
+              })
+        }
         selectionPreferenceScope={state.activeSelection.kind}
         selectionHasSections={hasSelectionSections(state)}
         scene={
@@ -293,17 +336,23 @@ export function ReviewInspectorBinding({
         onOpenVideoEditor={() => openReviewInspectorInVideoEditor(state, canvasComments, isCurrent)}
         {...reviewInspectorNoteActions(state, resource)}
       >
-        <ReviewSelectionBinding
-          onBackToHistory={
-            state.activeSelection === historySelection
-              ? () => navigation.setSection('history')
-              : undefined
-          }
-          state={state}
-          resource={resource}
-          audio={audio}
-          canvasComments={canvasComments}
-        />
+        {batch ? (
+          <ReviewTimelineBatchInspector state={state} duration={resource.source.duration} />
+        ) : (
+          <ReviewTimelineCloneScope state={state} duration={resource.source.duration}>
+            <ReviewSelectionBinding
+              onBackToHistory={
+                state.activeSelection === historySelection
+                  ? () => navigation.setSection('history')
+                  : undefined
+              }
+              state={state}
+              resource={resource}
+              audio={audio}
+              canvasComments={canvasComments}
+            />
+          </ReviewTimelineCloneScope>
+        )}
       </ReviewInspector>
     </ReviewIntervalMap.Provider>
   );
@@ -554,6 +603,7 @@ function ReviewScenePropertiesBinding({
   const { busy, editing } = state;
   return (
     <ReviewSceneProperties
+      headerIdentity={state.snapshot.snapshot.workspace.aggregateId}
       cropPreview={{ file, time: state.time }}
       cursorPath={
         <ReviewCursorPathSettings
@@ -632,6 +682,10 @@ function ReviewSelectionBinding({
   onBackToHistory?: (() => void) | undefined;
 }) {
   const video = state.video;
+  if (state.activeSelection.kind === 'cursor-motion' && state.advanced.ui.mode === 'advanced')
+    return (
+      <ReviewCursorMotionInspector editor={state.cursorMotion} busy={state.busy || state.playing} />
+    );
   if (state.activeSelection.kind === 'cursor-focus')
     return (
       <ReviewCursorPathEditor
@@ -853,6 +907,7 @@ function hasSelectionSections(state: InspectorState): boolean {
     state.activeSelection.kind === 'telemetry' ||
     (state.advanced.ui.mode === 'advanced' &&
       [
+        'cursor-motion',
         'zoom',
         'canvas-comment',
         'audio',

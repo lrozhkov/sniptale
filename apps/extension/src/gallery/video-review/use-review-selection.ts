@@ -46,6 +46,8 @@ export function reviewSelectionExists(
   cursorFocusKeys: readonly { id: string }[] = []
 ): boolean {
   if (selection.kind === 'none') return false;
+  if (selection.kind === 'cursor-motion')
+    return !!advanced.cursorMotions?.some((m) => m.id === selection.id);
   if (selection.kind === 'cursor-focus')
     return (
       cursorFocusKeys.some((key) => key.id === selection.id) ||
@@ -113,6 +115,7 @@ export function useReviewSelectionLifecycle(args: {
   cursorFocusKeys?: readonly { id: string }[];
   historyPending?: boolean;
   deleteCursorFocus?(id: string): void;
+  deleteCursorMotion?(id: string): void;
   commit(operation: ReviewOperation): Promise<unknown>;
   run(action: () => Promise<unknown>): Promise<unknown>;
   deleteCanvas(id: string): void;
@@ -129,6 +132,11 @@ export function useReviewSelectionLifecycle(args: {
 }) {
   const remove = () => {
     if (args.selection.kind === 'none' || args.selection.kind === 'telemetry') return;
+    if (args.selection.kind === 'cursor-motion') {
+      args.deleteCursorMotion?.(args.selection.id);
+      args.setSelection({ kind: 'none' });
+      return;
+    }
     if (args.selection.kind === 'cursor-focus') {
       const selectedId = args.selection.id;
       const key = args.cursorFocusPath?.segments
@@ -193,6 +201,8 @@ export function reviewSelectionSourceTime(
   const midpoint = (range: { start: number; end: number } | undefined) =>
     range ? (range.start + range.end) / 2 : null;
   switch (selection.kind) {
+    case 'cursor-motion':
+      return midpoint(advanced.cursorMotions?.find((m) => m.id === selection.id));
     case 'cursor-focus':
       return selection.time;
     case 'none':
@@ -284,6 +294,8 @@ function selectionTrackVisible(
 ) {
   const features = resolveQuickEditEffectiveFeatures(advanced);
   switch (selection.kind) {
+    case 'cursor-motion':
+      return advanced.ui.mode === 'advanced' && advanced.ui.tracks.cursorMotion !== false;
     case 'webcam':
     case 'webcam-position':
     case 'webcam-hidden':

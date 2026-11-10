@@ -1,3 +1,4 @@
+import { useReviewTimelineSnap } from './timeline-magnets';
 import { ReviewTrackVisibilityButton } from './track-row';
 import { reviewTrackMetrics, ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import { useReviewResizeBoundary } from './timeline-resize-guide';
@@ -9,7 +10,7 @@ import type {
   ReviewAnnotationEffectSnapshot,
 } from '../../features/video/review/annotation-effects/types';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
-import { SNAP_THRESHOLD_PX, snapTimelineTime } from '../../features/video/review/snap';
+import { SNAP_THRESHOLD_PX } from '../../features/video/review/snap';
 import {
   reviewTimeLabel,
   reviewTimelineItemTone,
@@ -85,6 +86,7 @@ function boundedRange(
 
 /** Source-clock plates; overlap rows are disposable and never change compositing order. */
 export function ReviewAnnotationEffectsTrack(props: TrackProps) {
+  const snapTimelineTime = useReviewTimelineSnap();
   const locale = useAppLocale();
   const drag = useRef<Drag | null>(null);
   const latest = useRef(props);
@@ -364,6 +366,8 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
               aria-disabled={props.busy}
               data-annotation-effect-id={instance.id}
               data-review-removal-key={`annotation:${instance.id}`}
+              data-review-snap-start={instance.start}
+              data-review-snap-end={instance.end}
               data-annotation-effect-row={rows.get(instance.id)}
               data-enabled={instance.enabled}
               title={`${name} ${interval}`}

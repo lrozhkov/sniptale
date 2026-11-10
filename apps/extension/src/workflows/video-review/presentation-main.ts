@@ -188,6 +188,7 @@ class PresentationMain {
       windowHeader: effective.windowHeader,
       watermark: effective.watermark,
       webcam: effective.webcam,
+      cursorMotions: effective.cursorMotions,
       zoomRegions: effective.zoomRegions,
       comments: (this.args.comments ?? []).filter((comment) => comment.renderToVideo),
       keys: this.args.keyCues ?? [],

@@ -192,6 +192,7 @@ export function ReviewKeyboardHelp(props: {
         ? createPortal(
             <div ref={menu} style={portalStyle} data-theme={theme ?? undefined}>
               <ProductDropdownMenu
+                className="review-utility-menu"
                 role="menu"
                 aria-label={translate('gallery.videoReview.moreActions')}
                 data-ui="gallery.videoReview.utilityMenu"

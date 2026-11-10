@@ -3,9 +3,13 @@ import type { InspectorDisclosureProps } from '../../ui/compact-inspector-contro
 import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
-import { useContext } from 'react';
+import { useContext, useLayoutEffect, useRef } from 'react';
 import { useCommandPress } from '@sniptale/ui/control-language/press';
-import { ReviewIntervalMap, reviewIntervalDuration } from './interval-timing';
+import {
+  ReviewIntervalMap,
+  ReviewIntervalHintContext,
+  reviewIntervalDuration,
+} from './interval-timing';
 import { Clock3 } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
@@ -133,9 +137,35 @@ export function ReviewInterval({
       : 'gallery.videoReview.resultInterval'
   );
   const rangeTitle = `${rangeLabel}: ${range}`;
+  const hintOwner = useContext(ReviewIntervalHintContext);
+  const hintIdentity = useRef({});
+  const hintText = [
+    rangeTitle,
+    ...(start !== end
+      ? [
+          `${translate('gallery.videoReview.intervalDuration')}: ${originalLabel}`,
+          ...(changed
+            ? [`${translate('gallery.videoReview.resultDuration')}: ${resultLabel}`]
+            : []),
+        ]
+      : []),
+  ].join('\n');
+  useLayoutEffect(() => {
+    if (!hintOwner?.title.current) return;
+    const identity = hintIdentity.current;
+    hintOwner.active = identity;
+    const title = hintOwner.title.current;
+    title.title = hintText;
+    return () => {
+      if (hintOwner.active !== identity) return;
+      hintOwner.active = null;
+      title.removeAttribute('title');
+    };
+  }, [hintOwner, hintText]);
+  if (hintOwner) return null;
   return (
     <div
-      className="flex min-h-8 min-w-0 items-center justify-between gap-2 border-b
+      className="review-interval min-h-8 min-w-0 gap-x-2 gap-y-1 border-b
       border-[var(--sniptale-color-border-soft)] px-2 pt-0.5 pb-2 text-[13px] tabular-nums"
       data-ui="gallery.videoReview.interval"
     >
@@ -150,7 +180,7 @@ export function ReviewInterval({
       >
         <span
           data-ui="gallery.videoReview.intervalRange"
-          className="min-w-0 truncate text-[var(--sniptale-color-text-secondary)]"
+          className="min-w-0 text-right text-[var(--sniptale-color-text-secondary)]"
           title={rangeTitle}
         >
           {range}

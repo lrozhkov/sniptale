@@ -166,7 +166,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
         )}
       </InspectorDetails>
       <WindowHeaderSettings
-        key={props.clip.id}
+        key={`${props.project.id}:${props.clip.id}`}
         header={props.clip.windowHeader}
         rememberedHeader={props.clip.rememberedWindowHeader}
         disabled={props.locked || !props.onUpdateMediaClipWindowHeader}

@@ -1,3 +1,4 @@
+import { resolveReviewTimelineSelection } from './timeline-batch-selection';
 import { ReviewInspectorToolbarNavigation } from './review-toolbar';
 import { ReviewSelectionActionsSurface } from './selection-actions';
 import { setGalleryQuickEditUrl, clearGalleryQuickEditUrl } from '../platform/browser-driver';
@@ -188,6 +189,19 @@ function ReviewEditor({
   return (
     <ReviewSelectionActionsSurface
       selection={state.activeSelection}
+      onSelectKey={(key) => {
+        if (!key) {
+          state.setActiveSelection({ kind: 'none' });
+          return;
+        }
+        const selection = resolveReviewTimelineSelection(key, state.advanced);
+        if (!selection) return;
+        if (selection.kind === 'cursor-focus') {
+          const point = state.cursorFocusKeys.find((point) => point.id === selection.id);
+          if (point) state.selectCursorFocusKey(point.id, point.sourceTime);
+        } else state.setActiveSelection(selection);
+        navigation.setSection('selected');
+      }}
       visible={navigation.shown === 'selected' && !voiceover.recording}
       disabled={busy || editing.exporter.phase !== 'idle'}
     >
@@ -215,8 +229,12 @@ function ReviewEditor({
             />
           </div>
           <ReviewInspectorBinding
-            onProject={trackNavigation.back}
+            onProject={() => {
+              if (voiceover.recording) voiceover.requestClose.current?.();
+              else trackNavigation.back();
+            }}
             backLabel={trackNavigation.backLabel}
+            inspectorTrack={trackNavigation.track}
             onRenameProject={projectCommands.rename}
             recording={
               voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
@@ -248,7 +266,9 @@ function ReviewEditor({
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              cursorMotion={state.cursorMotion}
               onOpenProject={trackNavigation.openProject}
+              onOpenTrack={trackNavigation.openTrack}
               onTrackChange={trackNavigation.setTrack}
               onHistoryRange={state.setHistoryRange}
               cursorArchiveAvailable={state.cursorArchiveAvailable}
