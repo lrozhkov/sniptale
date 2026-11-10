@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { VideoCompositionMediaSource } from '../../features/video/composition/draw/media-source';
 import { createVideoProjectCaptionRenderer } from '../../workflows/video-review/project-captions';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
@@ -20,7 +21,10 @@ beforeEach(() => {
   io.create.mockImplementation(() => ({ renderFrame: io.render, dispose: io.dispose }));
   io.render.mockImplementation(async () => document.createElement('canvas'));
 });
-afterEach(() => vi.resetAllMocks());
+afterEach(() => {
+  vi.resetAllMocks();
+  vi.unstubAllGlobals();
+});
 function fixture() {
   const canvas = document.createElement('canvas');
   const input: ProjectCompositionSceneInput & {
@@ -222,4 +226,173 @@ it('restores the output context and retires resources after publication failure'
   expect(f.input.context.globalAlpha).toBe(0.25);
   expect(io.dispose).toHaveBeenCalledOnce();
   expect(f.input.job.sharedComposition).toBeUndefined();
+});
+
+it('hands selected enhancement to the common GPU scene and retains the owner for complete Canvas retry', async () => {
+  const f = fixture();
+  f.input.settings.detailEnhancement = 'clark-x2';
+  vi.stubGlobal('VideoFrame', class {});
+  vi.stubGlobal('navigator', { gpu: {} });
+  const { createProjectExportSourceSampling } = await import('./renderer/source-sampling');
+  const sampling = createProjectExportSourceSampling({
+    project: f.input.project,
+    settings: f.input.settings,
+    sourceUrl: () => undefined,
+  });
+  f.input.job.sourceSampling = sampling;
+  const { PreviewGpuSerialFallback } =
+    await import('../../workflows/video/native-composition/render-scene');
+  io.render.mockRejectedValueOnce(new PreviewGpuSerialFallback());
+  try {
+    expect(await renderSharedProjectComposition(f.input)).toBe(false);
+    const prepared = vi.mocked(createNativeCompositionMaterializer).mock.calls[0]![0];
+    expect(prepared.requireGpu).toBe(true);
+    expect(prepared.prepareSources).toBeTypeOf('function');
+    expect(f.input.job.sourceSampling).toBe(sampling);
+    expect(f.input.settings.detailEnhancement).toBe('clark-x2');
+    expect(f.input.job.sharedComposition).toBeUndefined();
+    expect(io.dispose).toHaveBeenCalledOnce();
+    expect(f.draw).not.toHaveBeenCalled();
+  } finally {
+    await sampling.dispose();
+  }
+});
+
+it('keeps enhanced exposure leases distinct by frame and time until the common frame retires', async () => {
+  const f = fixture();
+  f.input.settings.detailEnhancement = 'clark-x2';
+  vi.stubGlobal('VideoFrame', class {});
+  vi.stubGlobal('navigator', { gpu: {} });
+  const { createProjectExportSourceSampling } = await import('./renderer/source-sampling');
+  const { resolveVideoCompositionRenderPasses } =
+    await import('../../features/video/composition/timeline/render');
+  const sampling = createProjectExportSourceSampling({
+    project: f.input.project,
+    settings: f.input.settings,
+    sourceUrl: () => undefined,
+  });
+  f.input.job.sourceSampling = sampling;
+  const prepare = vi.spyOn(sampling, 'prepare');
+  const releases: ReturnType<typeof vi.fn>[] = [];
+  const source = {
+    sourceWidth: 800,
+    sourceHeight: 600,
+    draw: vi.fn(),
+    toVideoFrame: vi.fn<() => VideoFrame>(),
+  };
+  prepare.mockImplementation(async () => {
+    const release = vi.fn();
+    releases.push(release);
+    return {
+      media: new Map<string, VideoCompositionMediaSource>([
+        ['video', source],
+        ['html', document.createElement('video')],
+      ]),
+      sourceRasterScale: 2,
+      rasterScaleForDemand: () => 2,
+      sourceRasterScaleForDemand: () => 2,
+      effectMedia: () => new Map(),
+      forDemand: () => new Map(),
+      renderDimensions: () => ({ width: 800, height: 600 }),
+      release,
+    };
+  });
+  try {
+    await renderSharedProjectComposition(f.input);
+    const options = vi.mocked(createNativeCompositionMaterializer).mock.calls[0]![0];
+    const passes = resolveVideoCompositionRenderPasses(f.input.project, 0.5);
+    const first = passes.visualPasses[0]!;
+    passes.visualPasses.push({ ...first, time: 0.4 });
+    const signal = new AbortController().signal;
+    const prepareImages = vi.fn(async () => {});
+    const prepared = await options.prepareSources!(
+      {
+        project: f.input.project,
+        currentTime: 0.5,
+        canvas: f.input.context.canvas,
+        stage: null,
+        imageBank: {},
+        videoRefs: { current: {} },
+        signal,
+        prepareImages,
+      },
+      passes,
+      'last'
+    );
+    expect(prepareImages).toHaveBeenCalledOnce();
+    expect(prepare.mock.calls.map(([input]) => input.time)).toEqual([0.5, 0.4]);
+    expect(
+      prepare.mock.calls.every(
+        ([input]) => input.retain && input.fallback === 'last' && input.signal === signal
+      )
+    ).toBe(true);
+    expect(prepared.nominal).toEqual(new Map([['video', source]]));
+    expect(prepared.media(passes.overlayFrame, 0.4).get('video')).toBe(source);
+    expect(prepared.sampling!(passes.overlayFrame, 0.5)).not.toBe(
+      prepared.sampling!(passes.overlayFrame, 0.4)
+    );
+    expect(() => prepared.media(passes.overlayFrame, 0.3)).toThrow(
+      'Enhanced export exposure is unavailable.'
+    );
+    expect(releases.every((release) => release.mock.calls.length === 0)).toBe(true);
+    prepared.release();
+    prepared.release();
+    expect(releases.every((release) => release.mock.calls.length === 1)).toBe(true);
+  } finally {
+    f.input.job.sharedComposition?.dispose();
+    await sampling.dispose();
+  }
+});
+
+it('releases prepared enhanced exposures when a later source request fails', async () => {
+  const f = fixture();
+  f.input.settings.detailEnhancement = 'bicubic-sharpen';
+  vi.stubGlobal('VideoFrame', class {});
+  vi.stubGlobal('navigator', { gpu: {} });
+  const { createProjectExportSourceSampling } = await import('./renderer/source-sampling');
+  const { resolveVideoCompositionRenderPasses } =
+    await import('../../features/video/composition/timeline/render');
+  const sampling = createProjectExportSourceSampling({
+    project: f.input.project,
+    settings: f.input.settings,
+    sourceUrl: () => undefined,
+  });
+  f.input.job.sourceSampling = sampling;
+  const release = vi.fn();
+  const prepare = vi.spyOn(sampling, 'prepare');
+  const pass = await prepare({
+    project: f.input.project,
+    frame: resolveVideoCompositionRenderPasses(f.input.project, 0.5).overlayFrame,
+    time: 0.5,
+    media: new Map(),
+  });
+  prepare.mockClear();
+  prepare.mockResolvedValueOnce({ ...pass, release });
+  const failure = new Error('Source read failed');
+  prepare.mockRejectedValueOnce(failure);
+  try {
+    await renderSharedProjectComposition(f.input);
+    const options = vi.mocked(createNativeCompositionMaterializer).mock.calls[0]![0];
+    const passes = resolveVideoCompositionRenderPasses(f.input.project, 0.5);
+    passes.visualPasses.push({ ...passes.visualPasses[0]!, time: 0.4 });
+    await expect(
+      options.prepareSources!(
+        {
+          project: f.input.project,
+          currentTime: 0.5,
+          canvas: f.input.context.canvas,
+          stage: null,
+          imageBank: {},
+          videoRefs: { current: {} },
+        },
+        passes
+      )
+    ).rejects.toBe(failure);
+    expect(release).toHaveBeenCalledOnce();
+    expect(f.draw).toHaveBeenCalledOnce();
+  } finally {
+    f.input.job.sharedComposition?.dispose();
+    pass.release();
+    await sampling.dispose();
+  }
 });

@@ -224,7 +224,8 @@ function getDecodedCompositeOwnerDocument(args: DecodedCompositeFrameArgs): Docu
 export async function renderAcceleratedCompositeWebmSpan(
   args: AcceleratedCompositeWebmRenderArgs
 ): Promise<boolean> {
-  if (parseEnhancementMode(args.settings.detailEnhancement) === 'off') return false;
+  if (parseEnhancementMode(args.settings.detailEnhancement) === 'off' || args.job.sourceSampling)
+    return false;
   if (
     resolveVideoProjectCompositionJoinPlans(args.project).some(
       (plan) => args.span.start < plan.seam + plan.after && args.span.end > plan.seam - plan.before

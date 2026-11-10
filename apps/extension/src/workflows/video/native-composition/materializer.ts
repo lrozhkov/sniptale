@@ -277,19 +277,30 @@ function materializerMediaIdentity(project: VideoProject): string {
   });
 }
 
-export function createNativeCompositionMaterializer(params: {
+export function createNativeCompositionMaterializer(options: {
   assetUrls: Record<string, string>;
   readAsset: (asset: VideoProject['assets'][number]) => Promise<Blob | null>;
   sceneOutput?: PreviewSceneRenderInput['sceneOutput'];
   assertCaptions?: PreviewSceneRenderInput['assertCaptions'];
   /** Required ordered frames retain their stream; random preview requests keep discontinuity. */
   sourceDiscontinuity?: boolean;
+  /** The source owner retains enhanced demand passes until this frame completes. */
+  prepareSources?: (
+    input: PreviewSceneRenderInput,
+    passes: ReturnType<typeof resolveVideoCompositionRenderPasses>,
+    fallback?: 'first' | 'last'
+  ) => Promise<import('./types').PreviewSceneSourceFrames>;
+  requireGpu?: boolean;
   sampleFps?: number;
   previewRenderer?: VideoPreviewRenderer;
   ownerDocument: Document;
   project: VideoProject;
   rasterSize: VideoEditorPreviewRasterSize;
 }): VideoPreviewFrameMaterializer {
+  let params = {
+    ...options,
+    rasterSize: { width: options.rasterSize.width, height: options.rasterSize.height },
+  };
   const mediaIdentity = materializerMediaIdentity(params.project);
   let busy = false;
   const joinPlans = resolveVideoProjectCompositionJoinPlans(params.project);
@@ -967,7 +978,7 @@ async function renderMaterializedFrame(
       decodedVideoFrames = sampled.media;
     }
     assertActive();
-    if (sourceRoute.kind === 'compatibility' && !decodedVideoFrames)
+    if (sourceRoute.kind === 'compatibility' && !decodedVideoFrames && !params.prepareSources)
       await prepareMaterializedVideos(params, state, stage, time, signal);
     else state.videoRefs = {};
     assertActive();
@@ -1055,7 +1066,18 @@ async function renderMaterializedFrame(
           }
         : {}),
     };
-    if (sourceRoute.kind === 'endpoint') {
+    if (params.prepareSources) {
+      input = {
+        ...input,
+        ...(params.requireGpu ? { gpuOnly: true } : {}),
+        prepareSourceFrames: (passes) =>
+          params.prepareSources!(input, passes, endpointSource?.fallback),
+      };
+      prepared = await prepareNativePreviewSceneFrame(input);
+      assertActive();
+      if (!prepared) throw new Error('Enhanced source preparation is unavailable.');
+      input = prepared.input;
+    } else if (sourceRoute.kind === 'endpoint') {
       if (typeof VideoFrame === 'undefined') {
         const passes = resolveVideoCompositionRenderPasses(renderProject, time);
         const bindings = await input.prepareSourceFrames!(passes);

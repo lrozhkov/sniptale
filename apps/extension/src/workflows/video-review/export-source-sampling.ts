@@ -8,6 +8,7 @@ import {
 import { parseEnhancementMode } from '../../features/video/composition/export-enhancement/mode';
 import {
   createPreparedSourceBudget,
+  type PreparedSourceBudget,
   hasMagnificationDemand,
   prepareSourceSampling,
 } from '../../features/video/composition/export-enhancement/prepared-source';
@@ -168,6 +169,7 @@ export function createReviewExportSampling(
 /** Preserve original decoded pixels before any window, transition, header or effect composition. */
 export async function prepareReviewExportSourceSampling(args: {
   enhancer: Pick<ExportEnhancer, 'withEnhancedRegion'>;
+  budget?: PreparedSourceBudget;
   scene: Readonly<ReviewExportSourceScene>;
   output: { width: number; height: number };
   sample: {
@@ -200,7 +202,7 @@ export async function prepareReviewExportSourceSampling(args: {
     ...(args.camera ? { camera: args.camera } : {}),
   });
   if (!hasMagnificationDemand(plan.demands)) return null;
-  const budget = createPreparedSourceBudget();
+  const budget = args.budget ?? createPreparedSourceBudget();
   const releaseRaw = budget.reserve(identity.sourceSize.width, identity.sourceSize.height);
   const raw = document.createElement('canvas');
   raw.width = identity.sourceSize.width;

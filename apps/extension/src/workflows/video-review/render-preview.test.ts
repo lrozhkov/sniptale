@@ -2684,3 +2684,54 @@ it('preserves enhancement preparation estimates but refuses an unknown source PT
   expect(enhancer.withEnhancedRegion).not.toHaveBeenCalled();
   renderer.dispose();
 });
+
+it('admits the GPU resource ledger for an enhanced export before submitting its frame', async () => {
+  const { createPreviewRenderResources } = await import('./preview-render-resources');
+  const { resources } = setup();
+  const ledger = createPreviewRenderResources({ maximumManagedBytes: 1, maximumCanvases: 1 });
+  const reservation = vi.fn(() => ledger.bytes('gpu-targets', 256 * 1024 * 1024));
+  const gpu = {
+    allocatedBytes: 0,
+    render: vi.fn(async () => {
+      const lease = reservation();
+      lease.release();
+      return true;
+    }),
+    releaseScene: vi.fn(),
+    dispose: vi.fn(),
+  };
+  io.gpu.mockReturnValue(gpu);
+  vi.stubGlobal('navigator', { gpu: {} });
+  const enhancer = {
+    mode: 'bicubic-sharpen' as const,
+    withEnhancedRegion: vi.fn(),
+    dispose: vi.fn(),
+  };
+  const renderer = createReviewPreviewRenderer({
+    resources,
+    exportEnhancer: enhancer,
+    allocation: {
+      describe: allocationInput,
+      replaceLimits: (limits) => ledger.replaceLimits(limits),
+    },
+  });
+  try {
+    const signal = new AbortController().signal;
+    const prepared = await renderer.prepare(scene(), dimensions, signal);
+    const output = await renderer.render(
+      prepared,
+      {
+        ...frame(),
+        source: { ...frame().source, videoFrame: () => ({}) as VideoFrame },
+      },
+      signal
+    );
+    expect(output.renderer.backend).toBe('gpu');
+    expect(reservation).toHaveBeenCalledOnce();
+    expect(io.frame).not.toHaveBeenCalled();
+    output.release();
+  } finally {
+    renderer.dispose();
+    ledger.dispose();
+  }
+});

@@ -1,3 +1,4 @@
+import { resolveGpuPreviewGroupRasters } from '../../../features/video/composition/canvas/gpu-preview-plan';
 import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import type {
   EffectRuntimeGpuPreparedComposition,
@@ -137,10 +138,12 @@ export async function buildNativeGpuPreviewLayers(args: {
   sourceForFrame?: (
     frame: Pick<VideoCompositionFrame, 'visualLayers'>,
     time: number,
-    layers?: readonly Layer[]
+    layers?: readonly Layer[],
+    demand?: string
   ) => {
     frames: ReadonlyMap<string, VideoFrame>;
     media: ReadonlyMap<string, VideoCompositionMediaSource>;
+    sourceRasterScale?: (clipId: string) => number | undefined;
   };
   media: ReadonlyMap<string, VideoCompositionMediaSource>;
   effects?: EffectRuntimeRenderedComposition | EffectRuntimeGpuPreparedComposition;
@@ -155,9 +158,19 @@ export async function buildNativeGpuPreviewLayers(args: {
   const output =
     args.inputComposition?.renderDimensions ?? resolvePreviewCompositionFrameSize(input) ?? logical;
   const retained: Array<{ release(): void }> = [];
+  let sourceDensity = 1;
+  const dense = (layers: readonly GpuPreviewLayer[], futureScale = 1) =>
+    resolveGpuPreviewGroupRasters({ layers, output, logical, sourceDensity, futureScale });
   let snapshotBytes = 0;
   let snapshotEntries = 0;
-  const snapshot = async (group: GpuPreviewGroup) => {
+  const snapshot = async (group: GpuPreviewGroup, futureScale = 1) => {
+    const prepared = dense(
+      [{ source: group, rect: { x: 0, y: 0, ...group.logical }, inverse: IDENTITY }],
+      futureScale
+    )[0]!.source;
+    if (!('kind' in prepared) || prepared.kind !== 'group')
+      throw new Error('GPU exposure group is unavailable.');
+    group = prepared;
     const bytes = assertEffectRasterDimensions(group.output.width, group.output.height) * 4;
     if (
       snapshotBytes + bytes > EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes ||
@@ -363,7 +376,7 @@ export async function buildNativeGpuPreviewLayers(args: {
   };
   const spotlight = (
     layers: readonly GpuPreviewLayer[],
-    frames: readonly SceneSpotlightLayer[],
+    frames: readonly (SceneSpotlightLayer & { sourceDemand?: string })[],
     blurBackdrop?: readonly GpuPreviewLayer[]
   ): GpuPreviewLayer[] => {
     if (!frames.length) return [...layers];
@@ -398,7 +411,23 @@ export async function buildNativeGpuPreviewLayers(args: {
         context.drawImage(mask.dim, 0, 0);
       });
       const lens: GpuPreviewLayer = {
-        ...snapshot,
+        ...(frame.sourceDemand
+          ? groupLayer(video.forDemand(layers, frame.sourceDemand))
+          : snapshot),
+        ...(sourceDensity > 1
+          ? {
+              clip: {
+                rect: {
+                  x: bounds.x - (2 * logical.width) / mask.dim.width,
+                  y: bounds.y - (2 * logical.height) / mask.dim.height,
+                  width: bounds.width + (4 * logical.width) / mask.dim.width,
+                  height: bounds.height + (4 * logical.height) / mask.dim.height,
+                },
+                radius: 0,
+                shape: 'hard-rect' as const,
+              },
+            }
+          : {}),
         lens: {
           bounds,
           scale: frame.lens.scale,
@@ -437,9 +466,15 @@ export async function buildNativeGpuPreviewLayers(args: {
   };
 
   const video = createNativeGpuVideoLayerBuilder({
-    select: (layer, frame, time) =>
-      args.sourceForFrame?.(frame, time, [layer]) ?? { frames: args.sources, media: args.media },
+    select: (layer, frame, time, demand) =>
+      args.sourceForFrame?.(frame, time, [layer], demand) ?? {
+        frames: args.sources,
+        media: args.media,
+      },
     imageBank: input.imageBank,
+    density: (value) => {
+      sourceDensity = Math.max(sourceDensity, value);
+    },
     inverse: (layer) => invertQuickEditProjection(layerProjection(layer)),
     raster,
     groupLayer,
@@ -475,6 +510,12 @@ export async function buildNativeGpuPreviewLayers(args: {
       let body: GpuPreviewLayer[];
       if (selected) {
         const frame = selected.frame;
+        if (input.preparedFrame?.sourceFrames?.sampling)
+          sourceDensity = Math.max(
+            sourceDensity,
+            frame.width / frame.logicalWidth,
+            frame.height / frame.logicalHeight
+          );
         if ('retain' in frame && !repeated) retained.push(frame.retain());
         if (repeated) body = [];
         else
@@ -549,19 +590,18 @@ export async function buildNativeGpuPreviewLayers(args: {
     frame: Parameters<typeof resolveCompositionSceneSpotlights>[0]['frame'],
     afterClipId?: string
   ) =>
-    resolveCompositionSceneSpotlights({
-      project,
-      frame: {
-        ...frame,
-        sceneSpotlights: (frame.sceneSpotlights ?? []).filter(
-          (state) => state.afterClipId === afterClipId
-        ),
-      },
-      images: input.imageBank,
-      viewport: { x: 0, y: 0, ...logical },
-      composition: { x: 0, y: 0, scale: 1 },
-      transform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
-    });
+    (frame.sceneSpotlights ?? [])
+      .filter((state) => state.afterClipId === afterClipId)
+      .flatMap((state) =>
+        resolveCompositionSceneSpotlights({
+          project,
+          frame: { ...frame, sceneSpotlights: [state] },
+          images: input.imageBank,
+          viewport: { x: 0, y: 0, ...logical },
+          composition: { x: 0, y: 0, scale: 1 },
+          transform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
+        }).map((resolved) => ({ ...resolved, sourceDemand: `sceneLens:${state.id}` }))
+      );
   const sceneMasks = (layers: readonly GpuPreviewLayer[], afterClipId?: string) =>
     spotlight(layers, sceneSpotlights(input.project, passes.overlayFrame, afterClipId));
   try {
@@ -614,7 +654,7 @@ export async function buildNativeGpuPreviewLayers(args: {
             );
           }
         }
-      return { layers: result, release };
+      return { layers: dense(result), release };
     }
     let layers: GpuPreviewLayer[] = args.background ? [args.background] : [];
     const split = resolveActiveCameraSplit(
@@ -669,7 +709,34 @@ export async function buildNativeGpuPreviewLayers(args: {
               ) {
                 if (!('kind' in exposureLayer.source) || exposureLayer.source.kind !== 'group')
                   throw new Error('GPU exposure group is unavailable.');
-                exposureLayer.source = await snapshot(exposureLayer.source);
+                const group = exposureLayer.source;
+                exposureLayer.source = await snapshot(group);
+                if (input.preparedFrame?.sourceFrames?.sampling) {
+                  const variants = new Map<string, GpuPreviewLayer>();
+                  for (const state of passes.overlayFrame.sceneSpotlights ?? []) {
+                    const id = `sceneLens:${state.id}`;
+                    if (
+                      !sceneSpotlights(input.project, passes.overlayFrame, state.afterClipId).some(
+                        (frame) => frame.sourceDemand === id && frame.lens && frame.lens.scale > 1
+                      )
+                    )
+                      continue;
+                    const futureLens = sceneSpotlights(
+                      input.project,
+                      passes.overlayFrame,
+                      state.afterClipId
+                    ).find((frame) => frame.sourceDemand === id)?.lens;
+                    const source = await snapshot(
+                      {
+                        ...group,
+                        layers: video.forDemand(group.layers, id),
+                      },
+                      futureLens?.scale ?? 1
+                    );
+                    variants.set(id, { ...exposureLayer, source });
+                  }
+                  if (variants.size) video.retainDemandSnapshots(exposureLayer, variants);
+                }
               }
               exposure.push(exposureLayer);
             }
@@ -789,7 +856,7 @@ export async function buildNativeGpuPreviewLayers(args: {
       });
       layers.push(groupLayer([...masked, { ...cameraMask, blend: 'mask' }]));
     }
-    return { layers, release };
+    return { layers: dense(layers), release };
   } catch (error) {
     release();
     throw error;

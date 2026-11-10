@@ -410,11 +410,7 @@ class PresentationMain {
       this.transitionBytes = endpoints
         ? [endpoints.left.allocationSize!(), endpoints.right.allocationSize!()]
         : null;
-      if (
-        this.args.renderer === 'gpu' &&
-        !this.args.exportEnhancer &&
-        typeof VideoFrame !== 'undefined'
-      )
+      if (this.args.renderer === 'gpu' && typeof VideoFrame !== 'undefined')
         raw = source.toVideoFrame();
       const frame: Frame = {
         ...(this.args.exportEnhancer ? { exportEnhancer: this.args.exportEnhancer } : {}),

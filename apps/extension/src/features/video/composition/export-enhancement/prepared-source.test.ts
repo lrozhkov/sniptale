@@ -8,6 +8,7 @@ import {
   prepareSourceSampling,
   hasMagnificationDemand,
   createPreparedSourceBudget,
+  preparedSourceGpuLayers,
 } from './prepared-source';
 import type { SourceSamplingDemand, SourceSamplingIdentity } from '../draw/media-source';
 import type { ExportEnhancer } from './enhancer';
@@ -442,4 +443,78 @@ it.each([
   expect(budget.snapshot()).toEqual({ bytes: 16, entries: 1 });
   raster();
   expect(budget.snapshot()).toEqual({ bytes: 0, entries: 0 });
+});
+
+it('maps retained enhanced tiles into GPU source coordinates without reducing their density', async () => {
+  const { source, identity, demand } = fixture();
+  const prepared = await prepareSourceSampling({
+    budget: createPreparedSourceBudget(),
+    source,
+    identity,
+    demands: [demand],
+    enhancer: tileDriver(),
+  });
+  try {
+    const gpu = preparedSourceGpuLayers(prepared.sampling, 'body', {
+      x: 10,
+      y: 20,
+      width: 960,
+      height: 4,
+    });
+    expect(gpu?.density).toBe(4);
+    expect(gpu?.layers.map(({ rect }) => rect)).toEqual([
+      { x: 10, y: 20, width: 480, height: 4 },
+      { x: 490, y: 20, width: 480, height: 4 },
+    ]);
+    expect(gpu?.layers.map(({ source }) => source)).toEqual([
+      expect.objectContaining({ width: 1920, height: 16 }),
+      expect.objectContaining({ width: 1920, height: 16 }),
+    ]);
+    expect(() =>
+      preparedSourceGpuLayers(prepared.sampling, 'missing', { x: 0, y: 0, width: 1, height: 1 })
+    ).toThrow();
+  } finally {
+    prepared.dispose();
+  }
+  expect(() =>
+    preparedSourceGpuLayers(prepared.sampling, 'body', { x: 0, y: 0, width: 1, height: 1 })
+  ).toThrow('disposed');
+});
+
+it('preserves a physical tile crop and declines an unchanged source without allocating a raster', () => {
+  const image = document.createElement('canvas');
+  image.width = image.height = 16;
+  const sampling = {
+    sourceKey: image,
+    sourceTime: 0,
+    passTime: 0,
+    sourceSize: { width: 16, height: 16 },
+    drawPrepared: () => false,
+    visitPreparedTiles: (
+      id: string,
+      consume: (tile: import('../draw/media-source').PreparedSourceTile) => void
+    ) => {
+      if (id === 'unchanged') return false;
+      consume({
+        image,
+        physicalSourceRect: { x: 4, y: 4, width: 8, height: 8 },
+        originalPixelROI: { x: 0, y: 0, width: 16, height: 16 },
+      });
+      return true;
+    },
+  };
+  expect(
+    preparedSourceGpuLayers(sampling, 'unchanged', { x: 0, y: 0, width: 32, height: 32 })
+  ).toBeNull();
+  const gpu = preparedSourceGpuLayers(sampling, 'crop', { x: 0, y: 0, width: 32, height: 32 });
+  expect(gpu?.density).toBe(0.25);
+  expect(gpu?.layers[0]?.source).toMatchObject({
+    kind: 'group',
+    output: { width: 8, height: 8 },
+    logical: { width: 8, height: 8 },
+    layers: [{ source: image, rect: { x: -4, y: -4, width: 16, height: 16 } }],
+  });
+  expect(() =>
+    preparedSourceGpuLayers(sampling, 'crop', { x: 0, y: 0, width: 0, height: 1 })
+  ).toThrow(RangeError);
 });

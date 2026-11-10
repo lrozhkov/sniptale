@@ -52,6 +52,32 @@ export function captureNativePreviewSources(input: PreviewSceneRenderInput, pass
     return { frames, media };
   };
   if (precise) {
+    const demandMedia = new Map<
+      object,
+      Map<string, ReadonlyMap<string, VideoCompositionMediaSource>>
+    >();
+    const scopedMedia = (
+      frame: Pick<Passes['overlayFrame'], 'visualLayers'>,
+      time: number,
+      demand: string
+    ) => {
+      let contexts = demandMedia.get(frame);
+      if (!contexts) {
+        contexts = new Map();
+        demandMedia.set(frame, contexts);
+      }
+      const key = JSON.stringify([time, demand]);
+      let media = contexts.get(key);
+      if (!media) {
+        media = new Map(
+          [
+            ...(precise.sampling?.(frame, time).forDemand(demand) ?? precise.media(frame, time)),
+          ].filter(([, source]) => isVideoCompositionFrameSource(source) && source.toVideoFrame)
+        );
+        contexts.set(key, media);
+      }
+      return media;
+    };
     try {
       const nominal = select(precise.nominal);
       return {
@@ -59,8 +85,17 @@ export function captureNativePreviewSources(input: PreviewSceneRenderInput, pass
         forFrame: (
           frame: Pick<Passes['overlayFrame'], 'visualLayers'>,
           time: number,
-          layers?: readonly VideoCompositionVisualLayer[]
-        ) => select(precise.media(frame, time, layers)),
+          layers?: readonly VideoCompositionVisualLayer[],
+          demand = 'body'
+        ) => ({
+          ...select(
+            demand === 'body' || !precise.sampling
+              ? precise.media(frame, time, layers)
+              : scopedMedia(frame, time, demand)
+          ),
+          sourceRasterScale: (clipId: string) =>
+            precise.sampling?.(frame, time).sourceRasterScaleForDemand(clipId, demand),
+        }),
         release() {
           for (const frame of owned.values()) frame.close();
           owned.clear();
@@ -107,8 +142,13 @@ export function captureNativePreviewSources(input: PreviewSceneRenderInput, pass
       forFrame: (
         _frame: Pick<Passes['overlayFrame'], 'visualLayers'>,
         _time: number,
-        _layers?: readonly VideoCompositionVisualLayer[]
-      ) => ({ frames, media }),
+        _layers?: readonly VideoCompositionVisualLayer[],
+        _demand?: string
+      ) => ({
+        frames,
+        media,
+        sourceRasterScale: (_clipId: string): number | undefined => undefined,
+      }),
     };
   } catch (error) {
     release();
@@ -129,6 +169,21 @@ export function prepareNativePreviewGpuComposition(
     stage: input.stage,
   })
 ) {
+  for (const { frame, time } of [
+    { frame: passes.overlayFrame, time: input.currentTime },
+    ...passes.visualPasses,
+  ]) {
+    const sampling = input.preparedFrame?.sourceFrames?.sampling?.(frame, time);
+    if (!sampling) continue;
+    for (const plan of frame.effectRuntimePlans) {
+      const size = sampling.renderDimensions(plan);
+      rasterScale = Math.max(
+        rasterScale,
+        size.width / plan.dimensions.width,
+        size.height / plan.dimensions.height
+      );
+    }
+  }
   return prepareEffectRuntimeGpuComposition({
     executor,
     overlayFrame: passes.overlayFrame,

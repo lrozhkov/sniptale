@@ -1,3 +1,4 @@
+import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
 // @vitest-environment jsdom
 import type { CanvasCommentExport } from '../../features/video/review/comments';
 import { isCanvasCommentVisibleAt } from '../../features/video/review/comments';
@@ -613,3 +614,32 @@ function paintLegacyExportReference({
   };
   drawReviewSceneFrame(context, frameArgs);
 }
+
+it('accounts simultaneous transition endpoint sources in one retained budget', async () => {
+  const budget = createPreparedSourceBudget();
+  const model = enhancer();
+  const sample = { timestamp: 1, draw: vi.fn() };
+  const args = {
+    enhancer: model,
+    budget,
+    scene,
+    output: { width: 64, height: 36 },
+    sample,
+    sourceTime: 1,
+    resultTime: 1,
+    signal: new AbortController().signal,
+  };
+  const first = await prepareReviewExportSourceSampling(args);
+  const one = budget.snapshot();
+  const second = await prepareReviewExportSourceSampling({
+    ...args,
+    sample: { ...sample, timestamp: 2 },
+  });
+  expect(budget.snapshot()).toEqual({ bytes: one.bytes * 2, entries: one.entries * 2 });
+  expect(one.bytes).toBeGreaterThan(0);
+  first!.dispose();
+  expect(budget.snapshot()).toEqual(one);
+  expect(second!.sampling.sourceTime).toBe(2);
+  second!.dispose();
+  expect(budget.snapshot()).toEqual({ bytes: 0, entries: 0 });
+});

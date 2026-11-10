@@ -1,3 +1,5 @@
+import { preparedSourceGpuLayers } from '../../../features/video/composition/export-enhancement/prepared-source';
+import { sourceClickSamplingDemandId } from '../../../features/video/composition/draw/effects/actions';
 import { resolveVideoMediaShadowParams } from '../../../features/video/composition/canvas/media-shadow';
 import type { GpuPreviewLayer } from '../../../features/video/composition/canvas/gpu-preview';
 import type {
@@ -25,6 +27,7 @@ import {
   getFittedMediaOriginalWindowFrame,
   getFittedMediaWindowFrame,
   drawFittedMediaLayer,
+  resolveFittedWindowRaster,
 } from '../../../features/video/composition/draw/fitted-media';
 import {
   resolveVideoWindowMedia,
@@ -112,6 +115,14 @@ function buildNativeGpuVideoLayers(args: {
   imageBank: Record<string, HTMLImageElement>;
   inverse: QuickEditHomography;
   sourceOwner: VideoLayer;
+  sourceContent?: GpuPreviewLayer['rect'];
+  headerLayer?(header: GpuPreviewLayer): GpuPreviewLayer;
+  sourceLayer(
+    content: GpuPreviewLayer['rect'],
+    inverse: QuickEditHomography,
+    orientation: GpuPreviewLayer['orientation']
+  ): GpuPreviewLayer;
+  forDemand(layers: readonly GpuPreviewLayer[], demand: string): GpuPreviewLayer[];
   sourceBodies: Map<VideoLayer, NativeGpuVideoSourceBody>;
   raster: Raster;
   sourceMask?: (key: string, paint: (context: CanvasRenderingContext2D) => void) => GpuPreviewLayer;
@@ -126,7 +137,7 @@ function buildNativeGpuVideoLayers(args: {
   ) => GpuPreviewLayer;
   spotlight: (
     layers: readonly GpuPreviewLayer[],
-    frames: readonly SceneSpotlightLayer[]
+    frames: readonly (SceneSpotlightLayer & { sourceDemand?: string })[]
   ) => GpuPreviewLayer[];
 }): GpuPreviewLayer[] {
   const { layer, source, inverse, raster, groupLayer, spotlight } = args;
@@ -152,7 +163,7 @@ function buildNativeGpuVideoLayers(args: {
   const window = appearance
     ? cameraWindowFrame(media.frame, appearance.shape)
     : getFittedMediaWindowFrame(media);
-  const content = getFittedMediaContentFrame(media);
+  const content = args.sourceContent ?? getFittedMediaContentFrame(media);
   const bare: VideoLayer = {
     ...layer,
     rotation: 0,
@@ -201,14 +212,13 @@ function buildNativeGpuVideoLayers(args: {
       multiplyQuickEditProjections(layer.sourceContentTransform ?? IDENTITY, mirror)
     );
     if (!sourceInverse) throw new Error('Source projection is unavailable.');
-    const sourceLayers: GpuPreviewLayer[] = [
-      { source, rect: content, inverse: sourceInverse, ...(orientation ? { orientation } : {}) },
-    ];
-    const header =
+    const sourceLayers: GpuPreviewLayer[] = [args.sourceLayer(content, sourceInverse, orientation)];
+    let header: GpuPreviewLayer | null =
       layer.effectActionsOnly &&
       !layer.actions?.some((action) => action.gestureFeedback?.effect === 'magnify')
         ? null
         : nativeGpuWindowHeader(media, raster, sourceInverse);
+    if (header && args.headerLayer) header = args.headerLayer(header);
     const paintMask = (context: CanvasRenderingContext2D) => {
       traceWindow(context);
       if (layer.clip.sourceCrop && !header) {
@@ -304,8 +314,8 @@ function buildNativeGpuVideoLayers(args: {
     const snapshot = groupLayer(body, true);
     const modified = spotlight(
       body,
-      layer.spotlights.map((state) =>
-        sampleCompositionSpotlightLayer({
+      layer.spotlights.map((state) => ({
+        ...sampleCompositionSpotlightLayer({
           state,
           window:
             state.coordinateSpace === 'source-window'
@@ -315,8 +325,9 @@ function buildNativeGpuVideoLayers(args: {
           projection: IDENTITY,
           scale: 1,
           clip: { rect: window, radius: layer.clip.windowCornerRadius ?? 0 },
-        })
-      )
+        }),
+        sourceDemand: `sceneLens:${state.id}`,
+      }))
     );
     const windowMask = raster(traceWindow, true);
     body = [
@@ -384,7 +395,7 @@ function buildNativeGpuVideoLayers(args: {
       groupLayer(
         [
           {
-            ...sourceSnapshot,
+            ...args.forDemand([sourceSnapshot], sourceClickSamplingDemandId(action))[0]!,
             lens: {
               bounds,
               scale: feedback.lens.scale,
@@ -492,10 +503,12 @@ export function createNativeGpuVideoLayerBuilder(args: {
   select(
     layer: VideoLayer,
     frame: Pick<VideoCompositionFrame, 'visualLayers'>,
-    time: number
+    time: number,
+    demand?: string
   ): {
     frames: ReadonlyMap<string, VideoFrame>;
     media: ReadonlyMap<string, VideoCompositionMediaSource>;
+    sourceRasterScale?: (clipId: string) => number | undefined;
   };
   imageBank: Record<string, HTMLImageElement>;
   inverse(layer: VideoLayer): QuickEditHomography | null;
@@ -505,12 +518,31 @@ export function createNativeGpuVideoLayerBuilder(args: {
   ownerDocument: Document;
   plane: GpuPreviewLayer['rect'];
   retain(lease: { release(): void }): void;
+  density(value: number): void;
   sourceMask?: NativeGpuSourceMaterial;
   sourceDecoration?: NativeGpuSourceMaterial;
 }) {
+  const demands = new WeakMap<object, { demand: string; build(demand: string): GpuPreviewLayer }>();
+  const forDemand = (layers: readonly GpuPreviewLayer[], prefix: string): GpuPreviewLayer[] =>
+    layers.map((layer) => {
+      const descriptor = demands.get(layer.source);
+      if (descriptor) {
+        const demand = descriptor.demand === 'body' ? prefix : `${prefix}/${descriptor.demand}`;
+        const replacement = descriptor.build(demand);
+        demands.set(replacement.source, { ...descriptor, demand });
+        return { ...layer, ...replacement, inverse: layer.inverse };
+      }
+      if ('kind' in layer.source && layer.source.kind === 'group') {
+        const group = layer.source;
+        const children = forDemand(group.layers, prefix);
+        if (children.some((child, index) => child !== group.layers[index]))
+          return { ...layer, source: { ...layer.source, layers: children } };
+      }
+      return layer;
+    });
   const bodies = new Map<
     Pick<VideoCompositionFrame, 'visualLayers'>,
-    Map<VideoLayer, NativeGpuVideoSourceBody>
+    Map<number, Map<VideoLayer, NativeGpuVideoSourceBody>>
   >();
   const material =
     (owner: NativeGpuSourceMaterial) =>
@@ -519,21 +551,49 @@ export function createNativeGpuVideoLayerBuilder(args: {
       args.retain(lease);
       return lease.layer;
     };
-  return (
+  const build = (
     layer: VideoLayer,
     sourceOwner: VideoLayer,
     frame: Pick<VideoCompositionFrame, 'visualLayers'>,
     time: number
   ) => {
     const selected = args.select(sourceOwner, frame, time);
+    const placement = (demand: string) => {
+      const selectedDemand = args.select(sourceOwner, frame, time, demand);
+      const borrowed = selectedDemand.media.get(layer.clipId);
+      const density = selectedDemand.sourceRasterScale?.(layer.clipId);
+      if (!isVideoCompositionFrameSource(borrowed) || density === undefined) return undefined;
+      const media = {
+        ...resolveVideoWindowMedia(sourceOwner, borrowed, 1, args.imageBank),
+        frame: sourceOwner,
+      };
+      const image = media.windowHeaderImage;
+      if (!image) return undefined;
+      const raster = resolveFittedWindowRaster(media, density, image.naturalHeight);
+      const window = getFittedMediaWindowFrame(media);
+      return {
+        content: raster.source,
+        header: {
+          x: window.x,
+          y: window.y,
+          width: window.width,
+          height: raster.visible.y - window.y,
+        },
+      };
+    };
     const source = selected.frames.get(layer.clipId);
     if (!source) throw new Error('GPU video source is unavailable.');
     const inverse = args.inverse(layer);
     if (!inverse) throw new Error('Visual layer projection is unavailable.');
-    let sourceBodies = bodies.get(frame);
+    let frameBodies = bodies.get(frame);
+    if (!frameBodies) {
+      frameBodies = new Map();
+      bodies.set(frame, frameBodies);
+    }
+    let sourceBodies = frameBodies.get(time);
     if (!sourceBodies) {
       sourceBodies = new Map();
-      bodies.set(frame, sourceBodies);
+      frameBodies.set(time, sourceBodies);
     }
     return buildNativeGpuVideoLayers({
       layer,
@@ -544,6 +604,104 @@ export function createNativeGpuVideoLayerBuilder(args: {
       inverse,
       sourceOwner,
       sourceBodies,
+      forDemand,
+      ...(placement('body') ? { sourceContent: placement('body')!.content } : {}),
+      headerLayer(header) {
+        if (!selected.sourceRasterScale?.(layer.clipId)) return header;
+        const create = (demand: string) => {
+          const target = placement(demand);
+          return {
+            ...args.groupLayer(
+              [{ ...header, rect: target?.header ?? header.rect, inverse: IDENTITY }],
+              true,
+              target?.header ?? header.rect
+            ),
+            inverse: header.inverse,
+          };
+        };
+        const leaf = create('body');
+        demands.set(leaf.source, { demand: 'body', build: create });
+        return leaf;
+      },
+      sourceLayer(content, sourceInverse, orientation) {
+        const borrowed = selected.media.get(layer.clipId);
+        if (
+          (!isVideoCompositionFrameSource(borrowed) || !borrowed.preparedSampling) &&
+          selected.sourceRasterScale?.(layer.clipId) === undefined
+        )
+          return {
+            source,
+            rect: content,
+            inverse: sourceInverse,
+            ...(orientation ? { orientation } : {}),
+          };
+        const create = (demand: string): GpuPreviewLayer => {
+          const selectedDemand = args.select(sourceOwner, frame, time, demand);
+          const borrowed = selectedDemand.media.get(layer.clipId);
+          const sampling = isVideoCompositionFrameSource(borrowed)
+            ? borrowed.preparedSampling
+            : undefined;
+          const target = placement(demand);
+          const destination = target?.content ?? content;
+          const clip =
+            sourceOwner.clip.sourceCrop && target
+              ? {
+                  rect: {
+                    x: destination.x + sourceOwner.clip.sourceCrop.x * destination.width,
+                    y: target.header.y + target.header.height,
+                    width: destination.width * sourceOwner.clip.sourceCrop.width,
+                    height: destination.height * sourceOwner.clip.sourceCrop.height,
+                  },
+                  radius: 0,
+                  shape: 'hard-rect' as const,
+                }
+              : undefined;
+          const prepared = sampling ? preparedSourceGpuLayers(sampling, 'body', destination) : null;
+          if (prepared) {
+            args.density(prepared.density);
+            if (prepared.layers.length === 1) {
+              const tile = prepared.layers[0]!;
+              return {
+                ...tile,
+                inverse: multiplyQuickEditProjections(tile.inverse, sourceInverse),
+                ...(clip ? { clip } : {}),
+              };
+            }
+            const x = Math.min(...prepared.layers.map((layer) => layer.rect.x));
+            const y = Math.min(...prepared.layers.map((layer) => layer.rect.y));
+            const bounds = {
+              x,
+              y,
+              width:
+                Math.max(...prepared.layers.map((layer) => layer.rect.x + layer.rect.width)) - x,
+              height:
+                Math.max(...prepared.layers.map((layer) => layer.rect.y + layer.rect.height)) - y,
+            };
+            const grouped = args.groupLayer(prepared.layers, true, bounds);
+            return { ...grouped, inverse: sourceInverse, ...(clip ? { clip } : {}) };
+          }
+          const source = selectedDemand.frames.get(layer.clipId);
+          if (!source) throw new Error('GPU video source is unavailable.');
+          return {
+            ...args.groupLayer(
+              [
+                {
+                  source,
+                  rect: destination,
+                  inverse: IDENTITY,
+                  ...(orientation ? { orientation } : {}),
+                },
+              ],
+              true
+            ),
+            inverse: sourceInverse,
+            ...(clip ? { clip } : {}),
+          };
+        };
+        const leaf = create('body');
+        demands.set(leaf.source, { demand: 'body', build: create });
+        return leaf;
+      },
       raster: args.raster,
       groupLayer: args.groupLayer,
       spotlight: args.spotlight,
@@ -551,4 +709,17 @@ export function createNativeGpuVideoLayerBuilder(args: {
       ...(args.sourceDecoration ? { sourceDecoration: material(args.sourceDecoration) } : {}),
     });
   };
+  return Object.assign(build, {
+    forDemand,
+    retainDemandSnapshots(layer: GpuPreviewLayer, variants: ReadonlyMap<string, GpuPreviewLayer>) {
+      demands.set(layer.source, {
+        demand: 'body',
+        build(demand) {
+          const replacement = variants.get(demand);
+          if (!replacement) throw new Error('Enhanced exposure demand snapshot is unavailable.');
+          return replacement;
+        },
+      });
+    },
+  });
 }

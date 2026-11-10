@@ -277,7 +277,10 @@ export async function runMp4HybridVideoPipeline(args: Mp4HybridVideoPipelineArgs
       }
 
       if (span.kind === 'accelerated-composite') {
-        if (parseEnhancementMode(args.settings.detailEnhancement) === 'off') {
+        if (
+          parseEnhancementMode(args.settings.detailEnhancement) === 'off' ||
+          args.job.sourceSampling
+        ) {
           applyCompositeFallback(span);
           await renderCompositeSpan(
             args,

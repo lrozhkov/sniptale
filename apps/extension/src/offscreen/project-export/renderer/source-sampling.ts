@@ -50,10 +50,11 @@ import {
   type NativeSamplingSourcePlan,
 } from './source-sampling-plan';
 
-interface NativePreparedSourcePass {
+export interface NativePreparedSourcePass {
   media: ReadonlyMap<string, VideoCompositionMediaSource>;
   sourceRasterScale: number;
   rasterScaleForDemand(id: string): number;
+  sourceRasterScaleForDemand(clipId: string, id: string): number | undefined;
   effectMedia(plan: EffectRuntimeFramePlan): ReadonlyMap<string, VideoCompositionMediaSource>;
   forDemand(id: string): ReadonlyMap<string, VideoCompositionMediaSource>;
   renderDimensions(plan: EffectRuntimeFramePlan): { width: number; height: number };
@@ -71,6 +72,8 @@ export interface ProjectExportSourceSampling {
     images?: Record<string, HTMLImageElement>;
     lensFrame?: VideoCompositionFrame;
     signal?: AbortSignal;
+    /** The caller retains this pass through GPU completion. */
+    retain?: boolean;
   }): Promise<NativePreparedSourcePass>;
   reserveRaster(width: number, height: number): () => void;
   releasePass(): void;
@@ -171,6 +174,7 @@ export function createProjectExportSourceSampling(args: {
   let enhancer: ExportEnhancer | undefined = args.enhancer;
   let samples: ReturnType<typeof createCompositionCutSampleSource> | undefined;
   let current: NativePreparedSourcePass | undefined;
+  const retained = new Set<NativePreparedSourcePass>();
   let key:
     | {
         time: number;
@@ -353,9 +357,11 @@ export function createProjectExportSourceSampling(args: {
       key.fallback === input.fallback &&
       key.project === input.project &&
       key.media === input.media
-    )
+    ) {
+      if (input.retain) retained.add(current);
       return current;
-    current?.release();
+    }
+    if (current && !retained.has(current)) current.release();
     current = undefined;
     key = undefined;
     if (mode === 'off' && !managesSources)
@@ -363,6 +369,7 @@ export function createProjectExportSourceSampling(args: {
         media: input.media,
         sourceRasterScale: 1,
         rasterScaleForDemand: () => 1,
+        sourceRasterScaleForDemand: () => undefined,
         effectMedia: () => input.media,
         forDemand: () => input.media,
         renderDimensions: (p) => p.renderDimensions,
@@ -377,6 +384,10 @@ export function createProjectExportSourceSampling(args: {
         resolveProjectOutputTransform(input.project, args.settings).scale,
         ...plans.map((plan) => plan.captureScales.get(id) ?? 0)
       );
+    const sourceRasterScaleForDemand = (clipId: string, id: string) => {
+      const plan = plans.find((plan) => plan.clipId === clipId);
+      return plan?.sourceRasterScales.get(id) ?? plan?.sourceRasterScales.get('body');
+    };
     const densityFor = (plan: EffectRuntimeFramePlan) =>
       Math.max(
         1,
@@ -427,6 +438,7 @@ export function createProjectExportSourceSampling(args: {
         media,
         sourceRasterScale: mode === 'off' ? 1 : rasterScaleForDemand('body'),
         rasterScaleForDemand: mode === 'off' ? () => 1 : rasterScaleForDemand,
+        sourceRasterScaleForDemand,
         effectMedia: () => media,
         forDemand: () => media,
         renderDimensions: mode === 'off' ? (p) => p.renderDimensions : physical,
@@ -437,9 +449,11 @@ export function createProjectExportSourceSampling(args: {
             current = undefined;
             key = undefined;
           }
+          retained.delete(pass);
           decoded.release();
         },
       };
+      if (input.retain) retained.add(pass);
       current = pass;
       key = {
         time: input.time,
@@ -456,6 +470,7 @@ export function createProjectExportSourceSampling(args: {
     const owned: VideoFrame[] = [];
     const normalized: Array<{ release(): void }> = [];
     let released = false;
+    let passReference: NativePreparedSourcePass | undefined;
     const release = () => {
       if (released) return;
       released = true;
@@ -463,6 +478,7 @@ export function createProjectExportSourceSampling(args: {
         current = undefined;
         key = undefined;
       }
+      if (passReference) retained.delete(passReference);
       for (const lease of leases) lease.dispose();
       for (const raster of normalized) {
         raster.release();
@@ -540,6 +556,7 @@ export function createProjectExportSourceSampling(args: {
         media,
         sourceRasterScale: rasterScaleForDemand('body'),
         rasterScaleForDemand,
+        sourceRasterScaleForDemand,
         effectMedia(plan) {
           return nativeSamplingTargetIncludes(plan, plans[0]?.clipId ?? '', input.frame) ||
             plans.some((p) => nativeSamplingTargetIncludes(plan, p.clipId, input.frame))
@@ -552,6 +569,8 @@ export function createProjectExportSourceSampling(args: {
         renderDimensions: physical,
         release,
       };
+      passReference = pass;
+      if (input.retain) retained.add(pass);
       current = pass;
       key = {
         time: input.time,
@@ -598,6 +617,8 @@ export function createProjectExportSourceSampling(args: {
         await enhancer?.dispose();
       } finally {
         current?.release();
+        for (const pass of retained) pass.release();
+        retained.clear();
         current = undefined;
         for (const lease of [...scratch]) lease.release();
         for (const release of [...byteLeases]) release();

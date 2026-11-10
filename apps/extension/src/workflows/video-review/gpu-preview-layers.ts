@@ -167,6 +167,7 @@ export async function reviewGpuContentLayers(args: {
   sourceTime: number;
   fps: number;
   original: GpuPreviewGroup;
+  originalForLens?: (index: number) => GpuPreviewGroup;
   primitives: ReviewGpuPrimitives;
   annotations: Awaited<ReturnType<typeof createReviewAnnotationRenderer>> | null;
   admit(bitmaps: readonly Size[]): void;
@@ -256,7 +257,7 @@ export async function reviewGpuContentLayers(args: {
         )
       );
     };
-    for (const click of clicks) {
+    for (const [clickIndex, click] of clicks.entries()) {
       if (click.effect !== 'magnify' || !click.lens || click.lens.scale <= 1) {
         pendingClicks.push(click);
         continue;
@@ -296,8 +297,14 @@ export async function reviewGpuContentLayers(args: {
           stroke: click.stroke * sourceScale,
         });
       });
+      const lensSource = args.originalForLens?.(clickIndex) ?? args.original;
+      const lensDensity = Math.max(
+        1,
+        lensSource.output.width / lensSource.logical.width,
+        lensSource.output.height / lensSource.logical.height
+      );
       const lens: GpuPreviewLayer = {
-        source: args.original,
+        source: lensSource,
         rect: full,
         inverse: identity,
         clip: {
@@ -336,7 +343,10 @@ export async function reviewGpuContentLayers(args: {
       const lensGroup: GpuPreviewGroup = {
         kind: 'group',
         logical: { width: artworkBounds.width, height: artworkBounds.height },
-        output: { width: artworkBounds.width, height: artworkBounds.height },
+        output: {
+          width: Math.ceil(artworkBounds.width * lensDensity),
+          height: Math.ceil(artworkBounds.height * lensDensity),
+        },
         layers: [texture(shadow, shadowBounds), lens, texture(ring, ringBounds)].map((layer) => ({
           ...layer,
           inverse: localToScene,
@@ -590,6 +600,7 @@ export function reviewGpuSpotlightLayers(args: {
   dimensions: PreviewSceneDimensions;
   geometry: ReviewPresentedGeometry;
   source: GpuPreviewGroup;
+  sourceForLens?: ((index: number) => GpuPreviewGroup) | undefined;
   projection: QuickEditHomography;
   primitives: ReviewGpuPrimitives;
 }) {
@@ -616,7 +627,13 @@ export function reviewGpuSpotlightLayers(args: {
     },
     projection: geometry.layout.spatial ? args.projection : undefined,
   }));
-  return applyReviewGpuSpotlightFrames({ dimensions, frames, source: args.source, primitives });
+  return applyReviewGpuSpotlightFrames({
+    dimensions,
+    frames,
+    source: args.source,
+    sourceForLens: args.sourceForLens,
+    primitives,
+  });
 }
 
 /** Main and inspector previews consume the same evaluated masks, lenses and GPU groups. */
@@ -624,6 +641,7 @@ export function applyReviewGpuSpotlightFrames(args: {
   dimensions: PreviewSceneDimensions;
   frames: readonly SceneSpotlightLayer[];
   source: GpuPreviewGroup;
+  sourceForLens?: ((index: number) => GpuPreviewGroup) | undefined;
   primitives: ReviewGpuPrimitives;
 }) {
   const { dimensions, frames, primitives } = args;
@@ -631,7 +649,7 @@ export function applyReviewGpuSpotlightFrames(args: {
   const full = { x: 0, y: 0, ...output };
   if (!frames.length) return args.source;
   const layers: GpuPreviewLayer[] = [{ source: args.source, rect: full, inverse: identity }];
-  for (const frame of frames) {
+  for (const [frameIndex, frame] of frames.entries()) {
     if (!frame.lens || frame.lens.scale <= 1) continue;
     const corners = [
       { x: frame.opening.x, y: frame.opening.y },
@@ -650,9 +668,20 @@ export function applyReviewGpuSpotlightFrames(args: {
     const lens = group(
       [
         {
-          source: args.source,
+          source: args.sourceForLens?.(frameIndex) ?? args.source,
           rect: full,
           inverse: identity,
+          // The canonical mask can cover two texels beyond its projected opening bounds.
+          clip: {
+            rect: {
+              x: bounds.x - 2,
+              y: bounds.y - 2,
+              width: bounds.width + 4,
+              height: bounds.height + 4,
+            },
+            radius: 0,
+            shape: 'hard-rect',
+          },
           lens: {
             bounds,
             scale: frame.lens.scale,

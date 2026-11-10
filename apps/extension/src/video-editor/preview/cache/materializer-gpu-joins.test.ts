@@ -12,6 +12,7 @@ import type { PreviewSceneRenderInput, PreviewScenePresentation } from '../stage
 import { createGpuPreviewRenderer } from '../../../features/video/composition/canvas/gpu-preview';
 import { renderNativeCompositionScene as renderPreviewScene } from '../../../workflows/video/native-composition/render-scene';
 import { createVideoPreviewFrameMaterializer } from './materializer';
+import { validateGpuPreviewFrame } from '../../../features/video/composition/canvas/gpu-preview-plan';
 
 vi.mock('../../../features/video/composition/canvas/gpu-preview', async (original) => ({
   ...(await original<typeof import('../../../features/video/composition/canvas/gpu-preview')>()),
@@ -30,12 +31,17 @@ vi.mock('../../../workflows/video-review/decoded-video-sample', () => ({
   }),
 }));
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   vi.resetAllMocks();
   document.body.replaceChildren();
 });
 
-function fixture(type: 'dissolve' | 'fade-black' = 'dissolve', sampling?: 'cut') {
+function fixture(
+  type: 'dissolve' | 'fade-black' = 'dissolve',
+  sampling?: 'cut',
+  rasterSize = { width: 8, height: 4 }
+) {
   const project = createEmptyVideoProject('GPU joins');
   project.fps = 4;
   project.duration = 2;
@@ -129,7 +135,7 @@ function fixture(type: 'dissolve' | 'fade-black' = 'dissolve', sampling?: 'cut')
     assetUrls: {},
     ownerDocument: document,
     project,
-    rasterSize: { width: 8, height: 4 },
+    rasterSize,
   });
   return {
     project,
@@ -454,5 +460,42 @@ it('retains a nested cut as a private GPU endpoint with one final frontend acqui
     owner.dispose();
   }
   expect(f.nestedSources[0]!.releaseImage).toHaveBeenCalledOnce();
+  expect(f.sources.every((source) => source.releaseImage.mock.calls.length === 1)).toBe(true);
+});
+
+it('publishes GPU joins when the raster comes from export settings', async () => {
+  vi.stubGlobal('VideoFrame', class {});
+  const settings = {
+    width: 8,
+    height: 4,
+    format: 'WEBM',
+    quality: 'HIGH',
+    downloadAfterExport: false,
+  };
+  const f = fixture('dissolve', undefined, settings);
+  f.present.mockImplementation(async (request) => {
+    validateGpuPreviewFrame(request, 8192);
+  });
+  try {
+    const frame = await f.owner.renderFrameWithPresentation(
+      1,
+      new AbortController().signal,
+      undefined,
+      f.acquire
+    );
+    expect(frame.canvas).toBe(f.finalCanvas);
+    expect(frame.presentation.renderer?.backend).toBe('gpu');
+    expect(f.present).toHaveBeenCalledOnce();
+    expect(settings).toEqual({
+      width: 8,
+      height: 4,
+      format: 'WEBM',
+      quality: 'HIGH',
+      downloadAfterExport: false,
+    });
+    frame.presentation.output?.release();
+  } finally {
+    f.owner.dispose();
+  }
   expect(f.sources.every((source) => source.releaseImage.mock.calls.length === 1)).toBe(true);
 });

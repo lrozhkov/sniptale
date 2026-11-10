@@ -728,9 +728,11 @@ async function resolvePreviewEffectRuntimeFrames(
               ...frame.effectInputLayers,
             ]),
             renderDimensions: (plan) =>
+              params.preparedFrame!.sourceFrames!.sampling?.(frame, time).renderDimensions(plan) ??
               scaleEffectRuntimeFramePlan(plan, resolvePreviewEffectRuntimeRasterScale(params))
                 .renderDimensions,
-            effectMedia: () =>
+            effectMedia: (plan) =>
+              params.preparedFrame!.sourceFrames!.sampling?.(frame, time).effectMedia(plan) ??
               params.preparedFrame!.sourceFrames!.media(frame, time, frame.effectInputLayers),
           }),
         }

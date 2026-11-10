@@ -9,7 +9,16 @@ import type {
   GpuPreviewRenderer,
 } from './gpu-preview-types';
 import type { CameraSpatialRect } from '../../project/motion/spatial';
-import { quickEditRotationMatrix } from '../motion/spatial-geometry';
+import {
+  quickEditRotationMatrix,
+  invertQuickEditProjection,
+  multiplyQuickEditProjections,
+  projectQuickEditPoint,
+  scaleQuickEditRectAboutCenter,
+  type QuickEditHomography,
+} from '../motion/spatial-geometry';
+import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
+import { samplingRasterSize } from '../export-enhancement/projection-density';
 type Size = { width: number; height: number };
 export type Raster = HTMLCanvasElement | OffscreenCanvas | ImageBitmap | GpuPreviewPaintSource;
 export function isPaintSource(source: Raster): source is GpuPreviewPaintSource {
@@ -634,4 +643,343 @@ export function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRe
   };
   const layers = normalize(request.layers, request);
   return layers === request.layers ? request : { ...request, layers };
+}
+
+/** Preserve detailed source rasters only over the GPU aperture that can read them. */
+export function resolveGpuPreviewGroupRasters({
+  layers,
+  output,
+  logical,
+  sourceDensity,
+  futureScale = 1,
+}: {
+  layers: readonly GpuPreviewLayer[];
+  output: Size;
+  logical: Size;
+  sourceDensity: number;
+  futureScale?: number;
+}): GpuPreviewLayer[] {
+  const IDENTITY: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  if (sourceDensity <= 1) return [...layers];
+  type Rect = GpuPreviewLayer['rect'];
+  const full = (group: GpuPreviewGroup): Rect => ({ x: 0, y: 0, ...group.logical });
+  const intersect = (a: Rect, b: Rect): Rect | null => {
+    const x = Math.max(a.x, b.x),
+      y = Math.max(a.y, b.y);
+    const right = Math.min(a.x + a.width, b.x + b.width);
+    const bottom = Math.min(a.y + a.height, b.y + b.height);
+    return right > x && bottom > y ? { x, y, width: right - x, height: bottom - y } : null;
+  };
+  const expand = (rect: Rect, x: number, y = x): Rect => ({
+    x: rect.x - x,
+    y: rect.y - y,
+    width: rect.width + x * 2,
+    height: rect.height + y * 2,
+  });
+  const union = (a: Rect, b: Rect): Rect => {
+    const x = Math.min(a.x, b.x),
+      y = Math.min(a.y, b.y);
+    return {
+      x,
+      y,
+      width: Math.max(a.x + a.width, b.x + b.width) - x,
+      height: Math.max(a.y + a.height, b.y + b.height) - y,
+    };
+  };
+  const project = (rect: Rect, matrix: QuickEditHomography): Rect | null => {
+    if (!matrix.every(Number.isFinite)) throw new TypeError('Invalid homography');
+    const points = [
+      { x: rect.x, y: rect.y },
+      { x: rect.x + rect.width, y: rect.y },
+      { x: rect.x, y: rect.y + rect.height },
+      { x: rect.x + rect.width, y: rect.y + rect.height },
+    ].map((point) => projectQuickEditPoint(matrix, point));
+    if (points.some((point) => !point)) return null;
+    return getCanvasPointsBounds(points.map((point) => point!));
+  };
+  const horizon = (error: unknown) =>
+    error instanceof RangeError &&
+    (error.message === 'ROI crosses projection horizon' ||
+      error.message === 'Projection behind camera');
+  const requests = new Map<GpuPreviewGroup, { roi: Rect; density: number }>();
+  const visited = new Map<GpuPreviewGroup, Set<string>>();
+  const inspect = (
+    layers: readonly GpuPreviewLayer[],
+    ancestor: QuickEditHomography,
+    aperture: Rect,
+    parentScale: number
+  ) => {
+    for (const layer of layers) {
+      if (!('kind' in layer.source) || layer.source.kind !== 'group') continue;
+      const group = layer.source;
+      const forward = invertQuickEditProjection(layer.inverse);
+      if (!forward) throw new Error('Preview projection is unavailable.');
+      const placement: QuickEditHomography = [
+        layer.rect.width / group.logical.width,
+        0,
+        layer.rect.x,
+        0,
+        layer.rect.height / group.logical.height,
+        layer.rect.y,
+        0,
+        0,
+        1,
+      ];
+      const lens = layer.lens
+        ? scaleQuickEditRectAboutCenter(layer.lens.bounds, layer.lens.scale)
+        : IDENTITY;
+      const projection = multiplyQuickEditProjections(
+        ancestor,
+        multiplyQuickEditProjections(forward, multiplyQuickEditProjections(lens, placement))
+      );
+      let plane = project(aperture, layer.inverse);
+      if (plane && layer.clip) {
+        let coverage = layer.clip.rect;
+        if (layer.clip.shape !== 'hard-rect') {
+          try {
+            coverage = expand(
+              coverage,
+              (2 * samplingRasterSize({ roi: aperture, projection: layer.inverse }).density) /
+                parentScale
+            );
+          } catch (error) {
+            if (!horizon(error)) throw error;
+            plane = null;
+          }
+        }
+        if (plane) {
+          const visible = intersect(plane, coverage);
+          if (!visible) continue;
+          plane = visible;
+        }
+      }
+      let roi: Rect;
+      if (!plane) roi = full(group);
+      else {
+        if (layer.lens) {
+          const optical = layer.lens.optics === 'optical';
+          const dispersion = optical ? 0.012 * Math.min(1, layer.lens.scale - 1) : 0;
+          const low = 1 / layer.lens.scale - dispersion;
+          const high = optical ? 1 + dispersion : low;
+          const first = project(plane, scaleQuickEditRectAboutCenter(layer.lens.bounds, low))!;
+          const last = project(plane, scaleQuickEditRectAboutCenter(layer.lens.bounds, high))!;
+          plane = union(first, last);
+        }
+        const sampled = {
+          x: ((plane.x - layer.rect.x) * group.logical.width) / layer.rect.width,
+          y: ((plane.y - layer.rect.y) * group.logical.height) / layer.rect.height,
+          width: (plane.width * group.logical.width) / layer.rect.width,
+          height: (plane.height * group.logical.height) / layer.rect.height,
+        };
+        const visible = intersect(sampled, full(group));
+        if (!visible) continue;
+        roi = visible;
+      }
+      const orientation = layer.orientation;
+      const unsafe =
+        layer.depth ||
+        layer.blur ||
+        layer.cssFilter ||
+        (orientation && (orientation.rotation || orientation.flip)) ||
+        group.layers.some((child) => child.operationClip || child.depth);
+      // Filter support and destination-UV masks retain their original target coordinate system.
+      if (unsafe) roi = full(group);
+      else
+        roi = intersect(
+          expand(
+            roi,
+            (2 * group.logical.width) / group.output.width,
+            (2 * group.logical.height) / group.output.height
+          ),
+          full(group)
+        )!;
+      const key = JSON.stringify([projection, roi]);
+      let contexts = visited.get(group);
+      if (!contexts) {
+        contexts = new Set();
+        visited.set(group, contexts);
+      }
+      if (contexts.has(key)) continue;
+      contexts.add(key);
+      let density: number;
+      try {
+        density = samplingRasterSize({ roi, projection }).density;
+      } catch (error) {
+        if (!horizon(error)) throw error;
+        density = sourceDensity;
+      }
+      const previous = requests.get(group);
+      requests.set(group, {
+        roi: previous ? union(previous.roi, roi) : roi,
+        density: Math.max(previous?.density ?? 0, density),
+      });
+      inspect(
+        group.layers,
+        projection,
+        roi,
+        Math.min(
+          group.output.width / group.logical.width,
+          group.output.height / group.logical.height
+        )
+      );
+    }
+  };
+  inspect(
+    layers,
+    [
+      (futureScale * output.width) / logical.width,
+      0,
+      0,
+      0,
+      (futureScale * output.height) / logical.height,
+      0,
+      0,
+      0,
+      1,
+    ],
+    { x: 0, y: 0, ...logical },
+    Math.min(output.width / logical.width, output.height / logical.height)
+  );
+  const groups = new Map<GpuPreviewGroup, { source: GpuPreviewGroup; crop: Rect }>();
+  const visit = (layers: readonly GpuPreviewLayer[]): GpuPreviewLayer[] =>
+    layers.map((layer) => {
+      if (!('kind' in layer.source) || layer.source.kind !== 'group') return layer;
+      const group = layer.source;
+      let lowered = groups.get(group);
+      if (!lowered) {
+        const request = requests.get(group);
+        if (!request)
+          lowered = {
+            source: {
+              kind: 'group',
+              output: { width: 1, height: 1 },
+              logical: { width: 1, height: 1 },
+              layers: [],
+            },
+            crop: full(group),
+          };
+        else {
+          const width = Math.max(
+            group.output.width,
+            Math.ceil(group.logical.width * request.density)
+          );
+          const height = Math.max(
+            group.output.height,
+            Math.ceil(group.logical.height * request.density)
+          );
+          const sx = width / group.logical.width,
+            sy = height / group.logical.height;
+          const x = Math.max(0, Math.floor(request.roi.x * sx)),
+            y = Math.max(0, Math.floor(request.roi.y * sy));
+          const right = Math.min(width, Math.ceil((request.roi.x + request.roi.width) * sx));
+          const bottom = Math.min(height, Math.ceil((request.roi.y + request.roi.height) * sy));
+          const crop = {
+            x: x / sx,
+            y: y / sy,
+            width: (right - x) / sx,
+            height: (bottom - y) / sy,
+          };
+          const translate: QuickEditHomography = [1, 0, crop.x, 0, 1, crop.y, 0, 0, 1];
+          lowered = {
+            crop,
+            source: {
+              ...group,
+              output: { width: right - x, height: bottom - y },
+              logical: { width: crop.width, height: crop.height },
+              layers: visit(group.layers).map((child) => ({
+                ...child,
+                inverse: multiplyQuickEditProjections(child.inverse, translate),
+              })),
+            },
+          };
+        }
+        groups.set(group, lowered);
+      }
+      const crop = lowered.crop;
+      const changed =
+        crop.x !== 0 ||
+        crop.y !== 0 ||
+        crop.width !== group.logical.width ||
+        crop.height !== group.logical.height;
+      if (!changed) return { ...layer, source: lowered.source };
+      // Source cropping must not narrow the pre-warp output coverage of a lens or destination mask.
+      return {
+        ...layer,
+        source: lowered.source,
+        clip: layer.clip ?? { rect: layer.rect, radius: 0 },
+        rect: {
+          x: layer.rect.x + (crop.x * layer.rect.width) / group.logical.width,
+          y: layer.rect.y + (crop.y * layer.rect.height) / group.logical.height,
+          width: (crop.width * layer.rect.width) / group.logical.width,
+          height: (crop.height * layer.rect.height) / group.logical.height,
+        },
+      };
+    });
+  return visit(layers);
+}
+
+/** Count backend texture identities; an optional group models one owned snapshot replacement. */
+export function gpuPreviewTextureBytes(
+  layers: readonly GpuPreviewLayer[],
+  materialized?: GpuPreviewGroup
+): number {
+  const groups = new Set<GpuPreviewGroup>();
+  const rasters = new Set<object | string>();
+  const caches = new Map<
+    string,
+    {
+      source: GpuPreviewLayer['source'];
+      revision: NonNullable<GpuPreviewLayer['cache']>['revision'];
+    }
+  >();
+  let bytes = 0;
+  const add = (size: Size) => {
+    validSize(size, Number.MAX_SAFE_INTEGER);
+    bytes += size.width * size.height * 4;
+    if (!Number.isSafeInteger(bytes)) throw new Error('GPU preview texture budget exceeded.');
+  };
+  const raster = (source: GpuPreviewLayer['source'], cache?: GpuPreviewLayer['cache']) => {
+    if (isGroup(source)) return;
+    const key = cache ? `cache:${cache.key}` : source;
+    if (cache) {
+      const previous = caches.get(cache.key);
+      if (previous && (previous.source !== source || previous.revision !== cache.revision))
+        throw new Error('GPU preview cache key has conflicting sources.');
+      caches.set(cache.key, { source, revision: cache.revision });
+    }
+    if (rasters.has(key)) return;
+    rasters.add(key);
+    if (typeof VideoFrame !== 'undefined' && source instanceof VideoFrame)
+      add({ width: source.displayWidth, height: source.displayHeight });
+    else if ('width' in source) add(source);
+    else add({ width: source.displayWidth, height: source.displayHeight });
+  };
+  const visit = (layers: readonly GpuPreviewLayer[]) => {
+    for (const layer of layers) {
+      if (layer.operationClip) raster(layer.operationClip.source, layer.operationClip.cache);
+      if (layer.alphaMask) raster(layer.alphaMask.source, layer.alphaMask.cache);
+      if (isGroup(layer.source)) {
+        if (layer.source === materialized) {
+          const key = layer.source;
+          if (!rasters.has(key)) {
+            rasters.add(key);
+            add(layer.source.output);
+          }
+          continue;
+        }
+        if (groups.has(layer.source)) continue;
+        groups.add(layer.source);
+        add(layer.source.output);
+        visit(layer.source.layers);
+      } else if (
+        typeof VideoFrame === 'undefined' ||
+        !(layer.source instanceof VideoFrame) ||
+        requiresRasterSource(layer) ||
+        needsNativeRgbSource(layer.source)
+      )
+        raster(layer.source, layer.cache);
+    }
+  };
+  visit(layers);
+  return bytes;
 }

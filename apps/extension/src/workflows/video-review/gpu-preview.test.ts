@@ -1,3 +1,6 @@
+import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
+import * as sourceSampling from './export-source-sampling';
+import { planReviewExportSource } from './export-source-plan';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createReviewGpuPreview, reviewGpuPreviewConcurrency } from './gpu-preview';
 import type { createReviewBackgroundPainter } from './scene-background';
@@ -60,6 +63,9 @@ function fixture(maximumInFlight: 1 | 2 = 1) {
   const released = vi.fn();
   const ctx = () => ({
     translate: vi.fn(),
+    arc: vi.fn(),
+    moveTo: vi.fn(),
+    stroke: vi.fn(),
     beginPath: vi.fn(),
     roundRect: vi.fn(),
     rect: vi.fn(),
@@ -1975,5 +1981,155 @@ it('allocates captions lazily and redraws a retained cue after leaving its inter
     );
   } finally {
     f.owner.dispose();
+  }
+});
+
+it.each([false, true])(
+  'retains enhanced source tiles until GPU completion (cancel %s)',
+  async (cancel) => {
+    const f = fixture();
+    const sourceSize = f.input.scene.source;
+    const tile = { width: 1280, height: 720 } as HTMLCanvasElement;
+    const plan = planReviewExportSource({
+      scene: { ...f.input.scene, sourceSize },
+      output: { width: 1280, height: 720 },
+      identity: { sourceKey: tile, sourceSize, sourceTime: 2, passTime: 2 },
+      resultTime: 2,
+    });
+    const dispose = vi.fn();
+    const prepare = vi
+      .spyOn(sourceSampling, 'prepareReviewExportSourceSampling')
+      .mockResolvedValue({
+        plan,
+        dispose,
+        original: { draw: vi.fn() },
+        sampling: {
+          ...plan.identity,
+          drawPrepared: vi.fn(),
+          visitPreparedTiles: (id, consume) => {
+            expect(id).toBe('body:0');
+            consume({
+              image: tile,
+              physicalSourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+              originalPixelROI: { x: 0, y: 0, ...sourceSize },
+            });
+            return true;
+          },
+        },
+      });
+    const finished = Promise.withResolvers<typeof f.bitmap>();
+    io.render.mockImplementationOnce(() => finished.promise);
+    const pending = f.owner.render({
+      ...f.input,
+      exportEnhancer: { withEnhancedRegion: vi.fn(), dispose: vi.fn() },
+      sourceSample: { timestamp: 2, draw: vi.fn() },
+    });
+    try {
+      await vi.waitFor(() => expect(io.render).toHaveBeenCalledOnce());
+      const leaves = (layers: readonly GpuPreviewLayer[]): GpuPreviewLayer[] =>
+        layers.flatMap((layer) =>
+          'kind' in layer.source && layer.source.kind === 'group'
+            ? leaves(layer.source.layers)
+            : [layer]
+        );
+      expect(
+        leaves(io.render.mock.calls[0]![0].layers).some((layer) => layer.source === tile)
+      ).toBe(true);
+      expect(
+        leaves(io.render.mock.calls[0]![0].layers).some((layer) => layer.source === f.frame)
+      ).toBe(false);
+      if (cancel) f.owner.dispose();
+      expect(dispose).not.toHaveBeenCalled();
+      finished.resolve(f.bitmap);
+      if (cancel) await expect(pending).rejects.toThrow();
+      else await expect(pending).resolves.toBe(true);
+      expect(dispose).toHaveBeenCalledOnce();
+    } finally {
+      prepare.mockRestore();
+      f.owner.dispose();
+    }
+  }
+);
+
+it('selects separate prepared source demands for body, scene lens and pointer lens', async () => {
+  vi.stubGlobal(
+    'Path2D',
+    class {
+      moveTo() {}
+      lineTo() {}
+      closePath() {}
+    }
+  );
+  const f = fixture();
+  const current: PreviewScene = {
+    ...scene,
+    zoomRegions: [
+      {
+        ...createQuickEditZoomRegion({ id: 'lens', at: 0, duration: 4 }),
+        transform: { scale: 1, centerX: 0.5, centerY: 0.5 },
+        spotlight: {
+          effect: 'magnify',
+          area: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+          magnification: 3,
+          strength: 0,
+          blur: 0,
+          roundness: 0,
+          reveal: 'fade',
+          exitReveal: 'fade',
+        },
+      },
+    ],
+    clicks: [
+      {
+        settings: { ...REVIEW_CLICK_DEFAULT, effect: 'magnify', magnification: 3 },
+        point: { x: 0.5, y: 0.5 },
+        anchor: 1.9,
+        start: 1.9,
+        end: 2.5,
+      },
+    ],
+  };
+  const tile = { width: 1280, height: 720 } as HTMLCanvasElement;
+  const plan = planReviewExportSource({
+    scene: { ...current, sourceSize: scene.source, clickCues: current.clicks },
+    output: dimensions.backing,
+    identity: { sourceKey: tile, sourceSize: scene.source, sourceTime: 2, passTime: 2 },
+    resultTime: 2,
+  });
+  const requested: string[] = [];
+  const prepare = vi.spyOn(sourceSampling, 'prepareReviewExportSourceSampling').mockResolvedValue({
+    plan,
+    dispose: vi.fn(),
+    original: { draw: vi.fn() },
+    sampling: {
+      ...plan.identity,
+      drawPrepared: vi.fn(),
+      visitPreparedTiles: (id, consume) => {
+        requested.push(id);
+        const demand = plan.demands.find((item) => item.id === id)!;
+        consume({
+          image: tile,
+          physicalSourceRect: { x: 0, y: 0, width: 1280, height: 720 },
+          originalPixelROI: demand.originalPixelROI,
+        });
+        return true;
+      },
+    },
+  });
+  try {
+    expect(
+      await f.owner.render({
+        ...f.input,
+        scene: current,
+        geometry: reviewPresentedGeometry(current, dimensions, 2),
+        exportEnhancer: { withEnhancedRegion: vi.fn(), dispose: vi.fn() },
+        sourceSample: { timestamp: 2, draw: vi.fn() },
+      })
+    ).toBe(true);
+    expect(new Set(requested)).toEqual(new Set(['body:0', 'scene:0', 'click:0']));
+  } finally {
+    prepare.mockRestore();
+    f.owner.dispose();
+    vi.unstubAllGlobals();
   }
 });

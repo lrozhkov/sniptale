@@ -523,7 +523,7 @@ async function drawPreparedFrame(
   signal.throwIfAborted();
   const scene = await recordingHistoryScene(prepared, frame, signal);
   const { dimensions } = prepared;
-  const raw = frame.exportEnhancer ? undefined : frame.source.videoFrame?.();
+  const raw = frame.source.videoFrame?.();
   if (raw && assets.gpu) {
     const geometry = reviewPresentedGeometry(
       scene,
@@ -536,6 +536,12 @@ async function drawPreparedFrame(
       dimensions,
       geometry,
       frame: raw,
+      exportEnhancer: frame.exportEnhancer,
+      sourceSample: {
+        ...frame.source,
+        timestamp: frame.source.timestamp ?? frame.sourceTime,
+        draw: frame.source.draw.bind(frame.source),
+      },
       orientation: frame.source.orientation,
       sourceTime: frame.sourceTime,
       header: assets.header,
@@ -954,11 +960,7 @@ function admitRender(
     }
   }
   const gpu =
-    assets.renderer === 'gpu' &&
-    !exportEnhancer &&
-    !frame?.exportEnhancer &&
-    typeof navigator !== 'undefined' &&
-    navigator.gpu
+    assets.renderer === 'gpu' && typeof navigator !== 'undefined' && navigator.gpu
       ? reviewGpuPreviewAllocation(prepared.scene, prepared.dimensions, assets.maximumInFlight)
       : { maximumManagedBytes: 0, maximumCanvases: 0 };
   allocation.replaceLimits({
@@ -1264,10 +1266,7 @@ export function createReviewPreviewRenderer(args: {
       };
       prepareSceneCameraPlans(prepared);
       const useGpu =
-        args.renderer !== 'legacy' &&
-        !args.exportEnhancer &&
-        typeof navigator !== 'undefined' &&
-        !!navigator.gpu;
+        args.renderer !== 'legacy' && typeof navigator !== 'undefined' && !!navigator.gpu;
       if (useGpu && !gpu)
         gpu = createReviewGpuPreview({
           resources: args.resources,
@@ -1287,7 +1286,7 @@ export function createReviewPreviewRenderer(args: {
           prepared.scene.annotationEffects.lane.instances.some((instance) => instance.enabled)
             ? EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterBytes + 4
             : 0,
-        renderer: args.exportEnhancer ? 'legacy' : (args.renderer ?? 'gpu'),
+        renderer: args.renderer ?? 'gpu',
         onContextLost: args.onContextLost,
         gpu: useGpu ? gpu : null,
         annotations: null,

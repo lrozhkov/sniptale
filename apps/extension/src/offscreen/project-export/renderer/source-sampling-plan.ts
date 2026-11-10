@@ -166,6 +166,7 @@ export interface NativeSamplingSourcePlan {
   demands: SourceSamplingDemand[];
   sourceRasterScale: number;
   captureScales: Map<string, number>;
+  sourceRasterScales: Map<string, number>;
 }
 type SamplingAperture = {
   id: string;
@@ -371,6 +372,20 @@ export function resolveNativeSourceSamplingDemands(args: {
       fit,
       shouldLockVisualLayerToViewport(layer, frame.camera) ? IDENTITY : camera
     );
+    const deviceScaleFor = (
+      world: QuickEditHomography,
+      sourceScale = 1,
+      isolatedScale = 1,
+      captureId = 'body'
+    ) =>
+      (frame.camera.spatial && args.captureRasterScales?.has(captureId)
+        ? args.captureRasterScales!.get(captureId)! *
+          samplingRasterSize({ roi: layer, projection: layerTransform(layer) }).density *
+          isolatedScale
+        : samplingRasterSize({
+            roi: layer,
+            projection: multiplyQuickEditProjections(world, layerTransform(layer)),
+          }).density) * sourceScale;
     const localFor = (
       world: QuickEditHomography,
       sourceScale = 1,
@@ -381,14 +396,7 @@ export function resolveNativeSourceSamplingDemands(args: {
         layer,
         sourceSize,
         args.images ?? {},
-        (frame.camera.spatial && args.captureRasterScales?.has(captureId)
-          ? args.captureRasterScales!.get(captureId)! *
-            samplingRasterSize({ roi: layer, projection: layerTransform(layer) }).density *
-            isolatedScale
-          : samplingRasterSize({
-              roi: layer,
-              projection: multiplyQuickEditProjections(world, layerTransform(layer)),
-            }).density) * sourceScale
+        deviceScaleFor(world, sourceScale, isolatedScale, captureId)
       );
     const local = localFor(cameraOutput);
     const projection = multiplyQuickEditProjections(cameraOutput, local);
@@ -407,6 +415,7 @@ export function resolveNativeSourceSamplingDemands(args: {
     };
     const demands: SourceSamplingDemand[] = [];
     const captureScales = new Map<string, number>();
+    const sourceRasterScales = new Map<string, number>();
     let sourceRasterScale = output.scale;
     const apertures: SamplingAperture[] = [];
     const append = (
@@ -432,6 +441,7 @@ export function resolveNativeSourceSamplingDemands(args: {
       if (id === captureId)
         captureScales.set(id, Math.max(output.scale, raster.density / localDensity));
       if (demands.some((d) => d.id === id)) return;
+      sourceRasterScales.set(id, deviceScaleFor(world, sourceLens[0], isolatedScale, captureId));
       demands.push({
         ...identity,
         id,
@@ -555,6 +565,8 @@ export function resolveNativeSourceSamplingDemands(args: {
             sourceKey: existing.demands[0]?.sourceKey ?? demand.sourceKey,
           });
       existing.sourceRasterScale = Math.max(existing.sourceRasterScale, sourceRasterScale);
+      for (const [id, scale] of sourceRasterScales)
+        if (!existing.sourceRasterScales.has(id)) existing.sourceRasterScales.set(id, scale);
       for (const [id, scale] of captureScales)
         existing.captureScales.set(
           id,
@@ -562,7 +574,14 @@ export function resolveNativeSourceSamplingDemands(args: {
         );
       continue;
     }
-    result.push({ clipId: layer.clipId, sourceSize, demands, sourceRasterScale, captureScales });
+    result.push({
+      clipId: layer.clipId,
+      sourceSize,
+      demands,
+      sourceRasterScale,
+      captureScales,
+      sourceRasterScales,
+    });
   }
   if (
     frame.camera.spatial &&

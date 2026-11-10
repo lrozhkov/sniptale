@@ -1,3 +1,6 @@
+import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
+import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
+import { prepareReviewExportSourceSampling } from './export-source-sampling';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import {
   reviewGpuAnnotationLayer,
@@ -52,6 +55,8 @@ interface ReviewGpuRenderInput {
   dimensions: Dimensions;
   geometry: ReviewPresentedGeometry;
   frame: VideoFrame;
+  exportEnhancer?: ExportEnhancer | undefined;
+  sourceSample?: Pick<ReviewTransitionSample, 'timestamp' | 'draw'> | undefined;
   orientation?: VideoCompositionFrameSource['orientation'];
   sourceTime: number;
   context: CanvasRenderingContext2D;
@@ -481,7 +486,41 @@ export function createReviewGpuPreview(args: {
       };
       const moving: Pick<ReviewTransitionSample, 'timestamp' | 'draw' | 'toVideoFrame'> = {
         timestamp: input.frame.timestamp / 1e6,
-        draw() {},
+        draw(context, x, y, width, height) {
+          if (!input.sourceSample) throw new Error('Enhanced GPU source pixels are unavailable.');
+          input.sourceSample.draw(context, x, y, width, height);
+        },
+      };
+      const samplingBudget = createPreparedSourceBudget();
+      const buildScene = async (
+        sceneInput: Parameters<typeof buildReviewGpuScene>[0],
+        sample: Pick<ReviewTransitionSample, 'timestamp' | 'draw'>
+      ) => {
+        const current = sceneInput.scene;
+        const sampling = input.exportEnhancer
+          ? await prepareReviewExportSourceSampling({
+              enhancer: input.exportEnhancer,
+              budget: samplingBudget,
+              scene: {
+                sourceSize: current.source,
+                ...(current.canvas ? { baseCanvas: current.canvas } : {}),
+                windowHeader: current.windowHeader,
+                background: current.background,
+                zoomRegions: current.zoomRegions,
+                clickCues: current.clicks,
+                sceneScale:
+                  dimensions.canonical.width / (current.canvas?.width ?? current.source.width),
+              },
+              output: dimensions.backing,
+              sample,
+              sourceTime: sceneInput.sourceTime,
+              resultTime: sceneInput.geometry.resultTime,
+              signal,
+              ...(input.cameraOverride ? { camera: sceneInput.geometry.camera } : {}),
+            })
+          : null;
+        if (sampling) primitives.retain({ release: sampling.dispose });
+        return buildReviewGpuScene({ ...sceneInput, sampling });
       };
       let main: GpuPreviewGroup;
       if (input.transition?.blend.plan.type === 'dissolve') {
@@ -506,17 +545,20 @@ export function createReviewGpuPreview(args: {
             input.cameraOverride
           );
           const firstHold = annotationHolds.length;
-          const endpoint = await buildReviewGpuScene({
-            ...sceneInputs,
-            source: frame,
-            scene: currentScene,
-            geometry: pose,
-            sourceTime: side.sample.timestamp,
-            orientation:
-              side.sample === moving
-                ? input.orientation
-                : { rotation: side.sample.rotation ?? 0, flip: side.sample.flip ?? false },
-          });
+          const endpoint = await buildScene(
+            {
+              ...sceneInputs,
+              source: frame,
+              scene: currentScene,
+              geometry: pose,
+              sourceTime: side.sample.timestamp,
+              orientation:
+                side.sample === moving
+                  ? input.orientation
+                  : { rotation: side.sample.rotation ?? 0, flip: side.sample.flip ?? false },
+            },
+            side.sample
+          );
           if (annotationHolds.slice(firstHold).every((hold) => hold.independent))
             sources.push(endpoint);
           else {
@@ -558,6 +600,7 @@ export function createReviewGpuPreview(args: {
         let source = input.frame;
         let sourceTime = input.sourceTime;
         let orientation = input.orientation;
+        let selectedSample: Pick<ReviewTransitionSample, 'timestamp' | 'draw'> = moving;
         if (input.transition) {
           const sides = reviewCutTransitionSides(
             input.transition.blend,
@@ -567,6 +610,7 @@ export function createReviewGpuPreview(args: {
             input.transition.resultOffset
           );
           const sample = sides[input.transition.blend.beforeSeam ? 0 : 1].sample;
+          selectedSample = sample;
           if (sample !== moving) {
             const frame = sample.toVideoFrame?.();
             if (!frame) throw new Error('Transition GPU pixels are unavailable.');
@@ -576,14 +620,17 @@ export function createReviewGpuPreview(args: {
             orientation = { rotation: sample.rotation ?? 0, flip: sample.flip ?? false };
           }
         }
-        main = await buildReviewGpuScene({
-          ...sceneInputs,
-          source,
-          scene,
-          geometry,
-          sourceTime,
-          orientation,
-        });
+        main = await buildScene(
+          {
+            ...sceneInputs,
+            source,
+            scene,
+            geometry,
+            sourceTime,
+            orientation,
+          },
+          selectedSample
+        );
       }
       const layers = reviewGpuFinishLayers({
         scene,
@@ -604,7 +651,12 @@ export function createReviewGpuPreview(args: {
             }
           : {}),
       });
-      preparedEffects = await prepareEffectRuntimeGpuScene({ layers, gpu: renderer, signal });
+      preparedEffects = await prepareEffectRuntimeGpuScene({
+        layers,
+        gpu: renderer,
+        signal,
+        boundTextures: !!input.exportEnhancer,
+      });
       const request = {
         output: dimensions.backing,
         logical: dimensions.canonical,

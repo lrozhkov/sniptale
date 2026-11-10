@@ -5011,43 +5011,43 @@
       "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-layers.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Native graph adapter owns construction and material leases. GPU annotations join its existing borrow ledger. Source capture, submission and publication stay outside this owner.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: Demand graphs and their physical density belong to ordered scene construction. Source acquisition, GPU submission and publication retain their existing owners. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "be9de9f3800f463ab259c6eb5eebfaf409a5f951f27c923967ad58f3a4073fb9",
-      "signatureHash": "fb4ed81c77feeca0df1de10a7e05c3317100aa08a4cc6a5916622092a1cc4104"
+      "astHash": "9c57a24732c976b6009f7fb20f7191fc8217278546ba11ad80b82b62ad1f0d9c",
+      "signatureHash": "7de9b2a00f65a27277d953b6a372b01696431159672bf68dcd2ec7bb30326d1c"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-layers.ts",
       "symbol": "buildNativeGpuPreviewLayers",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One graph builder owns masks, ordered layers and pose borrows. GPU sources use the existing placement boundary. Submission and publication remain outside this operation.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: Demand graphs and their physical density belong to ordered scene construction. Source acquisition, GPU submission and publication retain their existing owners. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "38c25ec88566cdf6f76c0c26371a014af77878c4df10214ceff3f85567c5add1",
-      "signatureHash": "341e0d3004258599c0e789f4225cced7f884e6e5743c97b82d2bbbc2ee0f3b76"
+      "astHash": "ba26e670ac0b3dab1cccf864b5cafac77576b771f9f13e9806576b14850c2bd2",
+      "signatureHash": "baa3091f13dfaf5fea81ea0fddbd59b99c3fe59f3b9f22f3ffdf0f282fd4c8c6"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-video.ts",
       "symbol": "buildNativeGpuVideoLayers",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Native source-material transaction now uses canonical ordinary-feedback bounds for raster allocation and its feedback group. Unknown bounds preserve full-plane allocation. Existing material leases, source transforms, GPU submission and publication owners are unchanged. Score stays six; the local rectangle does not add an independent state or effect owner. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent coordinate contract, state, effect, resource lifetime or owner. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: Source placement, headers, masks and derived lenses describe one source pose. Caller callbacks retain acquisition, raster allocation and source release. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "6df72fcae0c568c6a37b0a3670d8d2fa4aa9d4af83ed804e0c7d7869ca2a7111",
-      "signatureHash": "bea600bc1c27c3ca53815994b414aa4897f9a4abbe331250bfcb3c0da65c0440"
+      "astHash": "bfe53b5bd2d41e6a13fa50091303497db1be7c587657d4ba86cf07d17bddc301",
+      "signatureHash": "34cb25a3dcb5e0f3dc1357e7bb9f0dbd142f877ee374a4dab11c5ef8d1d4eba3"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video/native-composition/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Native session owns admission, private material slots and publication holds. Omitted backgrounds use the existing material owner. The enclosing factory includes its render transaction. Splitting its closure state would distribute renderer retirement.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: Prepared source resources enter the existing frame transaction and its cleanup ledger. GPU completion still controls their release. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "0e2739d13723baab6a85acc17c5982c5fa549ab7732e48d73659814416d708c7",
+      "astHash": "fbe5049b1d3fe3d2d8950c036bb7253b4002d3c1951c119938efcec6c7cfc2c3",
       "signatureHash": "ddf536b3b52336eb27c63c1421eec47f8baee8d782886037860f02ea568ec4e0"
     },
     {
@@ -5055,10 +5055,10 @@
       "file": "apps/extension/src/workflows/video/native-composition/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer.render",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One admitted Native frame retains captured sources, private materials and exclusive output through GPU completion. Optional backgrounds change ordered layer construction. Capture, cancellation, submission and retirement retain their existing authority and cleanup.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: Prepared source resources enter the existing frame transaction and its cleanup ledger. GPU completion still controls their release. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "62dd047585285871199f8c8160616184f84e1f5bdafab4c92faa5e82ea59229b",
+      "astHash": "55a226d935acceb93c99a6e13cf1aa90e7b3c776462313c13740e70cc6e8e056",
       "signatureHash": "7fbf6998a3988df89e02a05370e5486d9adf627b6e933b9dcfaf360518055ae2"
     },
     {
@@ -5209,32 +5209,32 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview-layers.ts",
       "symbol": "reviewGpuContentLayers",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One content-plane operation orders source, annotation and cursor layers. It borrows the annotation batch before producer retirement. Its caller retains that borrow through final GPU completion.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-07",
-      "astHash": "9a14b707ddb2f9de0203d67fa6f19415b944b93c8bcedd1107a0c1b9f054ea72",
-      "signatureHash": "729d1f4ed97c7634518ab617e5e33e35df130f23ec7e829236afdbdeb4f75225"
+      "reason": "tool-noise: Demand graphs and their physical density belong to ordered scene construction. Source acquisition, GPU submission and publication retain their existing owners. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "4196d5f25db2be0034c3e493406affeafca95b5f86637d7fe38d9422da813344",
+      "signatureHash": "8fd67a237452d1c8f8d40b870037ad2abcd32795bd148235c399f6afbd03b090"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/gpu-preview-scene.ts",
       "symbol": "buildReviewGpuScene",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One borrowed endpoint graph orders background, source exposures, focus and overlays. Absent shadow artwork contributes no layer. Endpoint geometry and annotation holds keep the existing owner. No independent lifecycle or publication authority is present.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any independent state, resource, queue or publication owner. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: The local traversal replaces borrowed source leaves with exact prepared demands. It preserves exposure identity and raster density without owning source acquisition or publication. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "2cbd89a83005f1e599e50e0a97dd3cce3b11daf2b0eb746f87255adba67c80fa",
-      "signatureHash": "6bd34a59de4fcd73b5e0d89bee99181a68a7775de60772a950e6adfc71b6ac7d"
+      "astHash": "c986b1119dc32d79afa4c9d3d2ce1f181e96e83b6e0f1dbe7022c34db683b2dc",
+      "signatureHash": "462b52d2a8dbf79835008eaf520c6238d93179f5b420204c506e0d1b52d3d420"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Gallery session owns its provider, material slots and retirement. Optional shadow and lazy caption surfaces stay in those slots. The enclosing factory includes the frame transaction. No independent state authority is present.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: Prepared source resources enter the existing frame transaction and its cleanup ledger. GPU completion still controls their release. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "97733f4d558ec74b947aeb9433dee39de341e0fdf3eab04658a577e71b533fbb",
+      "astHash": "88aa8d44652b5058d99377c670ee37c8c102261aa3cb2be363229d5139408b82",
       "signatureHash": "58e4f800820af68fba971b9d7a7b89f698765e9c8560ee0de826a02c4ba84ae5"
     },
     {
@@ -5242,10 +5242,10 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.ts",
       "symbol": "createReviewGpuPreview.execute#3",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Gallery frame transaction owns endpoint composition, annotation holds and publication. Absent artwork is omitted through canonical presence rules. Lazy caption surfaces use the same slot and cleanup after completion or failure. No new resource owner is present.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: Prepared source resources enter the existing frame transaction and its cleanup ledger. GPU completion still controls their release. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "d53834be558ee396ebbeebf60c571dce6582d2c93e40e1ff3cfaf5670d82bbb4",
+      "astHash": "04dacf199e22839522f1d7eddb03fcfe55d6ddc813ec6eb3100974eaac0791a6",
       "signatureHash": "b5cd7d268fb693d447a010fcf0557093562a1539e5eb864e3b0fa48378b7800f"
     },
     {
@@ -5253,21 +5253,21 @@
       "file": "apps/extension/src/workflows/video-review/gpu-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One Gallery producer fixture checks admission, cancellation, frame publication and artwork lifetime. Added cases prove absent materials and lazy caption return. Existing lifecycle assertions count only allocated resources. No independent fixture or product authority is present.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: The new cases use the existing GPU fixture and completion barrier to prove exact demand selection and resource retirement. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "b9c68c90831f24b554eab3c9ed5948b481942d6680f8b319fb2f8e90cf2f4739",
-      "signatureHash": "c3512e4a412e4b2f46c6c725df28dc7125dbd78b7c8c80b1e93fb13a1a6f9464"
+      "astHash": "20239502ec6e5569cbcbc6076ecf91c0c38adb612cd885b6e3aca0da8ca449c8",
+      "signatureHash": "f1b8a3f23d85c7a85dfba0f8d43e20566aa010fe72e099f36c223a5cad7070bf"
     },
     {
       "rule": "structural-file-risk",
       "file": "apps/extension/src/workflows/video-review/render-preview.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One renderer fixture checks admission, generations, time validation and cleanup. Separate cases cover unknown PTS, cache eligibility, transition refusal and enhancement boundaries. They use the existing scene and resource setup. Independent diagnosis found no separate fixture lifetime. Fresh architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: The existing Gallery prepared-frame suite now proves enhanced GPU admission with the real resource ledger. It adds no independent fixture or product authority. Source inspection confirms the existing fixture and admission owner. Final independent architecture review must check this binding.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "a2c8ee969bb786031c35a20444abe7d04ad92046a3df4d3c803f6ce9b4d04865",
+      "astHash": "aab4ab1ffb8717d13ecd218ee0fdd84c6d68ef078bcdf7e655ad81d28de443f8",
       "signatureHash": "5928effb6b5453427010c7032f2a46a605803fddca94076660f1d3c35821f22e"
     },
     {
@@ -5484,10 +5484,10 @@
       "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling-plan.ts",
       "symbol": "resolveNativeSourceSamplingDemands",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One pure calculation includes visual, effect-input and attached video owners. Local maps contain calculated outputs. The existing append fold retains ROI merging, density and header replan. No acquisition or publication enters the planner. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-09",
-      "astHash": "d5190583606814d3aff74cbc4e3447b9c3d1e68bec248b2632504e5a9580fb8b",
+      "reason": "tool-noise: The per-demand source scale records the existing fitted-window density beside its source demand. It adds no independent planner. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "7c63478e080df0d44b4b40ce2770f36a5ca037dea074d9c4b7088ca62dfd2a35",
       "signatureHash": "91fbb130b953a633102179433471700bdb3b3f4f5670cad0d3b0ee1032f338cc"
     },
     {
@@ -5495,10 +5495,10 @@
       "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.test.ts",
       "symbol": "<file>",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One suite proves the same source admission, preparation and release contract. New cases cover canonical and declined acquisition, strict failure, endpoint intent, late abort, disposal and attached inputs. Tests isolate local maps, promises and spies in each fixture. They do not establish separate product authorities. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-09",
-      "astHash": "827c2190e77356e0b0b699b339c8458b8652ba07070e5d30721d059c399346f1",
+      "reason": "tool-noise: Retained-pass tests use the existing sampling fixture and controlled acquisition failures. They add no independent fixture lifetime. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "da09d08907ce90be99eaa4219df6ea6e92e374f5b3d86f98e913da3c0c7b2f33",
       "signatureHash": "c949c5476c3899723953b773450a1d589bb1b473fd607362078199b2f685f436"
     },
     {
@@ -5506,10 +5506,10 @@
       "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.ts",
       "symbol": "createProjectExportSourceSampling",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One job owns lazy source providers, enhancer, active request, current pass, budget and teardown. Providers remain subordinate to this lifetime. Prepare refuses overlap. Dispose drains active work and releases current resources and providers. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-09",
-      "astHash": "1ad32dd04c26ab6fa66ff44f8b9244996a942c90a893961bdf31ecd4a2aa8947",
+      "reason": "tool-noise: Retained passes use the existing job resource ledger. Admission, decoding, enhancement, adoption and release remain one prepared-pass transaction. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "def25eb683fe3d119e171ec0d7121e1cc83db324a4a1ae74d049c12bfe099e4a",
       "signatureHash": "07234c11246bc362845b80ca75bbc6862359d6164759007caac72725a8f3fdf7"
     },
     {
@@ -5517,10 +5517,10 @@
       "file": "apps/extension/src/offscreen/project-export/renderer/source-sampling.ts",
       "symbol": "createProjectExportSourceSampling.prepare",
       "owner": "extension:offscreen:project-export",
-      "reason": "tool-noise: One prepared-pass transaction retains admission, acquisition, optional enhancement, lease adoption and release. Ordinary mode creates no enhancer. Abort and disposal checks precede adoption. Failure releases acquired media. Physical identity and actual timestamps remain paired. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-09",
-      "astHash": "03f5d4069be41b433b6ef71e2c360d3e0fcac2873a7dfb91fa15b155a84001bc",
+      "reason": "tool-noise: Retained passes use the existing job resource ledger. Admission, decoding, enhancement, adoption and release remain one prepared-pass transaction. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "2d4ec99303e311379dade53523a9167013c53447a83e3b1608df66aa15219f67",
       "signatureHash": "8742661b09c0b6151ef020c9b7d8ca77168a8d581056c85de0c331b45f53c92c"
     },
     {
@@ -5561,10 +5561,10 @@
       "file": "apps/extension/src/workflows/video-review/render-preview.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One prepared scene transaction checks frames and returns image and geometry. Unknown PTS stays explicit. Native accessors and exact temporal operations still require finite PTS. Cache eligibility uses this same policy. Independent diagnosis found no separate authority. Fresh architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: Enhanced source admission and forwarding use the existing prepared-scene boundary. Canvas fallback and source ownership remain with their existing owners. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "b3b0a68713abd7653f3f2b42e6031df3d2a2f135ed2244ed6871ffc8073f145d",
+      "astHash": "a639c5e331a7ea1ce0035dcbbd5f86ed4408ed862004464846af67aea1a60b0c",
       "signatureHash": "4a9e4901ac25e8106bd46c62349f1685ed10969427268f61e81f87081277e8e0"
     },
     {
@@ -5693,10 +5693,10 @@
       "file": "apps/extension/src/workflows/video/native-composition/materializer.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One materializer owns preparation and completed-frame handoff. The sampler owns endpoint selection. The canonical provider owns ordinary source selection. GPU composition and allocation retain separate owners. The new callback defers acquisition until resolved passes exist. Fresh architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, fixture, scheduling, publication, recovery or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: The source adapter receives resolved passes during the existing frame transaction. The same cleanup path releases partial and completed preparation. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "152cf017e0e2ce6a341dceead2ef91f56d9b1e4dbef7e2ed4cf2a1ea777c9c4a",
+      "astHash": "6bf45b91fe7d3a150ebea665a964c15aa3fa6c92f06a5d169b7f0643e6980ae0",
       "signatureHash": "308fca4746ebaafeba2957503ede224c732b37b27b06c50d5f5289e15c22da61"
     },
     {
@@ -5704,11 +5704,11 @@
       "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-layers.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: The existing Native graph fixture now verifies local ordinary-feedback raster and group extents, plus release. It adds no fixture, lifetime or authority. File score stays three and cohesion1.00. The same source-layer builder and canvas fixture own these assertions. Fresh independent architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent coordinate contract, state, effect, resource lifetime or owner. Remove when the analyzer models this cohesive operation.",
+      "reason": "tool-noise: The existing graph fixture now covers exact source demands, source time, density and header joins. It adds no independent fixture owner. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "a5a728dff111496537e5c9894a13126053457aaee44712cd6d926c9b52762a24",
-      "signatureHash": "49ef35ce515b255fc392b42214aabf7469f289d190dcf353de15b3ef9bfe2ce1"
+      "astHash": "9008268b5efb6ed20d324c4ebb01142fd44a91f316eb95eec925976265319caf",
+      "signatureHash": "73961fddd0bf546e1f139f3a52a75706e71cf82f9e15ad896228c06fd2fa7e91"
     },
     {
       "rule": "structural-file-risk",
@@ -6397,10 +6397,10 @@
       "file": "apps/extension/src/workflows/video-review/presentation-main.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: One PresentationMain fixture observes source requests, scene clocks, renderer resources and cleanup. New leading, metadata and cancellation cases use that owner. Fixture controls are not production state authorities. Independent inspection found no separate responsibility. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent fixture, consumer contract, decoder, policy, queue, publication or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: The existing source clone and cancellation case now includes enhanced export. Its source, settlement and cleanup fixture remains unchanged. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "7dc7cfbbb01c76056f3abd1fd5709a8f435a05b982a1b5f7d4f0866eb31a8d8b",
+      "astHash": "bf9ce411ac796c75e9cf34d3f65d7f7cd98ddf2f2d5a8afb6a2f896b3a41e5ad",
       "signatureHash": "a43f86fc182f558814e9ca55d6c42fc44aee0cfef9320c11c4f6a4772afd570e"
     },
     {
@@ -6650,11 +6650,66 @@
       "file": "apps/extension/src/workflows/video/native-composition/render-scene.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: This file builds one complete scene through GPU or Canvas. It applies output geometry, captions, watermark and final overlays in order. The caller supplies admission and asset access. Existing cleanup releases temporary effects and captured sources. Independent topology diagnosis confirmed this boundary. Final architecture review must check this exact binding.",
-      "removalCondition": "Remove when the AST or signature changes. Reassess an independent resource owner or scheduling authority. Remove when the analyzer models this cohesive transaction.",
+      "reason": "tool-noise: Effect input media and dimensions consume the retained source pass. This adds no independent source interpretation or sampling owner. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-10",
-      "astHash": "731bda6546cc20f7b3da37b23b96376ab95acf67529291422ef7369b2d307fa9",
+      "astHash": "4d7df3a1ff248b2ca15835be8d001e94279f3e50b4beee96a198355e8ffa25b6",
       "signatureHash": "0ca0935c4069535841f4856d8e5b566e802aad9cd1b724697e5acf4bcec410b4"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/offscreen/project-export/shared-composition.ts",
+      "symbol": "createSharedProjectComposition",
+      "owner": "extension:offscreen:project-export",
+      "reason": "tool-noise: The export adapter lends retained sampler passes to one job materializer. Its frame and time map shares the preparation result lifetime. Decoding, enhancement planning, GPU submission and encoding remain outside this adapter. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "f6c7382a99ca6076d46f2315a894c6c6ea7ff4743cd5f1a12b157a0c344a3b3f",
+      "signatureHash": "bf539389f293687abda795d5637e7ece9f3d508fa013d4334ddd18e2f22470ab"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-video.ts",
+      "symbol": "createNativeGpuVideoLayerBuilder",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: Source placement, headers, masks and derived lenses describe one source pose. Caller callbacks retain acquisition, raster allocation and source release. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "d7add3f5ac8cc865700e9ec126de80d17f76955513c24d12228899db7186dc98",
+      "signatureHash": "18e93a45cf20af07d8d0d7931cf51f232cde0cc2f61503f62f91e14488d95d64"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview-plan.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: The existing GPU-plan owner now owns the pure shared aperture/density/crop calculation used by both workflows. Maps are per-call graph-analysis memoization. No source acquisition, rendering, scheduling, publication or durable state enters this operation. Independent topology review approved this owner and the existing same-device preparation boundary. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "4ee8b5d4cf7305d7c3e9c1321a71694ed187927716722d0bee5d35ee930ce12f",
+      "signatureHash": "727f0eba12df082581b83341c9eaddacd43ee9d731e555537a1d92f6ece6af70"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview-plan.ts",
+      "symbol": "resolveGpuPreviewGroupRasters",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: The existing GPU-plan owner now owns the pure shared aperture/density/crop calculation used by both workflows. Maps are per-call graph-analysis memoization. No source acquisition, rendering, scheduling, publication or durable state enters this operation. Independent topology review approved this owner and the existing same-device preparation boundary. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "1427f6ac8184ffc683bfc479da76dbaf0b4095ff307efd1c7e1985abbc0e3755",
+      "signatureHash": "e14d512264addf897a3eee89a249f595d55f7f896df1143049f90c6ce59a7c9a"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/video/composition/canvas/gpu-preview-plan.ts",
+      "symbol": "resolveGpuPreviewGroupRasters.inspect",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: The existing GPU-plan owner now owns the pure shared aperture/density/crop calculation used by both workflows. Maps are per-call graph-analysis memoization. No source acquisition, rendering, scheduling, publication or durable state enters this operation. Independent topology review approved this owner and the existing same-device preparation boundary. Independent structural diagnosis confirmed this exact owner. Final architecture review must check the completed candidate.",
+      "removalCondition": "Remove when this AST or signature changes. Reassess source identity, demand density, resource retention, GPU completion or cleanup changes. Remove if an independent planner, scheduler, resource lifetime, publication owner or fixture owner enters this seam. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-10",
+      "astHash": "6143e1aa0f0c3ecfa857464a7d40d879bf1f935893e0a90d7f0f22753b648e7a",
+      "signatureHash": "93695c09044398bcb68dce85ebe810945b83df2e6d11725f952e616b9c6c34c0"
     }
   ]
 }

@@ -1304,3 +1304,810 @@ it('shares the exact attached SDK wrapper between foreground and descriptor-only
   expect(paint).toHaveBeenCalledOnce();
   expect(bitmap.close).not.toHaveBeenCalled();
 });
+
+it('retains exact enhanced body, source, click and nested scene demand graphs at physical density', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  const focus = {
+    id: 'inner',
+    phase: 'hold' as const,
+    progress: 1,
+    spotlight: { ...createQuickEditSpotlight(), effect: 'magnify' as const, magnification: 2 },
+  };
+  layer.spotlights = [focus];
+  const action = {
+    ...clickAction(layer.clipId),
+    gestureFeedback: {
+      effect: 'magnify' as const,
+      point: { x: 0.5, y: 0.5 },
+      radius: 3,
+      stroke: 1,
+      opacity: 1,
+      color: '#f00',
+      lens: { scale: 2, shape: 'circle' as const, shadow: 0 },
+    },
+  };
+  layer.actions = [action];
+  f.passes.overlayFrame.sceneSpotlights = [{ ...focus, id: 'outer' }];
+  const tiles = new Map<string, HTMLCanvasElement>();
+  const selected: string[] = [];
+  const sourceForFrame: NonNullable<
+    Parameters<typeof buildNativeGpuPreviewLayers>[0]['sourceForFrame']
+  > = (_frame, _time, _layers, demand = 'body') => {
+    selected.push(demand);
+    let image = tiles.get(demand);
+    if (!image) {
+      image = document.createElement('canvas');
+      image.width = 128;
+      image.height = 64;
+      tiles.set(demand, image);
+    }
+    const tile = image;
+    return {
+      frames: f.sources,
+      media: new Map([
+        [
+          layer.clipId,
+          {
+            ...f.borrowed,
+            preparedSampling: {
+              sourceKey: {},
+              sourceTime: 1,
+              passTime: 1,
+              sourceSize: { width: 32, height: 16 },
+              drawPrepared: () => true,
+              visitPreparedTiles(id, consume) {
+                expect(id).toBe('body');
+                consume({
+                  image: tile,
+                  physicalSourceRect: { x: 0, y: 0, width: 128, height: 64 },
+                  originalPixelROI: { x: 0, y: 0, width: 32, height: 16 },
+                });
+                return true;
+              },
+            },
+          },
+        ],
+      ]),
+    };
+  };
+  const plan = await buildNativeGpuPreviewLayers({ ...f, sourceForFrame });
+  plans.push(plan);
+  const { sourceClickSamplingDemandId } =
+    await import('../../../features/video/composition/draw/effects/actions');
+  const click = sourceClickSamplingDemandId(action);
+  expect(selected).toContain('sceneLens:inner');
+  expect(selected).toContain(click);
+  expect(selected).toContain('sceneLens:outer');
+  expect(selected).toContain('sceneLens:outer/sceneLens:inner');
+  expect(selected).toContain(`sceneLens:outer/${click}`);
+  const nodes = flatten(plan.layers);
+  for (const demand of [
+    'body',
+    'sceneLens:inner',
+    click,
+    'sceneLens:outer',
+    'sceneLens:outer/sceneLens:inner',
+    `sceneLens:outer/${click}`,
+  ])
+    expect(nodes.some((node) => node.source === tiles.get(demand))).toBe(true);
+  for (const [demand, density] of [
+    ['body', 1],
+    ['sceneLens:inner', 2],
+    [click, 2],
+    ['sceneLens:outer', 2],
+    ['sceneLens:outer/sceneLens:inner', 4],
+    [`sceneLens:outer/${click}`, 4],
+  ] as const) {
+    const holder = nodes.find(
+      (node) =>
+        'kind' in node.source &&
+        node.source.kind === 'group' &&
+        node.source.layers.some((child) => child.source === tiles.get(demand))
+    );
+    if (!holder || !('kind' in holder.source) || holder.source.kind !== 'group')
+      throw new Error('Missing prepared tile group');
+    expect(holder.source.output.width).toBeGreaterThanOrEqual(
+      holder.source.logical.width * density
+    );
+    expect(holder.source.output.height).toBeGreaterThanOrEqual(
+      holder.source.logical.height * density
+    );
+  }
+  expect(f.borrowed.draw).not.toHaveBeenCalled();
+});
+
+it('uses the sampler physical density for the enhanced header and source join', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  layer.clip.windowHeader = DEFAULT_WINDOW_HEADER;
+  const image = document.createElement('img');
+  Object.defineProperties(image, {
+    naturalWidth: { value: 931 },
+    naturalHeight: { value: 50 },
+    complete: { value: true },
+  });
+  f.input.imageBank[windowHeaderImageKey(layer.clipId, DEFAULT_WINDOW_HEADER)] = image;
+  const paint = vi
+    .spyOn(Object.getPrototypeOf(f.input.canvas.getContext('2d')), 'drawImage')
+    .mockImplementation(() => {});
+  try {
+    const density = 3.25;
+    const plan = await buildNativeGpuPreviewLayers({
+      ...f,
+      sourceForFrame: () => ({
+        frames: f.sources,
+        media: f.media,
+        sourceRasterScale: () => density,
+      }),
+    });
+    plans.push(plan);
+    const { resolveFittedWindowRaster } =
+      await import('../../../features/video/composition/draw/fitted-media');
+    const { resolveVideoWindowMedia } =
+      await import('../../../features/video/composition/draw/video');
+    const raster = resolveFittedWindowRaster(
+      { ...resolveVideoWindowMedia(layer, f.borrowed, 1, f.input.imageBank), frame: layer },
+      density,
+      50
+    );
+    const nodes = flatten(plan.layers);
+    expect(nodes.find((node) => node.source === f.source)?.rect).toEqual(raster.source);
+    const header = nodes.find((node) => node.clampSourceEdges?.includes('bottom'));
+    expect(header).toBeDefined();
+    expect(header!.rect.y + header!.rect.height).toBeCloseTo(raster.visible.y, 12);
+  } finally {
+    paint.mockRestore();
+  }
+});
+
+it('retains enhanced scene-demand exposure snapshots before the next streamed effect pass', async () => {
+  const f = fixture();
+  const first = f.passes.visualPasses[0]!;
+  const clipId = first.frame.visualLayers[0]!.clipId;
+  f.passes.visualPasses = [
+    { ...first, time: 0.99, alpha: 0.5 },
+    { ...first, time: 1.01, alpha: 0.5 },
+  ];
+  f.passes.overlayFrame.sceneSpotlights = [
+    {
+      id: 'outer',
+      phase: 'hold',
+      progress: 1,
+      spotlight: { ...createQuickEditSpotlight(), effect: 'magnify', magnification: 2 },
+    },
+  ];
+  const sampling = {
+    sourceRasterScaleForDemand: () => undefined,
+    forDemand: () => f.media,
+    effectMedia: () => f.media,
+    renderDimensions: () => ({ width: 32, height: 16 }),
+  };
+  f.input.preparedFrame = {
+    passes: f.passes,
+    rasterScale: 1,
+    compositionTime: 1,
+    sourcePresentation: new Map(),
+    sourceFrames: {
+      nominal: f.media,
+      bindings: new Map(),
+      media: () => f.media,
+      sampling: () => sampling,
+      release() {},
+    },
+  };
+  const demandTiles = new Map<string, HTMLCanvasElement>();
+  const sourceForFrame: NonNullable<
+    Parameters<typeof buildNativeGpuPreviewLayers>[0]['sourceForFrame']
+  > = (_frame, time, _layers, demand = 'body') => {
+    const key = `${time}/${demand}`;
+    let image = demandTiles.get(key);
+    if (!image) {
+      image = document.createElement('canvas');
+      image.width = 128;
+      image.height = 64;
+      demandTiles.set(key, image);
+    }
+    const tile = image;
+    return {
+      frames: f.sources,
+      media: new Map([
+        [
+          clipId,
+          {
+            ...f.borrowed,
+            preparedSampling: {
+              sourceKey: {},
+              sourceTime: time,
+              passTime: time,
+              sourceSize: { width: 32, height: 16 },
+              drawPrepared: () => true,
+              visitPreparedTiles(_id, consume) {
+                consume({
+                  image: tile,
+                  physicalSourceRect: { x: 0, y: 0, width: 128, height: 64 },
+                  originalPixelROI: { x: 0, y: 0, width: 32, height: 16 },
+                });
+                return true;
+              },
+            },
+          },
+        ],
+      ]),
+    };
+  };
+  let current = 0;
+  const snapshots: Array<HTMLCanvasElement & { close(): void }> = [];
+  const sceneReads: number[] = [];
+  const plan = await buildNativeGpuPreviewLayers({
+    ...f,
+    sourceForFrame,
+    effects: {
+      overlayFrames: new Map(),
+      framesByTime: new Map(),
+      prepareVisualPass: async (time) => {
+        current = time;
+      },
+    },
+    snapshotGroup: async (group) => {
+      const nodes = flatten(group.layers);
+      if (nodes.some((node) => node.source === demandTiles.get(`${current}/sceneLens:outer`))) {
+        sceneReads.push(current);
+        expect(group.output).toEqual({ width: 64, height: 32 });
+      }
+      const image = Object.assign(document.createElement('canvas'), { close: vi.fn() });
+      image.width = group.output.width;
+      image.height = group.output.height;
+      snapshots.push(image);
+      return image;
+    },
+  });
+  plans.push(plan);
+  expect(sceneReads).toEqual([0.99, 1.01]);
+  expect(snapshots).toHaveLength(4);
+  const nodes = flatten(plan.layers);
+  for (const snapshot of snapshots)
+    expect(nodes.some((node) => node.source === snapshot)).toBe(true);
+  plan.release();
+  for (const snapshot of snapshots) expect(snapshot.close).toHaveBeenCalledOnce();
+});
+
+it.each(['operationClip', 'depth'] as const)(
+  'retains the original parent target for direct %s semantics above the effect output pixel limit',
+  async (kind) => {
+    const f = fixture();
+    const clipId = f.passes.overlayFrame.visualLayers[0]!.clipId;
+    const depth = {
+      frame: {
+        rotation: [0, 0, 0, 1] as const,
+        perspective: 1,
+        windowMotion: 1,
+        lockBackground: true,
+        reference: { x: 0, y: 0, width: 32, height: 16 },
+        focus: [],
+      },
+      window: { x: 0, y: 0, width: 32, height: 16 },
+    };
+    const child: GpuPreviewLayer = {
+      source: f.input.canvas,
+      rect: { x: 0, y: 0, width: 32, height: 16 },
+      inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+      ...(kind === 'operationClip' ? { operationClip: { source: f.input.canvas } } : { depth }),
+    };
+    const group: import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewGroup =
+      {
+        kind: 'group',
+        output: { width: 3584, height: 2464 },
+        logical: { width: 32, height: 16 },
+        layers: [child],
+      };
+    const frame: import('../../../features/video/composition/effect-runtime/runtime/types').EffectRuntimeGpuPreparedFrame =
+      {
+        source: group,
+        effectInstanceId: 'large',
+        snapshotId: 'large',
+        kind: 'targetEffect',
+        target: {
+          kind: 'clip',
+          clipId,
+          chainIndex: 0,
+          placement: { x: 0, y: 0, width: 32, height: 16, rotation: 0, opacity: 1 },
+        },
+        width: 128,
+        height: 64,
+        logicalWidth: 32,
+        logicalHeight: 16,
+        retain: () => ({ release() {} }),
+        dispose() {},
+      };
+    const frames = new Map([['large', frame]]);
+    const sampling = {
+      sourceRasterScaleForDemand: () => undefined,
+      forDemand: () => f.media,
+      effectMedia: () => f.media,
+      renderDimensions: () => ({ width: 128, height: 64 }),
+    };
+    f.input.preparedFrame = {
+      passes: f.passes,
+      rasterScale: 1,
+      compositionTime: 1,
+      sourcePresentation: new Map(),
+      sourceFrames: {
+        nominal: f.media,
+        bindings: new Map(),
+        media: () => f.media,
+        sampling: () => sampling,
+        release() {},
+      },
+    };
+    f.passes.overlayFrame.camera.scale = 2;
+    f.passes.visualPasses[0]!.frame.camera.scale = 2;
+    const plan = await buildNativeGpuPreviewLayers({
+      ...f,
+      effects: {
+        kind: 'gpu-scene',
+        overlayFrames: frames,
+        framesByTime: new Map([[1, frames]]),
+        dispose() {},
+      },
+    });
+    plans.push(plan);
+    const owner = flatten(plan.layers).find(
+      (layer) =>
+        'kind' in layer.source &&
+        layer.source.kind === 'group' &&
+        layer.source.layers.some((layer) => layer.source === f.input.canvas)
+    );
+    if (!owner || !('kind' in owner.source) || owner.source.kind !== 'group')
+      throw new Error('Missing destination-sensitive target');
+    expect(owner.source.logical).toEqual({ width: 32, height: 16 });
+    expect(owner.source.output).toEqual(group.output);
+    expect(owner.source.layers[0]!.inverse).toEqual(child.inverse);
+    expect(owner.source.layers[0]![kind]).toBe(child[kind]);
+    const { EFFECT_RUNTIME_RESOURCE_LIMITS } =
+      await import('../../../features/video/composition/effect-runtime/runtime/resource-limits');
+    expect(owner.source.output.width * owner.source.output.height).toBeGreaterThan(
+      EFFECT_RUNTIME_RESOURCE_LIMITS.maxOutputPixels
+    );
+    const { validateGpuPreviewFrame } =
+      await import('../../../features/video/composition/canvas/gpu-preview-plan');
+    expect(() =>
+      validateGpuPreviewFrame(
+        {
+          output: { width: 32, height: 16 },
+          logical: { width: 32, height: 16 },
+          layers: plan.layers,
+          signal: new AbortController().signal,
+        },
+        8192
+      )
+    ).not.toThrow();
+  }
+);
+
+it('keeps repeated post-camera groups and a prepared source ROI within the existing GPU texture budget', async () => {
+  const f = fixture();
+  f.input.project.width = 1920;
+  f.input.project.height = 1080;
+  f.input.previewRasterSize = { width: 1920, height: 1080 };
+  f.passes.overlayFrame.camera.scale = 4;
+  f.passes.visualPasses[0]!.frame.camera.scale = 4;
+  f.passes.overlayFrame.sceneSpotlights = [
+    { id: 'dim', phase: 'hold', progress: 1, spotlight: createQuickEditSpotlight() },
+  ];
+  const image = document.createElement('canvas');
+  image.width = 128;
+  image.height = 64;
+  const source: VideoCompositionFrameSource = {
+    ...f.borrowed,
+    preparedSampling: {
+      sourceKey: {},
+      sourceTime: 1,
+      passTime: 1,
+      sourceSize: { width: 32, height: 16 },
+      drawPrepared: () => true,
+      visitPreparedTiles(_id, consume) {
+        consume({
+          image,
+          physicalSourceRect: { x: 0, y: 0, width: 128, height: 64 },
+          originalPixelROI: { x: 0, y: 0, width: 32, height: 16 },
+        });
+        return true;
+      },
+    },
+  };
+  const clipId = f.passes.overlayFrame.visualLayers[0]!.clipId;
+  const plan = await buildNativeGpuPreviewLayers({
+    ...f,
+    sourceForFrame: () => ({ frames: f.sources, media: new Map([[clipId, source]]) }),
+  });
+  plans.push(plan);
+  const nodes = flatten(plan.layers);
+  const groups = new Set<
+    import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewGroup
+  >();
+  const rasters = new Set<HTMLCanvasElement>();
+  for (const layer of nodes) {
+    if ('kind' in layer.source && layer.source.kind === 'group') groups.add(layer.source);
+    else if (layer.source instanceof HTMLCanvasElement) rasters.add(layer.source);
+  }
+  const bytes =
+    [...groups].reduce((sum, group) => sum + group.output.width * group.output.height * 4, 0) +
+    [...rasters].reduce((sum, raster) => sum + raster.width * raster.height * 4, 0);
+  const { MAX_TEXTURE_BYTES } =
+    await import('../../../features/video/composition/canvas/gpu-preview-plan');
+  expect(bytes).toBeLessThan(MAX_TEXTURE_BYTES);
+  const scene = [...groups].find(
+    (group) => group.logical.width === 1920 && group.logical.height === 1080
+  );
+  expect(scene?.output).toEqual({ width: 1920, height: 1080 });
+  const sampled = nodes.find((node) => node.source === image);
+  expect(sampled?.rect).toEqual({ x: 0, y: 0, width: 32, height: 16 });
+  expect(sampled?.source).toBe(image);
+  expect(image.width).toBe(128);
+  expect(image.height).toBe(64);
+});
+
+it('sizes an off-center source lens before its projective camera ancestor', async () => {
+  const f = fixture();
+  const layer = f.passes.overlayFrame.visualLayers[0]!;
+  if (layer.kind !== 'video') throw new Error('Expected video');
+  const point = { x: 0.75, y: 0.35 };
+  const action = {
+    ...clickAction(layer.clipId),
+    point,
+    gestureFeedback: {
+      effect: 'magnify' as const,
+      point,
+      radius: 3,
+      stroke: 1,
+      opacity: 1,
+      color: '#f00',
+      lens: { scale: 2, shape: 'circle' as const, shadow: 0 },
+    },
+  };
+  layer.actions = [action];
+  const camera = {
+    ...f.passes.overlayFrame.camera,
+    scale: 1.3,
+    spatial: {
+      rotation: [0, Math.sin(0.22), 0, Math.cos(0.22)] as const,
+      perspective: 1.5,
+      windowMotion: 1,
+      lockBackground: true,
+      reference: { x: 0, y: 0, width: 32, height: 16 },
+      focus: [],
+    },
+  };
+  f.passes.overlayFrame.camera = camera;
+  f.passes.visualPasses[0]!.frame.camera = camera;
+  const { sourceClickSamplingDemandId } =
+    await import('../../../features/video/composition/draw/effects/actions');
+  const click = sourceClickSamplingDemandId(action);
+  const images = new Map<string, HTMLCanvasElement>();
+  const sourceForFrame: NonNullable<
+    Parameters<typeof buildNativeGpuPreviewLayers>[0]['sourceForFrame']
+  > = (_frame, _time, _layers, demand = 'body') => {
+    let image = images.get(demand);
+    if (!image) {
+      image = document.createElement('canvas');
+      image.width = 64;
+      image.height = 64;
+      images.set(demand, image);
+    }
+    const tile = image;
+    return {
+      frames: f.sources,
+      media: new Map([
+        [
+          layer.clipId,
+          {
+            ...f.borrowed,
+            preparedSampling: {
+              sourceKey: {},
+              sourceTime: 1,
+              passTime: 1,
+              sourceSize: { width: 32, height: 16 },
+              drawPrepared: () => true,
+              visitPreparedTiles(_id, consume) {
+                for (const x of [0, 16])
+                  consume({
+                    image: tile,
+                    physicalSourceRect: { x: 0, y: 0, width: 64, height: 64 },
+                    originalPixelROI: { x, y: 0, width: 16, height: 16 },
+                  });
+                return true;
+              },
+            },
+          },
+        ],
+      ]),
+    };
+  };
+  const densityModule =
+    await import('../../../features/video/composition/export-enhancement/projection-density');
+  const densityProof = vi.spyOn(densityModule, 'samplingRasterSize');
+  const plan = await buildNativeGpuPreviewLayers({ ...f, sourceForFrame });
+  const actualProjections = densityProof.mock.calls.map(([request]) => request.projection);
+  densityProof.mockRestore();
+  plans.push(plan);
+  const { motionCameraProjection } =
+    await import('../../../features/video/composition/motion/spatial');
+  const { multiplyQuickEditProjections, scaleQuickEditRectAboutCenter } =
+    await import('../../../features/video/composition/motion/spatial-geometry');
+  const { samplingRasterSize } =
+    await import('../../../features/video/composition/export-enhancement/projection-density');
+  const lens = scaleQuickEditRectAboutCenter(
+    { x: point.x * 32 - 3, y: point.y * 16 - 3, width: 6, height: 6 },
+    2
+  );
+  const projection = multiplyQuickEditProjections(motionCameraProjection(camera)!, lens);
+  const expected = samplingRasterSize({ roi: { x: 0, y: 0, width: 32, height: 16 }, projection });
+  const holder = flatten(plan.layers).find(
+    (node) =>
+      'kind' in node.source &&
+      node.source.kind === 'group' &&
+      node.source.layers.some((child) => child.source === images.get(click))
+  );
+  if (!holder || !('kind' in holder.source) || holder.source.kind !== 'group')
+    throw new Error('Missing source lens group');
+  expect(
+    actualProjections.some((actual) =>
+      actual.every((value, index) => Math.abs(value - projection[index]!) < 1e-10)
+    )
+  ).toBe(true);
+  expect(holder.source.output.width).toBeLessThan(expected.width);
+  expect(holder.source.logical.width).toBeLessThan(32);
+});
+
+it('bounds the camera 2x optical scene lens 2x within existing GPU admission and keeps lens coverage', async () => {
+  const f = fixture();
+  const clip = f.input.project.clips[0]!;
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.transform = { x: 0, y: 0, width: 1920, height: 1080, rotation: 0, opacity: 1 };
+  f.input.project.width = 1920;
+  f.input.project.height = 1080;
+  f.input.previewRasterSize = { width: 1920, height: 1080 };
+  f.passes = resolveVideoCompositionRenderPasses(f.input.project, 1);
+  const camera = { ...f.passes.overlayFrame.camera, scale: 2, viewportX: 480, viewportY: 270 };
+  f.passes.overlayFrame.camera = camera;
+  f.passes.visualPasses[0]!.frame.camera = camera;
+  f.passes.overlayFrame.sceneSpotlights = [
+    {
+      id: 'optical',
+      phase: 'hold',
+      progress: 1,
+      spotlight: {
+        ...createQuickEditSpotlight(),
+        effect: 'magnify',
+        magnification: 2,
+        lensOptics: 'optical',
+      },
+    },
+  ];
+  const tile = document.createElement('canvas');
+  tile.width = 1920;
+  tile.height = 1080;
+  const sourceForFrame: NonNullable<
+    Parameters<typeof buildNativeGpuPreviewLayers>[0]['sourceForFrame']
+  > = (_frame, _time, _layers, demand = 'body') => {
+    const roi =
+      demand === 'body'
+        ? { x: 480, y: 270, width: 960, height: 540 }
+        : { x: 720, y: 405, width: 480, height: 270 };
+    return {
+      frames: f.sources,
+      media: new Map([
+        [
+          clip.id,
+          {
+            ...f.borrowed,
+            sourceWidth: 1920,
+            sourceHeight: 1080,
+            preparedSampling: {
+              sourceKey: {},
+              sourceTime: 1,
+              passTime: 1,
+              sourceSize: { width: 1920, height: 1080 },
+              drawPrepared: () => true,
+              visitPreparedTiles(_id, consume) {
+                consume({
+                  image: tile,
+                  physicalSourceRect: { x: 0, y: 0, width: 1920, height: 1080 },
+                  originalPixelROI: roi,
+                });
+                return true;
+              },
+            },
+          },
+        ],
+      ]),
+    };
+  };
+  const plan = await buildNativeGpuPreviewLayers({ ...f, sourceForFrame });
+  plans.push(plan);
+  const { validateGpuPreviewFrame, MAX_TEXTURE_BYTES } =
+    await import('../../../features/video/composition/canvas/gpu-preview-plan');
+  expect(() =>
+    validateGpuPreviewFrame(
+      {
+        output: { width: 1920, height: 1080 },
+        logical: { width: 1920, height: 1080 },
+        layers: plan.layers,
+        signal: new AbortController().signal,
+      },
+      8192
+    )
+  ).not.toThrow();
+  const nodes = flatten(plan.layers);
+  const groups = new Set<
+    import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewGroup
+  >();
+  const rasters = new Set<HTMLCanvasElement>();
+  for (const node of nodes) {
+    if ('kind' in node.source && node.source.kind === 'group') groups.add(node.source);
+    else if (node.source instanceof HTMLCanvasElement) rasters.add(node.source);
+  }
+  const bytes =
+    [...groups].reduce((sum, group) => sum + group.output.width * group.output.height * 4, 0) +
+    [...rasters].reduce((sum, raster) => sum + raster.width * raster.height * 4, 0);
+  expect(bytes).toBeLessThan(MAX_TEXTURE_BYTES);
+  const lens = nodes.find((node) => node.lens?.optics === 'optical');
+  expect(lens?.clip?.rect).toEqual({
+    x: lens!.lens!.bounds.x - 2,
+    y: lens!.lens!.bounds.y - 2,
+    width: lens!.lens!.bounds.width + 4,
+    height: lens!.lens!.bounds.height + 4,
+  });
+  expect(
+    nodes.some(
+      (node) =>
+        'kind' in node.source &&
+        node.source.kind === 'group' &&
+        node.clip &&
+        node.clip.rect.width > node.rect.width
+    )
+  ).toBe(true);
+  const {
+    invertQuickEditProjection,
+    multiplyQuickEditProjections,
+    projectQuickEditPoint,
+    scaleQuickEditRectAboutCenter,
+  } = await import('../../../features/video/composition/motion/spatial-geometry');
+  const positions: Array<{ x: number; y: number }> = [];
+  const locate = (
+    layers: readonly GpuPreviewLayer[],
+    ancestor: import('../../../features/video/composition/motion/spatial-geometry').QuickEditHomography
+  ) => {
+    for (const layer of layers) {
+      const forward = invertQuickEditProjection(layer.inverse)!;
+      const lensTransform = layer.lens
+        ? scaleQuickEditRectAboutCenter(layer.lens.bounds, layer.lens.scale)
+        : ([1, 0, 0, 0, 1, 0, 0, 0, 1] as const);
+      const transform = multiplyQuickEditProjections(
+        ancestor,
+        multiplyQuickEditProjections(forward, lensTransform)
+      );
+      if ('kind' in layer.source && layer.source.kind === 'group') {
+        const group = layer.source;
+        const placement = [
+          layer.rect.width / group.logical.width,
+          0,
+          layer.rect.x,
+          0,
+          layer.rect.height / group.logical.height,
+          layer.rect.y,
+          0,
+          0,
+          1,
+        ] as const;
+        locate(group.layers, multiplyQuickEditProjections(transform, placement));
+      } else if (layer.source === tile) {
+        positions.push(
+          projectQuickEditPoint(transform, {
+            x: layer.rect.x + layer.rect.width * 0.3,
+            y: layer.rect.y + layer.rect.height * 0.4,
+          })!
+        );
+      }
+    }
+  };
+  locate(plan.layers, [1, 0, 0, 0, 1, 0, 0, 0, 1]);
+  expect(positions.length).toBeGreaterThanOrEqual(2);
+  for (const point of positions) {
+    expect(point.x).toBeCloseTo(576, 9);
+    expect(point.y).toBeCloseTo(432, 9);
+  }
+});
+
+it('keeps destination-in clearing when its unread source group lowers to transparent', async () => {
+  const f = fixture();
+  const clipId = f.passes.overlayFrame.visualLayers[0]!.clipId;
+  const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
+  const mask: GpuPreviewLayer = {
+    source: {
+      kind: 'group',
+      output: { width: 8, height: 8 },
+      logical: { width: 8, height: 8 },
+      layers: [
+        { source: f.input.canvas, rect: { x: 0, y: 0, width: 8, height: 8 }, inverse: identity },
+      ],
+    },
+    rect: { x: 64, y: 64, width: 8, height: 8 },
+    inverse: identity,
+    blend: 'mask',
+  };
+  const source: import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewGroup = {
+    kind: 'group',
+    output: { width: 32, height: 16 },
+    logical: { width: 32, height: 16 },
+    layers: [
+      { source: f.input.canvas, rect: { x: 0, y: 0, width: 32, height: 16 }, inverse: identity },
+      mask,
+    ],
+  };
+  const frame: import('../../../features/video/composition/effect-runtime/runtime/types').EffectRuntimeGpuPreparedFrame =
+    {
+      source,
+      effectInstanceId: 'masked',
+      snapshotId: 'masked',
+      kind: 'targetEffect',
+      target: {
+        kind: 'clip',
+        clipId,
+        chainIndex: 0,
+        placement: { x: 0, y: 0, width: 32, height: 16, rotation: 0, opacity: 1 },
+      },
+      width: 64,
+      height: 32,
+      logicalWidth: 32,
+      logicalHeight: 16,
+      retain: () => ({ release() {} }),
+      dispose() {},
+    };
+  const frames = new Map([['masked', frame]]);
+  const sampling = {
+    sourceRasterScaleForDemand: () => undefined,
+    forDemand: () => f.media,
+    effectMedia: () => f.media,
+    renderDimensions: () => ({ width: 64, height: 32 }),
+  };
+  f.input.preparedFrame = {
+    passes: f.passes,
+    rasterScale: 1,
+    compositionTime: 1,
+    sourcePresentation: new Map(),
+    sourceFrames: {
+      nominal: f.media,
+      bindings: new Map(),
+      media: () => f.media,
+      sampling: () => sampling,
+      release() {},
+    },
+  };
+  const plan = await buildNativeGpuPreviewLayers({
+    ...f,
+    effects: {
+      kind: 'gpu-scene',
+      overlayFrames: frames,
+      framesByTime: new Map([[1, frames]]),
+      dispose() {},
+    },
+  });
+  plans.push(plan);
+  const empty = flatten(plan.layers).find(
+    (layer) =>
+      layer.blend === 'mask' &&
+      'kind' in layer.source &&
+      layer.source.kind === 'group' &&
+      layer.source.layers.length === 0
+  );
+  expect(empty).toMatchObject({
+    blend: 'mask',
+    rect: mask.rect,
+    inverse: identity,
+    source: { output: { width: 1, height: 1 }, layers: [] },
+  });
+});

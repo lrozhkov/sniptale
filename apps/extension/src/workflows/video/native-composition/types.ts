@@ -20,7 +20,11 @@ import type {
   VideoCompositionFrame,
   VideoCompositionVisualLayer,
 } from '../../../features/video/composition/types';
-import type { VideoCompositionFrameSource } from '../../../features/video/composition/draw/media-source';
+import type {
+  VideoCompositionFrameSource,
+  VideoCompositionMediaSource,
+} from '../../../features/video/composition/draw/media-source';
+import type { EffectRuntimeFramePlan } from '../../../features/video/composition/effect-runtime/runtime/types';
 import type { VideoProjectWatermarkRenderer } from '../../../features/video/composition/canvas/project-watermark';
 import type { VideoProjectCaptionRenderer } from '../../video-review/project-captions';
 import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
@@ -43,8 +47,20 @@ import type {
   VideoPreviewRenderer,
 } from '../../../features/video/preview/preferences';
 
+/** A source pass supplies exact demand media and physical effect dimensions. */
+interface NativeSceneSourceSampling {
+  sourceRasterScaleForDemand(clipId: string, id: string): number | undefined;
+  forDemand(id: string): ReadonlyMap<string, VideoCompositionMediaSource>;
+  effectMedia(plan: EffectRuntimeFramePlan): ReadonlyMap<string, VideoCompositionMediaSource>;
+  renderDimensions(plan: EffectRuntimeFramePlan): { width: number; height: number };
+}
+
 /** Exact source bindings belong to this resolved composition, never presentation metadata. */
 export interface PreviewSceneSourceFrames {
+  sampling?(
+    frame: Pick<VideoCompositionFrame, 'visualLayers'>,
+    time: number
+  ): NativeSceneSourceSampling;
   readonly nominal: ReadonlyMap<string, VideoCompositionFrameSource>;
   readonly bindings: ReadonlyMap<
     string,

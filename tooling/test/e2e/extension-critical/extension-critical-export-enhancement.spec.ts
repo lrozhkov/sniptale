@@ -1,3 +1,4 @@
+import { configureGpuPreviewProofBrowser } from '../support/gpu-preview-proof';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
@@ -19,6 +20,8 @@ import type {
   InspectionOptions,
   inspectEnhancementOutput,
 } from '../../harness/export-enhancement';
+
+configureGpuPreviewProofBrowser();
 
 type Inspection = Awaited<ReturnType<typeof inspectEnhancementOutput>>;
 const NEURAL_WINDOW = { start: 0.9, end: 1.9 };
@@ -546,11 +549,13 @@ for (const variant of [undefined, 'overlapping-scene-lenses'] satisfies (
         full = await page.evaluate(
           ({ bytes, probes }) =>
             window.__sniptaleOffscreenHarness!.enhancementProof.inspectFile(
-              new Blob([Uint8Array.from(bytes)], { type: 'video/webm' }),
+              new Blob([Uint8Array.from(atob(bytes), (character) => character.charCodeAt(0))], {
+                type: 'video/webm',
+              }),
               { duration: 10, probes, effectRoi: true }
             ),
           {
-            bytes: [...fullBytes],
+            bytes: fullBytes.toString('base64'),
             probes: controls.flatMap((control) =>
               LATE_PROBES.map((probe) => control.window.start + probe)
             ),

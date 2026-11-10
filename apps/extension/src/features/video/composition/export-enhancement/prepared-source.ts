@@ -1,3 +1,4 @@
+import type { GpuPreviewLayer } from '../canvas/gpu-preview-types';
 import type { ExportEnhancer } from './enhancer';
 import { planEnhancedRegion } from './region-plan';
 import { samplingRasterSize } from './projection-density';
@@ -332,4 +333,57 @@ export async function prepareSourceSampling(args: {
     dispose();
     throw error;
   }
+}
+
+/** Borrow retained source tiles through GPU completion; placement remains in source geometry. */
+export function preparedSourceGpuLayers(
+  sampling: PreparedSourceSampling,
+  demandId: string,
+  destination: SourceSamplingRect
+): { layers: GpuPreviewLayer[]; density: number } | null {
+  if (!validRect(destination)) throw new RangeError('Prepared source GPU bounds are invalid.');
+  const layers: GpuPreviewLayer[] = [];
+  let density = 0;
+  const applied = sampling.visitPreparedTiles(demandId, (tile) => {
+    const crop = tile.physicalSourceRect;
+    const roi = tile.originalPixelROI;
+    const rect = {
+      x: destination.x + (roi.x * destination.width) / sampling.sourceSize.width,
+      y: destination.y + (roi.y * destination.height) / sampling.sourceSize.height,
+      width: (roi.width * destination.width) / sampling.sourceSize.width,
+      height: (roi.height * destination.height) / sampling.sourceSize.height,
+    };
+    density = Math.max(density, crop.width / rect.width, crop.height / rect.height);
+    const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
+    const source: GpuPreviewLayer['source'] =
+      crop.x === 0 &&
+      crop.y === 0 &&
+      crop.width === tile.image.width &&
+      crop.height === tile.image.height
+        ? tile.image
+        : {
+            kind: 'group',
+            logical: { width: crop.width, height: crop.height },
+            output: { width: Math.ceil(crop.width), height: Math.ceil(crop.height) },
+            layers: [
+              {
+                source: tile.image,
+                rect: {
+                  x: -crop.x,
+                  y: -crop.y,
+                  width: tile.image.width,
+                  height: tile.image.height,
+                },
+                inverse: identity,
+              },
+            ],
+          };
+    layers.push({
+      source,
+      rect,
+      inverse: identity,
+      clampSourceEdges: ['left', 'top', 'right', 'bottom'],
+    });
+  });
+  return applied ? { layers, density } : null;
 }

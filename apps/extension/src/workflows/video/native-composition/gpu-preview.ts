@@ -45,6 +45,7 @@ type VideoLayer = Extract<VideoCompositionVisualLayer, { kind: 'video' }>;
 const IDENTITY: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
 function admittedLayer(input: Input, passes: Passes, depth = false): VideoLayer | null {
+  if (input.preparedFrame?.sourceFrames?.sampling) return null;
   const frame = passes.overlayFrame;
   const pass = passes.visualPasses[0];
   const layer = frame.visualLayers[0];
@@ -468,6 +469,7 @@ export function createNativeGpuPreviewRenderer(
           ];
         }
         preparedEffects = await prepareEffectRuntimeGpuScene({
+          boundTextures: !!input.preparedFrame?.sourceFrames?.sampling,
           layers: presentationLayers,
           gpu: provider,
           signal: input.signal ?? new AbortController().signal,
@@ -627,7 +629,12 @@ async function composeNativeGpuEffectInput(args: {
       },
       sources: captured,
       sourceForFrame: (_frame, time, layers) =>
-        forFrame(request.scene?.frame ?? passes.overlayFrame, request.time ?? time, layers),
+        forFrame(
+          request.scene?.frame ?? passes.overlayFrame,
+          request.time ?? time,
+          layers,
+          'effectInput'
+        ),
       media,
       background: backdrop,
       inputComposition: request,
