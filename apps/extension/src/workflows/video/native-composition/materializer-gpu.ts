@@ -10,7 +10,7 @@ import type {
   GpuPreviewTarget,
   GpuPreviewTargetFactory,
 } from '../../../features/video/composition/canvas/preview-presentation';
-import type { VideoEditorPreviewRasterSize } from '../stage/sizing/raster';
+import type { VideoEditorPreviewRasterSize } from './types';
 /** Owns GPU availability and completion for materialized endpoint composition. */
 export function createMaterializerGpuComposer(
   rasterSize: VideoEditorPreviewRasterSize,

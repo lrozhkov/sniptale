@@ -1,22 +1,22 @@
 // @vitest-environment jsdom
-import { createEffectRuntimeFailure } from '../../../../contracts/effect-runtime/identity';
+import { createEffectRuntimeFailure } from '../../../contracts/effect-runtime/identity';
 import type {
   EffectRuntimeSceneResult,
   EffectRuntimeRenderCommand,
-} from '../../../../contracts/effect-runtime/types';
+} from '../../../contracts/effect-runtime/types';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
-import * as timeline from '../../../../features/video/composition/timeline/render';
+import { windowHeaderImageKey } from '../../../features/video/composition/draw/window-header';
+import * as timeline from '../../../features/video/composition/timeline/render';
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseEffectRuntimeSnapshotDocument } from '../../../../features/video/composition/effect-runtime/runtime/snapshot-document';
-import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
-import { scaleEffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/render/wave';
+import { parseEffectRuntimeSnapshotDocument } from '../../../features/video/composition/effect-runtime/runtime/snapshot-document';
+import { createEffectHostClip } from '../../../features/video/project/factories/overlay-clip';
+import { scaleEffectRuntimeFramePlan } from '../../../features/video/composition/effect-runtime/render/wave';
 import {
   createProject,
   createVideoClip,
-} from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
+import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
 import {
   captureNativePreviewSources,
   prepareNativePreviewSceneFrame,

@@ -2,7 +2,7 @@ import type { PreviewScenePresentation } from '../stage/scene/types';
 import type { GpuPreviewOutput } from '../../../features/video/composition/canvas/preview-presentation';
 import type { VideoEditorPreviewMode } from '../../contracts/preview-runtime';
 import type { renderPreviewScene } from '../stage/scene/render-preview';
-import { createMaterializerGpuComposer } from './materializer-gpu';
+import { createMaterializerGpuComposer } from '../../../workflows/video/native-composition/materializer-gpu';
 import {
   createVideoPreviewExactFrameKey,
   type VideoPreviewExactFrameCache,

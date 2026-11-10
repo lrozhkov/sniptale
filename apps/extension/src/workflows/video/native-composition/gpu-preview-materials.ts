@@ -1,35 +1,35 @@
-import { createRetainedRasterMaterialOwner } from '../../../../features/video/composition/canvas/retained-raster-material';
+import { createRetainedRasterMaterialOwner } from '../../../features/video/composition/canvas/retained-raster-material';
 import {
   type GpuPreviewLayer,
   type GpuPreviewGroup,
-} from '../../../../features/video/composition/canvas/gpu-preview';
-import { resolveVideoWindowMedia } from '../../../../features/video/composition/draw/video';
-import { resolveVideoMediaShadowParams } from '../../../../features/video/composition/canvas/media-shadow';
+} from '../../../features/video/composition/canvas/gpu-preview';
+import { resolveVideoWindowMedia } from '../../../features/video/composition/draw/video';
+import { resolveVideoMediaShadowParams } from '../../../features/video/composition/canvas/media-shadow';
 
 import { buildNativeGpuPreviewLayers } from './gpu-preview-layers';
 import { nativeGpuWindowHeader, paintNativeGpuDecoration } from './gpu-preview-video';
-import { getFittedMediaWindowFrame } from '../../../../features/video/composition/draw/fitted-media';
-import { roundedWindowRadius } from '../../../../features/video/project/window-geometry';
+import { getFittedMediaWindowFrame } from '../../../features/video/composition/draw/fitted-media';
+import { roundedWindowRadius } from '../../../features/video/project/window-geometry';
 
-import { admittedVisualWindowHeader } from '../../../../features/video/composition/draw/window-header';
+import { admittedVisualWindowHeader } from '../../../features/video/composition/draw/window-header';
 
-import { motionCameraPlaneTransform } from '../../../../features/video/composition/motion/spatial';
+import { motionCameraPlaneTransform } from '../../../features/video/composition/motion/spatial';
 import {
   invertQuickEditProjection,
   type QuickEditHomography,
-} from '../../../../features/video/composition/motion/spatial-geometry';
+} from '../../../features/video/composition/motion/spatial-geometry';
 import {
   drawSceneBackground,
   getProjectSceneBackground,
-} from '../../../../features/video/project/scene/background';
+} from '../../../features/video/project/scene/background';
 import {
   evaluateSceneBackgroundMotion,
   hasSceneBackgroundMotion,
   sceneBackgroundDriftRect,
-} from '../../../../features/video/project/scene/background-motion';
-import { resolveSceneBackgroundAudioEnvelope } from '../../../../features/video/project/scene/background-audio';
-import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
+} from '../../../features/video/project/scene/background-motion';
+import { resolveSceneBackgroundAudioEnvelope } from '../../../features/video/project/scene/background-audio';
+import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
+import type { VideoCompositionVisualLayer } from '../../../features/video/composition/types';
 import type { PreviewSceneRenderInput as Input } from './types';
 
 type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;

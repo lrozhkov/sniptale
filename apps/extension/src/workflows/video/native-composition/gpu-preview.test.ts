@@ -3,22 +3,22 @@ import { afterEach, expect, it, vi } from 'vitest';
 import {
   createProject,
   createVideoClip,
-} from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
+import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
 import {
   GpuPreviewDeviceError,
   type GpuPreviewRenderer,
-} from '../../../../features/video/composition/canvas/gpu-preview';
+} from '../../../features/video/composition/canvas/gpu-preview';
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
 import * as effectPreparation from './effect-preparation';
-import { projectQuickEditPoint } from '../../../../features/video/composition/motion/spatial-geometry';
-import type { renderPreviewScene } from './render-preview';
-import { createSceneGradientBackground } from '../../../../features/video/project/scene/background-gradient';
+import { projectQuickEditPoint } from '../../../features/video/composition/motion/spatial-geometry';
+import type { renderNativeCompositionScene } from './render-scene';
+import { createSceneGradientBackground } from '../../../features/video/project/scene/background-gradient';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
+import { windowHeaderImageKey } from '../../../features/video/composition/draw/window-header';
 
-vi.mock('../../../../features/video/composition/draw/video', async (original) => ({
-  ...(await original<typeof import('../../../../features/video/composition/draw/video')>()),
+vi.mock('../../../features/video/composition/draw/video', async (original) => ({
+  ...(await original<typeof import('../../../features/video/composition/draw/video')>()),
   drawVideoLayer: vi.fn(),
 }));
 const owners: ReturnType<typeof createNativeGpuPreviewRenderer>[] = [];
@@ -76,7 +76,7 @@ function fixture(
     ...(maximumPresentationBytes !== undefined ? { maximumPresentationBytes } : {}),
   });
   owners.push(owner);
-  const input: Parameters<typeof renderPreviewScene>[0] = {
+  const input: Parameters<typeof renderNativeCompositionScene>[0] = {
     project,
     canvas,
     stage: null,
@@ -353,7 +353,7 @@ it('preserves oriented decoded sources in the general GPU graph', async () => {
   ]);
   expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBe(true);
   const find = (
-    layers: readonly import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
+    layers: readonly import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
   ): boolean =>
     layers.some(
       (layer) =>
@@ -405,8 +405,8 @@ it('retains exact-density DOF source masks and caches static artwork without a r
     ],
   ]);
   const walk = (
-    nodes: readonly import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
-  ): import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[] =>
+    nodes: readonly import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
+  ): import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[] =>
     nodes.flatMap((node) => [
       node,
       ...('kind' in node.source && node.source.kind === 'group' ? walk(node.source.layers) : []),
@@ -515,8 +515,8 @@ it('keeps the isolated GPU mask when an inner source transform uses a different 
   layer.sourceContentTransform = [1.2, 0, -2, 0, 1.2, -1, 0, 0, 1];
   expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBe(true);
   const walk = (
-    nodes: readonly import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
-  ): import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[] =>
+    nodes: readonly import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
+  ): import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[] =>
     nodes.flatMap((node) => [
       node,
       ...('kind' in node.source && node.source.kind === 'group' ? walk(node.source.layers) : []),
@@ -557,25 +557,25 @@ it.each(['clip', 'video-group', 'transition', 'chain'] as const)(
   'prepares %s EffectV1 inputs through the Native GPU entry without Canvas media materialization',
   async (kind) => {
     const f = fixture();
-    const timeline = await import('../../../../features/video/composition/timeline/render');
-    const { renderPreviewScene } = await import('./render-preview');
+    const timeline = await import('../../../features/video/composition/timeline/render');
+    const { renderNativeCompositionScene } = await import('./render-scene');
     f.render.mockImplementation(async () => {
       const bitmap = Object.assign(document.createElement('canvas'), { close: vi.fn() });
       bitmap.width = 8;
       bitmap.height = 4;
       return bitmap;
     });
-    const spatial = await import('../../../../features/video/composition/draw/spatial');
+    const spatial = await import('../../../features/video/composition/draw/spatial');
     vi.spyOn(spatial, 'drawSpatialCompositionGroup').mockImplementation(() => {
       throw new Error('Legacy spatial input forbidden');
     });
-    const effectDraw = await import('../../../../features/video/composition/draw/effect-runtime');
+    const effectDraw = await import('../../../features/video/composition/draw/effect-runtime');
     vi.spyOn(effectDraw, 'drawEffectRuntimeVisualLayer').mockImplementation(() => {
       throw new Error('Canvas effect bitmap composition forbidden');
     });
     const sourceLayer = f.passes.overlayFrame.visualLayers[0]!;
     const other = { ...sourceLayer, clipId: 'other' };
-    const base: import('../../../../features/video/composition/effect-runtime/runtime/types').EffectRuntimeFramePlan =
+    const base: import('../../../features/video/composition/effect-runtime/runtime/types').EffectRuntimeFramePlan =
       {
         assets: [],
         controls: {},
@@ -653,7 +653,7 @@ it.each(['clip', 'video-group', 'transition', 'chain'] as const)(
     f.input.effectRuntimeExecutor = {
       dispose: vi.fn(),
       renderFrame: vi.fn<
-        import('../../../../contracts/effect-runtime/types').EffectRuntimeSandboxExecutor['renderFrame']
+        import('../../../contracts/effect-runtime/types').EffectRuntimeSandboxExecutor['renderFrame']
       >(async (request) => {
         expect(f.render).toHaveBeenCalled();
         for (const input of Object.values(request.inputFrames)) input.bitmap.close();
@@ -677,7 +677,9 @@ it.each(['clip', 'video-group', 'transition', 'chain'] as const)(
         };
       }),
     };
-    await expect(renderPreviewScene({ ...f.input, gpuPreview: f.owner })).resolves.not.toBe(false);
+    await expect(
+      renderNativeCompositionScene({ ...f.input, gpuPreview: f.owner })
+    ).resolves.not.toBe(false);
     expect(draw).not.toHaveBeenCalled();
     expect(f.render.mock.calls.length).toBe(kind === 'transition' ? 3 : 2);
     const inputs = f.render.mock.calls.slice(0, -1);
@@ -697,7 +699,7 @@ it('remembers typed input device failure even when an effect driver wraps the er
   f.render.mockRejectedValueOnce(new GpuPreviewDeviceError('Input queue lost'));
   const prepare = vi.fn(
     async (
-      compose: import('../../../../features/video/composition/effect-runtime/frame/inputs').EffectRuntimeInputComposer
+      compose: import('../../../features/video/composition/effect-runtime/frame/inputs').EffectRuntimeInputComposer
     ) => {
       try {
         await compose({
@@ -761,9 +763,9 @@ it('reuses only immutable mask pixels through the production general renderer', 
   if (layer.kind !== 'video') throw new Error('Expected video');
   layer.sourceContentTransform = [1, 0, 1, 0, 1, 0, 0, 0, 1];
   const findMask = (
-    layers: readonly import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
+    layers: readonly import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
   ):
-    | import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer
+    | import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer
     | undefined => {
     for (const node of layers) {
       if (node.cache?.key === 'native-source-mask') return node;

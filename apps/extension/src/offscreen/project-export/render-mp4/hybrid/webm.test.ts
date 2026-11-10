@@ -358,3 +358,12 @@ it('refuses direct decoded acceleration inside an active composition join before
   expect(getPrimaryVideoTrackMock).not.toHaveBeenCalled();
   expect(args.videoEncoder.encode).not.toHaveBeenCalled();
 });
+
+it('declines direct unenhanced accelerated composition before acquiring a decoder', async () => {
+  const args = createArgs();
+  args.settings.detailEnhancement = 'off';
+  expect(await renderAcceleratedCompositeWebmSpan(args)).toBe(false);
+  expect(loadBlobForAssetMock).not.toHaveBeenCalled();
+  expect(samplesAtTimestampsMock).not.toHaveBeenCalled();
+  expect(args.videoEncoder.encode).not.toHaveBeenCalled();
+});

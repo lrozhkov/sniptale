@@ -8,10 +8,12 @@ import {
 } from '../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { VideoProjectAssetType } from '../../../../features/video/project/types';
-import { drawPreviewVisualPasses } from './render-visual';
+import { drawPreviewVisualPasses } from '../../../../workflows/video/native-composition/render-visual';
 import { renderPreviewScene } from './render-preview';
 import type { NativeGpuPreviewRenderer } from './types';
-vi.mock('./render-visual', () => ({ drawPreviewVisualPasses: vi.fn(() => null) }));
+vi.mock('../../../../workflows/video/native-composition/render-visual', () => ({
+  drawPreviewVisualPasses: vi.fn(() => null),
+}));
 beforeEach(() => vi.clearAllMocks());
 function setup() {
   const project = createEmptyVideoProject();
@@ -51,9 +53,10 @@ it('borrows the prepared geometry and effects without disposing their caller-own
   const { job } = setup();
   const { resolveVideoCompositionRenderPasses } =
     await import('../../../../features/video/composition/timeline/render');
-  const { resolvePreviewEffectRuntimeRasterScale } = await import('./canvas');
+  const { resolvePreviewEffectRuntimeRasterScale } =
+    await import('../../../../workflows/video/native-composition/canvas');
   const passes = resolveVideoCompositionRenderPasses(job.project, job.currentTime);
-  const imageOwner = await import('./image-resources');
+  const imageOwner = await import('../../../../workflows/video/native-composition/image-resources');
   const imageResources = imageOwner.capturePreviewImageResources(job, passes);
   const captureImages = vi.spyOn(imageOwner, 'capturePreviewImageResources');
   const timelineOwner = await import('../../../../features/video/composition/timeline/render');

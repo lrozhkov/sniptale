@@ -68,6 +68,8 @@ function input(type: 'dissolve' | 'fade-black' = 'dissolve') {
     fps: 8,
     resolution: 'SOURCE' as const,
     quality: VideoExportQualityPreset.MEDIUM,
+    // This suite retains the production enhancement route; shared ordinary joins use the common materializer suites.
+    detailEnhancement: 'bicubic-sharpen' as const,
     downloadAfterExport: false,
   };
   const canvas = document.createElement('canvas');

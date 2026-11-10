@@ -10,17 +10,19 @@ import type {
 import type { GpuPreviewTargetFactory } from '../../../features/video/composition/canvas/preview-presentation';
 import type { PreviewSceneRenderInput, PreviewScenePresentation } from '../stage/scene/types';
 import { createGpuPreviewRenderer } from '../../../features/video/composition/canvas/gpu-preview';
-import { renderPreviewScene } from '../stage/scene/render-preview';
+import { renderNativeCompositionScene as renderPreviewScene } from '../../../workflows/video/native-composition/render-scene';
 import { createVideoPreviewFrameMaterializer } from './materializer';
 
 vi.mock('../../../features/video/composition/canvas/gpu-preview', async (original) => ({
   ...(await original<typeof import('../../../features/video/composition/canvas/gpu-preview')>()),
   createGpuPreviewRenderer: vi.fn(),
 }));
-vi.mock('../stage/scene/gpu-preview', () => ({
+vi.mock('../../../workflows/video/native-composition/gpu-preview', () => ({
   createNativeGpuPreviewRenderer: () => ({ acceptsNativeFrames: true, dispose: vi.fn() }),
 }));
-vi.mock('../stage/scene/render-preview', () => ({ renderPreviewScene: vi.fn() }));
+vi.mock('../../../workflows/video/native-composition/render-scene', () => ({
+  renderNativeCompositionScene: vi.fn(),
+}));
 vi.mock('../../../workflows/video-review/decoded-video-sample', () => ({
   createCompositionCutSampleSource: () => ({
     sample: async () => ({ media: new Map(), release() {} }),

@@ -13,14 +13,14 @@ import {
   type VideoEditorEffectRuntime,
 } from '../../../runtime/effect-runtime';
 import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
-import { prepareNativePreviewSceneFrame } from './frame-plan';
+import { prepareNativePreviewSceneFrame } from '../../../../workflows/video/native-composition/frame-plan';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';
 import type { PreviewSceneRenderJob } from './render-scheduler';
 import type { PreviewStageCanvasSceneParams } from './types';
 import { createVideoPreviewRenderRevision } from '../../cache/revision';
 import { createVideoPreviewExactFrameRenderer } from '../../cache/render';
 import { createVideoProjectCaptionRenderer } from '../../../../workflows/video-review/project-captions';
-import { createNativeGpuPreviewRenderer } from './gpu-preview';
+import { createNativeGpuPreviewRenderer } from '../../../../workflows/video/native-composition/gpu-preview';
 import { resolveActivePreviewClips } from '../runtime/index';
 import { canRenderActivePreviewVideos } from './video-frame';
 import type { VideoPreviewRenderer } from '../../../../features/video/preview/preferences';

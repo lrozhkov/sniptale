@@ -1,14 +1,18 @@
-import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
+import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
 import {
   drawSceneBackground,
   getProjectSceneBackground,
-} from '../../../../features/video/project/scene/background';
-import { resolveSceneBackgroundAudioEnvelope } from '../../../../features/video/project/scene/background-audio';
-import type { VideoProject } from '../../../../features/video/project/types';
-import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../../../features/video/composition/effect-runtime';
-import { resolvePreviewStageViewportMetrics } from '../canvas/geometry';
-import type { PreviewSceneBounds, PreviewSceneViewport } from '../types';
-import type { VideoEditorPreviewRasterSize } from '../sizing/raster';
+} from '../../../features/video/project/scene/background';
+import { resolveSceneBackgroundAudioEnvelope } from '../../../features/video/project/scene/background-audio';
+import type { VideoProject } from '../../../features/video/project/types';
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../../features/video/composition/effect-runtime';
+import { resolvePreviewStageViewportMetrics } from '../../../features/video/composition/canvas/viewport';
+import {
+  resolveProjectOutputTransform,
+  type CameraOutputViewport,
+} from '../../../features/video/project/export/output-dimensions';
+import type { PreviewSceneBounds, PreviewSceneViewport } from './types';
+import type { VideoEditorPreviewRasterSize } from './types';
 
 export interface PreparedPreviewSceneCanvas {
   bounds: PreviewSceneBounds;
@@ -31,8 +35,20 @@ function syncCanvasResolution(
 function resolvePreviewSceneMetrics(
   canvas: HTMLCanvasElement,
   project: VideoProject,
-  stage: HTMLDivElement | null
+  stage: HTMLDivElement | null,
+  sceneOutput?: CameraOutputViewport
 ) {
+  if (sceneOutput) {
+    const transform = resolveProjectOutputTransform(project, sceneOutput);
+    return {
+      bounds: { width: sceneOutput.width, height: sceneOutput.height },
+      viewport: {
+        ...transform,
+        width: project.width * transform.scale,
+        height: project.height * transform.scale,
+      },
+    };
+  }
   const fallbackBounds = {
     height: Math.max(0, canvas.clientHeight),
     width: Math.max(0, canvas.clientWidth),
@@ -70,11 +86,13 @@ export function resolvePreviewSceneCanvasLayout(params: {
   stage: HTMLDivElement | null;
   previewRasterSize?: VideoEditorPreviewRasterSize;
   viewportCanvas?: HTMLCanvasElement;
+  sceneOutput?: CameraOutputViewport;
 }) {
   const { bounds, viewport } = resolvePreviewSceneMetrics(
     params.viewportCanvas ?? params.canvas,
     params.project,
-    params.stage
+    params.stage,
+    params.sceneOutput
   );
   const dpr = params.previewRasterSize
     ? params.previewRasterSize.width / Math.max(1, bounds.width)
@@ -92,10 +110,13 @@ export function resolvePreviewSceneCanvasLayout(params: {
 
 export function resolvePreviewEffectRuntimeRasterScale(params: {
   canvas: HTMLCanvasElement;
+  sceneOutput?: CameraOutputViewport;
   previewRasterSize?: VideoEditorPreviewRasterSize;
   project: VideoProject;
   stage: HTMLDivElement | null;
 }): number {
+  if (params.sceneOutput)
+    return resolveProjectOutputTransform(params.project, params.sceneOutput).scale;
   if (params.previewRasterSize) {
     return Math.min(
       params.previewRasterSize.width / Math.max(1, params.project.width),
@@ -121,12 +142,14 @@ function resolvePreviewSceneContext(
   project: VideoProject,
   stage: HTMLDivElement | null,
   rasterSize?: VideoEditorPreviewRasterSize,
-  viewportCanvas?: HTMLCanvasElement
+  viewportCanvas?: HTMLCanvasElement,
+  sceneOutput?: CameraOutputViewport
 ) {
   const layout = resolvePreviewSceneCanvasLayout({
     canvas,
     project,
     stage,
+    ...(sceneOutput ? { sceneOutput } : {}),
     ...(rasterSize ? { previewRasterSize: rasterSize } : {}),
     ...(viewportCanvas ? { viewportCanvas } : {}),
   });
@@ -183,6 +206,7 @@ export function resolvePreparedPreviewSceneCanvas(params: {
   backgroundCamera?: NonNullable<VideoCompositionCameraState['backgroundCamera']>;
   canvas: HTMLCanvasElement;
   viewportCanvas?: HTMLCanvasElement;
+  sceneOutput?: CameraOutputViewport;
   imageBank: Record<string, HTMLImageElement>;
   project: VideoProject;
   previewRasterSize?: VideoEditorPreviewRasterSize;
@@ -195,7 +219,8 @@ export function resolvePreparedPreviewSceneCanvas(params: {
     params.project,
     params.stage,
     params.previewRasterSize,
-    params.viewportCanvas
+    params.viewportCanvas,
+    params.sceneOutput
   );
   if (!hasUsablePreviewViewport(prepared)) {
     return null;
@@ -276,7 +301,7 @@ export function publishCompletedPreviewFrame(
 
 type CompletedCompositionPresentation = Pick<
   Parameters<typeof resolvePreparedPreviewSceneCanvas>[0],
-  'imageBank' | 'project' | 'stage' | 'previewRasterSize'
+  'imageBank' | 'project' | 'stage' | 'previewRasterSize' | 'sceneOutput'
 > & {
   canvas: HTMLCanvasElement;
   currentTime: number;
@@ -289,15 +314,25 @@ type CompletedCompositionPresentation = Pick<
 export function resolvePreviewCompositionFrameSize(
   input: Pick<
     CompletedCompositionPresentation,
-    'canvas' | 'project' | 'stage' | 'previewRasterSize'
+    'canvas' | 'project' | 'stage' | 'previewRasterSize' | 'sceneOutput'
   >
 ) {
-  const { viewport } = resolvePreviewSceneMetrics(input.canvas, input.project, input.stage);
+  const { viewport } = resolvePreviewSceneMetrics(
+    input.canvas,
+    input.project,
+    input.stage,
+    input.sceneOutput
+  );
   const dpr = input.canvas.ownerDocument.defaultView?.devicePixelRatio || 1;
-  const size = input.previewRasterSize ?? {
-    width: Math.round(viewport.width * dpr),
-    height: Math.round(viewport.height * dpr),
-  };
+  const size = input.sceneOutput
+    ? {
+        width: Math.max(1, Math.round(viewport.width)),
+        height: Math.max(1, Math.round(viewport.height)),
+      }
+    : (input.previewRasterSize ?? {
+        width: Math.round(viewport.width * dpr),
+        height: Math.round(viewport.height * dpr),
+      });
   return size.width > 0 && size.height > 0 && viewport.width > 0 && viewport.height > 0
     ? size
     : null;
@@ -318,6 +353,7 @@ export function publishPreviewCompositionFrame(
       viewportCanvas: input.canvas,
       imageBank: input.imageBank,
       project: input.project,
+      ...(input.sceneOutput ? { sceneOutput: input.sceneOutput } : {}),
       ...(input.previewRasterSize ? { previewRasterSize: input.previewRasterSize } : {}),
       shouldClearCanvas: true,
       stage: input.stage,

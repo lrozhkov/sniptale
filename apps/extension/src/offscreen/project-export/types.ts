@@ -1,3 +1,4 @@
+import type { SharedProjectExportComposition } from './shared-composition';
 import type { ProjectExportSourceSampling } from './renderer/source-sampling';
 import type { VideoProject } from '../../features/video/project/types/model';
 import type { VideoProjectExportSettings } from '../../features/video/project/types/export';
@@ -26,6 +27,7 @@ export interface ProjectExportCompositionJoinRenderer {
 }
 
 export interface ProjectExportRuntimeState {
+  sharedComposition?: SharedProjectExportComposition;
   sourceSampling?: ProjectExportSourceSampling;
   compositionJoinRenderer?: ProjectExportCompositionJoinRenderer;
   cameraSpatialRenderer?: ReviewSpatialRenderer;

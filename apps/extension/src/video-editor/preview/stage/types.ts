@@ -54,7 +54,6 @@ export interface NativePreviewSourceRuntime {
 export type PreviewStageInteractionMode = 'move' | 'nw' | 'ne' | 'sw' | 'se';
 export type VideoPreviewCanvasInsertKind = 'arrow' | 'line' | 'shape' | 'text';
 export type PreviewStageAudioBankClip = VideoProjectAudioClip | VideoProjectVideoClip;
-export type PreviewSceneBounds = { height: number; width: number };
 export interface PreviewStageGridSettings {
   color: string;
   enabled: boolean;
@@ -62,11 +61,6 @@ export interface PreviewStageGridSettings {
   size: number;
   snapEnabled: boolean;
 }
-export type PreviewSceneViewport = PreviewSceneBounds & {
-  offsetX: number;
-  offsetY: number;
-  scale: number;
-};
 
 export type PreviewStageInteractionHandler = (
   event: React.PointerEvent,

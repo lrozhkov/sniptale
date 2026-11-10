@@ -6,13 +6,13 @@ import type {
   EffectRuntimeGpuPlanResult,
   EffectRuntimeRenderCommand,
   EffectRuntimeSandboxExecutor,
-} from '../../../../contracts/effect-runtime/types';
-import type { GpuPreviewRenderer } from '../../../../features/video/composition/canvas/gpu-preview';
+} from '../../../contracts/effect-runtime/types';
+import type { GpuPreviewRenderer } from '../../../features/video/composition/canvas/gpu-preview';
 import {
   createProject,
   createVideoClip,
-} from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
+import { resolveVideoCompositionFrame } from '../../../features/video/composition/timeline/frame';
 const io = vi.hoisted(() => ({ next: vi.fn(), resolve: vi.fn(), wrap: vi.fn() }));
 vi.mock('./frame-plan', () => ({
   resolveUpcomingNativeEffectOnset: io.next,

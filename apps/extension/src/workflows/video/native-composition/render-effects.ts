@@ -3,12 +3,12 @@ import {
   drawTransitionOverlay,
   hasEffectRuntimeTransitionFrame,
   type EffectRuntimeDrawState,
-} from '../../../../features/video/composition/draw';
+} from '../../../features/video/composition/draw';
 import {
   getEffectRuntimeVisualPassFrames,
   type EffectRuntimeRenderedComposition,
-} from '../../../../features/video/composition/effect-runtime';
-import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
+} from '../../../features/video/composition/effect-runtime';
+import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
 import type { PreparedPreviewSceneCanvas } from './canvas';
 import { resolvePreviewPassTarget } from './render-pass-target';
 

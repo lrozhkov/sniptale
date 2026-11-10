@@ -3,14 +3,14 @@ import { afterEach, expect, it, vi } from 'vitest';
 import {
   createProject,
   createVideoClip,
-} from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
+import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
+import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import type {
   GpuPreviewRenderer,
   GpuPreviewLayer,
-} from '../../../../features/video/composition/canvas/gpu-preview';
-import type { renderPreviewScene } from './render-preview';
+} from '../../../features/video/composition/canvas/gpu-preview';
+import type { renderNativeCompositionScene } from './render-scene';
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
 const owners: ReturnType<typeof createNativeGpuPreviewRenderer>[] = [];
 afterEach(() => {
@@ -66,7 +66,7 @@ function fixture(
     ...(maximumPresentationBytes !== undefined ? { maximumPresentationBytes } : {}),
   });
   owners.push(owner);
-  const input: Parameters<typeof renderPreviewScene>[0] = {
+  const input: Parameters<typeof renderNativeCompositionScene>[0] = {
     project,
     canvas,
     stage: null,

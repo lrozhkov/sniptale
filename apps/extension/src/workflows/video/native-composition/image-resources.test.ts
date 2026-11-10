@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-import * as headers from '../../../../features/video/composition/draw/window-header';
-import * as timeline from '../../../../features/video/composition/timeline/render';
+import * as headers from '../../../features/video/composition/draw/window-header';
+import * as timeline from '../../../features/video/composition/timeline/render';
 import {
   createProject,
   createVideoClip,
   createImageClip,
   createShapeClip,
-} from '../../../../features/video/project/timeline/project-meta.test.helpers';
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
 import {
   capturePreviewImageResources,
   arePreviewImageResourcesCurrent,

@@ -1,14 +1,14 @@
-import { getClipPlaybackOffset } from '../../../../features/video/project/timeline/rate';
-import type { PreviewSourceDemand } from '../../../../workflows/video/preview-source';
+import { getClipPlaybackOffset } from '../../../features/video/project/timeline/rate';
+import type { PreviewSourceDemand } from '../preview-source';
 import type {
   VideoCompositionFrame,
   VideoCompositionVisualLayer,
-} from '../../../../features/video/composition/types';
-import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
-import { getVideoClipSourceTime } from '../../../../features/video/project/timeline';
+} from '../../../features/video/composition/types';
+import type { VideoCompositionFrameSource } from '../../../features/video/composition/draw/media-source';
+import { getVideoClipSourceTime } from '../../../features/video/project/timeline';
 import type { PreviewSceneRenderInput, PreviewSceneSourceFrames } from './types';
 export type { PreviewSceneSourceFrames } from './types';
-import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
+import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
 
 type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;
 type VideoLayer = Extract<VideoCompositionVisualLayer, { kind: 'video' }>;

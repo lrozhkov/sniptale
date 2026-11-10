@@ -4,20 +4,20 @@ import {
   createProject,
   createVideoClip,
   createTextClip,
-} from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-import { createQuickEditSpotlight } from '../../../../features/video/project/scene/focus-appearance';
-import type { GpuPreviewLayer } from '../../../../features/video/composition/canvas/gpu-preview';
-import type { VideoCompositionFrameSource } from '../../../../features/video/composition/draw/media-source';
-import type { renderPreviewScene } from './render-preview';
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
+import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
+import { createQuickEditSpotlight } from '../../../features/video/project/scene/focus-appearance';
+import type { GpuPreviewLayer } from '../../../features/video/composition/canvas/gpu-preview';
+import type { VideoCompositionFrameSource } from '../../../features/video/composition/draw/media-source';
+import type { renderNativeCompositionScene } from './render-scene';
 import { buildNativeGpuPreviewLayers, buildNativeGpuEffectLayer } from './gpu-preview-layers';
 import { createNativeGpuPreviewMaterials } from './gpu-preview-materials';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
-import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
-import { resolveDecoratedMediaFrame } from '../../../../features/video/project/window-geometry';
+import { windowHeaderImageKey } from '../../../features/video/composition/draw/window-header';
+import { resolveDecoratedMediaFrame } from '../../../features/video/project/window-geometry';
 
-vi.mock('../../../../features/video/composition/draw/spotlight', async (original) => ({
-  ...(await original<typeof import('../../../../features/video/composition/draw/spotlight')>()),
+vi.mock('../../../features/video/composition/draw/spotlight', async (original) => ({
+  ...(await original<typeof import('../../../features/video/composition/draw/spotlight')>()),
   createSceneSpotlightMasks: (
     size: { width: number; height: number },
     layers: readonly { blur: number }[] = []
@@ -79,7 +79,7 @@ function fixture() {
     sourceHeight: 16,
     draw: vi.fn(),
   };
-  const input: Parameters<typeof renderPreviewScene>[0] = {
+  const input: Parameters<typeof renderNativeCompositionScene>[0] = {
     project,
     currentTime: 1,
     canvas,
@@ -197,7 +197,7 @@ it('uploads tight cursor artwork with its original paint origin and camera proje
   f.passes.overlayFrame.camera.scale = 2;
   f.passes.overlayFrame.camera.viewportX = 3;
   f.passes.overlayFrame.camera.viewportY = 4;
-  const draw = await import('../../../../features/video/composition/draw/effects/cursor');
+  const draw = await import('../../../features/video/composition/draw/effects/cursor');
   let origin: { x: number; y: number } | undefined;
   const paint = vi.spyOn(draw, 'drawCursorCompositionState').mockImplementation((context) => {
     const transform = context.getTransform();
@@ -226,7 +226,7 @@ it('bounds accent artwork without changing action order or the keystroke fallbac
   const f = fixture();
   const accent = { ...clickAction('click'), point: { x: 20.25, y: 30.5 } };
   f.passes.overlayFrame.actions = [accent, { ...accent, renderKind: 'keystroke' }];
-  const draw = await import('../../../../features/video/composition/draw/effects/actions');
+  const draw = await import('../../../features/video/composition/draw/effects/actions');
   const expected = draw.resolveActionCompositionPaintBounds(accent, 1)!;
   const x = Math.floor(expected.x),
     y = Math.floor(expected.y);
@@ -255,7 +255,7 @@ it.each([null, { x: NaN, y: 0, width: 8, height: 8 }, { x: 0, y: 0, width: 0, he
   async (bounds) => {
     const f = fixture();
     f.passes.overlayFrame.actions = [clickAction('click')];
-    const draw = await import('../../../../features/video/composition/draw/effects/actions');
+    const draw = await import('../../../features/video/composition/draw/effects/actions');
     const resolve = vi.spyOn(draw, 'resolveActionCompositionPaintBounds').mockReturnValue(bounds);
     try {
       const plan = await buildNativeGpuPreviewLayers(f);
@@ -408,7 +408,7 @@ it('projects ordinary over layers directly and sizes temporal groups to the outp
 
 function clickAction(
   clipId: string
-): import('../../../../features/video/composition/types').VideoCompositionActionState {
+): import('../../../features/video/composition/types').VideoCompositionActionState {
   const event = {
     id: 'click',
     kind: 'CLICK' as const,
@@ -690,7 +690,7 @@ it.each([false, true])(
     ];
     const sampled = new Map<
       number,
-      import('../../../../features/video/composition/effect-runtime/runtime/types').EffectRuntimeRenderedFrameMap
+      import('../../../features/video/composition/effect-runtime/runtime/types').EffectRuntimeRenderedFrameMap
     >();
     const originals: Array<HTMLCanvasElement & { close: () => void }> = [];
     const snapshots: Array<HTMLCanvasElement & { close: () => void }> = [];
@@ -747,7 +747,7 @@ it.each([false, true])(
     };
     const snapshotGroup = vi.fn(
       async (
-        group: import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewGroup
+        group: import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewGroup
       ) => {
         expect(previous?.close).not.toHaveBeenCalled();
         expect(flatten(group.layers).some((layer) => layer.source === previous)).toBe(true);
@@ -793,7 +793,7 @@ it('releases completed exposure snapshots and owned artwork when a later snapsho
   let calls = 0;
   const snapshotGroup = vi.fn(
     async (
-      group: import('../../../../features/video/composition/canvas/gpu-preview').GpuPreviewGroup
+      group: import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewGroup
     ) => {
       artwork.push(
         ...flatten(group.layers)
@@ -825,7 +825,7 @@ async function attachedFixture() {
   const owner = f.passes.overlayFrame.visualLayers[0]!;
   if (owner.kind !== 'video') throw new Error('Expected video');
   const { createEffectHostClip } =
-    await import('../../../../features/video/project/factories/overlay-clip');
+    await import('../../../features/video/project/factories/overlay-clip');
   const clip = createEffectHostClip({
     duration: 2,
     effectInstanceId: 'attached',
@@ -836,7 +836,7 @@ async function attachedFixture() {
     projectHeight: 16,
   });
   const effect: Extract<
-    import('../../../../features/video/composition/types').VideoCompositionVisualLayer,
+    import('../../../features/video/composition/types').VideoCompositionVisualLayer,
     { kind: 'effect' }
   > = {
     ...owner,
@@ -1032,7 +1032,7 @@ it.each(['track', 'video-group'] as const)(
         },
       ],
     ]);
-    const draw = await import('../../../../features/video/composition/draw');
+    const draw = await import('../../../features/video/composition/draw');
     const paint = vi.spyOn(draw, 'drawCompositionVisualLayer').mockImplementation(() => {});
     try {
       const plan = await buildNativeGpuPreviewLayers({
@@ -1151,7 +1151,7 @@ it.each([false, true])(
     const material = plan.layers[1];
     expect(material).toBeDefined();
     const { projectQuickEditPoint } =
-      await import('../../../../features/video/composition/motion/spatial-geometry');
+      await import('../../../features/video/composition/motion/spatial-geometry');
     const centre = { x: layer.x + layer.width / 2, y: layer.y + layer.height / 2 };
     const mapped = projectQuickEditPoint(material!.inverse, centre);
     expect(mapped?.x).toBeCloseTo(centre.x, 10);

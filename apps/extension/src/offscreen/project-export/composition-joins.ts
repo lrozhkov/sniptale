@@ -1,3 +1,4 @@
+import { renderSharedProjectComposition } from './shared-composition';
 import { createCompositionCutSampleSource } from '../../workflows/video-review/decoded-video-sample';
 import { createCompositionJoinEndpoints } from '../../features/video/composition/canvas/join-endpoints';
 import {
@@ -24,7 +25,7 @@ import type { ExportJobState, ProjectExportCompositionJoinRenderer } from './typ
 
 type Input = ProjectCompositionSceneInput & {
   job: ProjectCompositionSceneInput['job'] &
-    Pick<ExportJobState, 'compositionJoinRenderer' | 'clipMediaElements'>;
+    Pick<ExportJobState, 'compositionJoinRenderer' | 'clipMediaElements' | 'sharedComposition'>;
 };
 
 export type { ProjectExportCompositionJoinRenderer } from './types';
@@ -32,6 +33,7 @@ export type { ProjectExportCompositionJoinRenderer } from './types';
 /** Applies final composition joins and outer fades after the caller synchronizes its ordinary media. */
 export async function renderProjectCompositionFrame(args: Input): Promise<void> {
   if (args.job.cancelled || args.signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
+  if (await renderSharedProjectComposition(args)) return;
   const plans = resolveVideoProjectCompositionJoinPlans(args.project);
   const plan = resolveActiveVideoProjectCompositionJoinPlan(plans, args.currentTime);
   const windowed = args.project.clips.some(

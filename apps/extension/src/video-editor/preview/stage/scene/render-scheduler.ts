@@ -1,12 +1,12 @@
-import { isPreviewFrameGpuIsolated } from './source-frames';
-import { arePreviewImageResourcesCurrent } from './image-resources';
+import { isPreviewFrameGpuIsolated } from '../../../../workflows/video/native-composition/source-frames';
+import { arePreviewImageResourcesCurrent } from '../../../../workflows/video/native-composition/image-resources';
 import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 import type {
   PreviewScenePresentation,
   PreviewScenePreparedFrame,
   PreviewSceneImageResources,
 } from './types';
-import { resolvePreviewCompositionFrameSize } from './canvas';
+import { resolvePreviewCompositionFrameSize } from '../../../../workflows/video/native-composition/canvas';
 import type { renderPreviewScene } from './render-preview';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 

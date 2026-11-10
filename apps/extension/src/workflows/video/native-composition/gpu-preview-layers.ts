@@ -3,18 +3,18 @@ import type {
   EffectRuntimeGpuPreparedComposition,
   EffectRuntimeGpuPreparedFrame,
   EffectRuntimeRenderedFrame,
-} from '../../../../features/video/composition/effect-runtime/runtime/types';
+} from '../../../features/video/composition/effect-runtime/runtime/types';
 import {
   assertEffectRasterDimensions,
   EFFECT_RUNTIME_RESOURCE_LIMITS,
   EffectRuntimeResourceError,
-} from '../../../../features/video/composition/effect-runtime/runtime/resource-limits';
-import type { EffectRuntimeInputComposition } from '../../../../features/video/composition/effect-runtime/frame/inputs';
+} from '../../../features/video/composition/effect-runtime/runtime/resource-limits';
+import type { EffectRuntimeInputComposition } from '../../../features/video/composition/effect-runtime/frame/inputs';
 import {
   getFittedMediaWindowFrame,
   getFittedMediaContentFrame,
-} from '../../../../features/video/composition/draw/fitted-media';
-import { roundedWindowRadius } from '../../../../features/video/project/window-geometry';
+} from '../../../features/video/composition/draw/fitted-media';
+import { roundedWindowRadius } from '../../../features/video/project/window-geometry';
 import {
   createNativeGpuVideoLayerBuilder,
   type NativeGpuSourceMaterial,
@@ -22,60 +22,60 @@ import {
 import type {
   GpuPreviewGroup,
   GpuPreviewLayer,
-} from '../../../../features/video/composition/canvas/gpu-preview';
+} from '../../../features/video/composition/canvas/gpu-preview';
 import type {
   VideoCompositionFrame,
   VideoCompositionCameraState,
   VideoCompositionVisualLayer,
-} from '../../../../features/video/composition/types';
+} from '../../../features/video/composition/types';
 import {
   isVideoCompositionFrameSource,
   type VideoCompositionMediaSource,
-} from '../../../../features/video/composition/draw/media-source';
-import { resolveVideoSourceLensPaintBounds } from '../../../../features/video/composition/draw/video';
-import type { EffectRuntimeRenderedComposition } from '../../../../features/video/composition/effect-runtime';
+} from '../../../features/video/composition/draw/media-source';
+import { resolveVideoSourceLensPaintBounds } from '../../../features/video/composition/draw/video';
+import type { EffectRuntimeRenderedComposition } from '../../../features/video/composition/effect-runtime';
 import {
   drawCompositionVisualLayer,
   drawTransitionOverlay,
   hasEffectRuntimeTransitionFrame,
-} from '../../../../features/video/composition/draw';
+} from '../../../features/video/composition/draw';
 import {
   resolveEffectRuntimeVisualLayerFrame,
   resolveEffectRuntimeVisualLayers,
-} from '../../../../features/video/composition/draw/effect-runtime';
-import { segmentVisualLayersByViewportLock } from '../../../../features/video/composition/motion/layer-camera';
+} from '../../../features/video/composition/draw/effect-runtime';
+import { segmentVisualLayersByViewportLock } from '../../../features/video/composition/motion/layer-camera';
 import {
   resolveOrderedVisualPassLayers,
   splitVisualLayersForSourceSpotlights,
-} from '../../../../features/video/composition/visual-pass-layers';
+} from '../../../features/video/composition/visual-pass-layers';
 import {
   motionCameraPlaneTransform,
   motionCameraProjection,
-} from '../../../../features/video/composition/motion/spatial';
+} from '../../../features/video/composition/motion/spatial';
 import {
   invertQuickEditProjection,
   multiplyQuickEditProjections,
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../../../features/video/composition/motion/spatial-geometry';
+} from '../../../features/video/composition/motion/spatial-geometry';
 import {
   createSceneSpotlightMasks,
   type SceneSpotlightLayer,
-} from '../../../../features/video/composition/draw/spotlight';
-import { resolveCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
+} from '../../../features/video/composition/draw/spotlight';
+import { resolveCompositionSceneSpotlights } from '../../../features/video/composition/draw/project-spotlight';
 import {
   drawActionCompositionState,
   drawSceneActionCompositionStates,
   resolveActionCompositionPaintBounds,
-} from '../../../../features/video/composition/draw/effects/actions';
+} from '../../../features/video/composition/draw/effects/actions';
 import {
   drawCursorCompositionState,
   resolveCursorCompositionPaintBounds,
-} from '../../../../features/video/composition/draw/effects/cursor';
-import { resolveCompositionPaintBounds } from '../../../../features/video/composition/draw/paint-bounds';
+} from '../../../features/video/composition/draw/effects/cursor';
+import { resolveCompositionPaintBounds } from '../../../features/video/composition/draw/paint-bounds';
 
-import { resolveActiveCameraSplit } from '../../../../features/video/composition/camera-split';
-import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
+import { resolveActiveCameraSplit } from '../../../features/video/composition/camera-split';
+import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
 import type { PreviewSceneRenderInput as Input } from './types';
 import { resolvePreviewCompositionFrameSize } from './canvas';
 

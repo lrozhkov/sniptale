@@ -3,12 +3,12 @@ import { expect, it, vi } from 'vitest';
 import {
   createProject,
   createVideoClip,
-} from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
-import { bindMotionRegionToClip } from '../../../../features/video/project/motion/source-binding';
-import { getVideoClipSourceTime } from '../../../../features/video/project/timeline';
-import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-import type { PreviewSourceDemand } from '../../../../workflows/video/preview-source';
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
+import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import { bindMotionRegionToClip } from '../../../features/video/project/motion/source-binding';
+import { getVideoClipSourceTime } from '../../../features/video/project/timeline';
+import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
+import type { PreviewSourceDemand } from '../preview-source';
 import { preparePreviewSourceFrames } from './source-frames';
 import type { PreviewSceneRenderInput } from './types';
 it.each([false, true])(

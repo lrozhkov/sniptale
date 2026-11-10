@@ -976,9 +976,9 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One existing materializer fixture proves composition sampling, Canvas compatibility and provider configuration. Updated assertions distinguish private endpoint acquisition from final frontend output. GPU route proof has its separate connected test file. Independent read-only structural diagnosis confirmed Keep. Fresh candidate architecture review must validate this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-08",
-      "astHash": "8b411ab0357d05bb9f46c45fca5e08debb7bc062546d8a5a1707c1f3e8a3d3ba",
-      "signatureHash": "1e6668576a1256b2b4af31305bf3ca307b98b9c4365dea1e1f76766337f29efc"
+      "reviewDate": "2026-11-10",
+      "astHash": "288e08179d817de7fba730d5eb33a10e0c6e2ab0027d956db1937fffa0151d37",
+      "signatureHash": "48a398438a808731f53b84aa01927a6ad2be00deb69f8e4aaab9ffad68e307ef"
     },
     {
       "rule": "structural-file-risk",
@@ -1361,8 +1361,8 @@
       "owner": "tooling:qa",
       "reason": "tool-noise: This file remains the declarative LOCAL_OWNER_MAPPINGS inventory. The exact project-follow mapping adds full-project and exported-fragment admission proof for a missing consumer. It adds no exclusion, threshold change, cross-owner waiver, executable behavior or new registry. Keep the canonical inventory together. Independent source review supports Keep. Final architecture review must check this binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent fixture, admission policy, proof selection, writing, resource ownership or recovery. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-09",
-      "astHash": "e5fbbdfb6835fd2d23e23ee960139240bee35168be8145b14050296996c108bf",
+      "reviewDate": "2026-11-10",
+      "astHash": "9c7c53fd9fba5bbf4e143917f00e32a0c702f3dd1913ea4c98e09ca3a6946bba",
       "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
     },
     {
@@ -5008,68 +5008,68 @@
     },
     {
       "rule": "structural-file-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-layers.ts",
       "symbol": "<file>",
-      "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One editor graph adapter owns construction and material leases. GPU annotations join its existing borrow ledger. Source capture, submission and publication stay outside this owner.",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: One Native graph adapter owns construction and material leases. GPU annotations join its existing borrow ledger. Source capture, submission and publication stay outside this owner.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-07",
-      "astHash": "16b1b64d2fdfb0bb8029607b3d875af348bf928a80b3ec26a3de3dbc33d1abc0",
-      "signatureHash": "1fbb96a034b6ce4202ea5dd02f6c54859813073168f1ef49b83511406c66b6ff"
+      "reviewDate": "2026-11-10",
+      "astHash": "be9de9f3800f463ab259c6eb5eebfaf409a5f951f27c923967ad58f3a4073fb9",
+      "signatureHash": "fb4ed81c77feeca0df1de10a7e05c3317100aa08a4cc6a5916622092a1cc4104"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-layers.ts",
       "symbol": "buildNativeGpuPreviewLayers",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One graph builder owns masks, ordered layers and pose borrows. GPU sources use the existing placement boundary. Submission and publication remain outside this operation.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-07",
-      "astHash": "e772a2f9f03d291a8b84a258fb5871dbef9cea2d62f45d38182c7c8acc66e822",
-      "signatureHash": "14f0d9a40a93889cc39c657e8125627fbcd460d88ee5551c15f7cec3797e9dc6"
+      "reviewDate": "2026-11-10",
+      "astHash": "38c25ec88566cdf6f76c0c26371a014af77878c4df10214ceff3f85567c5add1",
+      "signatureHash": "341e0d3004258599c0e789f4225cced7f884e6e5743c97b82d2bbbc2ee0f3b76"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-video.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-video.ts",
       "symbol": "buildNativeGpuVideoLayers",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One Native source-material transaction now uses canonical ordinary-feedback bounds for raster allocation and its feedback group. Unknown bounds preserve full-plane allocation. Existing material leases, source transforms, GPU submission and publication owners are unchanged. Score stays six; the local rectangle does not add an independent state or effect owner. Fresh independent architecture review must validate this exact binding.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent coordinate contract, state, effect, resource lifetime or owner. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-07",
+      "reviewDate": "2026-11-10",
       "astHash": "6df72fcae0c568c6a37b0a3670d8d2fa4aa9d4af83ed804e0c7d7869ca2a7111",
       "signatureHash": "bea600bc1c27c3ca53815994b414aa4897f9a4abbe331250bfcb3c0da65c0440"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One Native session owns admission, private material slots and publication holds. Omitted backgrounds use the existing material owner. The enclosing factory includes its render transaction. Splitting its closure state would distribute renderer retirement.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-10",
-      "astHash": "d960d637f2e7970aa0d0f57f63961223633f8181c0bc14bd3695de1eebdd3f55",
+      "astHash": "0e2739d13723baab6a85acc17c5982c5fa549ab7732e48d73659814416d708c7",
       "signatureHash": "ddf536b3b52336eb27c63c1421eec47f8baee8d782886037860f02ea568ec4e0"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview.ts",
       "symbol": "createNativeGpuPreviewRenderer.render",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One admitted Native frame retains captured sources, private materials and exclusive output through GPU completion. Optional backgrounds change ordered layer construction. Capture, cancellation, submission and retirement retain their existing authority and cleanup.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
       "reviewDate": "2026-11-10",
-      "astHash": "d6785d84bd3a553340e13a809379cfbce2990f3105bf01fcc848c12a076b059b",
+      "astHash": "62dd047585285871199f8c8160616184f84e1f5bdafab4c92faa5e82ea59229b",
       "signatureHash": "7fbf6998a3988df89e02a05370e5486d9adf627b6e933b9dcfaf360518055ae2"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/render-scene.ts",
       "symbol": "drawResolvedPreviewSceneOverlays",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One ordered overlay operation selects Canvas rendering or GPU artwork phases. Camera clipping, deferred spotlights, captions and scene edges share one prepared context. Independent topology diagnosis classified this exact operation as Keep. Final architecture review remains required.",
       "removalCondition": "Remove this entry if the AST or signature changes. Remove it if an independent state, resource or publication authority appears. Remove it when the analyzer models this cohesive operation without this false positive.",
-      "reviewDate": "2026-11-04",
-      "astHash": "979fb6b282630fc2de7f782caf91a629d0f8cb8ce0f8f405430e94ccc066b660",
+      "reviewDate": "2026-11-10",
+      "astHash": "980294c747bb66f60d1da4ef04b943a69945951ff58b753adae9463233740929",
       "signatureHash": "8731da06dff477f76fd43ffa3952d25a8bcaa1b0316bd11c169f638f10d5502a"
     },
     {
@@ -5140,14 +5140,14 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-layers.ts",
       "symbol": "buildNativeGpuPreviewLayers.paintLayers",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One visual-layer loop selects, deduplicates and places effects. It retains each GPU frame before graph insertion. The graph release returns the same borrow.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any new authority or independent operation. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-07",
-      "astHash": "9319b08090a4daa4503198d0449ffccc23c8eff6ce320c36e83311118a337cce",
-      "signatureHash": "1f2f6333324874ebfb6aed947829c03a2c0be4c0e108c96f767cbec8861a293f"
+      "reviewDate": "2026-11-10",
+      "astHash": "ef4b9773f168071119358adb53b3a03ba96b11753d40cd2b5364dc16b0f70db3",
+      "signatureHash": "ed1bc5283e291dadbbc36e33c5dec44c0a8e2403f3070b336ae5d4316fa64dc4"
     },
     {
       "rule": "structural-file-risk",
@@ -5690,25 +5690,25 @@
     },
     {
       "rule": "structural-file-risk",
-      "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/materializer.ts",
       "symbol": "<file>",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One materializer owns preparation and completed-frame handoff. The sampler owns endpoint selection. The canonical provider owns ordinary source selection. GPU composition and allocation retain separate owners. The new callback defers acquisition until resolved passes exist. Fresh architecture review must validate this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, fixture, scheduling, publication, recovery or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-09",
-      "astHash": "188e35153e916c6b2ced54c58202c223fc9ff36e885bee3c7e3b05aca7b885a7",
-      "signatureHash": "9fdcf3fbb03c050ca0514bf1c18501c9fee23529e44cd11df749301a7eeee66a"
+      "reviewDate": "2026-11-10",
+      "astHash": "152cf017e0e2ce6a341dceead2ef91f56d9b1e4dbef7e2ed4cf2a1ea777c9c4a",
+      "signatureHash": "308fca4746ebaafeba2957503ede224c732b37b27b06c50d5f5289e15c22da61"
     },
     {
       "rule": "structural-file-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview-layers.test.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-layers.test.ts",
       "symbol": "<file>",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: The existing Native graph fixture now verifies local ordinary-feedback raster and group extents, plus release. It adds no fixture, lifetime or authority. File score stays three and cohesion1.00. The same source-layer builder and canvas fixture own these assertions. Fresh independent architecture review must validate this exact binding.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent coordinate contract, state, effect, resource lifetime or owner. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-07",
-      "astHash": "d95581f1d5b1f0009e90649e120853f83ab269a86b54e1a1bae716b2e4a3ca51",
-      "signatureHash": "fdb1659b4354a8924d5e92981c334e5c5f2845d70c0235d182a5d42568a27b50"
+      "reviewDate": "2026-11-10",
+      "astHash": "a5a728dff111496537e5c9894a13126053457aaee44712cd6d926c9b52762a24",
+      "signatureHash": "49ef35ce515b255fc392b42214aabf7469f289d190dcf353de15b3ef9bfe2ce1"
     },
     {
       "rule": "structural-file-risk",
@@ -5717,9 +5717,9 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One scene-render contract has success, cancellation, prepared-frame and serial-fallback tests. The new case verifies that a GPU-only job cannot enter Canvas drawing. The fixture and product owner remain the same.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction.",
-      "reviewDate": "2026-11-07",
-      "astHash": "3389d7abb7232f83c7f83465ee5467c3bf2bdee744796f47f7a933419e1a594e",
-      "signatureHash": "de2cbbf58cc4943566e8dcca7f940d276f3c135d05f70d9896a478a54a1a1568"
+      "reviewDate": "2026-11-10",
+      "astHash": "b52d01716af163004b3ca9680a8347545189c6f550078812be66319deb23c1b1",
+      "signatureHash": "996578ef2685ad7695d1ca5fe04eeaf1f0ab68f1c9fe0bc5b5851e6e88d1c6b8"
     },
     {
       "rule": "structural-function-risk",
@@ -5778,14 +5778,14 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/render-preview.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/render-scene.ts",
       "symbol": "renderPreparedPreviewScene",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One prepared frame transaction selects GPU or Canvas and releases temporary effects and samples. The caller retains the original source lease. Canvas conversion follows the existing capture await. The scheduler retains retry policy. This function adds no source selection, queue or publication authority. Independent diagnosis supports this Keep classification. Fresh architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent source selection, scheduler, retry, publication, resource lifetime, authoring or persistence authority. Remove when the analyzer models this cohesive transaction.",
-      "astHash": "0ad70221be11c7978abcb21683ec42fec4766225135a864ff90b4137ef910e05",
+      "astHash": "1747d9dc37060b0cea7dbcfab936be6721bf6c7a67c6e13f966ae9cbfdaafe96",
       "signatureHash": "084a1b2312c4568a47f85b4608e3ec489241a489cc4774c140accadc29612e03",
-      "reviewDate": "2026-11-08"
+      "reviewDate": "2026-11-10"
     },
     {
       "rule": "structural-function-risk",
@@ -5854,12 +5854,12 @@
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent resource, queue, publication or state authority. Remove when the analyzer models this cohesive transaction."
     },
     {
-      "file": "apps/extension/src/video-editor/preview/stage/scene/gpu-preview.test.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview.test.ts",
       "rule": "structural-file-risk",
       "symbol": "<file>",
-      "owner": "extension:video-editor:preview",
-      "astHash": "912b410b279dcc215a2593e42b0e115a116f7b63510b19440e6bb78dd89fd13a",
-      "signatureHash": "d5b77e096b7ce9574b55a4972a68ab5f5d3c568c9ad792e6c06bb67b8c5eaa1b",
+      "owner": "extension:app-core:workflows",
+      "astHash": "5f3246a1333155b15152adbbcaa1d139f71ac8fb4eeda5555dc3dcdb898bff70",
+      "signatureHash": "9531b31c805e7914399e040c21319376079f8737b1f5bdc34b8f20056c82b124",
       "reviewDate": "2026-11-10",
       "reason": "tool-noise: One Native producer fixture checks frame lifetime, publication and optional artwork. Visible-shadow cases use actual shadow intensity. The same fixture proves absent materials and depth background changes. No second fixture authority is present.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent source, queue, publication, resource, authoring or persistence authority. Remove when the analyzer models this cohesive transaction."
@@ -5981,8 +5981,8 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One mounted preview session coordinates scheduler dependencies, publication and renderer retirement. Its exact-cache renderer follows the existing error, retry, renderer-change and unmount lifecycle. The injected factory owns GPU composition; the caller retains cache-data ownership. Extracting its reference would distribute this coordinated lifecycle. Independent read-only structural diagnosis confirmed Keep. Fresh candidate architecture review must validate this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent queue, resource, publication, state, cache-data or fixture ownership. Remove when the analyzer models this cohesive lifecycle.",
-      "reviewDate": "2026-11-08",
-      "astHash": "146244ecceff7b9d86f4b845d13778089574f54a20671851750bbb7bd3bd45a7",
+      "reviewDate": "2026-11-10",
+      "astHash": "4d13123c714d4030edc70a7c0901255d5a370c7a72df4f2360224e77ad85f853",
       "signatureHash": "2c629f4f939552b210db20350dffa3a44a616b1c0626c2fd6c9dd93d60a95705"
     },
     {
@@ -6014,9 +6014,9 @@
       "owner": "extension:video-editor:preview",
       "reason": "tool-noise: One mounted preview hook fixture checks scheduler wiring, publication and cleanup. The exact-cache case reuses its React root, scheduler mock and RenderHarness. It proves dependency reuse and retirement without clearing caller cache data. GPU and bitmap lifetime proof stays beside the cache renderer. Independent read-only structural diagnosis confirmed Keep. Fresh candidate architecture review must validate this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess any independent queue, resource, publication, state, cache-data or fixture ownership. Remove when the analyzer models this cohesive lifecycle.",
-      "reviewDate": "2026-11-08",
-      "astHash": "f48ecb285402763234ccd0ef405be0c438e23e292cf2426afe2e689a676adbf1",
-      "signatureHash": "25bb7b651e32706be425139ee904c2c8dfc5c7cd4c5e44d0e80d6ac4c5d9e334"
+      "reviewDate": "2026-11-10",
+      "astHash": "7204856aed7b3ae6bc239086a43bdf0ec30fb5eac682834de9029486b37a7ea0",
+      "signatureHash": "0205459f9e71638c745f649779933b1c3d70693ccc2e92ae2f7f44d6168db8bb"
     },
     {
       "rule": "structural-file-risk",
@@ -6119,14 +6119,14 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/cache/materializer.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/materializer.ts",
       "symbol": "renderMaterializedFrame",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One frame transaction selects endpoint, canonical or compatibility preparation. It prepares resolved bindings, renders and transfers completed output. Source policy and GPU allocation retain external owners. Completion and cleanup retain one authority. Independent inspection accepted the local route consolidation and removal of the obsolete map argument. Fresh architecture review must validate this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, fixture, scheduling, publication, recovery or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-09",
-      "astHash": "701b5892f6d154de698d13d3fb165be21a7e32b19ad96a9213e81d89de153403",
-      "signatureHash": "5517606ef93fda9a9bd1ecf6e16b45a6bd7fa7da3efe1e70192ce937d3519c6f"
+      "reviewDate": "2026-11-10",
+      "astHash": "d03f50aa1dc603e93a396aec29655c63da48264a4c13621fe2795ef57c343e27",
+      "signatureHash": "a4d6802ffe61f1e26148900fcd32170d76d02f516d6c017b6f9854fc8ef0c793"
     },
     {
       "rule": "structural-function-risk",
@@ -6405,13 +6405,13 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/scene/frame-plan.ts",
+      "file": "apps/extension/src/workflows/video/native-composition/frame-plan.ts",
       "symbol": "prepareNativePreviewSceneFrame",
-      "owner": "extension:video-editor:preview",
+      "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One preparation transaction resolves passes, applies the camera override, acquires sources and prepares capture and effects. The new callback receives those resolved contexts. Its resources join the existing cleanup and release authority. Independent inspection found no separate policy or lifecycle owner. Fresh architecture review must validate this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent selection, fixture, scheduling, publication, recovery or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-09",
-      "astHash": "1667957182c5c1390b62fa8d835aa99bd3aa55e5d25873a2d9d8c4f82cdebd44",
+      "reviewDate": "2026-11-10",
+      "astHash": "9e29cada6e79f5fd12731cd4a44b00b08afd79e911a46f6fe4506a6e963a516d",
       "signatureHash": "f2c2e7fa2938c0934d488fe7a39a43754dac375bd9e754a8d4b201987a958d4d"
     },
     {
@@ -6443,8 +6443,8 @@
       "owner": "tooling:test:e2e",
       "reason": "tool-noise: One acceptance scenario compares Native ordinary and enhanced exports in both formats against one VFR exposure oracle. It checks raw and encoded output and every output timestamp. Browser, decoder and file effects are proof adapters for the same result. Host teardown remains in finally. Independent source inspection supports this exact operation. Final architecture review must assess this binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess independent source selection, scheduling, lifecycle, state, geometry, publication, recovery or resource release. Remove when the analyzer models this cohesive operation.",
-      "reviewDate": "2026-11-09",
-      "astHash": "5d465871f95a24f18e5c766766c798857843d0f1cde89b5ed29f21095459c22a",
+      "reviewDate": "2026-11-10",
+      "astHash": "530ba05eefe108a0f76f54f4e02e50e7158ae3a6dae0ecb4e4de7867e4ff50a2",
       "signatureHash": "480c383de4d54124b252e87aeeae440ec69297310f81967b969b50363797a5f6"
     },
     {
@@ -6589,6 +6589,72 @@
       "reviewDate": "2026-11-10",
       "astHash": "29887e50a7478801d200094b5e4c6c9f50eaaa957906cbcffb3db990551cd722",
       "signatureHash": "715ffc809cd0ea56092816b7341ec3c8ae905925220a8c5501d6f101dec2bd50"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-materials.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This file owns retained scene materials. One caller controls acquisition and GPU submission. Disposal retires backgrounds, decoration, headers, masks and depth plans together. Raster mutations do not create separate session owners. Independent topology diagnosis confirmed this boundary. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent resource owner or scheduling authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-10",
+      "astHash": "e87e0638ad27159426e7cef3de0dc18be9d86329ffecd550a9fa8e9ccd16ef74",
+      "signatureHash": "8a61066b733c18717ca5f4f5f9204b86d73d85b58d799de38100df9912e9e22f"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview-video.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This file constructs materials for one source pose. Caller callbacks control raster allocation and lease retention. Derived draws share that source pose. Local canvas and array mutations do not create separate session owners. Independent topology diagnosis confirmed this boundary. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent resource owner or scheduling authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-10",
+      "astHash": "8510f5f9485c86303b71f70d7c8c420979fae0e9436df4ada60a1ee80e535fc1",
+      "signatureHash": "a48e8f90d5cb42091f08273857430f7cd78aaa313558b54c2ed5b07e1bf5dda5"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video/native-composition/gpu-preview.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This file owns GPU slots and completed output. Output artwork follows the requested viewport. Source capture, completion, fallback and retirement retain one transaction owner. Export scheduling, encoding and asset access remain outside this file. Independent topology diagnosis confirmed this boundary. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent resource owner or scheduling authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-10",
+      "astHash": "f07122e9e2ca802e511936e798a265d6fdec6681e87b0d7d0af24f3bbf27ddb1",
+      "signatureHash": "03f86176b868c1d3264791da87fcc02755759d1062494a81ee398fc7f3d51950"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video/native-composition/materializer.ts",
+      "symbol": "createMaterializedJoinPresentation",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This factory owns one composition join. Endpoint resources, the nested cut sampler, the composer and retirement share its lifetime. It forwards output geometry to camera preparation. Separate closures would distribute the same resource owner. Independent topology diagnosis confirmed this boundary. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent resource owner or scheduling authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-10",
+      "astHash": "d197ade0b0cd985802724cb159f592729221c85593be9e12493d657d99404946",
+      "signatureHash": "2d5b0f373c075ddba27f8feb85856a6859012f66fa334b0d18ada549fb2c685d"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video/native-composition/materializer.ts",
+      "symbol": "createMaterializedJoinPresentation.renderFrameWithPresentation",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This method completes one join frame. Busy admission, endpoint selection, backend selection, output handoff and cleanup retain their order. The output viewport changes camera preparation within this transaction. It adds no separate scheduling or storage owner. Independent topology diagnosis confirmed this boundary. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent resource owner or scheduling authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-10",
+      "astHash": "c595c76a83c51af682855e014b30874952eeac7a2ae9809b826a7dac0467cf0b",
+      "signatureHash": "f1cad025cef396bf4dd4fe4a735265dc7465d78415fa4acbfb0dcc61851cba00"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video/native-composition/render-scene.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This file builds one complete scene through GPU or Canvas. It applies output geometry, captions, watermark and final overlays in order. The caller supplies admission and asset access. Existing cleanup releases temporary effects and captured sources. Independent topology diagnosis confirmed this boundary. Final architecture review must check this exact binding.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess an independent resource owner or scheduling authority. Remove when the analyzer models this cohesive transaction.",
+      "reviewDate": "2026-11-10",
+      "astHash": "731bda6546cc20f7b3da37b23b96376ab95acf67529291422ef7369b2d307fa9",
+      "signatureHash": "0ca0935c4069535841f4856d8e5b566e802aad9cd1b724697e5acf4bcec410b4"
     }
   ]
 }

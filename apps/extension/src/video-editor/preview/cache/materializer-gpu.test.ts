@@ -6,7 +6,7 @@ import {
   type GpuPreviewRenderer,
 } from '../../../features/video/composition/canvas/gpu-preview';
 import type { GpuPreviewTargetFactory } from '../../../features/video/composition/canvas/preview-presentation';
-import { createMaterializerGpuComposer } from './materializer-gpu';
+import { createMaterializerGpuComposer } from '../../../workflows/video/native-composition/materializer-gpu';
 vi.mock('../../../features/video/composition/canvas/gpu-preview', async (original) => ({
   ...(await original<typeof import('../../../features/video/composition/canvas/gpu-preview')>()),
   createGpuPreviewRenderer: vi.fn(),

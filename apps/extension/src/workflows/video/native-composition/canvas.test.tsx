@@ -2,22 +2,22 @@
 
 import { afterEach, expect, it, vi } from 'vitest';
 
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 
 const { drawSceneBackgroundMock, getProjectSceneBackgroundMock } = vi.hoisted(() => ({
   drawSceneBackgroundMock: vi.fn(),
   getProjectSceneBackgroundMock: vi.fn(() => ({ kind: 'solid' })),
 }));
 
-vi.mock('../../../../features/video/project/scene/background', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../features/video/project/scene/background')>()),
+vi.mock('../../../features/video/project/scene/background', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../features/video/project/scene/background')>()),
   drawSceneBackground: drawSceneBackgroundMock,
   getProjectSceneBackground: getProjectSceneBackgroundMock,
 }));
 
-vi.mock('../../../../features/video/project/scene/background-audio', async (importOriginal) => ({
+vi.mock('../../../features/video/project/scene/background-audio', async (importOriginal) => ({
   ...(await importOriginal<
-    typeof import('../../../../features/video/project/scene/background-audio')
+    typeof import('../../../features/video/project/scene/background-audio')
   >()),
   resolveSceneBackgroundAudioEnvelope: vi.fn(() => 0),
 }));

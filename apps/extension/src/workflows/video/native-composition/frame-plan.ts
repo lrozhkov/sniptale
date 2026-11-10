@@ -1,19 +1,19 @@
 import { preparePreviewSourceFrames } from './source-frames';
 import { capturePreviewImageResources, arePreviewImageResourcesReady } from './image-resources';
-import type { EffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/runtime/types';
-import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
-import { scaleEffectRuntimeFramePlan } from '../../../../features/video/composition/effect-runtime/render/wave';
-import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
+import type { EffectRuntimeFramePlan } from '../../../features/video/composition/effect-runtime/runtime/types';
+import type { VideoCompositionVisualLayer } from '../../../features/video/composition/types';
+import { scaleEffectRuntimeFramePlan } from '../../../features/video/composition/effect-runtime/render/wave';
+import type { EffectRuntimeSandboxExecutor } from '../../../contracts/effect-runtime/types';
 import {
   canPrepareEffectRuntimeGpuComposition,
   prepareEffectRuntimeGpuComposition,
-} from '../../../../features/video/composition/effect-runtime/render/gpu-wave';
+} from '../../../features/video/composition/effect-runtime/render/gpu-wave';
 import {
   isVideoCompositionFrameSource,
   type VideoCompositionFrameSource,
   type VideoCompositionMediaSource,
-} from '../../../../features/video/composition/draw/media-source';
-import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
+} from '../../../features/video/composition/draw/media-source';
+import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
 import {
   resolvePreviewEffectRuntimeRasterScale,
   resolvePreviewCompositionFrameSize,
@@ -21,6 +21,17 @@ import {
 import type { PreviewSceneRenderInput, PreviewScenePreparedFrame } from './types';
 
 type Passes = ReturnType<typeof resolveVideoCompositionRenderPasses>;
+
+/** Source acquisition and drawing resolve the same output-specific camera and text rules. */
+export function resolveNativeSceneRenderPasses(input: PreviewSceneRenderInput) {
+  return resolveVideoCompositionRenderPasses(
+    input.project,
+    input.currentTime,
+    input.sceneOutput
+      ? { cameraViewport: input.sceneOutput, includeSubtitles: input.sceneOutput.includeSubtitles }
+      : undefined
+  );
+}
 
 /** Own captured sources independently of the moving media elements and their callers. */
 export function captureNativePreviewSources(input: PreviewSceneRenderInput, passes: Passes) {
@@ -112,6 +123,7 @@ export function prepareNativePreviewGpuComposition(
   executor: EffectRuntimeSandboxExecutor,
   rasterScale = resolvePreviewEffectRuntimeRasterScale({
     canvas: input.canvas,
+    ...(input.sceneOutput ? { sceneOutput: input.sceneOutput } : {}),
     ...(input.previewRasterSize ? { previewRasterSize: input.previewRasterSize } : {}),
     project: input.project,
     stage: input.stage,
@@ -139,9 +151,7 @@ export function prepareNativePreviewSceneFrame(
   )
     return undefined;
   input.signal?.throwIfAborted();
-  const passes =
-    input.preparedFrame?.passes ??
-    resolveVideoCompositionRenderPasses(input.project, input.currentTime);
+  const passes = input.preparedFrame?.passes ?? resolveNativeSceneRenderPasses(input);
   if (input.cameraOverride) {
     passes.overlayFrame.camera = input.cameraOverride;
     for (const pass of passes.visualPasses) pass.frame.camera = input.cameraOverride;
@@ -167,6 +177,7 @@ export function prepareNativePreviewSceneFrame(
     return undefined;
   const rasterScale = resolvePreviewEffectRuntimeRasterScale({
     canvas: input.canvas,
+    ...(input.sceneOutput ? { sceneOutput: input.sceneOutput } : {}),
     ...(input.previewRasterSize ? { previewRasterSize: input.previewRasterSize } : {}),
     project: input.project,
     stage: input.stage,

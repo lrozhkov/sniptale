@@ -15,7 +15,7 @@ import {
   DEFAULT_CAMERA_PERSPECTIVE,
   DEFAULT_CAMERA_DEPTH,
 } from '../../../apps/extension/src/features/video/project/motion/spatial';
-import { createNativeGpuPreviewRenderer } from '../../../apps/extension/src/video-editor/preview/stage/scene/gpu-preview';
+import { createNativeGpuPreviewRenderer } from '../../../apps/extension/src/workflows/video/native-composition/gpu-preview';
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,

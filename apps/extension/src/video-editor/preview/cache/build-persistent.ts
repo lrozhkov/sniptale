@@ -10,7 +10,7 @@ import {
   type VideoPreviewCacheSegment,
 } from '../../../composition/persistence/video-preview-cache';
 import { encodePersistentVideoPreview } from './encode';
-import { createMaterializerGpuOutputs } from './materializer-gpu-outputs';
+import { createMaterializerGpuOutputs } from '../../../workflows/video/native-composition/materializer-gpu-outputs';
 import type { VideoPreviewCacheSegmentPlanEntry } from './segments';
 import {
   cacheExactVideoPreviewFrame,

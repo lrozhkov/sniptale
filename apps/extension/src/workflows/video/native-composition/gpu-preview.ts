@@ -1,17 +1,18 @@
-import type { EffectRuntimeInputComposition } from '../../../../features/video/composition/effect-runtime/frame/inputs';
+import { resolveProjectOutputTransform } from '../../../features/video/project/export/output-dimensions';
+import type { EffectRuntimeInputComposition } from '../../../features/video/composition/effect-runtime/frame/inputs';
 import { isPreviewFrameGpuIsolated } from './source-frames';
-import type { GpuPreviewTarget } from '../../../../features/video/composition/canvas/preview-presentation';
+import type { GpuPreviewTarget } from '../../../features/video/composition/canvas/preview-presentation';
 import { createNativeEffectPreparation } from './effect-preparation';
-import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
-import { prepareEffectRuntimeGpuScene } from '../../../../features/video/composition/effect-runtime/render/gpu-plan';
+import type { EffectRuntimeSandboxExecutor } from '../../../contracts/effect-runtime/types';
+import { prepareEffectRuntimeGpuScene } from '../../../features/video/composition/effect-runtime/render/gpu-plan';
 import { createNativeGpuPreviewMaterials } from './gpu-preview-materials';
-import type { PreviewRendererStatus } from '../../../../features/video/preview/preferences';
+import type { PreviewRendererStatus } from '../../../features/video/preview/preferences';
 import {
   createGpuPreviewRenderer,
   GpuPreviewDeviceError,
   type GpuPreviewRenderer,
   type GpuPreviewLayer,
-} from '../../../../features/video/composition/canvas/gpu-preview';
+} from '../../../features/video/composition/canvas/gpu-preview';
 
 import { captureNativePreviewSources } from './frame-plan';
 
@@ -19,18 +20,18 @@ import { buildNativeGpuPreviewLayers } from './gpu-preview-layers';
 import {
   getFittedMediaContentFrame,
   getFittedMediaWindowFrame,
-} from '../../../../features/video/composition/draw/fitted-media';
-import { admittedVisualWindowHeader } from '../../../../features/video/composition/draw/window-header';
-import { roundedWindowRadius } from '../../../../features/video/project/window-geometry';
-import { motionCameraProjection } from '../../../../features/video/composition/motion/spatial';
+} from '../../../features/video/composition/draw/fitted-media';
+import { admittedVisualWindowHeader } from '../../../features/video/composition/draw/window-header';
+import { roundedWindowRadius } from '../../../features/video/project/window-geometry';
+import { motionCameraProjection } from '../../../features/video/composition/motion/spatial';
 import {
   invertQuickEditProjection,
   multiplyQuickEditProjections,
   type QuickEditHomography,
-} from '../../../../features/video/composition/motion/spatial-geometry';
+} from '../../../features/video/composition/motion/spatial-geometry';
 
-import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
+import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
+import type { VideoCompositionVisualLayer } from '../../../features/video/composition/types';
 import type { PreviewSceneRenderInput as Input, NativeGpuPreviewRenderer } from './types';
 import {
   publishCompletedPreviewFrame,
@@ -269,8 +270,13 @@ export function createNativeGpuPreviewRenderer(
         const backdrop = materials.background(input, passes);
         const createArtwork = (phase: 'borders' | 'final') => {
           const canvas = input.canvas.ownerDocument.createElement('canvas');
-          canvas.width = input.project.width;
-          canvas.height = input.project.height;
+          const size = phase === 'final' && input.sceneOutput ? input.sceneOutput : input.project;
+          canvas.width = size.width;
+          canvas.height = size.height;
+          const transform =
+            phase === 'final' && input.sceneOutput
+              ? resolveProjectOutputTransform(input.project, input.sceneOutput)
+              : { offsetX: 0, offsetY: 0, scale: 1 };
           const context = canvas.getContext('2d');
           if (!context) throw new Error('Preview artwork is unavailable.');
           finish(
@@ -279,11 +285,9 @@ export function createNativeGpuPreviewRenderer(
               bounds: { width: canvas.width, height: canvas.height },
               dpr: 1,
               viewport: {
-                offsetX: 0,
-                offsetY: 0,
-                width: canvas.width,
-                height: canvas.height,
-                scale: 1,
+                ...transform,
+                width: input.project.width * transform.scale,
+                height: input.project.height * transform.scale,
               },
             },
             phase
@@ -394,11 +398,12 @@ export function createNativeGpuPreviewRenderer(
           });
         if (finalArtworkRequired) {
           artwork = createArtwork('final');
-          layers.push({
-            source: artwork,
-            rect: { x: 0, y: 0, width: artwork.width, height: artwork.height },
-            inverse: IDENTITY,
-          });
+          if (!input.sceneOutput)
+            layers.push({
+              source: artwork,
+              rect: { x: 0, y: 0, width: artwork.width, height: artwork.height },
+              inverse: IDENTITY,
+            });
         }
         let prepared: ReturnType<typeof resolvePreparedPreviewSceneCanvas> = null;
         let layout: ReturnType<typeof resolvePreviewSceneCanvasLayout>;
@@ -448,6 +453,16 @@ export function createNativeGpuPreviewRenderer(
                 width: viewport.width,
                 height: viewport.height,
               },
+              inverse: IDENTITY,
+            },
+          ];
+        }
+        if (artwork && input.sceneOutput) {
+          presentationLayers = [
+            ...presentationLayers,
+            {
+              source: artwork,
+              rect: { x: 0, y: 0, width: logical.width, height: logical.height },
               inverse: IDENTITY,
             },
           ];

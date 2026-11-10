@@ -1,49 +1,49 @@
-import { resolveVideoMediaShadowParams } from '../../../../features/video/composition/canvas/media-shadow';
-import type { GpuPreviewLayer } from '../../../../features/video/composition/canvas/gpu-preview';
+import { resolveVideoMediaShadowParams } from '../../../features/video/composition/canvas/media-shadow';
+import type { GpuPreviewLayer } from '../../../features/video/composition/canvas/gpu-preview';
 import type {
   VideoCompositionFrame,
   VideoCompositionVisualLayer,
-} from '../../../../features/video/composition/types';
+} from '../../../features/video/composition/types';
 import {
   isVideoCompositionFrameSource,
   type VideoCompositionMediaSource,
-} from '../../../../features/video/composition/draw/media-source';
+} from '../../../features/video/composition/draw/media-source';
 
-import { drawCompositionVisualLayer } from '../../../../features/video/composition/draw';
+import { drawCompositionVisualLayer } from '../../../features/video/composition/draw';
 
 import {
   invertQuickEditProjection,
   multiplyQuickEditProjections,
   projectQuickEditPoint,
   type QuickEditHomography,
-} from '../../../../features/video/composition/motion/spatial-geometry';
-import { type SceneSpotlightLayer } from '../../../../features/video/composition/draw/spotlight';
-import { sampleCompositionSpotlightLayer } from '../../../../features/video/composition/draw/project-spotlight';
+} from '../../../features/video/composition/motion/spatial-geometry';
+import { type SceneSpotlightLayer } from '../../../features/video/composition/draw/spotlight';
+import { sampleCompositionSpotlightLayer } from '../../../features/video/composition/draw/project-spotlight';
 
 import {
   getFittedMediaContentFrame,
   getFittedMediaOriginalWindowFrame,
   getFittedMediaWindowFrame,
   drawFittedMediaLayer,
-} from '../../../../features/video/composition/draw/fitted-media';
+} from '../../../features/video/composition/draw/fitted-media';
 import {
   resolveVideoWindowMedia,
   resolveVideoSourceActionPaintBounds,
-} from '../../../../features/video/composition/draw/video';
+} from '../../../features/video/composition/draw/video';
 import {
   drawPointerFeedbackLensShadow,
   pointerFeedbackLensPaintBounds,
-} from '../../../../features/video/composition/draw/pointer-feedback';
+} from '../../../features/video/composition/draw/pointer-feedback';
 import {
   DEFAULT_CAMERA_APPEARANCE,
   cameraWindowFrame,
-} from '../../../../features/video/project/camera/appearance';
-import { traceCameraShape } from '../../../../features/video/composition/draw/media-shadow';
+} from '../../../features/video/project/camera/appearance';
+import { traceCameraShape } from '../../../features/video/composition/draw/media-shadow';
 import {
   roundedWindowRadius,
   resolveDecoratedMediaFrame,
-} from '../../../../features/video/project/window-geometry';
-import { VideoMediaFitMode } from '../../../../features/video/project/types';
+} from '../../../features/video/project/window-geometry';
+import { VideoMediaFitMode } from '../../../features/video/project/types';
 
 type Layer = VideoCompositionVisualLayer;
 type VideoLayer = Extract<Layer, { kind: 'video' }>;

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
-import { createEffectHostClip } from '../../../../features/video/project/factories/overlay-clip';
-import type { ResolvedTransitionOverlay } from '../../../../features/video/project/transition/presentation';
-import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../../../features/video/project/transition/presentation.types';
-import { VideoTemplateDirection } from '../../../../features/video/project/types';
-import type { VideoCompositionVisualLayer } from '../../../../features/video/composition/types';
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { createEffectHostClip } from '../../../features/video/project/factories/overlay-clip';
+import type { ResolvedTransitionOverlay } from '../../../features/video/project/transition/presentation';
+import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../../features/video/project/transition/presentation.types';
+import { VideoTemplateDirection } from '../../../features/video/project/types';
+import type { VideoCompositionVisualLayer } from '../../../features/video/composition/types';
 
 const {
   drawCompositionVisualLayerMock,
@@ -18,16 +18,16 @@ const {
   drawTransitionOverlayMock: vi.fn(),
 }));
 
-vi.mock('../../../../features/video/composition/draw', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../features/video/composition/draw')>()),
+vi.mock('../../../features/video/composition/draw', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../features/video/composition/draw')>()),
   drawCompositionVisualLayer: drawCompositionVisualLayerMock,
   drawEffectRuntimeVisualLayer: drawEffectRuntimeVisualLayerMock,
   drawTransitionOverlay: drawTransitionOverlayMock,
 }));
 
-vi.mock('../../../../features/video/composition/motion/layer-camera', async (importOriginal) => ({
+vi.mock('../../../features/video/composition/motion/layer-camera', async (importOriginal) => ({
   ...(await importOriginal<
-    typeof import('../../../../features/video/composition/motion/layer-camera')
+    typeof import('../../../features/video/composition/motion/layer-camera')
   >()),
   mapVisualLayerToViewportSpace: vi.fn((layer) => layer),
   partitionVisualLayersByViewportLock: vi.fn((layers) => ({ locked: [], unlocked: layers })),
@@ -35,21 +35,21 @@ vi.mock('../../../../features/video/composition/motion/layer-camera', async (imp
   shouldLockVisualLayerToViewport: vi.fn(() => false),
 }));
 
-vi.mock('../../../../features/video/project/scene/background', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../features/video/project/scene/background')>()),
+vi.mock('../../../features/video/project/scene/background', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../features/video/project/scene/background')>()),
   drawSceneBackground: vi.fn(),
   getProjectSceneBackground: vi.fn(() => ({ kind: 'solid' })),
 }));
 
-vi.mock('../../../../features/video/project/scene/background-audio', async (importOriginal) => ({
+vi.mock('../../../features/video/project/scene/background-audio', async (importOriginal) => ({
   ...(await importOriginal<
-    typeof import('../../../../features/video/project/scene/background-audio')
+    typeof import('../../../features/video/project/scene/background-audio')
   >()),
   resolveSceneBackgroundAudioEnvelope: vi.fn(() => 0),
 }));
 
-import { drawSpatialCompositionGroup } from '../../../../features/video/composition/draw/spatial';
-vi.mock('../../../../features/video/composition/draw/spatial', () => ({
+import { drawSpatialCompositionGroup } from '../../../features/video/composition/draw/spatial';
+vi.mock('../../../features/video/composition/draw/spatial', () => ({
   drawSpatialCompositionGroup: vi.fn(() => true),
 }));
 import { drawPreviewVisualPasses } from './render-visual';

@@ -73,7 +73,7 @@ vi.mock('../../../../features/video/project/scene/background-audio', async (impo
   resolveSceneBackgroundAudioEnvelope: vi.fn(() => 0),
 }));
 
-import { drawPreviewVisualPasses } from './render-visual';
+import { drawPreviewVisualPasses } from '../../../../workflows/video/native-composition/render-visual';
 
 afterEach(() => {
   vi.unstubAllGlobals();

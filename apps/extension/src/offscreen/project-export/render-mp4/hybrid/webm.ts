@@ -1,3 +1,4 @@
+import { parseEnhancementMode } from '../../../../features/video/composition/export-enhancement/mode';
 import { resolveVideoProjectCompositionJoinPlans } from '../../../../features/video/project/scene/joins';
 import { drawVideoProjectSceneEdges } from '../../../../features/video/composition/canvas/scene-edges';
 import type { VideoProjectExportTimeEstimate } from '../../../../features/video/project/types/export';
@@ -223,6 +224,7 @@ function getDecodedCompositeOwnerDocument(args: DecodedCompositeFrameArgs): Docu
 export async function renderAcceleratedCompositeWebmSpan(
   args: AcceleratedCompositeWebmRenderArgs
 ): Promise<boolean> {
+  if (parseEnhancementMode(args.settings.detailEnhancement) === 'off') return false;
   if (
     resolveVideoProjectCompositionJoinPlans(args.project).some(
       (plan) => args.span.start < plan.seam + plan.after && args.span.end > plan.seam - plan.before

@@ -41,7 +41,7 @@ vi.mock('./render-preview', async (original) => ({
   renderPreviewScene: vi.fn().mockResolvedValue(undefined),
 }));
 import { renderPreviewScene, PreviewGpuSerialFallback } from './render-preview';
-import * as nativeGpu from './gpu-preview';
+import * as nativeGpu from '../../../../workflows/video/native-composition/gpu-preview';
 import * as cachedGpu from '../../cache/render';
 import { createVideoPreviewExactFrameCache } from '../../cache/exact-frame-cache';
 import { createPreviewSceneRenderScheduler } from './render-scheduler';

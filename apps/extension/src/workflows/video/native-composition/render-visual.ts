@@ -1,30 +1,31 @@
+import type { CameraOutputViewport } from '../../../features/video/project/export/output-dimensions';
 import type { PreviewSceneSourceFrames } from './source-frames';
-import type { VideoCompositionMediaSource } from '../../../../features/video/composition/draw/media-source';
-import { drawCompositionSceneSpotlights } from '../../../../features/video/composition/draw/project-spotlight';
-import { drawSpatialCompositionGroup } from '../../../../features/video/composition/draw/spatial';
-import type { ReviewSpatialRenderer } from '../../../../features/video/composition/canvas/spatial-renderer';
+import type { VideoCompositionMediaSource } from '../../../features/video/composition/draw/media-source';
+import { drawCompositionSceneSpotlights } from '../../../features/video/composition/draw/project-spotlight';
+import { drawSpatialCompositionGroup } from '../../../features/video/composition/draw/spatial';
+import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import {
   resolveOrderedVisualPassLayers,
   splitVisualLayersForSourceSpotlights,
-} from '../../../../features/video/composition/visual-pass-layers';
-import { resolveEffectRuntimeVisualLayers } from '../../../../features/video/composition/draw/effect-runtime';
+} from '../../../features/video/composition/visual-pass-layers';
+import { resolveEffectRuntimeVisualLayers } from '../../../features/video/composition/draw/effect-runtime';
 import {
   createEffectRuntimeDrawState,
   drawCompositionVisualLayer,
   drawEffectRuntimeVisualLayer,
   type EffectRuntimeDrawState,
-} from '../../../../features/video/composition/draw';
+} from '../../../features/video/composition/draw';
 import {
   getEffectRuntimeVisualPassFrames,
   type EffectRuntimeRenderedComposition,
   type EffectRuntimeRenderedFrameMap,
-} from '../../../../features/video/composition/effect-runtime';
+} from '../../../features/video/composition/effect-runtime';
 import {
   mapVisualLayerToViewportSpace,
   segmentVisualLayersByViewportLock,
-} from '../../../../features/video/composition/motion/layer-camera';
-import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
-import type { VideoProject } from '../../../../features/video/project/types/index';
+} from '../../../features/video/composition/motion/layer-camera';
+import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
+import type { VideoProject } from '../../../features/video/project/types/index';
 import {
   beginPreviewCameraPass,
   beginPreviewViewportClip,
@@ -33,8 +34,8 @@ import {
 } from './canvas';
 import { drawPreviewTransitionOverlays, resolvePreviewEffectDrawState } from './render-effects';
 import { resolvePreviewPassTarget } from './render-pass-target';
-import type { VideoEditorPreviewRasterSize } from '../sizing/raster';
-import { resolveActiveCameraSplit } from '../../../../features/video/composition/camera-split';
+import type { VideoEditorPreviewRasterSize } from './types';
+import { resolveActiveCameraSplit } from '../../../features/video/composition/camera-split';
 
 function drawLockedPreviewLayer(
   prepared: PreparedPreviewSceneCanvas,
@@ -162,6 +163,7 @@ export async function drawPreviewVisualPasses(params: {
   passes: ReturnType<typeof resolveVideoCompositionRenderPasses>['visualPasses'];
   project: VideoProject;
   previewRasterSize?: VideoEditorPreviewRasterSize;
+  sceneOutput?: CameraOutputViewport;
   stage: HTMLDivElement | null;
 }) {
   const prepared = resolvePreparedPreviewSceneCanvas({
@@ -173,6 +175,7 @@ export async function drawPreviewVisualPasses(params: {
     currentTime: params.currentTime ?? 0,
     imageBank: params.imageBank,
     project: params.project,
+    ...(params.sceneOutput ? { sceneOutput: params.sceneOutput } : {}),
     ...(params.previewRasterSize ? { previewRasterSize: params.previewRasterSize } : {}),
     shouldClearCanvas: true,
     stage: params.stage,
@@ -205,6 +208,7 @@ export async function drawPreviewVisualPasses(params: {
 
 async function drawPreviewOrderedVisualLayers(params: {
   sourceFrames?: PreviewSceneSourceFrames;
+  sceneOutput?: CameraOutputViewport;
   project: VideoProject;
   time: number;
   canvas: HTMLCanvasElement;
@@ -287,6 +291,7 @@ async function drawPreviewOrderedVisualLayers(params: {
 
 async function drawPreviewUnlockedLayerGroup(params: {
   sourceFrames?: PreviewSceneSourceFrames;
+  sceneOutput?: CameraOutputViewport;
   canvas: HTMLCanvasElement;
   clipMediaElements: Map<string, VideoCompositionMediaSource>;
   imageBank: Record<string, HTMLImageElement>;

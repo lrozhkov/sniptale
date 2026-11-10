@@ -1,14 +1,14 @@
 import type {
   VideoProjectVideoClip,
   VideoProjectImageClip,
-} from '../../../../features/video/project/types';
+} from '../../../features/video/project/types';
 import type {
   VideoCompositionFrame,
   VideoCompositionVisualLayer,
-} from '../../../../features/video/composition/types';
-import { windowHeaderImageKey } from '../../../../features/video/composition/draw/window-header';
-import { getProjectSceneBackgroundImageAssetId } from '../../../../features/video/project/scene/background';
-import type { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
+} from '../../../features/video/composition/types';
+import { windowHeaderImageKey } from '../../../features/video/composition/draw/window-header';
+import { getProjectSceneBackgroundImageAssetId } from '../../../features/video/project/scene/background';
+import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
 import type {
   PreviewSceneRenderInput,
   PreviewSceneImageResources,

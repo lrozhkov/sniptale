@@ -1,11 +1,11 @@
-import type { EffectRuntimeSandboxExecutor } from '../../../../contracts/effect-runtime/types';
+import type { EffectRuntimeSandboxExecutor } from '../../../contracts/effect-runtime/types';
 import type {
   GpuPreviewRenderer,
   GpuPreviewLayer,
-} from '../../../../features/video/composition/canvas/gpu-preview';
-import { prepareEffectRuntimeGpuFramePlans } from '../../../../features/video/composition/effect-runtime/runtime/gpu-driver';
-import { createEffectRuntimeGpuFrameLedger } from '../../../../features/video/composition/effect-runtime/runtime/resource-limits';
-import type { EffectRuntimeGpuPreparedFrame } from '../../../../features/video/composition/effect-runtime/runtime/types';
+} from '../../../features/video/composition/canvas/gpu-preview';
+import { prepareEffectRuntimeGpuFramePlans } from '../../../features/video/composition/effect-runtime/runtime/gpu-driver';
+import { createEffectRuntimeGpuFrameLedger } from '../../../features/video/composition/effect-runtime/runtime/resource-limits';
+import type { EffectRuntimeGpuPreparedFrame } from '../../../features/video/composition/effect-runtime/runtime/types';
 import { resolvePreviewCompositionFrameSize } from './canvas';
 import { resolveUpcomingNativeEffect, resolveUpcomingNativeEffectOnset } from './frame-plan';
 import { buildNativeGpuEffectLayer } from './gpu-preview-layers';

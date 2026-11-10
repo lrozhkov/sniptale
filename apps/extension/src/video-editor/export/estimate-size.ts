@@ -37,6 +37,14 @@ export async function estimateProjectExportSize(args: {
   const materializer = createVideoPreviewFrameMaterializer({
     project,
     sampleFps: settings.fps,
+    sceneOutput: {
+      width: settings.width,
+      height: settings.height,
+      resolution: settings.resolution,
+      includeSubtitles: settings.burnInSubtitles === true,
+    },
+    sourceDiscontinuity: false,
+    assertCaptions: (captions) => captions.assertExportable(range),
     assetUrls: args.assetUrls,
     ownerDocument: document,
     rasterSize: settings,

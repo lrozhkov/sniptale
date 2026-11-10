@@ -1,4 +1,4 @@
-import { createVideoCompositionPassBuffer } from '../../../../features/video/composition/canvas/pass-buffer';
+import { createVideoCompositionPassBuffer } from '../../../features/video/composition/canvas/pass-buffer';
 import type { PreparedPreviewSceneCanvas } from './canvas';
 
 export function resolvePreviewPassTarget(params: {

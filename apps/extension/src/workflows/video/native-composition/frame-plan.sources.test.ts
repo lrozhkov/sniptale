@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import * as timeline from '../../../../features/video/composition/timeline/render';
-import * as gpuComposition from '../../../../features/video/composition/effect-runtime/render/gpu-wave';
+import * as timeline from '../../../features/video/composition/timeline/render';
+import * as gpuComposition from '../../../features/video/composition/effect-runtime/render/gpu-wave';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createProject,
   createVideoClip,
-} from '../../../../features/video/project/timeline/project-meta.test.helpers';
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
 import { prepareNativePreviewSceneFrame } from './frame-plan';
 import type { PreviewSceneRenderInput } from './types';
 afterEach(() => {

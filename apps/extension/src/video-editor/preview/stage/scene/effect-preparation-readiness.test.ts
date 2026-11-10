@@ -15,7 +15,7 @@ import {
   createProject,
   createVideoClip,
 } from '../../../../features/video/project/timeline/project-meta.test.helpers';
-import { createNativeEffectPreparation } from './effect-preparation';
+import { createNativeEffectPreparation } from '../../../../workflows/video/native-composition/effect-preparation';
 import type { PreviewSceneRenderInput } from './types';
 import { createVideoEditorEffectRuntime } from '../../../runtime/effect-runtime';
 import {
