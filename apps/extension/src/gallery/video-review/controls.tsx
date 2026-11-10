@@ -32,12 +32,12 @@ export function reviewTimelineItemTone(
     focus:
       'bg-[color-mix(in_srgb,var(--sniptale-color-success)_10%,var(--sniptale-color-surface-hover))]',
   };
-  return `${surface[kind]} ${border}`;
+  return `review-timeline-item ${selected ? 'review-timeline-item-selected ' : ''}${surface[kind]} ${border}`;
 }
 
 /** Consistent visible grips and hit areas across editable timeline lanes. */
 export const reviewTimelineResizeHandleClassName =
-  'absolute inset-y-0 z-10 flex w-3 items-center justify-center rounded ' +
+  'review-timeline-resize-handle absolute inset-y-0 z-10 flex w-3 max-w-[50%] items-center justify-center rounded ' +
   '!cursor-ew-resize disabled:!cursor-default [&_*]:!cursor-[inherit] ' +
   'bg-[var(--sniptale-color-surface-hover)]';
 

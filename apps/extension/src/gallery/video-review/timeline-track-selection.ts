@@ -12,6 +12,7 @@ export function useReviewTrackSelection(input: {
   beforeAction: ReviewBeforeAction | undefined;
   clearTools(): void;
   activate(track: QuickEditTrack): void;
+  onChange?: ((track: QuickEditTrack) => void) | undefined;
 }) {
   const [selection, setSelection] = useState({
     sourceId: input.sourceId,
@@ -35,6 +36,16 @@ export function useReviewTrackSelection(input: {
     if (reset) latest.current.clearTools();
     setSelection({ sourceId: input.sourceId, mode: input.mode, track });
   }, [track, selection, input.sourceId, input.mode, reset]);
+  useEffect(() => {
+    latest.current.onChange?.(track);
+  }, [track]);
+  // Item handlers own edit admission. This capture only changes the transient lane and tools.
+  const focusItem = (next: QuickEditTrack) => {
+    const current = latest.current;
+    if (!current.selectable[next] || current.blocked || next === track) return;
+    current.clearTools();
+    setSelection({ sourceId: current.sourceId, mode: current.mode, track: next });
+  };
   const select = (next: QuickEditTrack) => {
     if (!input.selectable[next] || input.blocked) return;
     (input.beforeAction ?? ((action) => action()))(() => {
@@ -53,5 +64,5 @@ export function useReviewTrackSelection(input: {
       current.activate(next);
     });
   };
-  return { track, select };
+  return { track, select, focusItem };
 }

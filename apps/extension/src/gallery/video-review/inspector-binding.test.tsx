@@ -11,7 +11,7 @@ import {
   REVIEW_ACTION_AUDIO_DEFAULT,
   type ReviewActionAudioTarget,
 } from '../../features/video/review/advanced/action-audio';
-import type { ReviewOriginalSpeechPanel } from './speech-panel';
+import type { ReviewSourceSpeechBinding } from './speech-panel';
 import type { ReviewSelectedProperties } from './selected-properties';
 import { ReviewInspectorBinding, backupReview } from './inspector-binding';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
@@ -83,10 +83,19 @@ vi.mock('./action-history', async () => {
   };
 });
 vi.mock('./speech-panel', () => ({
-  ReviewOriginalSpeechPanel: (props: ComponentProps<typeof ReviewOriginalSpeechPanel>) => (
+  ReviewSourceSpeechBinding: (props: ComponentProps<typeof ReviewSourceSpeechBinding>) => (
     <>
-      <button onClick={() => void props.flushAdvanced()}>Flush source buffers</button>
-      <button onClick={() => props.onJump?.(3)}>Seek source phrase</button>
+      <button onClick={() => void props.flush()}>Flush source buffers</button>
+      <button
+        onClick={() =>
+          (() => {
+            props.editor.video.current?.pause();
+            props.editor.seek(3, false);
+          })()
+        }
+      >
+        Seek source phrase
+      </button>
     </>
   ),
 }));
@@ -152,6 +161,7 @@ function inspectorFixture(
       message: 'Backup refused',
       actionSoundPreview: { audition: vi.fn(), stopAudition: vi.fn() },
       advanced,
+      webcam: { camera: undefined, pending: false, resourceAttempt: 0 },
       activeSelection: { kind: 'audio', id: 'clip', lane: 'voiceover' },
       selection: { kind: 'none' },
       projected: {

@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom';
+import { ReviewSelectionActionsContext } from './selection-actions';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Ellipsis, Info, type LucideIcon } from 'lucide-react';
@@ -15,6 +17,7 @@ const PresentationContext = createContext<{
 export function ReviewInspectorPresentation(props: {
   value: 'all' | 'sections';
   section?:
+    | 'project'
     | 'scene'
     | 'selected'
     | 'comments'
@@ -69,13 +72,22 @@ export function reviewInspectorActions(content: ReactNode): ReviewInspectorSecti
 
 /** One section definition drives both the vertical navigation and the collapsible list. */
 export function ReviewInspectorSections({
-  sections,
+  sections: suppliedSections,
   leadingSectionColumn = false,
 }: {
   sections: readonly ReviewInspectorSection[];
   /** Isolate a large leading group in All mode without changing category order. */
   leadingSectionColumn?: boolean;
 }) {
+  const actionTarget = useContext(ReviewSelectionActionsContext);
+  const actions = actionTarget?.commandHost
+    ? suppliedSections.find((section) => section.id === 'actions')
+    : undefined;
+  const sections = suppliedSections;
+  const actionPanel =
+    actions && actionTarget?.commandHost
+      ? createPortal(actions.content, actionTarget.commandHost)
+      : null;
   const context = useContext(PresentationContext);
   const presentation = context.value;
   const [local, setLocal] = useState<string>();
@@ -90,45 +102,48 @@ export function ReviewInspectorSections({
       : leadingSectionColumn
         ? 1
         : Math.ceil(parameterCount / 2);
-  if (!initial) return null;
+  if (!initial) return actionPanel;
   return (
-    <div data-ui="gallery.videoReview.inspectorSections" data-presentation={presentation}>
-      {presentation === 'sections' && sections.length > 1 ? (
-        <CategorizedInspector
-          dataUi="gallery.videoReview.inspectorCategories"
-          ariaLabel={translate('scenario.editor.inspectorShowSections')}
-          initialSection={initial}
-          sections={sections}
-          onSectionChange={remember}
-          showSectionHeading
-          renderSection={(id) => (
-            <div key={id} className="review-inspector-section-body" data-section={id}>
-              {sections.find((section) => section.id === id)?.content}
-            </div>
-          )}
-        />
-      ) : (
-        [sections.slice(0, columnBreak), sections.slice(columnBreak)]
-          .filter((column) => column.length > 0)
-          .map((column, index) => (
-            <div className="review-inspector-section-column" key={index}>
-              {column.map(({ id, label, icon, disclosureIcon, content }) => (
-                <section key={id} data-section={id} className="review-inspector-section">
-                  <ReviewDetails
-                    preferenceId={`section:${id}`}
-                    label={label}
-                    {...(disclosureIcon === null ? {} : { icon: disclosureIcon ?? icon })}
-                    level="section"
-                    initiallyOpen
-                  >
-                    {content}
-                  </ReviewDetails>
-                </section>
-              ))}
-            </div>
-          ))
-      )}
-    </div>
+    <>
+      {actionPanel}
+      <div data-ui="gallery.videoReview.inspectorSections" data-presentation={presentation}>
+        {presentation === 'sections' && sections.length > 1 ? (
+          <CategorizedInspector
+            dataUi="gallery.videoReview.inspectorCategories"
+            ariaLabel={translate('scenario.editor.inspectorShowSections')}
+            initialSection={initial}
+            sections={sections}
+            onSectionChange={remember}
+            showSectionHeading
+            renderSection={(id) => (
+              <div key={id} className="review-inspector-section-body" data-section={id}>
+                {sections.find((section) => section.id === id)?.content}
+              </div>
+            )}
+          />
+        ) : (
+          [sections.slice(0, columnBreak), sections.slice(columnBreak)]
+            .filter((column) => column.length > 0)
+            .map((column, index) => (
+              <div className="review-inspector-section-column" key={index}>
+                {column.map(({ id, label, icon, disclosureIcon, content }) => (
+                  <section key={id} data-section={id} className="review-inspector-section">
+                    <ReviewDetails
+                      preferenceId={`section:${id}`}
+                      label={label}
+                      {...(disclosureIcon === null ? {} : { icon: disclosureIcon ?? icon })}
+                      level="section"
+                      initiallyOpen
+                    >
+                      {content}
+                    </ReviewDetails>
+                  </section>
+                ))}
+              </div>
+            ))
+        )}
+      </div>
+    </>
   );
 }
 

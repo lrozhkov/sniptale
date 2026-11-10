@@ -1,3 +1,4 @@
+import { ReviewProjectInfo } from './project-info';
 import { prepareLibraryBackup } from '../../workflows/sync-transfer/retained-library';
 import { createSyncProductClient } from '../../platform/runtime-messaging/sync-product-client';
 import {
@@ -7,7 +8,7 @@ import {
 import { ReviewCursorPathEditor, ReviewCursorPathSettings } from './cursor-path-editor';
 import { ReviewAnnotationInspector } from './annotation-effects-inspector';
 import { reviewSubtitleMainOffset } from '../../features/video/review/subtitle-export';
-import { ReviewOriginalSpeechPanel } from './speech-panel';
+import { ReviewSourceSpeechBinding } from './speech-panel';
 import { ReviewTextDocumentPanel } from './text-panel';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import {
@@ -134,6 +135,25 @@ function ReviewInspectorFragment({ state }: { state: InspectorState }) {
   );
 }
 
+type ReviewInspectorBindingProps = {
+  recording?: ReactNode;
+  onProject?: (() => void) | undefined;
+  backLabel?: string | undefined;
+  onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
+  preview?: ReactNode;
+  resizeHandle?: ReactNode;
+  fullHeight: boolean;
+  navigation: ReviewInspectorNavigation;
+  onToggleHeight(): void;
+  resource: LoadedReview;
+  state: InspectorState;
+  canvasComments: ReturnType<typeof useCanvasComments>;
+  audio: ReturnType<typeof useReviewAudio>;
+  onBack(): void;
+  onClose(): void;
+  onRenameProject?: ((name: string) => Promise<void>) | undefined;
+};
+
 export function ReviewInspectorBinding({
   onRenameProject,
   resource,
@@ -149,22 +169,9 @@ export function ReviewInspectorBinding({
   preview,
   onJoinPreview,
   recording,
-}: {
-  recording?: ReactNode;
-  onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
-  preview?: ReactNode;
-  resizeHandle?: ReactNode;
-  fullHeight: boolean;
-  navigation: ReviewInspectorNavigation;
-  onToggleHeight(): void;
-  resource: LoadedReview;
-  state: InspectorState;
-  canvasComments: ReturnType<typeof useCanvasComments>;
-  audio: ReturnType<typeof useReviewAudio>;
-  onBack(): void;
-  onClose(): void;
-  onRenameProject?: ((name: string) => Promise<void>) | undefined;
-}) {
+  onProject,
+  backLabel,
+}: ReviewInspectorBindingProps) {
   const { editing, snapshot, composer, busy, run } = state;
   const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
   const active = useRef(true);
@@ -183,13 +190,28 @@ export function ReviewInspectorBinding({
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
         recording={recording}
+        onProject={onProject}
+        backLabel={backLabel}
+        project={
+          <ReviewProjectInfo
+            resource={resource}
+            name={snapshot.snapshot.workspace.project?.name ?? resource.filename}
+            busy={busy}
+            onRename={onRenameProject}
+            index={editing.exporter.index}
+            camera={state.webcam.camera}
+            cameraPending={state.webcam.pending}
+            cameraAttempt={state.webcam.resourceAttempt}
+            active={navigation.shown === 'project'}
+          />
+        }
         textDocument={reviewInspectorTextDocument(state, canvasComments)}
         speech={
           <ReviewSourceSpeechBinding
             resource={resource}
-            state={state}
+            editor={state}
             audio={audio}
-            canvasComments={canvasComments}
+            flush={() => flushReviewTextVoiceBuffers(state, canvasComments)}
           />
         }
         preview={preview}
@@ -268,21 +290,7 @@ export function ReviewInspectorBinding({
         onAdd={state.add}
         onSelect={state.selectComment}
         onHover={state.setHovered}
-        onOpenVideoEditor={() =>
-          void run(async () => {
-            await flushReviewTextVoiceBuffers(state, canvasComments);
-            const saved = await state.session.saveBuffered();
-            if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
-            const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent, saved);
-            if (!canLeave()) return;
-            await openVideoEditorPage(null, null, {
-              aggregateId: saved.workspace.aggregateId,
-              revision: saved.workspace.revision,
-              createdAt: saved.workspace.createdAt,
-              sourceAssetId: saved.workspace.sourceAssetId,
-            });
-          })
-        }
+        onOpenVideoEditor={() => openReviewInspectorInVideoEditor(state, canvasComments, isCurrent)}
         {...reviewInspectorNoteActions(state, resource)}
       >
         <ReviewSelectionBinding
@@ -347,49 +355,6 @@ function reviewInspectorTextDocument(
         state.editing.exporter.presentationDuration,
         state.editing.exporter.hasBookends
       )}
-    />
-  );
-}
-
-/** Original speech controls bind to the existing audio and timeline authorities. */
-function ReviewSourceSpeechBinding({
-  resource,
-  state,
-  audio,
-  canvasComments,
-}: {
-  resource: LoadedReview;
-  state: InspectorState;
-  audio: ReturnType<typeof useReviewAudio>;
-  canvasComments: ReturnType<typeof useCanvasComments>;
-}) {
-  return (
-    <ReviewOriginalSpeechPanel
-      key="original"
-      mainVideo={state.video.current ?? undefined}
-      resultTime={state.timeline.sceneOutputTime}
-      masterAudio={state.advanced.audio.original}
-      masterDisabled={state.busy}
-      onMasterVolumeChange={(volume) => audio.setOriginal({ volume })}
-      onJump={(time) => {
-        state.video.current?.pause();
-        state.seek(time, false);
-      }}
-      session={resource.session}
-      original={{
-        file: resource.file,
-        sourceAssetId: state.snapshot.snapshot.workspace.sourceAssetId,
-      }}
-      selection={
-        state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)
-      }
-      beforeAction={state.beforeAction}
-      flushAdvanced={() => flushReviewTextVoiceBuffers(state, canvasComments)}
-      registerSpeechFlush={state.registerSpeechFlush}
-      sourceAudioAvailable={!!state.editing.exporter.index?.audioCodec}
-      {...(state.advanced.ui.mode === 'basic'
-        ? { onEnableAdvanced: () => state.setMode('advanced') }
-        : {})}
     />
   );
 }
@@ -917,4 +882,25 @@ function reviewTextCutRange(editor: InspectorState['text'], ids: readonly string
     start: Math.min(...intervals.map((range) => range.start)),
     end: Math.max(...intervals.map((range) => range.end)),
   };
+}
+
+/** Transfers only a flushed checkpoint while the originating inspector still owns the session. */
+function openReviewInspectorInVideoEditor(
+  state: Pick<InspectorState, 'run' | 'composer' | 'flushAdvanced' | 'session'>,
+  canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>,
+  isCurrent: () => boolean
+) {
+  void state.run(async () => {
+    await flushReviewTextVoiceBuffers(state, canvasComments);
+    const saved = await state.session.saveBuffered();
+    if (!isCurrent() || !state.composer.endCheckpointEditAfterFlush()) return;
+    const canLeave = await prepareReviewCheckpointExit(state.session, isCurrent, saved);
+    if (!canLeave()) return;
+    await openVideoEditorPage(null, null, {
+      aggregateId: saved.workspace.aggregateId,
+      revision: saved.workspace.revision,
+      createdAt: saved.workspace.createdAt,
+      sourceAssetId: saved.workspace.sourceAssetId,
+    });
+  });
 }

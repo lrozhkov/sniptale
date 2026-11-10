@@ -421,6 +421,7 @@ function ReviewHistoryItem({
     <button
       key={`${marker.ref.kind}:${marker.ref.id}`}
       type="button"
+      data-review-action-key={`telemetry:${marker.ref.kind}:${marker.ref.id}`}
       aria-pressed={selected}
       data-animated={animated ? 'true' : 'false'}
       aria-label={`${translate('gallery.videoReview.telemetry')} · ${description}`}

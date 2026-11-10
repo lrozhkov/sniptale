@@ -517,16 +517,12 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
                 data-annotation-effect-edge="start"
                 aria-hidden
                 className={`${reviewTimelineResizeHandleClassName} left-0`}
-              >
-                <span className="h-2.5 border-l border-current" />
-              </div>
+              ></div>
               <div
                 data-annotation-effect-edge="end"
                 aria-hidden
                 className={`${reviewTimelineResizeHandleClassName} right-0`}
-              >
-                <span className="h-2.5 border-l border-current" />
-              </div>
+              ></div>
             </div>
           );
         })}

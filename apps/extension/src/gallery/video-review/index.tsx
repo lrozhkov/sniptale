@@ -1,8 +1,10 @@
-import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
+import { ReviewInspectorToolbarNavigation } from './review-toolbar';
+import { ReviewSelectionActionsSurface } from './selection-actions';
 import { setGalleryQuickEditUrl, clearGalleryQuickEditUrl } from '../platform/browser-driver';
 import { useReviewWorkspaceColor } from './workspace-color';
 import {
   useReviewInspectorNavigation,
+  useReviewInspectorTrackNavigation,
   reviewTimelineInspectorCommands,
 } from './inspector-navigation';
 import { useReviewAudioWiring } from './voiceover-recording';
@@ -18,10 +20,10 @@ import { usePresentationPreview } from './use-presentation-preview';
 import { ReviewEditorPresentationDialog } from './presentation-preview-dialog';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import { resolveOverlayComments } from '../../features/video/review/comments';
-import { ReviewPreviewInspector } from './preview-inspector';
+import { useReviewPreviewInspector } from './preview-inspector';
 import {
   ReviewPreviewRendererContext,
-  useReviewPreviewPreferences,
+  type useReviewPreviewPreferences,
 } from './use-preview-preferences';
 import { useReviewMusicImport } from './music-import';
 import { AudioLibraryPicker } from '../../composition/audio-library/picker';
@@ -32,7 +34,7 @@ import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
 import { reviewSelectionLabel } from './selected-properties';
 import { useEffect, useMemo, useState } from 'react';
-import { translate, useAppLocale } from '../../platform/i18n';
+import { translate, useAppLocale, usePageLocaleMetadata } from '../../platform/i18n';
 import { useReviewWaveforms } from './audio-waveform';
 import { ReviewTimelineBinding } from './timeline-binding';
 import { useLoadedReview, type LoadedReview } from './use-session';
@@ -53,7 +55,6 @@ function ReviewHistoryControlBinding({
       cursor={snapshot.snapshot.workspace.cursor}
       length={snapshot.snapshot.workspace.history.length}
       onHistory={state.moveHistory}
-      onAddNote={() => state.add()}
       autosave={{
         enabled: snapshot.autosaveEnabled,
         error: snapshot.error,
@@ -138,14 +139,11 @@ function ReviewEditor({
   onProjectCreated,
 }: ReviewEditorProps) {
   const state = useReviewEditorState(resource);
+  usePageLocaleMetadata(
+    'videoEditor.app.documentTitle',
+    state.snapshot.snapshot.workspace.project?.name ?? resource.filename
+  );
   const editorReady = !state.advanced.ui.modeSelectionPending;
-  const previewPreferences = useReviewPreviewPreferences();
-  const [previewRendererStatus, setPreviewRendererStatus] = useState<PreviewRendererStatus | null>(
-    null
-  );
-  const [previewRaster, setPreviewRaster] = useState<{ width: number; height: number } | null>(
-    null
-  );
   const [fullHeight, setFullHeight] = useState(false);
   const panelsEnabled = state.advanced.ui.mode === 'advanced';
   const panels = useReviewPanelLayout(panelsEnabled, editorReady);
@@ -155,8 +153,15 @@ function ReviewEditor({
     state.setWorkspaceColor,
     editorReady
   );
-  const { navigation, requestExport, historyCommands } = useReviewEditorNavigation(state);
+  const previewSettings = useReviewPreviewInspector({
+    workspaceColor,
+    projectFailed: state.advancedFailed,
+    retryProject: state.retryAdvanced,
+  });
+  const previewPreferences = previewSettings.preferences;
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
+  const navigationState = useReviewEditorNavigation(state, voiceover.recording);
+  const { navigation, requestExport, historyCommands, trackNavigation } = navigationState;
   const music = useReviewMusicImport(state);
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
     state;
@@ -174,25 +179,27 @@ function ReviewEditor({
     features.mode === 'advanced' || !!editing.exporter.index?.audioCodec,
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
+  const timelineRow = panels.timelineHeight === null ? 'auto' : `${panels.timelineHeight}px`;
   if (!editorReady) {
     return (
       <ReviewModeChoice filename={resource.filename} onSelect={state.setMode} onBack={onBack} />
     );
   }
   return (
-    <ReviewPreviewRendererContext.Provider value={previewPreferences.preferences.renderer}>
-      <ReviewEditorPresentationDialog preview={joinPreview} />
-      <div
-        data-ui="gallery.videoReview.workspaceScroll"
-        className="h-full min-h-0 overflow-x-auto overflow-y-hidden"
-      >
+    <ReviewSelectionActionsSurface
+      selection={state.activeSelection}
+      visible={navigation.shown === 'selected' && !voiceover.recording}
+      disabled={busy || editing.exporter.phase !== 'idle'}
+    >
+      <ReviewPreviewRendererContext.Provider value={previewPreferences.preferences.renderer}>
+        <ReviewEditorPresentationDialog preview={joinPreview} />
         <div
           ref={panels.container}
           data-ui="gallery.videoReview.workspace"
           style={{
             ...workspaceColor.style,
             gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,
-            gridTemplateRows: `minmax(0,1fr) ${panels.timelineHeight === null ? 'auto' : `${panels.timelineHeight}px`}`,
+            gridTemplateRows: `minmax(0,1fr) ${timelineRow}`,
           }}
           className="grid h-full min-h-0 min-w-[1254px]"
         >
@@ -200,38 +207,22 @@ function ReviewEditor({
             <ReviewPreviewBinding
               onOpenPreviewSettings={navigation.openPreview}
               previewPreferences={previewPreferences.preferences}
-              onPreviewRaster={setPreviewRaster}
-              onPreviewRendererStatus={setPreviewRendererStatus}
+              onPreviewRaster={previewSettings.setRaster}
+              onPreviewRendererStatus={previewSettings.setRendererStatus}
               resource={resource}
               state={state}
               sceneActive={navigation.shown === 'scene'}
             />
           </div>
           <ReviewInspectorBinding
+            onProject={trackNavigation.back}
+            backLabel={trackNavigation.backLabel}
             onRenameProject={projectCommands.rename}
             recording={
               voiceover.recording ? <ReviewVoiceoverLayer voiceover={voiceover} /> : undefined
             }
             onJoinPreview={onJoinPreview ?? joinPreview.open}
-            preview={
-              <ReviewPreviewInspector
-                workspaceColor={workspaceColor}
-                projectFailed={state.advancedFailed}
-                onProjectRetry={() => {
-                  void state.retryAdvanced().catch(() => undefined);
-                }}
-                preferences={previewPreferences.preferences}
-                status={previewPreferences.status}
-                actualRaster={previewRaster}
-                rendererStatus={previewRendererStatus}
-                onChange={previewPreferences.change}
-                onReset={() => {
-                  previewPreferences.reset();
-                  workspaceColor.reset();
-                }}
-                onRetry={previewPreferences.retry}
-              />
-            }
+            preview={previewSettings.inspector}
             navigation={navigation}
             resizeHandle={
               panelsEnabled ? <ReviewPanelResizeHandle resize={panels.inspector} /> : null
@@ -257,6 +248,8 @@ function ReviewEditor({
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              onOpenProject={trackNavigation.openProject}
+              onTrackChange={trackNavigation.setTrack}
               onHistoryRange={state.setHistoryRange}
               cursorArchiveAvailable={state.cursorArchiveAvailable}
               annotationEffects={state.annotationEffects}
@@ -278,7 +271,15 @@ function ReviewEditor({
               onPlaybackRange={state.setPlaybackRange}
               zoomAnchor={state.zoomAnchor}
               beforeAction={state.beforeAction}
+              onAddNote={() => state.add()}
               historyControls={<ReviewHistoryControlBinding state={state} />}
+              inspectorControls={
+                <ReviewInspectorToolbarNavigation
+                  navigation={navigation}
+                  advanced={features.mode === 'advanced'}
+                  busy={busy || editing.exporter.phase !== 'idle'}
+                />
+              }
               utilityControls={
                 <ReviewKeyboardHelp
                   busy={busy || editing.exporter.phase !== 'idle'}
@@ -334,9 +335,9 @@ function ReviewEditor({
             />
           </div>
         </div>
-      </div>
-      {music.drawer && <AudioLibraryPicker {...music.drawer} />}
-    </ReviewPreviewRendererContext.Provider>
+        {music.drawer && <AudioLibraryPicker {...music.drawer} />}
+      </ReviewPreviewRendererContext.Provider>
+    </ReviewSelectionActionsSurface>
   );
 }
 
@@ -382,7 +383,10 @@ export function VideoReview({
 }
 
 /** Inspector navigation owns selection context and explicit export requests. */
-function useReviewEditorNavigation(state: ReturnType<typeof useReviewEditorState>) {
+function useReviewEditorNavigation(
+  state: ReturnType<typeof useReviewEditorState>,
+  recordingAvailable: boolean
+) {
   const [exportRequest, requestExport] = useState(0);
   const navigation = useReviewInspectorNavigation({
     beforeAction: state.beforeAction,
@@ -396,6 +400,7 @@ function useReviewEditorNavigation(state: ReturnType<typeof useReviewEditorState
     }),
     settingsAvailable: state.advanced.ui.mode === 'advanced',
     exportAvailable: true,
+    recordingAvailable,
     exportRequest,
   });
   const historyCommands = {
@@ -423,5 +428,16 @@ function useReviewEditorNavigation(state: ReturnType<typeof useReviewEditorState
       navigation.setSection('selected');
     },
   };
-  return { navigation, requestExport, historyCommands };
+  const trackNavigation = useReviewInspectorTrackNavigation({
+    navigation,
+    selection: state.activeSelection,
+    beforeAction: state.beforeAction,
+    cancelAnnotation: state.annotationToolCancellation,
+    setDrawing: state.zoom.setDrawing,
+    setCutting: state.editing.setCutting,
+    setAudioTool: state.audio.setOriginalTool,
+    setAudioRange: state.audio.setOriginalRangeSelected,
+    select: state.setActiveSelection,
+  });
+  return { navigation, requestExport, historyCommands, trackNavigation };
 }

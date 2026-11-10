@@ -65,6 +65,8 @@ type TimelineProps = ReviewCursorTimelineInteractions & {
   zoomAnchor?: number | null | undefined;
   historyControls?: ReactNode;
   utilityControls?: ReactNode;
+  modeControl?: ReactNode;
+  inspectorControls?: ReactNode;
   tools?: ReactNode;
   trackControls?: ReactNode;
   expandedTools?: boolean;

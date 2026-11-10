@@ -131,7 +131,11 @@ export function useReviewTimelineHover(options: HoverOptions) {
     clear: () => setHover(null),
     cursor: blocked
       ? 'crosshair'
-      : !options.busy && hover && hover.lane !== 'seek'
+      : !options.busy &&
+          hover &&
+          hover.lane !== 'seek' &&
+          hover.lane !== 'text' &&
+          hover.lane !== 'track'
         ? rangeCursor
         : 'default',
     hover,

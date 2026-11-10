@@ -604,7 +604,7 @@ it('ignores the comment shortcut while report copying disables the comment contr
     await act(async () =>
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
-    await fixture.click('copyReport');
+    for (const action of ['comments', 'copyReport']) await fixture.click(action);
     expect(fixture.button('addComment').disabled).toBe(true);
     await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'm' })));
     expect(fixture.host.querySelector('textarea')).toBeNull();
@@ -758,7 +758,7 @@ it('connects Scene presentation controls to the real session and suppresses them
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     expect(inspector()).toBeNull();
-    await fixture.click('advancedEditing');
+    for (const action of ['advancedEditing', 'scene']) await fixture.click(action);
     const fade = inspector()!.querySelector<HTMLButtonElement>(
       'button[aria-label="gallery.videoReview.presentationFadeIn"]'
     );

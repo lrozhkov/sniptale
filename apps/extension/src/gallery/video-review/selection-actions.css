@@ -1,0 +1,86 @@
+.review-floating-selection-actions {
+  --review-actions-surface: var(--sniptale-color-surface-panel);
+  z-index: 80;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  transition: none;
+  animation: none;
+  gap: 2px;
+  min-width: 0;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+  background: var(--review-actions-surface);
+  box-shadow: var(--sniptale-shadow-floating);
+}
+.review-floating-selection-actions[hidden],
+.review-floating-selection-actions:empty {
+  display: none;
+}
+.review-floating-selection-actions .review-inspector-actions,
+.review-floating-selection-actions .review-inspector-actions > div {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 2px;
+}
+.review-floating-selection-actions button.review-command {
+  width: 32px !important;
+  min-width: 32px !important;
+  margin: 0 !important;
+  padding-inline: 0 !important;
+  justify-content: center;
+}
+.review-floating-selection-actions .review-command-content > span {
+  display: none;
+}
+
+.review-floating-selection-actions .review-command-content {
+  font-size: 0;
+  gap: 0;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .review-floating-selection-actions {
+    --review-actions-surface: color-mix(
+      in srgb,
+      var(--sniptale-color-surface-panel) 80%,
+      transparent
+    );
+    -webkit-backdrop-filter: blur(var(--sniptale-glass-blur)) saturate(1.15);
+    backdrop-filter: blur(var(--sniptale-glass-blur)) saturate(1.15);
+  }
+}
+
+.review-floating-selection-actions::before,
+.review-floating-selection-actions::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: var(--review-actions-tail-x, 50%);
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+  border-bottom: 0;
+  border-top-color: var(--sniptale-color-border-soft);
+  pointer-events: none;
+}
+.review-floating-selection-actions::after {
+  top: calc(100% - 1px);
+  border-inline-width: 5px;
+  border-top-color: var(--review-actions-surface);
+}
+.review-floating-selection-actions[data-tail-side='top']::before,
+.review-floating-selection-actions[data-tail-side='top']::after {
+  top: auto;
+  bottom: 100%;
+  border-top: 0;
+  border-bottom: 6px solid var(--sniptale-color-border-soft);
+}
+.review-floating-selection-actions[data-tail-side='top']::after {
+  bottom: calc(100% - 1px);
+  border-bottom-color: var(--review-actions-surface);
+}

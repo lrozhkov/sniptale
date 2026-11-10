@@ -208,6 +208,8 @@ export function ReviewToolbar(props: {
   resultDuration?: number;
   historyControls?: ReactNode;
   utilityControls?: ReactNode;
+  modeControl?: ReactNode;
+  inspectorControls?: ReactNode;
   tools?: ReactNode;
   expandedTools?: boolean;
   onPlay(): void;
@@ -298,6 +300,8 @@ export function ReviewToolbar(props: {
         {props.onOpenExport ? (
           <>
             <ReviewToolbarSeparator />
+            {props.inspectorControls}
+            {props.modeControl}
             <ReviewButton
               data-ui="gallery.videoReview.openExport"
               label={translate('gallery.videoReview.exportSection')}

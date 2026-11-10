@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { PreviewRendererStatus } from '../../features/video/preview/preferences';
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import type { useReviewWorkspaceColor } from './workspace-color';
@@ -13,7 +14,7 @@ import {
   QUICK_PREVIEW_FRAME_RATES,
   type QuickPreviewPreferences,
 } from '../../features/video/preview/quick-preferences';
-import type { useReviewPreviewPreferences } from './use-preview-preferences';
+import { useReviewPreviewPreferences } from './use-preview-preferences';
 import { ReviewButton, reviewSelectFieldClassName } from './controls';
 
 /** Runtime supplies actual dimensions; this panel owns no rendering or persisted project state. */
@@ -176,4 +177,58 @@ export function ReviewPreviewInspector(props: ReviewPreviewInspectorBinding) {
       ) : null}
     </div>
   );
+}
+
+/** Joins the preview preference controls while preserving each preference owner's reset. */
+function ReviewPreviewSettingsBinding(props: {
+  workspaceColor: ReturnType<typeof useReviewWorkspaceColor>;
+  preferences: ReturnType<typeof useReviewPreviewPreferences>;
+  projectFailed: boolean;
+  retryProject(): Promise<unknown>;
+  actualRaster: ReviewPreviewInspectorBinding['actualRaster'];
+  rendererStatus: PreviewRendererStatus | null;
+}) {
+  return (
+    <ReviewPreviewInspector
+      workspaceColor={props.workspaceColor}
+      projectFailed={props.projectFailed}
+      onProjectRetry={() => {
+        void props.retryProject().catch(() => undefined);
+      }}
+      preferences={props.preferences.preferences}
+      status={props.preferences.status}
+      actualRaster={props.actualRaster}
+      rendererStatus={props.rendererStatus}
+      onChange={props.preferences.change}
+      onReset={() => {
+        props.preferences.reset();
+        props.workspaceColor.reset();
+      }}
+      onRetry={props.preferences.retry}
+    />
+  );
+}
+
+/** Owns the transient renderer reports shown by local preview preferences. */
+export function useReviewPreviewInspector(props: {
+  workspaceColor: ReturnType<typeof useReviewWorkspaceColor>;
+  projectFailed: boolean;
+  retryProject(): Promise<unknown>;
+}) {
+  const preferences = useReviewPreviewPreferences();
+  const [rendererStatus, setRendererStatus] = useState<PreviewRendererStatus | null>(null);
+  const [raster, setRaster] = useState<{ width: number; height: number } | null>(null);
+  return {
+    preferences,
+    setRendererStatus,
+    setRaster,
+    inspector: (
+      <ReviewPreviewSettingsBinding
+        {...props}
+        preferences={preferences}
+        actualRaster={raster}
+        rendererStatus={rendererStatus}
+      />
+    ),
+  };
 }

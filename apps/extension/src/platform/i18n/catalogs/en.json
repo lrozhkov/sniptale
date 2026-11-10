@@ -6531,6 +6531,9 @@
       "thumbnailAlt": "Preview"
     },
     "videoReview": {
+      "aboutProject": "About project",
+      "sourceVideoCodec": "Video codec",
+      "sourceAudioCodec": "Audio codec",
       "noTrackSelected": "No track selected",
       "noTrackActions": "No actions available for this track",
       "trackActionsHint": "Use the track controls or drag its items",
@@ -6713,7 +6716,7 @@
       "previewNativeFrameRate": "Video frame rate",
       "previewPresentedFrameRate": "Preview presentation rate",
       "previewSettings": "Preview settings",
-      "previewSection": "Preview",
+      "previewSection": "Preview settings",
       "previewResolution": "Resolution",
       "previewCurrent": "Current",
       "previewFrameRate": "Frame rate",

@@ -207,9 +207,7 @@ export function ReviewWebcamHiddenMarker(props: {
               });
             }
           }}
-        >
-          <span className="h-4 w-px bg-current opacity-60" />
-        </button>
+        ></button>
       ))}
     </div>
   );

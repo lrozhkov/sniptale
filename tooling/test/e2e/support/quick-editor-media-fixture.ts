@@ -354,9 +354,10 @@ export async function recordedAudioResources(page: Page, excludedKeys: string[] 
 export async function addReviewFocus(page: Page) {
   const dialog = page.locator('dialog');
   await dialog.locator('[data-review-header-track="zoom"] [data-review-track-select]').click();
-  const tool = dialog.locator(
-    '[data-ui="gallery.videoReview.editingTools"] button:has(svg.lucide-focus)'
-  );
+  const tool = dialog.locator('[data-ui="gallery.videoReview.focusTools"]').getByRole('button', {
+    name: translate('gallery.videoReview.zoomRegionLabel'),
+    exact: true,
+  });
   const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
   const duration = Number(await plane.getAttribute('aria-valuemax'));
   const start = Number(await plane.getAttribute('aria-valuenow'));

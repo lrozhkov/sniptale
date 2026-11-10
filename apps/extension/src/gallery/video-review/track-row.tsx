@@ -22,6 +22,7 @@ type ReviewTrackControlsState = {
   selectedTrack?: QuickEditTrack | null;
   selectable?: Partial<Record<QuickEditTrack, boolean>>;
   selectTrack?(track: QuickEditTrack): void;
+  focusItemTrack?(track: QuickEditTrack): void;
   busy: boolean;
   unavailable: Partial<Record<QuickEditTrack, boolean>>;
   setEnabled(track: Exclude<QuickEditTrack, 'source'>, enabled: boolean): void;
@@ -96,6 +97,15 @@ export function ReviewTrackRow(props: TrackRowProps) {
       <div
         data-review-track-content
         className="relative min-w-0"
+        onKeyDownCapture={(event) => {
+          if (
+            track &&
+            (event.key === 'Enter' || event.key === ' ') &&
+            event.target instanceof Element &&
+            event.target.closest('[data-review-removal-key],button,[role="button"]')
+          )
+            controls?.focusItemTrack?.(track);
+        }}
         onPointerDownCapture={(event) => {
           if (
             !track ||
@@ -105,12 +115,21 @@ export function ReviewTrackRow(props: TrackRowProps) {
           )
             return;
           if (
+            event.target instanceof Element &&
+            event.target.closest('[data-review-removal-key],button,[role="button"]')
+          ) {
+            controls?.focusItemTrack?.(track);
+            return;
+          }
+          if (
             !(event.target instanceof Element) ||
             event.target.closest(
               'button,input,select,textarea,a,[role="button"],[data-audio-id],[data-text-id],[data-review-removal-key]'
             )
           )
             return;
+          // Empty-space gestures on the active lane retain its drawing tool and inspector.
+          if (controls?.selectedTrack === track) return;
           controls?.selectTrack?.(track);
         }}
       >

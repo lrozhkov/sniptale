@@ -266,10 +266,10 @@ it('preserves a selected speed range when toolbar preferences and tools change',
         )!
         .click()
     );
-    await fixture.click('focusRangeTool');
+    await fixture.click('zoomRegionLabel');
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
-    expect(input.isConnected).toBe(true);
-    expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
+    expect(input.isConnected).toBe(false);
+    expect(fixture.button('zoomRegionLabel').getAttribute('aria-pressed')).toBe('true');
     await act(async () =>
       fixture.host
         .querySelector<HTMLButtonElement>(
@@ -278,7 +278,7 @@ it('preserves a selected speed range when toolbar preferences and tools change',
         .click()
     );
     await fixture.click('cutMode');
-    expect(input.isConnected).toBe(true);
+    expect(input.isConnected).toBe(false);
     expect(fixture.snapshot.workspace.history).toHaveLength(historyLength);
   } finally {
     await fixture.cleanup();
@@ -405,11 +405,7 @@ it('keeps a newly saved note selected and visible after leaving another inspecto
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
-    await act(async () =>
-      [...fixture.host.querySelectorAll<HTMLButtonElement>('aside button')]
-        .find((button) => button.textContent === 'gallery.videoReview.comments')!
-        .click()
-    );
+    await fixture.click('comments');
     await fixture.click('addComment');
     const field = fixture.host.querySelector<HTMLTextAreaElement>('textarea')!;
     await act(async () => {
@@ -543,7 +539,7 @@ it('creates edits from recorded actions, selects their properties and recalculat
   }
 }, 30000);
 
-it('adds a note from the centered toolbar group and focuses the notes composer', async () => {
+it('adds a note from the primary toolbar group and focuses the notes composer', async () => {
   const fixture = createEditorFixture(integration);
   try {
     await act(async () =>
@@ -554,16 +550,17 @@ it('adds a note from the centered toolbar group and focuses the notes composer',
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')
     ).not.toBeNull();
-    const group = fixture.host.querySelector('[data-ui="gallery.videoReview.noteHistoryTools"]')!;
+    const group = fixture.host.querySelector('[data-ui="gallery.videoReview.primaryTools"]')!;
     const buttons = group.querySelectorAll<HTMLButtonElement>('button');
-    expect(buttons[0]?.getAttribute('aria-label')).toBe('gallery.videoReview.addComment');
-    expect(buttons[1]?.getAttribute('aria-label')).toBe('gallery.videoReview.undo');
-    await act(async () => buttons[0]!.click());
+    expect(buttons[0]?.getAttribute('aria-label')).toBe('gallery.videoReview.pointerTool');
+    expect(buttons[1]?.getAttribute('aria-label')).toBe('gallery.videoReview.addComment');
+    expect(fixture.button('undo')).toBeDefined();
+    await act(async () => buttons[1]!.click());
     const field = fixture.host.querySelector('textarea');
     expect(field).not.toBeNull();
     expect(document.activeElement).toBe(field);
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
-    expect(buttons[0]!.disabled).toBe(false);
+    expect(buttons[1]!.disabled).toBe(false);
     expect(
       fixture.host.querySelectorAll('[data-ui="gallery.videoReview.commentComposer"]')
     ).toHaveLength(1);

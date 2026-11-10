@@ -1,3 +1,6 @@
+import type { useReviewEditorState } from './use-editor-state';
+import type { useReviewAudio } from './use-review-audio';
+import type { LoadedReview } from './use-session';
 import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
 import { useRef, useState, type ReactNode } from 'react';
 import { AudioLines, FileText, LoaderCircle } from 'lucide-react';
@@ -33,31 +36,34 @@ export function ReviewOriginalSpeechPanel(
     masterAudio: { volume: number; muted: boolean };
     onMasterVolumeChange(volume: number): void;
     masterDisabled: boolean;
+    recognitionEnabled?: boolean;
   }
 ) {
-  const { masterAudio, onMasterVolumeChange, masterDisabled, ...speech } = props;
-  return (
-    <ReviewSpeechPanel
-      {...speech}
-      target={{ kind: 'original' }}
-      sound={(applying) => (
-        <ReviewPreviewNumberRow
-          label={translate('gallery.videoReview.volume')}
-          unit="%"
-          min={0}
-          max={200}
-          step={1}
-          precision={0}
-          enterBehavior="blur"
-          disabled={masterDisabled || applying}
-          value={masterAudio.muted ? 0 : masterAudio.volume * 100}
-          onChange={(value) => {
-            if (!masterDisabled && !applying) onMasterVolumeChange(value / 100);
-          }}
-        />
-      )}
+  const {
+    masterAudio,
+    onMasterVolumeChange,
+    masterDisabled,
+    recognitionEnabled = true,
+    ...speech
+  } = props;
+  const sound = (applying: boolean) => (
+    <ReviewPreviewNumberRow
+      label={translate('gallery.videoReview.volume')}
+      unit="%"
+      min={0}
+      max={200}
+      step={1}
+      precision={0}
+      enterBehavior="blur"
+      disabled={masterDisabled || applying}
+      value={masterAudio.muted ? 0 : masterAudio.volume * 100}
+      onChange={(value) => {
+        if (!masterDisabled && !applying) onMasterVolumeChange(value / 100);
+      }}
     />
   );
+  if (!recognitionEnabled) return sound(false);
+  return <ReviewSpeechPanel {...speech} target={{ kind: 'original' }} sound={sound} />;
 }
 
 /** Explicit source and selected voiceover commands share one canonical recognition workflow. */
@@ -562,5 +568,62 @@ function MultimodalRecognitionSettings({ recognition }: { recognition: Recogniti
         />
       )}
     </div>
+  );
+}
+
+/** Original speech controls bind to the existing audio and timeline authorities. */
+export function ReviewSourceSpeechBinding({
+  resource,
+  editor,
+  audio,
+  flush,
+}: {
+  resource: LoadedReview;
+  editor: Pick<
+    ReturnType<typeof useReviewEditorState>,
+    | 'advanced'
+    | 'video'
+    | 'timeline'
+    | 'busy'
+    | 'seek'
+    | 'snapshot'
+    | 'playbackRange'
+    | 'selection'
+    | 'beforeAction'
+    | 'registerSpeechFlush'
+    | 'editing'
+    | 'setMode'
+  >;
+  audio: Pick<ReturnType<typeof useReviewAudio>, 'setOriginal'>;
+  flush(): Promise<void>;
+}) {
+  return (
+    <ReviewOriginalSpeechPanel
+      recognitionEnabled={editor.advanced.ui.mode === 'advanced'}
+      mainVideo={editor.video.current ?? undefined}
+      resultTime={editor.timeline.sceneOutputTime}
+      masterAudio={editor.advanced.audio.original}
+      masterDisabled={editor.busy}
+      onMasterVolumeChange={(volume) => audio.setOriginal({ volume })}
+      onJump={(time) => {
+        editor.video.current?.pause();
+        editor.seek(time, false);
+      }}
+      session={resource.session}
+      original={{
+        file: resource.file,
+        sourceAssetId: editor.snapshot.snapshot.workspace.sourceAssetId,
+      }}
+      selection={
+        editor.playbackRange ?? (editor.selection.kind === 'range' ? editor.selection : undefined)
+      }
+      beforeAction={editor.beforeAction}
+      flushAdvanced={flush}
+      registerSpeechFlush={editor.registerSpeechFlush}
+      sourceAudioAvailable={!!editor.editing.exporter.index?.audioCodec}
+      {...(editor.advanced.ui.mode === 'basic'
+        ? { onEnableAdvanced: () => editor.setMode('advanced') }
+        : {})}
+    />
   );
 }

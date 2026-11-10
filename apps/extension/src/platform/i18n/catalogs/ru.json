@@ -6531,6 +6531,9 @@
       "thumbnailAlt": "Превью"
     },
     "videoReview": {
+      "aboutProject": "О проекте",
+      "sourceVideoCodec": "Видеокодек",
+      "sourceAudioCodec": "Аудиокодек",
       "noTrackSelected": "Дорожка не выбрана",
       "noTrackActions": "Для этой дорожки нет доступных действий",
       "trackActionsHint": "Используйте кнопки дорожки или перетаскивайте её элементы",
@@ -6713,7 +6716,7 @@
       "previewNativeFrameRate": "Частота кадров видео",
       "previewPresentedFrameRate": "Частота отрисовки превью",
       "previewSettings": "Настройки превью",
-      "previewSection": "Превью",
+      "previewSection": "Настройки области просмотра",
       "previewResolution": "Разрешение",
       "previewCurrent": "Текущее",
       "previewFrameRate": "Частота кадров",

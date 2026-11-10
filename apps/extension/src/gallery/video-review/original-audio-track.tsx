@@ -252,9 +252,7 @@ function ReviewOriginalGainBlock(props: {
           data-audio-edge={edge}
           data-audio-id={range.id}
           className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
-        >
-          <span className="h-4 w-px bg-current opacity-60" />
-        </span>
+        ></span>
       ))}
     </button>
   );

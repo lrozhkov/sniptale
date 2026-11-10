@@ -80,6 +80,7 @@ const CAMERA_REASON_LABEL: Record<
 export function ReviewTimelineTools(props: {
   mode: 'cut' | 'speed' | 'audio' | 'focus' | 'annotation' | null;
   sourceTools?: boolean;
+  showPointer?: boolean;
   available: boolean;
   cutAvailable?: boolean;
   cutHint?: string | undefined;
@@ -95,15 +96,17 @@ export function ReviewTimelineTools(props: {
 }) {
   return (
     <>
-      <ReviewButton
-        label={translate('gallery.videoReview.pointerTool')}
-        toolbarLabel={translate('gallery.videoReview.toolbarPointer')}
-        aria-pressed={props.mode === null}
-        className={plain}
-        onClick={props.onPointer}
-      >
-        <MousePointer2 size={16} />
-      </ReviewButton>
+      {props.showPointer !== false ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.pointerTool')}
+          toolbarLabel={translate('gallery.videoReview.toolbarPointer')}
+          aria-pressed={props.mode === null}
+          className={plain}
+          onClick={props.onPointer}
+        >
+          <MousePointer2 size={16} />
+        </ReviewButton>
+      ) : null}
       {props.sourceTools !== false ? (
         <>
           <ReviewButton

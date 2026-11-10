@@ -350,8 +350,6 @@ function ReviewEditEdge(props: {
             [props.edge]: next,
           });
       }}
-    >
-      <span aria-hidden="true" className="h-4 w-px bg-current opacity-60" />
-    </button>
+    ></button>
   );
 }

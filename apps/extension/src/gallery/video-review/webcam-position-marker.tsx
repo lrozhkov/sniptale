@@ -53,6 +53,7 @@ export function ReviewWebcamPositionMarker(props: {
     <button
       type="button"
       data-ui="gallery.videoReview.webcamPosition"
+      data-review-action-key={`webcam-position:${position.id}`}
       aria-label={label}
       title={label}
       aria-pressed={selected}

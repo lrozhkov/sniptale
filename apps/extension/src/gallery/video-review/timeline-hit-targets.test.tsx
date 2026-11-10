@@ -346,7 +346,7 @@ it('shows an exact range-start guide only over drawing zones, with neutral seek 
     )!,
     200
   );
-  expect(plane.style.cursor).toContain('4 16, cell');
+  expect(plane.style.cursor).toBe('default');
   hoverAt(host.querySelector('[data-ui="gallery.videoReview.trackHeader"]')!, 200);
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });

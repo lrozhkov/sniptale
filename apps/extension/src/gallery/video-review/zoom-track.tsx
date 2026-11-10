@@ -358,6 +358,7 @@ function ReviewZoomGapLink(props: {
     <button
       type="button"
       data-ui="gallery.videoReview.zoomLink"
+      data-review-action-key={`zoom-link:${region.id}`}
       title={label}
       data-connected={connected ? 'true' : 'false'}
       aria-label={label}
@@ -652,9 +653,7 @@ function ReviewZoomRegionBlock(
           style={{ maxWidth: '50%' }}
           className={`${reviewTimelineResizeHandleClassName}
               ${edge === 'start' ? 'left-0' : 'right-0'}`}
-        >
-          <span aria-hidden="true" className="h-4 w-px bg-current opacity-60" />
-        </span>
+        ></span>
       ))}
     </div>
   );

@@ -161,3 +161,40 @@
   outline: 1px solid var(--sniptale-color-border-strong);
   outline-offset: -1px;
 }
+
+/* One geometry and reveal policy for interval handles across all timeline lanes. */
+@layer utilities {
+  .review-timeline-resize-handle {
+    opacity: 0;
+    pointer-events: none;
+    padding: 0;
+    border: 0;
+  }
+
+  .review-timeline-resize-handle::after {
+    content: '';
+    position: absolute;
+    width: 1px;
+    height: 16px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: currentColor;
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  .review-timeline-item-selected .review-timeline-resize-handle,
+  .review-timeline-item:is(
+      :hover,
+      :active,
+      :focus-visible,
+      [data-dragging='true'],
+      [data-drag-edge]
+    )
+    .review-timeline-resize-handle,
+  .review-timeline-item:has(:focus-visible) .review-timeline-resize-handle {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

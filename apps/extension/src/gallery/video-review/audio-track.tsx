@@ -327,7 +327,8 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
           : filename
       }
       aria-pressed={props.selected}
-      className="pointer-events-none absolute z-[5] cursor-grab rounded text-xs active:cursor-grabbing
+      className="review-timeline-item pointer-events-none absolute z-[5] cursor-grab rounded text-xs
+        active:cursor-grabbing
         focus-visible:outline focus-visible:outline-[var(--sniptale-color-accent)]"
       style={{
         left: `${start * 100}%`,
@@ -369,9 +370,7 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
                   key={edge}
                   data-audio-edge={edge}
                   className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
-                >
-                  <span className="h-4 w-px bg-current opacity-60" />
-                </span>
+                ></span>
               ))}
           </div>
         );

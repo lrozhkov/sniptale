@@ -1,4 +1,4 @@
-import { ReviewProjectTitle } from './project-controls';
+import { CompactSelect } from '../../ui/compact-inspector-controls';
 import type { ReviewInspectorNavigation } from './inspector-navigation';
 import { InspectorLayout } from '../../ui/compact-inspector-controls/layout';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -6,8 +6,8 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ReviewInspectorPresentation } from './inspector-sections';
 import '../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
-import './inspector-navigation.css';
 import {
+  ArrowLeft,
   Clapperboard,
   List,
   PanelLeft,
@@ -20,8 +20,7 @@ import {
   FileDown,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import {
@@ -32,6 +31,7 @@ import {
 } from './controls';
 
 type InspectorSection =
+  | 'project'
   | 'scene'
   | 'selected'
   | 'comments'
@@ -42,46 +42,14 @@ type InspectorSection =
   | 'text'
   | 'recording';
 
-function inspectorNavigationOptions(args: {
-  shown: InspectorSection;
-  context: ReviewInspectorNavigation['context'];
-  settingsAvailable: boolean | undefined;
-  selectionLabel: string | undefined;
-  actionHistory: boolean;
-  actions: boolean;
-  recording?: boolean;
-}): { id: InspectorSection; label: string }[] {
-  const options: { id: InspectorSection; label: string }[] = [];
-  options.push({ id: 'comments', label: translate('gallery.videoReview.comments') });
-  if (args.settingsAvailable)
-    options.push({ id: 'scene', label: translate('gallery.videoReview.scene') });
-  if (args.recording)
-    return [
-      ...options,
-      { id: 'recording', label: translate('gallery.videoReview.recordVoiceover') },
-    ];
-  if (args.shown === 'preview') {
-    options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
-    return options;
-  }
-  if (args.context === 'text' && args.settingsAvailable)
-    options.push({ id: 'text', label: translate('gallery.videoReview.textTrackDocument') });
-  if (args.context === 'speech')
-    options.push({ id: 'speech', label: translate('gallery.videoReview.speechTitle') });
-  if (args.context === 'selected' && args.selectionLabel)
-    options.push({ id: 'selected', label: args.selectionLabel });
-  if (args.context === 'history' && args.actionHistory)
-    options.push({ id: 'history', label: translate('gallery.videoReview.telemetry') });
-  if (args.context === 'export' && args.actions)
-    options.push({ id: 'export', label: translate('gallery.videoReview.exportSection') });
-  return options;
-}
-
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
 export function ReviewInspector(props: {
   recording?: ReactNode;
   beforeAction?: ReviewBeforeAction | undefined;
   filename: string;
+  project?: ReactNode;
+  onProject?: (() => void) | undefined;
+  backLabel?: string | undefined;
   onRenameProject?: ((name: string) => Promise<void>) | undefined;
   annotations: readonly ReviewAnnotation[];
   selectedId: string | null;
@@ -118,14 +86,9 @@ export function ReviewInspector(props: {
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
-  const { presentation, setPresentation, shown, context, setSection, scroll } = props.navigation;
+  const { presentation, setPresentation, shown, scroll } = props.navigation;
   const previewHost = useRef<HTMLDivElement>(null);
-  const [recordingTab, setRecordingTab] = useState(true);
-  const recordingAvailable = !!props.recording;
-  const recordingShown = recordingAvailable && recordingTab;
-  useEffect(() => {
-    if (!recordingAvailable) setRecordingTab(true);
-  }, [recordingAvailable]);
+  const recordingShown = !!props.recording && props.navigation.recordingShown;
   useEffect(() => {
     if (shown === 'preview') previewHost.current?.focus({ preventScroll: true });
   }, [shown]);
@@ -146,12 +109,21 @@ export function ReviewInspector(props: {
         }`}
       >
         {props.resizeHandle}
-        <div inert={!!props.recording}>
+        <div>
           <ReviewInspectorHeader
             {...props}
             onBack={props.onBack}
             presentation={presentation}
-            section={shown}
+            recordingNavigation={
+              props.recording ? (
+                <ReviewRecordingNavigation
+                  navigation={props.navigation}
+                  shown={recordingShown ? 'recording' : shown}
+                  settingsAvailable={!!props.settingsAvailable}
+                />
+              ) : null
+            }
+            section={recordingShown ? 'recording' : shown}
             onTogglePresentation={() =>
               (props.beforeAction ?? ((action) => action()))(() =>
                 setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
@@ -160,36 +132,6 @@ export function ReviewInspector(props: {
           />
           <ReviewInspectorStatus {...props} />
         </div>
-        {props.settingsAvailable ||
-        props.selectionLabel ||
-        props.actions ||
-        shown === 'preview' ||
-        shown === 'speech' ||
-        props.recording ? (
-          <div
-            className="review-inspector-navigation shrink-0"
-            data-ui="gallery.videoReview.inspectorNavigation"
-          >
-            <SegmentedSwitch<InspectorSection>
-              density="compact"
-              activeId={recordingShown ? 'recording' : shown}
-              ariaLabel={translate('gallery.videoReview.inspector')}
-              options={inspectorNavigationOptions({
-                shown,
-                context,
-                settingsAvailable: props.settingsAvailable,
-                selectionLabel: props.selectionLabel,
-                actionHistory: !!props.actionHistory,
-                actions: !!props.actions,
-                recording: !!props.recording,
-              })}
-              onChange={(section) => {
-                if (props.recording) setRecordingTab(section === 'recording');
-                if (section !== 'recording') setSection(section);
-              }}
-            />
-          </div>
-        ) : null}
         <div
           inert={!!props.recording}
           hidden={recordingShown || shown !== 'history'}
@@ -219,6 +161,8 @@ export function ReviewInspector(props: {
               >
                 {props.preview}
               </div>
+            ) : shown === 'project' ? (
+              props.project
             ) : shown === 'history' ? null : shown === 'export' ? (
               <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
                 {props.actions}
@@ -442,9 +386,23 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
   );
 }
 
+const inspectorSectionLabels = {
+  project: 'gallery.videoReview.aboutProject',
+  scene: 'gallery.videoReview.scene',
+  selected: 'gallery.videoReview.inspector',
+  comments: 'gallery.videoReview.comments',
+  export: 'gallery.videoReview.exportSection',
+  history: 'gallery.videoReview.telemetry',
+  preview: 'gallery.videoReview.previewSection',
+  speech: 'gallery.videoReview.audioOriginal',
+  text: 'gallery.videoReview.textTrack',
+  recording: 'gallery.videoReview.recordVoiceover',
+} as const;
+
 /** The header close action returns to the viewer through the existing guarded exit. */
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
+    recordingNavigation: ReactNode;
     presentation: 'all' | 'sections';
     section: InspectorSection;
     onTogglePresentation(): void;
@@ -452,17 +410,28 @@ function ReviewInspectorHeader(
 ) {
   return (
     <header className="flex shrink-0 items-center gap-1">
-      <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={props.filename}>
-        {props.onRenameProject ? (
-          <ReviewProjectTitle
-            name={props.filename}
-            busy={props.busy}
-            onRename={props.onRenameProject}
-          />
-        ) : (
-          props.filename
+      {props.section !== 'project' ? (
+        <ContentToolbarButton
+          type="button"
+          tone="utility"
+          size="compact"
+          title={props.backLabel ?? translate('gallery.videoReview.aboutProject')}
+          aria-label={props.backLabel ?? translate('gallery.videoReview.aboutProject')}
+          disabled={props.busy || !!props.recording}
+          onClick={props.onProject}
+        >
+          <ArrowLeft size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        {props.recordingNavigation ?? (
+          <h2 className="truncate text-sm font-semibold">
+            {props.section === 'selected'
+              ? props.selectionLabel
+              : translate(inspectorSectionLabels[props.section])}
+          </h2>
         )}
-      </h2>
+      </div>
       {props.section === 'scene' ||
       props.section === 'speech' ||
       (props.section === 'selected' && props.selectionHasSections === true) ? (
@@ -476,6 +445,7 @@ function ReviewInspectorHeader(
               : 'scenario.editor.inspectorShowAll'
           )}
           dataUi="gallery.videoReview.inspectorPresentation"
+          disabled={!!props.recording}
           onClick={props.onTogglePresentation}
         >
           {props.presentation === 'all' ? (
@@ -496,6 +466,7 @@ function ReviewInspectorHeader(
             : 'videoEditor.app.panelFullHeight'
         )}
         aria-pressed={!!props.fullHeight}
+        disabled={!!props.recording}
         onClick={props.onToggleHeight}
       >
         {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
@@ -507,7 +478,7 @@ function ReviewInspectorHeader(
         className="review-inspector-close"
         size="compact"
         title={translate('common.actions.close')}
-        disabled={props.busy}
+        disabled={props.busy || !!props.recording}
         onPointerDown={(event) => {
           // The guarded exit owns field flush; blur must not disable Close before click.
           if (event.button === 0) event.preventDefault();
@@ -524,7 +495,7 @@ function ReviewInspectorHeader(
 function ReviewInspectorStatus(
   props: Pick<
     Parameters<typeof ReviewInspector>[0],
-    'saveStatus' | 'busy' | 'onRetry' | 'message' | 'recovery'
+    'saveStatus' | 'busy' | 'onRetry' | 'message' | 'recovery' | 'recording'
   >
 ) {
   return (
@@ -537,7 +508,7 @@ function ReviewInspectorStatus(
           <span>{translate('gallery.videoReview.saveFailed')}</span>
           <ReviewButton
             label={translate('gallery.videoReview.retry')}
-            disabled={props.busy}
+            disabled={props.busy || !!props.recording}
             onClick={props.onRetry}
           />
         </div>
@@ -549,5 +520,33 @@ function ReviewInspectorStatus(
       ) : null}
       {props.recovery}
     </>
+  );
+}
+
+/** Capture navigation changes only visibility; the recorder stays mounted with its take. */
+function ReviewRecordingNavigation(props: {
+  navigation: ReviewInspectorNavigation;
+  shown: InspectorSection;
+  settingsAvailable: boolean;
+}) {
+  return (
+    <div data-ui="gallery.videoReview.recordingNavigation">
+      <CompactSelect
+        appearance="plain"
+        aria-label={translate('gallery.videoReview.inspector')}
+        value={props.shown}
+        options={[
+          { value: 'recording' as const, label: translate(inspectorSectionLabels.recording) },
+          { value: 'comments' as const, label: translate(inspectorSectionLabels.comments) },
+          ...(props.settingsAvailable
+            ? [{ value: 'scene' as const, label: translate(inspectorSectionLabels.scene) }]
+            : []),
+        ]}
+        onChange={(section: InspectorSection) => {
+          if (section === 'recording') props.navigation.openRecording();
+          else props.navigation.setSection(section);
+        }}
+      />
+    </div>
   );
 }

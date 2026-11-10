@@ -110,7 +110,11 @@ export function ReviewTextTrack(props: TextTrackProps) {
               onLostPointerCapture={gesture.cancel}
             >
               <span className="flex h-full items-center">
-                <span className="block min-w-0 truncate">
+                <span
+                  className="block min-w-0 truncate
+                  text-[color:var(--review-item-foreground,var(--sniptale-color-text-secondary))]
+                  font-[number:var(--review-label-weight,400)]"
+                >
                   {fragment.text || translate('gallery.videoReview.speechText')}
                 </span>
               </span>
@@ -119,9 +123,7 @@ export function ReviewTextTrack(props: TextTrackProps) {
                   key={edge}
                   data-text-edge={edge}
                   className={`${reviewTimelineResizeHandleClassName} ${edge === 'start' ? 'left-0' : 'right-0'}`}
-                >
-                  <span className="h-4 w-px bg-current opacity-60" />
-                </span>
+                ></span>
               ))}
             </div>
           );

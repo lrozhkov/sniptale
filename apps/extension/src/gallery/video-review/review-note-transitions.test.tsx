@@ -329,16 +329,7 @@ it('saves before Home, a tool shortcut and history while existing edits stay exp
 
 it('keeps Scene and Export after the accompanying draft context reset', async () => {
   const fixture = createEditorFixture(integration);
-  const section = async (name: string) =>
-    act(async () => {
-      const node = Array.from(
-        fixture.host.querySelectorAll<HTMLButtonElement>(
-          '[data-ui="gallery.videoReview.inspectorNavigation"] button'
-        )
-      ).find((node) => node.textContent === `gallery.videoReview.${name}`);
-      expect(node).toBeDefined();
-      node!.click();
-    });
+  const section = (name: string) => fixture.click(name);
   try {
     await act(async () =>
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
@@ -458,8 +449,8 @@ it.each(['toolbar', 'shortcut'] as const)(
   'anchors %s Notes to the ruler range, then the playhead with action history hidden',
   async (entry) => {
     const fixture = createEditorFixture(integration);
-    const add = async (range: boolean) => {
-      if (entry === 'toolbar') await fixture.click(range ? 'commentRange' : 'addComment');
+    const add = async () => {
+      if (entry === 'toolbar') await fixture.click('addComment');
       else
         await act(async () =>
           fixture.key(new KeyboardEvent('keydown', { key: 'm', code: 'KeyM' }))
@@ -473,10 +464,10 @@ it.each(['toolbar', 'shortcut'] as const)(
       await fixture.selectRulerRange(1, 3);
       expect(
         fixture.host.querySelector(
-          '[data-ui="gallery.videoReview.inspector"] [aria-label="gallery.videoReview.commentRange"]'
+          '[data-ui="gallery.videoReview.primaryTools"] [aria-label="gallery.videoReview.addComment"]'
         )
       ).not.toBeNull();
-      await add(true);
+      await add();
       await fixture.fill('Ruler note');
       await fixture.click('save');
       expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
@@ -496,7 +487,7 @@ it.each(['toolbar', 'shortcut'] as const)(
         )
       ).not.toBeNull();
       await fixture.selectRulerRange(2, 2);
-      await add(false);
+      await add();
       await fixture.fill('Playhead note');
       await fixture.click('save');
       expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({

@@ -4,12 +4,27 @@ import {
 } from '../../composition/persistence/media-library';
 import { recoverProjectMediaPublications } from '../../composition/persistence/projects/asset-publication';
 import { resolveReviewAssetBytes } from './asset-bytes';
-import { prepareProjectAsset } from '../../composition/persistence/projects';
+import { getProjectAsset, prepareProjectAsset } from '../../composition/persistence/projects';
 import { withVoiceoverAttachmentLock } from '../../composition/persistence/projects/voiceover-publication-lock';
 import { readVideoWorkspace } from '../../composition/persistence/review-workspaces/store';
 import { collectReviewAssetReferences } from '../../composition/persistence/review-workspaces/asset-refs';
 import type { ReviewSource } from '../../features/video/review/types';
 import { inspectReviewVideo, readReviewMediaOriginal } from './source';
+
+/** Reads camera facts from retained bytes and the original display name from library metadata. */
+export async function readReviewWebcamInformation(assetId: string, signal: AbortSignal) {
+  signal.throwIfAborted();
+  const prefix = 'project-asset:';
+  if (!assetId.startsWith(prefix)) throw new Error('Review webcam source is unavailable.');
+  const asset = await getProjectAsset(assetId.slice(prefix.length));
+  signal.throwIfAborted();
+  if (asset.status !== 'ready') throw new Error('Review webcam source is unavailable.');
+  const { source } = await inspectReviewVideo(asset.entry.file, signal);
+  // Retained private files use their asset ID as File.name; it is not the source filename.
+  const media = await getMediaLibraryEntry(asset.entry.originMediaId ?? assetId).catch(() => null);
+  signal.throwIfAborted();
+  return { source, filename: media?.originalFilename ?? media?.filename ?? null };
+}
 
 /** Discovery is read-only and used only before the first authored camera attachment. */
 export async function findReviewWebcam(aggregateId: string, signal: AbortSignal) {

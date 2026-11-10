@@ -250,7 +250,11 @@ export function createEditorFixture(
   const root = createRoot(host);
   const back = vi.fn();
   const button = (key: string) => {
-    const node = host.querySelector<HTMLButtonElement>(
+    const scope =
+      key === 'zoomRegionLabel'
+        ? host.querySelector('[data-ui="gallery.videoReview.focusTools"]')
+        : host;
+    const node = scope?.querySelector<HTMLButtonElement>(
       `[aria-label="${key.includes('.') ? key : `gallery.videoReview.${key}`}"]`
     );
     if (!node) throw new Error(`Missing ${key}`);
@@ -317,8 +321,8 @@ export function createEditorFixture(
       const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
       const at = start ?? Number(plane.getAttribute('aria-valuenow'));
       const until = end ?? Math.min(Number(plane.getAttribute('aria-valuemax')), at + 2);
-      if (button('focusRangeTool').getAttribute('aria-pressed') !== 'true')
-        await click('focusRangeTool');
+      if (button('zoomRegionLabel').getAttribute('aria-pressed') !== 'true')
+        await click('zoomRegionLabel');
       const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
       const duration = Number(plane.getAttribute('aria-valuemax'));
       Object.assign(plane, {
