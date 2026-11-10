@@ -505,7 +505,7 @@ export function reviewGpuFinishLayers(args: {
   sourceTime: number;
   resultTime: number;
   primitives: ReviewGpuPrimitives;
-  caption: GpuPreviewLayer;
+  caption?: GpuPreviewLayer;
   watermark: Awaited<ReturnType<typeof createWatermarkRenderer>> | null;
   blackout?: { opacity: number; color: string };
 }) {
@@ -558,7 +558,7 @@ export function reviewGpuFinishLayers(args: {
     });
     layers.push(texture(overlay, full));
   }
-  layers.push(args.caption);
+  if (args.caption) layers.push(args.caption);
   const outer = scene.outerFadePlan
     ? presentationMainColorOpacity(scene.outerFadePlan, args.resultTime)
     : 0;

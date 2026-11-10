@@ -159,6 +159,9 @@ it('retains a source-density header at the exact direct-video boundary and relea
 
 it('composes raw frames and publishes only after GPU completion and final overlays', async () => {
   const f = fixture();
+  const shadowLayer = f.passes.overlayFrame.visualLayers[0];
+  if (shadowLayer?.kind !== 'video') throw new Error('Expected video');
+  shadowLayer.clip.shadowIntensity = 20;
   const completed = Promise.withResolvers<ImageBitmap>();
   f.render.mockReturnValueOnce(completed.promise);
   const published = vi.fn();
@@ -180,6 +183,9 @@ it('composes raw frames and publishes only after GPU completion and final overla
 
 it('omits the final raster when the scene owner proves its producers have no output', async () => {
   const f = fixture();
+  const shadowLayer = f.passes.overlayFrame.visualLayers[0];
+  if (shadowLayer?.kind !== 'video') throw new Error('Expected video');
+  shadowLayer.clip.shadowIntensity = 20;
   const published = vi.fn();
   f.input.canvas.addEventListener('sniptale-preview-frame', published);
   expect(await f.owner.render(f.input, f.passes, f.finish, () => false, undefined, false)).toBe(
@@ -231,6 +237,9 @@ it('falls back as a complete frame when the adapter is absent or fails without r
 
 it('reuses immutable raster texture revisions and applies authored rotation to video and decoration', async () => {
   const f = fixture();
+  const shadowLayer = f.passes.overlayFrame.visualLayers[0];
+  if (shadowLayer?.kind !== 'video') throw new Error('Expected video');
+  shadowLayer.clip.shadowIntensity = 20;
   f.passes.overlayFrame.visualLayers[0]!.rotation = 25;
   await f.owner.render(f.input, f.passes, f.finish, () => false);
   await f.owner.render(f.input, f.passes, f.finish, () => false);
@@ -243,7 +252,7 @@ it('reuses immutable raster texture revisions and applies authored rotation to v
 });
 
 it.each(['motion', 'gradient'] as const)(
-  'reuses a disabled background with remembered %s animation and invalidates when enabled',
+  'omits a disabled background with remembered %s animation and renders when enabled',
   async (kind) => {
     const f = fixture();
     f.input.project.sceneBackground =
@@ -263,27 +272,33 @@ it.each(['motion', 'gradient'] as const)(
     await f.owner.render(f.input, f.passes, f.finish, () => false);
     f.input.currentTime = 1.5;
     await f.owner.render(f.input, f.passes, f.finish, () => false);
-    const background = (index: number) => f.render.mock.calls[index]![0].layers[0]!;
-    expect(background(1).source).toBe(background(0).source);
-    expect(background(1).cache).toEqual(background(0).cache);
+    const background = (index: number) =>
+      f.render.mock.calls[index]![0].layers.find(
+        (layer) => layer.cache?.key === 'native-background'
+      );
+    expect(background(0)).toBeUndefined();
+    expect(background(1)).toBeUndefined();
     delete f.input.project.sceneBackground.enabled;
     await f.owner.render(f.input, f.passes, f.finish, () => false);
-    expect(background(2).cache).not.toEqual(background(1).cache);
+    expect(background(2)).toBeDefined();
     f.input.currentTime = 2;
     await f.owner.render(f.input, f.passes, f.finish, () => false);
-    expect(background(3).cache).not.toEqual(background(2).cache);
+    expect(background(3)?.cache).not.toEqual(background(2)?.cache);
     f.input.project.sceneBackground.enabled = false;
     await f.owner.render(f.input, f.passes, f.finish, () => false);
-    expect(background(4).cache).not.toEqual(background(3).cache);
+    expect(background(4)).toBeUndefined();
     f.input.currentTime = 2.5;
     await f.owner.render(f.input, f.passes, f.finish, () => false);
-    expect(background(5).cache).toEqual(background(4).cache);
+    expect(background(5)).toBeUndefined();
     expect(f.input.project).toEqual(original);
   }
 );
 
 it('keeps identity decoded frames on the direct texture route and reuses static raster revisions', async () => {
   const f = fixture();
+  const shadowLayer = f.passes.overlayFrame.visualLayers[0];
+  if (shadowLayer?.kind !== 'video') throw new Error('Expected video');
+  shadowLayer.clip.shadowIntensity = 20;
   const clipId = f.passes.overlayFrame.visualLayers[0]!.clipId;
   const draw = vi.fn();
   const toVideoFrame = vi.fn(() => new VideoFrame(f.bitmap, { timestamp: 1_000_000 }));
@@ -454,6 +469,17 @@ it('retains exact-density DOF source masks and caches static artwork without a r
   expect(staticArtwork(third).map((node) => node.cache)).toEqual(
     firstStatic.map((node) => node.cache)
   );
+  for (const enabled of [false, true]) {
+    f.input.project.sceneBackground = {
+      kind: 'solid',
+      color: '#123456',
+      ...(enabled ? {} : { enabled: false }),
+    };
+    await f.owner.render(f.input, f.passes, f.finish, () => false);
+    const latest = walk(f.render.mock.calls.at(-1)![0].layers);
+    expect(latest.some((node) => node.cache?.key === 'native-background')).toBe(enabled);
+    expect(latest.some((node) => node.source instanceof VideoFrame)).toBe(true);
+  }
 });
 
 it('keeps the isolated GPU mask when an inner source transform uses a different coordinate plane', async () => {
@@ -1219,4 +1245,17 @@ it('updates advisory preparation only after successful rendering on its actual p
   f.owner.dispose();
   expect(dispose).toHaveBeenCalledOnce();
   createPreparation.mockRestore();
+});
+
+it('omits disabled Native background and zero-shadow decoration without dropping video', async () => {
+  const f = fixture();
+  f.input.project.sceneBackground = { kind: 'solid', color: '#123456', enabled: false };
+  const layer = f.passes.overlayFrame.visualLayers[0];
+  if (layer?.kind !== 'video') throw new Error('Expected video');
+  layer.clip.shadowIntensity = 0;
+  await f.owner.render(f.input, f.passes, f.finish, () => false);
+  const layers = f.render.mock.calls[0]![0].layers;
+  expect(layers.some((layer) => layer.cache?.key === 'native-background')).toBe(false);
+  expect(layers.some((layer) => layer.cache?.key === 'native-decoration')).toBe(false);
+  expect(layers.some((layer) => layer.source instanceof VideoFrame)).toBe(true);
 });

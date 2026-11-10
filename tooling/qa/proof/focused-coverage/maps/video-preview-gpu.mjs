@@ -1,5 +1,17 @@
 export const VIDEO_PREVIEW_GPU_OWNER_MAPPINGS = [
   {
+    owner: 'shared-gpu-plan-normalization',
+    productionFile: 'apps/extension/src/features/video/composition/canvas/gpu-preview-plan.ts',
+    reason:
+      'Graph admission and normalization preserve source coverage before GPU resource mutation.',
+    testFiles: [
+      'apps/extension/src/features/video/composition/canvas/gpu-preview-plan.test.ts',
+      'apps/extension/src/features/video/composition/canvas/gpu-preview.test.ts',
+      'apps/extension/src/features/video/composition/canvas/gpu-preview-dag.test.ts',
+      'apps/extension/src/features/video/composition/canvas/gpu-preview-presentation.test.ts',
+    ],
+  },
+  {
     owner: 'native-persistent-gpu-frames',
     productionFile: 'apps/extension/src/video-editor/preview/cache/build-persistent.ts',
     reason:

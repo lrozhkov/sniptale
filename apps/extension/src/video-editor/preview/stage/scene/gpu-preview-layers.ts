@@ -144,7 +144,7 @@ export async function buildNativeGpuPreviewLayers(args: {
   };
   media: ReadonlyMap<string, VideoCompositionMediaSource>;
   effects?: EffectRuntimeRenderedComposition | EffectRuntimeGpuPreparedComposition;
-  background: GpuPreviewLayer;
+  background: GpuPreviewLayer | null;
   viewportBorders?: GpuPreviewLayer;
 }) {
   const { input, passes } = args;
@@ -597,7 +597,7 @@ export async function buildNativeGpuPreviewLayers(args: {
             const lowerSegments = request.camera
               ? segmentVisualLayersByViewportLock(lowerLayers, request.camera)
               : [{ isLocked: true, layers: lowerLayers }];
-            const underlay: GpuPreviewLayer[] = [args.background];
+            const underlay: GpuPreviewLayer[] = args.background ? [args.background] : [];
             for (const lowerSegment of lowerSegments) {
               const lowerPaint = mergeSharp(paintLayers(lowerSegment.layers, request.frames));
               underlay.push(
@@ -616,7 +616,7 @@ export async function buildNativeGpuPreviewLayers(args: {
         }
       return { layers: result, release };
     }
-    let layers: GpuPreviewLayer[] = [args.background];
+    let layers: GpuPreviewLayer[] = args.background ? [args.background] : [];
     const split = resolveActiveCameraSplit(
       input.project,
       input.currentTime,

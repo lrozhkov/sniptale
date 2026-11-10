@@ -124,10 +124,6 @@ test.describe('Gallery webcam GPU crop publication', () => {
         await dialog
           .locator('[data-review-header-track="webcam"] [data-review-track-select]')
           .click();
-        await dialog
-          .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
-          .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
-          .click();
         await expect(inspector).toBeVisible();
         const zoom = inspector.getByRole('textbox', {
           name: label('videoEditor.sidebar.cameraCropZoom'),
@@ -485,10 +481,6 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         await dialog
           .locator('[data-review-header-track="webcam"] [data-review-track-select]')
           .click();
-        await dialog
-          .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
-          .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
-          .click();
         await expect(inspector).toBeVisible();
         const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
         const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
@@ -504,10 +496,6 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         // Ruler seeking clears selection. Restore the camera settings without changing the clock.
         await dialog
           .locator('[data-review-header-track="webcam"] [data-review-track-select]')
-          .click();
-        await dialog
-          .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
-          .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
           .click();
         await expect(inspector).toBeVisible();
         const main = dialog.locator(
@@ -735,10 +723,6 @@ test('Gallery unsupported camera admits actual VFR source in GPU and Standard', 
     );
     await expect(main).toBeVisible();
     await dialog.locator('[data-review-header-track="webcam"] [data-review-track-select]').click();
-    await dialog
-      .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
-      .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
-      .click();
     await expect(dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]')).toBeVisible();
     const camera = await currentCameraSettings(page);
     const initial = await readWebcamWorkspace(page);
@@ -895,10 +879,6 @@ test('Gallery declined private camera keeps selected source and EOF in GPU and S
     cameraRectangleColors(canvas, { x: 0, y: 0, width: 1, height: 1 });
   const openCamera = async () => {
     await dialog.locator('[data-review-header-track="webcam"] [data-review-track-select]').click();
-    await dialog
-      .getByRole('group', { name: label('gallery.videoReview.inspector'), exact: true })
-      .getByRole('button', { name: label('gallery.videoReview.webcam'), exact: true })
-      .click();
     await expect(inspector).toBeVisible();
   };
   try {

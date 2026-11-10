@@ -29,6 +29,7 @@ import type { QuickEditHomography } from '../../features/video/composition/motio
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import { hasSceneBackgroundMotion } from '../../features/video/project/scene/background-motion';
+import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
 import { drawReviewSceneShadow } from './scene-shadow';
 import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
 import type { prepareReviewCaptions } from './render-captions';
@@ -139,8 +140,8 @@ export function createReviewGpuPreview(args: {
   type Artwork = {
     painter: ReturnType<typeof createReviewBackgroundPainter>;
     background: RenderCanvasLease;
-    decoration: RenderCanvasLease;
-    overlay: RenderCanvasLease;
+    decoration: RenderCanvasLease | null;
+    overlay: RenderCanvasLease | null;
     rect: { x: number; y: number; width: number; height: number };
     key: string;
     backgroundRevision: number;
@@ -156,8 +157,8 @@ export function createReviewGpuPreview(args: {
   const clearSlot = (slot: (typeof slots)[number]) => {
     slot.artwork?.painter.dispose();
     slot.artwork?.background.release();
-    slot.artwork?.decoration.release();
-    slot.artwork?.overlay.release();
+    slot.artwork?.decoration?.release();
+    slot.artwork?.overlay?.release();
     slot.artwork = null;
   };
   const clear = () => {
@@ -357,19 +358,21 @@ export function createReviewGpuPreview(args: {
         try {
           const bg = args.resources.canvas('preview-gpu-background', paintSize);
           retained.push(bg);
-          const decoration = args.resources.canvas('preview-gpu-decoration', decorRect);
-          retained.push(decoration);
-          const overlay = args.resources.canvas('preview-gpu-captions', dimensions.backing);
-          retained.push(overlay);
-          const ctx = decoration.context;
-          ctx.translate(-decorRect.x, -decorRect.y);
-          const radius = background.enabled ? background.layout.cornerRadius : 0;
-          drawReviewSceneShadow(ctx, background, base.windowRect, radius, scale);
+          const decoration = resolveQuickEditShadow(background, scale)
+            ? args.resources.canvas('preview-gpu-decoration', decorRect)
+            : null;
+          if (decoration) {
+            retained.push(decoration);
+            const ctx = decoration.context;
+            ctx.translate(-decorRect.x, -decorRect.y);
+            const radius = background.enabled ? background.layout.cornerRadius : 0;
+            drawReviewSceneShadow(ctx, background, base.windowRect, radius, scale);
+          }
           slot.artwork = {
             painter: createReviewBackgroundPainter(args.resources),
             background: bg,
             decoration,
-            overlay,
+            overlay: null,
             rect: decorRect,
             key,
             backgroundRevision: 0,
@@ -417,10 +420,12 @@ export function createReviewGpuPreview(args: {
           .map((cue) => cue.id)
           .join('|') ?? '';
       if (
-        art.captionOwner !== input.captions ||
-        art.captionKey !== captionKey ||
-        art.captionRevision === 0
+        captionKey &&
+        (art.captionOwner !== input.captions ||
+          art.captionKey !== captionKey ||
+          art.captionRevision === 0)
       ) {
+        art.overlay ??= args.resources.canvas('preview-gpu-captions', dimensions.backing);
         const ctx = art.overlay.context;
         ctx.clearRect(0, 0, dimensions.backing.width, dimensions.backing.height);
         ctx.save();
@@ -430,18 +435,21 @@ export function createReviewGpuPreview(args: {
         );
         input.captions?.draw(ctx, geometry.resultTime);
         ctx.restore();
-        art.captionOwner = input.captions;
-        art.captionKey = captionKey;
         art.captionRevision = ++artworkRevision;
       }
+      art.captionOwner = input.captions;
+      art.captionKey = captionKey;
       const full = { x: 0, y: 0, ...dimensions.canonical };
       const radius = background.enabled ? background.layout.cornerRadius : 0;
-      const caption: GpuPreviewLayer = {
-        source: art.overlay.canvas,
-        rect: full,
-        inverse: identity,
-        cache: { key: 'captions', revision: art.captionRevision },
-      };
+      const caption: GpuPreviewLayer | undefined =
+        captionKey && art.overlay
+          ? {
+              source: art.overlay.canvas,
+              rect: full,
+              inverse: identity,
+              cache: { key: 'captions', revision: art.captionRevision },
+            }
+          : undefined;
       const sceneInputs = {
         dimensions,
         base,
@@ -449,7 +457,7 @@ export function createReviewGpuPreview(args: {
         header: input.header,
         artwork: {
           background: art.background.canvas,
-          decoration: art.decoration.canvas,
+          decoration: art.decoration?.canvas ?? null,
           rect: art.rect,
           backgroundRevision: art.backgroundRevision,
           retainedDrift: drift !== null,
@@ -584,7 +592,7 @@ export function createReviewGpuPreview(args: {
         sourceTime: input.sourceTime,
         resultTime: geometry.resultTime,
         primitives,
-        caption,
+        ...(caption ? { caption } : {}),
         watermark: input.watermark ?? null,
         ...(input.camera ? { camera: input.camera } : {}),
         ...(input.transition?.blend.plan.type === 'fade-black'

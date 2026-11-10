@@ -50,7 +50,7 @@ export async function buildReviewGpuScene(args: {
   header: ImageBitmap | null;
   artwork: Readonly<{
     background: HTMLCanvasElement;
-    decoration: HTMLCanvasElement;
+    decoration: HTMLCanvasElement | null;
     rect: { x: number; y: number; width: number; height: number };
     backgroundRevision: number;
     retainedDrift: boolean;
@@ -156,12 +156,16 @@ export async function buildReviewGpuScene(args: {
       : { cache: { key: 'background', revision: artwork.backgroundRevision } }),
   };
   const originalLayers: GpuPreviewLayer[] = [
-    {
-      source: artwork.decoration,
-      rect: artwork.rect,
-      inverse: identity,
-      cache: { key: 'decoration', revision: artwork.decorationRevision },
-    },
+    ...(artwork.decoration
+      ? [
+          {
+            source: artwork.decoration,
+            rect: artwork.rect,
+            inverse: identity,
+            cache: { key: 'decoration', revision: artwork.decorationRevision },
+          },
+        ]
+      : []),
     ...(header
       ? [
           {

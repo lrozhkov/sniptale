@@ -311,7 +311,7 @@ export function createNativeGpuPreviewRenderer(
           };
           const window = getFittedMediaWindowFrame(fitted);
           layers = [
-            backdrop,
+            ...(backdrop ? [backdrop] : []),
             ...materials.decoration(input, layer, source, inverse),
             {
               source,
@@ -432,8 +432,14 @@ export function createNativeGpuPreviewRenderer(
           Math.abs(viewport.height - layout.bounds.height) > 1e-6
         ) {
           logical = { width: layout.bounds.width, height: layout.bounds.height };
+          const presentationBackdrop = materials.background(
+            input,
+            passes,
+            logical,
+            'native-presentation-background'
+          );
           presentationLayers = [
-            materials.background(input, passes, logical, 'native-presentation-background'),
+            ...(presentationBackdrop ? [presentationBackdrop] : []),
             {
               source: { kind: 'group', output, logical: input.project, layers },
               rect: {

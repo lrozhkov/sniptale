@@ -137,7 +137,7 @@ function retainedDepthLayers(
   source: VideoFrame,
   passes: Passes,
   inverse: QuickEditHomography,
-  backdrop: GpuPreviewLayer,
+  backdrop: GpuPreviewLayer | null,
   revision: object
 ): GpuPreviewLayer[] {
   const groups = new Map<GpuPreviewGroup, GpuPreviewGroup>();
@@ -229,7 +229,10 @@ function retainedDepthLayers(
         : {}),
     };
   };
-  return plan.layers.map((node, index) => (index === 0 ? backdrop : clone(node)));
+  return [
+    ...(backdrop ? [backdrop] : []),
+    ...plan.layers.filter((node) => node.cache?.key !== 'native-background').map(clone),
+  ];
 }
 
 interface RetainedRaster {
@@ -470,6 +473,7 @@ export function createNativeGpuPreviewMaterials() {
       size?: { width: number; height: number },
       cacheKey?: string
     ) {
+      if (getProjectSceneBackground(input.project).enabled === false) return null;
       if (size) {
         presentationBackground ??= createRaster(input.canvas.ownerDocument);
         return backgroundLayer(input, passes, presentationBackground, size, cacheKey);
@@ -478,8 +482,11 @@ export function createNativeGpuPreviewMaterials() {
       return backgroundLayer(input, passes, background);
     },
     decoration(input: Input, layer: VideoLayer, source: VideoFrame, inverse: QuickEditHomography) {
-      decoration ??= createRaster(input.canvas.ownerDocument);
-      const shadow = decorationLayer(input, layer, source, inverse, decoration);
+      const shadows: GpuPreviewLayer[] = [];
+      if (resolveVideoMediaShadowParams(layer.clip.shadowIntensity, 1, layer.clip.shadowMode)) {
+        decoration ??= createRaster(input.canvas.ownerDocument);
+        shadows.push(decorationLayer(input, layer, source, inverse, decoration));
+      }
       const media = {
         ...resolveVideoWindowMedia(
           layer,
@@ -490,7 +497,7 @@ export function createNativeGpuPreviewMaterials() {
         frame: layer,
       };
       const image = media.windowHeaderImage;
-      if (!image) return [shadow];
+      if (!image) return shadows;
       header ??= createRaster(input.canvas.ownerDocument);
       const raster = header;
       const key = JSON.stringify([
@@ -519,10 +526,10 @@ export function createNativeGpuPreviewMaterials() {
         },
         inverse
       );
-      if (!artwork) return [shadow];
+      if (!artwork) return shadows;
       const window = getFittedMediaWindowFrame(media);
       return [
-        shadow,
+        ...shadows,
         {
           ...artwork,
           clip: {

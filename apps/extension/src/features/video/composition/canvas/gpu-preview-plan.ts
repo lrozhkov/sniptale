@@ -464,6 +464,57 @@ function canOmitLeadingGroupCopy(
   );
 }
 
+/** A same-grid opaque video rectangle has binary coverage before its isolated copy. */
+function canInlineOpaqueVideo(
+  layer: GpuPreviewLayer,
+  parent: Pick<GpuPreviewRequest, 'output' | 'logical'>
+): boolean {
+  if (!canOmitLeadingGroupCopy(layer, parent) || !isGroup(layer.source)) return false;
+  if (
+    parent.output.width !== parent.logical.width ||
+    parent.output.height !== parent.logical.height ||
+    layer.source.layers.length !== 1
+  )
+    return false;
+  const video = layer.source.layers[0]!;
+  const source = video.source;
+  if (
+    !(source instanceof VideoFrame) ||
+    !['NV12', 'I420', 'I422', 'I444', 'RGBX', 'BGRX'].includes(source.format ?? '') ||
+    video.cache ||
+    (video.orientation?.rotation ?? 0) !== 0 ||
+    video.orientation?.flip
+  )
+    return false;
+  const rect = video.rect;
+  if (
+    ![rect.x, rect.y, rect.width, rect.height].every(Number.isSafeInteger) ||
+    rect.x < 0 ||
+    rect.y < 0 ||
+    rect.x + rect.width > parent.logical.width ||
+    rect.y + rect.height > parent.logical.height ||
+    rect.width !== source.displayWidth ||
+    rect.height !== source.displayHeight
+  )
+    return false;
+  const clip = video.clip;
+  if (
+    clip &&
+    (clip.radius !== 0 ||
+      clip.shape === 'ellipse' ||
+      clip.rect.x !== rect.x ||
+      clip.rect.y !== rect.y ||
+      clip.rect.width !== rect.width ||
+      clip.rect.height !== rect.height)
+  )
+    return false;
+  const { clip: _clip, orientation: _orientation, ...neutral } = video;
+  return isNeutralFullLayer(
+    { ...neutral, rect: { x: 0, y: 0, width: rect.width, height: rect.height } },
+    rect
+  );
+}
+
 /** Known opaque full-plane video overwrites prior draws; unknown alpha keeps the original graph. */
 function coversOpaqueDestination(
   layer: GpuPreviewLayer,
@@ -572,7 +623,14 @@ export function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRe
         break;
       result = [...group.layers, ...result.slice(1)];
     }
-    return result;
+    const direct = result.map((layer) =>
+      isGroup(layer.source) &&
+      references.get(layer.source) === 1 &&
+      canInlineOpaqueVideo(layer, parent)
+        ? layer.source.layers[0]!
+        : layer
+    );
+    return direct.every((layer, index) => layer === result[index]) ? result : direct;
   };
   const layers = normalize(request.layers, request);
   return layers === request.layers ? request : { ...request, layers };
