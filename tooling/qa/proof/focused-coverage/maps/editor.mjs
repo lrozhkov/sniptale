@@ -709,17 +709,7 @@ action-feedback-click-fields.test.tsx',
       'apps/extension/src/gallery/video-review/stage-geometry.test.tsx',
     ],
   },
-  {
-    owner: 'video-review-export-scene',
-    productionFile: 'apps/extension/src/workflows/video-review/render-export-scene.ts',
-    reason: `Export frame and overlay consumer suites execute the extracted scene composition,
-      borrowed raster lifetime and decorated lens sampling.`,
-    testFiles: [
-      'apps/extension/src/workflows/video-review/render-export.test.ts',
-      'apps/extension/src/workflows/video-review/scene-frame.test.ts',
-      'apps/extension/src/workflows/video-review/render-scene-overlays.test.ts',
-    ],
-  },
+
   {
     owner: 'gallery-review-annotation-numeric',
     productionFile: 'apps/extension/src/gallery/video-review/annotation-effects-numeric.tsx',

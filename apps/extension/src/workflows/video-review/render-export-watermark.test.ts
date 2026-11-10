@@ -1,6 +1,7 @@
 import { argsFixture, contextFixture, state } from './render-export.test-support';
 import { afterEach, expect, it, vi } from 'vitest';
 import { writeReviewFrames } from './render-export';
+import type { WatermarkAssets } from '../../features/video/composition/canvas/watermark';
 import { createQuickEditWatermark } from '../../features/video/project/scene/watermark';
 const painting = vi.hoisted(() => ({
   order: [] as string[],
@@ -10,6 +11,11 @@ const painting = vi.hoisted(() => ({
 }));
 vi.mock('../../features/video/composition/canvas/watermark', () => ({
   createWatermarkRenderer: painting.prepare,
+  measureWatermark: async (settings: unknown, output: unknown, signal: AbortSignal) => ({
+    cache: null,
+    source: null,
+    paint: (assets: unknown) => painting.prepare(settings, output, assets, signal),
+  }),
 }));
 vi.mock('./render-key-animation', () => ({ drawReviewKeys: () => painting.order.push('keys') }));
 vi.mock('./cut-transition-frames', async (original) => ({
@@ -23,18 +29,36 @@ afterEach(() => {
 it('prepares once and paints after keys before whole-frame blackout for every exported frame', async () => {
   const args = argsFixture();
   args.advanced.watermark = { ...createQuickEditWatermark('Saved'), mode: 'text' };
-  painting.prepare.mockResolvedValue({
-    draw: () => painting.order.push('watermark'),
-    dispose: painting.dispose,
+  args.edits = [
+    {
+      id: 'blackout',
+      kind: 'cut',
+      start: 0.5,
+      end: 1,
+      requestedStart: 0.5,
+      requestedEnd: 1,
+      transition: { type: 'fade-black', before: 0.5, after: 1, color: '#000000' },
+    },
+  ];
+  painting.prepare.mockImplementation(async (_settings, _output, assets: WatermarkAssets) => {
+    await assets.read('project-asset:watermark');
+    return { draw: () => painting.order.push('watermark'), dispose: painting.dispose };
   });
   await writeReviewFrames(args);
   expect(painting.prepare).toHaveBeenCalledOnce();
   expect(painting.prepare).toHaveBeenCalledWith(
     args.advanced.watermark,
     { width: 320, height: 180 },
-    expect.objectContaining({ read: args.readProjectAsset, unavailable: expect.any(Function) }),
-    args.signal
+    expect.objectContaining({ read: expect.any(Function), unavailable: expect.any(Function) }),
+    expect.any(AbortSignal)
   );
+  const preparedSignal: unknown = painting.prepare.mock.calls[0]![3];
+  expect(preparedSignal).toBeInstanceOf(AbortSignal);
+  if (!(preparedSignal instanceof AbortSignal)) throw new Error('Missing composition signal');
+  expect(args.readProjectAsset).toHaveBeenCalledOnce();
+  expect(args.readProjectAsset).toHaveBeenCalledWith('project-asset:watermark', preparedSignal);
+  expect(preparedSignal.aborted).toBe(true);
+  expect(args.signal.aborted).toBe(false);
   expect(painting.order).toEqual(
     Array.from({ length: state.encoded.length }, () => ['keys', 'watermark', 'blackout']).flat()
   );

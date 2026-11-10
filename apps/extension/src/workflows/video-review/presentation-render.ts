@@ -129,7 +129,7 @@ class PresentationRenderer {
     private readonly args: ReviewPresentationRendererInput,
     private readonly plan: PresentationSequencePlan
   ) {
-    this.gpu = args.renderer === 'gpu' ? createPresentationGpu() : null;
+    this.gpu = (args.renderer ?? 'gpu') === 'gpu' ? createPresentationGpu() : null;
     const { backing } = args.main.dimensions;
     this.resources = createPreviewRenderResources({
       maximumCanvases: plan.joins?.length ? 4 : 1,
@@ -178,7 +178,7 @@ class PresentationRenderer {
     this.main = this.adopt(
       await createReviewPresentationMain({
         ...this.args.main,
-        renderer: this.args.renderer ?? 'legacy',
+        renderer: this.args.renderer ?? 'gpu',
         signal,
       })
     );

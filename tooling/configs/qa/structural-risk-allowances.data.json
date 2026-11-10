@@ -1272,10 +1272,10 @@
       "symbol": "<file>",
       "owner": "extension:app-core:workflows",
       "removalCondition": "Remove when the AST or signature changes. Reassess an independent fixture, consumer contract, decoder, policy, queue, publication or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
-      "astHash": "3c7fd06c76447d87c27dc49335fef6c3feddc3e6162228b7bfda1c9cfc942595",
-      "signatureHash": "325957bcf85bbc33170819a704135f5f0f4636fe6a75c19de3ddcb41dae42936",
+      "astHash": "1c2f3849ecbada422ad7403597792dd69a3757d7811751d59f492a5a8c28da6c",
+      "signatureHash": "f57359f42af3dd6f490fb95a57c9e1ef73dcd09bcedf57577e522ee70fc884c0",
       "reason": "tool-noise: These tests share the existing decoder and output fixture. They prove one frame-export contract. Leading selection, exhaustive ticks, retained bounds and failure cases use that owner. Another split would add fixture navigation without a separate responsibility. Fresh complete-candidate architecture review must validate this exact binding.",
-      "reviewDate": "2026-11-09"
+      "reviewDate": "2026-11-10"
     },
     {
       "rule": "structural-file-risk",
@@ -4177,8 +4177,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One renderer generation owns admission, resources and completed output. Unknown PTS validation and receipt data stay in this transaction. Existing cancellation and output cleanup remain local. Independent diagnosis found no second clock or selection owner. Fresh architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-09",
-      "astHash": "a52e10a73adaf3ddcbf1454dc1d544f3d258052e5640cee1c28356fc07bf9fbf",
+      "reviewDate": "2026-11-10",
+      "astHash": "caed2b96c81b68207cadd44203ed241dc2df388c06270b95940bc17ab3a87eb2",
       "signatureHash": "1e14adff13052e9a8ffe49867ce685fa017cdb746ca17d96cd31972e5c1baf6b"
     },
     {
@@ -5266,8 +5266,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One renderer fixture checks admission, generations, time validation and cleanup. Separate cases cover unknown PTS, cache eligibility, transition refusal and enhancement boundaries. They use the existing scene and resource setup. Independent diagnosis found no separate fixture lifetime. Fresh architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-09",
-      "astHash": "371e48167a69b0c5e2178496cfd8636f3f6775525d545d5d7de96992a36321aa",
+      "reviewDate": "2026-11-10",
+      "astHash": "a2c8ee969bb786031c35a20444abe7d04ad92046a3df4d3c803f6ce9b4d04865",
       "signatureHash": "5928effb6b5453427010c7032f2a46a605803fddca94076660f1d3c35821f22e"
     },
     {
@@ -5563,8 +5563,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One prepared scene transaction checks frames and returns image and geometry. Unknown PTS stays explicit. Native accessors and exact temporal operations still require finite PTS. Cache eligibility uses this same policy. Independent diagnosis found no separate authority. Fresh architecture review must check this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess a new independent fixture, source, clock, state authority, resource lifetime, queue or publication contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-09",
-      "astHash": "3877980d8d599b5c5ce3243e146737ac3b46a54585aa0b29f2ca038396df5229",
+      "reviewDate": "2026-11-10",
+      "astHash": "b3b0a68713abd7653f3f2b42e6031df3d2a2f135ed2244ed6871ffc8073f145d",
       "signatureHash": "4a9e4901ac25e8106bd46c62349f1685ed10969427268f61e81f87081277e8e0"
     },
     {
@@ -6399,8 +6399,8 @@
       "owner": "extension:app-core:workflows",
       "reason": "tool-noise: One PresentationMain fixture observes source requests, scene clocks, renderer resources and cleanup. New leading, metadata and cancellation cases use that owner. Fixture controls are not production state authorities. Independent inspection found no separate responsibility. Fresh complete-candidate architecture review must validate this exact binding.",
       "removalCondition": "Remove when the AST or signature changes. Reassess an independent fixture, consumer contract, decoder, policy, queue, publication or resource-lifetime authority. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-09",
-      "astHash": "bfc4aa644015e5da3d86c01a888aeb59679be4c033fbe5746583c240cdb45665",
+      "reviewDate": "2026-11-10",
+      "astHash": "7dc7cfbbb01c76056f3abd1fd5709a8f435a05b982a1b5f7d4f0866eb31a8d8b",
       "signatureHash": "a43f86fc182f558814e9ca55d6c42fc44aee0cfef9320c11c4f6a4772afd570e"
     },
     {

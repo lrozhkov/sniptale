@@ -219,6 +219,8 @@ it('awaits plans, accounts for unique sources/outputs and releases them after pa
     f.input.annotationEffects!.snapshots[0]!.retainedByteLength
   );
   const output = await renderer.render(prepared, frame());
+  expect(output.context.imageSmoothingEnabled).toBe(true);
+  expect(output.context.imageSmoothingQuality).toBe('high');
   expect(f.executor.renderFrame.mock.calls.map(([request]) => request.effectInstanceId)).toEqual([
     'annotation-content',
     'annotation-viewport',

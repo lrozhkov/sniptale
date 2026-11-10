@@ -249,7 +249,7 @@ it('renders the complete rational sequence with explicit geometry and a partial 
   args.index.frameRate = 30000 / 1001;
   const result = await writeReviewPresentationFrames(args);
   const opened: ReviewPresentationRendererInput = io.open.mock.calls[0]![0];
-  expect(opened.renderer).toBe('legacy');
+  expect(opened.renderer).toBe('gpu');
   expect([...opened.main.plannedCandidates!()]).toEqual(
     io.render.mock.calls.map(([frame]) => frame)
   );
@@ -617,7 +617,7 @@ it('admits only the sparse probe candidates to the repeatable decoder schedule',
   expect(io.media).not.toHaveBeenCalled();
 });
 
-it('keeps full presentation export on the existing legacy renderer', async () => {
+it('uses the shared GPU backend preference for full presentation export', async () => {
   await writeReviewPresentationFrames(fixture());
-  expect(io.open.mock.calls[0]![0].renderer).toBe('legacy');
+  expect(io.open.mock.calls[0]![0].renderer).toBe('gpu');
 });

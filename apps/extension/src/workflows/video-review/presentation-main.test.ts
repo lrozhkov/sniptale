@@ -731,13 +731,14 @@ it.each(['long-leading-gap', 'outside-retained-interval'] as const)(
         },
       ];
     const owner = await open(args);
-    await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+    await expect(owner.renderAtTime(0)).rejects.toThrow('Source frame is unavailable.');
     expect(io.render).not.toHaveBeenCalled();
     expect(io.samples).toEqual([]);
   }
 );
 
 it('borrows an owned GPU source clone with SDK orientation until render settlement', async () => {
+  vi.stubGlobal('VideoFrame', class {});
   const raw = { close: vi.fn() };
   const source = {
     timestamp: 0,
@@ -814,7 +815,7 @@ it('rejects a leading gap that only the whole-file average would admit', async (
   const args = fixture();
   args.index.frameRate = 30;
   const owner = await open(args);
-  await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+  await expect(owner.renderAtTime(0)).rejects.toThrow('Source frame is unavailable.');
   expect(io.render).not.toHaveBeenCalled();
 });
 
@@ -828,7 +829,7 @@ it.each([0, NaN, Infinity])(
     const args = fixture();
     args.index.frameRate = 30;
     const owner = await open(args);
-    await expect(owner.renderAtTime(0)).rejects.toThrow('Main source frame is unavailable');
+    await expect(owner.renderAtTime(0)).rejects.toThrow('Source frame is unavailable.');
   }
 );
 
@@ -850,3 +851,90 @@ it.each(['error', 'abort'] as const)(
     expect(io.render).not.toHaveBeenCalled();
   }
 );
+
+it('retains one accounted transition pair for sequential export and releases it at the seam exit', async () => {
+  const args = fixture();
+  args.transitionFrameRetention = 'transition';
+  args.edits = [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 0.5,
+      end: 1,
+      requestedStart: 0.5,
+      requestedEnd: 1,
+      transition: { type: 'dissolve', before: 0.5, after: 0.5 },
+    },
+  ];
+  const owner = await open(args);
+  const first = await owner.renderAtTime(0.25);
+  const endpoints = io.samples.slice(1);
+  expect(endpoints).toHaveLength(2);
+  expect(endpoints.every((sample) => sample.close.mock.calls.length === 0)).toBe(true);
+  first.release();
+  const next = await owner.renderAtTime(0.4);
+  expect(io.samples).toHaveLength(4);
+  expect(io.render.mock.calls[1]![0].transition.frames).toEqual(
+    io.render.mock.calls[0]![0].transition.frames
+  );
+  next.release();
+  const outside = await owner.renderAtTime(1.25);
+  for (const sample of endpoints) expect(sample.close).toHaveBeenCalledOnce();
+  outside.release();
+  owner.dispose();
+  for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('holds export transition sources until an interrupted render settles', async () => {
+  const args = fixture();
+  args.transitionFrameRetention = 'transition';
+  args.edits = [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 0.5,
+      end: 1,
+      requestedStart: 0.5,
+      requestedEnd: 1,
+      transition: { type: 'dissolve', before: 0.5, after: 0.5 },
+    },
+  ];
+  const entered = Promise.withResolvers<void>();
+  const pending = Promise.withResolvers<void>();
+  io.render.mockImplementationOnce(() => {
+    entered.resolve();
+    return pending.promise;
+  });
+  const owner = await open(args);
+  const rendering = owner.renderAtTime(0.25);
+  const rejected = expect(rendering).rejects.toThrow();
+  await entered.promise;
+  owner.dispose();
+  expect(io.samples).toHaveLength(3);
+  for (const sample of io.samples) expect(sample.close).not.toHaveBeenCalled();
+  pending.resolve();
+  await rejected;
+  for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('streams the ordinary export schedule through one decoder without random per-frame reads', async () => {
+  const args = fixture();
+  args.plannedMainTimes = function* () {
+    yield 0;
+    yield 0.5;
+    yield 1;
+  };
+  const closed = Promise.withResolvers<void>();
+  io.streamClosed.mockImplementationOnce(() => closed.resolve());
+  const owner = await open(args);
+  for (const time of [0, 0.5, 1]) {
+    const frame = await owner.renderAtTime(time);
+    frame.release();
+  }
+  expect(io.stream).toHaveBeenCalledOnce();
+  expect(io.single).not.toHaveBeenCalled();
+  expect(io.render.mock.calls.map(([frame]) => frame.source.timestamp)).toEqual([0, 0.5, 1]);
+  owner.dispose();
+  await closed.promise;
+  for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});

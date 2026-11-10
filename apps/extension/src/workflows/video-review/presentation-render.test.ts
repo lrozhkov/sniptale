@@ -600,7 +600,7 @@ it.each([
 );
 
 it('keeps legacy free of GPU initialization and forwards GPU only to the selected main renderer', async () => {
-  const legacy = await open(fixture(false));
+  const legacy = await open({ ...fixture(false), renderer: 'legacy' });
   expect(io.gpuCreate).not.toHaveBeenCalled();
   expect(io.main.mock.calls[0]![0].renderer).toBe('legacy');
   legacy.dispose();

@@ -11,7 +11,7 @@ import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,
 } from '../../features/video/review/advanced/scene';
-import { renderRenderWindowFrames } from './render-export';
+import { renderRenderWindowFrames } from './render-export-composition.test-support';
 import { drawSceneSpotlights } from '../../features/video/composition/draw/spotlight';
 import { drawSceneBorders } from '../../features/video/composition/draw/border';
 
@@ -19,6 +19,10 @@ vi.mock('../../features/video/composition/draw/spotlight', () => ({
   drawSceneSpotlights: vi.fn(),
 }));
 vi.mock('../../features/video/composition/draw/border', () => ({ drawSceneBorders: vi.fn() }));
+vi.mock('./window-header', async (original) => ({
+  ...(await original<typeof import('./window-header')>()),
+  loadReviewWindowHeader: vi.fn(async () => ({ width: 320, height: 40, close: vi.fn() })),
+}));
 vi.mock('mediabunny', async (importOriginal) => ({
   ...(await importOriginal<typeof import('mediabunny')>()),
   VideoSample: class {
@@ -29,6 +33,8 @@ vi.mock('mediabunny', async (importOriginal) => ({
 function contextFixture() {
   return {
     translate: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
     scale: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),

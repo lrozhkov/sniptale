@@ -30,6 +30,8 @@ type Camera = Awaited<ReturnType<typeof createReviewWebcamRenderer>>;
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 
 export interface ReviewPresentationMainInput {
+  /** Frame consumers release endpoints after completion; sequential export can retain one pair. */
+  transitionFrameRetention?: 'frame' | 'transition';
   renderer?: import('../../features/video/preview/preferences').VideoPreviewRenderer;
   exportEnhancer?: ExportEnhancer;
   recordingHistory?: ReviewRecordingRenderSource;
@@ -41,6 +43,8 @@ export interface ReviewPresentationMainInput {
   fps?: number;
   /** Repeatable export/preview lattice; sparse probes supply only their selected candidates. */
   plannedCandidates?: () => Iterable<PresentationCandidate>;
+  /** Repeatable ordinary-export output times, before the fragment offset; not source PTS. */
+  plannedMainTimes?: () => Iterable<number>;
   effective: ReturnType<typeof resolveQuickEditEffectiveState>;
   comments?: readonly CanvasCommentExport[];
   clickCues?: readonly ReviewClickCue[];
@@ -97,6 +101,9 @@ class PresentationMain {
   private sourceBytes: number | null = null;
   private cameraBytes: number | null = null;
   private transitionBytes: readonly [number, number] | null = null;
+  private transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
+  private transitionPlan: ReturnType<typeof planReviewCutTransitions>[number] | null = null;
+  private transitionReservations: { release(): void }[] = [];
   private assets: PreviewRenderAllocationInput['assets'] = {
     headerBitmap: null,
     backgroundBitmap: null,
@@ -214,7 +221,7 @@ class PresentationMain {
       signal,
       await video.getDecoderConfig()
     );
-    if (this.args.plannedCandidates) {
+    if (this.args.plannedCandidates || this.args.plannedMainTimes) {
       this.decoder = createPresentationDecoder(this.sink, () => this.plannedSourceTimes(), signal);
     }
     if (effective.webcam) {
@@ -263,6 +270,12 @@ class PresentationMain {
   }
 
   private *plannedSourceTimes() {
+    if (this.args.plannedMainTimes) {
+      let tick = 0;
+      for (const time of this.args.plannedMainTimes())
+        yield { tick: tick++, time: this.mapTime(time).sampleTime };
+      return;
+    }
     for (const candidate of this.args.plannedCandidates?.() ?? []) {
       if (
         candidate.segment !== 'main' ||
@@ -332,7 +345,12 @@ class PresentationMain {
 
   /** Ordinary export preserves the original segment-relative frame schedule. */
   async renderAtTime(localTime: number) {
-    return this.renderFrame(this.mapTime(localTime), ++this.frameGeneration);
+    const generation = ++this.frameGeneration;
+    return this.renderFrame(
+      this.mapTime(localTime),
+      generation,
+      this.args.plannedMainTimes ? generation - 1 : undefined
+    );
   }
 
   private async renderFrame(
@@ -347,7 +365,12 @@ class PresentationMain {
     this.resultTime = mapped.resultTime;
     const signal = this.controller.signal;
     const leases: { release(): void }[] = [];
-    const transition = createReviewTransitionFrames(this.transitionSink!, signal);
+    const blend = reviewCutTransitionAt(mapped.localTime, this.transitions);
+    if (this.transitionPlan !== (blend?.plan ?? null)) this.releaseTransition();
+    if (blend && !this.transitionFrames) {
+      this.transitionFrames = createReviewTransitionFrames(this.transitionSink!, signal);
+      this.transitionPlan = blend.plan;
+    }
     const cameraFrames = this.camera?.sourceFrames([this.sourceTime]);
     let source: Awaited<ReturnType<SampleSink['getSample']>> = null;
     let raw: VideoFrame | undefined;
@@ -375,9 +398,8 @@ class PresentationMain {
         ? this.decoder.read(plannedTick, mapped.sampleTime)
         : this.sink!.getSample(mapped.sampleTime));
       signal.throwIfAborted();
-      if (!source) throw new Error('Main source frame is unavailable');
-      const blend = reviewCutTransitionAt(mapped.localTime, this.transitions);
-      const endpoints = blend ? await transition.load(blend.plan) : null;
+      if (!source) throw new Error('Source frame is unavailable.');
+      const endpoints = blend ? await this.transitionFrames!.load(blend.plan) : null;
       signal.throwIfAborted();
       if (blend && !endpoints) throw new QuickEditExportUnavailable(['transition-frames']);
       const cameraResult = await cameraFrames?.next();
@@ -388,7 +410,12 @@ class PresentationMain {
       this.transitionBytes = endpoints
         ? [endpoints.left.allocationSize!(), endpoints.right.allocationSize!()]
         : null;
-      if (this.args.renderer === 'gpu' && !this.args.exportEnhancer) raw = source.toVideoFrame();
+      if (
+        this.args.renderer === 'gpu' &&
+        !this.args.exportEnhancer &&
+        typeof VideoFrame !== 'undefined'
+      )
+        raw = source.toVideoFrame();
       const frame: Frame = {
         ...(this.args.exportEnhancer ? { exportEnhancer: this.args.exportEnhancer } : {}),
         ...(this.args.recordingHistory ? { recordingHistory: this.args.recordingHistory } : {}),
@@ -427,8 +454,8 @@ class PresentationMain {
       leases.push(this.resources.bytes('main-source', this.sourceBytes));
       if (this.cameraBytes !== null)
         leases.push(this.resources.bytes('main-camera', this.cameraBytes));
-      if (this.transitionBytes)
-        leases.push(
+      if (this.transitionBytes && this.transitionReservations.length === 0)
+        this.transitionReservations.push(
           this.resources.bytes('main-transition', this.transitionBytes[0] + this.transitionBytes[1])
         );
       const output = await this.renderer.render(prepared, frame, signal);
@@ -444,16 +471,19 @@ class PresentationMain {
           if (this.front === output) this.front = null;
         },
       };
+    } catch (error) {
+      this.releaseTransition();
+      throw error;
     } finally {
       raw?.close();
       source?.close();
-      transition.dispose();
+      if (this.args.transitionFrameRetention !== 'transition') this.releaseTransition();
       try {
         await cameraFrames?.return(undefined);
       } finally {
         for (const lease of leases) lease.release();
         prepared?.release();
-        this.sourceBytes = this.cameraBytes = this.transitionBytes = null;
+        this.sourceBytes = this.cameraBytes = null;
         this.busy = false;
         if (this.disposed) this.retire();
         signal.throwIfAborted();
@@ -469,7 +499,17 @@ class PresentationMain {
     if (!this.busy) this.retire();
   };
 
+  private releaseTransition() {
+    this.transitionFrames?.dispose();
+    this.transitionFrames = null;
+    this.transitionPlan = null;
+    this.transitionBytes = null;
+    for (const lease of this.transitionReservations) lease.release();
+    this.transitionReservations = [];
+  }
+
   private retire() {
+    this.releaseTransition();
     this.camera?.dispose();
     this.front?.release();
     this.front = null;

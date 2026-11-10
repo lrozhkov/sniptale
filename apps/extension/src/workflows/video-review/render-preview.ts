@@ -1098,6 +1098,9 @@ export function createReviewPreviewRenderer(args: {
         }),
         outputKind: 'canvas2d',
       };
+      // Export and preview share source filtering, including after a pooled context reset.
+      output.context.imageSmoothingEnabled = true;
+      output.context.imageSmoothingQuality = 'high';
       return output;
     };
     try {

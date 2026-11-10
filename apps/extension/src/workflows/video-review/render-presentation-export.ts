@@ -263,8 +263,9 @@ function createRenderer(
   return createReviewPresentationRenderer({
     plan: prepared.plan,
     settings: prepared.settings,
-    renderer: preview?.renderer ?? 'legacy',
+    renderer: preview?.renderer ?? 'gpu',
     main: {
+      transitionFrameRetention: preview ? 'frame' : 'transition',
       ...(exportEnhancer ? { exportEnhancer } : {}),
       *plannedCandidates() {
         for (const { candidate } of iteratePresentationVideoFrames(prepared.plan, {
