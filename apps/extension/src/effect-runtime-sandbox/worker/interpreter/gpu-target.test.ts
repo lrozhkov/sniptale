@@ -186,6 +186,21 @@ function draws(plan: EffectRuntimeGpuPlanResult) {
   return plan.passes.flatMap((pass) => pass.operations).filter((op) => op.op === 'draw');
 }
 
+function isPrimitive(plan: EffectRuntimeGpuPlanResult, id: number) {
+  const resource = plan.resources.find((item) => item.id === id);
+  return resource?.kind === 'primitive' || resource?.kind === 'paint';
+}
+function paintResource(plan: EffectRuntimeGpuPlanResult, id: number) {
+  const resource = plan.resources.find((item) => item.id === id);
+  if (!resource || resource.kind !== 'paint') throw new Error('Expected evaluated paint operands');
+  return resource.paint;
+}
+function bitmapResource(plan: EffectRuntimeGpuPlanResult, id: number) {
+  const resource = plan.resources.find((item) => item.id === id);
+  if (!resource || resource.kind === 'paint') throw new Error('Expected owned bitmap resource');
+  return resource.bitmap;
+}
+
 it('returns original inputs and immutable fresh-state snapshots without Canvas image draws', async () => {
   const { input, plan } = await run([
     {
@@ -212,9 +227,7 @@ it('returns original inputs and immutable fresh-state snapshots without Canvas i
   const sourceDraws = draws(plan).filter((op) => op.source.kind === 'resource');
   expect(sourceDraws.map((op) => op.alpha)).toEqual([1, 1]);
   expect(sourceDraws.map((op) => op.transform[4])).toEqual([40, 40]);
-  expect(plan.resources.find((entry) => entry.id === plan.inputResources.source)!.bitmap).toBe(
-    input.inputFrames.source!.bitmap
-  );
+  expect(bitmapResource(plan, plan.inputResources.source!)).toBe(input.inputFrames.source!.bitmap);
   expect(input.inputFrames.source!.bitmap.close).not.toHaveBeenCalled();
   for (const canvas of Canvas.all) expect(canvas.context.drawImage).not.toHaveBeenCalled();
 });
@@ -237,9 +250,7 @@ it('keeps every non-over fill and stroke as a raw operand with separate alpha, f
       shadow: { color: '#ff0000', blur: 3, x: 5, y: 7 },
     },
   ]);
-  const operations = draws(plan).filter(
-    (op) => plan.resources.find((entry) => entry.id === op.source.id)?.kind === 'primitive'
-  );
+  const operations = draws(plan).filter((op) => isPrimitive(plan, op.source.id));
   expect(operations).toHaveLength(2);
   for (const operation of operations) {
     expect(operation).toMatchObject({
@@ -249,20 +260,14 @@ it('keeps every non-over fill and stroke as a raw operand with separate alpha, f
       shadow: { color: [1, 0, 0, 1], blur: 1.5, offsetX: 2.5, offsetY: 3.5 },
     });
     expect(operation.destination.x).toBeLessThan(-10);
-    const bitmap = plan.resources.find((entry) => entry.id === operation.source.id)!
-      .bitmap as Bitmap;
-    expect(bitmap.paints).toEqual([
-      expect.objectContaining({
-        alpha: 1,
-        blend: 'source-over',
-        filter: 'none',
-        shadow: 'transparent',
-      }),
-    ]);
+    const paint = paintResource(plan, operation.source.id);
+    expect(paint.draw.op).toBe(operation === operations[0] ? 'fill' : 'stroke');
+    expect(paint).not.toHaveProperty('alpha');
+    expect(operation === operations[0] ? paint.style.fill : paint.style.stroke).toBe(
+      operation === operations[0] ? '#ff0000' : '#ffffff'
+    );
   }
-  expect(
-    (plan.resources.find((entry) => entry.id === operations[0]!.source.id)!.bitmap as Bitmap).paints
-  ).toEqual([expect.objectContaining({ kind: 'fill' })]);
+  expect(paintResource(plan, operations[0]!.source.id).draw.op).toBe('fill');
 });
 
 it('preserves clip-aware clear independently of alpha, filters and blend', async () => {
@@ -295,7 +300,11 @@ it('preserves clip-aware clear independently of alpha, filters and blend', async
     blend: 'destination-in',
     filter: { blur: 1.5 },
   });
-  expect(plan.resources.some((entry) => entry.kind === 'coverage')).toBe(true);
+  expect(
+    plan.resources.some(
+      (entry) => entry.kind === 'coverage' || (entry.kind === 'paint' && entry.coverage === true)
+    )
+  ).toBe(true);
 });
 
 it('does not add the core per-call 512-layer limit to interpreted scalar commands', async () => {
@@ -316,7 +325,9 @@ it('does not charge immutable primitive operands as live Canvas surfaces or deco
       fill: '#ffffff',
     })),
   ]);
-  expect(plan.resources.filter((resource) => resource.kind === 'primitive')).toHaveLength(80);
+  expect(
+    plan.resources.filter((resource) => resource.kind === 'primitive' || resource.kind === 'paint')
+  ).toHaveLength(80);
   expect(plan.passes[plan.rootPass]!.operations).toHaveLength(81);
 });
 
@@ -341,7 +352,9 @@ it('admits 100 small shapes at 720p without retaining100full-frame bitmaps', asy
   });
   expect(result.kind).toBe('gpu-plan');
   if (result.kind !== 'gpu-plan') return;
-  const primitives = result.resources.filter((resource) => resource.kind === 'primitive');
+  const primitives = result.resources.filter(
+    (resource) => resource.kind === 'primitive' || resource.kind === 'paint'
+  );
   expect(primitives).toHaveLength(100);
   expect(
     primitives.reduce((sum, resource) => sum + resource.width * resource.height * 4, 0)
@@ -384,7 +397,9 @@ it.each(['fillRect', 'polyline', 'path', 'sampledPath', 'text'] as const)(
     });
     expect(result.kind).toBe('gpu-plan');
     if (result.kind !== 'gpu-plan') return;
-    expect(result.resources.filter((r) => r.kind === 'primitive')).toHaveLength(100);
+    expect(
+      result.resources.filter((r) => r.kind === 'primitive' || r.kind === 'paint')
+    ).toHaveLength(100);
   }
 );
 
@@ -409,9 +424,7 @@ it('retains destructive outside and zero-path paints while keeping zero-fillRect
       blend: 'destination-in',
     },
   ]);
-  const primitives = draws(plan).filter(
-    (op) => plan.resources.find((r) => r.id === op.source.id)?.kind === 'primitive'
-  );
+  const primitives = draws(plan).filter((op) => isPrimitive(plan, op.source.id));
   expect(primitives).toHaveLength(2);
   expect(primitives[0]).toMatchObject({
     blend: 'destination-in',
@@ -480,7 +493,11 @@ it('admits 100 small SVG paths at 720p without using their misleading centroid a
   });
   expect(result.kind).toBe('gpu-plan');
   if (result.kind !== 'gpu-plan') return;
-  expect(result.resources.filter((resource) => resource.kind === 'primitive')).toHaveLength(100);
+  expect(
+    result.resources.filter(
+      (resource) => resource.kind === 'primitive' || resource.kind === 'paint'
+    )
+  ).toHaveLength(100);
   expect(input.assetSelectionRef.assets['logo']).not.toHaveProperty('bounds');
 });
 
@@ -516,16 +533,16 @@ it('keeps text reveal coverage separate from the raw glyph and its unmasked care
       alpha: 0.5,
     },
   ]);
-  const primitives = draws(plan).filter(
-    (op) => plan.resources.find((resource) => resource.id === op.source.id)?.kind === 'primitive'
-  );
+  const primitives = draws(plan).filter((op) => isPrimitive(plan, op.source.id));
   expect(primitives).toHaveLength(2);
   expect(primitives[0]).toMatchObject({ alpha: 0.5, coverage: expect.any(Number) });
   expect(primitives[1]).toMatchObject({ alpha: 0.41 });
   expect(primitives[1]).not.toHaveProperty('coverage');
-  const raw = plan.resources.find((resource) => resource.id === primitives[0]!.source.id)!
-    .bitmap as Bitmap;
-  expect(raw.paints).toEqual([expect.objectContaining({ kind: 'text', alpha: 1, filter: 'none' })]);
+  const raw = paintResource(plan, primitives[0]!.source.id);
+  expect(raw.draw.op).toBe('fillText');
+  expect(raw.draw.args[0]).toBe('Hello');
+  expect(raw).not.toHaveProperty('alpha');
+  expect(raw).not.toHaveProperty('filter');
 });
 
 it('allocates SVG padding after each part filter and keeps fill and stroke separate', async () => {
@@ -593,19 +610,17 @@ it('allocates SVG padding after each part filter and keeps fill and stroke separ
   });
   expect(plan.kind).toBe('gpu-plan');
   if (plan.kind !== 'gpu-plan') throw new Error(JSON.stringify(plan));
-  const primitives = draws(plan).filter(
-    (op) => plan.resources.find((resource) => resource.id === op.source.id)?.kind === 'primitive'
-  );
+  const primitives = draws(plan).filter((op) => isPrimitive(plan, op.source.id));
   expect(primitives).toHaveLength(2);
   for (const operation of primitives) {
     expect(operation.blend).toBe('screen');
     expect(operation.filter.blur).toBeGreaterThan(0);
     expect(-operation.destination.x).toBeGreaterThanOrEqual(6 * operation.filter.blur);
-    const raw = plan.resources.find((resource) => resource.id === operation.source.id)!
-      .bitmap as Bitmap;
-    expect(raw.paints).toEqual([
-      expect.objectContaining({ alpha: 1, filter: 'none', shadow: 'transparent' }),
-    ]);
+    const raw = paintResource(plan, operation.source.id);
+    expect(['fill', 'stroke']).toContain(raw.draw.op);
+    expect(raw).not.toHaveProperty('alpha');
+    expect(raw).not.toHaveProperty('filter');
+    expect(raw).not.toHaveProperty('shadow');
   }
 });
 
@@ -614,12 +629,8 @@ it('closes original inputs and partial primitive resources when finalization can
   const input = request([
     image,
     {
-      op: 'shape',
-      shape: 'rect',
-      x: 0,
-      y: 0,
-      width: 100,
-      height: 80,
+      op: 'path',
+      points: Array.from({ length: 130 }, (_, index) => ({ x: index, y: index % 2 ? 80 : 0 })),
       fill: '#ff0000',
       stroke: '#ffffff',
     },
@@ -670,12 +681,15 @@ it('clones cached image assets while returning original inputs and keeping the c
   const first = await state.execute(input);
   expect(first.kind).toBe('gpu-plan');
   if (first.kind !== 'gpu-plan') throw new Error(JSON.stringify(first));
-  expect(first.resources.find((resource) => resource.kind === 'asset-clone')!.bitmap).not.toBe(
-    original
-  );
+  const transferredAsset = first.resources.find((resource) => resource.kind === 'asset-clone');
+  if (!transferredAsset || transferredAsset.kind !== 'asset-clone')
+    throw new Error('Missing cloned asset');
+  expect(transferredAsset.bitmap).not.toBe(original);
   expect(createImageBitmap).toHaveBeenCalledWith(original);
   expect(original.close).not.toHaveBeenCalled();
-  for (const resource of first.resources) resource.bitmap.close();
+  for (const resource of first.resources) {
+    if (resource.kind !== 'paint') resource.bitmap.close();
+  }
   const second = await state.execute({
     ...input,
     documentRef: { id: input.documentRef.id },
@@ -709,4 +723,58 @@ it('closes the flat returned input table after a failed worker post even with a 
   scope.onmessage!(new MessageEvent('message', { data: input }));
   await vi.waitFor(() => expect(source.close).toHaveBeenCalledOnce());
   expect(scope.postMessage.mock.calls[0]![0].result).toMatchObject({ kind: 'gpu-plan' });
+});
+
+it('keeps unchanged primitive content as evaluated paint data instead of transferred pixels', async () => {
+  const { plan } = await run([
+    image,
+    {
+      op: 'fillRect',
+      x: 8,
+      y: 12,
+      width: 100,
+      height: 40,
+      fill: '#ff0000',
+      alpha: 0.4,
+    },
+  ]);
+  expect(plan.resources.map((resource) => resource.kind)).toContain('paint');
+  expect(Canvas.transfers).toBe(0);
+  expect(draws(plan)).toContainEqual(expect.objectContaining({ alpha: 0.4 }));
+});
+
+it('retains evaluated gradient stops without transferring a painted raster', async () => {
+  const { plan } = await run([
+    image,
+    {
+      op: 'fillRect',
+      x: 12,
+      y: 8,
+      width: 40,
+      height: 20,
+      fill: {
+        kind: 'linearGradient',
+        x0: 0,
+        y0: 0,
+        x1: 40,
+        y1: 20,
+        stops: [
+          { offset: 0, color: '#ffffff' },
+          { offset: 1, color: '#ff880080' },
+        ],
+      },
+    },
+  ]);
+  const resource = plan.resources.find((r) => r.kind === 'paint');
+  if (!resource || resource.kind !== 'paint') throw new Error('Expected paint resource');
+  expect(resource.paint.style.fill).toMatchObject({
+    kind: 'linear',
+    args: [0, 0, 40, 20],
+    stops: [
+      [0, '#ffffff'],
+      [1, '#ff880080'],
+    ],
+  });
+  expect(resource).not.toHaveProperty('bitmap');
+  expect(Canvas.transfers).toBe(0);
 });

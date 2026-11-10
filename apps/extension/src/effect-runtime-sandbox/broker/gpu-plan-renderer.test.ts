@@ -1,3 +1,4 @@
+import type { EffectRuntimeGpuRasterResource } from '../../contracts/effect-runtime/gpu-plan';
 import { expect, it, vi } from 'vitest';
 import type {
   EffectRuntimeGpuDraw,
@@ -39,7 +40,7 @@ function pass(id = 0, count = 1): EffectRuntimeGpuPass {
     operations: Array.from({ length: count }, draw),
   };
 }
-function plan(): EffectRuntimeGpuPlanResult {
+function plan(): EffectRuntimeGpuPlanResult & { resources: EffectRuntimeGpuRasterResource[] } {
   return {
     kind: 'gpu-plan',
     effectInstanceId: 'effect',

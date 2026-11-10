@@ -55,7 +55,7 @@ for (const variant of [
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
       await expect.poll(async () => (await persistedReviewContent(page))?.zoom.enabled).toBe(true);
-      await addReviewFocus(page);
+      await addReviewFocus(page, variant.locale);
       await button('gallery.videoReview.spatialToolTilt').click();
       const tilt = dialog.getByRole('textbox', {
         name: label('gallery.videoReview.perspectiveY'),

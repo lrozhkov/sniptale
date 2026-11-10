@@ -6,7 +6,7 @@ import type {
 import type { SerializedSvgVector } from './svg-vector';
 import type { EffectRuntimeGpuResource, EffectRuntimeGpuPass } from './gpu-plan';
 
-export const EFFECT_RUNTIME_PROTOCOL_VERSION = 5 as const;
+export const EFFECT_RUNTIME_PROTOCOL_VERSION = 6 as const;
 export const EFFECT_RUNTIME_SANDBOX_CONNECTION_FRAGMENT_KEY = 'connectionNonce' as const;
 export const EFFECT_RUNTIME_SANDBOX_CONNECT_MESSAGE = 'sniptale:effect-runtime:connect' as const;
 export const EFFECT_RUNTIME_SANDBOX_READY_MESSAGE = 'sniptale:effect-runtime:ready' as const;

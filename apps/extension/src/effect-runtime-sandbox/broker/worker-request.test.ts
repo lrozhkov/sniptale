@@ -766,7 +766,10 @@ it('materializes valid oversized scene plans through the existing GPU representa
   emitGpuPlan(worker, plan);
   await expect(pending).resolves.toMatchObject({ kind: 'frame', bitmap });
   expect(render).toHaveBeenCalledOnce();
-  for (const resource of plan.resources) expect(resource.bitmap.close).toHaveBeenCalledOnce();
+  for (const resource of plan.resources) {
+    if (resource.kind === 'paint') throw new Error('Unexpected paint in bitmap fixture');
+    expect(resource.bitmap.close).toHaveBeenCalledOnce();
+  }
 });
 
 it.each(['error', 'messageerror'] as const)(

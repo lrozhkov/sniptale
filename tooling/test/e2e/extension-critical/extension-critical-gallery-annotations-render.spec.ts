@@ -16,7 +16,7 @@ for (const combinedBorders of [false, true]) {
         format: 'esm',
         platform: 'browser',
         write: false,
-        loader: { '.svg': 'text', '.woff2': 'dataurl' },
+        loader: { '.svg': 'text', '.woff2': 'dataurl', '.bin': 'dataurl' },
         define: { 'process.env.NODE_ENV': '"production"' },
       });
       const host = await startHostServer();
@@ -72,7 +72,7 @@ for (const converted of [false, true]) {
         format: 'esm',
         platform: 'browser',
         write: false,
-        loader: { '.svg': 'text', '.woff2': 'dataurl' },
+        loader: { '.svg': 'text', '.woff2': 'dataurl', '.bin': 'dataurl' },
         define: { 'process.env.NODE_ENV': '"production"' },
       });
       const host = await startHostServer();

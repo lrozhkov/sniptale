@@ -1,3 +1,9 @@
+import {
+  EFFECT_RUNTIME_GPU_PAINT_LIMITS,
+  parseEffectRuntimeGpuPaint,
+  type EffectRuntimeGpuPaint,
+} from '../../../contracts/effect-runtime/gpu-plan';
+import { createEffectRuntimeGpuPaintRecorder } from './gpu-primitive';
 import type {
   EffectRuntimeGpuBlend,
   EffectRuntimeGpuDraw,
@@ -75,11 +81,13 @@ export function createEffectRuntimeGpuTarget(
   const inputResources: EffectRuntimeGpuPlanResult['inputResources'] = {};
   let nextResource = 0;
   let resourceBytes = 0;
+  let paintDataBytes = 0;
   let adopted = false;
   let scratch: {
     canvas: RuntimeCanvas;
     context: RuntimeCanvasContext;
     padding: number;
+    recorder: ReturnType<typeof createEffectRuntimeGpuPaintRecorder>;
     release(): void;
   } | null = null;
 
@@ -101,7 +109,7 @@ export function createEffectRuntimeGpuTarget(
   };
   const add = (
     bitmap: ImageBitmap,
-    kind: EffectRuntimeGpuResource['kind'],
+    kind: Exclude<EffectRuntimeGpuResource['kind'], 'paint'>,
     owned: boolean,
     id = nextResource++
   ) => {
@@ -130,6 +138,31 @@ export function createEffectRuntimeGpuTarget(
       throw error;
     }
   };
+  const addPaint = (
+    paint: EffectRuntimeGpuPaint,
+    width: number,
+    height: number,
+    coverage = false
+  ) => {
+    const cost = JSON.stringify(paint).length * 2;
+    if (paintDataBytes + cost > EFFECT_RUNTIME_GPU_PAINT_LIMITS.bytesPerPlan) return undefined;
+    admitBitmap(width, height);
+    const id = nextResource++;
+    paintDataBytes += cost;
+    resourceBytes += assertEffectDecodedRaster(width, height);
+    resources.set(id, {
+      wire: {
+        id,
+        kind: 'paint',
+        width,
+        height,
+        paint,
+        ...(coverage ? { coverage: true as const } : {}),
+      },
+      owned: false,
+    });
+    return id;
+  };
   const matrix = (context: RuntimeCanvasContext): EffectRuntimeGpuTransform => {
     const value = (
       context as RuntimeCanvasContext & Pick<OffscreenCanvasRenderingContext2D, 'getTransform'>
@@ -142,6 +175,31 @@ export function createEffectRuntimeGpuTarget(
     const key = JSON.stringify([pass.canvas.width, pass.canvas.height, pass.clips]);
     const known = masks.get(key);
     if (known !== undefined) return known;
+    const paint = parseEffectRuntimeGpuPaint({
+      clips: pass.clips.map((clip) => ({ rect: { ...clip.rect }, transform: [...clip.transform] })),
+      path: [],
+      draw: { op: 'fillRect', args: [0, 0, pass.canvas.width, pass.canvas.height] },
+      transform: [...identity],
+      style: {
+        fill: '#ffffff',
+        stroke: '#000000',
+        font: '10px sans-serif',
+        lineWidth: 1,
+        lineCap: 'butt',
+        lineJoin: 'miter',
+        miterLimit: 10,
+        textAlign: 'start',
+        textBaseline: 'alphabetic',
+        direction: 'inherit',
+      },
+    });
+    const retained = paint
+      ? addPaint(paint, pass.canvas.width, pass.canvas.height, true)
+      : undefined;
+    if (retained !== undefined) {
+      masks.set(key, retained);
+      return retained;
+    }
     const release = allocateRaster(pass.canvas.width, pass.canvas.height);
     const canvas = createCanvas(pass.canvas.width, pass.canvas.height);
     try {
@@ -256,7 +314,8 @@ export function createEffectRuntimeGpuTarget(
         release();
         throw new Error('GPU_PRIMITIVE_CONTEXT_UNAVAILABLE');
       }
-      scratch = { canvas, context, padding, release };
+      const recorder = createEffectRuntimeGpuPaintRecorder(context);
+      scratch = { canvas, context: recorder.context, recorder, padding, release };
     }
     return scratch;
   };
@@ -299,16 +358,20 @@ export function createEffectRuntimeGpuTarget(
       const context = state.context;
       if (bounds === null) return;
       const current = style(context);
-      context.save();
-      try {
-        context.globalAlpha = 1;
-        context.globalCompositeOperation = 'source-over';
-        context.filter = 'none';
-        context.shadowColor = 'transparent';
-        draw();
-      } finally {
-        context.restore();
-      }
+      scratch.recorder.resetPaint();
+      const paintRaw = () => {
+        context.save();
+        try {
+          context.globalAlpha = 1;
+          context.globalCompositeOperation = 'source-over';
+          context.filter = 'none';
+          context.shadowColor = 'transparent';
+          draw();
+        } finally {
+          context.restore();
+        }
+      };
+      paintRaw();
       const transform = (
         context as RuntimeCanvasContext & Pick<OffscreenCanvasRenderingContext2D, 'getTransform'>
       ).getTransform();
@@ -319,25 +382,31 @@ export function createEffectRuntimeGpuTarget(
         scratch.padding,
         stroke
       );
+      const recorded = scratch.recorder.take(region);
       const release = allocateRaster(region.width, region.height);
       let canvas: RuntimeCanvas | undefined;
       let resource: number;
       try {
-        canvas = createCanvas(region.width, region.height);
-        const copy = canvas.getContext('2d');
-        if (!copy) throw new Error('GPU_PRIMITIVE_COPY_CONTEXT_UNAVAILABLE');
-        copy.drawImage(
-          scratch.canvas,
-          region.x,
-          region.y,
-          region.width,
-          region.height,
-          0,
-          0,
-          region.width,
-          region.height
-        );
-        resource = snapshotBitmap(canvas, 'primitive');
+        const retained = recorded ? addPaint(recorded, region.width, region.height) : undefined;
+        if (retained !== undefined) resource = retained;
+        else {
+          if (recorded) scratch.recorder.raster(paintRaw);
+          canvas = createCanvas(region.width, region.height);
+          const copy = canvas.getContext('2d');
+          if (!copy) throw new Error('GPU_PRIMITIVE_COPY_CONTEXT_UNAVAILABLE');
+          copy.drawImage(
+            scratch.canvas,
+            region.x,
+            region.y,
+            region.width,
+            region.height,
+            0,
+            0,
+            region.width,
+            region.height
+          );
+          resource = snapshotBitmap(canvas, 'primitive');
+        }
       } finally {
         if (canvas) {
           canvas.width = 0;
@@ -461,7 +530,8 @@ export function createEffectRuntimeGpuTarget(
     },
     dispose() {
       for (const resource of resources.values()) {
-        if (!adopted && resource.owned) resource.wire.bitmap.close();
+        if (!adopted && resource.owned && resource.wire.kind !== 'paint')
+          resource.wire.bitmap.close();
       }
       resources.clear();
       resourceBytes = 0;

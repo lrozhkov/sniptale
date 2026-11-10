@@ -23,7 +23,7 @@ self.onmessage = (event: MessageEvent<unknown>) => {
   void executionState.execute(event.data).then((result) => {
     const transfer =
       result.kind === 'gpu-plan'
-        ? [...new Set(result.resources.map(({ bitmap }) => bitmap))]
+        ? [...new Set(collectEffectRuntimeResultBitmaps(result))]
         : collectEffectRuntimeResultBitmaps(result);
     try {
       self.postMessage({ result, type: EFFECT_RUNTIME_WORKER_RESPONSE }, { transfer });

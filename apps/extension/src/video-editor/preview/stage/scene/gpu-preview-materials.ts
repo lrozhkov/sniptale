@@ -83,7 +83,7 @@ function inlineRetainedMask(node: GpuPreviewLayer): GpuPreviewLayer | null {
     !video ||
     !mask ||
     !(video.source instanceof VideoFrame) ||
-    isGpuGroup(mask.source) ||
+    'kind' in mask.source ||
     mask.source instanceof VideoFrame ||
     mask.blend !== 'mask' ||
     (node.opacity ?? 1) !== 1 ||
@@ -204,7 +204,7 @@ function retainedDepthLayers(
       }
       pixels = copied;
     } else if (pixels instanceof VideoFrame) pixels = source;
-    else if (!cache) cache = rasterCache(pixels);
+    else if (!cache && !('kind' in pixels)) cache = rasterCache(pixels);
     return {
       ...node,
       source: pixels,

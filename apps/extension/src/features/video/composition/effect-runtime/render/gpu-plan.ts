@@ -252,12 +252,34 @@ type GpuPlanResources = ReadonlyMap<number, EffectRuntimeGpuPlanResult['resource
 function resolveGpuPlanResource(resources: GpuPlanResources, id: number) {
   const resource = resources.get(id);
   if (!resource) throw new Error('Effect GPU resource reference is unavailable.');
-  return { source: resource.bitmap, width: resource.width, height: resource.height };
+  return {
+    source:
+      resource.kind === 'paint'
+        ? {
+            kind: 'paint' as const,
+            width: resource.width,
+            height: resource.height,
+            paint: resource.paint,
+          }
+        : resource.bitmap,
+    width: resource.width,
+    height: resource.height,
+  };
 }
 
 function resolveGpuPlanCoverage(resources: GpuPlanResources, id: number) {
   const resource = resources.get(id);
-  if (!resource || resource.kind !== 'coverage')
+  if (
+    !resource ||
+    (resource.kind !== 'coverage' && !(resource.kind === 'paint' && resource.coverage))
+  )
     throw new Error('Effect GPU coverage reference is unavailable.');
-  return resource.bitmap;
+  return resource.kind === 'paint'
+    ? {
+        kind: 'paint' as const,
+        width: resource.width,
+        height: resource.height,
+        paint: resource.paint,
+      }
+    : resource.bitmap;
 }

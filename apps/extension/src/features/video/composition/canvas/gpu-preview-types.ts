@@ -1,8 +1,15 @@
+import type { EffectRuntimeGpuPaint } from '../../../../contracts/effect-runtime/gpu-plan';
 import type { CameraSpatialFrame, CameraSpatialRect } from '../../project/motion/spatial';
 import type { QuickEditHomography } from '../motion/spatial-geometry';
 
 type Size = { width: number; height: number };
 type Raster = HTMLCanvasElement | OffscreenCanvas | ImageBitmap;
+export type GpuPreviewPaintSource = {
+  kind: 'paint';
+  width: number;
+  height: number;
+  paint: EffectRuntimeGpuPaint;
+};
 type Request = Parameters<GpuPreviewRenderer['render']>[0];
 
 /** A retained scene description becomes a GPU render target, never a CPU-composited screenshot. */
@@ -15,7 +22,7 @@ export interface GpuPreviewGroup {
 
 /** A layer borrows its source through completion; inverse maps output logical points to its plane. */
 export interface GpuPreviewLayer {
-  source: Raster | VideoFrame | GpuPreviewGroup;
+  source: Raster | VideoFrame | GpuPreviewGroup | GpuPreviewPaintSource;
   rect: CameraSpatialRect;
   inverse: QuickEditHomography;
   /** Hard rectangles partition adjoining source planes; exterior contours retain antialiasing. */
@@ -48,7 +55,7 @@ export interface GpuPreviewLayer {
   tint?: readonly [number, number, number, number];
   /** Coverage of the destination operation, not a mask in the source plane. */
   operationClip?: {
-    source: Raster;
+    source: Raster | GpuPreviewPaintSource;
     cache?: { key: string; revision: object | string | number };
   };
   cache?: { key: string; revision: object | string | number };

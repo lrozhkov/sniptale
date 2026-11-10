@@ -2621,3 +2621,95 @@ it('keeps advisory compilation owned when starting validation settlement throws'
   await result;
   expect(g.device.destroy).toHaveBeenCalledOnce();
 });
+
+function paintSource(fill = '#ff0000'): GpuPreviewLayer['source'] {
+  return {
+    kind: 'paint',
+    width: 32,
+    height: 18,
+    paint: {
+      path: [],
+      draw: { op: 'fillRect', args: [0, 0, 32, 18] },
+      transform: [1, 0, 0, 1, 0, 0],
+      style: {
+        fill,
+        stroke: '#000000',
+        font: '10px sans-serif',
+        lineWidth: 1,
+        lineCap: 'butt',
+        lineJoin: 'miter',
+        miterLimit: 10,
+        textAlign: 'start',
+        textBaseline: 'alphabetic',
+        direction: 'inherit',
+      },
+    },
+  };
+}
+
+it('retains primitive pixels across fresh operand packets and placement changes', async () => {
+  const g = graphics();
+  const paint = { setTransform: vi.fn(), beginPath: vi.fn(), fillRect: vi.fn() };
+  const original = OffscreenCanvas.prototype.getContext;
+  vi.spyOn(OffscreenCanvas.prototype, 'getContext').mockImplementation(function (
+    this: OffscreenCanvas,
+    type: string
+  ) {
+    return type === '2d'
+      ? (paint as unknown as OffscreenCanvasRenderingContext2D)
+      : original.call(this, type as 'webgpu');
+  } as typeof original);
+  const renderer = await owner();
+  await renderer.render(request([layer(paintSource())]));
+  expect(paint.fillRect).toHaveBeenCalledTimes(1);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(1);
+  await renderer.render(
+    request([
+      { ...layer(paintSource()), opacity: 0.4, rect: { x: 8, y: 5, width: 32, height: 18 } },
+    ])
+  );
+  expect(paint.fillRect).toHaveBeenCalledTimes(1);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(1);
+  await renderer.render(request([layer(paintSource('#00ff00'))]));
+  expect(paint.fillRect).toHaveBeenCalledTimes(2);
+  expect(g.queue.copyExternalImageToTexture).toHaveBeenCalledTimes(2);
+});
+
+it('rejects malformed primitive operands before changing texture ownership', async () => {
+  const g = graphics();
+  const renderer = await owner();
+  const allocations = g.device.createTexture.mock.calls.length;
+  const source = paintSource();
+  if (!('kind' in source) || source.kind !== 'paint') throw new Error('Missing paint');
+  source.paint.draw = { op: 'fillRect', args: [0, 0, Number.NaN, 18] };
+  await expect(renderer.render(request([layer(source)]))).rejects.toThrow('paint operands');
+  expect(g.device.createTexture).toHaveBeenCalledTimes(allocations);
+  expect(g.queue.copyExternalImageToTexture).not.toHaveBeenCalled();
+});
+
+it('keeps materialized paint alive through aborted GPU completion', async () => {
+  const g = graphics(),
+    fence = deferred<void>();
+  const paint = { setTransform: vi.fn(), beginPath: vi.fn(), fillRect: vi.fn() };
+  const original = OffscreenCanvas.prototype.getContext;
+  vi.spyOn(OffscreenCanvas.prototype, 'getContext').mockImplementation(function (
+    this: OffscreenCanvas,
+    type: string
+  ) {
+    return type === '2d'
+      ? (paint as unknown as OffscreenCanvasRenderingContext2D)
+      : original.call(this, type as 'webgpu');
+  } as typeof original);
+  const renderer = await owner();
+  g.queue.onSubmittedWorkDone.mockReturnValue(fence.promise);
+  const controller = new AbortController();
+  const pending = renderer.render(request([layer(paintSource())], controller.signal));
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledOnce());
+  const uploaded = g.queue.copyExternalImageToTexture.mock.calls[0]![0].source as OffscreenCanvas;
+  controller.abort();
+  expect([uploaded.width, uploaded.height]).toEqual([32, 18]);
+  fence.resolve();
+  await rejected;
+  expect([uploaded.width, uploaded.height]).toEqual([0, 0]);
+});

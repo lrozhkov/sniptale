@@ -32,7 +32,7 @@ export function buildEffectRuntimeGpuOperationLayers(
   operation: EffectRuntimeGpuOperation,
   output: Size,
   resolveSource: (source: EffectRuntimeGpuSource) => EffectRuntimeGpuLayerSource,
-  resolveCoverage: (resourceId: number) => ImageBitmap
+  resolveCoverage: (resourceId: number) => NonNullable<GpuPreviewLayer['operationClip']>['source']
 ): { clear: boolean; layers: readonly GpuPreviewLayer[] } {
   if (operation.op === 'clear') {
     if (operation.coverage === undefined) return { clear: true, layers: [] };
@@ -110,7 +110,7 @@ export function buildEffectRuntimeGpuOperationLayers(
   layers.push(paint(image));
   return { clear: false, layers };
 
-  function coverage(id: number): ImageBitmap {
+  function coverage(id: number): NonNullable<GpuPreviewLayer['operationClip']>['source'] {
     const bitmap = resolveCoverage(id);
     if (bitmap.width !== output.width || bitmap.height !== output.height)
       throw new Error('GPU operation coverage dimensions do not match its pass.');

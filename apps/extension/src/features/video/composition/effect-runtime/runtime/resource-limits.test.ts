@@ -241,3 +241,16 @@ it('bounds each packet at 128 MiB and qualified aggregate at 256 MiB', () => {
   second.release();
   expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
 });
+
+it('admits a paint-only packet without a zero-byte external reservation', () => {
+  const reserve = vi.fn(() => {
+    throw new Error('External reservations require positive bytes.');
+  });
+  const ledger = createEffectRuntimeGpuFrameLedger(reserve);
+  const admitted = ledger.createFrameScope().reserve([]);
+  expect(reserve).not.toHaveBeenCalled();
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+  admitted.release();
+  admitted.release();
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+});

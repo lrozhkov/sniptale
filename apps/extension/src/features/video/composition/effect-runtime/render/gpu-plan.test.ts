@@ -1,3 +1,4 @@
+import type { EffectRuntimeGpuRasterResource } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EffectRuntimeGpuPlanResult } from '../../../../../contracts/effect-runtime/types';
 import type { GpuPreviewGroup, GpuPreviewRenderer } from '../../canvas/gpu-preview';
@@ -11,7 +12,9 @@ class Bitmap implements ImageBitmap {
 }
 beforeEach(() => vi.stubGlobal('ImageBitmap', Bitmap));
 afterEach(() => vi.unstubAllGlobals());
-function plan(depth = 1): EffectRuntimeGpuPlanResult {
+function plan(
+  depth = 1
+): EffectRuntimeGpuPlanResult & { resources: EffectRuntimeGpuRasterResource[] } {
   return {
     kind: 'gpu-plan',
     effectInstanceId: 'effect',
@@ -123,4 +126,49 @@ it('keeps covered clear rectangles numeric when a pass also contains operation m
   const group = buildEffectRuntimeGpuPlan(p);
   expect(group.layers[0]!.rect).toEqual({ x: 0, y: 0, width: 8, height: 8 });
   expect(Object.values(group.layers[0]!.rect).every(Number.isFinite)).toBe(true);
+});
+
+it('keeps closed paint and coverage in the shared graph without materialization', async () => {
+  const p: EffectRuntimeGpuPlanResult = plan();
+  const paint = {
+    path: [],
+    draw: { op: 'fillRect' as const, args: [0, 0, 8, 8] },
+    transform: [1, 0, 0, 1, 0, 0] as const,
+    style: {
+      fill: '#ffffff',
+      stroke: '#000000',
+      font: '10px sans-serif',
+      lineWidth: 1,
+      lineCap: 'butt' as const,
+      lineJoin: 'miter' as const,
+      miterLimit: 10,
+      textAlign: 'start' as const,
+      textBaseline: 'alphabetic' as const,
+      direction: 'inherit' as const,
+    },
+  };
+  p.resources = [
+    { id: 0, kind: 'paint', width: 8, height: 8, paint },
+    { id: 1, kind: 'paint', width: 8, height: 8, coverage: true, paint },
+  ];
+  const operation = p.passes[0]!.operations[0]!;
+  if (operation.op !== 'draw') throw new Error('Expected draw');
+  operation.coverage = 1;
+  const root = buildEffectRuntimeGpuPlan(p);
+  const { gpu, render } = backend();
+  const prepared = await prepareEffectRuntimeGpuScene({
+    layers: [layer(root)],
+    gpu,
+    signal: new AbortController().signal,
+  });
+  expect(root.layers[0]!.source).toMatchObject({ kind: 'paint', width: 8, height: 8, paint });
+  expect(root.layers[0]!.operationClip?.source).toMatchObject({
+    kind: 'paint',
+    width: 8,
+    height: 8,
+    paint,
+  });
+  expect(render).not.toHaveBeenCalled();
+  prepared.release();
+  prepared.release();
 });

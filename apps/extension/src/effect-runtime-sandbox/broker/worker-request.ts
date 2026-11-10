@@ -254,7 +254,7 @@ function startWorkerOperation(
         for (const [name, id] of Object.entries(plan.inputResources)) {
           if (name !== 'source' && name !== 'from' && name !== 'to') continue;
           const resource = plan.resources.find((entry) => entry.id === id);
-          if (!resource) {
+          if (!resource || resource.kind !== 'input') {
             fail('outputRejected');
             return;
           }
@@ -278,7 +278,9 @@ function startWorkerOperation(
       // A successful retry post transfers original inputs; all other plan handles remain ours.
       closeEffectRuntimeWorkerResponse({
         ...plan,
-        resources: plan.resources.filter(({ bitmap }) => !retriedInputs.has(bitmap)),
+        resources: plan.resources.filter(
+          (resource) => resource.kind === 'paint' || !retriedInputs.has(resource.bitmap)
+        ),
       });
       processing = false;
       pending -= 1;

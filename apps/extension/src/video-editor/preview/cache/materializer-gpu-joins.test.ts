@@ -147,7 +147,8 @@ function groupLayers(layers: readonly GpuPreviewLayer[]) {
   const group = layers.find(
     (layer) => 'kind' in layer.source && layer.source.kind === 'group'
   )?.source;
-  if (!group || !('kind' in group)) throw new Error('Missing GPU endpoint group');
+  if (!group || !('kind' in group) || group.kind !== 'group')
+    throw new Error('Missing GPU endpoint group');
   return group.layers;
 }
 

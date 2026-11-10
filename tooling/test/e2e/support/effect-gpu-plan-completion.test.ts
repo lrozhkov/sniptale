@@ -1,8 +1,18 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { installEffectGpuPlanCompletionObserver } from './effect-gpu-plan-completion';
 
-afterEach(() => vi.unstubAllGlobals());
+const nativeStringify = JSON.stringify;
+afterEach(() => {
+  JSON.stringify = nativeStringify;
+  vi.unstubAllGlobals();
+});
 function fixture() {
+  class Canvas {
+    constructor(
+      public width: number,
+      public height: number
+    ) {}
+  }
   class Bitmap {}
   class Frame {}
   class Port {
@@ -36,6 +46,9 @@ function fixture() {
     }
   }
   class Device {
+    createTexture(_descriptor: object) {
+      return new Texture();
+    }
     importExternalTexture(_descriptor: object) {
       return {};
     }
@@ -60,6 +73,7 @@ function fixture() {
   const receive = vi.fn();
   for (const [name, value] of Object.entries({
     window: target,
+    OffscreenCanvas: Canvas,
     ImageBitmap: Bitmap,
     VideoFrame: Frame,
     MessagePort: Port,
@@ -91,7 +105,7 @@ function fixture() {
     pass.end();
     queue.submit([encoder.finish()]);
   };
-  return { submit, receive, resolve, reject };
+  return { submit, receive, resolve, reject, port, device, queue, Encoder, Frame, Canvas };
 }
 it('counts only after submitted annotation and video work reaches a successful fence', async () => {
   const f = fixture();
@@ -112,3 +126,62 @@ it.each(['unrelated', 'no-draw', 'failed'] as const)(
     expect(f.receive).not.toHaveBeenCalled();
   }
 );
+
+it('tracks retained paint uploads and current identities through a completed parent scene', async () => {
+  const f = fixture();
+  const paint = { draw: { op: 'fillRect', args: [0, 0, 8, 6] } };
+  f.port.receive({
+    kind: 'gpu-plan',
+    requestId: 'paint-first',
+    resources: [{ kind: 'paint', width: 8, height: 6, paint }],
+  });
+  JSON.stringify(paint);
+  const texture = f.device.createTexture({ size: [8, 6] });
+  f.queue.copyExternalImageToTexture({ source: new f.Canvas(8, 6) }, { texture });
+  const submit = () => {
+    const group = f.device.createBindGroup({
+      entries: [
+        { resource: texture.createView() },
+        { resource: f.device.importExternalTexture({ source: new f.Frame() }) },
+      ],
+    });
+    const encoder = new f.Encoder();
+    const pass = encoder.beginRenderPass({ colorAttachments: [] });
+    pass.setBindGroup(0, group);
+    pass.draw();
+    pass.end();
+    f.queue.submit([encoder.finish()]);
+  };
+  submit();
+  expect(f.receive).not.toHaveBeenCalled();
+  f.resolve();
+  await Promise.resolve();
+  expect(f.receive).toHaveBeenCalledWith(['paint-first']);
+  const next = { draw: { op: 'fillRect', args: [0, 0, 8, 6] } };
+  f.port.receive({
+    kind: 'gpu-plan',
+    requestId: 'paint-cached',
+    resources: [{ kind: 'paint', width: 8, height: 6, paint: next }],
+  });
+  JSON.stringify(next);
+  // The existing texture supplies the same contents without another allocation/upload.
+  submit();
+  await Promise.resolve();
+  expect(f.receive).toHaveBeenLastCalledWith(['paint-first', 'paint-cached']);
+});
+
+it('does not attribute an unrelated allocation to a serialized paint plan', async () => {
+  const f = fixture();
+  const paint = { draw: { op: 'fillRect', args: [0, 0, 8, 6] } };
+  f.port.receive({
+    kind: 'gpu-plan',
+    requestId: 'paint-unused',
+    resources: [{ kind: 'paint', width: 8, height: 6, paint }],
+  });
+  JSON.stringify(paint);
+  f.device.createTexture({ size: [80, 60] });
+  f.submit(true);
+  f.resolve();
+  await Promise.resolve();
+  expect(f.receive).not.toHaveBeenCalledWith(['paint-unused']);
+});
