@@ -187,13 +187,13 @@ export function renderEditorDrawingTextBackground(
   context.fillStyle = textbox.textBackgroundColor;
   const left = textbox._getLeftOffset();
   let top = textbox._getTopOffset();
-  const lines = textbox._textLines.map((_line, index) => {
+  const lines = textbox._textLines.flatMap((line, index) => {
     const advance = textbox.getHeightOfLine(index);
     const height = index === textbox._textLines.length - 1 ? advance / textbox.lineHeight : advance;
     const width = Math.min(textbox.width, Math.max(12, textbox.getLineWidth(index) + 12));
     const rect = { left, top, width, height };
     top += advance;
-    return rect;
+    return line.join('').trim() ? [rect] : [];
   });
   context.beginPath();
   traceDrawingTextBackground(context, lines);

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
-import { act, useState } from 'react';
+import { act, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { DrawingTextEditor, useDrawingTextEditor, type DrawingTextDraft } from './text-editor';
 import { createContentDrawingController } from './controller';
 import { createDrawingSession } from '../../features/drawing/public';
-import { DrawingTextBackgrounds } from './text-content';
+import { DrawingTextBackgrounds, useDrawingTextBackgroundRects } from './text-content';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -277,7 +277,7 @@ it('keeps the first line visible while Shift+Enter creates an empty trailing lin
   expect(backgrounds).toHaveLength(1);
   expect(backgrounds[0]?.getAttribute('d')?.match(/M /g)).toHaveLength(1);
   expect(backgrounds[0]?.getAttribute('d')).toContain(' 27 ');
-  expect(backgrounds[0]?.getAttribute('d')).toContain(' 52 ');
+  expect(backgrounds[0]?.getAttribute('d')).not.toContain(' 52 ');
 
   const zoomKey = new KeyboardEvent('keydown', {
     bubbles: true,
@@ -348,3 +348,82 @@ it.each([0, 45])(
     act(() => root.unmount());
   }
 );
+
+it.each(['', '\nAlpha\n\n \t \nBeta\n'])('paints only populated draft rows for %j', (value) => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <DrawingTextEditor
+          draft={{ id: null, point: { x: 20, y: 30 }, value, width: 200 }}
+          projection={{ x: 0, y: 0 }}
+          style={{ backgroundColor: '#ff8800', color: '#111111', fontFamily: 'sans', fontSize: 20 }}
+          onCancel={vi.fn()}
+          onChange={vi.fn()}
+          onCommit={vi.fn()}
+        />
+      )
+    );
+    const path =
+      host.querySelector('[data-ui="content.drawing.text-background"]')?.getAttribute('d') ?? '';
+    expect(path.match(/M /g)?.length ?? 0).toBe(value ? 2 : 0);
+    expect(host.querySelector('textarea')?.value).toBe(value);
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+it('ignores obsolete font measurements after shortening text and unmounting', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const fontCallbacks: (() => void)[] = [];
+  const previousFonts = Object.getOwnPropertyDescriptor(document, 'fonts');
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: {
+      load: () => ({
+        then(callback: () => void) {
+          fontCallbacks.push(callback);
+        },
+      }),
+    },
+  });
+  const createRange = document.createRange.bind(document);
+  const measure = vi.fn(() => [new DOMRect(0, 2, 20, 25)]);
+  vi.spyOn(document, 'createRange').mockImplementation(() => {
+    const range = createRange();
+    Object.defineProperty(range, 'getClientRects', { value: measure });
+    return range;
+  });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  function Probe({ value }: { value: string }) {
+    const contentRef = useRef<HTMLSpanElement>(null);
+    useDrawingTextBackgroundRects({ contentRef, value, fontFamily: 'sans-serif', fontSize: 20 });
+    return <span ref={contentRef}>{value}</span>;
+  }
+  let mounted = true;
+  try {
+    act(() => root.render(<Probe value="Alpha" />));
+    act(() => root.render(<Probe value="B" />));
+    expect(fontCallbacks).toHaveLength(2);
+    const calls = measure.mock.calls.length;
+    expect(() => act(() => fontCallbacks[0]!())).not.toThrow();
+    expect(measure).toHaveBeenCalledTimes(calls);
+    act(() => fontCallbacks[1]!());
+    expect(measure).toHaveBeenCalledTimes(calls + 1);
+    act(() => root.unmount());
+    mounted = false;
+    act(() => fontCallbacks[1]!());
+    expect(measure).toHaveBeenCalledTimes(calls + 1);
+  } finally {
+    if (mounted) act(() => root.unmount());
+    if (previousFonts) Object.defineProperty(document, 'fonts', previousFonts);
+    else Reflect.deleteProperty(document, 'fonts');
+  }
+});

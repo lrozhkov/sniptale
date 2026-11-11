@@ -49,28 +49,35 @@ function readDrawingTextBackgroundRects(
   value: string,
   lineHeight: number
 ): DrawingTextBackgroundRect[] {
-  if (!value) {
-    return [
-      {
-        height: lineHeight,
-        left: 0,
-        top: DRAWING_TEXT_VERTICAL_PADDING,
-        width: DRAWING_TEXT_HORIZONTAL_PADDING,
-      },
-    ];
-  }
+  if (!value.trim()) return [];
   const range = document.createRange();
-  range.selectNodeContents(element);
   if (typeof range.getClientRects !== 'function') {
-    return value.split('\n').map((line, index) => ({
-      height: lineHeight,
-      left: 0,
-      top: DRAWING_TEXT_VERTICAL_PADDING + index * lineHeight,
-      width: Math.max(DRAWING_TEXT_HORIZONTAL_PADDING, line.length * lineHeight * 0.44),
-    }));
+    return value.split('\n').flatMap((line, index) =>
+      line.trim()
+        ? [
+            {
+              height: lineHeight,
+              left: 0,
+              top: DRAWING_TEXT_VERTICAL_PADDING + index * lineHeight,
+              width: Math.max(DRAWING_TEXT_HORIZONTAL_PADDING, line.length * lineHeight * 0.44),
+            },
+          ]
+        : []
+    );
   }
+  const textNode = element.firstChild;
+  if (!textNode) return [];
   const elementRect = element.getBoundingClientRect();
-  const fragments = Array.from(range.getClientRects()).filter((rect) => rect.height > 0);
+  let offset = 0;
+  // Both consumers render a plain text node. Exclude newline and trailing caret sentinel rects.
+  const fragments = value.split('\n').flatMap((paragraph) => {
+    const start = offset;
+    offset += paragraph.length + 1;
+    if (!paragraph.trim()) return [];
+    range.setStart(textNode, start);
+    range.setEnd(textNode, start + paragraph.length);
+    return Array.from(range.getClientRects()).filter((rect) => rect.height > 0 && rect.width > 0);
+  });
   return fragments.reduce<DrawingTextBackgroundRect[]>((lines, rect) => {
     const lineIndex = Math.max(
       0,
@@ -125,15 +132,22 @@ export function useDrawingTextBackgroundRects(args: {
   }, [args.contentRef, args.fontSize, args.value]);
 
   useLayoutEffect(() => {
-    measure();
+    let active = true;
+    const refresh = () => {
+      if (active) measure();
+    };
+    refresh();
     const element = args.contentRef.current;
     const observer =
-      element && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+      element && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(refresh) : null;
     if (element) observer?.observe(element);
     void document.fonts
       ?.load(`${args.fontSize}px ${args.fontFamily}`, args.value || 'M')
-      .then(measure);
-    return () => observer?.disconnect();
+      .then(refresh);
+    return () => {
+      active = false;
+      observer?.disconnect();
+    };
   }, [args.contentRef, args.fontFamily, args.fontSize, args.value, measure]);
 
   return rects;

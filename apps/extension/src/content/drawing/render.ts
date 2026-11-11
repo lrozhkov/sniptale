@@ -98,12 +98,18 @@ function drawText(
     });
     lines.push(line);
   });
-  const backgrounds = lines.map((line, index) => ({
-    left: x,
-    top: y + DRAWING_TEXT_VERTICAL_PADDING + index * lineHeight,
-    width: Math.min(bounds.width, Math.max(12, context.measureText(line).width + 12)),
-    height: lineHeight,
-  }));
+  const backgrounds = lines.flatMap((line, index) =>
+    line.trim()
+      ? [
+          {
+            left: x,
+            top: y + DRAWING_TEXT_VERTICAL_PADDING + index * lineHeight,
+            width: Math.min(bounds.width, Math.max(12, context.measureText(line).width + 12)),
+            height: lineHeight,
+          },
+        ]
+      : []
+  );
   const metrics = context.measureText('Mg');
   const fontBoxAscent = metrics.fontBoundingBoxAscent ?? object.fontSize * 0.8;
   const fontBoxDescent = metrics.fontBoundingBoxDescent ?? object.fontSize * 0.2;

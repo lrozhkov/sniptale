@@ -423,3 +423,30 @@ it('renders a dashed blue hover boundary without fill or handles and preserves c
   expect(context.lineWidth).toBe(3);
   expect(context.strokeStyle).toBe('#ff0000');
 });
+
+it.each(['#111111', '#00000000'])(
+  'leaves blank text rows transparent in captured output; glyphs=%s',
+  (color) => {
+    const context = createPixelCanvas();
+    renderDrawingObject(
+      context,
+      {
+        id: 'blank-rows',
+        kind: 'text',
+        bounds: { x: 10, y: 10, width: 200, height: 170 },
+        text: '\nAlpha\n\n \t \nBeta\n',
+        color,
+        backgroundColor: '#ff8800',
+        fontFamily: 'sans',
+        fontSize: 20,
+      },
+      { x: 0, y: 0 }
+    );
+    for (const index of [0, 2, 3, 5])
+      expect(context.getImageData(12, 24 + index * 25, 1, 1).data[3], `blank row ${index}`).toBe(0);
+    for (const index of [1, 4])
+      expect(context.getImageData(12, 24 + index * 25, 1, 1).data[3], `text row ${index}`).toBe(
+        255
+      );
+  }
+);

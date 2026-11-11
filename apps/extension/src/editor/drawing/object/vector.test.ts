@@ -622,3 +622,31 @@ describe('Fabric drawing adapter', () => {
     expect(object.height).toBeCloseTo(40);
   });
 });
+
+it('does not paint Fabric text backgrounds for empty or whitespace-only rows', () => {
+  const textbox = createEditorDrawingFabricObject(
+    {
+      id: 'blank-rows',
+      kind: 'text',
+      bounds: { x: 10, y: 10, width: 200, height: 170 },
+      text: '\nAlpha\n\n \t \nBeta\n',
+      color: '#111111',
+      backgroundColor: '#ff8800',
+      fontFamily: 'sans',
+      fontSize: 20,
+    },
+    1
+  ) as Textbox;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 400;
+  const context = canvas.getContext('2d')!;
+  context.translate(20 - textbox._getLeftOffset(), 10 - textbox._getTopOffset());
+  renderEditorDrawingTextBackground(textbox, context);
+  let top = 10;
+  for (let index = 0; index < textbox._textLines.length; index++) {
+    const advance = textbox.getHeightOfLine(index);
+    const alpha = context.getImageData(22, Math.floor(top + advance / 2), 1, 1).data[3];
+    expect(alpha, `row ${index}`).toBe([1, 4].includes(index) ? 255 : 0);
+    top += advance;
+  }
+});

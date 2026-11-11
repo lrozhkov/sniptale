@@ -531,3 +531,79 @@ for (const { width, height } of [
     }
   });
 }
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`blank text lines have no background during editing or after commit ${viewport.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    const value = '\nAlpha\n\n \t \nBeta\n';
+    try {
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+      const fill = page.locator('[data-ui="content.toolbar.drawing-options.text.background-none"]');
+      if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
+      await page
+        .locator(
+          '[data-ui="content.toolbar.drawing-options.text.background-colors"] button[title^="#"]'
+        )
+        .first()
+        .click();
+      await page.keyboard.press('Escape');
+      await page.mouse.click(400, 200);
+      const input = page.locator('[data-ui="content.drawing.text-input"]');
+      await input.fill(value);
+      const check = async (root: Locator, expected: boolean[]) => {
+        const path = root.locator('[data-ui="content.drawing.text-background"]');
+        await expect
+          .poll(() => path.evaluate((node) => node.getAttribute('d')?.match(/M /g)?.length ?? 0))
+          .toBe(2);
+        expect(
+          await root.evaluate((node) => {
+            const path = node.querySelector<SVGPathElement>(
+              '[data-ui="content.drawing.text-background"]'
+            )!;
+            const content =
+              node.querySelector<HTMLElement>('[data-ui="content.drawing.text-mirror"]') ??
+              node.querySelector('span')!;
+            const lineHeight = parseFloat(getComputedStyle(content).lineHeight);
+            return [0, 1, 2, 3, 4, 5].map((index) =>
+              path.isPointInFill(new DOMPoint(3, 2 + (index + 0.5) * lineHeight))
+            );
+          })
+        ).toEqual(expected);
+      };
+      await check(page.locator('[data-ui="content.drawing.text-editor"]'), [
+        false,
+        true,
+        false,
+        false,
+        true,
+        false,
+      ]);
+      await expect(input).toHaveValue(value);
+      await input.press('Enter');
+      await check(page.locator('[data-ui="content.drawing.text-object"]'), [
+        true,
+        false,
+        false,
+        true,
+        false,
+        false,
+      ]);
+      await page.screenshot({
+        path: info.outputPath('blank-lines-without-fill.png'),
+        fullPage: false,
+      });
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}
