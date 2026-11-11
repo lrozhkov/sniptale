@@ -384,3 +384,30 @@ it('places a generated raster proportionally inside a differently shaped area wi
   expect(receipt.object).toMatchObject({ left: 10, top: 25, scaleX: 10, scaleY: 10 });
   expect(controller.commitHistory).toHaveBeenCalledOnce();
 });
+
+it('keeps model input padding separate from the freely placed output aspect ratio', async () => {
+  const { controller } = setup();
+  const snapshot = await captureImageEditorSnapshot(controller, {
+    intention: 'region',
+    region: { left: 10, top: 20, width: 20, height: 40 },
+    context: 'region',
+  });
+  snapshot.inputBounds = { left: -108, top: -88, width: 256, height: 256 };
+  const receipt = await applyImageEditorResult({
+    controller: () => controller,
+    snapshot,
+    raster: { dataUrl: png, width: 2, height: 3 },
+    mode: 'add',
+    name: 'AI',
+    fit: true,
+  });
+  expect(create.mock.calls[0]?.[0].dataUrl).toBe(png);
+  expect(receipt.object).toMatchObject({
+    width: 2,
+    height: 3,
+    scaleX: 10,
+    scaleY: 10,
+    left: 10,
+    top: 25,
+  });
+});

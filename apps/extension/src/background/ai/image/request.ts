@@ -38,6 +38,25 @@ const routerResponse = z.object({
     .max(1),
   usage: z.object({ cost: z.number().finite().nonnegative().optional() }).optional(),
 });
+const providerErrorResponse = z.object({
+  error: z.object({
+    code: z.union([
+      z.number().int().min(400).max(599),
+      z
+        .string()
+        .regex(/^[45]\d{2}$/u)
+        .transform((value) => Number(value)),
+    ]),
+  }),
+});
+
+function throwProviderFailure(status: number): never {
+  const reason = classifyAIProviderHttpStatus(status);
+  logger.warn('Image provider request failed', { phase: 'response', status, reason });
+  if (status === 400 || status === 422) throw new Error('invalid-request');
+  throw new AIProviderRequestError(reason);
+}
+
 const chatResponse = z.object({
   choices: z
     .array(
@@ -128,6 +147,8 @@ function buildRouterImageRequest(modelCode: string, context: ImageContext) {
 }
 
 function parseJsonImageResponse(chat: boolean, raw: unknown): ImageRequestResult {
+  const failure = providerErrorResponse.safeParse(raw);
+  if (failure.success) throwProviderFailure(failure.data.error.code);
   if (chat) {
     const parsed = chatResponse.safeParse(raw);
     if (!parsed.success) throw new Error('invalid-response');
@@ -164,15 +185,7 @@ async function requestJson(
       body: JSON.stringify(body),
     }
   );
-  if (!response.ok) {
-    const reason = classifyAIProviderHttpStatus(response.status);
-    logger.warn('Image provider request failed', {
-      phase: 'response',
-      status: response.status,
-      reason,
-    });
-    throw new AIProviderRequestError(reason);
-  }
+  if (!response.ok) throwProviderFailure(response.status);
   let raw: unknown;
   try {
     raw = await response.json();

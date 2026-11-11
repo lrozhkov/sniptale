@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { resolveImageModelProfile } from '../../contracts/ai/image-profile';
+import { resolveImageModelProfile, getImageModelInputSize } from '../../contracts/ai/image-profile';
 import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
 import type { ImageBounds } from '../controller/ai-image/types';
 import type { ImageEditorSession, ImageSessionState } from './session';
@@ -35,6 +35,16 @@ export function useImageModelSelection(
     if (profile && state.status === 'idle')
       session.configureParameters(profileKey, profile.defaults);
   }, [profile, profileKey, session, state.status]);
+  const inputSize = useMemo(() => {
+    const base =
+      state.base &&
+      state.steps.find((step) => step.id === state.base?.stepId)?.variants[state.base.variant]
+        ?.image;
+    if (base && !getImageModelInputSize(profile, base)) return null;
+    return state.source && state.source.intention !== 'new-image'
+      ? getImageModelInputSize(profile, state.source.captureBounds)
+      : null;
+  }, [profile, state.source, state.base, state.steps]);
   const frozen = state.steps.some(
     (step) => step.operationId === state.operationId && step.variants.some(Boolean)
   );
@@ -48,11 +58,14 @@ export function useImageModelSelection(
   useEffect(() => {
     if (state.status !== 'idle') return;
     if (frozen || state.base || state.draft.intention === 'new-image') {
-      void session.prepareSource(null);
+      void session.prepareSource(inputSize);
       return;
     }
     if (state.draft.intention === 'region' && !sourceSelection.region) return;
-    if (captured.current === captureKey && (state.source || state.error)) return;
+    if (captured.current === captureKey && (state.source || state.error)) {
+      if (state.source) void session.prepareSource(inputSize);
+      return;
+    }
     captured.current = captureKey;
     void session.refreshSource(sourceSelection.region ?? undefined);
   }, [
@@ -65,6 +78,7 @@ export function useImageModelSelection(
     state.draft.intention,
     sourceSelection.region,
     captureKey,
+    inputSize,
   ]);
   const currentModel =
     model && provider?.destinationBinding
@@ -77,5 +91,5 @@ export function useImageModelSelection(
         }
       : null;
   const modelChoiceRequired = Boolean(currentModel && session.modelChoiceRequired(currentModel));
-  return { selection, model, profile, currentModel, editing, modelChoiceRequired };
+  return { selection, model, profile, inputSize, currentModel, editing, modelChoiceRequired };
 }

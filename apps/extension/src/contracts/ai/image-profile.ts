@@ -8,6 +8,7 @@ import { imageParametersSchema, type ImageContext, type ImageParameters } from '
 export interface ImageModelProfile {
   transport: 'router-images' | 'chat-images' | 'sdk-images';
   maxInputImages: number;
+  minInputSide?: number;
   aspectRatios: readonly string[];
   resolutions: readonly NonNullable<ImageParameters['resolution']>[];
   sizes: readonly NonNullable<ImageParameters['size']>[];
@@ -115,6 +116,7 @@ function routerProfile(model: ProfileModel): ImageModelProfile {
     return {
       ...base,
       maxInputImages: 10,
+      minInputSide: 256,
       aspectRatios: FLUX_RATIOS,
       resolutions: ['768', '1K', '1.5K', '2K', '4K'],
       formats: ['png', 'jpeg'],
@@ -185,6 +187,9 @@ export function acceptsImageContext(profile: ImageModelProfile, context: ImageCo
     context.images.length > profile.maxInputImages
   )
     return false;
+  const minimumSide = profile.minInputSide ?? 1;
+  if (context.images.some((image) => image.width < minimumSide || image.height < minimumSide))
+    return false;
   const p = context.parameters;
   const choices: Array<[string | undefined, readonly string[]]> = [
     [p.aspectRatio, profile.aspectRatios],
@@ -198,4 +203,15 @@ export function acceptsImageContext(profile: ImageModelProfile, context: ImageCo
     return false;
   if (p.background === 'transparent' && p.outputFormat === 'jpeg') return false;
   return p.seed === undefined || profile.seed;
+}
+
+/** Returns only the transparent input margins required by a known model minimum. */
+export function getImageModelInputSize(
+  profile: ImageModelProfile | null,
+  image: { width: number; height: number }
+): { width: number; height: number } | null {
+  const side = profile?.minInputSide ?? 1;
+  return image.width < side || image.height < side
+    ? { width: Math.max(side, image.width), height: Math.max(side, image.height) }
+    : null;
 }

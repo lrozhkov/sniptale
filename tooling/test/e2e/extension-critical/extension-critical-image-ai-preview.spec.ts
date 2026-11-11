@@ -222,3 +222,87 @@ test('image AI defaults follow explicit model choice and preserve provider-defau
     );
   }
 });
+
+test('image AI pads a tiny reference without resampling or changing the attachment draft', async ({
+  page,
+}) => {
+  const host = await startHostServer();
+  try {
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await applyHarnessBootstrap(page, {});
+    await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+    await page.goto(`${host.origin}${EDITOR_HARNESS_PATH}`);
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => window.__sniptaleEditorHarness?.getInteractionState().historyReady ?? false
+        )
+      )
+      .toBe(true);
+    await installImageApiFixture(page);
+    await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
+    const inspector = page.locator('[data-ui="editor.ai.inspector"]');
+    const reference = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2;
+      canvas.height = 3;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#ab1234';
+      ctx.fillRect(0, 0, 2, 3);
+      return canvas.toDataURL('image/png').split(',')[1]!;
+    });
+    await inspector.locator('input[type="file"]').setInputFiles({
+      name: 'tiny-reference.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(reference, 'base64'),
+    });
+    await expect(inspector.getByAltText('References 1', { exact: true })).toBeVisible();
+    await inspector.locator('[data-ui="editor.ai.prompt"]').fill('Use this tiny reference');
+    await expect(inspector.locator('[data-ui="editor.ai.generate"]')).toBeEnabled();
+    await inspector.locator('[data-ui="editor.ai.generate"]').click();
+    await expect(inspector.locator('[data-ui="editor.ai.prompt"]')).toHaveValue('');
+    const proof = await page.evaluate(async () => {
+      const requests = Reflect.get(window, 'imageAiRequests') as Array<{
+        context: {
+          images: Array<{ width: number; height: number; dataUrl: string; role: string }>;
+        };
+      }>;
+      const image = requests[0]!.context.images[0]!;
+      const bitmap = await createImageBitmap(await (await fetch(image.dataUrl)).blob());
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      const rgba = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let opaque = 0;
+      for (let i = 3; i < rgba.length; i += 4) if (rgba[i] === 255) opaque++;
+      return {
+        width: image.width,
+        height: image.height,
+        role: image.role,
+        opaque,
+        pixel: [...ctx.getImageData(127, 126, 1, 1).data],
+        corner: [...ctx.getImageData(0, 0, 1, 1).data],
+      };
+    });
+    expect(proof).toEqual({
+      width: 256,
+      height: 256,
+      role: 'reference',
+      opaque: 6,
+      pixel: [171, 18, 52, 255],
+      corner: [0, 0, 0, 0],
+    });
+    expect(
+      await inspector
+        .getByAltText('References 1', { exact: true })
+        .evaluate((image: HTMLImageElement) => [image.naturalWidth, image.naturalHeight])
+    ).toEqual([2, 3]);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      host.server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});

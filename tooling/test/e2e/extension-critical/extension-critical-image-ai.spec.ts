@@ -300,8 +300,8 @@ test.describe('image AI native region mapping', () => {
         expect(proof.top + proof.height).toBeLessThanOrEqual(proof.sourceHeight * 0.55 + 2);
         expect(Math.abs(proof.width - proof.height)).toBeLessThanOrEqual(1);
         expect(proof.request.images[0]).toMatchObject({
-          width: proof.request.editRegion.width,
-          height: proof.request.editRegion.height,
+          width: Math.max(256, proof.request.editRegion.width),
+          height: Math.max(256, proof.request.editRegion.height),
         });
         expect(proof.outsideChanges).toBe(0);
         expect(proof.insideGreen).toBeGreaterThan(0);
@@ -459,8 +459,8 @@ for (const intention of ['source', 'layers'] as const) {
       });
       expect(input).toMatchObject({
         intention,
-        width: input.target.width,
-        height: input.target.height,
+        width: Math.max(256, input.target.width),
+        height: Math.max(256, input.target.height),
       });
       if (intention === 'source') {
         expect(input.target).toMatchObject({ width: 640, height: 360 });

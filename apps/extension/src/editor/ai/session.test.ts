@@ -1,9 +1,11 @@
+import { reframeEditorRaster } from '../controller/layer-effects/rasterize/capture';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Canvas, Rect } from 'fabric';
 import { crc32, deflateSync } from 'node:zlib';
 import { createImageEditorSession } from './session';
 import type { EditorImageSnapshot, ImageApplyController } from '../controller/ai-image/types';
 
+vi.mock('../controller/layer-effects/rasterize/capture', () => ({ reframeEditorRaster: vi.fn() }));
 vi.mock('fabric', () => ({ Canvas: class {}, Rect: class {} }));
 vi.mock('../controller/ai-image/snapshot', () => ({
   captureImageEditorSnapshot: vi.fn(),
@@ -27,13 +29,17 @@ const image = {
   width: 2,
   height: 3,
 };
-function variantImage(red: number) {
+function variantImage(red: number, width = 2, height = 3) {
   const original = Buffer.from(image.dataUrl.split(',')[1]!, 'base64');
-  const rows = Buffer.alloc(3 * 9);
-  for (let row = 0; row < 3; row++)
-    for (let column = 0; column < 2; column++) {
-      rows[row * 9 + 1 + column * 4] = red;
-      rows[row * 9 + 4 + column * 4] = 255;
+  original.writeUInt32BE(width, 16);
+  original.writeUInt32BE(height, 20);
+  original.writeUInt32BE(crc32(original.subarray(12, 29)), 29);
+  const stride = width * 4 + 1;
+  const rows = Buffer.alloc(height * stride);
+  for (let row = 0; row < height; row++)
+    for (let column = 0; column < width; column++) {
+      rows[row * stride + 1 + column * 4] = red;
+      rows[row * stride + 4 + column * 4] = 255;
     }
   const data = deflateSync(rows);
   const chunk = Buffer.alloc(data.length + 12);
@@ -43,6 +49,8 @@ function variantImage(red: number) {
   chunk.writeUInt32BE(crc32(chunk.subarray(4, -4)), chunk.length - 4);
   return {
     ...image,
+    width,
+    height,
     dataUrl: `data:image/png;base64,${Buffer.concat([original.subarray(0, 33), chunk, original.subarray(-12)]).toString('base64')}`,
   };
 }
@@ -370,4 +378,42 @@ it('maps editing instructions to the actual raster after a different-size result
     width: 2,
     height: 3,
   });
+});
+
+it('pads a tiny reference before approval without changing its draft bytes', async () => {
+  const { session, deps } = setup();
+  const padded = variantImage(40, 256, 256);
+  vi.mocked(reframeEditorRaster).mockResolvedValueOnce(padded);
+  session.setDraft({ references: [image] });
+  await session.generate(model, undefined, null, 256);
+  expect(reframeEditorRaster).toHaveBeenCalledWith(
+    image,
+    { left: 0, top: 0, width: 2, height: 3 },
+    { left: 0, top: 0, width: 2, height: 3 },
+    { left: -127, top: -126, width: 256, height: 256 },
+    expect.any(AbortSignal)
+  );
+  expect(deps.run.mock.calls[0]?.[0].request.context.images).toEqual([
+    { ...padded, role: 'reference' },
+  ]);
+  expect(session.getSnapshot().draft.references).toEqual([image]);
+});
+
+it('does not dispatch after cancellation during reference padding', async () => {
+  const { session, deps } = setup();
+  let release!: (value: typeof image) => void;
+  vi.mocked(reframeEditorRaster).mockReturnValueOnce(
+    new Promise((done) => {
+      release = done;
+    })
+  );
+  session.setDraft({ references: [image] });
+  const flight = session.generate(model, undefined, null, 256);
+  await Promise.resolve();
+  session.stop();
+  release(variantImage(40, 256, 256));
+  await flight;
+  expect(deps.run).not.toHaveBeenCalled();
+  expect(session.getSnapshot().draft.references).toEqual([image]);
+  expect(session.getSnapshot().error).toBe('cancelled');
 });

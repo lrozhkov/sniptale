@@ -225,3 +225,17 @@ describe('image network transport', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.body).toBeInstanceOf(FormData);
   });
 });
+
+it('classifies a RouterAI422 envelope inside HTTP200 without exposing echoed input', async () => {
+  fetchMock.mockResolvedValue(
+    Response.json({
+      error: {
+        code: 422,
+        message: 'PRIVATE PROVIDER MESSAGE',
+        metadata: { raw: 'PRIVATE ECHOED IMAGE' },
+      },
+    })
+  );
+  await expect(run()).rejects.toMatchObject({ message: 'invalid-request' });
+  expect(fetchMock).toHaveBeenCalledOnce();
+});

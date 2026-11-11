@@ -68,11 +68,8 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
     (store) => `${store.selection.selectedObjectIds.join(',')}:${store.history.index}`
   );
   const selectedCount = useEditorStore((store) => store.selection.selectedObjectCount);
-  const { selection, model, profile, editing, modelChoiceRequired } = useImageModelSelection(
-    session,
-    state,
-    { region, key: sourceSelectionKey }
-  );
+  const { selection, model, profile, inputSize, editing, modelChoiceRequired } =
+    useImageModelSelection(session, state, { region, key: sourceSelectionKey });
   const [preparationError, setPreparationError] = useState<string | null>(null),
     [uploading, setUploading] = useState(false);
   const pending = useRef<AbortController | null>(null);
@@ -106,7 +103,9 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
           destinationBinding: selectedProvider.destinationBinding,
           label: `${selectedProvider.name} / ${selectedModel.displayName}`,
         },
-        region ?? undefined
+        region ?? undefined,
+        inputSize,
+        profile?.minInputSide
       );
     } catch (error) {
       if (!attempt.signal.aborted)
@@ -266,7 +265,7 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
             !profile ||
             incompatibleParameters ||
             modelChoiceRequired ||
-            !session.sourceIsPrepared(null) ||
+            !session.sourceIsPrepared(inputSize) ||
             tooManyInputs ||
             uploading ||
             !state.draft.prompt.trim() ||

@@ -183,3 +183,16 @@ it('provides known native output dimensions without inventing dimensions for unk
     getImageModelOutputSize(profile, { variants: 1, resolution: '2K', aspectRatio: '1:1' })
   ).toEqual({ width: 2048, height: 2048 });
 });
+
+it('rejects a Klein layer raster shorter than256pixels before dispatch', () => {
+  const profile = resolveImageModelProfile(model, provider, 'image-editing')!;
+  const context: ImageContext = {
+    version: 1,
+    intention: 'layers',
+    prompt: 'Edit the layers',
+    images: [{ role: 'source', dataUrl: 'synthetic-profile-input', width: 588, height: 195 }],
+    parameters: { ...profile.defaults },
+    editRegion: { left: 0, top: 0, width: 588, height: 195 },
+  };
+  expect(acceptsImageContext(profile, context)).toBe(false);
+});

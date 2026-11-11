@@ -151,10 +151,14 @@ vi.mock('@sniptale/ui/product-feedback/confirm-dialog', () => ({
 
 const image = {
   dataUrl:
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZw' +
-    'AAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII=',
-  width: 2,
-  height: 3,
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAABFUlEQVR4nO' +
+    '3BMQEAAADCoPVP7WsIoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAeAMBPAABPO1TCQAAAABJRU5ErkJggg==',
+  width: 256,
+  height: 256,
 };
 let catalog: Catalog;
 let host: HTMLDivElement, root: Root, session: ImageEditorSession;
@@ -234,9 +238,9 @@ function setupSession() {
       replacementAllowed: options.intention === 'source',
       raster: options.intention === 'new-image' ? null : image,
       captureRaster: options.intention === 'new-image' ? null : image,
-      captureBounds: { left: 0, top: 0, width: 2, height: 3 },
-      inputBounds: { left: 0, top: 0, width: 2, height: 3 },
-      targetBounds: { left: 0, top: 0, width: 2, height: 3 },
+      captureBounds: { left: 0, top: 0, width: image.width, height: image.height },
+      inputBounds: { left: 0, top: 0, width: image.width, height: image.height },
+      targetBounds: { left: 0, top: 0, width: image.width, height: image.height },
       contextMode: options.context ?? 'surroundings',
       regionSource: options.regionSource ?? 'canvas',
     })),
@@ -300,7 +304,7 @@ beforeEach(() => {
     value: vi.fn(),
   });
   store = {
-    cropSelection: { left: 0, top: 0, width: 2, height: 3 },
+    cropSelection: { left: 0, top: 0, width: image.width, height: image.height },
     selection: { selectedObjectCount: 2, selectedObjectIds: ['one', 'two'] },
     history: { index: 0 },
     setActiveTool: vi.fn(),

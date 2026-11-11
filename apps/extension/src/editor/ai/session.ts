@@ -1,3 +1,5 @@
+import { reframeEditorRaster } from '../controller/layer-effects/rasterize/capture';
+import { padImageBounds } from '../controller/ai-image/geometry';
 import { imageRasterRegion } from '../controller/ai-image/geometry';
 import {
   IMAGE_JOB_FAILURE_CODES,
@@ -118,6 +120,16 @@ function initialState(): ImageSessionState {
 }
 function failureCode(error: unknown): string {
   return error instanceof Error && failures.has(error.message) ? error.message : 'invalid-request';
+}
+
+async function prepareImageReference(image: ImageRaster, minimumSide: number, signal: AbortSignal) {
+  if (image.width >= minimumSide && image.height >= minimumSide) return image;
+  const bounds = { left: 0, top: 0, width: image.width, height: image.height };
+  const padded = padImageBounds(bounds, {
+    width: Math.max(image.width, minimumSide),
+    height: Math.max(image.height, minimumSide),
+  });
+  return reframeEditorRaster(image, bounds, bounds, padded, signal);
 }
 
 function buildImageContext(
@@ -417,7 +429,8 @@ export function createImageEditorSession(
     async generate(
       model: ImageSessionModel,
       region?: ImageBounds,
-      size: { width: number; height: number } | null = null
+      size: { width: number; height: number } | null = null,
+      minimumInputSide = 1
     ) {
       const job = begin('preparing');
       if (!job) return;
@@ -437,17 +450,26 @@ export function createImageEditorSession(
         const source = state.source ?? (await capture(job.signal, region));
         job.signal.throwIfAborted();
         if (active !== job) return;
+        let base =
+          source.intention === 'new-image'
+            ? (selectedVariant(state.base)?.image ?? null)
+            : source.raster;
+        if (base && source.intention === 'new-image')
+          base = await prepareImageReference(base, minimumInputSide, job.signal);
+        const references: ImageRaster[] = [];
+        for (const reference of draft.references) {
+          job.signal.throwIfAborted();
+          references.push(await prepareImageReference(reference, minimumInputSide, job.signal));
+        }
+        job.signal.throwIfAborted();
+        if (active !== job) return;
         const currentDocument = controller();
         if (
           currentDocument.canvas !== source.canvas ||
           currentDocument.originalDocument !== source.originalDocument
         )
           throw new Error('stale-document');
-        const base =
-          source.intention === 'new-image'
-            ? (selectedVariant(state.base)?.image ?? null)
-            : source.raster;
-        const context = buildImageContext(source, draft, base);
+        const context = buildImageContext(source, { ...draft, references }, base);
         const requestId = crypto.randomUUID();
         const step: ImageSessionStep = {
           id: requestId,

@@ -6628,22 +6628,11 @@
       "file": "apps/extension/src/editor/ai/session.ts",
       "symbol": "createImageEditorSession",
       "owner": "extension:editor:ai",
-      "reason": "tool-noise: Fresh independent diagnosis inspected this exact factory and its consumers. One factory owns the temporary conversation, draft, preparation, cancellation, results and receipts. Profile changes fill absent parameters within this draft authority. Narrow adapters retain capture, transport and document mutation ownership. Splitting the closure would distribute the same lifecycle. Fresh complete-candidate architecture review remains required for this exact classification.",
+      "reason": "tool-noise: Independent read-only diagnosis inspected this exact factory and its consumers. One temporary conversation owns draft preparation, cancellation, results and receipts. Minimum-input preparation creates separate rasters through the existing adapter without changing draft references. Active-job, abort and document checks remain before dispatch. Capture, transport and document mutation retain their existing owners. Splitting the closure would distribute the same lifecycle. Fresh complete-candidate architecture review remains required.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, fixture or resource lifetime, writer, transport effect or transaction. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-11",
-      "astHash": "1a625b6be983d98738f25409088611997b015cf939056fb107b1163b0df7749d",
+      "astHash": "458d0428757adda77e5f156cd30d43fa2378169b717ad2a079ecc752c34c6dae",
       "signatureHash": "3e899fc484590c2b483453333e63b6a60d1dabcf99a9014e25703e64ea8ead0a"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/editor/ai/inspector.tsx",
-      "symbol": "ImageAIInspector",
-      "owner": "extension:editor:ai",
-      "reason": "tool-noise: Independent read-only diagnosis inspected this exact assistant composition after request-control presentation extraction. Disposable area selection, picker visibility, upload readiness and preparation feedback belong to one mounted interface. The session retains draft, result and operation authority. Existing adapters retain model choice, source preparation, provider execution and document transactions. Remaining branches compose availability, validation and temporary history. Splitting these branches would add prop forwarding without removing an independent authority. Fresh complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess independent state or resource lifetimes, direct transport or persistence effects, document mutation or additional interaction authority. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-11",
-      "astHash": "44a58ee45eba034bced5de255319790b8e24f2c348e6ec9b9d8519af9e276bcc",
-      "signatureHash": "6c09e0658ecd8ca9bdcc2de0b47239a49895fc5763c65660caa0b15e498346e5"
     },
     {
       "rule": "structural-function-risk",

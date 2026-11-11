@@ -132,6 +132,32 @@ export async function installImageApiFixture(
               throw new Error('Invalid fixture context');
             const requests: unknown = Reflect.get(window, 'imageAiRequests');
             if (Array.isArray(requests)) requests.push(message);
+
+            if (
+              'approvedModelCode' in message &&
+              message.approvedModelCode === 'black-forest-labs/flux-3-image-klein' &&
+              context.images.some(
+                (image: unknown) =>
+                  image &&
+                  typeof image === 'object' &&
+                  'width' in image &&
+                  typeof image.width === 'number' &&
+                  'height' in image &&
+                  typeof image.height === 'number' &&
+                  (image.width < 256 || image.height < 256)
+              )
+            ) {
+              queueMicrotask(() =>
+                listeners.forEach((fn) =>
+                  fn({
+                    type: 'failure',
+                    requestId: message.requestId,
+                    code: 'invalid-request',
+                  })
+                )
+              );
+              return;
+            }
             const input: unknown = context.images[0];
             let width = 768,
               height = 768;

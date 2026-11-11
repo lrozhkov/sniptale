@@ -14,6 +14,17 @@ async function prepareResultRaster(
   retainResolution = false
 ): Promise<ImageRaster> {
   if (snapshot.intention === 'new-image') return raster;
+  // Input compatibility margins do not constrain the aspect ratio of a freely placed result.
+  if (
+    retainResolution &&
+    (raster.width !== snapshot.inputBounds.width ||
+      raster.height !== snapshot.inputBounds.height) &&
+    snapshot.captureBounds.left === snapshot.targetBounds.left &&
+    snapshot.captureBounds.top === snapshot.targetBounds.top &&
+    snapshot.captureBounds.width === snapshot.targetBounds.width &&
+    snapshot.captureBounds.height === snapshot.targetBounds.height
+  )
+    return raster;
   const crop = imageResultCrop(snapshot.inputBounds, snapshot.targetBounds, raster, fit);
   if (
     retainResolution &&
