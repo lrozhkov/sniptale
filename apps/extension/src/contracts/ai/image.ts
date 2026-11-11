@@ -1,3 +1,4 @@
+import { isAIConnectionReason, type AIConnectionReason } from '../settings/ai-catalog';
 import { z } from 'zod';
 import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
 import { readImageDataUrlDimensions } from '@sniptale/runtime-contracts/validation/data-url';
@@ -190,7 +191,12 @@ const serverSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z
-    .object({ type: z.literal('failure'), requestId, code: z.enum(IMAGE_JOB_FAILURE_CODES) })
+    .object({
+      type: z.literal('failure'),
+      requestId,
+      code: z.enum(IMAGE_JOB_FAILURE_CODES),
+      failureReason: z.custom<AIConnectionReason>(isAIConnectionReason).optional(),
+    })
     .strict(),
 ]);
 export type ImageJobServerMessage = z.infer<typeof serverSchema>;

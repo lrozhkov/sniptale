@@ -1,4 +1,4 @@
-import { FabricImage, util, type FabricObject } from 'fabric';
+import { FabricImage, config, util, type FabricObject } from 'fabric';
 import { imageRasterSchema, type ImageRaster } from '../../../contracts/ai/image';
 import { getSourceObject } from '../document/layers';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
@@ -10,10 +10,19 @@ import type { EditorImageSnapshot, ImageApplyController, ImageApplyReceipt } fro
 async function prepareResultRaster(
   snapshot: EditorImageSnapshot,
   raster: ImageRaster,
-  fit: boolean
+  fit: boolean,
+  retainResolution = false
 ): Promise<ImageRaster> {
   if (snapshot.intention === 'new-image') return raster;
   const crop = imageResultCrop(snapshot.inputBounds, snapshot.targetBounds, raster, fit);
+  if (
+    retainResolution &&
+    crop.left === 0 &&
+    crop.top === 0 &&
+    crop.width === raster.width &&
+    crop.height === raster.height
+  )
+    return raster;
   if (
     crop.left === 0 &&
     crop.top === 0 &&
@@ -27,8 +36,12 @@ async function prepareResultRaster(
   const bitmap = await createImageBitmap(await dataUrlToBlob(raster.dataUrl));
   try {
     const output = document.createElement('canvas');
-    output.width = snapshot.targetBounds.width;
-    output.height = snapshot.targetBounds.height;
+    output.width = retainResolution
+      ? Math.max(1, Math.round(crop.width))
+      : snapshot.targetBounds.width;
+    output.height = retainResolution
+      ? Math.max(1, Math.round(crop.height))
+      : snapshot.targetBounds.height;
     const context = output.getContext('2d');
     if (!context) throw new Error('apply-unavailable');
     context.drawImage(
@@ -43,7 +56,7 @@ async function prepareResultRaster(
       output.height
     );
     // Region overlay cannot claim erasure to transparency: require opaque pixels in its entire target.
-    if (snapshot.intention === 'region') {
+    if (snapshot.intention === 'region' && !retainResolution) {
       const pixels = context.getImageData(0, 0, output.width, output.height).data;
       for (let i = 3; i < pixels.length; i += 4)
         if (pixels[i] !== 255) throw new Error('transparent-region');
@@ -59,6 +72,33 @@ async function prepareResultRaster(
   } finally {
     bitmap.close();
   }
+}
+
+function positionImageResult(image: FabricImage, snapshot: EditorImageSnapshot, contain: boolean) {
+  const precision = Math.max(0, Math.trunc(config.NUM_FRACTION_DIGITS));
+  const unit = 10 ** precision;
+  const rawScale = Math.min(
+    snapshot.targetBounds.width / image.width,
+    snapshot.targetBounds.height / image.height
+  );
+  const scale = contain ? Math.max(1 / unit, Math.floor(rawScale * unit) / unit) : 1;
+  if (contain)
+    image.set({
+      scaleX: scale,
+      scaleY: scale,
+      left: snapshot.targetBounds.left + (snapshot.targetBounds.width - image.width * scale) / 2,
+      top: snapshot.targetBounds.top + (snapshot.targetBounds.height - image.height * scale) / 2,
+    });
+  if (snapshot.intention === 'source' && snapshot.sourceTransform)
+    util.applyTransformToObject(
+      image,
+      contain
+        ? util.multiplyTransformMatrices(snapshot.sourceTransform, [scale, 0, 0, scale, 0, 0])
+        : snapshot.sourceTransform
+    );
+  // Match Fabric's saved transform before the first render, so history restores the same pixels.
+  for (const key of ['left', 'top', 'scaleX', 'scaleY', 'angle', 'skewX', 'skewY'] as const)
+    image.set(key, Number(image[key].toFixed(precision)));
 }
 
 /** Update is available only while the exact accepted object and bytes remain unchanged. */
@@ -131,10 +171,11 @@ export async function applyImageEditorResult(options: {
   options.signal?.throwIfAborted();
   const initial = options.controller();
   assertImageApplyTarget(initial, snapshot, options.mode, options.previous);
-  const prepared = await prepareResultRaster(snapshot, raster, options.fit);
   const mainSource =
     (options.mode === 'replace' && snapshot.intention === 'source') ||
     (options.mode === 'update' && options.previous?.sourceDataUrl !== undefined);
+  const contain = options.fit && !mainSource && snapshot.intention !== 'new-image';
+  const prepared = await prepareResultRaster(snapshot, raster, options.fit, contain);
   const image = await createRasterizedEditorImage({
     dataUrl: prepared.dataUrl,
     id: crypto.randomUUID(),
@@ -146,8 +187,7 @@ export async function applyImageEditorResult(options: {
     visible: true,
     locked: false,
   });
-  if (snapshot.intention === 'source' && snapshot.sourceTransform)
-    util.applyTransformToObject(image, snapshot.sourceTransform);
+  positionImageResult(image, snapshot, contain);
   options.signal?.throwIfAborted();
   const controller = options.controller();
   assertImageApplyTarget(controller, snapshot, options.mode, options.previous);

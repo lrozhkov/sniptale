@@ -82,6 +82,37 @@ it('retains delivered previews on failure and performs no paid retry', async () 
   expect(remote.connect).toHaveBeenCalledOnce();
   expect(remote.approve).toHaveBeenCalledOnce();
 });
+
+it('retains safe failure metadata and never opens a port after approval refusal', async () => {
+  remote.approve.mockRejectedValueOnce(new Error('PRIVATE APPROVAL ERROR'));
+  await expect(
+    runImageEditorJob({ request, signal: new AbortController().signal, receive: vi.fn() })
+  ).rejects.toMatchObject({
+    message: 'unauthorized',
+    diagnostic: { code: 'unauthorized', phase: 'approval' },
+  });
+  expect(remote.connect).not.toHaveBeenCalled();
+});
+
+it('preserves provider reason and the last progress stage', async () => {
+  const flight = runImageEditorJob({
+    request,
+    signal: new AbortController().signal,
+    receive: vi.fn(),
+  });
+  const failed = expect(flight).rejects.toMatchObject({
+    diagnostic: { code: 'provider-failed', phase: 'requesting', reason: 'invalid-credential' },
+  });
+  await ready();
+  port.onMessage.emit({ type: 'progress', requestId: uuid, phase: 'requesting', variant: 0 });
+  port.onMessage.emit({
+    type: 'failure',
+    requestId: uuid,
+    code: 'provider-failed',
+    failureReason: 'invalid-credential',
+  });
+  await failed;
+});
 it('cancels and disconnects before accepting late replies', async () => {
   const controller = new AbortController(),
     receive = vi.fn();
@@ -104,4 +135,13 @@ it('rejects malformed or duplicate result traffic without replaying the request'
   await rejected;
   expect(receive).toHaveBeenCalledOnce();
   expect(remote.connect).toHaveBeenCalledOnce();
+});
+
+it('keeps the fixed admission refusal without exposing arbitrary error text', async () => {
+  remote.approve.mockRejectedValueOnce(new Error('Unable to issue LLM session token'));
+  await expect(
+    runImageEditorJob({ request, signal: new AbortController().signal, receive: vi.fn() })
+  ).rejects.toMatchObject({
+    diagnostic: { phase: 'approval', approvalReason: 'token-unavailable' },
+  });
 });

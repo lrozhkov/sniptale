@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Eye } from 'lucide-react';
 import { useImagePreview } from './preview';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -17,19 +16,14 @@ export function ImageResults(props: {
   state: ImageSessionState;
   controller: ImageApplyController;
 }) {
-  const [fit, setFit] = useState(false);
   const preview = useImagePreview();
   const step = props.state.steps.find((entry) => entry.id === props.state.selected?.stepId);
   const result = props.session.getSelectedVariant();
   if (!step || !result) return null;
   const source = step.snapshot;
-  const mismatch =
-    source.intention !== 'new-image' &&
-    (result.image.width !== source.inputBounds.width ||
-      result.image.height !== source.inputBounds.height);
   const current = isImageSnapshotCurrent(props.controller, source);
   const busy = props.state.status !== 'idle';
-  const applyDisabled = busy || (mismatch && !fit);
+  const applyDisabled = busy;
   return (
     <div className="space-y-2" data-ui="editor.ai.result">
       <div className="flex items-center justify-between gap-2">
@@ -51,22 +45,6 @@ export function ImageResults(props: {
           {formatNumber(result.costRub, { maximumFractionDigits: 2 })} ₽
         </p>
       ) : null}
-      {mismatch ? (
-        <>
-          <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-            {translate('editor.ai.sizeMismatch')}
-          </p>
-          <label className="flex items-start gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={fit}
-              onChange={(event) => setFit(event.currentTarget.checked)}
-              className="sniptale-parameter-check"
-            />
-            {translate('editor.ai.fit')}
-          </label>
-        </>
-      ) : null}
       {!current ? (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('editor.ai.stale')}
@@ -84,7 +62,7 @@ export function ImageResults(props: {
             className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
             disabled={applyDisabled || props.session.isApplied('update')}
             onClick={() =>
-              void props.session.apply('update', fit, translate('editor.ai.newLayerName'))
+              void props.session.apply('update', true, translate('editor.ai.newLayerName'))
             }
           >
             {translate('editor.ai.update')}
@@ -99,7 +77,7 @@ export function ImageResults(props: {
               : INSPECTOR_PRIMARY_BUTTON_CLASS_NAME
           }
           disabled={applyDisabled || props.session.isApplied('add')}
-          onClick={() => void props.session.apply('add', fit, translate('editor.ai.newLayerName'))}
+          onClick={() => void props.session.apply('add', true, translate('editor.ai.newLayerName'))}
         >
           {translate('editor.ai.apply')}
         </ProductActionButton>
@@ -110,7 +88,7 @@ export function ImageResults(props: {
             className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
             disabled={applyDisabled || props.session.isApplied('replace') || !current}
             onClick={() =>
-              void props.session.apply('replace', fit, translate('editor.ai.newLayerName'))
+              void props.session.apply('replace', true, translate('editor.ai.newLayerName'))
             }
           >
             {translate('editor.ai.replace')}

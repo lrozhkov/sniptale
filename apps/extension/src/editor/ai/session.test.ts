@@ -14,7 +14,10 @@ vi.mock('../controller/ai-image/apply', () => ({
   canUpdateImageResult: () => true,
   isImageApplyResultPresent: () => true,
 }));
-vi.mock('./client', () => ({ runImageEditorJob: vi.fn() }));
+vi.mock('./client', async (original) => ({
+  ...(await original<typeof import('./client')>()),
+  runImageEditorJob: vi.fn(),
+}));
 vi.mock('../workflows/open-generated-image-document', () => ({
   openGeneratedImageDocument: vi.fn(),
 }));
@@ -339,5 +342,32 @@ it('preserves an explicit provider-default choice across profile changes and rem
     variants: 2,
     resolution: undefined,
     aspectRatio: '16:9',
+  });
+});
+
+it('maps editing instructions to the actual raster after a different-size result', async () => {
+  const { session, snapshot, deps } = setup();
+  snapshot.intention = 'region';
+  snapshot.captureBounds = { left: 10, top: 20, width: 20, height: 30 };
+  snapshot.inputBounds = snapshot.captureBounds;
+  snapshot.targetBounds = snapshot.captureBounds;
+  snapshot.captureRaster = image;
+  session.setDraft({ intention: 'region' });
+  await session.refreshSource(snapshot.targetBounds);
+  await session.generate(model);
+  expect(deps.run.mock.calls[0]?.[0].request.context.editRegion).toEqual({
+    left: 0,
+    top: 0,
+    width: 2,
+    height: 3,
+  });
+  session.setDraft({ prompt: 'Refine the complete result' });
+  await session.prepareSource(null);
+  await session.generate(model);
+  expect(deps.run.mock.calls[1]?.[0].request.context.editRegion).toEqual({
+    left: 0,
+    top: 0,
+    width: 2,
+    height: 3,
   });
 });

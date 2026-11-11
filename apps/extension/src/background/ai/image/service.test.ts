@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createImageJobService } from './service';
+import { AIProviderRequestError } from '../providers';
 import {
   IMAGE_JOB_TIMEOUT_MS,
   type ImageJobStart,
@@ -68,6 +69,20 @@ function setup() {
   return { service, connection, messages, deps, settle };
 }
 afterEach(() => vi.useRealTimers());
+
+it('preserves the safe provider rejection reason without copying exception text', async () => {
+  const { deps, messages, connection, settle } = setup();
+  deps.request.mockRejectedValue(new AIProviderRequestError('quota-exceeded', 'PRIVATE BODY'));
+  connection.receive(start);
+  await settle();
+  expect(messages.at(-1)).toEqual({
+    type: 'failure',
+    requestId: uuid,
+    code: 'provider-failed',
+    failureReason: 'quota-exceeded',
+  });
+  expect(JSON.stringify(messages)).not.toContain('PRIVATE BODY');
+});
 
 describe('image operation lifecycle', () => {
   it('approves once, requests variants sequentially and preserves each preview before completion', async () => {

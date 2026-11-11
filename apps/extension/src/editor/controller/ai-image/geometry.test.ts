@@ -3,6 +3,7 @@ import {
   integerImageBounds,
   imageContextBounds,
   imageResultCrop,
+  imageRasterRegion,
   padImageBounds,
 } from './geometry';
 
@@ -62,4 +63,21 @@ it('pads an odd-sized native target with integer margins and crops back without 
   expect(() =>
     padImageBounds({ left: 0, top: 0, width: 100, height: 300 }, { width: 256, height: 256 })
   ).toThrow('output-too-small');
+});
+
+it('maps a selected region into the current result raster rather than using document dimensions', () => {
+  expect(
+    imageRasterRegion(
+      { left: 10, top: 20, width: 20, height: 40 },
+      { left: 10, top: 20, width: 20, height: 40 },
+      { width: 768, height: 768 }
+    )
+  ).toEqual({ left: 0, top: 0, width: 768, height: 768 });
+  expect(
+    imageRasterRegion(
+      { left: 0, top: 0, width: 100, height: 100 },
+      { left: 25, top: 50, width: 25, height: 25 },
+      { width: 20, height: 20 }
+    )
+  ).toEqual({ left: 5, top: 10, width: 5, height: 5 });
 });

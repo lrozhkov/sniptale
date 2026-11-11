@@ -155,142 +155,186 @@ for (const locale of ['en', 'ru'] as const) {
 
 test.describe('image AI native region mapping', () => {
   test.use({ deviceScaleFactor: 2 });
-  test('changes only the selected native rectangle at zoom 50%', async ({ page }, info) => {
-    const host = await startHostServer();
-    try {
-      await page.setViewportSize({ width: 1920, height: 900 });
-      await applyHarnessBootstrap(page, {});
-      await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
-      await page.goto(`${host.origin}${EDITOR_HARNESS_PATH}?theme=dark`);
-      await expect
-        .poll(() =>
-          page.evaluate(
-            () => window.__sniptaleEditorHarness?.getInteractionState().historyReady ?? false
+  for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+    test(`changes only the selected native rectangle at zoom 50% ${viewport.name}`, async ({
+      page,
+    }, info) => {
+      const host = await startHostServer();
+      try {
+        await page.setViewportSize(viewport.size);
+        await applyHarnessBootstrap(page, {});
+        await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+        await page.goto(`${host.origin}${EDITOR_HARNESS_PATH}?theme=dark`);
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () => window.__sniptaleEditorHarness?.getInteractionState().historyReady ?? false
+            )
           )
-        )
-        .toBe(true);
-      await installImageApiFixture(page);
-      await page.evaluate(() => window.__sniptaleEditorHarness?.setZoomLevel(0.5));
-      const before = await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage());
-      const initialHistory = await page.evaluate(
-        () => window.__sniptaleEditorHarness!.getInteractionState().historyIndex
-      );
-      await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
-      const inspector = page.locator('[data-ui="editor.ai.inspector"]');
-      await inspector.getByRole('button', { name: 'Work with', exact: true }).click();
-      await page.getByRole('option', { name: 'Selected region', exact: true }).click();
-      await inspector
-        .getByRole('button', { name: 'Select a region on the canvas', exact: true })
-        .click();
-      const boundary = page.locator('[data-ui="editor.canvas.document-boundary"]');
-      const box = (await boundary.boundingBox())!;
-      const x = box.x + box.width * 0.25,
-        y = box.y + box.height * 0.3;
-      await page.mouse.move(x, y);
-      await page.mouse.down();
-      await page.mouse.move(x + box.width * 0.15, y + box.height * 0.25, { steps: 5 });
-      await page.mouse.up();
-      // Tool changes can select the crop inspector; returning must retain the guide.
-      await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
-      await inspector.getByRole('button', { name: 'Use current selection', exact: true }).click();
-      await inspector
-        .locator('[data-ui="editor.ai.prompt"]')
-        .fill('Fill the selected rectangle green');
-      await expect(inspector.locator('[data-ui="editor.ai.generate"]')).toBeEnabled();
-      await inspector.locator('[data-ui="editor.ai.generate"]').click();
-      await expect(inspector.locator('[data-ui="editor.ai.result"]')).toBeVisible();
-      expect(
-        await page.evaluate(
+          .toBe(true);
+        await installImageApiFixture(page);
+        await page.evaluate(() => window.__sniptaleEditorHarness?.setZoomLevel(0.5));
+        const before = await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage());
+        const initialHistory = await page.evaluate(
           () => window.__sniptaleEditorHarness!.getInteractionState().historyIndex
-        )
-      ).toBe(initialHistory);
-      await inspector.getByRole('button', { name: 'Add as layer', exact: true }).click();
-      await expect
-        .poll(() =>
-          page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
-        )
-        .toBe(initialHistory + 1);
-      const proof = await page.evaluate(async (original) => {
-        const harness = window.__sniptaleEditorHarness!;
-        const objects = harness.getCanvasObjects();
-        const patch = objects[objects.length - 1]!;
-        const left = Number(patch.left),
-          top = Number(patch.top),
-          width = Number(patch.width),
-          height = Number(patch.height);
-        const decode = async (url: string) => {
-          const bitmap = await createImageBitmap(await (await fetch(url)).blob());
-          const canvas = document.createElement('canvas');
-          canvas.width = bitmap.width;
-          canvas.height = bitmap.height;
-          const ctx = canvas.getContext('2d')!;
-          ctx.drawImage(bitmap, 0, 0);
-          bitmap.close();
+        );
+        await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
+        const inspector = page.locator('[data-ui="editor.ai.inspector"]');
+        await inspector.getByRole('button', { name: 'Work with', exact: true }).click();
+        await page.getByRole('option', { name: 'Selected region', exact: true }).click();
+        await expect(page.locator('[data-ui="editor.ai.region-picker"]')).toBeVisible();
+        await page.keyboard.press('Escape');
+        expect(await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage())).toBe(
+          before
+        );
+        await inspector.getByRole('button', { name: 'Work with', exact: true }).click();
+        await page.getByRole('option', { name: 'Selected region', exact: true }).click();
+        await expect(page.locator('[data-ui="editor.ai.region-picker"]')).toBeVisible();
+        const boundary = page.locator('[data-ui="editor.canvas.document-boundary"]');
+        const box = (await boundary.boundingBox())!;
+        const x = box.x + box.width * 0.25,
+          y = box.y + box.height * 0.3;
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + box.width * 0.15, y + box.height * 0.25, { steps: 5 });
+        await page.screenshot({
+          path: info.outputPath('ai-region-selection.png'),
+          fullPage: false,
+        });
+        await page.mouse.up();
+        await expect(page.locator('[data-ui="editor.ai.region-picker"]')).toBeHidden();
+        expect(await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage())).toBe(
+          before
+        );
+        await inspector
+          .locator('[data-ui="editor.ai.prompt"]')
+          .fill('Fill the selected rectangle green');
+        await expect(inspector.locator('[data-ui="editor.ai.generate"]')).toBeEnabled();
+        await inspector.locator('[data-ui="editor.ai.generate"]').click();
+        await expect(inspector.locator('[data-ui="editor.ai.result"]')).toBeVisible();
+        expect(
+          await page.evaluate(
+            () => window.__sniptaleEditorHarness!.getInteractionState().historyIndex
+          )
+        ).toBe(initialHistory);
+        await inspector.getByRole('button', { name: 'Add as layer', exact: true }).click();
+        await expect
+          .poll(() =>
+            page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
+          )
+          .toBe(initialHistory + 1);
+        const proof = await page.evaluate(async (original) => {
+          const harness = window.__sniptaleEditorHarness!;
+          const objects = harness.getCanvasObjects();
+          const patch = objects[objects.length - 1]!;
+          const left = Number(patch.left),
+            top = Number(patch.top),
+            width = Number(patch.width) * Number(patch.scaleX),
+            height = Number(patch.height) * Number(patch.scaleY);
+          const decode = async (url: string) => {
+            const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+            const canvas = document.createElement('canvas');
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(bitmap, 0, 0);
+            bitmap.close();
+            return {
+              width: canvas.width,
+              height: canvas.height,
+              data: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
+            };
+          };
+          const a = await decode(original),
+            b = await decode(await harness.renderImage());
+          let outsideChanges = 0,
+            insideGreen = 0,
+            insideChanges = 0;
+          for (let y = 0; y < a.height; y++)
+            for (let x = 0; x < a.width; x++) {
+              const i = (y * a.width + x) * 4;
+              const inside =
+                x >= Math.floor(left) &&
+                x < Math.ceil(left + width) &&
+                y >= Math.floor(top) &&
+                y < Math.ceil(top + height);
+              if (inside) {
+                if ([0, 1, 2, 3].some((offset) => a.data[i + offset] !== b.data[i + offset]))
+                  insideChanges++;
+                if (
+                  b.data[i] === 0 &&
+                  b.data[i + 1] === 160 &&
+                  b.data[i + 2] === 64 &&
+                  b.data[i + 3] === 255
+                )
+                  insideGreen++;
+              } else if ([0, 1, 2, 3].some((offset) => a.data[i + offset] !== b.data[i + offset]))
+                outsideChanges++;
+            }
+          const requests = Reflect.get(window, 'imageAiRequests') as Array<{
+            context: {
+              images: Array<{ width: number; height: number }>;
+              editRegion: { width: number; height: number };
+            };
+          }>;
           return {
-            width: canvas.width,
-            height: canvas.height,
-            data: ctx.getImageData(0, 0, canvas.width, canvas.height).data,
+            left,
+            top,
+            width,
+            height,
+            sourceWidth: a.width,
+            sourceHeight: a.height,
+            outputWidth: b.width,
+            outputHeight: b.height,
+            outsideChanges,
+            insideGreen,
+            insideChanges,
+            request: requests[0]!.context,
           };
-        };
-        const a = await decode(original),
-          b = await decode(await harness.renderImage());
-        let outsideChanges = 0,
-          insideGreen = 0;
-        for (let y = 0; y < a.height; y++)
-          for (let x = 0; x < a.width; x++) {
-            const i = (y * a.width + x) * 4;
-            const inside = x >= left && x < left + width && y >= top && y < top + height;
-            if (inside) {
-              if (
-                b.data[i] === 0 &&
-                b.data[i + 1] === 160 &&
-                b.data[i + 2] === 64 &&
-                b.data[i + 3] === 255
-              )
-                insideGreen++;
-            } else if ([0, 1, 2, 3].some((offset) => a.data[i + offset] !== b.data[i + offset]))
-              outsideChanges++;
-          }
-        const requests = Reflect.get(window, 'imageAiRequests') as Array<{
-          context: {
-            images: Array<{ width: number; height: number }>;
-            editRegion: { width: number; height: number };
-          };
-        }>;
-        return {
-          left,
-          top,
-          width,
-          height,
-          sourceWidth: a.width,
-          sourceHeight: a.height,
-          outputWidth: b.width,
-          outputHeight: b.height,
-          outsideChanges,
-          insideGreen,
-          request: requests[0]!.context,
-        };
-      }, before);
-      expect(proof.outputWidth).toBe(proof.sourceWidth);
-      expect(proof.outputHeight).toBe(proof.sourceHeight);
-      expect(Math.abs(proof.left - proof.sourceWidth * 0.25)).toBeLessThanOrEqual(2);
-      expect(Math.abs(proof.top - proof.sourceHeight * 0.3)).toBeLessThanOrEqual(2);
-      expect(Math.abs(proof.width - proof.sourceWidth * 0.15)).toBeLessThanOrEqual(2);
-      expect(Math.abs(proof.height - proof.sourceHeight * 0.25)).toBeLessThanOrEqual(2);
-      expect(proof.request.images[0]).toMatchObject({ width: 768, height: 768 });
-      expect(proof.request.editRegion).toMatchObject({ width: proof.width, height: proof.height });
-      expect(proof.outsideChanges).toBe(0);
-      expect(proof.insideGreen).toBe(proof.width * proof.height);
-      await page.screenshot({
-        path: info.outputPath('ai-region-native-pixels.png'),
-        fullPage: false,
-      });
-    } finally {
-      await new Promise<void>((resolve, reject) =>
-        host.server.close((error) => (error ? reject(error) : resolve()))
-      );
-    }
-  });
+        }, before);
+        expect(proof.outputWidth).toBe(proof.sourceWidth);
+        expect(proof.outputHeight).toBe(proof.sourceHeight);
+        expect(proof.left).toBeGreaterThanOrEqual(proof.sourceWidth * 0.25 - 2);
+        expect(proof.top).toBeGreaterThanOrEqual(proof.sourceHeight * 0.3 - 2);
+        expect(proof.left + proof.width).toBeLessThanOrEqual(proof.sourceWidth * 0.4 + 2);
+        expect(proof.top + proof.height).toBeLessThanOrEqual(proof.sourceHeight * 0.55 + 2);
+        expect(Math.abs(proof.width - proof.height)).toBeLessThanOrEqual(1);
+        expect(proof.request.images[0]).toMatchObject({
+          width: proof.request.editRegion.width,
+          height: proof.request.editRegion.height,
+        });
+        expect(proof.outsideChanges).toBe(0);
+        expect(proof.insideGreen).toBeGreaterThan(0);
+        expect(proof.insideChanges).toBeGreaterThan((proof.width - 2) * (proof.height - 2) * 0.9);
+        const acceptedPixels = await page.evaluate(() =>
+          window.__sniptaleEditorHarness!.renderImage()
+        );
+        await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+        await expect
+          .poll(
+            async () =>
+              (await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage())) === before
+          )
+          .toBe(true);
+        await page.locator('[data-ui="editor.floating.tool-rail.history.redo"]').click();
+        await expect
+          .poll(
+            async () =>
+              (await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage())) ===
+              acceptedPixels
+          )
+          .toBe(true);
+        await page.screenshot({
+          path: info.outputPath('ai-region-native-pixels.png'),
+          fullPage: false,
+        });
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    });
+  }
 });
 
 for (const intention of ['source', 'layers'] as const) {
@@ -364,7 +408,6 @@ for (const intention of ['source', 'layers'] as const) {
           exact: true,
         })
         .click();
-      await inspector.getByRole('button', { name: 'Use current selection', exact: true }).click();
       await inspector.locator('[data-ui="editor.ai.prompt"]').fill('Make the source green');
       await expect(inspector.locator('[data-ui="editor.ai.generate"]')).toBeEnabled();
       const original = {
@@ -414,7 +457,11 @@ for (const intention of ['source', 'layers'] as const) {
           opaque,
         };
       });
-      expect(input).toMatchObject({ intention, width: 768, height: 768 });
+      expect(input).toMatchObject({
+        intention,
+        width: input.target.width,
+        height: input.target.height,
+      });
       if (intention === 'source') {
         expect(input.target).toMatchObject({ width: 640, height: 360 });
         expect(input.transparent).toBe(0);
@@ -465,10 +512,14 @@ for (const intention of ['source', 'layers'] as const) {
         expect(applied).toHaveLength(4);
         expect(applied[0]).toEqual(original.objects[0]);
         expect(applied.slice(1, 3).map((object) => object.visible)).toEqual([false, false]);
-        expect(applied[3]).toMatchObject({
-          width: input.target.width,
-          height: input.target.height,
-        });
+        expect(applied[3]).toMatchObject({ width: 768, height: 768 });
+        expect(Number(applied[3]!.scaleX)).toBeCloseTo(Number(applied[3]!.scaleY), 6);
+        expect(Number(applied[3]!.width) * Number(applied[3]!.scaleX)).toBeLessThanOrEqual(
+          input.target.width
+        );
+        expect(Number(applied[3]!.height) * Number(applied[3]!.scaleY)).toBeLessThanOrEqual(
+          input.target.height
+        );
       }
       await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
       await expect

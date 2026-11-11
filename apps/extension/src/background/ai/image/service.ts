@@ -38,7 +38,12 @@ export function createImageJobService(
       variant: 0,
     }),
     result: (request, received) => ({ type: 'complete', requestId: request.requestId, received }),
-    failure: (request, code) => ({ type: 'failure', requestId: request.requestId, code }),
+    failure: (request, code, failureReason) => ({
+      type: 'failure',
+      requestId: request.requestId,
+      code,
+      ...(failureReason ? { failureReason } : {}),
+    }),
     async run(request, sender, signal, send) {
       await deps.authorize(request, sender, signal);
       signal.throwIfAborted();

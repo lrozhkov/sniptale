@@ -92,3 +92,17 @@ export function imageResultCrop(
     throw new Error('size-mismatch');
   return { left, top, width, height };
 }
+
+/** Projects world-space bounds into a raster and includes each touched pixel. */
+export function imageRasterRegion(
+  input: ImageBounds,
+  target: ImageBounds,
+  raster: { width: number; height: number }
+): ImageBounds {
+  const crop = imageResultCrop(input, target, raster, true);
+  const left = Math.max(0, Math.floor(crop.left));
+  const top = Math.max(0, Math.floor(crop.top));
+  const right = Math.min(raster.width, Math.ceil(crop.left + crop.width));
+  const bottom = Math.min(raster.height, Math.ceil(crop.top + crop.height));
+  return integerImageBounds({ left, top, width: right - left, height: bottom - top });
+}

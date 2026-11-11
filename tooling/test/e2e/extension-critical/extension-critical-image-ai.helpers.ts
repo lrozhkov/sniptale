@@ -146,6 +146,7 @@ export async function installImageApiFixture(
               height = 576;
             }
             if (
+              echoInput &&
               input &&
               typeof input === 'object' &&
               'width' in input &&
@@ -173,6 +174,10 @@ export async function installImageApiFixture(
             const images = Array.from({ length: count }, (_, index) => {
               ctx.fillStyle = ['#00a040', '#0040d0', '#d08000'][index]!;
               ctx.fillRect(0, 0, width, height);
+              if ('intention' in context && context.intention === 'region') {
+                ctx.fillStyle = '#d02020';
+                for (let x = 13; x < width; x += 31) ctx.fillRect(x, 0, 3, height);
+              }
               return {
                 dataUrl:
                   echoInput &&

@@ -101,7 +101,6 @@ test('image AI captures full layer shadow and replaces it without losing pixels'
     const inspector = page.locator('[data-ui="editor.ai.inspector"]');
     await inspector.getByRole('button', { name: 'Work with', exact: true }).click();
     await page.getByRole('option', { name: 'Selected layers · 1', exact: true }).click();
-    await inspector.getByRole('button', { name: 'Use current selection', exact: true }).click();
     await inspector.locator('[data-ui="editor.ai.prompt"]').fill('Return the source unchanged');
     await inspector.locator('[data-ui="editor.ai.generate"]').click();
     await expect(inspector.locator('[data-ui="editor.ai.result"]')).toBeVisible();

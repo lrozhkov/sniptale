@@ -1,3 +1,4 @@
+import { getAIProviderFailureKey } from '../../features/ai/provider-failure-copy';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -7,7 +8,9 @@ import { AIModelSelector } from '../../features/ai/model-selector';
 import { useEditorController } from '../application/controller-context';
 import { useEditorStore } from '../state/useEditorStore';
 import { EditorIconButton } from '../chrome/ui';
-import type { ImageEditorSession } from './session';
+import { ImageRegionPicker } from './region-picker';
+import type { ImageBounds } from '../controller/ai-image/types';
+import type { ImageEditorSession, ImageSessionState } from './session';
 import { ImageParametersEditor, resolveImageParameterChoices } from './parameters';
 import { ImageAttachments } from './attachments';
 import { ImageResults } from './results';
@@ -21,6 +24,12 @@ import {
 } from '../inspector/chrome';
 
 const errorMessages: Readonly<Record<string, TranslationKey>> = {
+  unauthorized: 'editor.ai.approvalFailed',
+  'provider-failed': 'editor.ai.providerFailed',
+  'invalid-request': 'editor.ai.requestRejected',
+  stale: 'editor.ai.configurationChanged',
+  'catalog-unavailable': 'editor.ai.noModel',
+  'selection-write-failed': 'editor.ai.selectionFailed',
   'session-limit': 'editor.ai.limit',
   'output-too-small': 'editor.ai.outputTooSmall',
   'source-not-prepared': 'editor.ai.prepareSource',
@@ -51,11 +60,20 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
   useAppLocale();
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const controller = useEditorController();
-  const region = useEditorStore((store) => store.cropSelection);
+  const [region, setRegion] = useState<ImageBounds | null>(() =>
+    state.source?.intention === 'region' ? state.source.targetBounds : null
+  );
+  const [pickingRegion, setPickingRegion] = useState(false);
+  const sourceSelectionKey = useEditorStore(
+    (store) => `${store.selection.selectedObjectIds.join(',')}:${store.history.index}`
+  );
   const selectedCount = useEditorStore((store) => store.selection.selectedObjectCount);
-  const { selection, model, profile, outputSize, editing, modelChoiceRequired } =
-    useImageModelSelection(session, state);
-  const [preparationError, setPreparationError] = useState(false),
+  const { selection, model, profile, editing, modelChoiceRequired } = useImageModelSelection(
+    session,
+    state,
+    { region, key: sourceSelectionKey }
+  );
+  const [preparationError, setPreparationError] = useState<string | null>(null),
     [uploading, setUploading] = useState(false);
   const pending = useRef<AbortController | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
@@ -71,7 +89,7 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
   const generate = async () => {
     const attempt = new AbortController();
     pending.current = attempt;
-    setPreparationError(false);
+    setPreparationError(null);
     try {
       const prepared = await selection.prepareModelSelection(attempt.signal);
       const selectedModel = prepared.catalog.models.find((entry) => entry.id === prepared.modelId);
@@ -88,18 +106,41 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
           destinationBinding: selectedProvider.destinationBinding,
           label: `${selectedProvider.name} / ${selectedModel.displayName}`,
         },
-        region ?? undefined,
-        outputSize
+        region ?? undefined
       );
-    } catch {
-      if (!attempt.signal.aborted) setPreparationError(true);
+    } catch (error) {
+      if (!attempt.signal.aborted)
+        setPreparationError(
+          error instanceof Error &&
+            ['catalog-unavailable', 'model-unavailable', 'selection-write-failed'].includes(
+              error.message
+            )
+            ? error.message
+            : 'invalid-request'
+        );
     } finally {
       if (pending.current === attempt) pending.current = null;
     }
   };
-  const error = translate((state.error && errorMessages[state.error]) || 'editor.ai.error');
+  const failure = preparationError ?? state.error;
+  const error = translate(
+    (!preparationError && getAIProviderFailureKey(state.diagnostic?.reason)) ||
+      (failure && errorMessages[failure]) ||
+      'editor.ai.error'
+  );
   return (
-    <ImagePreviewWorkspace session={session} state={state}>
+    <ImagePreviewWorkspace session={session} state={state} hidden={pickingRegion}>
+      {pickingRegion ? (
+        <ImageRegionPicker
+          controller={controller.getPublicApiAdapter()}
+          onCancel={() => setPickingRegion(false)}
+          onSelect={(bounds) => {
+            setPickingRegion(false);
+            setRegion(bounds);
+            session.setDraft({ intention: 'region', regionSource: 'canvas' });
+          }}
+        />
+      ) : null}
       <div
         className={[
           'sniptale-inspector-surface editor-inspector-surface space-y-3',
@@ -150,11 +191,11 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
           state={state}
           region={region}
           selectedCount={selectedCount}
-          busy={busy}
-          outputSize={outputSize}
+          pickingRegion={pickingRegion}
+          busy={busy || pickingRegion}
           onSelectRegion={() => {
-            controller.setActiveTool('crop');
-            useEditorStore.getState().setActiveTool('crop');
+            controller.setActiveTool('select');
+            setPickingRegion(true);
           }}
         />
         <ImageResults
@@ -187,7 +228,7 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
           placeholder={translate(state.base ? 'editor.ai.refine' : 'editor.ai.prompt')}
           onChange={(event) => {
             session.setDraft({ prompt: event.currentTarget.value });
-            setPreparationError(false);
+            setPreparationError(null);
           }}
           className="w-full resize-y"
           data-ui="editor.ai.prompt"
@@ -215,57 +256,28 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
             {translate('editor.ai.modelUnsupported')}
           </p>
         ) : null}
-        {state.error || preparationError ? (
-          <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
-            {error}
-          </p>
-        ) : null}
-        {busy ? (
-          <div className="flex items-center justify-between gap-2">
-            <span role="status" className="text-xs">
-              {translate(
-                state.status === 'opening'
-                  ? 'editor.ai.openingDocument'
-                  : state.status === 'applying'
-                    ? 'editor.ai.applying'
-                    : state.status === 'generating'
-                      ? 'editor.ai.generating'
-                      : 'editor.ai.preparing'
-              )}
-            </span>
-            <ProductActionButton
-              compact
-              tone="secondary"
-              className={INSPECTOR_INLINE_BUTTON_CLASS_NAME}
-              disabled={state.status === 'opening'}
-              onClick={() => {
-                pending.current?.abort();
-                session.stop();
-              }}
-            >
-              {translate('editor.ai.stop')}
-            </ProductActionButton>
-          </div>
-        ) : (
-          <ProductActionButton
-            compact
-            className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
-            disabled={
-              !profile ||
-              incompatibleParameters ||
-              modelChoiceRequired ||
-              !session.sourceIsPrepared(outputSize) ||
-              tooManyInputs ||
-              uploading ||
-              !state.draft.prompt.trim() ||
-              (state.draft.intention !== 'new-image' && !state.source)
-            }
-            onClick={() => void generate()}
-            data-ui="editor.ai.generate"
-          >
-            {translate('editor.ai.generate')}
-          </ProductActionButton>
-        )}
+        <ImageRequestControls
+          busy={busy}
+          status={state.status}
+          error={failure ? error : null}
+          diagnostic={preparationError ? null : state.diagnostic}
+          disabled={
+            pickingRegion ||
+            !profile ||
+            incompatibleParameters ||
+            modelChoiceRequired ||
+            !session.sourceIsPrepared(null) ||
+            tooManyInputs ||
+            uploading ||
+            !state.draft.prompt.trim() ||
+            (state.draft.intention !== 'new-image' && !state.source)
+          }
+          onGenerate={() => void generate()}
+          onStop={() => {
+            pending.current?.abort();
+            session.stop();
+          }}
+        />
         <p className="text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
           {translate('editor.ai.privacy')}
         </p>
@@ -315,5 +327,66 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
         ) : null}
       </div>
     </ImagePreviewWorkspace>
+  );
+}
+
+function ImageRequestControls(props: {
+  busy: boolean;
+  status: ImageSessionState['status'];
+  error: string | null;
+  diagnostic: ImageSessionState['diagnostic'];
+  disabled: boolean;
+  onGenerate(): void;
+  onStop(): void;
+}) {
+  const statusKey =
+    props.status === 'opening'
+      ? 'editor.ai.openingDocument'
+      : props.status === 'applying'
+        ? 'editor.ai.applying'
+        : props.status === 'generating'
+          ? 'editor.ai.generating'
+          : 'editor.ai.preparing';
+  return (
+    <>
+      {props.error ? (
+        <div role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+          {props.error}
+          {props.diagnostic ? (
+            <details className="mt-1 text-[var(--sniptale-color-text-secondary)]">
+              <summary>{translate('editor.ai.diagnostics')}</summary>
+              {props.diagnostic.phase} ·{' '}
+              {props.diagnostic.approvalReason ?? props.diagnostic.reason ?? props.diagnostic.code}
+            </details>
+          ) : null}
+        </div>
+      ) : null}
+      {props.busy ? (
+        <div className="flex items-center justify-between gap-2">
+          <span role="status" className="text-xs">
+            {translate(statusKey)}
+          </span>
+          <ProductActionButton
+            compact
+            tone="secondary"
+            className={INSPECTOR_INLINE_BUTTON_CLASS_NAME}
+            disabled={props.status === 'opening'}
+            onClick={props.onStop}
+          >
+            {translate('editor.ai.stop')}
+          </ProductActionButton>
+        </div>
+      ) : (
+        <ProductActionButton
+          compact
+          className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
+          disabled={props.disabled}
+          onClick={props.onGenerate}
+          data-ui="editor.ai.generate"
+        >
+          {translate('editor.ai.generate')}
+        </ProductActionButton>
+      )}
+    </>
   );
 }

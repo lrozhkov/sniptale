@@ -45,23 +45,23 @@ function ImageSourcePreview({ snapshot }: { snapshot: EditorImageSnapshot }) {
   ) : null;
 }
 
-/** Describes the chosen source and keeps recapture an explicit user action. */
+/** Selects the source directly; local preparation follows the chosen source automatically. */
 export function ImageSourceControls({
   session,
   state,
   region,
   selectedCount,
   busy,
-  outputSize,
   onSelectRegion,
+  pickingRegion,
 }: {
   session: Pick<ImageEditorSession, 'setDraft' | 'refreshSource'>;
   state: Pick<ImageSessionState, 'source' | 'draft'>;
   region: ImageBounds | null;
   selectedCount: number;
   busy: boolean;
-  outputSize: { width: number; height: number } | null;
   onSelectRegion(): void;
+  pickingRegion: boolean;
 }) {
   const describedRegion = state.source?.intention === 'region' ? state.source.targetBounds : region;
   const describedLayerCount =
@@ -82,34 +82,16 @@ export function ImageSourceControls({
     <>
       <CompactSelect
         aria-label={translate('editor.ai.source')}
-        value={state.draft.intention}
+        value={pickingRegion ? 'region' : state.draft.intention}
         options={intentions}
         disabled={busy}
-        onChange={(intention) => session.setDraft({ intention })}
+        onChange={(intention) => {
+          if (intention === 'region') onSelectRegion();
+          else session.setDraft({ intention, regionSource: 'canvas' });
+        }}
       />
-      {state.draft.intention === 'region' ? (
+      {pickingRegion || state.draft.intention === 'region' ? (
         <div className="space-y-1">
-          <SelectField
-            label={translate('editor.ai.regionSource')}
-            value={state.draft.regionSource}
-            options={[
-              { value: 'canvas', label: translate('editor.ai.canvas') },
-              { value: 'source', label: translate('editor.ai.main') },
-            ]}
-            disabled={busy}
-            onChange={(regionSource) => session.setDraft({ regionSource })}
-          />
-          <SelectField
-            label={translate('editor.ai.context')}
-            value={state.draft.context}
-            options={[
-              { value: 'region', label: translate('editor.ai.regionOnly') },
-              { value: 'surroundings', label: translate('editor.ai.surroundings') },
-              { value: 'whole', label: translate('editor.ai.whole') },
-            ]}
-            disabled={busy}
-            onChange={(context) => session.setDraft({ context })}
-          />
           <ProductActionButton
             compact
             tone="secondary"
@@ -119,23 +101,23 @@ export function ImageSourceControls({
           >
             {translate('editor.ai.selectRegion')}
           </ProductActionButton>
-          {state.draft.regionSource === 'canvas' ? (
-            <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-              {translate('editor.ai.canvasNotice')}
-            </p>
-          ) : null}
+          <details className="text-xs">
+            <summary className="cursor-pointer py-1 text-[var(--sniptale-color-text-secondary)]">
+              {translate('editor.ai.context')}
+            </summary>
+            <SelectField
+              label={translate('editor.ai.context')}
+              value={state.draft.context}
+              options={[
+                { value: 'region', label: translate('editor.ai.regionOnly') },
+                { value: 'surroundings', label: translate('editor.ai.surroundings') },
+                { value: 'whole', label: translate('editor.ai.whole') },
+              ]}
+              disabled={busy}
+              onChange={(context) => session.setDraft({ context })}
+            />
+          </details>
         </div>
-      ) : null}
-      {state.draft.intention !== 'new-image' ? (
-        <ProductActionButton
-          compact
-          tone="secondary"
-          className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
-          disabled={busy}
-          onClick={() => void session.refreshSource(region ?? undefined, outputSize)}
-        >
-          {translate('editor.ai.refreshSource')}
-        </ProductActionButton>
       ) : null}
       {state.source ? <ImageSourcePreview snapshot={state.source} /> : null}
       {state.draft.intention === 'layers' ? (

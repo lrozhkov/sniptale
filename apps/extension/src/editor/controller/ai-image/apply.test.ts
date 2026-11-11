@@ -364,3 +364,23 @@ it('updates a previous raster once and refuses a late Apply after document repla
   ).rejects.toThrow('stale-document');
   expect(controller.commitHistory).toHaveBeenCalledTimes(2);
 });
+
+it('places a generated raster proportionally inside a differently shaped area without resampling it', async () => {
+  const { controller } = setup();
+  const snapshot = await captureImageEditorSnapshot(controller, {
+    intention: 'region',
+    region: { left: 10, top: 20, width: 20, height: 40 },
+    context: 'region',
+  });
+  const receipt = await applyImageEditorResult({
+    controller: () => controller,
+    snapshot,
+    raster: { dataUrl: png, width: 2, height: 3 },
+    mode: 'add',
+    name: 'AI',
+    fit: true,
+  });
+  expect(create.mock.calls[0]?.[0].dataUrl).toBe(png);
+  expect(receipt.object).toMatchObject({ left: 10, top: 25, scaleX: 10, scaleY: 10 });
+  expect(controller.commitHistory).toHaveBeenCalledOnce();
+});

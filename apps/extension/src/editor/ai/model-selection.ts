@@ -1,13 +1,16 @@
-import { useEffect, useMemo } from 'react';
-import {
-  resolveImageModelProfile,
-  getImageModelOutputSize,
-} from '../../contracts/ai/image-profile';
+import { useEffect, useMemo, useRef } from 'react';
+import { resolveImageModelProfile } from '../../contracts/ai/image-profile';
 import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
+import type { ImageBounds } from '../controller/ai-image/types';
 import type { ImageEditorSession, ImageSessionState } from './session';
 
 /** Coordinates model-specific parameters and preparation of the retained source. */
-export function useImageModelSelection(session: ImageEditorSession, state: ImageSessionState) {
+export function useImageModelSelection(
+  session: ImageEditorSession,
+  state: ImageSessionState,
+  sourceSelection: { region: ImageBounds | null; key: string }
+) {
+  const captured = useRef('');
   const editing =
     state.draft.intention !== 'new-image' ||
     state.draft.references.length > 0 ||
@@ -32,19 +35,36 @@ export function useImageModelSelection(session: ImageEditorSession, state: Image
     if (profile && state.status === 'idle')
       session.configureParameters(profileKey, profile.defaults);
   }, [profile, profileKey, session, state.status]);
-  const outputSize = useMemo(
-    () => (profile ? getImageModelOutputSize(profile, state.draft.parameters) : null),
-    [profile, state.draft.parameters]
+  const frozen = state.steps.some(
+    (step) => step.operationId === state.operationId && step.variants.some(Boolean)
   );
+  const captureKey = JSON.stringify([
+    state.draft.intention,
+    state.draft.context,
+    state.draft.regionSource,
+    sourceSelection.region,
+    sourceSelection.key,
+  ]);
   useEffect(() => {
-    if (state.status === 'idle') void session.prepareSource(outputSize);
+    if (state.status !== 'idle') return;
+    if (frozen || state.base || state.draft.intention === 'new-image') {
+      void session.prepareSource(null);
+      return;
+    }
+    if (state.draft.intention === 'region' && !sourceSelection.region) return;
+    if (captured.current === captureKey && (state.source || state.error)) return;
+    captured.current = captureKey;
+    void session.refreshSource(sourceSelection.region ?? undefined);
   }, [
     session,
     state.status,
-    state.source?.id,
-    state.base?.stepId,
-    state.base?.variant,
-    outputSize,
+    state.source,
+    state.base,
+    frozen,
+    state.error,
+    state.draft.intention,
+    sourceSelection.region,
+    captureKey,
   ]);
   const currentModel =
     model && provider?.destinationBinding
@@ -57,5 +77,5 @@ export function useImageModelSelection(session: ImageEditorSession, state: Image
         }
       : null;
   const modelChoiceRequired = Boolean(currentModel && session.modelChoiceRequired(currentModel));
-  return { selection, model, profile, outputSize, currentModel, editing, modelChoiceRequired };
+  return { selection, model, profile, currentModel, editing, modelChoiceRequired };
 }

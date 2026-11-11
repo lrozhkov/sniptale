@@ -6631,30 +6631,30 @@
       "reason": "tool-noise: Fresh independent diagnosis inspected this exact factory and its consumers. One factory owns the temporary conversation, draft, preparation, cancellation, results and receipts. Profile changes fill absent parameters within this draft authority. Narrow adapters retain capture, transport and document mutation ownership. Splitting the closure would distribute the same lifecycle. Fresh complete-candidate architecture review remains required for this exact classification.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, fixture or resource lifetime, writer, transport effect or transaction. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-11",
-      "astHash": "0855f8327861c67626eac7612b056edb3495d2c28ce396df2952dd351616190b",
+      "astHash": "1a625b6be983d98738f25409088611997b015cf939056fb107b1163b0df7749d",
       "signatureHash": "3e899fc484590c2b483453333e63b6a60d1dabcf99a9014e25703e64ea8ead0a"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/editor/ai/session.ts",
-      "symbol": "createImageEditorSession.generate",
+      "file": "apps/extension/src/editor/ai/inspector.tsx",
+      "symbol": "ImageAIInspector",
       "owner": "extension:editor:ai",
-      "reason": "tool-noise: Independent topology diagnosis inspected this exact function and its consumers. One request lifetime fixes the source and draft, admits the request and retains partial variants after failure. Matching-job and abort checks reject late callbacks. Its finalizer releases only that request. Fresh complete-candidate architecture review remains required for this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess new independent state authority, privileged effect, transport, persistence, transaction or resource lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: Independent read-only diagnosis inspected this exact assistant composition after request-control presentation extraction. Disposable area selection, picker visibility, upload readiness and preparation feedback belong to one mounted interface. The session retains draft, result and operation authority. Existing adapters retain model choice, source preparation, provider execution and document transactions. Remaining branches compose availability, validation and temporary history. Splitting these branches would add prop forwarding without removing an independent authority. Fresh complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess independent state or resource lifetimes, direct transport or persistence effects, document mutation or additional interaction authority. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-11",
-      "astHash": "8f3babeeddd1e6ce6098d23b1c852506e225e2f7128e6cf857a3356e0cfd3c21",
-      "signatureHash": "1bc9e14c2c3abede99c45c3b1abdcd6a6c1a7cec42859080ef9b4c720ac4202d"
+      "astHash": "44a58ee45eba034bced5de255319790b8e24f2c348e6ec9b9d8519af9e276bcc",
+      "signatureHash": "6c09e0658ecd8ca9bdcc2de0b47239a49895fc5763c65660caa0b15e498346e5"
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/editor/controller/ai-image/apply.ts",
-      "symbol": "applyImageEditorResult",
-      "owner": "extension:editor:controller",
-      "reason": "tool-noise: Fresh independent topology wrapper diagnosis inspected this exact candidate and its consumers. One transaction admits before and after decoding, commits once and restores captured document state after failure. Its mutation alternatives share one admission and rollback contract. Immutable result identity enters an ephemeral receipt and adds no transaction participant. Read-only presence does not authorize Update or Replace. Fresh complete-candidate architecture review remains required for this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, fixture or resource lifetime, writer, transport effect or transaction. Remove when the analyzer models this cohesive boundary.",
+      "file": "apps/extension/src/editor/ai/region-picker.tsx",
+      "symbol": "ImageRegionPicker",
+      "owner": "extension:editor:ai",
+      "reason": "tool-noise: Independent read-only diagnosis inspected this exact gesture after guide presentation extraction. Portal placement, coordinate projection, pointer capture, drag state, cancellation and cleanup share one disposable picker lifetime. Canvas access reads geometry only. Accepted bounds leave through onSelect. The picker has no crop-state, document-mutation, persistence or provider authority. Splitting placement from input would distribute the same element, bounds and cancellation lifetime. Fresh complete-candidate architecture review remains required.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess independent state or resource lifetimes, direct transport or persistence effects, document mutation or additional interaction authority. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-11",
-      "astHash": "78a4c96b632054de5084b5921419acfde25ea794c1cfc2d197761e46834ace01",
-      "signatureHash": "a8235692b1a0b4d5a68d25862ba6da8868fa38a33a3ca6e866590aa659e67d0b"
+      "astHash": "d0a3a6f288f362340ab6ae47c23405ecf5f4245011649f0db645bb7014a7507f",
+      "signatureHash": "a6f42e2ea10bc45cab3e6e0bfc0b1bce48215cc417f63c7ab913d638b22951e1"
     }
   ]
 }

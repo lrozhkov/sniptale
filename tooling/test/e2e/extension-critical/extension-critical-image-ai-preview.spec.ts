@@ -62,9 +62,6 @@ for (const locale of ['en', 'ru'] as const) {
           .getByRole('button', { name: text('editor.ai.source'), exact: true })
           .click();
         await page.getByRole('option', { name: text('editor.ai.main'), exact: true }).click();
-        await inspector
-          .getByRole('button', { name: text('editor.ai.refreshSource'), exact: true })
-          .click();
         const prompt = inspector.locator('[data-ui="editor.ai.prompt"]');
         await prompt.fill('Generate three alternatives');
         await inspector.locator('[data-ui="editor.ai.generate"]').click();

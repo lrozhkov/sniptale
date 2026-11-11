@@ -15,6 +15,16 @@ const raster = {
   height: 3,
 };
 const uuid = 'fdd43bfc-2c5b-416e-91b2-d2c2cc820ac7';
+
+it('admits only fixed provider failure reasons', () => {
+  const failure = { type: 'failure', requestId: uuid, code: 'provider-failed' };
+  expect(parseImageJobServerMessage({ ...failure, failureReason: 'quota-exceeded' })).toEqual({
+    ...failure,
+    failureReason: 'quota-exceeded',
+  });
+  for (const failureReason of ['PRIVATE BODY', { status: 402 }, 402])
+    expect(parseImageJobServerMessage({ ...failure, failureReason })).toBeNull();
+});
 const context = {
   version: 1,
   intention: 'new-image',

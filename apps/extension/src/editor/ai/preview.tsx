@@ -1,3 +1,4 @@
+import { imageRasterRegion } from '../controller/ai-image/geometry';
 import {
   createContext,
   useContext,
@@ -42,6 +43,7 @@ export function ImagePreviewWorkspace(
   props: PropsWithChildren<{
     session: ImageEditorSession;
     state: ImageSessionState;
+    hidden?: boolean;
   }>
 ) {
   const anchor = useRef<HTMLDivElement>(null);
@@ -85,7 +87,7 @@ export function ImagePreviewWorkspace(
       <div ref={anchor} className="contents">
         {props.children}
       </div>
-      {kind && image ? (
+      {!props.hidden && kind && image ? (
         <ImagePreviewPanel
           anchor={anchor}
           panel={panel}
@@ -97,12 +99,7 @@ export function ImagePreviewWorkspace(
           }
           region={
             kind === 'source' && source
-              ? {
-                  left: source.targetBounds.left - source.inputBounds.left,
-                  top: source.targetBounds.top - source.inputBounds.top,
-                  width: source.targetBounds.width,
-                  height: source.targetBounds.height,
-                }
+              ? imageRasterRegion(source.inputBounds, source.targetBounds, image)
               : null
           }
           imageKey={`${kind}:${source?.id}:${step?.id}:${props.state.selected?.variant}`}

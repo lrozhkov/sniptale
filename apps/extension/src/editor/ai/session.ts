@@ -1,3 +1,4 @@
+import { imageRasterRegion } from '../controller/ai-image/geometry';
 import {
   IMAGE_JOB_FAILURE_CODES,
   imageContextSchema,
@@ -23,7 +24,7 @@ import type {
   ImageCaptureContext,
   ImageIntention,
 } from '../controller/ai-image/types';
-import { runImageEditorJob } from './client';
+import { runImageEditorJob, ImageJobError, type ImageJobDiagnostic } from './client';
 import { openGeneratedImageDocument } from '../workflows/open-generated-image-document';
 
 const MAX_STEPS_PER_OPERATION = 10;
@@ -79,6 +80,7 @@ export interface ImageSessionState {
   operationId: string;
   status: 'idle' | 'preparing' | 'generating' | 'applying' | 'opening';
   error: string | null;
+  diagnostic: ImageJobDiagnostic | null;
 }
 interface ImageSessionModel {
   modelId: string;
@@ -98,7 +100,7 @@ function initialState(): ImageSessionState {
   return {
     draft: {
       intention: 'new-image',
-      context: 'surroundings',
+      context: 'region',
       regionSource: 'canvas',
       prompt: '',
       parameters: { variants: 1 },
@@ -111,6 +113,7 @@ function initialState(): ImageSessionState {
     operationId: crypto.randomUUID(),
     status: 'idle',
     error: null,
+    diagnostic: null,
   };
 }
 function failureCode(error: unknown): string {
@@ -135,12 +138,9 @@ function buildImageContext(
     ),
     ...(source.intention !== 'new-image'
       ? {
-          editRegion: {
-            left: source.targetBounds.left - source.inputBounds.left,
-            top: source.targetBounds.top - source.inputBounds.top,
-            width: source.targetBounds.width,
-            height: source.targetBounds.height,
-          },
+          editRegion: base
+            ? imageRasterRegion(source.inputBounds, source.targetBounds, base)
+            : undefined,
         }
       : {}),
   });
@@ -233,7 +233,7 @@ export function createImageEditorSession(
   const begin = (status: ImageSessionState['status']) => {
     if (active) return null;
     active = new AbortController();
-    publish({ status, error: null });
+    publish({ status, error: null, diagnostic: null });
     return active;
   };
   const end = (job: AbortController) => {
@@ -294,7 +294,10 @@ export function createImageEditorSession(
         }
       } catch (error) {
         if (active === job)
-          publish({ error: job.signal.aborted ? 'cancelled' : failureCode(error) });
+          publish({
+            error: job.signal.aborted ? 'cancelled' : failureCode(error),
+            diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
+          });
       } finally {
         end(job);
       }
@@ -403,7 +406,10 @@ export function createImageEditorSession(
         }
       } catch (error) {
         if (active === job)
-          publish({ error: job.signal.aborted ? 'cancelled' : failureCode(error) });
+          publish({
+            error: job.signal.aborted ? 'cancelled' : failureCode(error),
+            diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
+          });
       } finally {
         end(job);
       }
@@ -491,7 +497,10 @@ export function createImageEditorSession(
           publish({ draft: { ...state.draft, prompt: '' } });
       } catch (error) {
         if (active === job)
-          publish({ error: job.signal.aborted ? 'cancelled' : failureCode(error) });
+          publish({
+            error: job.signal.aborted ? 'cancelled' : failureCode(error),
+            diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
+          });
       } finally {
         end(job);
       }
@@ -539,7 +548,10 @@ export function createImageEditorSession(
         });
       } catch (error) {
         if (active === job)
-          publish({ error: job.signal.aborted ? 'cancelled' : failureCode(error) });
+          publish({
+            error: job.signal.aborted ? 'cancelled' : failureCode(error),
+            diagnostic: error instanceof ImageJobError ? error.diagnostic : null,
+          });
       } finally {
         end(job);
       }

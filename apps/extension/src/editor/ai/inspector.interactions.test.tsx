@@ -8,6 +8,7 @@ import { ImageAIInspector } from './inspector';
 import { ImageAttachments } from './attachments';
 import { ImageParametersEditor } from './parameters';
 import { createImageEditorSession, type ImageEditorSession } from './session';
+import { ImageJobError } from './client';
 import type {
   EditorImageSnapshot,
   ImageApplyController,
@@ -50,10 +51,27 @@ vi.mock('../controller/ai-image/apply', () => ({
 vi.mock('../workflows/open-generated-image-document', () => ({
   openGeneratedImageDocument: vi.fn(),
 }));
-vi.mock('./client', () => ({ runImageEditorJob: vi.fn() }));
+vi.mock('./client', async (original) => ({
+  ...(await original<typeof import('./client')>()),
+  runImageEditorJob: vi.fn(),
+}));
 vi.mock('fabric', async (original) => ({
   ...(await original<typeof import('fabric')>()),
-  Canvas: class {},
+  Canvas: class {
+    upperCanvasEl = Object.assign(document.createElement('canvas'), {
+      getBoundingClientRect: () => new DOMRect(0, 0, 100, 100),
+    });
+    viewportTransform = [1, 0, 0, 1, 0, 0];
+    getWidth() {
+      return 100;
+    }
+    getHeight() {
+      return 100;
+    }
+    getScenePoint(event: PointerEvent) {
+      return { x: event.clientX, y: event.clientY };
+    }
+  },
 }));
 vi.mock('../application/controller-context', () => ({ useEditorController: () => controller }));
 vi.mock('../state/useEditorStore', () => ({
@@ -146,7 +164,8 @@ let controller: ImageApplyController & {
 };
 let store: {
   cropSelection: ImageBounds | null;
-  selection: { selectedObjectCount: number };
+  selection: { selectedObjectCount: number; selectedObjectIds: string[] };
+  history: { index: number };
   setActiveTool: (_: string) => void;
 };
 type Deps = Required<NonNullable<Parameters<typeof createImageEditorSession>[1]>>;
@@ -282,7 +301,8 @@ beforeEach(() => {
   });
   store = {
     cropSelection: { left: 0, top: 0, width: 2, height: 3 },
-    selection: { selectedObjectCount: 2 },
+    selection: { selectedObjectCount: 2, selectedObjectIds: ['one', 'two'] },
+    history: { index: 0 },
     setActiveTool: vi.fn(),
   };
   catalog = createCatalog();
@@ -332,34 +352,49 @@ it('previews variants, refines the chosen result and applies without duplicating
   expect(session.getSnapshot().base).toBeNull();
 });
 
-it('captures an explicitly chosen region and keeps its context visible before dispatch', async () => {
+it('accepts an AI area without Crop or a second source confirmation', async () => {
   await render();
   await select('editor.ai.source', 'region');
-  await select('editor.ai.regionSource', 'source');
-  await select('editor.ai.context', 'whole');
-  await click('editor.ai.selectRegion');
-  expect(controller.setActiveTool).toHaveBeenCalledWith('crop');
-  expect(store.setActiveTool).toHaveBeenCalledWith('crop');
-  await click('editor.ai.refreshSource');
+  expect(controller.setActiveTool).toHaveBeenCalledWith('select');
+  expect(controller.setActiveTool).not.toHaveBeenCalledWith('crop');
+  const picker = document.querySelector<HTMLElement>('[data-ui="editor.ai.region-picker"]')!;
+  picker.setPointerCapture = vi.fn();
+  await act(async () =>
+    picker.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 10, clientY: 20 }))
+  );
+  await act(async () =>
+    picker.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 40, clientY: 60 }))
+  );
+  expect(document.querySelector('[data-ui="editor.ai.region-picker"]')).toBeNull();
   expect(deps.capture).toHaveBeenCalledWith(
     controller,
-    expect.objectContaining({ intention: 'region', context: 'whole', regionSource: 'source' })
+    expect.objectContaining({
+      intention: 'region',
+      region: { left: 10, top: 20, width: 30, height: 40 },
+    })
   );
-  await click('editor.ai.openSourcePreview');
-  expect(document.querySelector('[aria-label="editor.ai.editArea"]')).not.toBeNull();
+  expect(host.textContent).not.toContain('editor.ai.refreshSource');
+  expect(controller.commitHistory).not.toHaveBeenCalled();
   await enter('Change the chosen area');
   await click('editor.ai.generate');
   expect(deps.run.mock.calls[0]?.[0].request.context.intention).toBe('region');
-  await click('editor.ai.original');
-  expect(document.querySelector('[data-ui="editor.ai.preview-image"]')?.getAttribute('href')).toBe(
-    image.dataUrl
-  );
-  await click('editor.ai.result');
   await select('editor.ai.source', 'layers');
-  await click('editor.ai.refreshSource');
   expect(host.textContent).toContain('Layer one');
   expect(host.textContent).toContain('Layer two');
-  expect(host.textContent).toContain('editor.ai.layersNotice');
+});
+
+it('prepares the main image automatically and cancels AI area selection without a document command', async () => {
+  await render();
+  await select('editor.ai.source', 'source');
+  expect(session.getSnapshot().source?.intention).toBe('source');
+  await enter('Edit the image');
+  expect(button('editor.ai.generate').disabled).toBe(false);
+  await select('editor.ai.source', 'region');
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('[data-ui="editor.ai.region-picker"]')).toBeNull();
+  expect(controller.commitHistory).not.toHaveBeenCalled();
 });
 
 it('keeps generation unavailable when configuration fails and lets the user retry', async () => {
@@ -452,7 +487,7 @@ it('uses an explicitly selected refinement model and preserves the result after 
   await click('editor.ai.generate');
   expect(deps.run).toHaveBeenCalledOnce();
   expect(session.getSelectedVariant()).not.toBeNull();
-  expect(host.querySelector('[role="alert"]')?.textContent).toBe('editor.ai.error');
+  expect(host.querySelector('[role="alert"]')?.textContent).toBe('editor.ai.noModel');
   await click('editor.ai.generate');
   expect(deps.run.mock.calls[1]?.[0].request.modelId).toBe('second');
   expect(deps.run.mock.calls[1]?.[0].request.context.images).toHaveLength(1);
@@ -684,4 +719,23 @@ it('keeps preview outside the inspector and restores focus without changing docu
   expect(document.activeElement).toBe(button('editor.ai.openPreview'));
   expect(controller.commitHistory).not.toHaveBeenCalled();
   expect(deps.apply).not.toHaveBeenCalled();
+});
+
+it('shows the provider rejection and retains the prompt and safe diagnostic stage', async () => {
+  deps.run.mockRejectedValueOnce(
+    new ImageJobError({
+      code: 'provider-failed',
+      phase: 'requesting',
+      reason: 'invalid-credential',
+    })
+  );
+  await render();
+  await enter('Keep my request');
+  await click('editor.ai.generate');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+    'settings.aiProviders.providerStatusInvalidKey'
+  );
+  expect(host.querySelector('[role="alert"] details')?.textContent).toContain('requesting');
+  expect(session.getSnapshot().draft.prompt).toBe('Keep my request');
+  expect(deps.run).toHaveBeenCalledOnce();
 });

@@ -1,3 +1,4 @@
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { generateImage } from 'ai';
 import { z } from 'zod';
 import { readImageDataUrlDimensions } from '@sniptale/runtime-contracts/validation/data-url';
@@ -18,6 +19,8 @@ import {
 import { createAIOperationObservation } from '../operation-observation';
 import { createProviderSdkFetch } from '../llm/transport/http';
 import type { ImageModelConfig } from './model-config';
+
+const logger = createLogger({ namespace: 'BackgroundImageRequest' });
 
 interface ImageRequestResult {
   image: ImageRaster;
@@ -161,7 +164,15 @@ async function requestJson(
       body: JSON.stringify(body),
     }
   );
-  if (!response.ok) throw new AIProviderRequestError(classifyAIProviderHttpStatus(response.status));
+  if (!response.ok) {
+    const reason = classifyAIProviderHttpStatus(response.status);
+    logger.warn('Image provider request failed', {
+      phase: 'response',
+      status: response.status,
+      reason,
+    });
+    throw new AIProviderRequestError(reason);
+  }
   let raw: unknown;
   try {
     raw = await response.json();
