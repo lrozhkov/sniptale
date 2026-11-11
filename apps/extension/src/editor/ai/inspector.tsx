@@ -14,6 +14,11 @@ import { ImageResults } from './results';
 import { ImageSessionMenu } from './session-menu';
 import { ImageSourceControls } from './source';
 import { useImageModelSelection } from './model-selection';
+import { ImagePreviewWorkspace } from './preview';
+import {
+  INSPECTOR_INLINE_BUTTON_CLASS_NAME,
+  INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
+} from '../inspector/chrome';
 
 const errorMessages: Readonly<Record<string, TranslationKey>> = {
   'session-limit': 'editor.ai.limit',
@@ -45,21 +50,6 @@ const errorMessages: Readonly<Record<string, TranslationKey>> = {
 export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
   useAppLocale();
   const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
-  const inspectorRef = useRef<HTMLDivElement>(null);
-  const lastResult = useRef(state.selected?.stepId ?? null);
-  useEffect(() => {
-    if (
-      state.status !== 'idle' ||
-      !state.selected ||
-      lastResult.current === state.selected.stepId ||
-      document.activeElement instanceof HTMLTextAreaElement
-    )
-      return;
-    lastResult.current = state.selected.stepId;
-    inspectorRef.current
-      ?.querySelector<HTMLElement>('[data-ui="editor.ai.result"]')
-      ?.scrollIntoView({ block: 'start' });
-  }, [state.status, state.selected]);
   const controller = useEditorController();
   const region = useEditorStore((store) => store.cropSelection);
   const selectedCount = useEditorStore((store) => store.selection.selectedObjectCount);
@@ -109,211 +99,221 @@ export function ImageAIInspector({ session }: { session: ImageEditorSession }) {
   };
   const error = translate((state.error && errorMessages[state.error]) || 'editor.ai.error');
   return (
-    <div
-      className={[
-        'sniptale-inspector-surface editor-inspector-surface space-y-3',
-        'text-[var(--sniptale-color-text-primary)]',
-      ].join(' ')}
-      ref={inspectorRef}
-      data-ui="editor.ai.inspector"
-    >
-      <div className="flex min-w-0 items-center gap-1">
-        <div className="min-w-0 flex-1">
-          <AIModelSelector
-            portalMenu
-            models={selection.configuration?.models ?? []}
-            providers={selection.configuration?.providers ?? []}
-            selectedModelId={selection.modelId}
-            onSelect={(id) => {
-              selection.chooseModel(id);
-              const selected = selection.configuration?.models.find((entry) => entry.id === id);
-              const destination = selection.configuration?.providers.find(
-                (entry) => entry.id === selected?.providerId
-              );
-              if (selected && destination?.destinationBinding)
-                session.acknowledgeModel({
-                  modelId: selected.id,
-                  modelCode: selected.modelCode,
-                  providerId: destination.id,
-                  destinationBinding: destination.destinationBinding,
-                  label: `${destination.name} / ${selected.displayName}`,
-                });
-            }}
-            disabled={busy}
-          />
+    <ImagePreviewWorkspace session={session} state={state}>
+      <div
+        className={[
+          'sniptale-inspector-surface editor-inspector-surface space-y-3',
+          'text-[var(--sniptale-color-text-primary)]',
+        ].join(' ')}
+        data-ui="editor.ai.inspector"
+      >
+        <div className="flex min-w-0 items-center gap-1">
+          <div className="min-w-0 flex-1">
+            <AIModelSelector
+              portalMenu
+              models={selection.configuration?.models ?? []}
+              providers={selection.configuration?.providers ?? []}
+              selectedModelId={selection.modelId}
+              onSelect={(id) => {
+                selection.chooseModel(id);
+                const selected = selection.configuration?.models.find((entry) => entry.id === id);
+                const destination = selection.configuration?.providers.find(
+                  (entry) => entry.id === selected?.providerId
+                );
+                if (selected && destination?.destinationBinding)
+                  session.acknowledgeModel({
+                    modelId: selected.id,
+                    modelCode: selected.modelCode,
+                    providerId: destination.id,
+                    destinationBinding: destination.destinationBinding,
+                    label: `${destination.name} / ${selected.displayName}`,
+                  });
+              }}
+              disabled={busy}
+            />
+          </div>
+          <ImageSessionMenu session={session} disabled={busy} />
         </div>
-        <ImageSessionMenu session={session} disabled={busy} />
+        {selection.configurationFailed || selection.selectionUnavailable || !model ? (
+          <div className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-secondary)]">
+            <span>{translate('editor.ai.noModel')}</span>
+            <EditorIconButton
+              title={translate('editor.ai.retryModels')}
+              onClick={() => void selection.retryConfiguration()}
+            >
+              <RefreshCw size={14} />
+            </EditorIconButton>
+          </div>
+        ) : null}
+        <ImageSourceControls
+          session={session}
+          state={state}
+          region={region}
+          selectedCount={selectedCount}
+          busy={busy}
+          outputSize={outputSize}
+          onSelectRegion={() => {
+            controller.setActiveTool('crop');
+            useEditorStore.getState().setActiveTool('crop');
+          }}
+        />
+        <ImageResults
+          key={`${state.selected?.stepId}:${state.selected?.variant}`}
+          session={session}
+          state={state}
+          controller={controller.getPublicApiAdapter()}
+        />
+        {state.base ? (
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span>
+              {translate('editor.ai.base')} · {state.base.variant + 1}
+            </span>
+            <ProductActionButton
+              compact
+              tone="secondary"
+              className={INSPECTOR_INLINE_BUTTON_CLASS_NAME}
+              disabled={busy}
+              onClick={() => session.useOriginal()}
+            >
+              {translate('editor.ai.useOriginal')}
+            </ProductActionButton>
+          </div>
+        ) : null}
+        <ProductTextarea
+          rows={3}
+          maxLength={4000}
+          value={state.draft.prompt}
+          aria-label={translate('editor.ai.prompt')}
+          placeholder={translate(state.base ? 'editor.ai.refine' : 'editor.ai.prompt')}
+          onChange={(event) => {
+            session.setDraft({ prompt: event.currentTarget.value });
+            setPreparationError(false);
+          }}
+          className="w-full resize-y"
+          data-ui="editor.ai.prompt"
+        />
+        <ImageAttachments
+          operationId={state.operationId}
+          images={state.draft.references}
+          disabled={busy}
+          onPendingChange={setUploading}
+          onChange={(references) => session.setDraft({ references })}
+        />
+        <ImageParametersEditor
+          profile={profile}
+          value={state.draft.parameters}
+          disabled={busy}
+          onChange={(parameters) => session.setDraft({ parameters })}
+        />
+        {modelChoiceRequired ? (
+          <p className="text-xs text-[var(--sniptale-color-danger)]">
+            {translate('editor.ai.confirmModel')}
+          </p>
+        ) : null}
+        {tooManyInputs || (model && !profile) ? (
+          <p className="text-xs text-[var(--sniptale-color-danger)]">
+            {translate('editor.ai.modelUnsupported')}
+          </p>
+        ) : null}
+        {state.error || preparationError ? (
+          <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
+            {error}
+          </p>
+        ) : null}
+        {busy ? (
+          <div className="flex items-center justify-between gap-2">
+            <span role="status" className="text-xs">
+              {translate(
+                state.status === 'opening'
+                  ? 'editor.ai.openingDocument'
+                  : state.status === 'applying'
+                    ? 'editor.ai.applying'
+                    : state.status === 'generating'
+                      ? 'editor.ai.generating'
+                      : 'editor.ai.preparing'
+              )}
+            </span>
+            <ProductActionButton
+              compact
+              tone="secondary"
+              className={INSPECTOR_INLINE_BUTTON_CLASS_NAME}
+              disabled={state.status === 'opening'}
+              onClick={() => {
+                pending.current?.abort();
+                session.stop();
+              }}
+            >
+              {translate('editor.ai.stop')}
+            </ProductActionButton>
+          </div>
+        ) : (
+          <ProductActionButton
+            compact
+            className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
+            disabled={
+              !profile ||
+              incompatibleParameters ||
+              modelChoiceRequired ||
+              !session.sourceIsPrepared(outputSize) ||
+              tooManyInputs ||
+              uploading ||
+              !state.draft.prompt.trim() ||
+              (state.draft.intention !== 'new-image' && !state.source)
+            }
+            onClick={() => void generate()}
+            data-ui="editor.ai.generate"
+          >
+            {translate('editor.ai.generate')}
+          </ProductActionButton>
+        )}
+        <p className="text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
+          {translate('editor.ai.privacy')}
+        </p>
+        {state.steps.length ? (
+          <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-2">
+            {state.steps.map((step) => (
+              <details key={step.id} className="text-xs">
+                <summary className="cursor-pointer break-words">
+                  <span>{step.context.prompt}</span>
+                  <span className="ml-2 text-[var(--sniptale-color-text-secondary)]">
+                    {step.variants.filter(Boolean).length}
+                    {step.applied ? ` · ${translate('editor.ai.applied')}` : ''}
+                  </span>
+                </summary>
+                <p className="my-1 break-words text-[var(--sniptale-color-text-secondary)]">
+                  {step.modelLabel}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {step.variants.map((variant, i) =>
+                    variant ? (
+                      <ProductActionButton
+                        key={i}
+                        type="button"
+                        compact
+                        tone="toggle"
+                        active={state.selected?.stepId === step.id && state.selected.variant === i}
+                        aria-pressed={
+                          state.selected?.stepId === step.id && state.selected.variant === i
+                        }
+                        className="!h-auto !p-1"
+                        disabled={busy}
+                        aria-label={`${translate('editor.ai.variants')} ${i + 1}`}
+                        onClick={() => session.chooseVariant(step.id, i)}
+                      >
+                        <img
+                          src={variant.image.dataUrl}
+                          alt=""
+                          className="h-12 w-16 rounded-[4px] object-contain"
+                        />
+                      </ProductActionButton>
+                    ) : null
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+        ) : null}
       </div>
-      {selection.configurationFailed || selection.selectionUnavailable || !model ? (
-        <div className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-secondary)]">
-          <span>{translate('editor.ai.noModel')}</span>
-          <EditorIconButton
-            title={translate('editor.ai.retryModels')}
-            onClick={() => void selection.retryConfiguration()}
-          >
-            <RefreshCw size={14} />
-          </EditorIconButton>
-        </div>
-      ) : null}
-      <ImageSourceControls
-        session={session}
-        state={state}
-        region={region}
-        selectedCount={selectedCount}
-        busy={busy}
-        outputSize={outputSize}
-        onSelectRegion={() => {
-          controller.setActiveTool('crop');
-          useEditorStore.getState().setActiveTool('crop');
-        }}
-      />
-      <ImageResults
-        key={`${state.selected?.stepId}:${state.selected?.variant}`}
-        session={session}
-        state={state}
-        controller={controller.getPublicApiAdapter()}
-      />
-      {state.base ? (
-        <div className="flex items-center justify-between gap-2 text-xs">
-          <span>
-            {translate('editor.ai.base')} · {state.base.variant + 1}
-          </span>
-          <ProductActionButton
-            compact
-            tone="secondary"
-            disabled={busy}
-            onClick={() => session.useOriginal()}
-          >
-            {translate('editor.ai.useOriginal')}
-          </ProductActionButton>
-        </div>
-      ) : null}
-      <ProductTextarea
-        rows={3}
-        maxLength={4000}
-        value={state.draft.prompt}
-        aria-label={translate('editor.ai.prompt')}
-        placeholder={translate(state.base ? 'editor.ai.refine' : 'editor.ai.prompt')}
-        onChange={(event) => {
-          session.setDraft({ prompt: event.currentTarget.value });
-          setPreparationError(false);
-        }}
-        className="w-full resize-y"
-        data-ui="editor.ai.prompt"
-      />
-      <ImageAttachments
-        operationId={state.operationId}
-        images={state.draft.references}
-        disabled={busy}
-        onPendingChange={setUploading}
-        onChange={(references) => session.setDraft({ references })}
-      />
-      <ImageParametersEditor
-        profile={profile}
-        value={state.draft.parameters}
-        disabled={busy}
-        onChange={(parameters) => session.setDraft({ parameters })}
-      />
-      {modelChoiceRequired ? (
-        <p className="text-xs text-[var(--sniptale-color-danger)]">
-          {translate('editor.ai.confirmModel')}
-        </p>
-      ) : null}
-      {tooManyInputs || (model && !profile) ? (
-        <p className="text-xs text-[var(--sniptale-color-danger)]">
-          {translate('editor.ai.modelUnsupported')}
-        </p>
-      ) : null}
-      {state.error || preparationError ? (
-        <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
-          {error}
-        </p>
-      ) : null}
-      {busy ? (
-        <div className="flex items-center justify-between gap-2">
-          <span role="status" className="text-xs">
-            {translate(
-              state.status === 'opening'
-                ? 'editor.ai.openingDocument'
-                : state.status === 'applying'
-                  ? 'editor.ai.applying'
-                  : state.status === 'generating'
-                    ? 'editor.ai.generating'
-                    : 'editor.ai.preparing'
-            )}
-          </span>
-          <ProductActionButton
-            compact
-            tone="secondary"
-            disabled={state.status === 'opening'}
-            onClick={() => {
-              pending.current?.abort();
-              session.stop();
-            }}
-          >
-            {translate('editor.ai.stop')}
-          </ProductActionButton>
-        </div>
-      ) : (
-        <ProductActionButton
-          compact
-          className="w-full"
-          disabled={
-            !profile ||
-            incompatibleParameters ||
-            modelChoiceRequired ||
-            !session.sourceIsPrepared(outputSize) ||
-            tooManyInputs ||
-            uploading ||
-            !state.draft.prompt.trim() ||
-            (state.draft.intention !== 'new-image' && !state.source)
-          }
-          onClick={() => void generate()}
-          data-ui="editor.ai.generate"
-        >
-          {translate('editor.ai.generate')}
-        </ProductActionButton>
-      )}
-      <p className="text-xs leading-4 text-[var(--sniptale-color-text-secondary)]">
-        {translate('editor.ai.privacy')}
-      </p>
-      {state.steps.length ? (
-        <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-2">
-          {state.steps.map((step) => (
-            <details key={step.id} className="text-xs">
-              <summary className="cursor-pointer break-words">
-                <span>{step.context.prompt}</span>
-                <span className="ml-2 text-[var(--sniptale-color-text-secondary)]">
-                  {step.variants.filter(Boolean).length}
-                  {step.applied ? ` · ${translate('editor.ai.applied')}` : ''}
-                </span>
-              </summary>
-              <p className="my-1 break-words text-[var(--sniptale-color-text-secondary)]">
-                {step.modelLabel}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {step.variants.map((variant, i) =>
-                  variant ? (
-                    <button
-                      key={i}
-                      type="button"
-                      disabled={busy}
-                      aria-label={`${translate('editor.ai.variants')} ${i + 1}`}
-                      onClick={() => session.chooseVariant(step.id, i)}
-                    >
-                      <img
-                        src={variant.image.dataUrl}
-                        alt=""
-                        className="h-12 w-16 rounded-[4px] object-contain"
-                      />
-                    </button>
-                  ) : null
-                )}
-              </div>
-            </details>
-          ))}
-        </div>
-      ) : null}
-    </div>
+    </ImagePreviewWorkspace>
   );
 }

@@ -1,12 +1,13 @@
+import { useImagePreview } from './preview';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../platform/i18n';
 import { CompactSelect, SelectField } from '../chrome/ui';
 import type { EditorImageSnapshot, ImageBounds } from '../controller/ai-image/types';
 import type { ImageEditorSession, ImageSessionState } from './session';
+import { INSPECTOR_SECONDARY_BUTTON_CLASS_NAME } from '../inspector/chrome';
 
 function ImageSourcePreview({ snapshot }: { snapshot: EditorImageSnapshot }) {
-  const input = snapshot.inputBounds;
-  const target = snapshot.targetBounds;
+  const preview = useImagePreview();
   return snapshot.raster ? (
     <details className="text-xs">
       <summary className="flex cursor-pointer items-center gap-2">
@@ -16,26 +17,14 @@ function ImageSourcePreview({ snapshot }: { snapshot: EditorImageSnapshot }) {
           {snapshot.raster.height}
         </span>
       </summary>
-      <div className="relative my-2">
-        <img
-          src={snapshot.raster.dataUrl}
-          alt={translate('editor.ai.sourcePreview')}
-          className="block h-auto w-full"
-        />
-        {snapshot.intention !== 'new-image' ? (
-          <div
-            role="img"
-            aria-label={translate('editor.ai.editArea')}
-            className="pointer-events-none absolute border border-[var(--sniptale-color-accent)]"
-            style={{
-              left: `${(100 * (target.left - input.left)) / input.width}%`,
-              top: `${(100 * (target.top - input.top)) / input.height}%`,
-              width: `${(100 * target.width) / input.width}%`,
-              height: `${(100 * target.height) / input.height}%`,
-            }}
-          />
-        ) : null}
-      </div>
+      <ProductActionButton
+        compact
+        tone="secondary"
+        className={`${INSPECTOR_SECONDARY_BUTTON_CLASS_NAME} my-2`}
+        onClick={(event) => preview.openSource(event.currentTarget)}
+      >
+        {translate('editor.ai.openSourcePreview')}
+      </ProductActionButton>
       {snapshot.inputBounds.width !== snapshot.captureBounds.width ||
       snapshot.inputBounds.height !== snapshot.captureBounds.height ? (
         <p className="my-2 text-[var(--sniptale-color-text-secondary)]">
@@ -121,7 +110,13 @@ export function ImageSourceControls({
             disabled={busy}
             onChange={(context) => session.setDraft({ context })}
           />
-          <ProductActionButton compact tone="secondary" disabled={busy} onClick={onSelectRegion}>
+          <ProductActionButton
+            compact
+            tone="secondary"
+            className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
+            disabled={busy}
+            onClick={onSelectRegion}
+          >
             {translate('editor.ai.selectRegion')}
           </ProductActionButton>
           {state.draft.regionSource === 'canvas' ? (
@@ -135,6 +130,7 @@ export function ImageSourceControls({
         <ProductActionButton
           compact
           tone="secondary"
+          className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
           disabled={busy}
           onClick={() => void session.refreshSource(region ?? undefined, outputSize)}
         >

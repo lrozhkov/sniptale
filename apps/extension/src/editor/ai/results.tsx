@@ -1,89 +1,15 @@
 import { useState } from 'react';
+import { Eye } from 'lucide-react';
+import { useImagePreview } from './preview';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import type { ImageRaster } from '../../contracts/ai/image';
 import { formatNumber, translate } from '../../platform/i18n';
 import { isImageSnapshotCurrent } from '../controller/ai-image/snapshot';
 import type { ImageApplyController } from '../controller/ai-image/types';
 import type { ImageEditorSession, ImageSessionState } from './session';
-
-function ImageResultPreview({
-  original,
-  image,
-}: {
-  original: ImageRaster | null;
-  image: ImageRaster;
-}) {
-  const [compare, setCompare] = useState(false);
-  return (
-    <>
-      <div className="flex gap-1">
-        <ProductActionButton
-          compact
-          tone="toggle"
-          active={!compare}
-          onClick={() => setCompare(false)}
-        >
-          {translate('editor.ai.result')}
-        </ProductActionButton>
-        {original ? (
-          <ProductActionButton
-            compact
-            tone="toggle"
-            active={compare}
-            onClick={() => setCompare(true)}
-          >
-            {translate('editor.ai.original')}
-          </ProductActionButton>
-        ) : null}
-        <span className="ml-auto self-center text-xs tabular-nums">
-          {image.width} × {image.height}
-        </span>
-      </div>
-      <img
-        src={compare && original ? original.dataUrl : image.dataUrl}
-        alt={translate(compare ? 'editor.ai.original' : 'editor.ai.result')}
-        className="max-h-[min(10rem,24vh)] w-full rounded-[4px] object-contain"
-      />
-    </>
-  );
-}
-
-function ImageResultVariants({
-  variants,
-  selectedIndex,
-  busy,
-  onChoose,
-}: {
-  variants: ImageSessionState['steps'][number]['variants'];
-  selectedIndex: number | undefined;
-  busy: boolean;
-  onChoose(index: number): void;
-}) {
-  return variants.filter(Boolean).length > 1 ? (
-    <div className="flex flex-wrap gap-2">
-      {variants.map((variant, index) =>
-        variant ? (
-          <button
-            key={index}
-            type="button"
-            disabled={busy}
-            aria-pressed={selectedIndex === index}
-            aria-label={`${translate('editor.ai.variants')} ${index + 1}`}
-            onClick={() => onChoose(index)}
-            className={[
-              'rounded-[4px] border p-0.5',
-              selectedIndex === index
-                ? 'border-[var(--sniptale-color-accent)]'
-                : 'border-[var(--sniptale-color-border-soft)]',
-            ].join(' ')}
-          >
-            <img src={variant.image.dataUrl} alt="" className="h-12 w-16 object-contain" />
-          </button>
-        ) : null
-      )}
-    </div>
-  ) : null;
-}
+import {
+  INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
+  INSPECTOR_SECONDARY_BUTTON_CLASS_NAME,
+} from '../inspector/chrome';
 
 /** Previews remain disposable. Only the Apply commands call the document mutation owner. */
 export function ImageResults(props: {
@@ -92,6 +18,7 @@ export function ImageResults(props: {
   controller: ImageApplyController;
 }) {
   const [fit, setFit] = useState(false);
+  const preview = useImagePreview();
   const step = props.state.steps.find((entry) => entry.id === props.state.selected?.stepId);
   const result = props.session.getSelectedVariant();
   if (!step || !result) return null;
@@ -105,13 +32,20 @@ export function ImageResults(props: {
   const applyDisabled = busy || (mismatch && !fit);
   return (
     <div className="space-y-2" data-ui="editor.ai.result">
-      <ImageResultPreview original={source.raster} image={result.image} />
-      <ImageResultVariants
-        variants={step.variants}
-        selectedIndex={props.state.selected?.variant}
-        busy={busy}
-        onChoose={(index) => props.session.chooseVariant(step.id, index)}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <ProductActionButton
+          compact
+          tone="secondary"
+          className={`${INSPECTOR_SECONDARY_BUTTON_CLASS_NAME} !w-auto flex-1`}
+          onClick={(event) => preview.openResult(event.currentTarget)}
+        >
+          <Eye size={14} />
+          {translate('editor.ai.openPreview')}
+        </ProductActionButton>
+        <span className="text-xs tabular-nums">
+          {result.image.width} × {result.image.height}
+        </span>
+      </div>
       {result.costRub !== undefined ? (
         <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {formatNumber(result.costRub, { maximumFractionDigits: 2 })} ₽
@@ -143,10 +77,11 @@ export function ImageResults(props: {
           {translate('editor.ai.sourceLocked')}
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-1 gap-1">
         {props.session.canUpdate() ? (
           <ProductActionButton
             compact
+            className={INSPECTOR_PRIMARY_BUTTON_CLASS_NAME}
             disabled={applyDisabled || props.session.isApplied('update')}
             onClick={() =>
               void props.session.apply('update', fit, translate('editor.ai.newLayerName'))
@@ -158,6 +93,11 @@ export function ImageResults(props: {
         <ProductActionButton
           compact
           tone="secondary"
+          className={
+            props.session.canUpdate()
+              ? INSPECTOR_SECONDARY_BUTTON_CLASS_NAME
+              : INSPECTOR_PRIMARY_BUTTON_CLASS_NAME
+          }
           disabled={applyDisabled || props.session.isApplied('add')}
           onClick={() => void props.session.apply('add', fit, translate('editor.ai.newLayerName'))}
         >
@@ -167,6 +107,7 @@ export function ImageResults(props: {
           <ProductActionButton
             compact
             tone="secondary"
+            className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
             disabled={applyDisabled || props.session.isApplied('replace') || !current}
             onClick={() =>
               void props.session.apply('replace', fit, translate('editor.ai.newLayerName'))
@@ -179,6 +120,7 @@ export function ImageResults(props: {
           <ProductActionButton
             compact
             tone="secondary"
+            className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
             disabled={busy}
             onClick={() => void props.session.openDocument(translate('editor.ai.newLayerName'))}
           >

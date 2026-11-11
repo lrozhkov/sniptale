@@ -310,3 +310,34 @@ it('retains captured pixels while preparing another size and refuses payment aft
   expect(session.sourceIsPrepared({ width: 1, height: 1 })).toBe(false);
   expect(session.getSnapshot().source?.captureRaster).toBe(image);
 });
+
+it('fills absent parameters from the selected profile without resetting explicit choices', () => {
+  const { session } = setup();
+  session.configureParameters('generic', { variants: 1 });
+  session.setDraft({ parameters: { variants: 3 } });
+  session.configureParameters('klein', {
+    variants: 1,
+    resolution: '768',
+    aspectRatio: '1:1',
+    outputFormat: 'png',
+  });
+  expect(session.getSnapshot().draft.parameters).toEqual({
+    variants: 3,
+    resolution: '768',
+    aspectRatio: '1:1',
+    outputFormat: 'png',
+  });
+});
+
+it('preserves an explicit provider-default choice across profile changes and remounts', () => {
+  const { session } = setup();
+  session.configureParameters('first', { variants: 1, resolution: '768', aspectRatio: '1:1' });
+  session.setDraft({ parameters: { variants: 2, resolution: undefined, aspectRatio: '16:9' } });
+  session.configureParameters('second', { variants: 1, resolution: '1K', aspectRatio: '1:1' });
+  session.configureParameters('second', { variants: 1, resolution: '1K', aspectRatio: '1:1' });
+  expect(session.getSnapshot().draft.parameters).toEqual({
+    variants: 2,
+    resolution: undefined,
+    aspectRatio: '16:9',
+  });
+});

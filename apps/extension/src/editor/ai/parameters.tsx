@@ -1,8 +1,10 @@
 import { SlidersHorizontal } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { INSPECTOR_SECONDARY_BUTTON_CLASS_NAME } from '../inspector/chrome';
 import { translate, type TranslationKey } from '../../platform/i18n';
 import type { ImageModelProfile } from '../../contracts/ai/image-profile';
 import type { ImageParameters } from '../../contracts/ai/image';
+import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { CompactInput, SelectField } from '../chrome/ui';
 
 type ChoiceKey = Exclude<keyof ImageParameters, 'variants' | 'seed'>;
@@ -31,7 +33,10 @@ export function resolveImageParameterChoices(profile: ImageModelProfile, value: 
   const incompatible: string[] = [];
   for (const field of getChoiceFields(profile)) {
     const current = value[field.key];
-    if (current === undefined) continue;
+    if (current === undefined) {
+      if (Object.hasOwn(value, field.key)) parameters = { ...parameters, [field.key]: undefined };
+      continue;
+    }
     if (field.choices.some((choice) => choice === current))
       parameters = { ...parameters, [field.key]: current };
     else incompatible.push(current);
@@ -85,6 +90,7 @@ export function ImageParametersEditor(props: {
           <ProductActionButton
             compact
             tone="secondary"
+            className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
             disabled={props.disabled}
             onClick={() => props.onChange(resolution.parameters)}
           >
@@ -92,11 +98,16 @@ export function ImageParametersEditor(props: {
           </ProductActionButton>
         </div>
       ) : null}
-      <SelectField
+      <SegmentedRow
+        ariaLabel={translate('editor.ai.variants')}
         label={translate('editor.ai.variants')}
+        columns={3}
         value={String(value.variants)}
-        options={['1', '2', '3'].map((choice) => ({ value: choice, label: choice }))}
-        disabled={props.disabled}
+        options={['1', '2', '3'].map((choice) => ({
+          value: choice,
+          label: choice,
+          disabled: props.disabled,
+        }))}
         onChange={(choice) => props.onChange({ ...value, variants: Number(choice) })}
       />
       {p ? (
@@ -107,7 +118,7 @@ export function ImageParametersEditor(props: {
             <span className="ml-auto tabular-nums">
               {[value.resolution, value.aspectRatio, value.outputFormat?.toUpperCase()]
                 .filter(Boolean)
-                .join(' · ')}
+                .join(' · ') || translate('editor.ai.providerDefault')}
             </span>
           </summary>
           <div className="space-y-1">
@@ -116,12 +127,17 @@ export function ImageParametersEditor(props: {
                 key={field.key}
                 label={translate(field.label)}
                 value={value[field.key] ?? ''}
-                options={field.choices.map((choice) => ({
-                  value: choice,
-                  label: getChoiceLabel(field.key, choice),
-                }))}
+                options={[
+                  { value: '', label: translate('editor.ai.providerDefault') },
+                  ...field.choices.map((choice) => ({
+                    value: choice,
+                    label: getChoiceLabel(field.key, choice),
+                  })),
+                ]}
                 disabled={props.disabled}
-                onChange={(choice) => props.onChange({ ...value, [field.key]: choice })}
+                onChange={(choice) =>
+                  props.onChange({ ...value, [field.key]: choice || undefined })
+                }
               />
             ))}
             {p.seed ? (

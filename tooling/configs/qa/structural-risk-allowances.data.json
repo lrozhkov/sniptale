@@ -6625,35 +6625,13 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/editor/ai/inspector.tsx",
-      "symbol": "ImageAIInspector",
-      "owner": "extension:editor:ai",
-      "reason": "tool-noise: Independent topology diagnosis inspected this exact function and its consumers. The inspector composes existing controls and delegates state, document commands and provider execution to their existing owners. Its local state controls presentation and preparation feedback. Menu, source and model preparation have separate substantive roles. Fresh complete-candidate architecture review remains required for this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess new independent state authority, privileged effect, transport, persistence, transaction or resource lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-11",
-      "astHash": "9e035571a76d137c1c9433929c32019364206ff10f446817db66279c6a5b0d47",
-      "signatureHash": "6c09e0658ecd8ca9bdcc2de0b47239a49895fc5763c65660caa0b15e498346e5"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/editor/ai/results.tsx",
-      "symbol": "ImageResults",
-      "owner": "extension:editor:ai",
-      "reason": "tool-noise: Independent topology diagnosis inspected this exact function and its consumers. This component owns one selected-result interaction and explicit Fit consent. Preview comparison has its own local role. All Apply commands enter the session, without document, credential or transport authority here. Fresh complete-candidate architecture review remains required for this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess new independent state authority, privileged effect, transport, persistence, transaction or resource lifetime. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-11",
-      "astHash": "bec9787317cbf13b2c5ecbf432c4d2ca7c6a71872f59f0405a5c9757dcf1dad3",
-      "signatureHash": "72e85d74a90d6cd3b9545289b5dd863f582da89f823a0e42e7ca07414c407e7d"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/editor/ai/session.ts",
       "symbol": "createImageEditorSession",
       "owner": "extension:editor:ai",
-      "reason": "tool-noise: Fresh independent topology wrapper diagnosis inspected this exact candidate and its consumers. One factory owns the temporary conversation, operation identity, cancellation, preparation and receipts. Read-only presence suppresses duplicate Add after history rehydration. Strict object identity still controls Update and Replace. Splitting the closure would distribute these coupled invariants. Fresh complete-candidate architecture review remains required for this exact classification.",
+      "reason": "tool-noise: Fresh independent diagnosis inspected this exact factory and its consumers. One factory owns the temporary conversation, draft, preparation, cancellation, results and receipts. Profile changes fill absent parameters within this draft authority. Narrow adapters retain capture, transport and document mutation ownership. Splitting the closure would distribute the same lifecycle. Fresh complete-candidate architecture review remains required for this exact classification.",
       "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, fixture or resource lifetime, writer, transport effect or transaction. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-11",
-      "astHash": "6d718a0842ae517751d75185bf85446d0cb5c96f367df0e4be4fdb03945fb867",
+      "astHash": "0855f8327861c67626eac7612b056edb3495d2c28ce396df2952dd351616190b",
       "signatureHash": "3e899fc484590c2b483453333e63b6a60d1dabcf99a9014e25703e64ea8ead0a"
     },
     {
@@ -6677,17 +6655,6 @@
       "reviewDate": "2026-11-11",
       "astHash": "78a4c96b632054de5084b5921419acfde25ea794c1cfc2d197761e46834ace01",
       "signatureHash": "a8235692b1a0b4d5a68d25862ba6da8868fa38a33a3ca6e866590aa659e67d0b"
-    },
-    {
-      "rule": "structural-file-risk",
-      "file": "apps/extension/src/editor/ai/inspector.interactions.test.tsx",
-      "symbol": "<file>",
-      "owner": "extension:editor:ai",
-      "reason": "tool-noise: Fresh independent topology wrapper diagnosis inspected this exact candidate and its consumers. One React fixture owns shared mount and cleanup for inspector controls, parameters and attachments. External catalog, controller and file-read boundaries remain controlled. Promises settle inside their owning test. No independent transport, timer, writer or fixture lifetime appears. Fresh complete-candidate architecture review remains required for this exact classification.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, fixture or resource lifetime, writer, transport effect or transaction. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-11",
-      "astHash": "f7946adbe4585b24fcce59a57a2960d06e1f116c48e232206f0dbe9de6ae4d50",
-      "signatureHash": "ffd6f123d0add03c898c167f575d3facc12c4f57976960814ed1c456996017fd"
     }
   ]
 }

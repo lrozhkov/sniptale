@@ -130,7 +130,9 @@ function buildImageContext(
       ...(base ? [{ ...base, role: 'source' }] : []),
       ...draft.references.map((image) => ({ ...image, role: 'reference' })),
     ],
-    parameters: draft.parameters,
+    parameters: Object.fromEntries(
+      Object.entries(draft.parameters).filter(([, value]) => value !== undefined)
+    ),
     ...(source.intention !== 'new-image'
       ? {
           editRegion: {
@@ -305,9 +307,9 @@ export function createImageEditorSession(
     },
     configureParameters(key: string, defaults: ImageParameters) {
       if (active || key === parameterProfileKey) return;
-      const initialize = !parameterProfileKey;
+      const parameters = { ...defaults, ...state.draft.parameters };
       parameterProfileKey = key;
-      if (initialize) publish({ draft: { ...state.draft, parameters: { ...defaults } } });
+      publish({ draft: { ...state.draft, parameters } });
     },
     setDraft(patch: Partial<ImageSessionState['draft']>) {
       if (active && Object.keys(patch).some((key) => key !== 'prompt')) return;

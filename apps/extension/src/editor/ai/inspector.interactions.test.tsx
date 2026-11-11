@@ -246,6 +246,14 @@ async function click(name: string) {
   await act(async () => button(name).click());
 }
 async function select(label: string, value: string) {
+  if (label === 'editor.ai.variants') {
+    const group = document.querySelector<HTMLElement>(`[aria-label="${label}"]`)!;
+    const option = [...group.querySelectorAll('button')].find(
+      (button) => button.textContent === value
+    )!;
+    await act(async () => option.click());
+    return;
+  }
   const input = document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
   await act(async () => {
     input.value = value;
@@ -310,6 +318,11 @@ it('previews variants, refines the chosen result and applies without duplicating
   expect(deps.run.mock.calls[1]?.[0].request.context.images).toEqual([
     { ...image, role: 'source' },
   ]);
+  await click('editor.ai.original');
+  expect(document.querySelector('[data-ui="editor.ai.preview-image"]')?.getAttribute('href')).toBe(
+    deps.run.mock.calls[1]?.[0].request.context.images[0]?.dataUrl
+  );
+  await click('editor.ai.result');
   await click('editor.ai.apply');
   expect(deps.apply).toHaveBeenCalledOnce();
   expect(button('editor.ai.apply').disabled).toBe(true);
@@ -332,12 +345,13 @@ it('captures an explicitly chosen region and keeps its context visible before di
     controller,
     expect.objectContaining({ intention: 'region', context: 'whole', regionSource: 'source' })
   );
+  await click('editor.ai.openSourcePreview');
   expect(document.querySelector('[aria-label="editor.ai.editArea"]')).not.toBeNull();
   await enter('Change the chosen area');
   await click('editor.ai.generate');
   expect(deps.run.mock.calls[0]?.[0].request.context.intention).toBe('region');
   await click('editor.ai.original');
-  expect(document.querySelector('img[alt="editor.ai.original"]')?.getAttribute('src')).toBe(
+  expect(document.querySelector('[data-ui="editor.ai.preview-image"]')?.getAttribute('href')).toBe(
     image.dataUrl
   );
   await click('editor.ai.result');
@@ -417,6 +431,8 @@ it('stops a partial request and ignores its late result while preserving the pro
   await enter('Retain the unfinished instruction');
   await click('editor.ai.generate');
   expect(session.getSnapshot().status).toBe('generating');
+  const count = document.querySelector('[aria-label="editor.ai.variants"]')!;
+  expect([...count.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
   await click('editor.ai.stop');
   await act(async () => release());
   expect(session.getSnapshot().error).toBe('cancelled');
@@ -591,4 +607,81 @@ it('discards a late reference read after a new operation and rejects excessive a
   await attach([oversized]);
   expect(changed).not.toHaveBeenCalled();
   expect(host.textContent).toContain('editor.ai.fileError');
+});
+
+it('retains a count chosen before the first model configuration arrives', async () => {
+  let complete!: (result: Catalog) => void;
+  io.read.mockReturnValueOnce(new Promise<Catalog>((resolve) => (complete = resolve)));
+  await render();
+  await select('editor.ai.variants', '3');
+  expect(session.getSnapshot().draft.parameters.variants).toBe(3);
+  await act(async () => complete(catalog));
+  expect(session.getSnapshot().draft.parameters).toMatchObject({
+    variants: 3,
+    resolution: '768',
+    aspectRatio: '1:1',
+    outputFormat: 'png',
+  });
+  await enter('Preserve my selected count');
+  await click('editor.ai.generate');
+  expect(deps.run.mock.calls[0]?.[0].request.context.parameters.variants).toBe(3);
+});
+
+it('fills missing model defaults and retains an explicit provider default through adaptation', async () => {
+  catalog.models[0]!.modelCode = 'aaa-generic-image';
+  catalog.models[1]!.modelCode = 'black-forest-labs/flux-3-image-klein';
+  await render();
+  await select('editor.ai.variants', '3');
+  await select('model', 'second');
+  expect(session.getSnapshot().draft.parameters).toMatchObject({
+    variants: 3,
+    resolution: '768',
+    aspectRatio: '1:1',
+    outputFormat: 'png',
+  });
+  await select('editor.ai.resolution', '');
+  await select('model', 'first');
+  await click('editor.ai.adaptParameters');
+  await select('model', 'second');
+  expect(session.getSnapshot().draft.parameters.resolution).toBeUndefined();
+  await enter('Use the provider resolution default');
+  await click('editor.ai.generate');
+  expect(deps.run.mock.calls[0]?.[0].request.context.parameters.resolution).toBeUndefined();
+  expect(Object.hasOwn(deps.run.mock.calls[0]![0].request.context.parameters, 'resolution')).toBe(
+    false
+  );
+  expect(deps.run.mock.calls[0]?.[0].request.context.parameters.variants).toBe(3);
+});
+
+it('keeps preview outside the inspector and restores focus without changing document history', async () => {
+  await render();
+  await select('editor.ai.variants', '3');
+  await enter('Generate three choices');
+  await click('editor.ai.generate');
+  const preview = document.querySelector<HTMLElement>('[data-ui="editor.ai.preview"]')!;
+  expect(preview).not.toBeNull();
+  expect(host.querySelector('[data-ui="editor.ai.preview"]')).toBeNull();
+  expect(
+    document
+      .querySelector('[data-ui="editor.ai.inspector"]')
+      ?.querySelector('[data-ui="editor.ai.preview-image"]')
+  ).toBeNull();
+  await enter('Keep typing while the preview is open');
+  expect(session.getSnapshot().draft.prompt).toBe('Keep typing while the preview is open');
+  const variant = preview.querySelector<HTMLButtonElement>('[aria-label="editor.ai.variants 2"]')!;
+  await act(async () => variant.click());
+  expect(session.getSnapshot().selected?.variant).toBe(1);
+  await click('100%');
+  const focus = document.activeElement;
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('[data-ui="editor.ai.preview"]')).toBeNull();
+  expect(document.activeElement).toBe(focus);
+  await click('editor.ai.openPreview');
+  await act(async () => button('common.actions.close').focus());
+  await click('common.actions.close');
+  expect(document.activeElement).toBe(button('editor.ai.openPreview'));
+  expect(controller.commitHistory).not.toHaveBeenCalled();
+  expect(deps.apply).not.toHaveBeenCalled();
 });

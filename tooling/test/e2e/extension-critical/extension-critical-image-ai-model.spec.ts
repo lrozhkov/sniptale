@@ -34,8 +34,10 @@ for (const viewport of [
       await installImageApiFixture(page);
       await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
       const inspector = page.locator('[data-ui="editor.ai.inspector"]');
-      await inspector.getByRole('button', { name: 'Variants', exact: true }).click();
-      await page.getByRole('option', { name: '3', exact: true }).click();
+      await inspector
+        .getByRole('group', { name: 'Variants', exact: true })
+        .getByRole('button', { name: '3', exact: true })
+        .click();
       await inspector.locator('summary').filter({ hasText: 'Parameters' }).click();
       await inspector.getByRole('button', { name: 'Resolution', exact: true }).click();
       await page.getByRole('option', { name: '4K', exact: true }).click();
