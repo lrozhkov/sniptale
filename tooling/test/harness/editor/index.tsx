@@ -30,6 +30,7 @@ declare global {
       applyBrowserFrameMutation: () => Promise<void>;
       clearSelection: () => void;
       getCanvasObjects: () => Array<Record<string, unknown>>;
+      renderImage: () => Promise<string>;
       getInteractionState: () => {
         historyIndex: number;
         historyReady: boolean;
@@ -63,6 +64,8 @@ function snapshotCanvasObject(object: FabricObject): HarnessCanvasObjectSnapshot
   return {
     type: object.type ?? null,
     sniptaleType: object.sniptaleType ?? null,
+    sniptaleId: object.sniptaleId ?? null,
+    visible: object.visible,
     left: object.left ?? null,
     top: object.top ?? null,
     width: object.width ?? null,
@@ -150,6 +153,7 @@ function HarnessEditorDebugBridge() {
       getCanvasObjects: () => {
         return getCanvasObjects(controller).map(snapshotCanvasObject);
       },
+      renderImage: () => controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
       getInteractionState: () => {
         const transform = controller.canvas?._currentTransform;
         return {

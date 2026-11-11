@@ -98,6 +98,17 @@ export function resolveLlmSessionSenderKey(
   purpose: LlmSessionPurpose,
   sender: chrome.runtime.MessageSender
 ): string | null {
+  if (
+    purpose === 'image-editor' &&
+    sender.id === chrome.runtime.id &&
+    Number.isInteger(sender.frameId) &&
+    sender.frameId !== undefined &&
+    sender.frameId >= 0 &&
+    sender.documentId &&
+    (sender.documentLifecycle === undefined || sender.documentLifecycle === 'active') &&
+    isOwnedExtensionPagePath(sender.url, 'apps/extension/src/editor/index.html')
+  )
+    return `image-editor:frame:${sender.frameId}:document:${sender.documentId}`;
   if (purpose === 'content-ai-pick') return resolveContentAiPickSenderKey(sender);
   if (purpose === 'scenario-editor') return resolveScenarioEditorSenderKey(sender);
   if (
@@ -124,7 +135,9 @@ function resolveLlmSessionScope(purpose: LlmSessionPurpose): CapabilityScope {
     ? 'llm:content-ai-pick'
     : purpose === 'review-text'
       ? 'llm:review-text'
-      : 'llm:scenario-editor';
+      : purpose === 'image-editor'
+        ? 'llm:image-editor'
+        : 'llm:scenario-editor';
 }
 
 function createLlmSessionSenderBinding(args: {

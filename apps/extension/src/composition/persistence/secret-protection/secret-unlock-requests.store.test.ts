@@ -312,3 +312,17 @@ it('retains the native popup principal across reconcile and consumes its exact r
     expect(await reconcileStoredAISecretUnlockRequests(1)).toEqual(new Map());
   }
 });
+
+it('preserves the image-editor unlock purpose through persisted reconciliation', async () => {
+  await upsertStoredAISecretUnlockRequest({
+    ...createUnlockRequest('image-request'),
+    purpose: 'image-editor',
+    senderKey: 'image-editor:frame:0:document:image-document',
+    expiresAt: 100,
+  });
+  const restored = await reconcileStoredAISecretUnlockRequests(10);
+  expect(restored.get('image-request')).toMatchObject({
+    purpose: 'image-editor',
+    status: 'pending',
+  });
+});

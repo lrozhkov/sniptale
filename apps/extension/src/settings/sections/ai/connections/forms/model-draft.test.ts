@@ -27,6 +27,19 @@ const model: AIModel = {
     },
   },
 };
+it.each(['image-generation', 'image-editing'] as const)(
+  'restores %s legacy drafts with image output',
+  (operation) => {
+    const draft = createModelDraft({ ...model, capabilities: undefined, operation });
+    expect(draft.capabilities?.operations[operation]).toBe('supported');
+    expect(draft.capabilities?.output).toEqual({ image: 'supported' });
+    expect(draft.capabilities?.input).toEqual(
+      operation === 'image-editing'
+        ? { text: 'supported', image: 'supported' }
+        : { text: 'supported' }
+    );
+  }
+);
 it('previews current provider facts without mutating the manual draft or provenance', () => {
   const draft = createModelDraft(model);
   const bound = applyCatalogModelDraft(draft, model);

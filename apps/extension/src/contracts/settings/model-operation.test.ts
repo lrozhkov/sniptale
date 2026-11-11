@@ -31,6 +31,8 @@ describe('AI model operation configuration', () => {
     },
     {},
     { operation: 'text' },
+    { operation: 'image-generation' },
+    { operation: 'image-editing' },
     {
       operation: 'transcription',
       audio: {
@@ -83,6 +85,7 @@ describe('AI model operation configuration', () => {
     { operation: 'speech' },
     { audio: {} },
     { operation: 'text', audio: { speech: { voiceId: 'x', responseFormat: 'mp3' } } },
+    { operation: 'image-editing', audio: { speech: { voiceId: 'x', responseFormat: 'mp3' } } },
     { operation: 'transcription', audio: { speech: { voiceId: 'x', responseFormat: 'mp3' } } },
     {
       operation: 'transcription',
@@ -114,6 +117,36 @@ describe('AI model operation configuration', () => {
   ])('rejects incompatible or undeclared configuration %j', (value) => {
     expect(isValidAIModelOperationConfiguration(value)).toBe(false);
   });
+});
+
+it('requires explicit image operation support and an admitted provider adapter', () => {
+  const model = {
+    capabilities: {
+      operations: { 'image-generation': 'supported' as const, 'image-editing': 'unknown' as const },
+      input: { text: 'supported' as const, image: 'supported' as const },
+      output: { image: 'supported' as const },
+      features: {},
+    },
+  };
+  expect(
+    supportsAIProviderModelOperation(
+      model,
+      { connectionType: 'openai-compatible' },
+      'image-generation'
+    )
+  ).toBe(true);
+  expect(
+    supportsAIProviderModelOperation(
+      model,
+      { connectionType: 'openai-compatible' },
+      'image-editing'
+    )
+  ).toBe(false);
+  expect(
+    supportsAIProviderModelOperation(model, { connectionType: 'anthropic' }, 'image-generation')
+  ).toBe(false);
+  expect(supportsAIModelOperation({}, 'image-generation')).toBe(false);
+  expect(supportsAIModelOperation({ ...model, enabled: false }, 'image-generation')).toBe(false);
 });
 
 it('admits explicitly selected PCM synthesis without model-name inference', () => {

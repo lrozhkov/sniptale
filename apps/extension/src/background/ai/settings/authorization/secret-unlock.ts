@@ -79,6 +79,7 @@ function isUnlockStatusOwner(
     record.senderKey === contentSenderKey ||
     record.senderKey === scenarioSenderKey ||
     record.senderKey === reviewSenderKey ||
+    record.senderKey === resolveLlmSessionSenderKey('image-editor', sender) ||
     record.senderKey === resolveSecretUnlockSenderKey('sync', sender)
   );
 }
@@ -88,6 +89,7 @@ function isPotentialUnlockStatusOwner(sender: chrome.runtime.MessageSender): boo
     resolveLlmSessionSenderKey('content-ai-pick', sender) !== null ||
     resolveLlmSessionSenderKey('scenario-editor', sender) !== null ||
     resolveLlmSessionSenderKey('review-text', sender) !== null ||
+    resolveLlmSessionSenderKey('image-editor', sender) !== null ||
     resolveSecretUnlockSenderKey('sync', sender) !== null
   );
 }

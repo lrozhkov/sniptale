@@ -86,6 +86,14 @@ Parsed SDK error metadata remains inside the bounded background receiver. Only f
 
 Settings transfer excludes credentials, local observations, cached catalog facts and runtime approval state. Export retains a disabled flag for known lifecycle blocks when it omits catalog evidence. Imported configuration carries no request approval. See [AI persistence](../architecture/persistence-contracts.md#ai-settings-graph-and-alpha-reset) for alpha reset and transfer admission.
 
+### Image editor requests
+
+`background/ai/image/request.ts` owns image credentials and network requests. The existing session capability binds each operation to its editor document and approved payload. This payload includes the prompt, raster inputs, parameters and provider destination. Check current provider admission before each dispatch. The editor checks current document applicability before Apply.
+
+Send inline raster data only. Reject remote result URLs. Bound encoded bytes and raster dimensions before bitmap allocation. Request each variant once without automatic paid retries. Preserve completed previews when a later variant fails. Cancellation excludes late previews. Local-data erasure excludes new jobs and drains active jobs through the existing job owner.
+
+Keep prompts and preview bytes in the temporary editor session. Do not add them to request history, diagnostics or settings transfer. Only explicit Apply adds a result to the document. Document retention then follows the existing document policy.
+
 ## Import and export
 
 Media backup payload layouts `library-folders-v2`, `library-folders-v3` and `library-folders-v4` treat authored strings as text rather than binary signatures. Canonical domain owners check resource roles and portable references. Image-document Canvas source/background/blur slots still require declared object references. Restrict PNG window-header transport to the existing normalized PNG/64-pixel decoration profile. Import revalidates the declared JSON/PNG inventory, MIME, UTF-8 and expanded metadata limits directly in the ZIP before runtime staging.

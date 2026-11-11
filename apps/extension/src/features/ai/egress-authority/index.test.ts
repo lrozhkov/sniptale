@@ -5,6 +5,7 @@ import {
   canonicalizeScenarioEditorEgressPayload,
   createContentAiEgressAuthority,
   createReviewTextEgressAuthority,
+  createImageEditorEgressAuthority,
   createScenarioEditorEgressAuthority,
 } from './index';
 
@@ -153,5 +154,40 @@ it('binds project text consent to the exact placements document revision and des
   ])
     expect((await createReviewTextEgressAuthority(changed)).payloadHash).not.toBe(
       authority.payloadHash
+    );
+});
+
+it('binds image approval to prompt, pixels, options, local snapshot and provider destination', async () => {
+  const input = {
+    context: {
+      version: 1,
+      intention: 'new-image',
+      prompt: 'A square',
+      images: [],
+      parameters: { variants: 1 },
+    },
+    scope: {
+      documentId: 'doc',
+      sessionId: 'fdd43bfc-2c5b-416e-91b2-d2c2cc820ac7',
+      snapshotId: 'fdd43bfc-2c5b-416e-91b2-d2c2cc820ac7',
+    },
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    approvedModelCode: 'code',
+    approvedDestination: 'sha256:' + 'a'.repeat(64),
+  } satisfies Parameters<typeof createImageEditorEgressAuthority>[0];
+  const base = await createImageEditorEgressAuthority(input);
+  expect(base.purpose).toBe('image-editor');
+  for (const changed of [
+    { ...input, context: { ...input.context, prompt: 'A circle' } },
+    { ...input, context: { ...input.context, parameters: { variants: 2 } } },
+    { ...input, scope: { ...input.scope, snapshotId: '6a9f1ae5-8960-4126-b8dd-7802819cfaa9' } },
+    { ...input, modelId: 'other' },
+    { ...input, approvedProviderId: 'other' },
+    { ...input, approvedModelCode: 'other' },
+    { ...input, approvedDestination: 'sha256:' + 'b'.repeat(64) },
+  ])
+    expect((await createImageEditorEgressAuthority(changed)).payloadHash).not.toBe(
+      base.payloadHash
     );
 });

@@ -80,6 +80,8 @@ it('admits separate bounded operation generations and observations', () => {
       text: { generation: 'pending', observation: { ...observation, scope: 'operation' } },
       speech: { observation: { ...observation, scope: 'operation', reason: 'model-unavailable' } },
       transcription: { generation: 'another' },
+      'image-generation': { observation: { ...observation, scope: 'operation' } },
+      'image-editing': { generation: 'image-edit' },
     })
   ).toBe(true);
 });

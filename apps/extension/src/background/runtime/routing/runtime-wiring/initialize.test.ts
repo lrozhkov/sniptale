@@ -31,6 +31,7 @@ const {
   configureSyncPrivacyErasurePort,
   eraseLocalExtensionDataFromBackground,
   registerContentTextPorts,
+  registerImageJobPort,
   configureNativeIngestionPrivacyErasureCleanupPort,
   configureScreenshotPrivacyErasureCleanupPort,
   executeDownloadBlob,
@@ -53,6 +54,7 @@ const {
   configureSyncPrivacyErasurePort: vi.fn(),
   eraseLocalExtensionDataFromBackground: vi.fn(),
   registerContentTextPorts: vi.fn(),
+  registerImageJobPort: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort: vi.fn(),
   configureScreenshotPrivacyErasureCleanupPort: vi.fn(),
   executeDownloadBlob: vi.fn(),
@@ -214,6 +216,7 @@ vi.mock('@sniptale/platform/observability/logger', async (original) => {
   };
 });
 vi.mock('../../../ai/llm/content-text-port', () => ({ registerContentTextPorts }));
+vi.mock('../../../ai/image/port', () => ({ registerImageJobPort }));
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   subscribeToLocaleChanges,
@@ -356,10 +359,13 @@ it('registers all background listeners through the runtime-wiring owner', async 
   expect(registerInstallListener).toHaveBeenCalledBefore(initializeBackgroundContextMenus);
   expect(registerContentTextPorts).toHaveBeenCalledOnce();
   const contentTextJobs = registerContentTextPorts.mock.calls[0]?.[0];
+  expect(registerImageJobPort).toHaveBeenCalledOnce();
+  const imageJobs = registerImageJobPort.mock.calls[0]?.[0];
   expect(configureAudioJobPrivacyErasurePort).toHaveBeenCalledWith(
     expect.any(Object),
     expect.any(Object),
-    contentTextJobs
+    contentTextJobs,
+    imageJobs
   );
   expect(registerWindowBoundsListener).toHaveBeenCalledOnce();
   expect(registerVoiceInputPorts).toHaveBeenCalledOnce();

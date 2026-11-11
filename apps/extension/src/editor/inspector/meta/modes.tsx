@@ -25,6 +25,7 @@ interface TranslatedInspectorDescriptor {
 }
 
 const staticInspectorDescriptors = {
+  ai: { Icon: Sparkles, subtitleKey: 'editor.ai.subtitle', titleKey: 'editor.ai.title' },
   'browser-frame': {
     Icon: Globe,
     subtitleKey: 'editor.toolbar.browserSubtitle',

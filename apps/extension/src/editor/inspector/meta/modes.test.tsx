@@ -36,3 +36,8 @@ it('returns metadata for size, frame, and workspace-like inspector modes', () =>
   expect(getInspectorModeMeta('meta')?.title).toBe('editor.toolbar.metaTitle');
   expect(getInspectorModeMeta('none')).toBeNull();
 });
+
+it('returns dedicated image assistant metadata', () => {
+  expect(getInspectorModeMeta('ai')?.title).toBe('editor.ai.title');
+  expect(getInspectorModeMeta('ai')?.subtitle).toBe('editor.ai.subtitle');
+});

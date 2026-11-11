@@ -1,0 +1,165 @@
+import { describe, expect, it } from 'vitest';
+import {
+  getImageContextOperation,
+  formatImageProviderPrompt,
+  imageContextSchema,
+  imageRasterSchema,
+  parseImageJobClientMessage,
+  parseImageJobServerMessage,
+} from './image';
+
+const raster = {
+  dataUrl:
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII=',
+  width: 2,
+  height: 3,
+};
+const uuid = 'fdd43bfc-2c5b-416e-91b2-d2c2cc820ac7';
+const context = {
+  version: 1,
+  intention: 'new-image',
+  prompt: 'Draw a square',
+  images: [],
+  parameters: { variants: 1 },
+};
+const start = {
+  type: 'start',
+  requestId: uuid,
+  modelId: 'model',
+  approvedProviderId: 'provider',
+  approvedModelCode: 'code',
+  approvedDestination: `sha256:${'a'.repeat(64)}`,
+  llmSessionToken: 'token',
+  scope: { documentId: 'document', sessionId: uuid, snapshotId: uuid },
+  context,
+};
+
+describe('image job admission', () => {
+  it('admits generation and raster editing with declared dimensions', () => {
+    expect(parseImageJobClientMessage(start)).not.toBeNull();
+    for (const intention of ['region', 'source', 'layers'])
+      expect(
+        parseImageJobClientMessage({
+          ...start,
+          context: {
+            ...context,
+            intention,
+            images: [{ ...raster, role: 'source' }],
+            editRegion: { left: 0, top: 1, width: 2, height: 2 },
+          },
+        })
+      ).not.toBeNull();
+  });
+  it('binds the edit rectangle to the first source image and rejects invalid coordinates', () => {
+    const source = { ...raster, role: 'source' };
+    const editing = { ...context, intention: 'region', images: [source] };
+    for (const editRegion of [
+      undefined,
+      { left: -1, top: 0, width: 1, height: 1 },
+      { left: 0.5, top: 0, width: 1, height: 1 },
+      { left: 1, top: 0, width: 2, height: 1 },
+      { left: 0, top: 2, width: 1, height: 2 },
+    ])
+      expect(imageContextSchema.safeParse({ ...editing, editRegion }).success).toBe(false);
+    expect(
+      imageContextSchema.safeParse({
+        ...editing,
+        editRegion: { left: 0, top: 0, width: 1, height: 1 },
+        images: [{ ...raster, role: 'reference' }, source],
+      }).success
+    ).toBe(false);
+    expect(
+      imageContextSchema.safeParse({
+        ...context,
+        editRegion: { left: 0, top: 0, width: 1, height: 1 },
+      }).success
+    ).toBe(false);
+    const admitted = imageContextSchema.parse({
+      ...editing,
+      editRegion: { left: 0, top: 1, width: 2, height: 2 },
+    });
+    expect(formatImageProviderPrompt(admitted)).toContain('left=0, top=1, width=2, height=2');
+    expect(formatImageProviderPrompt(admitted)).toContain(`User instruction:\n${context.prompt}`);
+    expect(formatImageProviderPrompt(imageContextSchema.parse(context))).toBe(context.prompt);
+  });
+  it('rejects missing, duplicate and non-raster source attachments', () => {
+    expect(imageContextSchema.safeParse({ ...context, intention: 'layers' }).success).toBe(false);
+    expect(
+      imageContextSchema.safeParse({
+        ...context,
+        images: [
+          { ...raster, role: 'source' },
+          { ...raster, role: 'source' },
+        ],
+      }).success
+    ).toBe(false);
+    for (const dataUrl of [
+      'https://example.com/p.png',
+      'data:image/svg+xml;base64,PHN2Zy8+',
+      'data:image/png;base64,QUJDRA==',
+    ])
+      expect(imageRasterSchema.safeParse({ ...raster, dataUrl }).success).toBe(false);
+  });
+  it('rejects forged raster geometry and pixel bombs before bitmap allocation', () => {
+    expect(imageRasterSchema.safeParse({ ...raster, width: 3 }).success).toBe(false);
+    const bytes = Buffer.from(raster.dataUrl.split(',')[1]!, 'base64');
+    bytes.writeUInt32BE(8192, 16);
+    bytes.writeUInt32BE(8192, 20);
+    expect(
+      imageRasterSchema.safeParse({
+        dataUrl: `data:image/png;base64,${bytes.toString('base64')}`,
+        width: 8192,
+        height: 8192,
+      }).success
+    ).toBe(false);
+  });
+  it('rejects extra command fields, unapproved destinations and unsupported parameter values', () => {
+    expect(parseImageJobClientMessage({ ...start, apiKey: 'forbidden' })).toBeNull();
+    expect(
+      parseImageJobClientMessage({ ...start, approvedDestination: 'https://other.test' })
+    ).toBeNull();
+    expect(
+      parseImageJobClientMessage({ ...start, context: { ...context, parameters: { variants: 4 } } })
+    ).toBeNull();
+    expect(
+      parseImageJobClientMessage({
+        ...start,
+        context: { ...context, parameters: { variants: 1, arbitrary: true } },
+      })
+    ).toBeNull();
+  });
+  it('requires editing capability for references during new-image generation', () => {
+    const generation = imageContextSchema.parse(context);
+    expect(getImageContextOperation(generation)).toBe('image-generation');
+    expect(
+      getImageContextOperation({ ...generation, images: [{ ...raster, role: 'reference' }] })
+    ).toBe('image-editing');
+  });
+  it('validates incremental previews, fixed failures and request-bound controls', () => {
+    expect(
+      parseImageJobServerMessage({
+        type: 'image',
+        requestId: uuid,
+        variant: 0,
+        image: raster,
+        costRub: 0.85,
+      })
+    ).not.toBeNull();
+    expect(
+      parseImageJobServerMessage({
+        type: 'image',
+        requestId: uuid,
+        variant: 0,
+        image: { ...raster, width: 999 },
+      })
+    ).toBeNull();
+    expect(
+      parseImageJobServerMessage({ type: 'failure', requestId: uuid, code: 'raw-provider-secret' })
+    ).toBeNull();
+    expect(
+      parseImageJobServerMessage({ type: 'complete', requestId: uuid, received: 0 })
+    ).toBeNull();
+    expect(parseImageJobClientMessage({ type: 'cancel', requestId: uuid })).not.toBeNull();
+    expect(parseImageJobClientMessage({ type: 'keepalive', requestId: 'foreign' })).toBeNull();
+  });
+});

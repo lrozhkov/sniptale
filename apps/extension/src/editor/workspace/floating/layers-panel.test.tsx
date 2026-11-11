@@ -8,6 +8,7 @@ import { EditorFloatingLayersPanel } from './layers-panel';
 
 const mocks = vi.hoisted(() => ({
   editorController: {
+    getPublicApiAdapter: vi.fn(() => ({ originalDocument: null, canvas: null, source: null })),
     cancelCropMode: vi.fn(),
     clearSelection: vi.fn(),
     setActiveTool: vi.fn(),
@@ -26,6 +27,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../application/controller-context', () => ({
   useEditorController: () => mocks.editorController,
 }));
+
+vi.mock('../../ai/inspector', () => ({ ImageAIInspector: () => <div data-ui="mock.ai" /> }));
 
 vi.mock('../../inspector/layers', () => ({ EditorInspectorLayersPanel: mocks.layers }));
 vi.mock('../../inspector/content', () => ({ EditorInspectorContent: mocks.content }));
@@ -183,7 +186,7 @@ it('moves collapsed layers to the bottom-right toolbar without insert image acti
   expect(toolbar?.parentElement?.className).toContain('pointer-events-auto');
   expect(toolbar?.querySelector('[role="toolbar"]')?.className).toContain('flex-row');
   expect(container?.querySelector('[data-ui="mock.insert-image"]')).toBeNull();
-  expect(container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]')).toHaveLength(6);
+  expect(container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]')).toHaveLength(7);
 });
 
 it('keeps collapsed modes visually inactive while preserving selection for expansion', () => {
@@ -313,3 +316,26 @@ it.each(['canvas-size', 'frame', 'tool'])(
     }
   }
 );
+
+it('opens AI from a selection without clearing selection or cancelling the crop', () => {
+  renderPanel();
+  const button = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.floating.layers.mode.ai"]'
+  );
+  act(() => button?.click());
+  expect(mocks.setInspector).toHaveBeenCalledWith('ai');
+  expect(mocks.editorController.clearSelection).not.toHaveBeenCalled();
+  expect(mocks.editorController.cancelCropMode).not.toHaveBeenCalled();
+});
+
+it('returns from AI to layers without clearing the fixed multi-selection', () => {
+  renderPanel({ inspector: 'ai' });
+  expect(container?.querySelector('[data-ui="mock.ai"]')).toBeTruthy();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.mode.layers"]')
+      ?.click()
+  );
+  expect(mocks.setInspector).toHaveBeenCalledWith('tool');
+  expect(mocks.editorController.clearSelection).not.toHaveBeenCalled();
+});

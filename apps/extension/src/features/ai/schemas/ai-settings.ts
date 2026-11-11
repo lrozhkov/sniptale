@@ -1,5 +1,6 @@
 import { AI_PROVIDER_TYPES } from '../../../contracts/settings/ai-provider';
 import {
+  AI_MODEL_OPERATIONS,
   isAIModelCapabilities,
   isAICatalogFacts,
   isAIConnectionObservation,
@@ -60,7 +61,7 @@ export const AIProviderSchema = z.object({
 });
 
 const operationFields = {
-  operation: z.enum(['text', 'transcription', 'speech']).optional(),
+  operation: z.enum(AI_MODEL_OPERATIONS).optional(),
   audio: z
     .custom<AIModelAudioParameters>(
       (value) =>

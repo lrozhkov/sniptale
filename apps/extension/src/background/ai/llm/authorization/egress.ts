@@ -47,7 +47,10 @@ export function authorizeLlmSessionRequestRoute(
 
   const { purpose, egressAuthority } = parsedMessage.data;
   if (
-    (purpose !== 'content-ai-pick' && purpose !== 'scenario-editor' && purpose !== 'review-text') ||
+    (purpose !== 'content-ai-pick' &&
+      purpose !== 'scenario-editor' &&
+      purpose !== 'review-text' &&
+      purpose !== 'image-editor') ||
     egressAuthority.purpose !== purpose ||
     !resolveLlmSessionSenderKey(purpose, request.sender)
   ) {

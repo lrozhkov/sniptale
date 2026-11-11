@@ -21,6 +21,7 @@ export type AIProviderSelectorEntry = Pick<
   | 'observation'
 > & {
   destinationKind: AIProviderDestinationKind;
+  imageApi?: 'routerai' | undefined;
   destinationBinding?: string | undefined;
 };
 

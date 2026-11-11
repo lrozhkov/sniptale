@@ -3,6 +3,7 @@ export {
   type AiEgressAuthority,
   type ContentAiEgressAuthority,
   type ReviewTextAiEgressAuthority,
+  type ImageEditorAiEgressAuthority,
   type ScenarioAiAttachmentSummary,
   type ScenarioAiAttachmentSummaryItem,
   type ScenarioEditorAiEgressAuthority,

@@ -48,10 +48,17 @@ export type ReviewTextAiEgressAuthority = {
   purpose: 'review-text';
 };
 
+export type ImageEditorAiEgressAuthority = {
+  contractVersion: typeof AI_EGRESS_AUTHORITY_CONTRACT_VERSION;
+  payloadHash: string;
+  purpose: 'image-editor';
+};
+
 export type AiEgressAuthority =
   | ContentAiEgressAuthority
   | ScenarioEditorAiEgressAuthority
-  | ReviewTextAiEgressAuthority;
+  | ReviewTextAiEgressAuthority
+  | ImageEditorAiEgressAuthority;
 
 export type ScenarioEditorCanonicalEgressPayload = {
   attachments: ScenarioAIAttachment[];
@@ -99,6 +106,13 @@ const scenarioAiAttachmentSummarySchema = z
 export const aiEgressAuthoritySchema: z.ZodType<AiEgressAuthority> = z.discriminatedUnion(
   'purpose',
   [
+    z
+      .object({
+        contractVersion: z.literal(AI_EGRESS_AUTHORITY_CONTRACT_VERSION),
+        payloadHash: z.string().regex(SHA256_DIGEST_PATTERN),
+        purpose: z.literal('image-editor'),
+      })
+      .strict(),
     z
       .object({
         contractVersion: z.literal(AI_EGRESS_AUTHORITY_CONTRACT_VERSION),

@@ -65,6 +65,7 @@ function isAISecretUnlockPurpose(value: unknown): value is AISecretUnlockPurpose
     value === 'content-ai-pick' ||
     value === 'scenario-editor' ||
     value === 'review-text' ||
+    value === 'image-editor' ||
     value === 'sync'
   );
 }
