@@ -239,3 +239,31 @@ it('classifies a RouterAI422 envelope inside HTTP200 without exposing echoed inp
   await expect(run()).rejects.toMatchObject({ message: 'invalid-request' });
   expect(fetchMock).toHaveBeenCalledOnce();
 });
+
+it.each(['alpha', 'reference'] as const)(
+  'dispatches the approved %s mask using its documented wire field',
+  async (mode) => {
+    fetchMock.mockResolvedValue(Response.json({ data: [{ b64_json: png }] }));
+    const image = context.images[0]!;
+    await requestImage({
+      config,
+      context: {
+        ...context,
+        editRegion: { left: 0, top: 0, width: 1, height: 1 },
+        editMask: { mode, image },
+      },
+      signal: new AbortController().signal,
+      beforeSend: async () => {},
+    });
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    if (mode === 'alpha') {
+      expect(body.mask).toEqual({ image_url: { url: image.dataUrl } });
+      expect(body.input_references).toHaveLength(1);
+    } else {
+      expect(body.mask).toBeUndefined();
+      expect(body.input_references).toHaveLength(2);
+      expect(body.input_references[1].image_url.url).toBe(image.dataUrl);
+      expect(body.prompt).toContain('second input image is an edit mask');
+    }
+  }
+);

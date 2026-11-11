@@ -9,6 +9,7 @@ export interface ImageModelProfile {
   transport: 'router-images' | 'chat-images' | 'sdk-images';
   maxInputImages: number;
   minInputSide?: number;
+  editMask?: 'alpha' | 'reference';
   aspectRatios: readonly string[];
   resolutions: readonly NonNullable<ImageParameters['resolution']>[];
   sizes: readonly NonNullable<ImageParameters['size']>[];
@@ -147,15 +148,35 @@ function routerProfile(model: ProfileModel): ImageModelProfile {
       resolutions: ['1K'],
       defaults: { variants: 1, aspectRatio: '1:1', resolution: '1K' },
     };
+  if (modelCode === 'openai/gpt-image-2.6-sunburst')
+    return {
+      ...base,
+      maxInputImages: 16,
+      editMask: 'alpha',
+      aspectRatios: RATIOS,
+      qualities: ['low', 'medium', 'high'],
+      formats: ['png', 'jpeg', 'webp'],
+      backgrounds: ['opaque', 'transparent'],
+      defaults: { variants: 1, aspectRatio: '1:1', outputFormat: 'png', quality: 'medium' },
+    };
+  if (modelCode === 'google/gemini-nano-banana-2.1')
+    return {
+      ...base,
+      maxInputImages: 14,
+      aspectRatios: [...RATIOS, '4:5', '5:4', '1:4', '4:1', '1:8', '8:1'],
+      resolutions: ['1K', '2K', '4K'],
+      defaults: { variants: 1, aspectRatio: '1:1', resolution: '1K' },
+    };
   if (modelCode === 'openai/gpt-image-1-mini')
     return {
       ...base,
       maxInputImages: 16,
+      editMask: 'alpha',
       aspectRatios: ['1:1', '3:2', '2:3'],
       qualities: ['low', 'medium', 'high'],
       formats: ['png', 'jpeg', 'webp'],
       backgrounds: ['opaque', 'transparent'],
-      defaults: { variants: 1, outputFormat: 'png' },
+      defaults: { variants: 1, outputFormat: 'png', quality: 'low' },
     };
   // Unknown remote parameters stay hidden. The endpoint supplies its own defaults.
   const capabilities = model.capabilities ?? model.catalog?.capabilities;
@@ -184,7 +205,9 @@ export function getImageModelOutputSize(
 export function acceptsImageContext(profile: ImageModelProfile, context: ImageContext): boolean {
   if (
     !imageParametersSchema.safeParse(context.parameters).success ||
-    context.images.length > profile.maxInputImages
+    context.images.length + (context.editMask?.mode === 'reference' ? 1 : 0) >
+      profile.maxInputImages ||
+    (context.editMask !== undefined && context.editMask.mode !== (profile.editMask ?? 'reference'))
   )
     return false;
   const minimumSide = profile.minInputSide ?? 1;
@@ -214,4 +237,60 @@ export function getImageModelInputSize(
   return image.width < side || image.height < side
     ? { width: Math.max(side, image.width), height: Math.max(side, image.height) }
     : null;
+}
+
+/** Expands a working frame to a supported ratio without scaling its source pixels. */
+export function getImageEditFrameSize(
+  profile: ImageModelProfile | null,
+  bounds: { width: number; height: number }
+): { width: number; height: number } | null {
+  if (!profile) return null;
+  const ratios = profile.aspectRatios.length
+    ? profile.aspectRatios
+    : profile.sizes
+        .map((size) => {
+          const [width, height] = size.split('x').map(Number);
+          if (!width || !height) return '';
+          let a = width,
+            b = height;
+          while (b) {
+            const remainder = a % b;
+            a = b;
+            b = remainder;
+          }
+          return `${width / a}:${height / a}`;
+        })
+        .filter(Boolean);
+  if (!ratios.length) return getImageModelInputSize(profile, bounds);
+  const minimum = profile.minInputSide ?? 1;
+  let best: { width: number; height: number } | null = null;
+  for (const ratio of ratios) {
+    const [w, h] = ratio.split(':').map(Number);
+    if (!w || !h) continue;
+    const unit = Math.ceil(Math.max(bounds.width / w, bounds.height / h, minimum / w, minimum / h));
+    const size = { width: w * unit, height: h * unit };
+    if (!best || size.width * size.height < best.width * best.height) best = size;
+  }
+  return best;
+}
+
+/** Uses the transport's ratio or size field for an automatically prepared local-edit frame. */
+export function getImageEditParameters(
+  profile: ImageModelProfile,
+  frame: { width: number; height: number },
+  current: ImageParameters
+): ImageParameters {
+  const matches = (w: number | undefined, h: number | undefined) =>
+    w && h && Math.abs(frame.width / frame.height - w / h) < 0.000001;
+  const aspectRatio = profile.aspectRatios.find((ratio) => {
+    const [w, h] = ratio.split(':').map(Number);
+    return matches(w, h);
+  });
+  const size = !aspectRatio
+    ? profile.sizes.find((size) => {
+        const [w, h] = size.split('x').map(Number);
+        return matches(w, h);
+      })
+    : undefined;
+  return { ...current, aspectRatio, size };
 }

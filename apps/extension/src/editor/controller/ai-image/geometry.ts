@@ -106,3 +106,22 @@ export function imageRasterRegion(
   const bottom = Math.min(raster.height, Math.ceil(crop.top + crop.height));
   return integerImageBounds({ left, top, width: right - left, height: bottom - top });
 }
+
+/** Allows observed tier rounding, while refusing a model's different composition. */
+export function uniformImageResultCrop(
+  input: ImageBounds,
+  target: ImageBounds,
+  result: { width: number; height: number }
+): ImageBounds {
+  const sx = result.width / input.width,
+    sy = result.height / input.height;
+  // Nano tiers include 1376x768 for 16:9 and 1584x672 for 21:9. Allow their rounding, not a new composition.
+  if (Math.abs(sx / sy - 1) > 0.015) throw new Error('size-mismatch');
+  const scale = Math.min(sx, sy);
+  return {
+    left: (result.width - input.width * scale) / 2 + (target.left - input.left) * scale,
+    top: (result.height - input.height * scale) / 2 + (target.top - input.top) * scale,
+    width: target.width * scale,
+    height: target.height * scale,
+  };
+}

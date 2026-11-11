@@ -92,9 +92,9 @@ export function createEditorToolbarActions(args: ToolbarActionArgs) {
         return;
       }
 
-      args.setInspector('tool');
       args.setActiveTool(tool);
       args.controller.setActiveTool(tool);
+      args.setInspector(args.inspector === 'ai' ? 'ai' : 'tool');
     },
 
     toggleInspector(value: ToolbarInspector) {

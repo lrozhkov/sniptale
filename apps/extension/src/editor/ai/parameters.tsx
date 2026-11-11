@@ -1,11 +1,11 @@
+import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { SlidersHorizontal } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { INSPECTOR_SECONDARY_BUTTON_CLASS_NAME } from '../inspector/chrome';
 import { translate, type TranslationKey } from '../../platform/i18n';
 import type { ImageModelProfile } from '../../contracts/ai/image-profile';
 import type { ImageParameters } from '../../contracts/ai/image';
-import { SegmentedRow } from '../../ui/compact-inspector-controls';
-import { CompactInput, SelectField } from '../chrome/ui';
+import { TextField, CompactSelect } from '../chrome/ui';
 
 type ChoiceKey = Exclude<keyof ImageParameters, 'variants' | 'seed'>;
 type ChoiceField = {
@@ -73,14 +73,21 @@ export function ImageParametersEditor(props: {
   profile: ImageModelProfile | null;
   value: ImageParameters;
   disabled: boolean;
+  automaticGeometry?: boolean;
   onChange(value: ImageParameters): void;
 }) {
   const p = props.profile,
     value = props.value;
-  const fields = p ? getChoiceFields(p).filter((field) => field.choices.length > 0) : [];
+  const fields = p
+    ? getChoiceFields(p).filter(
+        (field) =>
+          field.choices.length > 0 &&
+          (!props.automaticGeometry || (field.key !== 'aspectRatio' && field.key !== 'size'))
+      )
+    : [];
   const resolution = p ? resolveImageParameterChoices(p, value) : null;
   return (
-    <div className="space-y-1">
+    <div className="min-w-0 space-y-1">
       {resolution?.incompatible.length ? (
         <div className="space-y-1 py-1 text-xs" role="status">
           <p>{translate('editor.ai.incompatibleParameters')}</p>
@@ -98,71 +105,74 @@ export function ImageParametersEditor(props: {
           </ProductActionButton>
         </div>
       ) : null}
-      <SegmentedRow
-        ariaLabel={translate('editor.ai.variants')}
-        label={translate('editor.ai.variants')}
-        columns={3}
-        value={String(value.variants)}
-        options={['1', '2', '3'].map((choice) => ({
-          value: choice,
-          label: choice,
-          disabled: props.disabled,
-        }))}
-        onChange={(choice) => props.onChange({ ...value, variants: Number(choice) })}
-      />
       {p ? (
-        <details className="text-xs">
-          <summary className="flex cursor-pointer items-center gap-2 py-2 text-[var(--sniptale-color-text-secondary)]">
-            <SlidersHorizontal size={14} />
-            {translate('editor.ai.parameters')}
-            <span className="ml-auto tabular-nums">
-              {[value.resolution, value.aspectRatio, value.outputFormat?.toUpperCase()]
+        <details className="min-w-0 text-xs">
+          <summary
+            data-ui="editor.ai.parameters-summary"
+            className="flex min-w-0 cursor-pointer items-center gap-2 py-2 text-[var(--sniptale-color-text-secondary)]"
+          >
+            <SlidersHorizontal size={14} className="shrink-0" />
+            <span className="min-w-0 flex-1">{translate('editor.ai.parameters')}</span>
+            <span className="ml-auto min-w-0 max-w-[55%] break-words text-right tabular-nums">
+              {[
+                props.automaticGeometry
+                  ? `${translate('editor.ai.autoRatio')} ${value.aspectRatio ?? ''}`
+                  : value.aspectRatio,
+                value.resolution,
+                value.outputFormat?.toUpperCase(),
+              ]
                 .filter(Boolean)
                 .join(' · ') || translate('editor.ai.providerDefault')}
             </span>
           </summary>
-          <div className="space-y-1">
+          <div className="min-w-0 space-y-1">
             {fields.map((field) => (
-              <SelectField
+              <InspectorParameterRow
                 key={field.key}
                 label={translate(field.label)}
-                value={value[field.key] ?? ''}
-                options={[
-                  { value: '', label: translate('editor.ai.providerDefault') },
-                  ...field.choices.map((choice) => ({
-                    value: choice,
-                    label: getChoiceLabel(field.key, choice),
-                  })),
-                ]}
-                disabled={props.disabled}
-                onChange={(choice) =>
-                  props.onChange({ ...value, [field.key]: choice || undefined })
-                }
-              />
+                keepInline
+                dataUi={`editor.ai.parameter.${field.key}`}
+              >
+                <CompactSelect
+                  aria-label={translate(field.label)}
+                  appearance="plain"
+                  value={value[field.key] ?? ''}
+                  options={[
+                    { value: '', label: translate('editor.ai.providerDefault') },
+                    ...field.choices.map((choice) => ({
+                      value: choice,
+                      label: getChoiceLabel(field.key, choice),
+                    })),
+                  ]}
+                  disabled={props.disabled}
+                  onChange={(choice) =>
+                    props.onChange({ ...value, [field.key]: choice || undefined })
+                  }
+                />
+              </InspectorParameterRow>
             ))}
             {p.seed ? (
-              <label className="flex items-center justify-between gap-2 py-1">
-                <span>{translate('editor.ai.seed')}</span>
-                <CompactInput
-                  className="w-28"
-                  type="number"
-                  min={0}
-                  max={2147483647}
-                  disabled={props.disabled}
-                  value={value.seed ?? ''}
-                  onChange={(event) => {
-                    const seed =
-                      event.currentTarget.value === ''
-                        ? undefined
-                        : Number(event.currentTarget.value);
-                    if (
-                      seed === undefined ||
-                      (Number.isInteger(seed) && seed >= 0 && seed <= 2147483647)
-                    )
-                      props.onChange({ ...value, seed });
-                  }}
-                />
-              </label>
+              <TextField
+                label={translate('editor.ai.seed')}
+                placeholder={translate('editor.ai.automaticSeed')}
+                data-ui="editor.ai.seed"
+                type="number"
+                min={0}
+                max={2147483647}
+                disabled={props.disabled}
+                value={value.seed ?? ''}
+                onChange={(event) => {
+                  const seed =
+                    event.currentTarget.value === ''
+                      ? undefined
+                      : Number(event.currentTarget.value);
+                  if (
+                    seed === undefined ||
+                    (Number.isInteger(seed) && seed >= 0 && seed <= 2147483647)
+                  )
+                    props.onChange({ ...value, seed });
+                }}
+              />
             ) : null}
           </div>
         </details>

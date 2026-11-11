@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { resolveImageModelProfile, getImageModelInputSize } from '../../contracts/ai/image-profile';
+import {
+  resolveImageModelProfile,
+  getImageModelInputSize,
+  getImageEditFrameSize,
+} from '../../contracts/ai/image-profile';
 import { useAIScenarioModelSelection } from '../../workflows/ai-settings/use-scenario-model-selection';
 import type { ImageBounds } from '../controller/ai-image/types';
 import type { ImageEditorSession, ImageSessionState } from './session';
@@ -8,7 +12,7 @@ import type { ImageEditorSession, ImageSessionState } from './session';
 export function useImageModelSelection(
   session: ImageEditorSession,
   state: ImageSessionState,
-  sourceSelection: { region: ImageBounds | null; key: string }
+  sourceSelection: { region: ImageBounds | null; key: string; selectedCount: number }
 ) {
   const captured = useRef('');
   const editing =
@@ -36,6 +40,8 @@ export function useImageModelSelection(
       session.configureParameters(profileKey, profile.defaults);
   }, [profile, profileKey, session, state.status]);
   const inputSize = useMemo(() => {
+    if (state.source?.intention === 'region' || state.source?.intention === 'layers')
+      return getImageEditFrameSize(profile, state.source.contextBounds);
     const base =
       state.base &&
       state.steps.find((step) => step.id === state.base?.stepId)?.variants[state.base.variant]
@@ -62,6 +68,10 @@ export function useImageModelSelection(
       return;
     }
     if (state.draft.intention === 'region' && !sourceSelection.region) return;
+    if (state.draft.intention === 'layers' && !sourceSelection.selectedCount) {
+      if (state.source) session.setDraft({ intention: 'layers' });
+      return;
+    }
     if (captured.current === captureKey && (state.source || state.error)) {
       if (state.source) void session.prepareSource(inputSize);
       return;
@@ -77,6 +87,7 @@ export function useImageModelSelection(
     state.error,
     state.draft.intention,
     sourceSelection.region,
+    sourceSelection.selectedCount,
     captureKey,
     inputSize,
   ]);

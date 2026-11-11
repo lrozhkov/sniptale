@@ -1,13 +1,6 @@
-import {
-  AppWindow,
-  ChevronDown,
-  Crop,
-  Info,
-  Layers3,
-  Scaling,
-  Sparkles,
-  Wallpaper,
-} from 'lucide-react';
+import pencilAiIcon from '@iconify-icons/tabler/pencil-ai';
+import { Icon } from '@iconify/react';
+import { AppWindow, ChevronDown, Crop, Info, Layers3, Scaling, Wallpaper } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { EditorInspector } from '../../state/types';
@@ -46,11 +39,6 @@ const modes: ReadonlyArray<{
     label: () => translate('editor.toolbar.layersTitle'),
   },
   {
-    id: 'ai',
-    icon: <Sparkles size={16} strokeWidth={2} />,
-    label: () => translate('editor.ai.title'),
-  },
-  {
     id: 'frame',
     icon: <Wallpaper size={16} strokeWidth={2} />,
     label: () => translate('editor.toolbar.frame'),
@@ -59,6 +47,11 @@ const modes: ReadonlyArray<{
     id: 'browser-frame',
     icon: <AppWindow size={16} strokeWidth={2} />,
     label: () => translate('editor.toolbar.browserFrame'),
+  },
+  {
+    id: 'ai',
+    icon: <Icon ssr aria-hidden="true" icon={pencilAiIcon} width={16} height={16} />,
+    label: () => translate('editor.ai.title'),
   },
   {
     id: 'meta',

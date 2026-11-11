@@ -6628,10 +6628,10 @@
       "file": "apps/extension/src/editor/ai/session.ts",
       "symbol": "createImageEditorSession",
       "owner": "extension:editor:ai",
-      "reason": "tool-noise: Independent read-only diagnosis inspected this exact factory and its consumers. One temporary conversation owns draft preparation, cancellation, results and receipts. Minimum-input preparation creates separate rasters through the existing adapter without changing draft references. Active-job, abort and document checks remain before dispatch. Capture, transport and document mutation retain their existing owners. Splitting the closure would distribute the same lifecycle. Fresh complete-candidate architecture review remains required.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, fixture or resource lifetime, writer, transport effect or transaction. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-11",
-      "astHash": "458d0428757adda77e5f156cd30d43fa2378169b717ad2a079ecc752c34c6dae",
+      "reason": "tool-noise: This factory owns one temporary image conversation and its single active-job identity. Preparation, cancellation, retained variants and accepted receipts use that identity. The mask is prepared through the existing adapter and enters the same validated request as its source. Live-document checks remain before dispatch and mutation. Capture, transport and document writes retain their adapters. Splitting this closure would distribute the same active-job and receipt authority. Final independent architecture review must confirm this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, resource lifetime, transport, writer or document transaction. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-12",
+      "astHash": "3ad90ad7a1e5a3d6a6a7c4767f1d77bc657a9088d52b3071b08a6cca3cd9fffb",
       "signatureHash": "3e899fc484590c2b483453333e63b6a60d1dabcf99a9014e25703e64ea8ead0a"
     },
     {
@@ -6644,6 +6644,50 @@
       "reviewDate": "2026-11-11",
       "astHash": "d0a3a6f288f362340ab6ae47c23405ecf5f4245011649f0db645bb7014a7507f",
       "signatureHash": "a6f42e2ea10bc45cab3e6e0bfc0b1bce48215cc417f63c7ab913d638b22951e1"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/ai/inspector.tsx",
+      "symbol": "ImageAIInspector",
+      "owner": "extension:editor:ai",
+      "reason": "tool-noise: This component binds one mounted inspector to one temporary session. Region and layer capture, model admission, preparation, history visibility and command rendering share that session and its abort lifetime. It calls the session and controller adapters. It does not own provider transport, document mutation or durable storage. Child controls retain independent presentation. Splitting its state would duplicate admission and cancellation authority. Final independent architecture review must confirm this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, resource lifetime, transport, writer or document transaction. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-12",
+      "astHash": "065a322993ff10507115d3609d97d03b1ec402720cea3cc3181bece73f0a9fca",
+      "signatureHash": "6c09e0658ecd8ca9bdcc2de0b47239a49895fc5763c65660caa0b15e498346e5"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/ai/preview-raster.tsx",
+      "symbol": "ImagePreviewRaster",
+      "owner": "extension:editor:ai",
+      "reason": "tool-noise: This viewer owns one scroll element, one rendered raster plane and their pointer, wheel, divider and opacity interaction. Geometry and captured-pointer cleanup share the same element and transform lifetime. It changes viewer state only and emits zoom through one callback. It cannot mutate the editor, session, transport or storage. Its conditional branches implement mutually exclusive gestures on that one element. Final independent architecture review must confirm this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, resource lifetime, transport, writer or document transaction. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-12",
+      "astHash": "ed83f9dff1a726a23328fdddaddde1a18ebc32b7f8a2f928e93cf105ebb0c8a0",
+      "signatureHash": "82798d0db2cf72ae7c205d474a2fac1a3c4aaa81ca497c414eb088ea0088f53c"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/ai/preview.tsx",
+      "symbol": "ImagePreviewWorkspace",
+      "owner": "extension:editor:ai",
+      "reason": "tool-noise: This workspace binds one selected variant or attachment to one disposable side preview. Prepared and original rasters, comparison, source switching and focus recovery share the selected-result identity. Preparation uses the controller adapter; document commands remain in ImageResults and the session. The independently changing raster gesture viewer is now a separate component. Remaining state coordinates one preview lifetime and has no persistence or provider authority. Final independent architecture review must confirm this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, resource lifetime, transport, writer or document transaction. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-12",
+      "astHash": "5e1128e5c532e8fefb05368f07ade54fd00eee355960b5d04c08c6cc67d0040b",
+      "signatureHash": "0cfbd201cef5794f2001d5a309973e348664318c59d6223431e9d25771872337"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/controller/ai-image/snapshot.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:controller",
+      "reason": "tool-noise: This snapshot adapter binds frozen raster pixels and source signatures to one editor snapshot. Capture, validity checks, frozen-frame preparation and same-grid masks implement that contract. Counted state comes from object properties, temporary canvas contexts and decoded bitmap cleanup. There is no new session, writer, provider or history authority. Frame preparation reads retained pixels and does not recapture live content. The module remains the snapshot adapter used by the image session and apply guard. Final independent architecture review must confirm this exact classification.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent state authority, resource lifetime, transport, writer or document transaction. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-12",
+      "astHash": "32e9471c25d06e47aedd6b5913c4748cecc07b1c94ef7170857e73b5bce28c4c",
+      "signatureHash": "7bf80f18d5ea40ed057a83d8d1e04af301858fbd898271a273f9166fbc5bc9ec"
     }
   ]
 }

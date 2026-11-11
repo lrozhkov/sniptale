@@ -77,6 +77,10 @@ export const imageContextSchema = z
       .refine((value) => value.trim().length > 0),
     images: z.array(inputImageSchema).max(IMAGE_JOB_LIMITS.maxImages),
     parameters: imageParametersSchema,
+    editMask: z
+      .object({ image: imageRasterSchema, mode: z.enum(['alpha', 'reference']) })
+      .strict()
+      .optional(),
     editRegion: z
       .object({
         left: z.number().int().min(0).max(16_384),
@@ -107,7 +111,19 @@ export const imageContextSchema = z
         code: 'custom',
         message: 'Choose a valid edit rectangle inside the source image',
       });
-    let total = 0;
+    if (
+      value.editMask &&
+      (!source ||
+        !region ||
+        value.editMask.image.width !== source.width ||
+        value.editMask.image.height !== source.height)
+    )
+      context.addIssue({ code: 'custom', message: 'Edit mask must share the source pixel grid' });
+    let total = value.editMask
+      ? estimateBase64DecodedBytes(
+          value.editMask.image.dataUrl.slice(value.editMask.image.dataUrl.indexOf(',') + 1)
+        )
+      : 0;
     for (const image of value.images) {
       total += estimateBase64DecodedBytes(image.dataUrl.slice(image.dataUrl.indexOf(',') + 1));
     }
@@ -228,7 +244,21 @@ export function formatImageProviderPrompt(context: ImageContext): string {
     'Edit the first input image. Pixel coordinates start at its top-left corner. ' +
     `Change only the rectangle: left=${region.left}, top=${region.top}, ` +
     `width=${region.width}, height=${region.height}. ` +
-    'Keep the input dimensions. Preserve content outside this rectangle. Other input images are references.\n' +
+    'Preserve the full input framing, aspect ratio, positions, and proportions. ' +
+    'Do not crop, zoom, stretch or reposition content. Preserve content outside this rectangle. ' +
+    (context.editMask?.mode === 'reference'
+      ? 'The second input image is an edit mask: white means edit, black means preserve. ' +
+        'Do not render this mask. Remaining images are references.\n'
+      : context.editMask
+        ? 'The alpha mask marks the editable pixels. Other input images are references.\n'
+        : 'Other input images are references.\n') +
     `User instruction:\n${context.prompt}`
   );
+}
+
+/** Keeps a visual mask immediately after its source, separate from user references. */
+export function getImageProviderInputs(context: ImageContext): ImageRaster[] {
+  return context.editMask?.mode === 'reference'
+    ? [...context.images.slice(0, 1), context.editMask.image, ...context.images.slice(1)]
+    : context.images;
 }

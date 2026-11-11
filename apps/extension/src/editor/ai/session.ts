@@ -1,3 +1,4 @@
+import { getImageEditParameters, type ImageModelProfile } from '../../contracts/ai/image-profile';
 import { reframeEditorRaster } from '../controller/layer-effects/rasterize/capture';
 import { padImageBounds } from '../controller/ai-image/geometry';
 import { imageRasterRegion } from '../controller/ai-image/geometry';
@@ -11,10 +12,12 @@ import {
 } from '../../contracts/ai/image';
 import {
   captureImageEditorSnapshot,
+  createEditorImageMask,
   prepareImageEditorSnapshot,
 } from '../controller/ai-image/snapshot';
 import {
   applyImageEditorResult,
+  type ImageResultFitting,
   canUpdateImageResult,
   isImageApplyResultPresent,
 } from '../controller/ai-image/apply';
@@ -54,10 +57,12 @@ const failures = new Set<string>([
 
 interface ImageSessionVariant {
   image: ImageRaster;
+  durationMs: number;
   costRub?: number;
 }
 interface ImageSessionStep {
   id: string;
+  startedAt: number;
   operationId: string;
   snapshot: EditorImageSnapshot;
   context: ImageContext;
@@ -93,6 +98,7 @@ interface ImageSessionModel {
 }
 interface Dependencies {
   capture: typeof captureImageEditorSnapshot;
+  mask: typeof createEditorImageMask;
   prepare: typeof prepareImageEditorSnapshot;
   apply: typeof applyImageEditorResult;
   run: typeof runImageEditorJob;
@@ -135,7 +141,8 @@ async function prepareImageReference(image: ImageRaster, minimumSide: number, si
 function buildImageContext(
   source: EditorImageSnapshot,
   draft: ImageSessionState['draft'],
-  base: ImageRaster | null
+  base: ImageRaster | null,
+  mask?: ImageContext['editMask']
 ): ImageContext {
   return imageContextSchema.parse({
     version: 1,
@@ -145,6 +152,7 @@ function buildImageContext(
       ...(base ? [{ ...base, role: 'source' }] : []),
       ...draft.references.map((image) => ({ ...image, role: 'reference' })),
     ],
+    ...(mask ? { editMask: mask } : {}),
     parameters: Object.fromEntries(
       Object.entries(draft.parameters).filter(([, value]) => value !== undefined)
     ),
@@ -165,6 +173,7 @@ export function createImageEditorSession(
 ) {
   const deps: Dependencies = {
     capture: captureImageEditorSnapshot,
+    mask: createEditorImageMask,
     prepare: prepareImageEditorSnapshot,
     apply: applyImageEditorResult,
     run: runImageEditorJob,
@@ -232,7 +241,9 @@ export function createImageEditorSession(
     if (source?.captureRaster) rasters.push(source.captureRaster.dataUrl);
     state.draft.references.forEach((image) => rasters.push(image.dataUrl));
     for (const step of steps) {
+      if (step.snapshot.captureRaster) rasters.push(step.snapshot.captureRaster.dataUrl);
       step.context.images.forEach((image) => rasters.push(image.dataUrl));
+      if (step.context.editMask) rasters.push(step.context.editMask.image.dataUrl);
       step.variants.forEach((variant) => {
         if (variant) rasters.push(variant.image.dataUrl);
       });
@@ -430,7 +441,8 @@ export function createImageEditorSession(
       model: ImageSessionModel,
       region?: ImageBounds,
       size: { width: number; height: number } | null = null,
-      minimumInputSide = 1
+      minimumInputSide = 1,
+      profile?: ImageModelProfile
     ) {
       const job = begin('preparing');
       if (!job) return;
@@ -469,10 +481,32 @@ export function createImageEditorSession(
           currentDocument.originalDocument !== source.originalDocument
         )
           throw new Error('stale-document');
-        const context = buildImageContext(source, { ...draft, references }, base);
+        const local = source.intention === 'region' || source.intention === 'layers';
+        const mask =
+          local && base
+            ? deps.mask(
+                base,
+                imageRasterRegion(source.inputBounds, source.targetBounds, base),
+                profile?.editMask ?? 'reference'
+              )
+            : undefined;
+        const context = buildImageContext(
+          source,
+          {
+            ...draft,
+            references,
+            parameters:
+              local && profile
+                ? getImageEditParameters(profile, source.inputBounds, draft.parameters)
+                : draft.parameters,
+          },
+          base,
+          mask
+        );
         const requestId = crypto.randomUUID();
         const step: ImageSessionStep = {
           id: requestId,
+          startedAt: performance.now(),
           operationId: state.operationId,
           snapshot: source,
           context,
@@ -502,6 +536,7 @@ export function createImageEditorSession(
               const variants = [...entry.variants];
               variants[message.variant] = {
                 image: message.image,
+                durationMs: Math.max(0, performance.now() - step.startedAt),
                 ...(message.costRub !== undefined ? { costRub: message.costRub } : {}),
               };
               return { ...entry, variants };
@@ -540,7 +575,12 @@ export function createImageEditorSession(
         end(job);
       }
     },
-    async apply(mode: 'add' | 'replace' | 'update', fit: boolean, name: string) {
+    async apply(
+      mode: 'add' | 'replace' | 'update',
+      fit: boolean,
+      name: string,
+      fitting: ImageResultFitting = 'exact'
+    ) {
       const choice = state.selected;
       const step = state.steps.find((entry) => entry.id === choice?.stepId);
       const variant = selectedVariant();
@@ -556,6 +596,7 @@ export function createImageEditorSession(
           raster: variant.image,
           mode,
           fit,
+          fitting,
           name,
           ...(previous ? { previous } : {}),
           signal: job.signal,

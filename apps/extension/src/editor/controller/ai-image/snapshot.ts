@@ -1,10 +1,16 @@
 import { ActiveSelection, Group, config, type FabricObject } from 'fabric';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { imageRasterSchema, type ImageRaster } from '../../../contracts/ai/image';
+import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { CUSTOM_JSON_PROPS, isSourceObject, isUserObject } from '../../document/model';
 import { getSourceObject } from '../document/layers';
 import { captureEditorRaster, reframeEditorRaster } from '../layer-effects/rasterize/capture';
-import { integerImageBounds, imageContextBounds, padImageBounds } from './geometry';
+import {
+  integerImageBounds,
+  imageContextBounds,
+  padImageBounds,
+  uniformImageResultCrop,
+} from './geometry';
 import type {
   EditorImageSnapshot,
   ImageApplyController,
@@ -143,7 +149,7 @@ export function isImageSnapshotCurrent(
   };
   controller.canvas.getObjects().forEach(visit);
   return (
-    snapshot.sources.every(
+    [...snapshot.sources, ...(snapshot.contextSources ?? [])].every(
       (binding) =>
         all.includes(binding.object) &&
         persistentParent(binding.object) === binding.parent &&
@@ -212,10 +218,14 @@ export async function captureImageEditorSnapshot(
       width: source.intrinsicWidth,
       height: source.intrinsicHeight,
     };
-  const inputBounds =
-    options.intention === 'region'
-      ? imageContextBounds(targetBounds, documentBounds, options.context ?? 'surroundings')
-      : targetBounds;
+  const local = options.intention === 'region' || options.intention === 'layers';
+  const captureBounds = local
+    ? integerImageBounds(unionImageBounds([documentBounds, targetBounds]))
+    : targetBounds;
+  const contextBounds = local
+    ? imageContextBounds(targetBounds, captureBounds, options.context ?? 'surroundings')
+    : targetBounds;
+  const inputBounds = captureBounds;
   const snapshot: EditorImageSnapshot = {
     id: crypto.randomUUID(),
     intention: options.intention,
@@ -233,10 +243,24 @@ export async function captureImageEditorSnapshot(
       signature: imageObjectSignature(object),
       parent: persistentParent(object),
     })),
+    ...(options.intention === 'layers'
+      ? {
+          contextSources: order
+            .filter(
+              (object) => object.visible && !object.excludeFromExport && !selected.includes(object)
+            )
+            .map((object) => ({
+              object,
+              signature: imageObjectSignature(object),
+              parent: persistentParent(object),
+            })),
+        }
+      : {}),
     names: selected.map((object) => object.sniptaleLabel ?? object.sniptaleId ?? ''),
     raster: null,
     captureRaster: null,
-    captureBounds: inputBounds,
+    captureBounds,
+    contextBounds,
     contextMode: options.context ?? 'surroundings',
     regionSource: options.regionSource ?? 'canvas',
     inputBounds,
@@ -257,7 +281,7 @@ export async function captureImageEditorSnapshot(
     snapshot.raster = await captureEditorRaster(
       canvas,
       inputBounds,
-      options.intention === 'layers' || options.regionSource === 'source'
+      options.regionSource === 'source'
         ? selected.flatMap((object) => (object.sniptaleId ? [object.sniptaleId] : []))
         : undefined,
       options.signal
@@ -267,7 +291,99 @@ export async function captureImageEditorSnapshot(
   return snapshot;
 }
 
-/** Reframes the retained input or an explicit variant without reading the live selection again. */
+/** Renders a frozen working frame and composites only the previous accepted edit rectangle. */
+async function prepareLocalFrame(
+  snapshot: EditorImageSnapshot,
+  size: { width: number; height: number } | null,
+  variant: { image: ImageRaster; inputBounds: ImageBounds } | undefined,
+  signal?: AbortSignal
+): Promise<EditorImageSnapshot> {
+  if (!snapshot.captureRaster) throw new Error('source-unavailable');
+  const contextBounds = snapshot.contextBounds;
+  const inputBounds = size ? padImageBounds(contextBounds, size) : { ...contextBounds };
+  // Use real surrounding pixels when the working frame fits inside the frozen document.
+  for (const [position, extent] of [
+    ['left', 'width'],
+    ['top', 'height'],
+  ] as const) {
+    if (inputBounds[extent] <= snapshot.captureBounds[extent])
+      inputBounds[position] = Math.max(
+        snapshot.captureBounds[position],
+        Math.min(
+          inputBounds[position],
+          snapshot.captureBounds[position] + snapshot.captureBounds[extent] - inputBounds[extent]
+        )
+      );
+  }
+  const base = await createImageBitmap(await dataUrlToBlob(snapshot.captureRaster.dataUrl, signal));
+  let previous: ImageBitmap | null = null;
+  const canvas = document.createElement('canvas');
+  try {
+    signal?.throwIfAborted();
+    canvas.width = inputBounds.width;
+    canvas.height = inputBounds.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('capture-unavailable');
+    const left = Math.max(snapshot.captureBounds.left, inputBounds.left);
+    const top = Math.max(snapshot.captureBounds.top, inputBounds.top);
+    const width =
+      Math.min(
+        snapshot.captureBounds.left + snapshot.captureBounds.width,
+        inputBounds.left + inputBounds.width
+      ) - left;
+    const height =
+      Math.min(
+        snapshot.captureBounds.top + snapshot.captureBounds.height,
+        inputBounds.top + inputBounds.height
+      ) - top;
+    if (width > 0 && height > 0)
+      ctx.drawImage(
+        base,
+        left - snapshot.captureBounds.left,
+        top - snapshot.captureBounds.top,
+        width,
+        height,
+        left - inputBounds.left,
+        top - inputBounds.top,
+        width,
+        height
+      );
+    if (variant) {
+      const crop = uniformImageResultCrop(
+        variant.inputBounds,
+        snapshot.targetBounds,
+        variant.image
+      );
+      previous = await createImageBitmap(await dataUrlToBlob(variant.image.dataUrl, signal));
+      signal?.throwIfAborted();
+      ctx.drawImage(
+        previous,
+        crop.left,
+        crop.top,
+        crop.width,
+        crop.height,
+        snapshot.targetBounds.left - inputBounds.left,
+        snapshot.targetBounds.top - inputBounds.top,
+        snapshot.targetBounds.width,
+        snapshot.targetBounds.height
+      );
+    }
+    const raster = imageRasterSchema.parse({
+      dataUrl: canvas.toDataURL('image/png'),
+      width: canvas.width,
+      height: canvas.height,
+    });
+    signal?.throwIfAborted();
+    return { ...snapshot, inputBounds, raster };
+  } finally {
+    base.close();
+    previous?.close();
+    canvas.width = 0;
+    canvas.height = 0;
+  }
+}
+
+/** Reframes retained pixels without recapturing live content during a refinement. */
 export async function prepareImageEditorSnapshot(
   snapshot: EditorImageSnapshot,
   size: { width: number; height: number } | null,
@@ -275,6 +391,8 @@ export async function prepareImageEditorSnapshot(
   signal?: AbortSignal
 ): Promise<EditorImageSnapshot> {
   if (snapshot.intention === 'new-image') return { ...snapshot, raster: variant?.image ?? null };
+  if (snapshot.intention === 'region' || snapshot.intention === 'layers')
+    return prepareLocalFrame(snapshot, size, variant, signal);
   const image = variant?.image ?? snapshot.captureRaster;
   if (!image) throw new Error('source-unavailable');
   if (!size)
@@ -292,4 +410,37 @@ export async function prepareImageEditorSnapshot(
     signal
   );
   return { ...snapshot, inputBounds, raster };
+}
+
+/** Produces the provider mask on the exact prepared source grid. */
+export function createEditorImageMask(
+  image: ImageRaster,
+  region: ImageBounds,
+  mode: 'alpha' | 'reference'
+): NonNullable<import('../../../contracts/ai/image').ImageContext['editMask']> {
+  const canvas = document.createElement('canvas');
+  canvas.width = image.width;
+  canvas.height = image.height;
+  try {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('capture-unavailable');
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (mode === 'alpha') ctx.clearRect(region.left, region.top, region.width, region.height);
+    else {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(region.left, region.top, region.width, region.height);
+    }
+    return {
+      mode,
+      image: imageRasterSchema.parse({
+        dataUrl: canvas.toDataURL('image/png'),
+        width: canvas.width,
+        height: canvas.height,
+      }),
+    };
+  } finally {
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }

@@ -10,6 +10,7 @@ vi.mock('fabric', () => ({ Canvas: class {}, Rect: class {} }));
 vi.mock('../controller/ai-image/snapshot', () => ({
   captureImageEditorSnapshot: vi.fn(),
   prepareImageEditorSnapshot: vi.fn(),
+  createEditorImageMask: vi.fn(),
 }));
 vi.mock('../controller/ai-image/apply', () => ({
   applyImageEditorResult: vi.fn(),
@@ -90,6 +91,7 @@ function setup() {
     raster: null,
     captureRaster: null,
     captureBounds: { left: 0, top: 0, width: 2, height: 3 },
+    contextBounds: { left: 0, top: 0, width: 2, height: 3 },
     contextMode: 'surroundings',
     regionSource: 'canvas',
     inputBounds: { left: 0, top: 0, width: 2, height: 3 },
@@ -97,6 +99,7 @@ function setup() {
   };
   type Deps = Required<NonNullable<Parameters<typeof createImageEditorSession>[1]>>;
   const deps = {
+    mask: vi.fn<Deps['mask']>((raster, _region, mode) => ({ image: raster, mode })),
     capture: vi.fn<Deps['capture']>(async () => snapshot),
     prepare: vi.fn<Deps['prepare']>(async (source, _size, variant) => ({
       ...source,

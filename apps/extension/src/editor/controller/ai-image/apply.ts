@@ -1,58 +1,54 @@
-import { FabricImage, config, util, type FabricObject } from 'fabric';
+import { FabricImage, config, util, type FabricObject, type TMat2D } from 'fabric';
 import { imageRasterSchema, type ImageRaster } from '../../../contracts/ai/image';
 import { getSourceObject } from '../document/layers';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { createRasterizedEditorImage } from '../layer-effects/rasterize/image-object';
-import { imageResultCrop } from './geometry';
+import { imageResultCrop, uniformImageResultCrop } from './geometry';
 import { imageObjectSignature, isImageSnapshotCurrent } from './snapshot';
 import type { EditorImageSnapshot, ImageApplyController, ImageApplyReceipt } from './types';
 
-async function prepareResultRaster(
+export type ImageResultFitting = 'exact' | 'cover' | 'free';
+
+/** Removes input padding and produces the same bitmap for preview and document application. */
+export async function prepareImageEditorResult(
   snapshot: EditorImageSnapshot,
   raster: ImageRaster,
-  fit: boolean,
-  retainResolution = false
+  fit = true,
+  fitting: ImageResultFitting = 'exact'
 ): Promise<ImageRaster> {
   if (snapshot.intention === 'new-image') return raster;
-  // Input compatibility margins do not constrain the aspect ratio of a freely placed result.
-  if (
-    retainResolution &&
-    (raster.width !== snapshot.inputBounds.width ||
-      raster.height !== snapshot.inputBounds.height) &&
-    snapshot.captureBounds.left === snapshot.targetBounds.left &&
-    snapshot.captureBounds.top === snapshot.targetBounds.top &&
-    snapshot.captureBounds.width === snapshot.targetBounds.width &&
-    snapshot.captureBounds.height === snapshot.targetBounds.height
-  )
-    return raster;
-  const crop = imageResultCrop(snapshot.inputBounds, snapshot.targetBounds, raster, fit);
-  if (
-    retainResolution &&
-    crop.left === 0 &&
-    crop.top === 0 &&
-    crop.width === raster.width &&
-    crop.height === raster.height
-  )
-    return raster;
+  const local = snapshot.intention === 'region' || snapshot.intention === 'layers';
+  const crop = local
+    ? uniformImageResultCrop(snapshot.inputBounds, snapshot.targetBounds, raster)
+    : imageResultCrop(snapshot.inputBounds, snapshot.targetBounds, raster, fit);
+  const free = !local && fitting === 'free';
+  const output = document.createElement('canvas');
+  output.width = free ? Math.max(1, Math.round(crop.width)) : snapshot.targetBounds.width;
+  output.height = free ? Math.max(1, Math.round(crop.height)) : snapshot.targetBounds.height;
+  if (!local && fitting === 'cover') {
+    const scale = Math.max(output.width / crop.width, output.height / crop.height);
+    const width = output.width / scale;
+    const height = output.height / scale;
+    crop.left += (crop.width - width) / 2;
+    crop.top += (crop.height - height) / 2;
+    crop.width = width;
+    crop.height = height;
+  }
   if (
     crop.left === 0 &&
     crop.top === 0 &&
     crop.width === raster.width &&
     crop.height === raster.height &&
-    raster.width === snapshot.targetBounds.width &&
-    raster.height === snapshot.targetBounds.height &&
-    snapshot.intention !== 'region'
-  )
+    output.width === raster.width &&
+    output.height === raster.height &&
+    (snapshot.intention !== 'region' || fit)
+  ) {
+    output.width = 0;
+    output.height = 0;
     return raster;
+  }
   const bitmap = await createImageBitmap(await dataUrlToBlob(raster.dataUrl));
   try {
-    const output = document.createElement('canvas');
-    output.width = retainResolution
-      ? Math.max(1, Math.round(crop.width))
-      : snapshot.targetBounds.width;
-    output.height = retainResolution
-      ? Math.max(1, Math.round(crop.height))
-      : snapshot.targetBounds.height;
     const context = output.getContext('2d');
     if (!context) throw new Error('apply-unavailable');
     context.drawImage(
@@ -66,48 +62,50 @@ async function prepareResultRaster(
       output.width,
       output.height
     );
-    // Region overlay cannot claim erasure to transparency: require opaque pixels in its entire target.
-    if (snapshot.intention === 'region' && !retainResolution) {
+    // Strict native-pixel replacement cannot claim erasure through an alpha overlay.
+    if (snapshot.intention === 'region' && !fit) {
       const pixels = context.getImageData(0, 0, output.width, output.height).data;
       for (let i = 3; i < pixels.length; i += 4)
         if (pixels[i] !== 255) throw new Error('transparent-region');
     }
-    const result = {
-      dataUrl: output.toDataURL('image/png'),
-      width: output.width,
-      height: output.height,
-    };
-    output.width = 0;
-    output.height = 0;
-    return result;
+    return { dataUrl: output.toDataURL('image/png'), width: output.width, height: output.height };
   } finally {
     bitmap.close();
+    output.width = 0;
+    output.height = 0;
   }
 }
 
-function positionImageResult(image: FabricImage, snapshot: EditorImageSnapshot, contain: boolean) {
-  const precision = Math.max(0, Math.trunc(config.NUM_FRACTION_DIGITS));
-  const unit = 10 ** precision;
-  const rawScale = Math.min(
-    snapshot.targetBounds.width / image.width,
-    snapshot.targetBounds.height / image.height
-  );
-  const scale = contain ? Math.max(1 / unit, Math.floor(rawScale * unit) / unit) : 1;
-  if (contain)
-    image.set({
-      scaleX: scale,
-      scaleY: scale,
-      left: snapshot.targetBounds.left + (snapshot.targetBounds.width - image.width * scale) / 2,
-      top: snapshot.targetBounds.top + (snapshot.targetBounds.height - image.height * scale) / 2,
-    });
+/** Center-based Fabric transform shared by the canvas preview and the inserted layer. */
+export function imageResultTransform(
+  snapshot: EditorImageSnapshot,
+  raster: Pick<ImageRaster, 'width' | 'height'>,
+  fitting: ImageResultFitting = 'exact'
+): TMat2D {
+  const target = snapshot.targetBounds;
+  const contain =
+    (fitting === 'free' && snapshot.intention !== 'region' && snapshot.intention !== 'layers') ||
+    snapshot.intention === 'new-image';
+  const scale = contain
+    ? Math.min(
+        snapshot.intention === 'new-image' ? 1 : Infinity,
+        target.width / raster.width,
+        target.height / raster.height
+      )
+    : 1;
   if (snapshot.intention === 'source' && snapshot.sourceTransform)
-    util.applyTransformToObject(
-      image,
-      contain
-        ? util.multiplyTransformMatrices(snapshot.sourceTransform, [scale, 0, 0, scale, 0, 0])
-        : snapshot.sourceTransform
-    );
-  // Match Fabric's saved transform before the first render, so history restores the same pixels.
+    return util.multiplyTransformMatrices(snapshot.sourceTransform, [scale, 0, 0, scale, 0, 0]);
+  return [scale, 0, 0, scale, target.left + target.width / 2, target.top + target.height / 2];
+}
+
+function positionImageResult(
+  image: FabricImage,
+  snapshot: EditorImageSnapshot,
+  fitting: ImageResultFitting
+) {
+  util.applyTransformToObject(image, imageResultTransform(snapshot, image, fitting));
+  // Match Fabric's saved transform before the first render.
+  const precision = Math.max(0, Math.trunc(config.NUM_FRACTION_DIGITS));
   for (const key of ['left', 'top', 'scaleX', 'scaleY', 'angle', 'skewX', 'skewY'] as const)
     image.set(key, Number(image[key].toFixed(precision)));
 }
@@ -174,6 +172,7 @@ export async function applyImageEditorResult(options: {
   mode: 'add' | 'replace' | 'update';
   name: string;
   fit: boolean;
+  fitting?: ImageResultFitting;
   previous?: ImageApplyReceipt;
   signal?: AbortSignal;
 }): Promise<ImageApplyReceipt> {
@@ -185,8 +184,8 @@ export async function applyImageEditorResult(options: {
   const mainSource =
     (options.mode === 'replace' && snapshot.intention === 'source') ||
     (options.mode === 'update' && options.previous?.sourceDataUrl !== undefined);
-  const contain = options.fit && !mainSource && snapshot.intention !== 'new-image';
-  const prepared = await prepareResultRaster(snapshot, raster, options.fit, contain);
+  const fitting = mainSource && options.fitting === 'free' ? 'exact' : (options.fitting ?? 'exact');
+  const prepared = await prepareImageEditorResult(snapshot, raster, options.fit, fitting);
   const image = await createRasterizedEditorImage({
     dataUrl: prepared.dataUrl,
     id: crypto.randomUUID(),
@@ -198,7 +197,7 @@ export async function applyImageEditorResult(options: {
     visible: true,
     locked: false,
   });
-  positionImageResult(image, snapshot, contain);
+  positionImageResult(image, snapshot, fitting);
   options.signal?.throwIfAborted();
   const controller = options.controller();
   assertImageApplyTarget(controller, snapshot, options.mode, options.previous);

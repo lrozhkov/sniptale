@@ -25,10 +25,12 @@ export interface EditorImageSnapshot {
   sourceId: string;
   sourceDataUrl: string;
   sources: ImageSourceBinding[];
+  contextSources?: ImageSourceBinding[];
   order: FabricObject[];
   raster: ImageRaster | null;
   captureRaster: ImageRaster | null;
   captureBounds: ImageBounds;
+  contextBounds: ImageBounds;
   contextMode: ImageCaptureContext;
   regionSource: 'canvas' | 'source';
   inputBounds: ImageBounds;

@@ -1,8 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Canvas, FabricImage, Rect, type FabricObject } from 'fabric';
-import { applyImageEditorResult, canUpdateImageResult, isImageApplyResultPresent } from './apply';
-import { captureImageEditorSnapshot } from './snapshot';
+import {
+  applyImageEditorResult,
+  canUpdateImageResult,
+  isImageApplyResultPresent,
+  prepareImageEditorResult,
+  imageResultTransform,
+} from './apply';
+import { captureImageEditorSnapshot as captureSnapshot } from './snapshot';
 import type { ImageApplyController } from './types';
 
 const create = vi.hoisted(() => vi.fn());
@@ -48,6 +54,13 @@ vi.mock('fabric', async (original) => {
 });
 const png =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII=';
+// Transaction fixtures represent a prepared native target; geometry cases set their own working frame.
+async function captureImageEditorSnapshot(...args: Parameters<typeof captureSnapshot>) {
+  const snapshot = await captureSnapshot(...args);
+  if (snapshot.intention === 'region' || snapshot.intention === 'layers')
+    snapshot.inputBounds = { ...snapshot.targetBounds };
+  return snapshot;
+}
 function image() {
   const element = document.createElement('img');
   element.width = 2;
@@ -147,6 +160,12 @@ describe('local image Apply transaction', () => {
     restored.sniptaleId = receipt.objectId;
     restored.sniptaleType = 'image';
     restored.sniptaleRole = 'annotation';
+    restored.set({
+      left: receipt.object.left,
+      top: receipt.object.top,
+      scaleX: receipt.object.scaleX,
+      scaleY: receipt.object.scaleY,
+    });
     canvas.remove(receipt.object);
     canvas.add(restored);
     expect(canUpdateImageResult(controller, receipt)).toBe(false);
@@ -365,49 +384,61 @@ it('updates a previous raster once and refuses a late Apply after document repla
   expect(controller.commitHistory).toHaveBeenCalledTimes(2);
 });
 
-it('places a generated raster proportionally inside a differently shaped area without resampling it', async () => {
+it.each(['region', 'layers'] as const)(
+  'prepares %s pixels to exact target size after removing model padding',
+  async (intention) => {
+    const { controller } = setup();
+    const snapshot = await captureImageEditorSnapshot(controller, {
+      intention: 'region',
+      region: { left: 10, top: 20, width: 20, height: 40 },
+      context: 'region',
+    });
+    snapshot.intention = intention;
+    snapshot.inputBounds = { left: -108, top: -88, width: 256, height: 256 };
+    const drawImage = vi.fn(),
+      close = vi.fn();
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ close }))
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage,
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(png);
+    const raster = await prepareImageEditorResult(snapshot, {
+      dataUrl: png,
+      width: 768,
+      height: 768,
+    });
+    expect(drawImage).toHaveBeenCalledWith(expect.anything(), 354, 324, 60, 120, 0, 0, 20, 40);
+    expect(raster).toMatchObject({ width: 20, height: 40 });
+    expect(imageResultTransform(snapshot, raster)).toEqual([1, 0, 0, 1, 20, 40]);
+    expect(close).toHaveBeenCalledOnce();
+    expect(controller.commitHistory).not.toHaveBeenCalled();
+  }
+);
+
+it('refuses different output proportions for local edits instead of stretching or cropping them to fit', async () => {
   const { controller } = setup();
   const snapshot = await captureImageEditorSnapshot(controller, {
     intention: 'region',
     region: { left: 10, top: 20, width: 20, height: 40 },
     context: 'region',
   });
-  const receipt = await applyImageEditorResult({
-    controller: () => controller,
-    snapshot,
-    raster: { dataUrl: png, width: 2, height: 3 },
-    mode: 'add',
-    name: 'AI',
-    fit: true,
-  });
-  expect(create.mock.calls[0]?.[0].dataUrl).toBe(png);
-  expect(receipt.object).toMatchObject({ left: 10, top: 25, scaleX: 10, scaleY: 10 });
-  expect(controller.commitHistory).toHaveBeenCalledOnce();
+  for (const fitting of ['exact', 'cover', 'free'] as const)
+    await expect(
+      prepareImageEditorResult(snapshot, { dataUrl: png, width: 80, height: 80 }, true, fitting)
+    ).rejects.toThrow('size-mismatch');
+  expect(controller.commitHistory).not.toHaveBeenCalled();
 });
 
-it('keeps model input padding separate from the freely placed output aspect ratio', async () => {
+it('keeps new document pixels native and centers an added image without upscaling', async () => {
   const { controller } = setup();
-  const snapshot = await captureImageEditorSnapshot(controller, {
-    intention: 'region',
-    region: { left: 10, top: 20, width: 20, height: 40 },
-    context: 'region',
-  });
-  snapshot.inputBounds = { left: -108, top: -88, width: 256, height: 256 };
-  const receipt = await applyImageEditorResult({
-    controller: () => controller,
-    snapshot,
-    raster: { dataUrl: png, width: 2, height: 3 },
-    mode: 'add',
-    name: 'AI',
-    fit: true,
-  });
-  expect(create.mock.calls[0]?.[0].dataUrl).toBe(png);
-  expect(receipt.object).toMatchObject({
-    width: 2,
-    height: 3,
-    scaleX: 10,
-    scaleY: 10,
-    left: 10,
-    top: 25,
-  });
+  const snapshot = await captureImageEditorSnapshot(controller, { intention: 'new-image' });
+  const raster = { dataUrl: png, width: 2, height: 3 };
+  expect(await prepareImageEditorResult(snapshot, raster)).toBe(raster);
+  expect(imageResultTransform(snapshot, raster)).toEqual([1, 0, 0, 1, 50, 50]);
+  expect(imageResultTransform(snapshot, { width: 200, height: 400 })).toEqual([
+    0.25, 0, 0, 0.25, 50, 50,
+  ]);
 });

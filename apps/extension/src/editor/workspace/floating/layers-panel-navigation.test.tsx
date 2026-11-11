@@ -66,9 +66,9 @@ it('keeps the canonical header order when expanded', () => {
 function expectToolbarOrder(markup: string, includeCollapse: boolean) {
   const selectors = [
     'editor.floating.layers.mode.layers',
-    'editor.floating.layers.mode.ai',
     'editor.floating.layers.mode.frame',
     'editor.floating.layers.mode.browser-frame',
+    'editor.floating.layers.mode.ai',
     'editor.floating.layers.mode.meta',
     'editor.floating.layers.mode.image-size',
     'editor.floating.layers.mode.canvas-size',

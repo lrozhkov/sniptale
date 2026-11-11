@@ -173,3 +173,34 @@ describe('image job admission', () => {
     expect(parseImageJobClientMessage({ type: 'keepalive', requestId: 'foreign' })).toBeNull();
   });
 });
+
+it('admits only masks on the disclosed source grid and includes them in provider input ordering', async () => {
+  const { getImageProviderInputs } = await import('./image');
+  const image = {
+    dataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII=',
+    width: 2,
+    height: 3,
+  };
+  const context = {
+    version: 1,
+    intention: 'region',
+    prompt: 'Change selected pixels',
+    images: [{ ...image, role: 'source' }],
+    parameters: { variants: 1 },
+    editRegion: { left: 0, top: 0, width: 1, height: 2 },
+    editMask: { mode: 'reference', image },
+  };
+  const parsed = imageContextSchema.parse(context);
+  expect(getImageProviderInputs(parsed)).toEqual([parsed.images[0], parsed.editMask?.image]);
+  expect(formatImageProviderPrompt(parsed)).toContain('second input image is an edit mask');
+  expect(
+    imageContextSchema.safeParse({
+      ...context,
+      editMask: { mode: 'reference', image: { ...image, width: 3 } },
+    }).success
+  ).toBe(false);
+  expect(
+    imageContextSchema.safeParse({ ...context, images: [], editRegion: undefined }).success
+  ).toBe(false);
+});

@@ -27,7 +27,7 @@ const COMPACT_LAYER_BASE_CLASS_NAME = ['pointer-events-none absolute inset-0 tex
 );
 const EXPANDED_LAYER_BASE_CLASS_NAME = [
   'pointer-events-none absolute inset-y-0 left-[38px] flex min-w-0 items-center text-left',
-  'w-[calc((100cqw-12px)*var(--popup-mode-expanded-grow)/(var(--popup-mode-expanded-grow)+2)-48px)]',
+  'w-[calc((100cqw-var(--mode-gap))*var(--mode-grow)/(var(--mode-grow)+var(--mode-rest))-48px)]',
 ].join(' ');
 const MODE_ICON_CLASS_NAME = [
   'absolute h-[19px] w-[19px]',
@@ -50,6 +50,8 @@ interface PopupExpandingModeButtonProps {
   icon: ComponentType<{ className?: string }>;
   label: string;
   compact?: boolean;
+  optionCount?: number;
+  dataUi?: string;
   onClick(): void;
 }
 
@@ -94,13 +96,22 @@ export function PopupExpandingModeButton({
   icon: Icon,
   label,
   compact = false,
+  optionCount = 3,
+  dataUi,
   onClick,
 }: PopupExpandingModeButtonProps) {
-  const textLayoutStyle: CSSProperties & { '--popup-mode-expanded-grow': number } = {
-    '--popup-mode-expanded-grow': compact ? 2.2 : 1.9,
+  const textLayoutStyle: CSSProperties & {
+    '--mode-grow': number;
+    '--mode-gap': string;
+    '--mode-rest': number;
+  } = {
+    '--mode-grow': compact ? 2.2 : 1.9,
+    '--mode-gap': `${(optionCount - 1) * 6}px`,
+    '--mode-rest': optionCount - 1,
   };
   return (
     <button
+      data-ui={dataUi}
       type="button"
       aria-label={label}
       aria-pressed={active}
@@ -124,7 +135,7 @@ export function PopupExpandingModeButton({
         <span
           className={[
             'absolute bottom-[6px] left-1/2 -translate-x-1/2 line-clamp-2 text-[10px] font-normal leading-tight',
-            'w-[calc((100cqw-12px)/(var(--popup-mode-expanded-grow)+2)-8px)]',
+            'w-[calc((100cqw-var(--mode-gap))/(var(--mode-grow)+var(--mode-rest))-8px)]',
           ].join(' ')}
         >
           {label}

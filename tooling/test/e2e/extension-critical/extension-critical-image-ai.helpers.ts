@@ -172,7 +172,9 @@ export async function installImageApiFixture(
               height = 576;
             }
             if (
-              echoInput &&
+              (echoInput ||
+                ('intention' in context &&
+                  ['region', 'layers'].includes(String(context.intention)))) &&
               input &&
               typeof input === 'object' &&
               'width' in input &&

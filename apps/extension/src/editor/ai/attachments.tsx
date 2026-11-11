@@ -1,19 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Paperclip, X } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { blobToDataUrl } from '../../platform/media-utils/data-url';
 import { readImageDataUrlDimensions } from '@sniptale/runtime-contracts/validation/data-url';
 import { IMAGE_JOB_LIMITS, imageRasterSchema, type ImageRaster } from '../../contracts/ai/image';
 import { EditorIconButton } from '../chrome/ui';
+import { useImagePreview } from './preview';
 
 /** Keeps local reference preparation bounded and discards uploads from an old operation. */
 export function ImageAttachments(props: {
   operationId: string;
+  controls?: ReactNode;
+  source?: ImageRaster | null;
+  sourceFromResult?: boolean;
+  onRemoveSource?(): void;
   images: ImageRaster[];
   disabled: boolean;
   onPendingChange(pending: boolean): void;
   onChange(images: ImageRaster[]): void;
 }) {
+  const preview = useImagePreview();
   const input = useRef<HTMLInputElement>(null),
     generation = useRef({ value: 0 });
   const lifetime = generation.current;
@@ -66,7 +72,7 @@ export function ImageAttachments(props: {
     }
   };
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 pt-2" data-ui="editor.ai.attachments">
       <input
         ref={input}
         type="file"
@@ -82,42 +88,39 @@ export function ImageAttachments(props: {
         }}
       />
       <div className="flex flex-wrap items-center gap-2">
+        {props.controls}
         <EditorIconButton
           title={translate('editor.ai.addReferences')}
+          className={[
+            '!h-8 !w-8 !border-transparent !bg-transparent',
+            'hover:!text-[var(--sniptale-color-text-primary-strong)]',
+          ].join(' ')}
           disabled={props.disabled || reading}
           onClick={() => input.current?.click()}
         >
-          <Paperclip size={15} />
+          <Paperclip size={20} />
         </EditorIconButton>
-        <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('editor.ai.references')}
-          {props.images.length ? ` · ${props.images.length}` : ''}
-        </span>
+        {props.source ? (
+          <ImageAttachmentTile
+            image={props.source}
+            label={translate('editor.ai.sourcePreview')}
+            disabled={props.disabled}
+            source
+            onOpen={(trigger) =>
+              props.sourceFromResult ? preview.openResult(trigger) : preview.openSource(trigger)
+            }
+            onRemove={() => props.onRemoveSource?.()}
+          />
+        ) : null}
         {props.images.map((image, index) => (
-          <div key={index} className="relative">
-            <details>
-              <summary className="cursor-pointer">
-                <img
-                  src={image.dataUrl}
-                  alt={`${translate('editor.ai.references')} ${index + 1}`}
-                  className="h-10 w-10 rounded-[4px] object-contain"
-                />
-              </summary>
-              <img
-                src={image.dataUrl}
-                alt={translate('editor.ai.sourcePreview')}
-                className="max-h-56 max-w-full object-contain"
-              />
-            </details>
-            <EditorIconButton
-              title={translate('editor.ai.removeReference')}
-              disabled={props.disabled || reading}
-              className="absolute -right-1 -top-1 !h-5 !w-5"
-              onClick={() => props.onChange(props.images.filter((_image, i) => i !== index))}
-            >
-              <X size={12} />
-            </EditorIconButton>
-          </div>
+          <ImageAttachmentTile
+            key={index}
+            image={image}
+            label={`${translate('editor.ai.references')} ${index + 1}`}
+            disabled={props.disabled || reading}
+            onOpen={(trigger) => preview.openAttachment(image, trigger)}
+            onRemove={() => props.onChange(props.images.filter((_image, i) => i !== index))}
+          />
         ))}
       </div>
       {failed ? (
@@ -125,6 +128,60 @@ export function ImageAttachments(props: {
           {translate('editor.ai.fileError')}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/** Keeps each removable raster in one square target; opening never changes the document. */
+function ImageAttachmentTile(props: {
+  image: ImageRaster;
+  label: string;
+  disabled: boolean;
+  source?: boolean;
+  onOpen(trigger: HTMLElement): void;
+  onRemove(): void;
+}) {
+  return (
+    <div className="group relative h-8 w-8 shrink-0" data-ui="editor.ai.attachment-tile">
+      <button
+        type="button"
+        title={`${props.label} · ${props.image.width} × ${props.image.height}`}
+        aria-label={props.label}
+        data-ui={props.source ? 'editor.ai.source-attachment' : 'editor.ai.reference-attachment'}
+        className={[
+          'h-8 w-8 rounded-[4px] border focus-visible:outline-2',
+          'focus-visible:outline-[var(--sniptale-color-accent)]',
+          props.source ? 'border-[var(--sniptale-color-accent)]' : 'border-transparent',
+        ].join(' ')}
+        onClick={(event) => props.onOpen(event.currentTarget)}
+      >
+        <img
+          src={props.image.dataUrl}
+          alt=""
+          className="block h-full w-full rounded-[3px] object-cover"
+        />
+      </button>
+      <button
+        type="button"
+        title={translate('editor.ai.removeReference')}
+        aria-label={translate('editor.ai.removeReference')}
+        disabled={props.disabled}
+        data-ui={
+          props.source
+            ? 'editor.ai.source-attachment.remove'
+            : 'editor.ai.reference-attachment.remove'
+        }
+        className={[
+          'absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-[3px]',
+          'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-secondary)]',
+          'opacity-0 transition-opacity hover:text-[var(--sniptale-color-text-primary-strong)]',
+          'focus:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100',
+          'disabled:cursor-not-allowed',
+        ].join(' ')}
+        onClick={props.onRemove}
+      >
+        <X size={12} />
+      </button>
     </div>
   );
 }

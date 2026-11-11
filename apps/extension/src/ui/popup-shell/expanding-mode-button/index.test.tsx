@@ -89,7 +89,7 @@ it('crossfades stable text layouts at the same time as width without a delayed r
   expect(markup).toContain('transition-opacity duration-150');
   expect(markup).not.toContain('delay-300');
   expect(markup).toContain('100cqw');
-  expect(markup).toContain('--popup-mode-expanded-grow:1.9');
+  expect(markup).toContain('--mode-grow:1.9');
   expect(markup).toContain('transition-[left,top,translate,color,filter,scale]');
   expect(markup).toContain('top-1/2');
   expect(markup).toContain('left-2.5');

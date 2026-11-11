@@ -5,6 +5,7 @@ import {
   imageResultCrop,
   imageRasterRegion,
   padImageBounds,
+  uniformImageResultCrop,
 } from './geometry';
 
 describe('AI document pixel geometry', () => {
@@ -80,4 +81,26 @@ it('maps a selected region into the current result raster rather than using docu
       { width: 20, height: 20 }
     )
   ).toEqual({ left: 5, top: 10, width: 5, height: 5 });
+});
+
+it('uses one scale for observed tier rounding and rejects a changed model frame', () => {
+  const input = { left: 0, top: 0, width: 576, height: 324 };
+  const target = { left: 136, top: 102, width: 320, height: 120 };
+  const crop = uniformImageResultCrop(input, target, { width: 1376, height: 768 });
+  expect(crop.width / target.width).toBeCloseTo(crop.height / target.height, 12);
+  expect(crop.width / crop.height).toBeCloseTo(target.width / target.height, 12);
+  expect(() => uniformImageResultCrop(input, target, { width: 1536, height: 1024 })).toThrow(
+    'size-mismatch'
+  );
+});
+
+it('accepts the documented Nano21:9 tier without independent axis scales', () => {
+  const input = { left: 0, top: 0, width: 357, height: 153 };
+  const crop = uniformImageResultCrop(
+    input,
+    { left: 50, top: 50, width: 220, height: 42 },
+    { width: 1584, height: 672 }
+  );
+  expect(crop.width / 220).toBeCloseTo(crop.height / 42, 12);
+  expect(crop.width / crop.height).toBeCloseTo(220 / 42, 12);
 });

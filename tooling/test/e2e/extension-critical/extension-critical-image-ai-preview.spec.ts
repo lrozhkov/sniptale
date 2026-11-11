@@ -7,7 +7,7 @@ import { installImageApiFixture } from './extension-critical-image-ai.helpers';
 
 for (const locale of ['en', 'ru'] as const) {
   for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
-    test(`image AI workspace preview and segmented count ${locale} ${viewport.name}`, async ({
+    test(`image AI workspace preview, comparison and cyclic count ${locale} ${viewport.name}`, async ({
       page,
     }, info) => {
       const host = await startHostServer();
@@ -47,21 +47,18 @@ for (const locale of ['en', 'ru'] as const) {
         );
         await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
         const inspector = page.locator('[data-ui="editor.ai.inspector"]');
-        const count = inspector.getByRole('group', {
-          name: text('editor.ai.variants'),
-          exact: true,
-        });
-        await count.getByRole('button', { name: '2', exact: true }).focus();
+        const count = inspector.locator('[data-ui="editor.ai.variant-count"]');
+        const initialCountBounds = await count.boundingBox();
+        await count.focus();
         await page.keyboard.press('Enter');
-        await expect(count.getByRole('button', { name: '2', exact: true })).toHaveAttribute(
-          'aria-pressed',
-          'true'
-        );
-        await count.getByRole('button', { name: '3', exact: true }).click();
-        await inspector
-          .getByRole('button', { name: text('editor.ai.source'), exact: true })
-          .click();
-        await page.getByRole('option', { name: text('editor.ai.main'), exact: true }).click();
+        await expect(count).toHaveText('2');
+        await count.click();
+        await expect(count).toHaveText('3');
+        expect(await count.boundingBox()).toMatchObject({
+          width: initialCountBounds!.width,
+          height: initialCountBounds!.height,
+        });
+        await inspector.locator('[data-ui="editor.ai.mode.source"]').click();
         const prompt = inspector.locator('[data-ui="editor.ai.prompt"]');
         await prompt.fill('Generate three alternatives');
         await inspector.locator('[data-ui="editor.ai.generate"]').click();
@@ -75,9 +72,9 @@ for (const locale of ['en', 'ru'] as const) {
         ]);
         expect(panelBounds!.x + panelBounds!.width).toBeLessThanOrEqual(inspectorBounds!.x - 8);
         expect(panelBounds!.width).toBeGreaterThan(280);
-        expect(panelBounds!.width).toBeLessThanOrEqual(400);
-        expect(panelBounds!.width).toBeLessThanOrEqual((inspectorBounds!.x - 24) * 0.45);
-        expect(panelBounds!.height).toBeLessThanOrEqual(400);
+        expect(panelBounds!.width).toBeLessThanOrEqual(640);
+        expect(panelBounds!.x).toBeGreaterThanOrEqual(12);
+        expect(panelBounds!.height).toBeLessThanOrEqual(Math.min(600, viewport.size.height - 96));
         expect(panelBounds!.y).toBeLessThanOrEqual(inspectorBounds!.y);
         expect(panelBounds!.y + panelBounds!.height).toBeGreaterThan(inspectorBounds!.y);
         expect(panelBounds!.height).toBeGreaterThan(250);
@@ -89,6 +86,69 @@ for (const locale of ['en', 'ru'] as const) {
         await expect(
           preview.getByRole('button', { name: `${text('editor.ai.variants')} 2`, exact: true })
         ).toHaveAttribute('aria-pressed', 'true');
+        const compare = preview.locator('[data-ui="editor.ai.preview.compare"]');
+        const blend = preview.locator('[data-ui="editor.ai.preview.blend"]');
+        const raster = preview.locator('[data-ui="editor.ai.preview.viewport"] svg[role="img"]');
+        const scrollOwner = preview.locator('[data-ui="editor.ai.preview.viewport"]');
+        await compare.click();
+        const divider = preview.locator('[data-ui="editor.ai.preview.divider"]');
+        await expect(divider).toBeVisible();
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+            )
+        );
+        const imageBounds = (await raster.boundingBox())!;
+        const baseline = await scrollOwner.evaluate((el) => ({
+          width: el.clientWidth,
+          height: el.clientHeight,
+          scrollWidth: el.scrollWidth,
+          scrollHeight: el.scrollHeight,
+        }));
+        for (const fraction of [0, 0.5, 1, 1.1, -0.1]) {
+          await page.mouse.move(
+            imageBounds.x + imageBounds.width / 2,
+            imageBounds.y + imageBounds.height / 2
+          );
+          await page.mouse.down();
+          await page.mouse.move(
+            imageBounds.x + imageBounds.width * fraction,
+            imageBounds.y + imageBounds.height / 2
+          );
+          await page.mouse.up();
+          expect(
+            await scrollOwner.evaluate((el) => ({
+              width: el.clientWidth,
+              height: el.clientHeight,
+              scrollWidth: el.scrollWidth,
+              scrollHeight: el.scrollHeight,
+            }))
+          ).toEqual(baseline);
+          const current = (await raster.boundingBox())!;
+          expect(Math.abs(current.y - imageBounds.y)).toBeLessThan(0.5);
+        }
+        await divider.focus();
+        await page.keyboard.press('Home');
+        await expect(divider).toHaveAttribute('aria-valuenow', '0');
+        await page.keyboard.press('End');
+        await expect(divider).toHaveAttribute('aria-valuenow', '100');
+        await blend.click();
+        await expect(compare).toHaveAttribute('aria-pressed', 'false');
+        await expect(divider).toHaveCount(0);
+        const opacity = preview.getByRole('slider', {
+          name: text('editor.ai.opacity'),
+          exact: true,
+        });
+        await opacity.fill('25');
+        await expect(preview.locator('[data-ui="editor.ai.preview-image"]')).toHaveAttribute(
+          'opacity',
+          '0.25'
+        );
+        await compare.click();
+        await expect(blend).toHaveAttribute('aria-pressed', 'false');
+        await expect(opacity).toHaveCount(0);
+        await compare.click();
         const selected = await preview
           .locator('[data-ui="editor.ai.preview-image"]')
           .getAttribute('href');
@@ -110,12 +170,10 @@ for (const locale of ['en', 'ru'] as const) {
           'href',
           selected!
         );
-        await preview.getByRole('button', { name: '100%', exact: true }).click();
-        await expect(preview.locator('svg[role="img"]').first()).toHaveAttribute('width', '768');
+        await preview.locator('[data-ui="editor.ai.preview.zoom"]').click();
+        await expect(preview.locator('[data-ui="editor.ai.preview.zoom"]')).toHaveText('100%');
+        await preview.locator('[data-ui="editor.ai.preview.zoom"]').click();
         await preview
-          .getByRole('button', { name: text('editor.ai.fitPreview'), exact: true })
-          .click();
-        await inspector
           .getByRole('button', { name: text('editor.ai.apply'), exact: true })
           .scrollIntoViewIfNeeded();
         await page.screenshot({ path: info.outputPath('workspace-preview.png'), fullPage: false });
@@ -124,25 +182,12 @@ for (const locale of ['en', 'ru'] as const) {
         await page.keyboard.press('Escape');
         await expect(preview).toBeHidden();
         await expect(prompt).toBeFocused();
-        const reopen = inspector.getByRole('button', {
-          name: text('editor.ai.openPreview'),
-          exact: true,
-        });
+        const reopen = inspector.locator('[data-ui="editor.ai.source-attachment"]');
         await reopen.click();
-        await preview
-          .getByRole('button', { name: text('common.actions.close'), exact: true })
-          .click();
+        await preview.locator('[data-ui="editor.ai.preview.close"]').click();
         await expect(reopen).toBeFocused();
-        await inspector
-          .locator('summary')
-          .filter({ hasText: text('editor.ai.sourcePreview') })
-          .click();
-        await inspector
-          .getByRole('button', { name: text('editor.ai.openSourcePreview'), exact: true })
-          .click();
-        await expect(
-          preview.getByRole('img', { name: text('editor.ai.editArea'), exact: true })
-        ).toBeVisible();
+        await reopen.click();
+        await expect(preview.locator('[data-ui="editor.ai.preview-image"]')).toBeVisible();
         await page.screenshot({ path: info.outputPath('attachment-preview.png'), fullPage: false });
         await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
         await expect(preview).toBeHidden();
@@ -182,10 +227,8 @@ test('image AI defaults follow explicit model choice and preserve provider-defau
     await installImageApiFixture(page, false, true);
     await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
     const inspector = page.locator('[data-ui="editor.ai.inspector"]');
-    await inspector
-      .getByRole('group', { name: 'Variants', exact: true })
-      .getByRole('button', { name: '3', exact: true })
-      .click();
+    await inspector.locator('[data-ui="editor.ai.variant-count"]').click();
+    await inspector.locator('[data-ui="editor.ai.variant-count"]').click();
     await inspector.locator('.sniptale-ai-model-selector-trigger').click();
     await page
       .getByRole('button', {
@@ -196,7 +239,7 @@ test('image AI defaults follow explicit model choice and preserve provider-defau
     const parameters = inspector
       .locator('details')
       .filter({ has: page.locator('summary').filter({ hasText: 'Image parameters' }) });
-    await expect(parameters.locator('summary')).toContainText('768 · 1:1 · PNG');
+    await expect(parameters.locator('summary')).toContainText('1:1 · 768 · PNG');
     await parameters.locator('summary').click();
     await inspector.getByRole('button', { name: 'Resolution', exact: true }).click();
     await page.getByRole('option', { name: 'Provider default', exact: true }).click();
@@ -256,7 +299,7 @@ test('image AI pads a tiny reference without resampling or changing the attachme
       mimeType: 'image/png',
       buffer: Buffer.from(reference, 'base64'),
     });
-    await expect(inspector.getByAltText('References 1', { exact: true })).toBeVisible();
+    await expect(inspector.locator('[data-ui="editor.ai.reference-attachment"] img')).toBeVisible();
     await inspector.locator('[data-ui="editor.ai.prompt"]').fill('Use this tiny reference');
     await expect(inspector.locator('[data-ui="editor.ai.generate"]')).toBeEnabled();
     await inspector.locator('[data-ui="editor.ai.generate"]').click();
@@ -297,7 +340,7 @@ test('image AI pads a tiny reference without resampling or changing the attachme
     });
     expect(
       await inspector
-        .getByAltText('References 1', { exact: true })
+        .locator('[data-ui="editor.ai.reference-attachment"] img')
         .evaluate((image: HTMLImageElement) => [image.naturalWidth, image.naturalHeight])
     ).toEqual([2, 3]);
   } finally {

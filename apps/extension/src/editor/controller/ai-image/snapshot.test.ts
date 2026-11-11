@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { reframeEditorRaster } from '../layer-effects/rasterize/capture';
+import { crc32, deflateSync } from 'node:zlib';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ActiveSelection, Canvas, Group, Rect, Shadow, type FabricObject } from 'fabric';
 import {
@@ -97,7 +97,10 @@ beforeEach(() => {
     height: bounds.height,
   }));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe('frozen image editor source', () => {
   it('includes offset, blurred shadows in the captured native layer rectangle', async () => {
@@ -132,7 +135,9 @@ describe('frozen image editor source', () => {
     const { controller, canvas, a, b } = setup();
     const snapshot = await captureImageEditorSnapshot(controller, { intention: 'layers' });
     expect(snapshot.targetBounds).toEqual({ left: 10, top: 20, width: 50, height: 40 });
-    expect(capture).toHaveBeenCalledWith(canvas, snapshot.targetBounds, ['a', 'b'], undefined);
+    expect(capture).toHaveBeenCalledWith(canvas, snapshot.captureBounds, undefined, undefined);
+    expect(snapshot.captureBounds).toEqual({ left: 0, top: 0, width: 200, height: 300 });
+    expect(snapshot.contextBounds.width).toBeGreaterThan(snapshot.targetBounds.width);
     expect(snapshot.sources.map((binding) => binding.object)).toEqual([a, b]);
     expect(snapshot.replacementAllowed).toBe(true);
     expect(controller.commitHistory).not.toHaveBeenCalled();
@@ -205,7 +210,8 @@ describe('frozen image editor source', () => {
       region: { left: 5, top: 10, width: 20, height: 30 },
       context: 'region',
     });
-    expect(snapshot.inputBounds).toEqual(snapshot.targetBounds);
+    expect(snapshot.contextBounds).toEqual(snapshot.targetBounds);
+    expect(snapshot.inputBounds).toEqual(snapshot.captureBounds);
     expect(capture.mock.calls.at(-1)?.[2]).toBeUndefined();
   });
 });
@@ -219,19 +225,61 @@ it('keeps the frozen source current when only temporary ActiveSelection grouping
   expect(isImageSnapshotCurrent(controller, snapshot)).toBe(true);
 });
 
-it('prepares retained source content without recapturing a changed live selection', async () => {
+it('prepares retained full context without recapturing a changed live selection', async () => {
   const { controller, a } = setup();
   const snapshot = await captureImageEditorSnapshot(controller, { intention: 'layers' });
   a.set({ left: 99 });
+  const drawImage = vi.fn(),
+    close = vi.fn();
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async () => ({ close }))
+  );
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage,
+  } as unknown as CanvasRenderingContext2D);
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation(function (
+    this: HTMLCanvasElement
+  ) {
+    const header = Buffer.from(png.split(',')[1]!, 'base64').subarray(0, 33);
+    header.writeUInt32BE(this.width, 16);
+    header.writeUInt32BE(this.height, 20);
+    header.writeUInt32BE(crc32(header.subarray(12, 29)), 29);
+    const rows = Buffer.alloc(this.height * (1 + this.width * 4));
+    const data = deflateSync(rows);
+    const chunk = Buffer.alloc(data.length + 12);
+    chunk.writeUInt32BE(data.length, 0);
+    chunk.write('IDAT', 4);
+    data.copy(chunk, 8);
+    chunk.writeUInt32BE(crc32(chunk.subarray(4, -4)), chunk.length - 4);
+    const end = Buffer.from(png.split(',')[1]!, 'base64').subarray(-12);
+    return `data:image/png;base64,${Buffer.concat([header, chunk, end]).toString('base64')}`;
+  });
   const prepared = await prepareImageEditorSnapshot(snapshot, { width: 768, height: 768 });
   expect(capture).toHaveBeenCalledOnce();
   expect(prepared.targetBounds).toEqual(snapshot.targetBounds);
-  expect(prepared.inputBounds).toEqual({ left: -349, top: -344, width: 768, height: 768 });
-  expect(reframeEditorRaster).toHaveBeenCalledWith(
-    snapshot.captureRaster,
-    snapshot.captureBounds,
-    snapshot.captureBounds,
-    prepared.inputBounds,
-    undefined
+  expect(prepared.inputBounds.width).toBe(768);
+  expect(prepared.inputBounds.height).toBe(768);
+  expect(drawImage).toHaveBeenCalledWith(
+    expect.anything(),
+    0,
+    0,
+    200,
+    300,
+    -prepared.inputBounds.left,
+    -prepared.inputBounds.top,
+    200,
+    300
   );
+  expect(close).toHaveBeenCalledOnce();
+});
+
+it('invalidates layer replacement if unselected context pixels changed while leaving selected ownership intact', async () => {
+  const { controller, canvas, a, b } = setup();
+  vi.spyOn(canvas, 'getActiveObjects').mockReturnValue([a]);
+  const snapshot = await captureImageEditorSnapshot(controller, { intention: 'layers' });
+  expect(snapshot.sources.map((binding) => binding.object)).toEqual([a]);
+  expect(isImageSnapshotCurrent(controller, snapshot)).toBe(true);
+  b.set({ fill: '#0055ff' });
+  expect(isImageSnapshotCurrent(controller, snapshot)).toBe(false);
 });

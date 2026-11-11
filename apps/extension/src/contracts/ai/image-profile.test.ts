@@ -4,6 +4,8 @@ import {
   resolveImageModelProfile,
   getProviderImageApi,
   getImageModelOutputSize,
+  getImageEditFrameSize,
+  getImageEditParameters,
 } from './image-profile';
 import type { ImageContext } from './image';
 
@@ -195,4 +197,104 @@ it('rejects a Klein layer raster shorter than256pixels before dispatch', () => {
     editRegion: { left: 0, top: 0, width: 588, height: 195 },
   };
   expect(acceptsImageContext(profile, context)).toBe(false);
+});
+
+it('exposes verified GPT2.6 and Nano Banana2.1 image endpoints without unsupported raster parameters', () => {
+  const gpt = resolveImageModelProfile(
+    { ...model, modelCode: 'openai/gpt-image-2.6-sunburst' },
+    provider,
+    'image-editing'
+  );
+  const nano = resolveImageModelProfile(
+    { ...model, modelCode: 'google/gemini-nano-banana-2.1' },
+    provider,
+    'image-editing'
+  );
+  expect(gpt).toMatchObject({
+    transport: 'router-images',
+    maxInputImages: 16,
+    defaults: { variants: 1, aspectRatio: '1:1', quality: 'medium', outputFormat: 'png' },
+    resolutions: [],
+  });
+  expect(nano).toMatchObject({
+    transport: 'router-images',
+    maxInputImages: 14,
+    resolutions: ['1K', '2K', '4K'],
+    qualities: [],
+    defaults: { variants: 1, aspectRatio: '1:1', resolution: '1K' },
+  });
+  expect(nano?.aspectRatios).toHaveLength(14);
+  expect(gpt?.formats).not.toContain('gif');
+  for (const profile of [gpt, nano]) {
+    if (!profile) throw new Error('Missing verified profile');
+    const context: ImageContext = {
+      version: 1,
+      intention: 'new-image',
+      prompt: 'test',
+      images: [],
+      parameters: profile.defaults,
+    };
+    expect(acceptsImageContext(profile, context)).toBe(true);
+    expect(
+      acceptsImageContext(profile, { ...context, parameters: { ...profile.defaults, seed: 1 } })
+    ).toBe(false);
+  }
+});
+
+it('chooses an enclosing supported ratio with the least extra area, independent of a square generation default', () => {
+  const profile = resolveImageModelProfile(
+    { ...model, modelCode: 'openai/gpt-image-2.6-sunburst' },
+    provider,
+    'image-editing'
+  );
+  expect(getImageEditFrameSize(profile, { width: 480, height: 280 })).toEqual({
+    width: 512,
+    height: 288,
+  });
+  const nano = resolveImageModelProfile(
+    { ...model, modelCode: 'google/gemini-nano-banana-2.1' },
+    provider,
+    'image-editing'
+  );
+  expect(getImageEditFrameSize(nano, { width: 1024, height: 576 })).toEqual({
+    width: 1024,
+    height: 576,
+  });
+  const image = {
+    dataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAFElEQVR4AWKS8Mj5D8JMDFAAZwAAAAD//238wugAAAAGSURBVAMATl0DnQxeRbkAAAAASUVORK5CYII=',
+    width: 2,
+    height: 3,
+  };
+  if (!nano) throw new Error('Missing profile');
+  expect(
+    acceptsImageContext(nano, {
+      version: 1,
+      intention: 'layers',
+      prompt: 'test',
+      images: Array.from({ length: 14 }, (_, i) => ({
+        ...image,
+        role: i ? 'reference' : 'source',
+      })),
+      parameters: nano.defaults,
+      editMask: { mode: 'reference', image },
+    })
+  ).toBe(false);
+});
+
+it('selects native SDK size parameters automatically without mutating generation defaults', () => {
+  const profile = resolveImageModelProfile(
+    { operation: 'image-editing', modelCode: 'gpt-image-1' },
+    { connectionType: 'openai' },
+    'image-editing'
+  );
+  if (!profile) throw new Error('Missing SDK profile');
+  const original = { ...profile.defaults, aspectRatio: '1:1' };
+  const size = getImageEditFrameSize(profile, { width: 600, height: 300 });
+  expect(size).toEqual({ width: 600, height: 400 });
+  expect(getImageEditParameters(profile, size!, original)).toMatchObject({
+    size: '1536x1024',
+    aspectRatio: undefined,
+  });
+  expect(original.aspectRatio).toBe('1:1');
 });

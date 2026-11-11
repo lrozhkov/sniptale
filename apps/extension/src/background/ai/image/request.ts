@@ -7,6 +7,7 @@ import {
   IMAGE_JOB_TIMEOUT_MS,
   imageRasterSchema,
   formatImageProviderPrompt,
+  getImageProviderInputs,
   type ImageContext,
   type ImageRaster,
 } from '../../../contracts/ai/image';
@@ -105,7 +106,7 @@ function buildChatImageRequest(modelCode: string, context: ImageContext) {
         role: 'user',
         content: [
           { type: 'text', text: formatImageProviderPrompt(context) },
-          ...context.images.map((image) => ({
+          ...getImageProviderInputs(context).map((image) => ({
             type: 'image_url',
             image_url: { url: image.dataUrl },
           })),
@@ -129,9 +130,12 @@ function buildRouterImageRequest(modelCode: string, context: ImageContext) {
     model: modelCode,
     prompt: formatImageProviderPrompt(context),
     n: 1,
+    ...(context.editMask?.mode === 'alpha'
+      ? { mask: { image_url: { url: context.editMask.image.dataUrl } } }
+      : {}),
     ...(context.images.length
       ? {
-          input_references: context.images.map((image) => ({
+          input_references: getImageProviderInputs(context).map((image) => ({
             type: 'image_url',
             image_url: { url: image.dataUrl },
           })),
@@ -224,7 +228,7 @@ async function requestSdk(
     prompt: context.images.length
       ? {
           text: formatImageProviderPrompt(context),
-          images: context.images.map((image) =>
+          images: getImageProviderInputs(context).map((image) =>
             image.dataUrl.slice(image.dataUrl.indexOf(',') + 1)
           ),
         }

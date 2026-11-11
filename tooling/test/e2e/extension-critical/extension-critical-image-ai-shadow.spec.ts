@@ -99,11 +99,12 @@ test('image AI captures full layer shadow and replaces it without losing pixels'
     );
     await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
     const inspector = page.locator('[data-ui="editor.ai.inspector"]');
-    await inspector.getByRole('button', { name: 'Work with', exact: true }).click();
-    await page.getByRole('option', { name: 'Selected layers · 1', exact: true }).click();
+    await inspector.locator('[data-ui="editor.ai.mode.layers"]').click();
     await inspector.locator('[data-ui="editor.ai.prompt"]').fill('Return the source unchanged');
     await inspector.locator('[data-ui="editor.ai.generate"]').click();
-    await expect(inspector.locator('[data-ui="editor.ai.result"]')).toBeVisible();
+    await expect(
+      page.locator('[data-ui="editor.ai.preview"] [data-ui="editor.ai.result"]')
+    ).toBeVisible();
     const pixels = await page.evaluate(async () => {
       const requests = Reflect.get(window, 'imageAiRequests') as Array<{
         context: { images: Array<{ dataUrl: string }> };
@@ -134,7 +135,10 @@ test('image AI captures full layer shadow and replaces it without losing pixels'
     });
     expect(pixels.shadowRight - pixels.redRight).toBeGreaterThan(40);
     expect(pixels.shadowPixels).toBeGreaterThan(500);
-    await inspector.getByRole('button', { name: 'Replace source', exact: true }).click();
+    await page
+      .locator('[data-ui="editor.ai.preview"]')
+      .getByRole('button', { name: 'Replace source', exact: true })
+      .click();
     await expect
       .poll(() =>
         page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)

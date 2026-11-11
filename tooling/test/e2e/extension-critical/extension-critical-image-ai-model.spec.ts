@@ -7,7 +7,7 @@ for (const viewport of [
   { width: 1280, height: 560 },
   { width: 1920, height: 900 },
 ]) {
-  test(`image AI resolves incompatible model parameters explicitly at ${viewport.width}`, async ({
+  test(`image AI adapts incompatible resolution on model choice at ${viewport.width}`, async ({
     page,
   }, info) => {
     const host = await startHostServer();
@@ -34,10 +34,8 @@ for (const viewport of [
       await installImageApiFixture(page);
       await page.locator('[data-ui="editor.floating.layers.mode.ai"]').click();
       const inspector = page.locator('[data-ui="editor.ai.inspector"]');
-      await inspector
-        .getByRole('group', { name: 'Variants', exact: true })
-        .getByRole('button', { name: '3', exact: true })
-        .click();
+      await inspector.locator('[data-ui="editor.ai.variant-count"]').click();
+      await inspector.locator('[data-ui="editor.ai.variant-count"]').click();
       await inspector.locator('summary').filter({ hasText: 'Parameters' }).click();
       await inspector.getByRole('button', { name: 'Resolution', exact: true }).click();
       await page.getByRole('option', { name: '4K', exact: true }).click();
@@ -46,20 +44,16 @@ for (const viewport of [
       await inspector.getByRole('button', { name: /Image model with a deliberately/ }).click();
       await page.getByRole('button', { name: 'Gemini image test model', exact: true }).click();
       await inspector.locator('[data-ui="editor.ai.prompt"]').fill('Keep my compatible settings');
-      await expect(inspector.locator('[data-ui="editor.ai.generate"]')).toBeDisabled();
-      await expect(inspector.getByText('4K · png', { exact: true })).toBeVisible();
       expect(await page.evaluate(() => Reflect.get(window, 'imageAiRequests'))).toEqual([]);
-      await inspector
-        .getByRole('button', { name: 'Adapt settings', exact: true })
-        .scrollIntoViewIfNeeded();
       await page.screenshot({
-        path: info.outputPath('incompatible-model-parameters.png'),
+        path: info.outputPath('adapted-model-parameters.png'),
         fullPage: false,
       });
-      await inspector.getByRole('button', { name: 'Adapt settings', exact: true }).click();
       await expect(inspector.locator('[data-ui="editor.ai.generate"]')).toBeEnabled();
       await inspector.locator('[data-ui="editor.ai.generate"]').click();
-      await expect(inspector.locator('[data-ui="editor.ai.result"]')).toBeVisible();
+      await expect(
+        page.locator('[data-ui="editor.ai.preview"] [data-ui="editor.ai.result"]')
+      ).toBeVisible();
       const submitted = await page.evaluate(() => {
         const requests = Reflect.get(window, 'imageAiRequests') as Array<{
           context: { parameters: unknown };

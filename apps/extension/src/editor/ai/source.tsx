@@ -1,130 +1,111 @@
-import { useImagePreview } from './preview';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { useState } from 'react';
+import { Icon } from '@iconify/react';
+import marqueeIcon from '@iconify-icons/tabler/marquee-2';
+import cameraIcon from '@iconify-icons/tabler/camera-spark';
+import stackIcon from '@iconify-icons/tabler/stack-forward';
+import photoIcon from '@iconify-icons/tabler/photo-plus';
+import { PopupExpandingModeButton } from '../../ui/popup-shell/expanding-mode-button';
 import { translate } from '../../platform/i18n';
-import { CompactSelect, SelectField } from '../chrome/ui';
-import type { EditorImageSnapshot, ImageBounds } from '../controller/ai-image/types';
+import type { ImageBounds } from '../controller/ai-image/types';
 import type { ImageEditorSession, ImageSessionState } from './session';
-import { INSPECTOR_SECONDARY_BUTTON_CLASS_NAME } from '../inspector/chrome';
 
-function ImageSourcePreview({ snapshot }: { snapshot: EditorImageSnapshot }) {
-  const preview = useImagePreview();
-  return snapshot.raster ? (
-    <details className="text-xs">
-      <summary className="flex cursor-pointer items-center gap-2">
-        <img src={snapshot.raster.dataUrl} alt="" className="h-10 w-14 object-contain" />
-        <span>
-          {translate('editor.ai.sourcePreview')} · {snapshot.raster.width} ×{' '}
-          {snapshot.raster.height}
-        </span>
-      </summary>
-      <ProductActionButton
-        compact
-        tone="secondary"
-        className={`${INSPECTOR_SECONDARY_BUTTON_CLASS_NAME} my-2`}
-        onClick={(event) => preview.openSource(event.currentTarget)}
-      >
-        {translate('editor.ai.openSourcePreview')}
-      </ProductActionButton>
-      {snapshot.inputBounds.width !== snapshot.captureBounds.width ||
-      snapshot.inputBounds.height !== snapshot.captureBounds.height ? (
-        <p className="my-2 text-[var(--sniptale-color-text-secondary)]">
-          {translate('editor.ai.nativePadding')}
-        </p>
-      ) : null}
-      {snapshot.intention === 'layers' ? (
-        <ul className="space-y-1 break-words">
-          {snapshot.names.map((name, i) => (
-            <li key={i}>{name}</li>
-          ))}
-        </ul>
-      ) : null}
-      <p className="mt-2 text-[var(--sniptale-color-text-secondary)]">
-        {translate('editor.ai.sourceFrozen')}
-      </p>
-    </details>
-  ) : null;
-}
+const RegionIcon = ({ className }: { className?: string }) => (
+  <Icon ssr aria-hidden="true" icon={marqueeIcon} className={className} />
+);
+const SourceIcon = ({ className }: { className?: string }) => (
+  <Icon ssr aria-hidden="true" icon={cameraIcon} className={className} />
+);
+const LayersIcon = ({ className }: { className?: string }) => (
+  <Icon ssr aria-hidden="true" icon={stackIcon} className={className} />
+);
+const NewIcon = ({ className }: { className?: string }) => (
+  <Icon ssr aria-hidden="true" icon={photoIcon} className={className} />
+);
 
-/** Selects the source directly; local preparation follows the chosen source automatically. */
-export function ImageSourceControls({
-  session,
-  state,
-  region,
-  selectedCount,
-  busy,
-  onSelectRegion,
-  pickingRegion,
-}: {
-  session: Pick<ImageEditorSession, 'setDraft' | 'refreshSource'>;
+/** Uses the popup mode interaction with four source choices. Picking a region does not lock the inspector. */
+export function ImageSourceControls(props: {
+  session: Pick<ImageEditorSession, 'setDraft'>;
   state: Pick<ImageSessionState, 'source' | 'draft'>;
   region: ImageBounds | null;
   selectedCount: number;
   busy: boolean;
-  onSelectRegion(): void;
   pickingRegion: boolean;
+  onSelectRegion(): void;
+  onSelectLayers(): void;
+  onCancelRegion(): void;
 }) {
-  const describedRegion = state.source?.intention === 'region' ? state.source.targetBounds : region;
-  const describedLayerCount =
-    state.source?.intention === 'layers' ? state.source.sources.length : selectedCount;
-  const regionSize = describedRegion
-    ? ` · ${Math.round(describedRegion.width)} × ${Math.round(describedRegion.height)}`
-    : '';
-  const intentions = [
+  const [animate, setAnimate] = useState(false);
+  const region =
+    props.state.source?.intention === 'region' ? props.state.source.targetBounds : props.region;
+  const count =
+    props.state.source?.intention === 'layers'
+      ? props.state.source.sources.length
+      : props.selectedCount;
+  const choices = [
     {
       value: 'region',
-      label: `${translate('editor.ai.region')}${regionSize}`,
+      label: translate('editor.ai.modeRegion'),
+      icon: RegionIcon,
+      description: props.pickingRegion
+        ? translate('editor.ai.modeRegionPicking')
+        : region
+          ? `${Math.round(region.width)} × ${Math.round(region.height)}`
+          : translate('editor.ai.modeRegionHint'),
     },
-    { value: 'source', label: translate('editor.ai.main') },
-    { value: 'layers', label: `${translate('editor.ai.layers')} · ${describedLayerCount}` },
-    { value: 'new-image', label: translate('editor.ai.newImage') },
+    {
+      value: 'source',
+      label: translate('editor.ai.modeSource'),
+      icon: SourceIcon,
+      description: translate('editor.ai.modeSourceHint'),
+    },
+    {
+      value: 'layers',
+      label: translate('editor.ai.modeLayers'),
+      icon: LayersIcon,
+      description: `${translate('editor.ai.modeLayersHint')} ${count}`,
+    },
+    {
+      value: 'new-image',
+      label: translate('editor.ai.modeNew'),
+      icon: NewIcon,
+      description: translate('editor.ai.modeNewHint'),
+    },
   ] as const;
   return (
-    <>
-      <CompactSelect
-        aria-label={translate('editor.ai.source')}
-        value={pickingRegion ? 'region' : state.draft.intention}
-        options={intentions}
-        disabled={busy}
-        onChange={(intention) => {
-          if (intention === 'region') onSelectRegion();
-          else session.setDraft({ intention, regionSource: 'canvas' });
-        }}
-      />
-      {pickingRegion || state.draft.intention === 'region' ? (
-        <div className="space-y-1">
-          <ProductActionButton
-            compact
-            tone="secondary"
-            className={INSPECTOR_SECONDARY_BUTTON_CLASS_NAME}
-            disabled={busy}
-            onClick={onSelectRegion}
-          >
-            {translate('editor.ai.selectRegion')}
-          </ProductActionButton>
-          <details className="text-xs">
-            <summary className="cursor-pointer py-1 text-[var(--sniptale-color-text-secondary)]">
-              {translate('editor.ai.context')}
-            </summary>
-            <SelectField
-              label={translate('editor.ai.context')}
-              value={state.draft.context}
-              options={[
-                { value: 'region', label: translate('editor.ai.regionOnly') },
-                { value: 'surroundings', label: translate('editor.ai.surroundings') },
-                { value: 'whole', label: translate('editor.ai.whole') },
-              ]}
-              disabled={busy}
-              onChange={(context) => session.setDraft({ context })}
-            />
-          </details>
-        </div>
-      ) : null}
-      {state.source ? <ImageSourcePreview snapshot={state.source} /> : null}
-      {state.draft.intention === 'layers' ? (
-        <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('editor.ai.layersNotice')}
-        </p>
-      ) : null}
-    </>
+    <div
+      className="flex gap-1.5 [container-type:inline-size]"
+      role="group"
+      aria-label={translate('editor.ai.source')}
+      data-ui="editor.ai.modes"
+    >
+      {choices.map((choice) => (
+        <PopupExpandingModeButton
+          key={choice.value}
+          dataUi={`editor.ai.mode.${choice.value}`}
+          icon={choice.icon}
+          label={choice.label}
+          description={choice.description}
+          compact
+          optionCount={4}
+          active={choice.value === (props.pickingRegion ? 'region' : props.state.draft.intention)}
+          animate={animate}
+          disabled={props.busy}
+          accentClassName="text-[var(--sniptale-color-accent)]"
+          onClick={() => {
+            setAnimate(true);
+            if (choice.value === 'region') props.onSelectRegion();
+            else if (choice.value === 'layers') props.onSelectLayers();
+            else {
+              props.onCancelRegion();
+              props.session.setDraft({
+                intention: choice.value,
+                context: 'region',
+                regionSource: 'canvas',
+              });
+            }
+          }}
+        />
+      ))}
+    </div>
   );
 }
