@@ -1,3 +1,4 @@
+import { createDrawingCleanup } from '../../../../features/drawing/public';
 import { DrawingSimplifyOptions } from '../../../../ui/drawing-tools/simplify-options';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
@@ -183,7 +184,7 @@ export function resolveDrawingQuickOptionsTool(
   const selected = snapshot.document.objects.find(
     (object) => object.id === snapshot.selectedObjectId
   );
-  if (selected?.kind === 'simplify') return 'simplify';
+  if (selected?.kind === 'simplify') return selected.settings.erase ? 'blur' : 'simplify';
   if (selected?.kind === 'blur') return 'blur';
   if (selected?.kind === 'pencil' || selected?.kind === 'marker') return selected.kind;
   if (selected?.kind === 'arrow') return 'arrow';
@@ -701,13 +702,40 @@ export function ToolbarDrawingOptions(props: ToolbarDrawingOptionsProps) {
   }
   if (tool === 'simplify') return <ToolbarSimplifyOptions {...props} />;
   if (tool === 'blur') {
-    const selectedBlur = selectedObject?.kind === 'blur' ? selectedObject : null;
+    const selectedBlur =
+      selectedObject?.kind === 'blur' ||
+      (selectedObject?.kind === 'simplify' && selectedObject.settings.erase)
+        ? selectedObject
+        : null;
     const content = (
       <DrawingBlurStrengthOptions
-        value={selectedBlur?.amount ?? (selectedBlur ? 10 : snapshot.defaults.blur.amount)}
+        vertical={displayMode === 'vertical'}
+        value={
+          selectedBlur?.kind === 'blur'
+            ? (selectedBlur.amount ?? 10)
+            : (selectedBlur?.blurAmount ?? snapshot.defaults.blur.amount)
+        }
+        clean={
+          selectedBlur ? selectedBlur.kind === 'simplify' : snapshot.defaults.blur.clean === true
+        }
+        onClean={(event) => {
+          controller.session.setDefaults({
+            ...snapshot.defaults,
+            blur: { ...snapshot.defaults.blur, clean: true },
+          });
+          if (selectedBlur?.kind === 'blur')
+            void controller.simplify?.submit(createDrawingCleanup(selectedBlur), event);
+        }}
         onChange={(amount) => {
-          controller.session.setDefaults({ ...snapshot.defaults, blur: { amount } });
-          if (selectedBlur) controller.session.replaceObject({ ...selectedBlur, amount });
+          controller.session.setDefaults({ ...snapshot.defaults, blur: { amount, clean: false } });
+          if (selectedBlur)
+            controller.session.replaceObject({
+              id: selectedBlur.id,
+              kind: 'blur',
+              bounds: selectedBlur.bounds,
+              ...(selectedBlur.rotation === undefined ? {} : { rotation: selectedBlur.rotation }),
+              amount,
+            });
         }}
       />
     );

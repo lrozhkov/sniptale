@@ -13,7 +13,7 @@ export function createBlurObject(args: {
   labelIndex: number;
   left: number;
   settings: BlurSettings;
-  source: SourceState;
+  source?: SourceState;
   top: number;
   width: number;
 }): Rect {
@@ -33,7 +33,7 @@ export function createBlurObject(args: {
   object.sniptaleLabel = createObjectLabel('blur', args.labelIndex);
   updateBlurObject(object, {
     settings: args.settings,
-    source: args.source,
+    ...(args.source ? { source: args.source } : {}),
   });
   return object;
 }

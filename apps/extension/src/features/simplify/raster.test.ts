@@ -488,3 +488,96 @@ it('restores source ink outside narrowed right-aligned rows and keeps all paint 
     source.context.getImageData(0, 0, 280, 8).data
   );
 });
+
+it('cleanup removes text without placeholders and preserves the separator and pixels outside the region', () => {
+  const source = canvas(400, 180);
+  source.context.fillStyle = '#f5f5f5';
+  source.context.fillRect(0, 0, 400, 180);
+  source.context.strokeStyle = '#a0a0a0';
+  source.context.beginPath();
+  source.context.moveTo(10, 120.5);
+  source.context.lineTo(390, 120.5);
+  source.context.stroke();
+  source.context.fillStyle = '#202020';
+  source.context.font = '16px Arial';
+  source.context.fillText('Private information', 24, 45);
+  source.context.fillText('Account number', 24, 80);
+  const image = source.context.getImageData(0, 0, 400, 180);
+  const raster = createSimplifyRaster(image),
+    output = canvas(400, 180);
+  const region = { x: 16, y: 20, width: 300, height: 125 };
+  raster.render(output.context, source.element, region, {
+    ...createDefaultSimplifySettings(),
+    content: 'all',
+    sensitivity: 90,
+    erase: true,
+  });
+  const result = output.context.getImageData(0, 0, 400, 180).data;
+  let remaining = 0,
+    outside = 0;
+  for (let y = 0; y < 180; y++)
+    for (let x = 0; x < 400; x++) {
+      const i = (y * 400 + x) * 4;
+      if (x >= 20 && x < 210 && y >= 22 && y < 90 && result[i]! < 200) remaining++;
+      if (
+        (x < region.x ||
+          x >= region.x + region.width ||
+          y < region.y ||
+          y >= region.y + region.height) &&
+        image.data.slice(i, i + 4).some((v, c) => v !== result[i + c])
+      )
+        outside++;
+    }
+  expect(remaining).toBe(0);
+  expect(outside).toBe(0);
+  expect([...output.context.getImageData(30, 120, 1, 1).data]).toEqual([
+    ...source.context.getImageData(30, 120, 1, 1).data,
+  ]);
+});
+
+it('cleanup removes a continuous image while retaining a uniform panel, smooth gradient and frame lines', () => {
+  const source = canvas(420, 220),
+    output = canvas(420, 220);
+  source.context.fillStyle = '#fff';
+  source.context.fillRect(0, 0, 420, 220);
+  const ctx = source.context;
+  const photo = ctx.createLinearGradient(30, 30, 170, 110);
+  photo.addColorStop(0, '#4b91be');
+  photo.addColorStop(1, '#c7a342');
+  ctx.fillStyle = photo;
+  ctx.fillRect(30, 30, 140, 80);
+  ctx.fillStyle = '#245f47';
+  ctx.beginPath();
+  ctx.moveTo(30, 110);
+  ctx.lineTo(65, 50);
+  ctx.lineTo(110, 90);
+  ctx.lineTo(140, 50);
+  ctx.lineTo(170, 110);
+  ctx.fill();
+  ctx.fillStyle = '#e0e8f0';
+  ctx.fillRect(210, 30, 150, 60);
+  const background = ctx.createLinearGradient(210, 120, 360, 190);
+  background.addColorStop(0, '#4692c0');
+  background.addColorStop(1, '#d0ac60');
+  ctx.fillStyle = background;
+  ctx.fillRect(210, 120, 150, 70);
+  ctx.strokeStyle = '#222';
+  ctx.strokeRect(15.5, 15.5, 380, 190);
+  const before = ctx.getImageData(0, 0, 420, 220);
+  createSimplifyRaster(before).render(
+    output.context,
+    source.element,
+    { x: 20, y: 20, width: 350, height: 180 },
+    { ...createDefaultSimplifySettings(), content: 'all', sensitivity: 90, erase: true }
+  );
+  expect([...output.context.getImageData(80, 70, 1, 1).data]).toEqual([255, 255, 255, 255]);
+  expect([...output.context.getImageData(250, 50, 1, 1).data]).toEqual([
+    ...ctx.getImageData(250, 50, 1, 1).data,
+  ]);
+  expect([...output.context.getImageData(280, 150, 1, 1).data]).toEqual([
+    ...ctx.getImageData(280, 150, 1, 1).data,
+  ]);
+  expect([...output.context.getImageData(15, 50, 1, 1).data]).toEqual([
+    ...ctx.getImageData(15, 50, 1, 1).data,
+  ]);
+});

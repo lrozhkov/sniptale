@@ -41,6 +41,22 @@ export interface RecordingDrawingOwner {
   dispose(): void;
 }
 
+/** Prevents source acquisition from uncovering masks on a recordable surface. */
+function preserveRecordingMasks(
+  dependencies?: ContentSimplifyDependencies
+): ContentSimplifyDependencies | undefined {
+  if (!dependencies) return undefined;
+  return {
+    ...dependencies,
+    acquire(event, signal, excludedDrawingObjectId) {
+      // Keep this mode-wide: acquisition may overlap recording start or resume.
+      if (excludedDrawingObjectId)
+        return Promise.reject(new Error('Recording capture must preserve accepted drawings.'));
+      return dependencies.acquire(event, signal);
+    },
+  };
+}
+
 /**
  * Owns disposable recording drawings and their recording-time expiry clock. Tool preferences stay
  * in the shared drawing controller; no page-preparation history or persistence owner is reused.
@@ -113,7 +129,7 @@ export function createRecordingDrawingOwner(options?: {
 
   controller = createContentDrawingController(
     createDrawingSession({ autoSelectCreatedObjects: false, onDocumentCommit: acceptCommit }),
-    options?.simplifyDependencies
+    preserveRecordingMasks(options?.simplifyDependencies)
   );
 
   return {

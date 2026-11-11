@@ -85,6 +85,8 @@ function simplify(
   const angle = rotation(value);
   const settings = parseSimplifySettings(value['settings']);
   const sourceDirty = value['sourceDirty'];
+  const blurAmount = value['blurAmount'];
+  if (blurAmount !== undefined && (!isNumber(blurAmount) || blurAmount < 0)) return null;
   const engineVersion = value['engineVersion'];
   if (
     engineVersion !== undefined &&
@@ -112,6 +114,7 @@ function simplify(
   return {
     id,
     kind: 'simplify',
+    ...(blurAmount === undefined ? {} : { blurAmount }),
     bounds: rect,
     settings,
     ...angle,

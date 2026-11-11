@@ -323,3 +323,21 @@ it.each(['', ' ', 'engine version', 'v'.repeat(129), 'engine/../next', null, 4, 
     ).toBeNull();
   }
 );
+
+it('round-trips cleanup metadata and rejects invalid erase or retained strength values', () => {
+  const object = {
+    id: 'clean',
+    kind: 'simplify',
+    bounds: { x: 1, y: 2, width: 30, height: 40 },
+    blurAmount: 6,
+    settings: { ...createDefaultSimplifySettings(), content: 'all', erase: true },
+  };
+  expect(parseDrawingDocument({ version: 2, objects: [object] })?.objects[0]).toEqual(object);
+  expect(parseDrawingDocument({ version: 2, objects: [{ ...object, blurAmount: -1 }] })).toBeNull();
+  expect(
+    parseDrawingDocument({
+      version: 2,
+      objects: [{ ...object, settings: { ...object.settings, erase: 'true' } }],
+    })
+  ).toBeNull();
+});

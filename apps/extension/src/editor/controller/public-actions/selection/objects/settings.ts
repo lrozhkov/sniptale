@@ -1,4 +1,9 @@
-import { requestEditorSimplify } from '../../../../drawing/simplify-runtime';
+import { createDrawingCleanup } from '../../../../../features/drawing/public';
+import { readEditorDrawingObject } from '../../../../drawing/object/metadata';
+import {
+  cancelPendingEditorSimplify,
+  requestEditorSimplify,
+} from '../../../../drawing/simplify-runtime';
 import type { Canvas } from 'fabric';
 
 import { useEditorStore } from '../../../../state/useEditorStore';
@@ -28,6 +33,21 @@ function runSelectionSettingsMutation(
     return false;
   }
 
+  if (
+    selectedType === 'blur' &&
+    !preview &&
+    useEditorStore.getState().selectionToolSettings.blur.clean
+  ) {
+    for (const object of activeObjects) {
+      const drawing = readEditorDrawingObject(object);
+      if (drawing?.kind === 'blur') {
+        const replacement = createDrawingCleanup(drawing);
+        requestEditorSimplify(canvas, object, replacement.settings, false, false, replacement);
+      }
+    }
+    return false;
+  }
+
   if (selectedType === 'simplify' && activeObjects.length === 1 && activeObjects[0]) {
     requestEditorSimplify(
       canvas,
@@ -37,6 +57,8 @@ function runSelectionSettingsMutation(
     );
     return false;
   }
+
+  if (selectedType === 'blur' && !preview) cancelPendingEditorSimplify(canvas);
 
   withHistoryMuted(() => {
     applySelectionToolSettingsToObjects(

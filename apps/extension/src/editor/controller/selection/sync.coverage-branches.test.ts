@@ -104,6 +104,7 @@ describe('editor-controller selection sync drawing dispatch', () => {
 
     expect(mocks.updateSelectionDrawingToolSettings).toHaveBeenCalledExactlyOnceWith('blur', {
       amount: 10,
+      clean: false,
     });
   });
 

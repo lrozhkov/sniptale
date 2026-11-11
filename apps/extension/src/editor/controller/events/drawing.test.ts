@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
   state: {
     canvasCropMode: 'crop',
     toolSettings: {
-      blur: { amount: 20 },
+      blur: { amount: 20, clean: false },
       arrow: { drawFromTip: false },
       text: {
         backgroundColor: null,
@@ -45,7 +45,8 @@ const mocks = vi.hoisted(() => ({
   writeDrawing: vi.fn(),
 }));
 
-vi.mock('../../../features/drawing/public', () => ({
+vi.mock('../../../features/drawing/public', async (original) => ({
+  ...(await original<typeof import('../../../features/drawing/public')>()),
   appendDrawingSamples: mocks.appendSamples,
   clampDrawingTextWidth: vi.fn(() => 80),
   createDrawingBounds: mocks.createBounds,
@@ -168,6 +169,7 @@ function resetDrawingMocks() {
   vi.clearAllMocks();
   mocks.state.toolSettings.arrow.drawFromTip = false;
   mocks.state.canvasCropMode = 'crop';
+  mocks.state.toolSettings.blur.clean = false;
   mocks.cropDown.mockReturnValue(false);
   mocks.isTextTarget.mockReturnValue(false);
   mocks.isDrawingSelection.mockReturnValue(false);
@@ -765,4 +767,27 @@ it.each(['pencil', 'marker'])('does not repaint the committed scene on %s moves'
   }
   expect(mocks.stageDrawing).toHaveBeenCalledTimes(8);
   expect(path.canvas.requestRenderAll).not.toHaveBeenCalled();
+});
+
+it('starts cleanup from Blur through the Simplify raster path while keeping the Blur gesture', () => {
+  resetDrawingMocks();
+  mocks.state.toolSettings.blur.clean = true;
+  const { bindings, handlers } = createBindings('blur');
+  handlers.handleMouseDown(pointerEvent() as never);
+  expect(mocks.createBlur).not.toHaveBeenCalled();
+  expect(mocks.writeDrawing).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      kind: 'simplify',
+      blurAmount: 20,
+      settings: expect.objectContaining({ erase: true, content: 'all' }),
+    })
+  );
+  expect(bindings.startDrawSession).toHaveBeenCalledWith(
+    'blur',
+    expect.anything(),
+    expect.anything(),
+    null
+  );
+  mocks.state.toolSettings.blur.clean = false;
 });

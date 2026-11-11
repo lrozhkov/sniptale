@@ -39,7 +39,11 @@ export async function grantNativeSimplifyCapture(popup: Page) {
   });
 }
 
-export async function prepareNativeSimplifySource(page: Page, mode: SimplifyNativeMode) {
+export async function prepareNativeSimplifySource(
+  page: Page,
+  mode: SimplifyNativeMode,
+  prepareContent?: () => Promise<void>
+) {
   await page.bringToFront();
   await page.evaluate(() => {
     const target = document.createElement('section');
@@ -52,6 +56,7 @@ export async function prepareNativeSimplifySource(page: Page, mode: SimplifyNati
     target.textContent = 'Account settings\nContact details\nSave your changes';
     document.body.append(target);
   });
+  await prepareContent?.();
   await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
   await page
     .locator(`[data-ui="content.toolbar.mode-option.${mode === 'crop' ? 'drawing' : mode}"]`)

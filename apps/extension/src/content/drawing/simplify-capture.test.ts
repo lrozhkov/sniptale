@@ -298,3 +298,31 @@ it.each(['resolve', 'reject', 'abort'] as const)(
     if (exit === 'abort') h.complete.resolve({ success: true, ...png() });
   }
 );
+
+it.each(['resolve', 'reject', 'abort'] as const)(
+  'excludes only the converted Blur and restores its visibility after %s',
+  async (exit) => {
+    const h = captureHarness();
+    const target = document.createElement('div');
+    target.dataset['sniptaleDrawingObjectId'] = 'converting';
+    target.style.setProperty('visibility', 'visible', 'important');
+    const other = document.createElement('div');
+    other.dataset['sniptaleDrawingObjectId'] = 'other';
+    other.style.visibility = 'visible';
+    document.body.append(target, other);
+    const abort = new AbortController();
+    const acquisition = h.runtime.acquire(new Event('pointerup'), abort.signal, 'converting');
+    const completion = exit === 'resolve' ? acquisition : expect(acquisition).rejects.toBeDefined();
+    await vi.waitFor(() => expect(h.send).toHaveBeenCalledOnce());
+    expect(target.style.visibility).toBe('hidden');
+    expect(other.style.visibility).toBe('visible');
+    if (exit === 'resolve') h.complete.resolve({ success: true, dataUrl: png().dataUrl });
+    else if (exit === 'reject') h.complete.reject(new Error('capture failed'));
+    else abort.abort();
+    await completion;
+    expect(target.style.getPropertyValue('visibility')).toBe('visible');
+    expect(target.style.getPropertyPriority('visibility')).toBe('important');
+    expect(other.style.visibility).toBe('visible');
+    if (exit === 'abort') h.complete.resolve({ success: true, dataUrl: png().dataUrl });
+  }
+);

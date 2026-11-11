@@ -23,7 +23,7 @@ export function clearLegacyBlurMetadata(object: FabricObject): void {
 export function createEditorDrawingBlurObject(args: {
   drawing: Extract<DrawingObject, { kind: 'blur' }>;
   labelIndex: number;
-  source: SourceState;
+  source?: SourceState;
 }): FabricObject {
   const { bounds } = args.drawing;
   const object = createBlurObject({
@@ -32,7 +32,7 @@ export function createEditorDrawingBlurObject(args: {
     labelIndex: args.labelIndex,
     left: bounds.x,
     settings: { ...DEFAULT_BLUR_SETTINGS, amount: args.drawing.amount ?? 10 },
-    source: args.source,
+    ...(args.source ? { source: args.source } : {}),
     top: bounds.y,
     width: bounds.width,
   });

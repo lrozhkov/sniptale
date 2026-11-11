@@ -161,7 +161,7 @@ describe('drawing selection settings', () => {
   it('writes the chosen strength into a selected blur drawing', () => {
     const object = new Rect();
     const surface = createCanvasWithObject(object);
-    mocks.readEditorDrawingObject.mockReturnValueOnce({
+    mocks.readEditorDrawingObject.mockReturnValue({
       id: 'blur-1',
       kind: 'blur',
       bounds: { x: 0, y: 0, width: 20, height: 20 },
@@ -224,5 +224,31 @@ describe('drawing selection settings', () => {
     expect(prepareObject).not.toHaveBeenCalled();
     expect(mocks.replaceEditorDrawingFabricGeometry).not.toHaveBeenCalled();
     surface.dispose();
+  });
+});
+
+it('keeps the layer name, lock and visibility when cleanup returns to Blur', () => {
+  const object = new Rect();
+  object.sniptaleLabel = 'Private account';
+  object.sniptaleLocked = false;
+  object.visible = false;
+  const canvas = createCanvasWithObject(object);
+  mocks.readEditorDrawingObject.mockReturnValue({
+    id: 'cleanup',
+    kind: 'simplify',
+    bounds: { x: 10, y: 20, width: 30, height: 40 },
+    settings: { erase: true },
+    blurAmount: 6,
+  });
+  applySelectionToolSettingsToObjects(canvas, [object], 'blur', {
+    ...settings,
+    blur: { amount: 6, clean: false },
+  });
+  const replacement = vi.mocked(canvas.insertAt).mock.calls[0]?.[1];
+  expect(replacement).toMatchObject({
+    sniptaleId: 'cleanup',
+    sniptaleLabel: 'Private account',
+    sniptaleLocked: false,
+    visible: false,
   });
 });

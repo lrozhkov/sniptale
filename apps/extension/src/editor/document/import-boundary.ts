@@ -264,7 +264,8 @@ function assertDrawingFabricObject(value: UnknownRecord): void {
   }
   if (
     value['sniptaleId'] !== drawing.id ||
-    String(objectType) !== expectedObjectType(drawing.kind)
+    (String(objectType) !== expectedObjectType(drawing.kind) &&
+      !(objectType === 'blur' && drawing.kind === 'simplify' && drawing.settings.erase === true))
   ) {
     throw new Error('Mismatched editor drawing metadata');
   }

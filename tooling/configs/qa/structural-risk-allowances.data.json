@@ -6688,6 +6688,17 @@
       "reviewDate": "2026-11-12",
       "astHash": "32e9471c25d06e47aedd6b5913c4748cecc07b1c94ef7170857e73b5bce28c4c",
       "signatureHash": "7bf80f18d5ea40ed057a83d8d1e04af301858fbd898271a273f9166fbc5bc9ec"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/content/overlay/toolbar/controls/drawing-options.tsx",
+      "symbol": "<file>",
+      "owner": "extension:content:overlay",
+      "reason": "tool-noise: This existing toolbar renderer binds peer drawing-property controls to one selected drawing session and one shared options/action surface. The file score stays nine and cohesion is0.92. Cleanup adds a fourth Blur choice and calls the existing session and Simplify transaction adapters. It adds no transport, capture, persistence or document authority to this UI owner. The hard line limit causes this finding. Splitting only the new choice into a forwarding component would distribute the same selection and popup lifetime. Independent complete-candidate architecture review must confirm this exact classification.",
+      "removalCondition": "Remove when the AST or signature changes. Reassess independent selection state, popup/resource lifetimes, direct transport or persistence effects, or additional transaction authority. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-12",
+      "astHash": "0a74773d3f61c4ee3b5ba6dda5d6079b8504ed6ba34bee5fb1e786f8a579d1f5",
+      "signatureHash": "77c6d0b53c141937a841fdb2afd9334184d9f690ea2529009f4779c88f0eac0c"
     }
   ]
 }

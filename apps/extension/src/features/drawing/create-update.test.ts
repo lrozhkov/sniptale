@@ -189,3 +189,23 @@ it('creates a bounded simplify draft with independent settings and no unresolved
   expect(draft).not.toHaveProperty('result');
   expect(draft).not.toHaveProperty('source');
 });
+
+it('creates cleanup through the blur tool while retaining ordinary blur defaults', () => {
+  const object = createDrawingObject('blur', start, 0, {
+    ...defaults,
+    blur: { amount: 6, clean: true },
+  });
+  expect(object).toMatchObject({
+    kind: 'simplify',
+    blurAmount: 6,
+    settings: { erase: true, automatic: true, content: 'all' },
+  });
+  expect(createDrawingObject('blur', start, 0, defaults)).toMatchObject({
+    kind: 'blur',
+    amount: defaults.blur.amount,
+  });
+  expect(createDrawingObject('simplify', start, 0, defaults)).toMatchObject({
+    kind: 'simplify',
+    settings: defaults.simplify,
+  });
+});

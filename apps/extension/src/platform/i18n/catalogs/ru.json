@@ -4587,6 +4587,7 @@
       "drawingColor": "Цвет",
       "drawingWidth": "Толщина",
       "drawingOpacity": "Прозрачность",
+      "drawingBlurClean": "Очистить содержимое — оставить фон и линии",
       "drawingBlurWeak": "Слабое",
       "drawingBlurStrength": "Сила размытия",
       "drawingBlurMedium": "Среднее",

@@ -243,7 +243,10 @@ it('shows strong blur by default and updates its strength', async () => {
   const button = host.querySelector<HTMLButtonElement>('[data-ui="mock.blur-strength"]');
   expect(button?.dataset['value']).toBe('20');
   await act(async () => button?.click());
-  expect(storeState.updateDrawingToolSettings).toHaveBeenCalledWith('blur', { amount: 2 });
+  expect(storeState.updateDrawingToolSettings).toHaveBeenCalledWith('blur', {
+    amount: 2,
+    clean: false,
+  });
   await act(async () => root.unmount());
 });
 

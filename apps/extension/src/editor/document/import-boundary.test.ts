@@ -1,3 +1,4 @@
+import { createCanvas } from 'canvas';
 import { describe, expect, it } from 'vitest';
 import type { DrawingObject } from '../../features/drawing/public';
 import {
@@ -237,4 +238,58 @@ it('round trips every admitted drawing kind through the document metadata serial
     expect(JSON.parse(serialized)).toEqual({ version: 1, object });
     expect(parseEditorDrawingMetadata(serialized)).toEqual(object);
   }
+});
+
+it('admits cleanup as a Blur layer only with validated Simplify erase metadata and PNG pixels', () => {
+  const png = createCanvas(30, 20);
+  const settings = {
+    automatic: true,
+    content: 'all',
+    manualKind: 'text',
+    sensitivity: 90,
+    thickness: 0.5,
+    lineSpacing: 1.5,
+    textPattern: 'typical',
+    textAlign: 'left',
+    color: null,
+    erase: true,
+  };
+  const object = {
+    id: 'cleanup',
+    kind: 'simplify' as const,
+    bounds: { x: 10, y: 20, width: 30, height: 20 },
+    settings,
+  };
+  const raster = {
+    type: 'Image',
+    sniptaleId: 'cleanup',
+    sniptaleType: 'blur',
+    width: 30,
+    height: 20,
+    src: png.toDataURL('image/png'),
+    sniptaleDrawingJson: JSON.stringify({ version: 2, object }),
+  };
+  expect(() =>
+    assertValidEditorDrawingCanvasJson(JSON.stringify({ objects: [raster] }))
+  ).not.toThrow();
+  expect(() =>
+    assertValidEditorDrawingCanvasJson(
+      JSON.stringify({ objects: [{ ...raster, src: 'data:image/png;base64,invalid' }] })
+    )
+  ).toThrow();
+  expect(() =>
+    assertValidEditorDrawingCanvasJson(
+      JSON.stringify({
+        objects: [
+          {
+            ...raster,
+            sniptaleDrawingJson: JSON.stringify({
+              version: 2,
+              object: { ...object, settings: { ...settings, erase: false } },
+            }),
+          },
+        ],
+      })
+    )
+  ).toThrow('Mismatched editor drawing metadata');
 });

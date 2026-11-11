@@ -43,7 +43,7 @@ export function createCompletedDrawWorkflowState(
     completion.object.enterEditing();
   }
   canvas.requestRenderAll();
-  if (completion.completedTool === 'simplify') {
+  if (drawing?.kind === 'simplify') {
     requestEditorSimplify(canvas, completion.object);
   } else if (completion.completedTool !== 'text') {
     commitHistory();

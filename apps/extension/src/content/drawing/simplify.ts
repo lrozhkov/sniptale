@@ -19,7 +19,11 @@ type SimplifyPending = {
 };
 type SimplifyFeedback = 'failed' | 'too-small' | 'no-source' | null;
 export interface ContentSimplifyDependencies extends SimplifyComputeDependencies {
-  acquire(event: Event, signal?: AbortSignal): Promise<DrawingSimplifySource>;
+  acquire(
+    event: Event,
+    signal?: AbortSignal,
+    excludedDrawingObjectId?: string
+  ): Promise<DrawingSimplifySource>;
   decode(dataUrl: string): Promise<void>;
 }
 export interface ContentSimplifyRuntime {
@@ -171,6 +175,11 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
     );
     if (!plan) return;
     const { baselines, creating } = plan;
+    const convertingBlur =
+      objects.length === 1 &&
+      objects[0]?.kind === 'simplify' &&
+      objects[0].settings.erase === true &&
+      baselines.get(objects[0].id)?.kind === 'blur';
     if (this.pending) this.compute.cancel();
     this.acquisitionAbort?.abort();
     const abort = new AbortController();
@@ -189,11 +198,15 @@ class ContentSimplifyRuntimeOwner implements ContentSimplifyRuntime {
           current,
           render: this.compute.render,
           decode: (dataUrl) => this.deps.decode(dataUrl),
-          ...(creating && event
+          ...((creating || convertingBlur) && event
             ? {
                 acquire: async () => {
                   acquiring = true;
-                  const source = await this.deps.acquire(event, abort.signal);
+                  const source = await this.deps.acquire(
+                    event,
+                    abort.signal,
+                    convertingBlur ? objects[0]?.id : undefined
+                  );
                   acquiring = false;
                   if (current()) this.retained = source;
                   return source;

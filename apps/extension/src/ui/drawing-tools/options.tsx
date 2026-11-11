@@ -11,7 +11,14 @@ import {
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
-import { useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import {
+  useContext,
+  useEffect,
+  useRef,
+  type ReactNode,
+  type RefObject,
+  type MouseEvent,
+} from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
   DRAWING_MARKER_OPACITIES,
@@ -50,7 +57,7 @@ export function QuickOptionButton(props: {
   children: ReactNode;
   dataUi: string;
   label: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const scoped = useContext(CommandPressScope);
   return (
@@ -154,33 +161,73 @@ const BLUR_PREVIEW_RADII = [0.35, 1.2, 2.6] as const;
 
 export function DrawingBlurStrengthOptions(props: {
   value: number;
+  clean?: boolean;
+  vertical?: boolean;
+  onClean?(event: Event): void;
   onChange: (value: number) => void;
 }) {
-  return DRAWING_BLUR_STRENGTHS.map((amount, index) => {
-    const label = translate(BLUR_STRENGTH_LABELS[index]!);
-    return (
-      <QuickOptionButton
-        key={amount}
-        active={props.value === amount}
-        label={`${translate('content.toolbar.drawingBlurStrength')}: ${label}, ${amount}px`}
-        dataUi={`content.toolbar.drawing-options.blur.amount-${amount}`}
-        onClick={() => props.onChange(amount)}
-      >
-        <svg aria-hidden viewBox="0 0 24 24" width="19" height="19" fill="none">
-          <rect x="2.5" y="2.5" width="19" height="19" rx="2" stroke="currentColor" />
-          <rect
-            x="7"
-            y="7"
-            width="10"
-            height="10"
-            fill="currentColor"
-            data-ui="drawing-blur-preview"
-            style={{ filter: `blur(${BLUR_PREVIEW_RADII[index]}px)` }}
-          />
-        </svg>
-      </QuickOptionButton>
-    );
-  });
+  return (
+    <>
+      {DRAWING_BLUR_STRENGTHS.map((amount, index) => {
+        const label = translate(BLUR_STRENGTH_LABELS[index]!);
+        return (
+          <QuickOptionButton
+            key={amount}
+            active={!props.clean && props.value === amount}
+            label={`${translate('content.toolbar.drawingBlurStrength')}: ${label}, ${amount}px`}
+            dataUi={`content.toolbar.drawing-options.blur.amount-${amount}`}
+            onClick={() => props.onChange(amount)}
+          >
+            <svg aria-hidden viewBox="0 0 24 24" width="19" height="19" fill="none">
+              <rect x="2.5" y="2.5" width="19" height="19" rx="2" stroke="currentColor" />
+              <rect
+                x="7"
+                y="7"
+                width="10"
+                height="10"
+                fill="currentColor"
+                data-ui="drawing-blur-preview"
+                style={{ filter: `blur(${BLUR_PREVIEW_RADII[index]}px)` }}
+              />
+            </svg>
+          </QuickOptionButton>
+        );
+      })}
+      {props.onClean ? (
+        <>
+          <DrawingOptionsDivider vertical={props.vertical === true} />
+          <QuickOptionButton
+            active={props.clean === true}
+            dataUi="content.toolbar.drawing-options.blur.clean"
+            label={translate('content.toolbar.drawingBlurClean')}
+            onClick={(event) => props.onClean?.(event.nativeEvent)}
+          >
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              width="19"
+              height="19"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* Tabler opacity, MIT: https://tabler.io/icons?icon=opacity */}
+              <path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2" />
+              <path
+                d={[
+                  'M6 18v.01 M18 18v.01 M9 18v.01 M12 18.01v.01 M15 18.01v.01',
+                  'M18 15.01v.01 M9 15.01v.01 M12 15.02v.01 M15 15.02v.01',
+                  'M18 12.02v.01 M12 12.03v.01 M15 12.03v.01 M18 9.03v.01 M18 6.04v.01 M15 9.04v.01',
+                ].join(' ')}
+              />
+            </svg>
+          </QuickOptionButton>
+        </>
+      ) : null}
+    </>
+  );
 }
 
 const SHAPE_OPTIONS: readonly {

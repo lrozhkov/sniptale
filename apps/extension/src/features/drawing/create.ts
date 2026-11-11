@@ -1,3 +1,4 @@
+import { createDefaultSimplifySettings } from '../simplify/settings';
 import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
 import type { DrawingObject, DrawingPoint, DrawingTool, DrawingToolDefaults } from './model';
 
@@ -32,9 +33,31 @@ export function createDrawingObject(
     case 'simplify':
       return { id, kind: 'simplify', bounds, settings: { ...defaults.simplify } };
     case 'blur':
+      if (defaults.blur.clean)
+        return createDrawingCleanup({ id, kind: 'blur', bounds, amount: defaults.blur.amount });
       return { id, kind: 'blur', bounds, amount: defaults.blur.amount };
     case 'select':
     case 'text':
       return null;
   }
+}
+
+/** Reuses Simplify recognition while preserving the blur layer identity and geometry. */
+export function createDrawingCleanup(
+  object: Extract<DrawingObject, { kind: 'blur' }>
+): Extract<DrawingObject, { kind: 'simplify' }> {
+  return {
+    id: object.id,
+    kind: 'simplify',
+    bounds: { ...object.bounds },
+    ...(object.rotation === undefined ? {} : { rotation: object.rotation }),
+    blurAmount: object.amount ?? 10,
+    settings: {
+      ...createDefaultSimplifySettings(),
+      automatic: true,
+      content: 'all',
+      sensitivity: 90,
+      erase: true,
+    },
+  };
 }

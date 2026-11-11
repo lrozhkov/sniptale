@@ -4587,6 +4587,7 @@
       "drawingColor": "Color",
       "drawingWidth": "Width",
       "drawingOpacity": "Opacity",
+      "drawingBlurClean": "Clear content — keep backgrounds and lines",
       "drawingBlurWeak": "Weak",
       "drawingBlurStrength": "Blur strength",
       "drawingBlurMedium": "Medium",

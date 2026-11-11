@@ -1,6 +1,7 @@
 import type { Canvas, FabricObject, TPointerEvent, Transform } from 'fabric';
 import {
   createDrawingObject,
+  createDrawingCleanup,
   clampDrawingTextWidth,
   resolveDrawingTextHeight,
   type DrawingObject,
@@ -99,11 +100,10 @@ function startBlur(
     amount: useEditorStore.getState().toolSettings.blur.amount,
     bounds: { x: point.x, y: point.y, width: 1, height: 1 },
   };
-  const object = createEditorDrawingBlurObject({
-    drawing,
-    labelIndex: bindings.nextLabelIndex('blur'),
-    source,
-  });
+  const labelIndex = bindings.nextLabelIndex('blur');
+  const object = useEditorStore.getState().toolSettings.blur.clean
+    ? createEditorDrawingSimplifyObject(createDrawingCleanup(drawing), labelIndex)
+    : createEditorDrawingBlurObject({ drawing, labelIndex, source });
   bindings.prepareObject(object);
   bindings.startDrawSession('blur', point, object, pointerId);
 }
