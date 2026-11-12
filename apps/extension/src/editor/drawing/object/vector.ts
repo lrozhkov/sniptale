@@ -32,6 +32,7 @@ type TextboxVisualAdapter = {
   render: Textbox['_render'];
   renderTextFill: Textbox['_renderTextFill'];
   stencilContext: CanvasRenderingContext2D | null;
+  measurementContext: CanvasRenderingContext2D | null;
 };
 
 const textboxVisualAdapters = new WeakMap<Textbox, TextboxVisualAdapter>();
@@ -261,6 +262,46 @@ function renderEditorDrawingTextStencil(
   }
 }
 
+function resolveTextCaretLeft(
+  textbox: Textbox,
+  adapter: TextboxVisualAdapter,
+  cursor: ReturnType<Textbox['getCursorRenderingData']>,
+  selectionStart: number
+): number {
+  const { lineIndex, charIndex } = textbox.get2DCursorLocation(selectionStart);
+  const line = textbox._textLines[lineIndex] ?? [];
+  const edge = line.length === 0 ? 0 : charIndex === 0 ? -1 : charIndex === line.length ? 1 : 0;
+  const gap = (cursor.width / textbox.cursorWidth) * 2;
+  const fallback = cursor.left + edge * (textbox.direction === 'rtl' ? -1 : 1) * gap;
+  if (
+    !edge ||
+    textbox.direction === 'rtl' ||
+    textbox.charSpacing !== 0 ||
+    textbox.path ||
+    textbox.textAlign.includes('justify') ||
+    !textbox.isEmptyStyles(lineIndex) ||
+    !(edge < 0 ? line[0] : line.at(-1))?.trim()
+  )
+    return fallback;
+  try {
+    const context = adapter.measurementContext ?? document.createElement('canvas').getContext('2d');
+    if (!context) return fallback;
+    adapter.measurementContext = context;
+    context.font = textbox._getFontDeclaration();
+    context.textAlign = 'left';
+    context.direction = 'ltr';
+    const metrics = context.measureText(line.join(''));
+    const origin = textbox._getLeftOffset() + textbox._getLineLeftOffset(lineIndex);
+    if (edge > 0 && Number.isFinite(metrics.actualBoundingBoxRight))
+      return origin + metrics.actualBoundingBoxRight + gap;
+    if (edge < 0 && Number.isFinite(metrics.actualBoundingBoxLeft))
+      return origin - metrics.actualBoundingBoxLeft - gap - cursor.width;
+  } catch {
+    // Cursor measurement must not interrupt text input when canvas resources are unavailable.
+  }
+  return fallback;
+}
+
 export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
   textbox.cursorColor = DEFAULT_COLOR_INFO_STRONG;
   textbox.cursorWidth = 1.5;
@@ -273,18 +314,14 @@ export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
       render: textbox._render.bind(textbox),
       renderTextFill: textbox._renderTextFill.bind(textbox),
       stencilContext: null,
+      measurementContext: null,
     };
     textboxVisualAdapters.set(textbox, adapter);
     textbox.getCursorRenderingData = (selectionStart = textbox.selectionStart, boundaries) => {
       const cursor = adapter.getCursorRenderingData(selectionStart, boundaries);
-      const { lineIndex, charIndex } = textbox.get2DCursorLocation(selectionStart);
-      const lineLength = textbox._textLines[lineIndex]?.length ?? 0;
-      const edge = lineLength === 0 ? 0 : charIndex === 0 ? -1 : charIndex === lineLength ? 1 : 0;
-      const direction = textbox.direction === 'rtl' ? -1 : 1;
-      const gap = (cursor.width / textbox.cursorWidth) * 2;
       return {
         ...cursor,
-        left: cursor.left + edge * direction * gap,
+        left: resolveTextCaretLeft(textbox, adapter, cursor, selectionStart),
         top: cursor.top + cursor.height * 0.1,
         height: cursor.height * 0.8,
       };
@@ -312,7 +349,11 @@ export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
       }
     };
   }
-  textbox.set({ lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR, strokeWidth: 0 });
+  // Fabric multiplies its lineHeight by the font box factor; the drawing policy is in ems.
+  textbox.set({
+    lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR / textbox._fontSizeMult,
+    strokeWidth: 0,
+  });
   textbox._renderTextLinesBackground = (context) =>
     renderEditorDrawingTextBackground(textbox, context);
   textbox.initDimensions();
