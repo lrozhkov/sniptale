@@ -310,13 +310,15 @@ export function createEditorDrawingEventHandlers(
       completeDrawWorkflowFromBindings(bindings);
     },
     handlePointerCancel: (event) => {
+      if (event && 'isPrimary' in event && event.isPrimary === false) return;
       textTargetCandidate = null;
       selectionModifierGesture = null;
       lastHandledMoveEvent = null;
       const drawSession = bindings.getDrawSession();
       if (drawSession && !isEditorDrawingSessionPointer(drawSession, event)) return;
-      endEditorCanvasTransform(bindings.getCanvas(), event);
+      const cancelled = endEditorCanvasTransform(bindings.getCanvas(), event);
       if (drawSession) bindings.cancelTransientInteraction();
+      else if (cancelled) bindings.syncRuntimeState();
     },
   };
 }

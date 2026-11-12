@@ -4,6 +4,7 @@ import {
   resolveDrawingArrowBendTarget,
   hitTestDrawingDocument,
   type DrawingPoint,
+  type DrawingObject,
   type DrawingSimplifySource,
   type DrawingSessionSnapshot,
 } from '../../features/drawing/public';
@@ -14,13 +15,14 @@ import {
   commitDrawingPointerDraft,
   toDrawingScenePoint,
   getDrawingViewportProjection,
+  resolveDrawingResizeHandle,
   type PointerDraft,
   type DrawingArrowHover,
 } from './interaction';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { DrawingTextDraft } from './text-editor';
 import { updateDrawingMarqueeDraft, updateDrawingPointerDraft } from './pointer-update';
-import type { DrawingAlignmentGuide } from './move-alignment';
+import type { DrawingSnapFeedback } from '../../features/drawing/public';
 
 export const TEXT_DRAG_THRESHOLD = 4;
 
@@ -55,6 +57,8 @@ function useDrawingDraftInterruption(
 
 type DrawingPointerRuntimeOptions = {
   active: boolean;
+  controlsEnabled?: boolean;
+  getObjectOpacity?: (objectId: string) => number;
   /** Enables disposable page alignment for page and crop drawing. */
   alignMoves?: boolean;
   controller: ContentDrawingController;
@@ -254,8 +258,21 @@ function useDrawingHover(
       const previous = hoverBendRef.current;
       const previousPoint = hoverPointRef.current;
       const snapshot = session.getSnapshot();
+      const selected =
+        snapshot.selectedObjectIds.length === 1
+          ? snapshot.document.objects.find((object) => object.id === snapshot.selectedObjectIds[0])
+          : undefined;
+      const nextEndpoint =
+        selected?.kind === 'arrow' ? resolveDrawingResizeHandle(selected, point) : null;
+      const previousEndpoint =
+        selected?.kind === 'arrow' && previousPoint
+          ? resolveDrawingResizeHandle(selected, toDrawingScenePoint(previousPoint, root))
+          : null;
+      const arrowEndpointHover = snapshot.activeTool === 'arrow' && nextEndpoint !== null;
       hoverPointRef.current =
-        active && snapshot.activeTool === 'select' && event.pointerType !== 'touch'
+        active &&
+        (snapshot.activeTool === 'select' || arrowEndpointHover) &&
+        event.pointerType !== 'touch'
           ? { clientX: event.clientX, clientY: event.clientY }
           : null;
       const previousHit = previousPoint
@@ -268,7 +285,14 @@ function useDrawingHover(
         ? hitTestDrawingDocument(snapshot.document.objects, point)
         : null;
       hoverBendRef.current = active ? resolveArrowHover(snapshot, point, event) : null;
-      if (hoverBendRef.current || previous || previousHit?.id !== nextHit?.id) changed();
+      const readyEndpoint = hoverPointRef.current ? nextEndpoint : null;
+      if (
+        hoverBendRef.current ||
+        previous ||
+        previousHit?.id !== nextHit?.id ||
+        previousEndpoint !== readyEndpoint
+      )
+        changed();
     },
     [active, changed, root, session]
   );
@@ -279,10 +303,36 @@ function useDrawingHover(
   return { hoverBendRef, hoverPointRef, updateHover, clearHover };
 }
 
+function eligibleRelationObjects(
+  controller: ContentDrawingController,
+  getOpacity?: (id: string) => number
+): readonly DrawingObject[] {
+  const snapshot = controller.session.getSnapshot();
+  return snapshot.document.objects.filter((object) => {
+    if (snapshot.selectedObjectIds.includes(object.id) || (getOpacity?.(object.id) ?? 1) <= 0)
+      return false;
+    const anchor = controller.getObjectAnchor?.(object);
+    if (!anchor) return true;
+    if (
+      !anchor.isConnected ||
+      anchor.checkVisibility?.({ checkOpacity: true, checkVisibilityCSS: true }) === false
+    )
+      return false;
+    const style = getComputedStyle(anchor);
+    return (
+      style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity || 1) !== 0
+    );
+  });
+}
+
 export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   const { active, controller, root, onCancelText, onText } = args;
   const draftRef = useRef<PointerDraft | null>(null);
-  const alignmentGuidesRef = useRef<DrawingAlignmentGuide[]>([]);
+  const alignmentFeedbackRef = useRef<DrawingSnapFeedback>({
+    guides: [],
+    relations: [],
+    acceptedByAxis: {},
+  });
   const activePointerRef = useRef<number | null>(null);
   const lastPointerEventRef = useRef<ReactPointerEvent<HTMLCanvasElement> | null>(null);
   const touchPointsRef = useRef(new Map<number, DrawingPoint>());
@@ -297,7 +347,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     if (draft?.kind === 'marquee') controller.session.setSelection(draft.initialSelectionIds);
     draftRef.current = null;
     simplifyDraft.clear();
-    alignmentGuidesRef.current = [];
+    alignmentFeedbackRef.current = { guides: [], relations: [], acceptedByAxis: {} };
     clearHover();
     activePointerRef.current = null;
     lastPointerEventRef.current = null;
@@ -312,6 +362,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       const point = toDrawingScenePoint(event, root);
       if (beginTouchViewport(event, touchPointsRef, touchCentroidRef, cancelDraft)) return;
       const start = beginDrawingPointer({
+        controlsEnabled: args.controlsEnabled ?? true,
         modifiers: { altKey: event.altKey, ctrlKey: event.ctrlKey, shiftKey: event.shiftKey },
         point,
         snapshot: controller.session.getSnapshot(),
@@ -319,7 +370,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       });
       draftRef.current = start.draft;
       simplifyDraft.begin(start.draft, event.nativeEvent, root);
-      alignmentGuidesRef.current = [];
+      alignmentFeedbackRef.current = { guides: [], relations: [], acceptedByAxis: {} };
       activePointerRef.current = event.pointerId;
       lastPointerEventRef.current = event;
       clearHover();
@@ -328,7 +379,17 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       event.currentTarget.setPointerCapture(event.pointerId);
       changed();
     },
-    [active, cancelDraft, changed, controller, onText, root, simplifyDraft, clearHover]
+    [
+      active,
+      args.controlsEnabled,
+      cancelDraft,
+      changed,
+      controller,
+      onText,
+      root,
+      simplifyDraft,
+      clearHover,
+    ]
   );
 
   const onPointerMove = useCallback(
@@ -352,6 +413,8 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
         if (distance < TEXT_DRAG_THRESHOLD) return;
       }
       const update = updateDrawingPointerDraft({
+        previousFeedback: alignmentFeedbackRef.current,
+        relationObjects: eligibleRelationObjects(controller, args.getObjectOpacity),
         documentObjects: controller.session.getSnapshot().document.objects,
         draft,
         event,
@@ -360,13 +423,17 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
         modifiers,
         alignToPage: args.alignMoves ?? false,
       });
-      alignmentGuidesRef.current = update.guides ?? [];
+      alignmentFeedbackRef.current = update.feedback ?? {
+        guides: [],
+        relations: [],
+        acceptedByAxis: {},
+      };
       draftRef.current = update.draft;
       simplifyDraft.update(update.draft);
       if (update.selection) controller.session.setSelection(update.selection);
       changed();
     },
-    [args.alignMoves, changed, controller, root, simplifyDraft, updateHover]
+    [args.alignMoves, args.getObjectOpacity, changed, controller, root, simplifyDraft, updateHover]
   );
 
   useDrawingAlignmentModifiers({
@@ -383,7 +450,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       commitPointerDraft(controller, draft, event, simplifyDraft.getSource());
       draftRef.current = null;
       simplifyDraft.clear();
-      alignmentGuidesRef.current = [];
+      alignmentFeedbackRef.current = { guides: [], relations: [], acceptedByAxis: {} };
       clearHover();
       activePointerRef.current = null;
       lastPointerEventRef.current = null;
@@ -409,7 +476,7 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
   );
 
   return {
-    alignmentGuidesRef,
+    alignmentFeedbackRef,
     cancelLostPointer,
     cancelDraft,
     cancelPointer,

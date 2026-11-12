@@ -247,6 +247,10 @@ export const LayerRow = React.memo(function LayerRow(props: {
   return (
     <div
       key={props.layer.id}
+      data-editor-layer-id={props.layer.id}
+      data-parent-context={
+        props.layer.containsSelection && !props.layer.selected ? true : undefined
+      }
       onDragOver={dragHandlers.onDragOver}
       onDrop={dragHandlers.onDrop}
       onMouseEnter={expandedActionsVisibility.showExpandedActions}

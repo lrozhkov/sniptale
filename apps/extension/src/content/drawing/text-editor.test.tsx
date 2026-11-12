@@ -369,3 +369,35 @@ it('ignores obsolete font completion after shortening and unmounting', async () 
     Reflect.deleteProperty(document, 'fonts');
   }
 });
+
+it('suppresses capture caret and selection while retaining editable draft ink', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <DrawingTextEditor
+          serviceUiSuppressed
+          draft={{ id: null, point: { x: 20, y: 30 }, value: 'Live draft', width: 160 }}
+          projection={{ x: 0, y: 0 }}
+          style={{ backgroundColor: '#f97316', color: '#111827', fontFamily: 'sans', fontSize: 24 }}
+          onCancel={vi.fn()}
+          onChange={vi.fn()}
+          onCommit={vi.fn()}
+        />
+      )
+    );
+    const input = host.querySelector('textarea')!;
+    expect(input.style.caretColor).toBe('transparent');
+    expect(input.value).toBe('Live draft');
+    expect(host.querySelector('span')?.textContent).toContain('Live draft');
+    expect(host.querySelector('style')?.textContent).toContain('background: transparent');
+    expect(document.activeElement).toBe(input);
+  } finally {
+    act(() => root.unmount());
+  }
+});

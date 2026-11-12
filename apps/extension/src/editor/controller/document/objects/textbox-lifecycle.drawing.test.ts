@@ -90,3 +90,34 @@ it('restores fitted pixels, coordinates and automatic wrapping after edit-cancel
     await canvas.dispose();
   }
 });
+
+it('restores a grouped text scene origin after parent layout changes during a cancelled edit', async () => {
+  const { Group, Point, Rect } = await import('fabric');
+  const { beginEditorTextboxEditing, cancelEditorTextboxEditing } =
+    await import('./textbox-lifecycle');
+  const text = new Textbox('Original  text\n', { left: 20, top: 30, width: 130, fontSize: 24 });
+  text.sniptaleDrawingTextAutoWidth = false;
+  text.sniptaleDrawingTextMaxWidth = 170;
+  const peer = new Rect({ left: 200, top: 100, width: 30, height: 20 });
+  const parent = new Group([text, peer], { angle: 30, scaleX: 2, scaleY: 2 });
+  const onCommit = vi.fn();
+  attachEditorTextboxLifecycle(text, { onEmpty: vi.fn(), onCommit });
+  text.selectionStart = 2;
+  text.selectionEnd = 8;
+  const original = text.getXY();
+  const width = text.width;
+  beginEditorTextboxEditing(text);
+  text.isEditing = true;
+  text.set({ text: 'Changed text that changes the group layout', width: 260 });
+  text.fire('changed');
+  parent.triggerLayout();
+  cancelEditorTextboxEditing(text);
+  expect(text.text).toBe('Original  text\n');
+  expect(text.getXY().distanceFrom(new Point(original.x, original.y))).toBeLessThan(0.001);
+  expect(text.width).toBe(width);
+  expect(text.selectionStart).toBe(2);
+  expect(text.selectionEnd).toBe(8);
+  expect(text.sniptaleDrawingTextAutoWidth).toBe(false);
+  expect(text.sniptaleDrawingTextMaxWidth).toBe(170);
+  expect(onCommit).not.toHaveBeenCalled();
+});

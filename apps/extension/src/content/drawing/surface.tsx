@@ -122,12 +122,13 @@ const DRAWING_SURFACE_EVENT_SHIELD = {
 
 function resolveDrawingCanvasHoverCursor(args: {
   active: boolean;
+  serviceUiSuppressed?: boolean;
   point: DrawingPoint;
   pointer: DrawingPointerRuntime;
   snapshot: DrawingSessionSnapshot;
 }): string {
   const baseCursor = resolveDrawingCanvasCursor(args.active, args.snapshot);
-  if (!args.active) return baseCursor;
+  if (!args.active || args.serviceUiSuppressed) return baseCursor;
   const draft = args.pointer.draftRef.current;
   if (draft?.kind === 'bend') return 'none';
   if (draft?.kind === 'rotate' || draft?.kind === 'rotate-selection') return 'grabbing';
@@ -163,6 +164,11 @@ function resolveDrawingCanvasHoverCursor(args: {
   if (handle && selected)
     return resolveDrawingResizeCursor(handle, false, getDrawingObjectRotation(selected));
   if (args.pointer.hoverBendRef.current) return 'grab';
+  if (
+    args.snapshot.activeTool === 'select' &&
+    hitTestDrawingDocument(args.snapshot.document.objects, args.point)
+  )
+    return 'move';
   return baseCursor;
 }
 
@@ -191,14 +197,12 @@ function isNonTextSelectionDrag(draft: PointerDraft | null): boolean {
   if (!draft) return false;
   if (draft.kind === 'move-selection' || draft.kind === 'rotate-selection')
     return draft.originals.every((object) => object.kind !== 'text');
-  return (
-    (draft.kind === 'move' || draft.kind === 'resize' || draft.kind === 'rotate') &&
-    draft.original.kind !== 'text'
-  );
+  return (draft.kind === 'move' || draft.kind === 'rotate') && draft.original.kind !== 'text';
 }
 
 function createDrawingPointerHandlers(args: {
   active: boolean;
+  serviceUiSuppressed?: boolean;
   pointer: DrawingPointerRuntime;
   root: PageScrollRoot;
   selectionDragHiddenRef: React.MutableRefObject<boolean>;
@@ -241,6 +245,7 @@ function createDrawingPointerHandlers(args: {
         ? 'none'
         : resolveDrawingCanvasHoverCursor({
             active,
+            serviceUiSuppressed: args.serviceUiSuppressed ?? false,
             point: toDrawingScenePoint(event, root),
             pointer,
             snapshot,
@@ -265,6 +270,7 @@ function createDrawingPointerHandlers(args: {
         ? 'none'
         : resolveDrawingCanvasHoverCursor({
             active,
+            serviceUiSuppressed: args.serviceUiSuppressed ?? false,
             point: toDrawingScenePoint(event, root),
             pointer,
             snapshot,
@@ -293,6 +299,7 @@ function createDrawingPointerHandlers(args: {
 
 function DrawingCanvasLayer(props: {
   active: boolean;
+  serviceUiSuppressed: boolean;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   chromeCanvasRef: RefObject<HTMLCanvasElement | null>;
   controller: ContentDrawingController;
@@ -337,6 +344,7 @@ function DrawingCanvasLayer(props: {
   }, [props.active, props.canvasRef, props.controller]);
   const pointerHandlers = createDrawingPointerHandlers({
     active: props.active,
+    serviceUiSuppressed: props.serviceUiSuppressed,
     pointer: props.pointer,
     root: props.root,
     selectionDragHiddenRef,
@@ -422,6 +430,7 @@ function DrawingCanvasLayer(props: {
       <canvas
         ref={props.chromeCanvasRef}
         data-ui="content.drawing.selection-chrome"
+        hidden={props.serviceUiSuppressed}
         aria-hidden="true"
         style={{
           position: 'fixed',
@@ -482,6 +491,7 @@ export function DrawingSurface(props: {
   escapeImmediately?: boolean;
   onExit?: () => void;
   showSelectionChrome?: boolean;
+  serviceUiSuppressed?: boolean;
   visualEffects?: {
     getOpacity(objectId: string): number;
     getRevision(): number;
@@ -489,6 +499,7 @@ export function DrawingSurface(props: {
   };
 }) {
   const { active, chromeHidden, controller } = props;
+  const serviceUiSuppressed = props.serviceUiSuppressed ?? false;
   const getObjectOpacity = props.visualEffects?.getOpacity;
   const snapshot = useDrawingSessionSnapshot(controller.session);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -515,6 +526,8 @@ export function DrawingSurface(props: {
   const pointer = useDrawingPointerRuntime({
     active,
     alignMoves: props.alignMovesToPage ?? false,
+    controlsEnabled: !serviceUiSuppressed,
+    ...(getObjectOpacity ? { getObjectOpacity } : {}),
     controller,
     root,
     onCancelText: cancelText,
@@ -552,7 +565,7 @@ export function DrawingSurface(props: {
     active,
     canvasRef,
     chromeCanvasRef,
-    chromeHidden: chromeHidden || pendingGeometry,
+    chromeHidden: chromeHidden || pendingGeometry || serviceUiSuppressed,
     controller,
     draftRef: pointer.visualDraftRef,
     draftRevision,
@@ -611,7 +624,8 @@ export function DrawingSurface(props: {
       editingTextObject={editingTextObject}
       frameObjects={frameObjects}
       pendingGeometry={pendingGeometry}
-      alignmentVisible={active && !chromeHidden}
+      alignmentVisible={active && !chromeHidden && !serviceUiSuppressed}
+      serviceUiSuppressed={serviceUiSuppressed}
       pointer={pointer}
       projection={projection}
       root={root}
@@ -628,6 +642,7 @@ export function DrawingSurface(props: {
 function DrawingSurfaceContent(props: {
   active: boolean;
   alignmentVisible: boolean;
+  serviceUiSuppressed: boolean;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   chromeCanvasRef: RefObject<HTMLCanvasElement | null>;
   controller: ContentDrawingController;
@@ -652,6 +667,7 @@ function DrawingSurfaceContent(props: {
     <div
       aria-hidden={!props.active}
       data-ui="content.drawing.surface"
+      data-service-ui-suppressed={props.serviceUiSuppressed ? 'true' : undefined}
       style={{
         position: 'fixed',
         inset: 0,
@@ -663,6 +679,13 @@ function DrawingSurfaceContent(props: {
       }}
       {...DRAWING_SURFACE_EVENT_SHIELD}
     >
+      {props.serviceUiSuppressed ? (
+        <style>
+          {
+            '[data-service-ui-suppressed="true"] [data-simplify-pending="true"] { border: 0 !important; }'
+          }
+        </style>
+      ) : null}
       <DrawingVisualLayers
         layers={layers}
         projection={props.projection}
@@ -672,9 +695,14 @@ function DrawingSurfaceContent(props: {
           : {})}
         {...(props.getObjectOpacity ? { getObjectOpacity: props.getObjectOpacity } : {})}
       />
-      <DrawingSimplifyFeedback controller={props.controller} projection={props.projection} />
+      <DrawingSimplifyFeedback
+        controller={props.controller}
+        projection={props.projection}
+        suppressed={props.serviceUiSuppressed}
+      />
       <DrawingCanvasLayer
         active={props.active}
+        serviceUiSuppressed={props.serviceUiSuppressed}
         canvasRef={props.canvasRef}
         chromeCanvasRef={props.chromeCanvasRef}
         controller={props.controller}
@@ -687,13 +715,14 @@ function DrawingSurfaceContent(props: {
       />
       {props.alignmentVisible ? (
         <DrawingMoveAlignmentGuides
-          guides={props.pointer.alignmentGuidesRef.current}
+          feedback={props.pointer.alignmentFeedbackRef.current}
           projection={props.projection}
-          layer={layers.length}
+          layer={Math.max(0, layers.length - 1)}
         />
       ) : null}
       {props.active && props.textDraft ? (
         <DrawingTextEditor
+          serviceUiSuppressed={props.serviceUiSuppressed}
           draft={props.textDraft}
           layoutRevision={props.viewportRevision}
           projection={props.projection}

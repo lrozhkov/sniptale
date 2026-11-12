@@ -468,11 +468,11 @@
       "file": "apps/extension/src/content/overlay/video-recording/session/controller.test.tsx",
       "symbol": "<file>",
       "owner": "extension:content:overlay",
-      "reason": "tool-noise: This file tests one mounted recording surface controller with one Probe, transport mock receiver and reset/unmount lifecycle. The hide success and refusal cases use that same fixture and preserve recording and camera state. The score is 2, delta is 0, cohesion is 1.00, and there are no effectful clusters. No authority was added; only the 800-line limit is crossed. Splitting these cases would duplicate the fixture or add a fixture-only forwarding boundary. Independent read-only diagnosis supports Keep. Fresh complete-candidate architecture review must validate this classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent fixture, state authority, resource lifetime or recovery owner. Remove when the analyzer models this cohesive test shape.",
-      "reviewDate": "2026-10-24",
-      "astHash": "057301f67e379ce8699fd1c2c5d132df0b077b8d9f45878fe41b249c54932f8c",
-      "signatureHash": "99464e722cafa745f7bada7105ee114e588e55ae5ee41eabe9397b75579040b4"
+      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. Preparation, refusal, stale identity and disposal extend the same mounted Probe, transport mocks and teardown. No independent fixture lifetime was introduced. Both stale hashes require this fresh diagnosis. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-12",
+      "astHash": "81f12c0bfd191e089c5297508aa1b1ba78ecc372517c51bf1206b1028dffd829",
+      "signatureHash": "26cc978c4cff1d9cf450200d8fdde2d0c1cd3092174371d784b11977cf43be10"
     },
     {
       "rule": "structural-file-risk",
@@ -6699,6 +6699,116 @@
       "reviewDate": "2026-11-12",
       "astHash": "0a74773d3f61c4ee3b5ba6dda5d6079b8504ed6ba34bee5fb1e786f8a579d1f5",
       "signatureHash": "77c6d0b53c141937a841fdb2afd9334184d9f690ea2529009f4779c88f0eac0c"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/content/drawing/frame.ts",
+      "symbol": "drawDrawingFrame",
+      "owner": "extension:content:drawing",
+      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. One Canvas frame transaction owns projection, clipping, artwork and gated chrome. Added hover and capture feedback do not add a document writer or another effect authority. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-12",
+      "astHash": "c540726aa0e0da8ceeb11c1c9c930062a38639cdc1b23d68fc75ea7dbb496a6d",
+      "signatureHash": "11201056d62d2bb555677aeec7cedd0b061c0f23f4cb9fbfc5cb7d8a852b839e"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/content/drawing/pointer-runtime.ts",
+      "symbol": "useDrawingPointerRuntime",
+      "owner": "extension:content:drawing",
+      "reason": "tool-noise: Part3 replaces the guide-only ref with one DrawingSnapFeedback ref for the same captured pointer gesture. Guides, relations and primary axis keys are replaced together on update and cleared together on down, finalization and cancellation. The ref is disposable presentation/tie-retention data; controller.session remains the accepted document authority. The hook passes eligible relation objects and the previous envelope into the existing pointer-update owner; it does not calculate a competing correction or retain another session. The opacity input and owner-local eligibility read filter existing document/anchor objects for the same active gesture, without acquiring a resource, installing a new listener or introducing persistence/transport.",
+      "removalCondition": "Remove this exact allowance when this hook AST/signature changes. Reassess any added session/document writer, independent async result publisher, resource/listener lifetime, or second feedback store. Do not extend it to eligibleRelationObjects or another function. Remove it when the analyzer models the single captured gesture without this false positive.",
+      "reviewDate": "2026-11-12",
+      "astHash": "577dd591f9634a6bec4a191a820de2740509443a95becfb189c63dd705c9b119",
+      "signatureHash": "6e2189699c966df1adc0ae7ba245ed41a86d003ce3ac2f3e471b6f4ed837b1ca"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/content/drawing/surface.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:content:drawing",
+      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. The added recording-control proof uses the existing mounted surface, session, Canvas fixture and cleanup. The unchanged score and test-local receivers do not identify another production authority. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-12",
+      "astHash": "777186ddb1887254590572657f5d29c8bf598f7f623a6426123583d32c796b3c",
+      "signatureHash": "f8a2bd2eba941bc650ab879e884f5c5b3704325ca4eebaae1c3c29f922127480"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/content/drawing/surface.tsx",
+      "symbol": "DrawingSurface",
+      "owner": "extension:content:drawing",
+      "reason": "tool-noise: The only Part3 change inside DrawingSurface is forwarding its existing getObjectOpacity callback to the existing pointer-runtime hook. It does not create a new subscription, clock, document receiver or transport. The existing controller remains the lifecycle/document owner. The guide-view prop update outside this symbol passes the same single feedback envelope through the already gated alignment view; it does not create another mutable owner. This remains the mounted surface composition that settles existing pointer/text work before repainting clean ink.",
+      "removalCondition": "Remove this exact allowance when DrawingSurface AST/signature changes. Reassess any new independent subscription, drawing/session authority, capture admission authority or persistence/transport effect. Do not extend it to DrawingSurfaceContent or another symbol. Remove it when the analyzer models this existing mounted composition without the false positive.",
+      "reviewDate": "2026-11-12",
+      "astHash": "cc59f8dff349f9cc6d0d49d42015a3d0451a8020487af1d1e0a28f2eb86e3559",
+      "signatureHash": "6d7cf5ce281ea03e80d7738c46a23899ecae06045ca06975b1fb4567e4b5b532"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/content/overlay/video-recording/session/controller.ts",
+      "symbol": "<file>",
+      "owner": "extension:content:overlay",
+      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. Preparation belongs to the existing surface identity and drawing lifecycle. One identity-bound settle, paint and disposal transaction shares the controller receiver and phase. The separately established producer dependency cycle was removed by caller injection. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-12",
+      "astHash": "cfe413dd8ac111a3da3c4570b1ca28c4c772a2bd004daa8f14d7c33a933d8cf7",
+      "signatureHash": "7f7fcff496854c2e116782695d5c1770f8313a7926d14c0e339946c2ba8cb1ea"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/controller/events/drawing.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:controller",
+      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. The added pointer cancellation assertions use the existing drawing-event fixture. Ten added lines cross the file cap without another fixture lifetime or production authority. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-12",
+      "astHash": "47a661d80f276ac0806386275cffd0c1c0429a330e673da5cdbb98067c4db6b6",
+      "signatureHash": "717d64b8206edc1a0f52eb6f425a90468c389b2e7557270967d9e005e43dc58f"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/controller/instance/actions/lifecycle/selection-chrome.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:controller",
+      "reason": "tool-noise: Part3 updates the existing manager mocks from getVisualGuides to the explicit getVisualFeedback envelope and extends the existing clean-PNG/SVG test with one dimension witness and its displayed measurement. It reuses that test’s real EditorCanvas, authored shape, baseline PNG, mounted chrome and dispose lifecycle. The existing test proves the measurement is painted in the external overlay but is absent from scene PNG/SVG. No test service, global mutable fixture, second resource lifecycle or production dependency direction is introduced.",
+      "removalCondition": "Remove this exact file allowance when its AST/signature changes. Reassess any independent fixture setup/cleanup, service or capture lifetime, replacement export implementation or unrelated production contract. It does not authorize an allowance for appendGuides or any production symbol. Remove it when the analyzer models this cohesive chrome proof scope without the false positive.",
+      "reviewDate": "2026-11-12",
+      "astHash": "348a83e90eb142f9861d1ba434dad4e02b450c07b365ec846bc14a29f88efebd",
+      "signatureHash": "cf9ef95ec902f9446c5bb9e58bf655c0a39152e773b0070c92e06322dd7a8259"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/controller/instance/actions/lifecycle/selection-chrome.ts",
+      "symbol": "mountEditorSelectionChrome",
+      "owner": "extension:editor:controller",
+      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. One mount/dispose lifetime owns the SVG, subscriptions, transient hover sources and restoration of patched Canvas controls. It has no persistence or transport effect. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-12",
+      "astHash": "6c6d170ed6f324528ca9a62e54ad7bdb142cd1d52dda132c43027d65fa2f75a4",
+      "signatureHash": "f9f9651e46acf9d2cef24f917002ef400eb9764e0138f677ee5b36e0262bfd65"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/document/canvas-surface/render-region.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:document",
+      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. Nested selection, marquee and cancellation exercise the same EditorCanvas instance through supported actions and fixture cleanup. Cross-owner test imports prove consumers without a production ownership change. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-12",
+      "astHash": "4348c2feec20528748a314b054f815a3e9e0228dff5cb483ec02944100d1268b",
+      "signatureHash": "ac748ac720c6c174465411154a6ee61ea1fc3aa970cbd5f7081eb0ae3ae64081"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/document/canvas-surface/render-region.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:document",
+      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. Group scope, target collection, marquee and cancellation operate on the same native Fabric Canvas protected selector and transform state. Cancellation restores that instance atomically. Splitting mutable state would create competing Canvas authority or delegation. The counted this receivers are method locations. Fresh complete-candidate architecture review must validate this exact binding.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-12",
+      "astHash": "e147f1b6069d11b8cf6efcb94b332e5f2d82c93ec87bfb0220e15fe690fced0d",
+      "signatureHash": "5fa10cbdae06d0bbd1ca1f024a068c9ea783f5d00232843760bdadcecb74e573"
     }
   ]
 }

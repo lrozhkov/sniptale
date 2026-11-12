@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 import { EditorInspectorLayersHeader, EditorInspectorLayersList } from './header';
@@ -6,6 +9,10 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
   useAppLocale: vi.fn(),
+}));
+const selectLayer = vi.hoisted(() => vi.fn());
+vi.mock('../../application/controller-context', () => ({
+  useEditorController: () => ({ selectLayer }),
 }));
 vi.mock('./file-input', () => ({
   LayerInsertImageControl: () => <button data-ui="mock.insert" type="button" />,
@@ -113,4 +120,41 @@ it('keeps insertion beside navigation in the integrated header', () => {
   expect(markup).toContain('mock.insert');
   expect(markup).not.toContain('lucide-layers-3');
   expect(markup.match(/<button/g)).toHaveLength(2);
+});
+
+it('selects a child through its keyboard-accessible button while retaining parent context', () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      <EditorInspectorLayersList
+        layers={[
+          {
+            id: 'group',
+            selected: false,
+            containsSelection: true,
+            groupChildren: [
+              { id: 'child', name: 'Child', type: 'shape', typeLabel: 'Shape', selected: true },
+            ],
+          } as never,
+        ]}
+        dragOverLayerId={null}
+        setDraggedLayerId={vi.fn()}
+        setDragOverLayerId={vi.fn()}
+        onDrop={vi.fn()}
+        onOpenLayerEffects={vi.fn()}
+      />
+    )
+  );
+  const button = container.querySelector<HTMLButtonElement>('[data-editor-layer-id="child"]')!;
+  expect(button.tagName).toBe('BUTTON');
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  act(() => button.click());
+  expect(selectLayer).toHaveBeenCalledWith('child', {
+    additive: false,
+    toggle: false,
+    range: false,
+    focusViewport: false,
+  });
+  act(() => root.unmount());
 });

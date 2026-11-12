@@ -122,6 +122,8 @@ export interface VideoRecordingSurfaceSnapshotMessage {
   type: typeof VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT;
   snapshot: VideoRecordingSurfaceSnapshot;
   surfaceToken?: string;
+  /** Transient admission request. The reply follows settled drawing-surface paint. */
+  capturePreparation?: { requestId: string; suppressed: boolean };
 }
 
 export type VideoRecordingSurfaceCommand =
@@ -471,10 +473,19 @@ export function isVideoRecordingSurfaceSnapshotMessage(
   return (
     isRecord(value) &&
     (hasExactKeys(value, ['type', 'snapshot']) ||
-      hasExactKeys(value, ['type', 'snapshot', 'surfaceToken'])) &&
+      hasExactKeys(value, ['type', 'snapshot', 'surfaceToken']) ||
+      hasExactKeys(value, ['type', 'snapshot', 'surfaceToken', 'capturePreparation'])) &&
     value['type'] === VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT &&
     isVideoRecordingSurfaceSnapshot(value['snapshot']) &&
-    (value['surfaceToken'] === undefined || typeof value['surfaceToken'] === 'string')
+    (value['surfaceToken'] === undefined || typeof value['surfaceToken'] === 'string') &&
+    (value['capturePreparation'] === undefined ||
+      (isRecord(value['capturePreparation']) &&
+        hasExactKeys(value['capturePreparation'], ['requestId', 'suppressed']) &&
+        typeof value['capturePreparation']['requestId'] === 'string' &&
+        value['capturePreparation']['requestId'].length > 0 &&
+        typeof value['capturePreparation']['suppressed'] === 'boolean' &&
+        typeof value['surfaceToken'] === 'string' &&
+        value['surfaceToken'].length > 0))
   );
 }
 

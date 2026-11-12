@@ -1,6 +1,6 @@
 import type { Control, FabricObject } from 'fabric';
-import { EDITOR_ROTATE_CONTROL_SIZE, EDITOR_ROTATE_CONTROL_SIZE_HOVER } from './constants';
-import { isActiveControl } from './base';
+import { renderCanvasRotationHandle } from '../../../../ui/drawing-tools/selection-chrome';
+import { DRAWING_SELECTION_ACCENT } from '../../../drawing/object/controls/chrome';
 
 type ControlStyleOverride = Parameters<Control['render']>[3];
 
@@ -12,36 +12,7 @@ function renderRotateControl(
   _styleOverride: ControlStyleOverride | undefined,
   object: FabricObject
 ): void {
-  const size = isActiveControl(object, 'mtr')
-    ? EDITOR_ROTATE_CONTROL_SIZE_HOVER
-    : EDITOR_ROTATE_CONTROL_SIZE;
-  const iconScale = size / 24;
-  const strokeColor = object.cornerStrokeColor || object.borderColor || '#f97316';
-
-  ctx.save();
-  ctx.translate(left, top);
-  ctx.scale(iconScale, iconScale);
-  ctx.translate(-12, -12);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = strokeColor;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.arc(12, 12, 9, Math.PI, Math.PI * 1.75);
-  ctx.lineTo(21, 8);
-  ctx.moveTo(21, 3);
-  ctx.lineTo(21, 8);
-  ctx.lineTo(16, 8);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(12, 12, 9, 0, Math.PI * 0.75);
-  ctx.lineTo(3, 16);
-  ctx.moveTo(8, 16);
-  ctx.lineTo(3, 16);
-  ctx.lineTo(3, 21);
-  ctx.lineTo(8, 16);
-  ctx.stroke();
-  ctx.restore();
+  renderCanvasRotationHandle(ctx, left, top, object.cornerStrokeColor || DRAWING_SELECTION_ACCENT);
 }
 
 export function patchRotateControl(control: Control | undefined): void {
@@ -49,9 +20,12 @@ export function patchRotateControl(control: Control | undefined): void {
     return;
   }
 
-  control.sizeX = EDITOR_ROTATE_CONTROL_SIZE_HOVER;
-  control.sizeY = EDITOR_ROTATE_CONTROL_SIZE_HOVER;
-  control.offsetY = -32;
+  control.sizeX = 28;
+  control.sizeY = 28;
+  control.x = 0.5;
+  control.y = -0.5;
+  control.offsetX = 20;
+  control.offsetY = -20;
   control.withConnection = false;
   control.render = renderRotateControl;
 }

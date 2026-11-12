@@ -8,7 +8,7 @@ it('applies the content drawing selection chrome', () => {
   applyDrawingSelectionChrome(object);
 
   expect(object.borderColor).toBe('#2563eb');
-  expect(object.borderDashArray).toEqual([4, 3]);
+  expect(object.borderDashArray).toBeNull();
   expect(object.cornerColor).toBe('#ffffff');
   expect(object.transparentCorners).toBe(false);
 });

@@ -1,10 +1,11 @@
 import React from 'react';
 import { ChevronDown, ChevronUp, Layers3, Minus, SquareMousePointer } from 'lucide-react';
 import { translate, useAppLocale } from '../../../platform/i18n';
-import type { EditorLayerItem } from '../../../features/editor/document/types';
+import type { EditorLayerChild, EditorLayerItem } from '../../../features/editor/document/types';
 import { getLayerIcon } from '../../chrome/tool-icons';
 import { EditorIconButton, cx } from '../../chrome/ui';
 import { LayerRow } from './row';
+import { useEditorController } from '../../application/controller-context';
 import { LayerInsertImageControl } from './file-input';
 import { ACTIVE_LAYER_NAVIGATION_ICON_CLASS_NAME } from './header.constants';
 import {
@@ -23,6 +24,17 @@ const HEADER_TOGGLE_BUTTON_CLASS_NAME =
   'hover:bg-[color:var(--sniptale-color-surface-hover)] focus:outline-none ' +
   'focus-visible:ring-2 focus-visible:ring-[color:var(--sniptale-color-focus-ring)]';
 const LIST_VIEWPORT_BASE_CLASS_NAME = 'min-h-0 flex-1 space-y-1 pb-3 pt-2';
+const GROUP_CHILD_BUTTON_CLASS_NAME =
+  'flex min-h-8 w-full items-center gap-1 rounded-[4px] px-1 text-left text-[13px] leading-[18px]';
+const GROUP_CHILD_FOCUS_CLASS_NAME =
+  'focus-visible:outline-none focus-visible:ring-2 ' +
+  'focus-visible:ring-[color:var(--sniptale-color-focus-ring)]';
+const GROUP_CHILD_SELECTED_CLASS_NAME =
+  'bg-[color:color-mix(in_srgb,var(--sniptale-color-canvas-selection)_12%,transparent)] ' +
+  'text-[color:var(--sniptale-color-canvas-selection)]';
+const GROUP_CHILD_IDLE_CLASS_NAME =
+  'text-[color:var(--sniptale-color-text-secondary)] ' +
+  'hover:bg-[color:var(--sniptale-color-surface-hover)]';
 
 type EditorInspectorLayersListProps = {
   layers: EditorLayerItem[];
@@ -165,6 +177,54 @@ export function EditorInspectorLayersHeader({
   );
 }
 
+function GroupChildRows(props: { layers: EditorLayerChild[]; autoNavigateSelectedLayer: boolean }) {
+  const controller = useEditorController();
+  return (
+    <div
+      data-ui="editor.layers.group-children"
+      className="ml-4 border-l border-[color:var(--sniptale-color-border-soft)] pl-2"
+    >
+      {props.layers.map((child) => (
+        <div key={child.id}>
+          <button
+            type="button"
+            title={child.name}
+            aria-pressed={child.selected === true}
+            data-ui="editor.layers.group-child"
+            data-layer-id={child.id}
+            data-editor-layer-id={child.id}
+            data-parent-context={child.containsSelection || undefined}
+            className={cx(
+              GROUP_CHILD_BUTTON_CLASS_NAME,
+              GROUP_CHILD_FOCUS_CLASS_NAME,
+              child.selected ? GROUP_CHILD_SELECTED_CLASS_NAME : GROUP_CHILD_IDLE_CLASS_NAME
+            )}
+            onClick={(event) =>
+              controller.selectLayer(child.id, {
+                additive: event.ctrlKey || event.metaKey,
+                toggle: event.ctrlKey || event.metaKey,
+                range: event.shiftKey,
+                focusViewport: props.autoNavigateSelectedLayer,
+              })
+            }
+          >
+            <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center">
+              {getLayerIcon(child.type)}
+            </span>
+            <span className="truncate">{child.name}</span>
+          </button>
+          {(child.selected || child.containsSelection) && child.groupChildren?.length ? (
+            <GroupChildRows
+              layers={child.groupChildren}
+              autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
+            />
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export const EditorInspectorLayersList = React.memo(function EditorInspectorLayersList({
   layers,
   dragOverLayerId,
@@ -197,30 +257,11 @@ export const EditorInspectorLayersList = React.memo(function EditorInspectorLaye
               autoNavigateSelectedLayer={autoNavigateSelectedLayer}
               onOpenLayerEffects={onOpenLayerEffects}
             />
-            {layer.selected && layer.groupChildren?.length ? (
-              <div
-                data-ui="editor.layers.group-children"
-                className="ml-4 border-l border-[color:var(--sniptale-color-border-soft)] pl-2"
-              >
-                {layer.groupChildren.map((child) => (
-                  <div
-                    key={child.id}
-                    title={child.name}
-                    className={[
-                      'flex min-h-8 items-center gap-1 truncate px-1 text-[13px] leading-[18px]',
-                      'text-[color:var(--sniptale-color-text-secondary)]',
-                    ].join(' ')}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="flex size-4 shrink-0 items-center justify-center"
-                    >
-                      {getLayerIcon(child.type)}
-                    </span>
-                    <span className="truncate">{child.name}</span>
-                  </div>
-                ))}
-              </div>
+            {(layer.selected || layer.containsSelection) && layer.groupChildren?.length ? (
+              <GroupChildRows
+                layers={layer.groupChildren}
+                autoNavigateSelectedLayer={autoNavigateSelectedLayer}
+              />
             ) : null}
           </div>
         ))

@@ -5,7 +5,11 @@ import {
 } from '../../features/drawing/public';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import type { PointerDraft, DrawingArrowHover } from './interaction';
-import { getDrawingViewportProjection, toDrawingScenePoint } from './interaction';
+import {
+  getDrawingViewportProjection,
+  toDrawingScenePoint,
+  resolveDrawingResizeHandle,
+} from './interaction';
 import {
   renderDrawingMarquee,
   renderDrawingMultiSelection,
@@ -61,6 +65,18 @@ export function drawDrawingFrame(args: {
   context.setTransform(ratio, 0, 0, ratio, 0, 0);
   context.clearRect(0, 0, width, height);
   const projection = getDrawingViewportProjection(root);
+  const hoveredSelection =
+    !draft && selectedIds.length === 1
+      ? objects.find((object) => object.id === selectedIds[0])
+      : undefined;
+  const hoveredEndpoint =
+    hoveredSelection?.kind === 'arrow' && args.hoverPoint
+      ? resolveDrawingResizeHandle(hoveredSelection, toDrawingScenePoint(args.hoverPoint, root))
+      : null;
+  const endpointPoint =
+    hoveredSelection?.kind === 'arrow' && (hoveredEndpoint === 'start' || hoveredEndpoint === 'end')
+      ? hoveredSelection[hoveredEndpoint]
+      : undefined;
   context.save();
   if (root.kind === 'element') {
     const rect = root.element.getBoundingClientRect();
@@ -80,7 +96,7 @@ export function drawDrawingFrame(args: {
     renderDrawingMarquee(context, draft.start, draft.current, projection);
   }
   context.restore();
-  if (showChrome && !draft && !args.bendOnly && args.hoverPoint) {
+  if (showChrome && !draft && !args.bendOnly && args.hoverPoint && !endpointPoint) {
     const hovered = hitTestDrawingDocument(objects, toDrawingScenePoint(args.hoverPoint, root));
     if (hovered && !selectedIds.includes(hovered.id)) {
       context.save();
@@ -114,13 +130,39 @@ export function drawDrawingFrame(args: {
       context.clip();
     }
     if (selected.length === 1) {
-      const hoverPoint =
-        args.hoverBend && args.hoverBend.object === selected[0]
-          ? args.hoverBend.target.point
-          : draft?.kind === 'bend'
-            ? (draft.object.bendPoints?.[draft.target.index] ?? draft.target.point)
+      const capturedBend = draft?.kind === 'bend' ? draft : null;
+      const inserted =
+        capturedBend &&
+        (capturedBend.object.bendPoints?.length ?? 0) >
+          (capturedBend.original.bendPoints?.length ?? 0);
+      const capturedIndex =
+        capturedBend && (!capturedBend.target.insert || inserted)
+          ? capturedBend.target.index
+          : null;
+      const hoverPoint = capturedBend
+        ? capturedIndex === null
+          ? capturedBend.target.point
+          : capturedBend.object.bendPoints?.[capturedIndex]
+        : (endpointPoint ??
+          (!draft && args.hoverBend && args.hoverBend.object === selected[0]
+            ? args.hoverBend.target.point
+            : undefined));
+      const activeHandle =
+        draft?.kind === 'resize'
+          ? draft.handle
+          : capturedBend
+            ? capturedIndex === null
+              ? 'bend:pending'
+              : `bend:${capturedIndex}`
             : undefined;
-      renderDrawingSelection(context, selected[0]!, projection, hoverPoint, args.bendOnly);
+      renderDrawingSelection(
+        context,
+        selected[0]!,
+        projection,
+        hoverPoint,
+        args.bendOnly,
+        activeHandle
+      );
     } else if (!args.bendOnly)
       renderDrawingMultiSelection(
         context,

@@ -81,9 +81,9 @@ export type TabVideoRequestByType = {
 
 export type TabVideoResponseByType = {
   [VideoMessageType.RECORDING_STATE_SYNC]: RuntimeMessageResponse<Record<string, never>>;
-  [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: RuntimeMessageResponse<
-    Record<string, never>
-  >;
+  [VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT]: RuntimeMessageResponse<{
+    capturePreparationId?: string;
+  }>;
   [VideoMessageType.ENABLE_CONTROLLED_CURSOR_CAPTURE]: ViewportCoordsResponse;
   [VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE]: RecordingTelemetryResponse;
   [VideoMessageType.PAUSE_CONTROLLED_CURSOR_CAPTURE]: RuntimeMessageResponse<Record<string, never>>;

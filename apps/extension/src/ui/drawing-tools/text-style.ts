@@ -1,5 +1,4 @@
 import type { CSSProperties } from 'react';
-import { DEFAULT_COLOR_INFO_STRONG } from '@sniptale/ui/default-colors/constants';
 import {
   DRAWING_TEXT_LINE_HEIGHT_FACTOR,
   type DrawingTextInkLayout,
@@ -15,7 +14,7 @@ export const DRAWING_TEXT_INPUT_PAINT_STYLE: CSSProperties = {
 
 export const DRAWING_TEXT_INPUT_SELECTION_CSS = `
 textarea[data-sniptale-drawing-input]::selection {
-  background: color-mix(in srgb, ${DEFAULT_COLOR_INFO_STRONG} 22%, transparent);
+  background: color-mix(in srgb, var(--sniptale-color-text-secondary) 22%, transparent);
   color: transparent;
   -webkit-text-fill-color: transparent;
 }

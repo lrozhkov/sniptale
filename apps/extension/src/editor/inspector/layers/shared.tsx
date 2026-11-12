@@ -37,7 +37,10 @@ export function getLayerRowClassName(
       'border-[color:var(--sniptale-color-border-strong)] ' +
         'bg-[color:var(--sniptale-color-surface-hover)] ' +
         'before:absolute before:inset-y-1.5 before:left-0 before:w-px ' +
-        'before:bg-[color:var(--sniptale-color-text-secondary)]',
+        'before:bg-[color:var(--sniptale-color-canvas-selection)]',
+    layer.containsSelection &&
+      !layer.selected &&
+      'border-dashed border-[color:var(--sniptale-color-border-strong)]',
     dragOverLayerId === layer.id &&
       'border-[color:var(--sniptale-color-border-accent-strong)] ' +
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-soft)_82%,transparent)]',

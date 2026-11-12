@@ -25,6 +25,7 @@ import {
   type DrawingArrowBendTarget,
 } from '../../features/drawing/public';
 import { readPageScroll, type PageScrollRoot } from '../platform/page-scroll';
+import { CANVAS_SELECTION_METRICS } from '../../ui/drawing-tools/selection-chrome';
 import { measureContentDrawingTextLayout } from './text-measurement';
 import { resizeDrawingBox } from './box-resize';
 import { constrainDrawingSimplifyResize } from './simplify-object';
@@ -94,8 +95,8 @@ type DrawingPointerModifiers = {
 const STRICT_ANGLE_STEP = 15;
 const MAGNETIC_ANGLE_STEP = 45;
 const MAGNETIC_ANGLE_TOLERANCE = 5;
-const ROTATION_HANDLE_OFFSET = 18;
-const ROTATION_HANDLE_RADIUS = 9;
+const ROTATION_HANDLE_OFFSET = CANVAS_SELECTION_METRICS.rotationOffset;
+const ROTATION_HANDLE_RADIUS = 14;
 
 export function getDrawingViewportProjection(root: PageScrollRoot): Readonly<DrawingPoint> {
   const scroll = readPageScroll(root);
@@ -128,12 +129,22 @@ export function resolveDrawingResizeHandle(
   object: DrawingObject,
   point: DrawingPoint
 ): DrawingResizeHandle | null {
-  const near = (candidate: DrawingPoint) =>
-    Math.hypot(point.x - candidate.x, point.y - candidate.y) <= 9;
   if (object.kind === 'arrow') {
-    if (near(object.start)) return 'start';
-    if (near(object.end)) return 'end';
-    return null;
+    const ends = [
+      ['start', object.start],
+      ['end', object.end],
+    ] as const;
+    const nearest = [...ends].sort(
+      (a, b) =>
+        Math.hypot(point.x - a[1].x, point.y - a[1].y) -
+        Math.hypot(point.x - b[1].x, point.y - b[1].y)
+    )[0]!;
+    const endpointDistance = Math.hypot(point.x - nearest[1].x, point.y - nearest[1].y);
+    const bodyDistance = Math.hypot(
+      point.x - (object.start.x + object.end.x) / 2,
+      point.y - (object.start.y + object.end.y) / 2
+    );
+    return endpointDistance <= 11 && endpointDistance <= bodyDistance ? nearest[0] : null;
   }
   const bounds = getDrawingObjectBounds(object);
   const candidates: Array<[DrawingResizeHandle, DrawingPoint]> =
@@ -152,10 +163,17 @@ export function resolveDrawingResizeHandle(
           ['sw', { x: bounds.x, y: bounds.y + bounds.height }],
           ['w', { x: bounds.x, y: bounds.y + bounds.height / 2 }],
         ];
-  return (
-    candidates.find(([, candidate]) => near(transformDrawingObjectPoint(object, candidate)))?.[0] ??
-    null
-  );
+  const nearest = candidates
+    .map(([handle, candidate]) => {
+      const world = transformDrawingObjectPoint(object, candidate);
+      return { handle, distance: Math.hypot(point.x - world.x, point.y - world.y) };
+    })
+    .sort((a, b) => a.distance - b.distance)[0];
+  const center = transformDrawingObjectPoint(object, getDrawingBoundsCenter(bounds));
+  const bodyDistance = Math.hypot(point.x - center.x, point.y - center.y);
+  return nearest && nearest.distance <= 11 && nearest.distance <= bodyDistance
+    ? nearest.handle
+    : null;
 }
 
 const ROTATION_CORNERS: ReadonlyArray<
@@ -168,16 +186,13 @@ export function getDrawingRotationHandlePoint(
 ): DrawingPoint | null {
   if (object.kind === 'arrow') return null;
   const bounds = getDrawingObjectBounds(object);
-  const center = getDrawingBoundsCenter(bounds);
   const cornerFactory = ROTATION_CORNERS.find(([candidate]) => candidate === handle)?.[1];
   if (!cornerFactory) return null;
-  const corner = transformDrawingObjectPoint(object, cornerFactory(bounds));
-  const distance = Math.hypot(corner.x - center.x, corner.y - center.y);
-  if (distance < 0.001) return corner;
-  return {
-    x: corner.x + ((corner.x - center.x) / distance) * ROTATION_HANDLE_OFFSET,
-    y: corner.y + ((corner.y - center.y) / distance) * ROTATION_HANDLE_OFFSET,
-  };
+  const corner = cornerFactory(bounds);
+  return transformDrawingObjectPoint(object, {
+    x: corner.x + ROTATION_HANDLE_OFFSET,
+    y: corner.y - ROTATION_HANDLE_OFFSET,
+  });
 }
 
 export function resolveDrawingRotationHandle(
@@ -212,12 +227,9 @@ export function rotateDrawingObject(
 }
 
 export function getDrawingMultiRotationHandlePoint(bounds: DrawingBounds): DrawingPoint {
-  const center = getDrawingBoundsCenter(bounds);
-  const corner = { x: bounds.x + bounds.width, y: bounds.y };
-  const distance = Math.max(0.001, Math.hypot(corner.x - center.x, corner.y - center.y));
   return {
-    x: corner.x + ((corner.x - center.x) / distance) * ROTATION_HANDLE_OFFSET,
-    y: corner.y + ((corner.y - center.y) / distance) * ROTATION_HANDLE_OFFSET,
+    x: bounds.x + bounds.width + ROTATION_HANDLE_OFFSET,
+    y: bounds.y - ROTATION_HANDLE_OFFSET,
   };
 }
 
@@ -569,11 +581,13 @@ function beginSelectionPointer(
 
 export function beginDrawingPointer(args: {
   modifiers?: DrawingPointerModifiers;
+  controlsEnabled?: boolean;
   point: DrawingPoint;
   snapshot: DrawingSessionSnapshot;
   timestamp: number;
 }): DrawingPointerStart {
   const { point, snapshot, timestamp } = args;
+  const controlsEnabled = args.controlsEnabled ?? true;
   const modifiers = args.modifiers ?? { ctrlKey: false, shiftKey: false };
   const selectedObjects = snapshot.document.objects.filter((object) =>
     snapshot.selectedObjectIds.includes(object.id)
@@ -581,7 +595,7 @@ export function beginDrawingPointer(args: {
   const selected = selectedObjects.length === 1 ? selectedObjects[0] : null;
   const selectionBounds =
     selectedObjects.length > 1 ? getDrawingSelectionBounds(selectedObjects) : null;
-  if (selectionBounds && isDrawingMultiRotationHandle(selectionBounds, point)) {
+  if (controlsEnabled && selectionBounds && isDrawingMultiRotationHandle(selectionBounds, point)) {
     return {
       draft: {
         kind: 'rotate-selection',
@@ -594,7 +608,8 @@ export function beginDrawingPointer(args: {
     };
   }
   const hit = hitTestDrawingDocument(snapshot.document.objects, point);
-  const rotationHandle = selected ? resolveDrawingRotationHandle(selected, point) : null;
+  const rotationHandle =
+    controlsEnabled && selected ? resolveDrawingRotationHandle(selected, point) : null;
   if (selected && rotationHandle) {
     return {
       draft: {
@@ -606,14 +621,18 @@ export function beginDrawingPointer(args: {
       },
     };
   }
-  const handle = selected ? resolveDrawingResizeHandle(selected, point) : null;
+  const handle = controlsEnabled && selected ? resolveDrawingResizeHandle(selected, point) : null;
   if (selected && handle) {
     return {
       draft: { kind: 'resize', start: point, original: selected, object: selected, handle },
     };
   }
   const bend =
-    selected?.kind === 'arrow' && !modifiers.altKey && !modifiers.ctrlKey && !modifiers.shiftKey
+    controlsEnabled &&
+    selected?.kind === 'arrow' &&
+    !modifiers.altKey &&
+    !modifiers.ctrlKey &&
+    !modifiers.shiftKey
       ? resolveDrawingArrowBendTarget(selected, point)
       : null;
   if (selected?.kind === 'arrow' && bend) {

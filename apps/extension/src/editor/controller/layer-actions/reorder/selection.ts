@@ -2,8 +2,8 @@ import type { Canvas } from 'fabric';
 import {
   isBackgroundObject,
   isBrowserFrameObject,
-  isEditableObject,
   isFrameObject,
+  isEditableObject,
   isSourceObject,
 } from '../../../document/model';
 
@@ -15,10 +15,15 @@ export function moveLayerSelection(canvas: Canvas | null, direction: 1 | -1): bo
     return false;
   }
 
-  const objects = canvas.getObjects().filter((object) => !isBrowserFrameObject(object));
-  const hasBrowserWindow = canvas.getObjects().some(isBrowserFrameObject);
   const activeObjects = canvas.getActiveObjects().filter(isEditableObject);
-  if (activeObjects.length === 0 || hasLockedObject(activeObjects, hasBrowserWindow)) {
+  const collection = activeObjects[0]?.parent ?? canvas;
+  const objects = collection.getObjects().filter((object) => !isBrowserFrameObject(object));
+  const hasBrowserWindow = collection === canvas && canvas.getObjects().some(isBrowserFrameObject);
+  if (
+    activeObjects.length === 0 ||
+    activeObjects.some((object) => (object.parent ?? canvas) !== collection) ||
+    hasLockedObject(activeObjects, hasBrowserWindow)
+  ) {
     return false;
   }
 
@@ -36,7 +41,8 @@ export function moveLayerSelection(canvas: Canvas | null, direction: 1 | -1): bo
     moveSelectionBackward(nextOrder, selectedIds, hasBrowserWindow);
   }
 
-  applyLayerOrder(canvas, nextOrder);
+  if (collection === canvas) applyLayerOrder(canvas, nextOrder);
+  else nextOrder.forEach((object, index) => collection.moveObjectTo(object, index));
   return true;
 }
 
@@ -45,12 +51,17 @@ export function moveLayerSelectionToEdge(canvas: Canvas | null, edge: 'front' | 
     return false;
   }
 
-  const objects = canvas.getObjects().filter((object) => !isBrowserFrameObject(object));
-  const hasBrowserWindow = canvas.getObjects().some(isBrowserFrameObject);
-  const activeObjects = getEditableLayerSelection(canvas);
+  const selection = canvas.getActiveObjects().filter(isEditableObject);
+  const collection = selection[0]?.parent ?? canvas;
+  const objects = collection.getObjects().filter((object) => !isBrowserFrameObject(object));
+  const hasBrowserWindow = collection === canvas && canvas.getObjects().some(isBrowserFrameObject);
+  const activeObjects = selection
+    .slice()
+    .sort((left, right) => objects.indexOf(left) - objects.indexOf(right));
   if (
     activeObjects.length === 0 ||
     activeObjects.length === objects.length ||
+    activeObjects.some((object) => (object.parent ?? canvas) !== collection) ||
     hasLockedObject(activeObjects, hasBrowserWindow)
   ) {
     return false;
@@ -71,24 +82,21 @@ export function moveLayerSelectionToEdge(canvas: Canvas | null, edge: 'front' | 
           ...remainingObjects.filter((object) => !baseObjects.includes(object)),
         ];
 
-  applyLayerOrder(canvas, nextOrder);
+  if (collection === canvas) applyLayerOrder(canvas, nextOrder);
+  else nextOrder.forEach((object, index) => collection.moveObjectTo(object, index));
   return true;
 }
 
-function getEditableLayerSelection(canvas: Canvas) {
-  const objects = canvas.getObjects();
-
-  return canvas
-    .getActiveObjects()
-    .filter(isEditableObject)
-    .slice()
-    .sort((left, right) => objects.indexOf(left) - objects.indexOf(right));
-}
-
 function hasLockedObject(objects: LayerReorderObjects, hasBrowserWindow: boolean) {
-  return objects.some(
-    (object) => object.sniptaleLocked && !(hasBrowserWindow && isSourceObject(object))
-  );
+  return objects.some((object) => {
+    if (object.sniptaleLocked && !(hasBrowserWindow && isSourceObject(object))) return true;
+    let parent = object.parent;
+    while (parent) {
+      if (parent.sniptaleLocked || parent.visible === false) return true;
+      parent = parent.parent;
+    }
+    return false;
+  });
 }
 
 function createSelectedLayerIds(objects: LayerReorderObjects): Set<string> {

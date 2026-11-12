@@ -1,7 +1,21 @@
 import { Control, controlsUtils, type FabricObject } from 'fabric';
+import { DEFAULT_COLOR_CANVAS_SELECTION } from '@sniptale/ui/default-colors/constants';
+import {
+  renderCanvasSelectionHandle,
+  renderCanvasRotationHandle,
+} from '../../../../ui/drawing-tools/selection-chrome';
 
-export const DRAWING_SELECTION_ACCENT = '#2563eb';
+export const DRAWING_SELECTION_ACCENT = DEFAULT_COLOR_CANVAS_SELECTION;
 const DRAWING_SELECTION_SURFACE = '#ffffff';
+
+/** Capture identity is stable even when Fabric updates its hover control. */
+export function isDrawingControlCaptured(
+  object: Pick<FabricObject, 'canvas'>,
+  key: string | undefined
+): boolean {
+  const transform = object.canvas?._currentTransform;
+  return Boolean(key && transform?.target === object && transform.corner === key);
+}
 
 export function applyDrawingSelectionChrome(
   object: FabricObject,
@@ -9,7 +23,7 @@ export function applyDrawingSelectionChrome(
 ): void {
   object.set({
     borderColor: DRAWING_SELECTION_ACCENT,
-    borderDashArray: [4, 3],
+    borderDashArray: null,
     cornerColor: DRAWING_SELECTION_SURFACE,
     cornerStrokeColor: DRAWING_SELECTION_ACCENT,
     hasBorders: true,
@@ -20,21 +34,21 @@ export function applyDrawingSelectionChrome(
 }
 
 export function renderDrawingBoxHandle(
+  this: Control,
   ctx: CanvasRenderingContext2D,
   left: number,
   top: number,
   _styleOverride: unknown,
   object: FabricObject
 ): void {
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(left, top, 4, 0, Math.PI * 2);
-  ctx.fillStyle = object.cornerColor || DRAWING_SELECTION_SURFACE;
-  ctx.strokeStyle = object.cornerStrokeColor || object.borderColor || DRAWING_SELECTION_ACCENT;
-  ctx.lineWidth = 1.6;
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  const kind = this.x === 0 ? 'horizontal' : this.y === 0 ? 'vertical' : 'corner';
+  renderCanvasSelectionHandle(ctx, left, top, kind, {
+    color: object.cornerStrokeColor || DRAWING_SELECTION_ACCENT,
+    active: isDrawingControlCaptured(
+      object,
+      Object.keys(object.controls).find((key) => object.controls[key] === this)
+    ),
+  });
 }
 
 function renderDrawingRotationHandle(
@@ -44,30 +58,7 @@ function renderDrawingRotationHandle(
   _styleOverride: unknown,
   object: FabricObject
 ): void {
-  const stroke = object.cornerStrokeColor || object.borderColor || DRAWING_SELECTION_ACCENT;
-  ctx.save();
-  ctx.translate(left, top);
-  ctx.scale(0.65, 0.65);
-  ctx.translate(-12, -12);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = stroke;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.arc(12, 12, 9, Math.PI, Math.PI * 1.75);
-  ctx.lineTo(21, 8);
-  ctx.moveTo(21, 3);
-  ctx.lineTo(21, 8);
-  ctx.lineTo(16, 8);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(12, 12, 9, 0, Math.PI * 0.75);
-  ctx.lineTo(3, 16);
-  ctx.moveTo(8, 16);
-  ctx.lineTo(3, 16);
-  ctx.lineTo(3, 21);
-  ctx.stroke();
-  ctx.restore();
+  renderCanvasRotationHandle(ctx, left, top, object.cornerStrokeColor || DRAWING_SELECTION_ACCENT);
 }
 
 function rotateWithDrawingModifiers(
@@ -105,8 +96,8 @@ export function createDrawingRotationControl(): Control {
     offsetX: 20,
     offsetY: -20,
     render: renderDrawingRotationHandle as Control['render'],
-    sizeX: 22,
-    sizeY: 22,
+    sizeX: 28,
+    sizeY: 28,
     withConnection: false,
     x: 0.5,
     y: -0.5,

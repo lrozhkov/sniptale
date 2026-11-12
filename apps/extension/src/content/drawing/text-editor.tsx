@@ -22,6 +22,14 @@ import {
   type DrawingTextVisualStyle,
 } from './text-content';
 
+const SUPPRESSED_DRAWING_TEXT_SELECTION_CSS = `
+textarea[data-sniptale-drawing-input]::selection {
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+`;
+
 export type DrawingTextDraft = {
   autoWidth?: boolean;
   fittedWidth?: number | undefined;
@@ -157,6 +165,7 @@ export function useDrawingTextEditor(controller: ContentDrawingController) {
 }
 
 type DrawingTextEditorProps = {
+  serviceUiSuppressed?: boolean;
   draft: DrawingTextDraft;
   layoutRevision?: number;
   projection: DrawingPoint;
@@ -293,7 +302,11 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
         zIndex: 'var(--sniptale-drawing-editor-layer, 2)',
       }}
     >
-      <style>{DRAWING_TEXT_INPUT_SELECTION_CSS}</style>
+      <style>
+        {props.serviceUiSuppressed
+          ? SUPPRESSED_DRAWING_TEXT_SELECTION_CSS
+          : DRAWING_TEXT_INPUT_SELECTION_CSS}
+      </style>
       <DrawingTextBackgrounds
         color={props.style.backgroundColor}
         rects={layout.backgrounds}
@@ -339,7 +352,7 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
           ...DRAWING_TEXT_INPUT_PAINT_STYLE,
           background: 'transparent',
           border: 0,
-          caretColor: DEFAULT_COLOR_INFO_STRONG,
+          caretColor: props.serviceUiSuppressed ? 'transparent' : DEFAULT_COLOR_INFO_STRONG,
           outline: 'none',
           overflow: 'hidden',
           resize: 'none',

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   permissionRequest: vi.fn(),
   permissionRelease: vi.fn(),
   disposeDrawing: vi.fn(),
+  finalizeDrawing: vi.fn(),
   drawingClear: vi.fn(),
   getAutoHideDelay: vi.fn(() => 0),
   loggerWarn: vi.fn(),
@@ -53,7 +54,10 @@ vi.mock('../transport/client', async (importOriginal) => ({
 vi.mock('../../toolbar/video-recording/drawing-session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../toolbar/video-recording/drawing-session')>()),
   createRecordingSurfaceDrawingOwner: () => ({
-    controller: { session: { clear: mocks.drawingClear } },
+    controller: {
+      session: { clear: mocks.drawingClear },
+      finalizeInteraction: mocks.finalizeDrawing,
+    },
     dispose: mocks.disposeDrawing,
     getAutoHideDelay: mocks.getAutoHideDelay,
     setAutoHideDelay: mocks.setAutoHideDelay,
@@ -74,6 +78,8 @@ vi.mock('./permission-frame', async (importOriginal) => ({
 }));
 
 import { useVideoRecordingSurfaceController } from './controller';
+import { prepareVideoRecordingCapture } from '../transport/snapshot-channel';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { RecordingPermissionFrameError } from './permission-frame';
 
 type Controller = ReturnType<typeof useVideoRecordingSurfaceController>;
@@ -138,6 +144,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount());
+  vi.unstubAllGlobals();
 });
 
 it.each(['camera', 'microphone'] as const)(
@@ -829,4 +836,106 @@ it('propagates a hide refusal without duplicating the shell error or interruptin
   expect(controller.state.error).toBeNull();
   expect(controller.state.cameraEnabled).toBe(true);
   expect(mocks.release).not.toHaveBeenCalled();
+});
+
+function captureRequest() {
+  return {
+    type: VideoMessageType.VIDEO_RECORDING_SURFACE_SNAPSHOT,
+    snapshot: { ...snapshot, recordingId: 'recording-1', status: VideoRecordingStatus.PAUSED },
+    surfaceToken: 'token-1',
+    capturePreparation: { requestId: 'paint-1', suppressed: true },
+  };
+}
+
+it('settles editing and confirms readiness after drawing suppression has painted', async () => {
+  const frames: FrameRequestCallback[] = [];
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.PAUSED });
+  expect(controller.drawingCaptureSuppressed).toBe(false);
+  let operation!: Promise<void>;
+  let acknowledged = false;
+  act(() => {
+    operation = prepareVideoRecordingCapture(captureRequest()).then(() => {
+      acknowledged = true;
+    });
+  });
+  expect(mocks.finalizeDrawing).toHaveBeenCalledOnce();
+  expect(controller.drawingCaptureSuppressed).toBe(true);
+  expect(acknowledged).toBe(false);
+  await act(async () => {
+    frames.shift()!(0);
+  });
+  expect(acknowledged).toBe(false);
+  await act(async () => {
+    frames.shift()!(16);
+    await operation;
+  });
+  expect(acknowledged).toBe(true);
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.RECORDING });
+  expect(controller.drawingCaptureSuppressed).toBe(true);
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.PAUSED });
+  expect(controller.drawingCaptureSuppressed).toBe(false);
+});
+
+it('restores paused controls after a refused resume preparation', async () => {
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callback(0);
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.PAUSED });
+  await act(async () => {
+    await prepareVideoRecordingCapture(captureRequest());
+  });
+  expect(controller.drawingCaptureSuppressed).toBe(true);
+  const request = captureRequest();
+  request.capturePreparation.suppressed = false;
+  await act(async () => {
+    await prepareVideoRecordingCapture(request);
+  });
+  expect(controller.drawingCaptureSuppressed).toBe(false);
+  expect(mocks.drawingClear).not.toHaveBeenCalled();
+});
+
+it('rejects capture preparation from a different document generation', async () => {
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.PAUSED });
+  const request = captureRequest();
+  request.snapshot.documentGeneration += 1;
+  await expect(prepareVideoRecordingCapture(request)).rejects.toThrow('identity changed');
+  expect(mocks.finalizeDrawing).not.toHaveBeenCalled();
+  expect(controller.drawingCaptureSuppressed).toBe(false);
+});
+
+it('rejects pending readiness when the surface controller disposes', async () => {
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.PAUSED });
+  let operation!: Promise<void>;
+  act(() => {
+    operation = prepareVideoRecordingCapture(captureRequest());
+  });
+  const failure = expect(operation).rejects.toThrow('disposed during preparation');
+  act(() => root.unmount());
+  await failure;
+});
+
+it('preserves accepted drawings across failed or cancelled start, then clears completed recordings', () => {
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.PREPARING });
+  emitSurfaceSnapshot({ recordingId: null, status: VideoRecordingStatus.IDLE });
+  expect(mocks.drawingClear).not.toHaveBeenCalled();
+  emitSurfaceSnapshot({ recordingId: 'recording-1', status: VideoRecordingStatus.RECORDING });
+  emitSurfaceSnapshot({
+    recordingId: 'recording-1',
+    status: VideoRecordingStatus.IDLE,
+    errorCode: 'internal-error',
+  });
+  emitSurfaceSnapshot({ recordingId: null, status: VideoRecordingStatus.IDLE });
+  expect(mocks.drawingClear).not.toHaveBeenCalled();
+  emitSurfaceSnapshot({ recordingId: 'recording-2', status: VideoRecordingStatus.RECORDING });
+  emitSurfaceSnapshot({ recordingId: null, status: VideoRecordingStatus.IDLE });
+  expect(mocks.drawingClear).toHaveBeenCalledOnce();
 });

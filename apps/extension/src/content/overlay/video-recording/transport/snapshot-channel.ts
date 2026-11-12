@@ -1,6 +1,9 @@
 // policyStateId: video-recording-surface-lease
 // Caches the latest authorized surface projection for late React subscribers.
-import type { VideoRecordingSurfaceSnapshot } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import type {
+  VideoRecordingSurfaceSnapshotMessage,
+  VideoRecordingSurfaceSnapshot,
+} from '@sniptale/runtime-contracts/video/types/messages.surface';
 import type { VideoRecordingRuntimeState } from '@sniptale/runtime-contracts/video/types/types';
 
 type SurfaceSnapshotListener = (
@@ -48,4 +51,25 @@ export function subscribeToVideoRecordingSurfaceSnapshots(
 
 export function clearVideoRecordingSurfaceSnapshot(): void {
   latestMessage = null;
+}
+
+type CapturePreparationListener = (message: VideoRecordingSurfaceSnapshotMessage) => Promise<void>;
+const capturePreparationListeners = new Set<CapturePreparationListener>();
+
+/** Admission must wait for a mounted surface, including its paint boundary. */
+export async function prepareVideoRecordingCapture(
+  message: VideoRecordingSurfaceSnapshotMessage
+): Promise<void> {
+  if (capturePreparationListeners.size !== 1)
+    throw new Error('Recording drawing surface is unavailable');
+  await Promise.all([...capturePreparationListeners].map((listener) => listener(message)));
+}
+
+export function subscribeToVideoRecordingCapturePreparation(
+  listener: CapturePreparationListener
+): () => void {
+  capturePreparationListeners.add(listener);
+  return () => {
+    capturePreparationListeners.delete(listener);
+  };
 }

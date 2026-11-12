@@ -142,6 +142,18 @@ interface EditorDocumentVersion2 {
 
 export type EditorDocument = EditorDocumentVersion2;
 
+export interface EditorLayerChild {
+  id: string;
+  name: string;
+  type: EditorObjectType;
+  typeLabel: string;
+  selected?: boolean;
+  locked?: boolean;
+  visible?: boolean;
+  containsSelection?: boolean;
+  groupChildren?: EditorLayerChild[];
+}
+
 export interface EditorLayerItem {
   effectCount: number;
   effects: EditorRasterEffect[];
@@ -159,7 +171,8 @@ export interface EditorLayerItem {
   selectedCount: number;
   typeLabel: string;
   groupSize?: number;
-  groupChildren?: Array<{ id: string; name: string; type: EditorObjectType; typeLabel: string }>;
+  containsSelection?: boolean;
+  groupChildren?: EditorLayerChild[];
   visible: boolean;
 }
 

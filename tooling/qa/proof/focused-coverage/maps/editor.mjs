@@ -1302,6 +1302,8 @@ action-feedback-click-fields.test.tsx',
     reason:
       'Shared drawing geometry, creation, updates, selection, and sessions are covered by focused model suites.',
     testFiles: [
+      'apps/extension/src/features/drawing/alignment.test.ts',
+      'apps/extension/src/features/drawing/alignment-relations.test.ts',
       'apps/extension/src/features/drawing/arrow.test.ts',
       'apps/extension/src/features/drawing/create-update.test.ts',
       'apps/extension/src/features/drawing/geometry.test.ts',

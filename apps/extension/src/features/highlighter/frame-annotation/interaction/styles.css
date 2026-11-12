@@ -1,14 +1,5 @@
 .sniptale-resize-handle {
   touch-action: none;
-  transition:
-    border-color 120ms ease,
-    background-color 120ms ease,
-    box-shadow 120ms ease;
-}
-
-.sniptale-resize-handle:hover {
-  border-color: var(--sniptale-color-accent) !important;
-  background: #ffffff !important;
 }
 
 .sniptale-callout-drag-handle,

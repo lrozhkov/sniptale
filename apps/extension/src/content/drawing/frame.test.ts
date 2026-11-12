@@ -85,6 +85,7 @@ it('drops a hover marker after its immutable arrow version changes', () => {
     arrow,
     expect.anything(),
     target.point,
+    undefined,
     undefined
   );
   const next = { ...arrow, design: 'standard' as const };
@@ -93,6 +94,7 @@ it('drops a hover marker after its immutable arrow version changes', () => {
     expect.anything(),
     next,
     expect.anything(),
+    undefined,
     undefined,
     undefined
   );
@@ -491,3 +493,84 @@ it('projects and clips a hover outline to its scrolled element root', () => {
   expect(renderDrawingHoverOutline).toHaveBeenCalledWith(context, untouched, { x: 80, y: 70 });
   expect(context.rect).toHaveBeenCalledWith(20, 30, 300, 200);
 });
+
+it.each([false, true])(
+  'keeps captured inserted bend identity ahead of stale hover; inserted=%s',
+  (inserted) => {
+    const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+      id: 'captured',
+      kind: 'arrow',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      bendPoints: [
+        { x: 80, y: 80 },
+        { x: 180, y: 80 },
+      ],
+      color: '#f00',
+      width: 2,
+      dynamicWidth: false,
+    };
+    const target = { index: 1, insert: true, point: { x: 130, y: 100 } };
+    const captured = { x: 130, y: 180 };
+    const object = inserted
+      ? { ...arrow, bendPoints: [arrow.bendPoints![0]!, captured, arrow.bendPoints![1]!] }
+      : arrow;
+    vi.mocked(renderDrawingSelection).mockClear();
+    drawDrawingFrame({
+      canvas: document.createElement('canvas'),
+      objects: [arrow],
+      selectedIds: [arrow.id],
+      draft: { kind: 'bend', original: arrow, object, target, start: target.point },
+      root: { kind: 'viewport', element: null },
+      showChrome: true,
+      renderObjects: false,
+      hoverBend: {
+        object: arrow,
+        target: { point: arrow.bendPoints![1]!, index: 1, insert: false },
+      },
+    });
+    expect(renderDrawingSelection).toHaveBeenLastCalledWith(
+      expect.anything(),
+      object,
+      expect.anything(),
+      inserted ? captured : target.point,
+      undefined,
+      inserted ? 'bend:1' : 'bend:pending'
+    );
+  }
+);
+
+it.each(['start', 'end'] as const)(
+  'resolves ready standard-arrow %s hover from the actual pointer point',
+  (handle) => {
+    const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+      id: 'endpoint-hover',
+      kind: 'arrow',
+      design: 'standard',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      color: '#f00',
+      width: 2,
+      dynamicWidth: false,
+    };
+    drawDrawingFrame({
+      canvas: document.createElement('canvas'),
+      objects: [arrow],
+      selectedIds: [arrow.id],
+      draft: null,
+      root: { kind: 'viewport', element: null },
+      showChrome: true,
+      renderObjects: false,
+      hoverPoint: { clientX: arrow[handle].x + 2, clientY: arrow[handle].y + 2 },
+    });
+    expect(renderDrawingSelection).toHaveBeenLastCalledWith(
+      expect.anything(),
+      arrow,
+      expect.anything(),
+      arrow[handle],
+      undefined,
+      undefined
+    );
+  }
+);

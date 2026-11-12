@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { Rect } from 'fabric';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -30,6 +32,7 @@ vi.mock('../draw-session-completion', async (importOriginal) => ({
   completeDrawSessionOnEnterFromBindings: mocks.completeDrawSessionOnEnterFromBindings,
 }));
 
+import { cancelEditorTransientInteraction } from '../../input/canvas-actions/transient';
 import { createRuntimeWindowBlurHandler } from './blur';
 import { createRuntimeDoubleClickHandler } from './double-click';
 import { createRuntimeWindowKeyDownHandler, createRuntimeWindowKeyUpHandler } from './keyboard';
@@ -147,4 +150,74 @@ it('keeps keyup and blur cleanup owned by window adapters', () => {
   expect(bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
   expect(bindings.cancelTransientInteraction).toHaveBeenCalledWith('window-blur');
   expect(bindings.finalizeSelectionNudge).toHaveBeenCalledOnce();
+});
+
+it('retains the accepted editor selection after a blurred native transform is restored', () => {
+  const canvas = new EditorCanvas(document.createElement('canvas'), { width: 800, height: 600 });
+  const object = new Rect({ left: 100, top: 100, width: 80, height: 60 });
+  canvas.add(object);
+  canvas.setActiveObject(object);
+  const point = object.getCenterPoint();
+  canvas.__onMouseDown(new MouseEvent('mousedown', { clientX: point.x, clientY: point.y }));
+  canvas.__onMouseMove(
+    new MouseEvent('mousemove', { clientX: point.x + 20, clientY: point.y + 10, buttons: 1 })
+  );
+  const bindings = { ...createBindings(), getCanvas: () => canvas };
+  mocks.handleEditorWindowBlur.mockImplementationOnce(
+    (options: {
+      endCurrentTransform?: () => void;
+      cancelTransientInteraction?: () => boolean;
+      finalizeSelectionNudge?: () => void;
+    }) => {
+      options.endCurrentTransform?.();
+      options.cancelTransientInteraction?.();
+      options.finalizeSelectionNudge?.();
+    }
+  );
+  createRuntimeWindowBlurHandler(bindings)();
+  expect(object.getCenterPoint().distanceFrom(point)).toBeLessThan(0.001);
+  expect(canvas.getActiveObject()).toBe(object);
+  expect(canvas._currentTransform).toBeNull();
+  expect(bindings.cancelTransientInteraction).not.toHaveBeenCalled();
+  expect(bindings.syncRuntimeState).toHaveBeenCalledOnce();
+  void canvas.dispose();
+});
+
+it('restores the previous marquee selection once through the window blur owner', () => {
+  const canvas = new EditorCanvas(document.createElement('canvas'), { width: 800, height: 600 });
+  const object = new Rect({ left: 100, top: 100, width: 80, height: 60 });
+  canvas.add(object);
+  canvas.setActiveObject(object);
+  canvas.__onMouseDown(new MouseEvent('mousedown', { clientX: 30, clientY: 30 }));
+  canvas.__onMouseMove(new MouseEvent('mousemove', { clientX: 300, clientY: 250, buttons: 1 }));
+  const bindings = { ...createBindings(), getCanvas: () => canvas };
+  bindings.cancelTransientInteraction.mockImplementation(
+    () =>
+      cancelEditorTransientInteraction({
+        canvas,
+        drawSession: null,
+        cropGuide: null,
+        activeTool: 'select',
+        preserveActiveTool: true,
+        clearCropSelection: vi.fn(),
+        switchToSelectTool: vi.fn(),
+        syncRuntimeState: bindings.syncRuntimeState,
+      }).changed
+  );
+  mocks.handleEditorWindowBlur.mockImplementationOnce(
+    (options: {
+      endCurrentTransform?: () => void;
+      cancelTransientInteraction?: () => boolean;
+      finalizeSelectionNudge?: () => void;
+    }) => {
+      options.endCurrentTransform?.();
+      options.cancelTransientInteraction?.();
+      options.finalizeSelectionNudge?.();
+    }
+  );
+  createRuntimeWindowBlurHandler(bindings)();
+  expect(canvas.getActiveObject()).toBe(object);
+  expect(canvas.getSelectionPreviewObjects()).toEqual([]);
+  expect(bindings.cancelTransientInteraction).toHaveBeenCalledOnce();
+  void canvas.dispose();
 });

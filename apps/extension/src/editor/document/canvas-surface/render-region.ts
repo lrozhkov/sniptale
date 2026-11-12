@@ -1,5 +1,22 @@
-import { Canvas, type FabricObject, type TPointerEvent } from 'fabric';
-import { isBackgroundObject, isEditableObject, isUserObject } from '../model/index';
+import {
+  ActiveSelection,
+  Canvas,
+  Group,
+  Line,
+  Path,
+  Polyline,
+  Textbox,
+  util,
+  type FabricObject,
+  type TPointerEvent,
+  type Transform,
+} from 'fabric';
+import {
+  CUSTOM_JSON_PROPS,
+  isBackgroundObject,
+  isEditableObject,
+  isUserObject,
+} from '../model/index';
 import {
   createEditorWorkspaceInsets,
   getEditorWorkspaceSurfaceSize,
@@ -27,6 +44,169 @@ const RENDER_OVERSCAN_PX = 2;
 
 /** The backing canvas covers the scrollable workspace; interactive frames paint only its visible part. */
 export class EditorCanvas extends Canvas {
+  private marqueeSelection: { objects: FabricObject[]; scope: Group | null } | null = null;
+  private marqueeCancelled = false;
+  private transformDraft: { transform: Transform; restore: () => void } | null = null;
+
+  constructor(...args: ConstructorParameters<typeof Canvas>) {
+    super(...args);
+    this.on('mouse:down:before', ({ e, target }) => {
+      this.marqueeCancelled = false;
+      this.marqueeSelection =
+        this.selection &&
+        !this.skipTargetFind &&
+        !this.isDrawingMode &&
+        (!('button' in e) || e.button === 0) &&
+        (!target || !target.selectable)
+          ? { objects: this.getActiveObjects().slice(), scope: this.getSelectionGroupScope() }
+          : null;
+    });
+    this.on('mouse:up', () => {
+      this.marqueeSelection = null;
+      this.transformDraft = null;
+    });
+    this.on('before:transform', ({ transform }) => this.captureTransformDraft(transform));
+  }
+
+  private captureTransformDraft(transform: Transform): void {
+    const objects = new Set<FabricObject>();
+    const restore: Array<() => void> = [];
+    const capture = (object: FabricObject) => {
+      if (objects.has(object)) return;
+      objects.add(object);
+      const geometry = {
+        ...util.saveObjectTransform(object),
+        originX: object.originX,
+        originY: object.originY,
+        width: object.width,
+        height: object.height,
+        strokeWidth: object.strokeWidth,
+      };
+      const custom = CUSTOM_JSON_PROPS.map((key) => {
+        const value: unknown = object.get(key);
+        return { key, value: structuredClone(value) };
+      });
+      const richShape = structuredClone(object.sniptaleRichShape);
+      const path =
+        object instanceof Path
+          ? { path: structuredClone(object.path), pathOffset: object.pathOffset.clone() }
+          : null;
+      const points = object instanceof Polyline ? structuredClone(object.points) : null;
+      const line =
+        object instanceof Line
+          ? { x1: object.x1, y1: object.y1, x2: object.x2, y2: object.y2 }
+          : null;
+      const restoreCustom = () => {
+        for (const { key, value } of custom) {
+          if (value === undefined) Reflect.deleteProperty(object, key);
+          else object.set(key, value);
+        }
+      };
+      restore.push(() => {
+        restoreCustom();
+        if (richShape === undefined) delete object.sniptaleRichShape;
+        else object.sniptaleRichShape = richShape;
+        object.set(geometry);
+        if (object instanceof Path && path) object.set(path);
+        if (object instanceof Polyline && points) object.set({ points });
+        if (object instanceof Line && line) object.set(line);
+        if (object instanceof Textbox) {
+          // The text adapter detects a width change before it reads the accepted wrapping mode.
+          object.initDimensions();
+          restoreCustom();
+          object.initDimensions();
+          object.set({ width: geometry.width, height: geometry.height });
+          restoreCustom();
+        }
+        object.dirty = true;
+      });
+      if (object instanceof Group) object.getObjects().forEach(capture);
+    };
+    const selected =
+      transform.target instanceof ActiveSelection
+        ? transform.target.getObjects()
+        : [transform.target];
+    for (const member of selected) {
+      let root: FabricObject = member;
+      while (root.parent) root = root.parent;
+      capture(root);
+    }
+    capture(transform.target);
+    this.transformDraft = {
+      transform,
+      restore: () => {
+        restore.forEach((apply) => apply());
+        objects.forEach((object) => object.setCoords());
+      },
+    };
+  }
+
+  /** Restores an interrupted native transform without publishing a document modification. */
+  cancelCurrentTransform(): boolean {
+    const transform = this._currentTransform;
+    if (!transform) return false;
+    if (this.transformDraft?.transform === transform) this.transformDraft.restore();
+    else {
+      const { left, top, scaleX, scaleY, skewX, skewY, angle, flipX, flipY } = transform.original;
+      transform.target.set({
+        left,
+        top,
+        scaleX,
+        scaleY,
+        skewX,
+        skewY,
+        angle,
+        flipX,
+        flipY,
+        width: transform.width,
+        height: transform.height,
+      });
+      transform.target.setCoords();
+    }
+    transform.actionPerformed = false;
+    transform.target.isMoving = false;
+    transform.target._scaling = false;
+    this._currentTransform = null;
+    this.transformDraft = null;
+    delete this._objectsToRender;
+    this.setCursor(this.defaultCursor);
+    this.requestRenderAll();
+    return true;
+  }
+
+  /** Restores the accepted selection before leaving a group or cancelling another operation. */
+  cancelSelectionMarquee(): boolean {
+    if (!this._groupSelector) return false;
+    const previous = this.marqueeSelection;
+    this._groupSelector = null;
+    this.marqueeSelection = null;
+    this.marqueeCancelled = true;
+    this.clearContext(this.contextTop);
+    this.discardActiveObject();
+    if (previous) {
+      this.selectionGroupScope = previous.scope;
+      const siblings = this.getSelectionScopeObjects();
+      const objects = previous.objects.filter((object) => siblings.includes(object));
+      if (objects.length === 1) this.setActiveObject(objects[0]!);
+      else if (objects.length > 1)
+        this.setActiveObject(new ActiveSelection(objects, { canvas: this }));
+    }
+    this.requestRenderAll();
+    return true;
+  }
+
+  /** Prevents modifier completion from reapplying an already cancelled marquee. */
+  isSelectionMarqueeCancelled(): boolean {
+    return this.marqueeCancelled;
+  }
+
+  override dispose(): ReturnType<Canvas['dispose']> {
+    this.marqueeSelection = null;
+    this.transformDraft = null;
+    this.selectionGroupScope = null;
+    return super.dispose();
+  }
+
   private renderViewport: HTMLElement | null = null;
   private virtualStage: HTMLElement | null = null;
   private documentSize: DocumentSize | null = null;
@@ -43,6 +223,80 @@ export class EditorCanvas extends Canvas {
   private layerSelectionPriority: FabricObject | null = null;
   private tracksLayerSelectionPriority = false;
 
+  private selectionGroupScope: Group | null = null;
+  private tracksSelectionGroupScope = false;
+
+  /** Returns the entered group while it belongs to the live, editable document. */
+  getSelectionGroupScope(): Group | null {
+    const scope = this.selectionGroupScope;
+    if (!scope) return null;
+    let current: FabricObject = scope;
+    while (true) {
+      if (!current.visible || current.sniptaleLocked) {
+        this.selectionGroupScope = null;
+        return null;
+      }
+      const parent = current.parent;
+      if (!parent) break;
+      if (!parent.getObjects().includes(current)) {
+        this.selectionGroupScope = null;
+        return null;
+      }
+      current = parent;
+    }
+    if (!this.getObjects().includes(current)) this.selectionGroupScope = null;
+    // Native groups refresh child hit coordinates only when subTargetCheck is persisted.
+    this.selectionGroupScope?.getObjects().forEach((object) => object.setCoords());
+    return this.selectionGroupScope;
+  }
+
+  /** Enters one sibling collection without changing serialized group interaction flags. */
+  enterSelectionGroup(group: Group, event?: TPointerEvent): boolean {
+    if (group.sniptaleType !== 'group') return false;
+    const previous = this.selectionGroupScope;
+    this.selectionGroupScope = group;
+    if (!this.getSelectionGroupScope()) {
+      this.selectionGroupScope = previous;
+      return false;
+    }
+    if (!this.tracksSelectionGroupScope) {
+      const followSelection = () => {
+        const members = this.getActiveObjects();
+        const parent = members[0]?.parent ?? null;
+        if (members.length && members.every((object) => (object.parent ?? null) === parent)) {
+          this.selectionGroupScope = parent;
+        }
+      };
+      this.on('selection:created', followSelection);
+      this.on('selection:updated', followSelection);
+      this.tracksSelectionGroupScope = true;
+    }
+    this.discardActiveObject();
+    if (event) {
+      const hit = this.searchPossibleTargets(group.getObjects(), this.getScenePoint(event)).target;
+      if (hit && hit.visible && hit.selectable && !hit.sniptaleLocked)
+        this.setActiveObject(hit, event);
+    }
+    this.requestRenderAll();
+    return true;
+  }
+
+  /** Selects the containing group and leaves exactly one entered level. */
+  exitSelectionGroup(): boolean {
+    const group = this.getSelectionGroupScope();
+    if (!group) return false;
+    this.discardActiveObject();
+    this.selectionGroupScope = group.parent ?? null;
+    this.setActiveObject(group);
+    this.requestRenderAll();
+    return true;
+  }
+
+  /** Lists the siblings available to pointer and marquee selection. */
+  getSelectionScopeObjects(): FabricObject[] {
+    return this.getSelectionGroupScope()?.getObjects() ?? this.getObjects();
+  }
+
   setLayerSelectionPriority(object: FabricObject | null): void {
     if (!this.tracksLayerSelectionPriority) {
       const clearPriority = () => {
@@ -58,18 +312,39 @@ export class EditorCanvas extends Canvas {
 
   override findTarget(e: TPointerEvent): ReturnType<Canvas['findTarget']> {
     const priority = this.layerSelectionPriority;
-    if (!priority) return super.findTarget(e);
-    if (this.getActiveObject() !== priority) {
-      this.layerSelectionPriority = null;
-      return super.findTarget(e);
-    }
+    if (priority && this.getActiveObject() !== priority) this.layerSelectionPriority = null;
     const preserveObjectStacking = this.preserveObjectStacking;
-    this.preserveObjectStacking = false;
+    if (this.layerSelectionPriority) this.preserveObjectStacking = false;
+    let native: ReturnType<Canvas['findTarget']>;
     try {
-      return super.findTarget(e);
+      native = super.findTarget(e);
     } finally {
       this.preserveObjectStacking = preserveObjectStacking;
     }
+    const scope = this.getSelectionGroupScope();
+    if (!scope || this.skipTargetFind || this._currentTransform || this._targetInfo) return native;
+    const active = this.getActiveObject();
+    if (active?.findControl(this.getViewportPoint(e), util.isTouchEvent(e))) return native;
+    if (
+      native.target === active &&
+      (active instanceof ActiveSelection || this.layerSelectionPriority === active)
+    )
+      return native;
+    const scoped = this.searchPossibleTargets(scope.getObjects(), this.getScenePoint(e));
+    const target = scoped.target;
+    if (!target || target.sniptaleLocked || !target.selectable) {
+      // Empty space inside the entered group belongs to its marquee, not to its parent.
+      if (this._checkTarget(scope, this.getScenePoint(e))) {
+        return { subTargets: [], currentSubTargets: [] };
+      }
+      return native;
+    }
+    return {
+      ...scoped,
+      currentTarget: target,
+      ...(scoped.container ? { currentContainer: scoped.container } : {}),
+      currentSubTargets: scoped.subTargets,
+    };
   }
 
   private presentationBounds: PresentationBoundsResolver | null = null;
@@ -89,12 +364,13 @@ export class EditorCanvas extends Canvas {
   override collectObjects(
     ...args: Parameters<Canvas['collectObjects']>
   ): ReturnType<Canvas['collectObjects']> {
-    const native = super.collectObjects(...args);
+    const native =
+      this.getSelectionGroupScope()?.collectObjects(...args) ?? super.collectObjects(...args);
     if (!this.presentationBounds) return native;
     const [rect, options] = args;
     const includeIntersecting = options?.includeIntersecting ?? true;
     const nativeObjects = new Set(native);
-    return this.getObjects()
+    return this.getSelectionScopeObjects()
       .toReversed()
       .filter((object) => {
         const bounds = this.presentationBounds?.(object);
@@ -139,13 +415,26 @@ export class EditorCanvas extends Canvas {
           { includeIntersecting: false }
         )
       );
-      return this.getObjects()
+      return this.getSelectionScopeObjects()
         .toReversed()
         .filter((object) => candidates.has(object) && eligible(object));
     }
+    const liveHover = (object: FabricObject): boolean => {
+      let current = object;
+      while (current.parent) {
+        if (
+          !current.parent.visible ||
+          current.parent.sniptaleLocked ||
+          !current.parent.getObjects().includes(current)
+        )
+          return false;
+        current = current.parent;
+      }
+      return this.getObjects().includes(current);
+    };
     return hoverTarget &&
       eligible(hoverTarget) &&
-      this.getObjects().includes(hoverTarget) &&
+      liveHover(hoverTarget) &&
       !this.getActiveObjects().includes(hoverTarget)
       ? [hoverTarget]
       : [];

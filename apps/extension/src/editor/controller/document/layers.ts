@@ -1,6 +1,6 @@
 import type { Canvas } from 'fabric';
 import { Group, type FabricObject } from 'fabric';
-import type { EditorLayerItem } from '../../../features/editor/document/types';
+import type { EditorLayerChild, EditorLayerItem } from '../../../features/editor/document/types';
 import {
   createObjectLabel,
   getEditorObjectTypeLabel,
@@ -56,6 +56,29 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
     (canvas?.getActiveObjects?.() ?? []).map((object) => object.sniptaleId)
   );
   const selectedCount = activeIds.size;
+  const collectChildren = (group: Group): EditorLayerChild[] =>
+    group
+      .getObjects()
+      .slice()
+      .reverse()
+      .map((child) => {
+        const children =
+          child instanceof Group && child.sniptaleType === 'group'
+            ? collectChildren(child)
+            : undefined;
+        return {
+          id: child.sniptaleId ?? crypto.randomUUID(),
+          name: child.sniptaleLabel ?? getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
+          type: child.sniptaleType ?? 'image',
+          typeLabel: getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
+          selected: Boolean(child.sniptaleId && activeIds.has(child.sniptaleId)),
+          locked: Boolean(group.sniptaleLocked || child.sniptaleLocked),
+          visible: group.visible !== false && child.visible !== false,
+          containsSelection:
+            children?.some((member) => member.selected || member.containsSelection) ?? false,
+          ...(children ? { groupChildren: children } : {}),
+        };
+      });
   return getLayerObjects(canvas)
     .slice()
     .reverse()
@@ -84,17 +107,10 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
       ...(object instanceof Group && object.sniptaleType === 'group'
         ? {
             groupSize: object.getObjects().length,
-            groupChildren: object
-              .getObjects()
-              .slice()
-              .reverse()
-              .map((child) => ({
-                id: child.sniptaleId ?? crypto.randomUUID(),
-                name:
-                  child.sniptaleLabel ?? getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
-                type: child.sniptaleType ?? 'image',
-                typeLabel: getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
-              })),
+            containsSelection: collectChildren(object).some(
+              (child) => child.selected || child.containsSelection
+            ),
+            groupChildren: collectChildren(object),
           }
         : {}),
       visible: object.visible !== false,

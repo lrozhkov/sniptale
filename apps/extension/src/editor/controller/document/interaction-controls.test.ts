@@ -19,7 +19,7 @@ function createControlSet() {
   };
 }
 
-it('applies Miro-style corner-only visual controls with hidden edge resize targets', () => {
+it('applies fixed corner and side controls with larger pointer targets', () => {
   const controls = createControlSet();
   const object = {
     borderColor: '#f97316',
@@ -32,8 +32,8 @@ it('applies Miro-style corner-only visual controls with hidden edge resize targe
   applyEditorObjectInteractionControls(object as never);
 
   expect(object.set).toHaveBeenCalledWith({
-    borderScaleFactor: 1.35,
-    cornerSize: 13,
+    borderScaleFactor: 1.25,
+    cornerSize: 9,
     cornerStyle: 'circle',
     snapAngle: 15,
     snapThreshold: 4,
@@ -41,9 +41,9 @@ it('applies Miro-style corner-only visual controls with hidden edge resize targe
   expect(controls.mt.sizeX).toBe(22);
   expect(controls.mr.render).toBeTypeOf('function');
   expect(controls.mr.shouldActivate).toBeTypeOf('function');
-  expect(controls.tl.sizeX).toBe(17);
+  expect(controls.tl.sizeX).toBe(22);
   expect(controls.mtr.withConnection).toBe(false);
-  expect(controls.mtr.offsetY).toBe(-32);
+  expect(controls.mtr.offsetY).toBe(-20);
 });
 
 it('uses diagonal cursors for default box corners even on elongated objects', () => {
@@ -64,7 +64,7 @@ it('uses diagonal cursors for default box corners even on elongated objects', ()
   ).toBe('nwse-resize');
 });
 
-it('renders hover-expanded corner and rotation controls while keeping edge controls invisible', () => {
+it('renders fixed corners, visible side controls and an unbacked rotation icon during hover', () => {
   const controls = createControlSet();
   const object = {
     __corner: 'tl',
@@ -76,6 +76,7 @@ it('renders hover-expanded corner and rotation controls while keeping edge contr
   };
   const ctx = {
     arc: vi.fn(),
+    roundRect: vi.fn(),
     beginPath: vi.fn(),
     fill: vi.fn(),
     lineTo: vi.fn(),
@@ -93,7 +94,8 @@ it('renders hover-expanded corner and rotation controls while keeping edge contr
   object.__corner = 'mtr';
   controls.mtr.render?.call(controls.mtr, ctx as never, 20, 22, undefined, object as never);
 
-  expect(ctx.arc).toHaveBeenCalledWith(0, 0, 8.5, 0, Math.PI * 2);
+  expect(ctx.roundRect).toHaveBeenCalledWith(-4.5, -4.5, 9, 9, 1.5);
+  expect(ctx.roundRect).toHaveBeenCalledWith(-3, -6, 6, 12, 3);
   expect(ctx.scale).toHaveBeenCalled();
   expect(ctx.translate).toHaveBeenCalledWith(20, 22);
 });
@@ -103,6 +105,7 @@ it('renders default-size controls when no handle is actively hovered', () => {
   const object = { controls, set: vi.fn() };
   const ctx = {
     arc: vi.fn(),
+    roundRect: vi.fn(),
     beginPath: vi.fn(),
     fill: vi.fn(),
     lineTo: vi.fn(),
@@ -118,11 +121,11 @@ it('renders default-size controls when no handle is actively hovered', () => {
   controls.tl.render?.call(controls.tl, ctx as never, 1, 2, undefined, object as never);
   controls.mtr.render?.call(controls.mtr, ctx as never, 3, 4, undefined, object as never);
 
-  expect(ctx.arc).toHaveBeenCalledWith(0, 0, 6.5, 0, Math.PI * 2);
-  expect(ctx.lineTo).toHaveBeenCalledWith(21, 8);
+  expect(ctx.roundRect).toHaveBeenCalledWith(-4.5, -4.5, 9, 9, 1.5);
+  expect(ctx.lineTo).toHaveBeenCalledWith(19.95, 15);
 });
 
-it('shrinks corner handles smoothly for compact selected objects', () => {
+it('keeps corner handles readable on compact selected objects', () => {
   const controls = createControlSet();
   const object = {
     controls,
@@ -132,10 +135,12 @@ it('shrinks corner handles smoothly for compact selected objects', () => {
   };
   const ctx = {
     arc: vi.fn(),
+    roundRect: vi.fn(),
     beginPath: vi.fn(),
     fill: vi.fn(),
     restore: vi.fn(),
     save: vi.fn(),
+    scale: vi.fn(),
     stroke: vi.fn(),
     translate: vi.fn(),
   };
@@ -143,10 +148,10 @@ it('shrinks corner handles smoothly for compact selected objects', () => {
   applyEditorObjectInteractionControls(object as never);
   controls.tl.render?.call(controls.tl, ctx as never, 1, 2, undefined, object as never);
 
-  expect(ctx.arc).toHaveBeenCalledWith(0, 0, 4.5, 0, Math.PI * 2);
+  expect(ctx.roundRect).toHaveBeenCalledWith(-4.5, -4.5, 9, 9, 1.5);
 });
 
-it('activates hidden edge resize controls along the whole border except corner handle zones', () => {
+it('activates side handles near their visible centers without stealing corner gestures', () => {
   const controls = createControlSet();
   const object = {
     canvas: { getActiveObject: vi.fn(), viewportTransform: [1, 0, 0, 1, 0, 0] },
@@ -165,7 +170,7 @@ it('activates hidden edge resize controls along the whole border except corner h
   applyEditorObjectInteractionControls(object as never);
 
   expect(
-    controls.mt.shouldActivate?.('mt', object as never, { x: 170, y: 104 } as never, {} as never)
+    controls.mt.shouldActivate?.('mt', object as never, { x: 200, y: 104 } as never, {} as never)
   ).toBe(true);
   expect(
     controls.mt.shouldActivate?.('mt', object as never, { x: 112, y: 102 } as never, {} as never)

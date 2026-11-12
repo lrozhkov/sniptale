@@ -10,11 +10,3 @@ export function applyEditorObjectControlDefaults(object: FabricObject): void {
     snapThreshold: 4,
   });
 }
-
-export function isActiveControl(object: FabricObject, controlKey: string): boolean {
-  return object.__corner === controlKey;
-}
-
-export function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}

@@ -1,8 +1,18 @@
-import type { Canvas, Control, FabricObject } from 'fabric';
+import { Group, IText, type Canvas, type Control, type FabricObject } from 'fabric';
+import { resolveDrawingAlignmentFeedback } from '../../../../../features/drawing/public';
+import { readCanvasChromeColors } from '../../../../../ui/drawing-tools/selection-chrome';
 import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
-import { DRAWING_SELECTION_ACCENT } from '../../../../drawing/object/controls/chrome';
-import type { EditorMagnetManager } from '../../../magnet';
+import {
+  CANVAS_SELECTION_METRICS,
+  CANVAS_ROTATE_DOT_PATH,
+  getCanvasHandleSize,
+} from '../../../../../ui/drawing-tools/selection-chrome';
+import { isDrawingControlCaptured } from '../../../../drawing/object/controls/chrome';
+import { readEditorDrawingObject } from '../../../../drawing/object/metadata';
+import { getRichShapeSelectionGeometry } from '../../../document/objects/rich-shape-controls';
 import { isEditorHiddenEdgeControl } from '../../../document/interaction-border-controls';
+import { readFrameAnnotationSnapshot } from '../../../../frame-annotation/proxy';
+import type { EditorMagnetManager } from '../../../magnet';
 import { mountSelectionVisibility } from './selection-visibility';
 import { mountProjectedSelection } from './projected-selection';
 import type { EditorLayerPresentationBounds } from '../../../../document/canvas-surface/render-region';
@@ -19,16 +29,16 @@ const controlGeometry = new WeakMap<
     touchSizeY: number;
     offsetX: number;
     offsetY: number;
+    shouldActivate: Control['shouldActivate'];
   }
 >();
 
-export function resolveSelectionChromeMetrics(zoom: number) {
-  const visualScale = Math.max(0.75, Math.min(1.25, Math.sqrt(zoom)));
+export function resolveSelectionChromeMetrics(_zoom: number) {
   return {
-    borderWidth: 1.35,
-    cornerRadius: 6.5 * visualScale,
+    borderWidth: CANVAS_SELECTION_METRICS.border,
+    cornerRadius: CANVAS_SELECTION_METRICS.corner / 2,
     guideWidth: 1,
-    rotationRadius: 9 * visualScale,
+    rotationRadius: CANVAS_SELECTION_METRICS.rotation / 2,
   };
 }
 
@@ -49,8 +59,25 @@ function appendSelectionBorder(
   object: FabricObject,
   zoom: number,
   preview = false,
-  bounds?: EditorLayerPresentationBounds
+  bounds?: EditorLayerPresentationBounds,
+  parentContext = false,
+  layerPreview = false
 ): void {
+  const drawing = readEditorDrawingObject(object);
+  const richGeometry = getRichShapeSelectionGeometry(object);
+  if (
+    !layerPreview &&
+    !bounds &&
+    (richGeometry === 'line' ||
+      drawing?.kind === 'arrow' ||
+      (!preview &&
+        (richGeometry === 'rectangle' ||
+          drawing?.kind === 'rectangle' ||
+          (object.sniptaleType === 'shape' && object.type === 'rect') ||
+          (object.sniptaleType === 'frame-annotation' &&
+            !readFrameAnnotationSnapshot(object)?.annotationKind))))
+  )
+    return;
   const corners = bounds
     ? [
         { x: bounds.left, y: bounds.top },
@@ -69,15 +96,19 @@ function appendSelectionBorder(
         )
         .join(' '),
       fill: 'none',
-      stroke:
-        preview || bounds
-          ? DRAWING_SELECTION_ACCENT
-          : object.borderColor || DRAWING_SELECTION_ACCENT,
+      stroke: parentContext
+        ? 'var(--sniptale-color-text-muted, #64748b)'
+        : preview || bounds
+          ? 'var(--sniptale-color-canvas-selection, #2563eb)'
+          : object.sniptaleLocked
+            ? 'var(--sniptale-color-text-muted, #64748b)'
+            : 'var(--sniptale-color-canvas-selection, #2563eb)',
       'stroke-width': resolveSelectionChromeMetrics(zoom).borderWidth,
       'stroke-dasharray':
-        (preview || bounds ? [4, 3] : object.borderDashArray)
+        (parentContext ? [4, 3] : preview || bounds ? [] : object.borderDashArray)
           ?.map((value) => value / zoom)
           .join(' ') ?? '',
+      ...(parentContext ? { 'data-ui': 'editor.canvas.parent-group-context' } : {}),
       ...(!preview && bounds
         ? {
             'data-ui': 'editor.canvas.projected-selection-outline',
@@ -111,11 +142,43 @@ function updateControlHitGeometry(
         touchSizeY: control.touchSizeY,
         offsetX: control.offsetX,
         offsetY: control.offsetY,
+        shouldActivate: control.shouldActivate,
       };
       controlGeometry.set(control, initial);
+      touchedControls.add(control);
+      const activate = control.shouldActivate;
+      control.shouldActivate = function (key, target, pointer, corners) {
+        if (!activate.call(this, key, target, pointer, corners)) return false;
+        const positions = target.calcOCoords();
+        const candidates = Object.keys(target.controls).filter(
+          (candidate) => target.isControlVisible(candidate) && positions[candidate]
+        );
+        candidates.sort((a, b) => {
+          const first = positions[a]!,
+            second = positions[b]!;
+          return (
+            Math.hypot(pointer.x - first.x, pointer.y - first.y) -
+              Math.hypot(pointer.x - second.x, pointer.y - second.y) ||
+            Number(!CORNERS.includes(a)) - Number(!CORNERS.includes(b)) ||
+            a.localeCompare(b)
+          );
+        });
+        const nearestKey = candidates[0];
+        if (nearestKey !== key) return false;
+        if (CORNERS.includes(key) || ['mt', 'mr', 'mb', 'ml', 'start', 'end'].includes(key)) {
+          const position = positions[key]!;
+          const center = target.getCenterPoint().transform(target.getViewportTransform());
+          if (
+            Math.hypot(pointer.x - center.x, pointer.y - center.y) <
+            Math.hypot(pointer.x - position.x, pointer.y - position.y)
+          )
+            return false;
+        }
+        return true;
+      };
     }
-    const sizeX = Math.max(20, initial.sizeX || object.cornerSize) / zoom;
-    const sizeY = Math.max(20, initial.sizeY || object.cornerSize) / zoom;
+    const sizeX = Math.max(CANVAS_SELECTION_METRICS.hit, initial.sizeX || object.cornerSize) / zoom;
+    const sizeY = Math.max(CANVAS_SELECTION_METRICS.hit, initial.sizeY || object.cornerSize) / zoom;
     const touchSizeX = Math.max(28, initial.touchSizeX || 28) / zoom;
     const touchSizeY = Math.max(28, initial.touchSizeY || 28) / zoom;
     const offsetX = initial.offsetX / zoom;
@@ -143,11 +206,24 @@ function appendSelectionControl(
   point: { x: number; y: number },
   zoom: number
 ): void {
-  const metrics = resolveSelectionChromeMetrics(zoom);
-  const color = object.cornerStrokeColor || object.borderColor || '#2563eb';
+  const color =
+    object.sniptaleRole === 'crop-guide'
+      ? object.cornerStrokeColor || object.borderColor
+      : 'var(--sniptale-color-canvas-selection, #2563eb)';
+  const readyPoint =
+    key !== 'bend-insert' &&
+    (readEditorDrawingObject(object)?.kind === 'arrow' ||
+      getRichShapeSelectionGeometry(object) === 'line');
+  const active =
+    isDrawingControlCaptured(object, key) ||
+    (!object.canvas?._currentTransform && readyPoint && object.__corner === key);
   if (key === 'mtr') {
-    const icon = svgElement('g', {
-      transform: `translate(${point.x} ${point.y}) scale(${metrics.rotationRadius / (9 * zoom)})`,
+    const scale = CANVAS_SELECTION_METRICS.rotation / (24 * zoom);
+    const icon = svgElement('path', {
+      d: CANVAS_ROTATE_DOT_PATH,
+      transform: `translate(${point.x} ${point.y}) scale(${scale}) translate(-12 -12)`,
+      'data-ui': 'editor.canvas.selection-rotate',
+      'data-control': key,
       opacity: 'var(--editor-selection-controls-opacity, 1)',
       fill: 'none',
       stroke: color,
@@ -155,29 +231,35 @@ function appendSelectionControl(
       'stroke-linecap': 'round',
       'stroke-linejoin': 'round',
     });
-    icon.appendChild(
-      svgElement('path', {
-        d: [
-          'M -9 0 A 9 9 0 0 1 6.364 -6.364 L 9 -4',
-          'M 9 -9 L 9 -4 L 4 -4',
-          'M 9 0 A 9 9 0 0 1 -6.364 6.364 L -9 4',
-          'M -4 4 L -9 4 L -9 9 L -4 4',
-        ].join(' '),
-      })
-    );
     svg.appendChild(icon);
     return;
   }
-  const radius = CORNERS.includes(key) ? metrics.cornerRadius : (5.5 * metrics.cornerRadius) / 6.5;
+  const kind = CORNERS.includes(key)
+    ? 'corner'
+    : key === 'ml' || key === 'mr'
+      ? 'vertical'
+      : key === 'mt' || key === 'mb'
+        ? 'horizontal'
+        : 'point';
+  const size = getCanvasHandleSize(kind);
   svg.appendChild(
-    svgElement('circle', {
-      cx: point.x,
-      cy: point.y,
+    svgElement(kind === 'point' ? 'circle' : 'rect', {
+      ...(kind === 'point'
+        ? { cx: point.x, cy: point.y, r: size.width / (2 * zoom) }
+        : {
+            x: point.x - size.width / (2 * zoom),
+            y: point.y - size.height / (2 * zoom),
+            width: size.width / zoom,
+            height: size.height / zoom,
+            rx: (kind === 'corner' ? 1.5 : 3) / zoom,
+            transform: `rotate(${object.getTotalAngle?.() ?? 0} ${point.x} ${point.y})`,
+          }),
+      'data-ui': 'editor.canvas.selection-handle',
+      'data-control': key,
       opacity: 'var(--editor-selection-controls-opacity, 1)',
-      r: radius / zoom,
-      fill: object.cornerColor || '#fff',
+      fill: active ? color : '#fff',
       stroke: color,
-      'stroke-width': 1.6,
+      'stroke-width': 1.25,
       'vector-effect': 'non-scaling-stroke',
     })
   );
@@ -189,12 +271,22 @@ function appendSelection(
   zoom: number,
   touchedControls: Set<Control>
 ): void {
+  if (object instanceof IText && object.isEditing) return;
+  if (object.canvas instanceof EditorCanvas) {
+    const parent = object.canvas.getSelectionGroupScope();
+    if (parent && parent !== object)
+      appendSelectionBorder(svg, parent, zoom, false, undefined, true);
+  }
   appendSelectionBorder(svg, object, zoom);
   if (!object.hasControls) return;
   updateControlHitGeometry(object, zoom, touchedControls);
   const positions = object.calcOCoords();
   for (const key of Object.keys(object.controls)) {
-    if (!object.isControlVisible(key) || isEditorHiddenEdgeControl(object.controls[key])) continue;
+    if (
+      !object.isControlVisible(key) ||
+      (object.sniptaleRole === 'crop-guide' && isEditorHiddenEdgeControl(object.controls[key]))
+    )
+      continue;
     const point = positions[key];
     if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
     appendSelectionControl(svg, object, key, point, zoom);
@@ -202,39 +294,81 @@ function appendSelection(
 }
 
 function appendGuides(svg: SVGElement, magnet: EditorMagnetManager, zoom: number): void {
-  const { lines, points } = magnet.getVisualGuides();
-  const color = 'rgba(14, 165, 233, 0.88)';
-  const appendCross = (point: { x: number; y: number }) => {
-    const extent = 4 / zoom;
-    const firstDiagonal = `M ${point.x - extent} ${point.y - extent} L ${point.x + extent} ${point.y + extent}`;
-    const secondDiagonal = `M ${point.x + extent} ${point.y - extent} L ${point.x - extent} ${point.y + extent}`;
-    svg.appendChild(
-      svgElement('path', {
-        d: `${firstDiagonal} ${secondDiagonal}`,
-        fill: 'none',
-        stroke: color,
-        'stroke-width': 1,
-        'vector-effect': 'non-scaling-stroke',
-      })
-    );
-  };
-  for (const { origin, target } of lines) {
+  const accepted = magnet.getVisualFeedback();
+  const feedback = resolveDrawingAlignmentFeedback(accepted.guides, zoom, accepted.relations);
+  const color = 'var(--sniptale-color-canvas-magnet, #9854d8)';
+  for (const line of feedback.lines)
     svg.appendChild(
       svgElement('line', {
-        x1: origin.x,
-        y1: origin.y,
-        x2: target.x,
-        y2: target.y,
+        x1: line.axis === 'x' ? line.coordinate : line.from,
+        y1: line.axis === 'y' ? line.coordinate : line.from,
+        x2: line.axis === 'x' ? line.coordinate : line.to,
+        y2: line.axis === 'y' ? line.coordinate : line.to,
         stroke: color,
         'stroke-width': 1,
-        'stroke-dasharray': `${4 / zoom} ${4 / zoom}`,
+        'stroke-dasharray': `${4 / zoom} ${3 / zoom}`,
+        'data-ui': 'editor.canvas.magnet-guide',
+        'data-axis': line.axis,
         'vector-effect': 'non-scaling-stroke',
       })
     );
-    appendCross(origin);
-    appendCross(target);
+  for (const measurement of feedback.measurements) {
+    const group = svgElement('g', {
+      'data-ui': 'editor.canvas.magnet-relation',
+      'data-relation-kind': measurement.kind,
+      'data-relation-axis': measurement.axis,
+      'data-relation-key': measurement.key,
+      'data-value': measurement.value,
+    });
+    for (const points of measurement.segments)
+      group.appendChild(
+        svgElement('polyline', {
+          points: points.map((point) => `${point.x},${point.y}`).join(' '),
+          fill: 'none',
+          stroke: color,
+          'stroke-width': 1,
+          'vector-effect': 'non-scaling-stroke',
+        })
+      );
+    if (measurement.label) {
+      const label = svgElement('text', {
+        x: measurement.label.point.x,
+        y: measurement.label.point.y,
+        'text-anchor': measurement.label.anchor,
+        'font-size': 10 / zoom,
+        'font-family': 'ui-monospace, SFMono-Regular, monospace',
+        fill: color,
+        stroke: 'var(--sniptale-color-surface-panel, #fff)',
+        'stroke-width': 3,
+        'stroke-linejoin': 'round',
+        'paint-order': 'stroke',
+        'vector-effect': 'non-scaling-stroke',
+      });
+      label.textContent = measurement.label.text;
+      group.appendChild(label);
+    }
+    svg.appendChild(group);
   }
-  for (const point of points) appendCross(point);
+  for (const marker of feedback.markers) {
+    const r = 4 / zoom;
+    const vertices = [
+      `M ${marker.x} ${marker.y - r}`,
+      `L ${marker.x + r} ${marker.y}`,
+      `L ${marker.x} ${marker.y + r}`,
+      `L ${marker.x - r} ${marker.y} Z`,
+    ];
+    svg.appendChild(
+      svgElement('path', {
+        d: vertices.join(' '),
+        fill: marker.filled ? color : 'none',
+        stroke: color,
+        'stroke-width': 1.2,
+        'data-ui': 'editor.canvas.magnet-marker',
+        'data-filled': marker.filled ? 'true' : 'false',
+        'vector-effect': 'non-scaling-stroke',
+      })
+    );
+  }
 }
 
 export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetManager): void {
@@ -255,6 +389,17 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     zIndex: String(Math.max(31, upperCanvasZIndex + 1)),
   });
   container.appendChild(svg);
+  const originalMarquee = {
+    selectionColor: canvas.selectionColor,
+    selectionBorderColor: canvas.selectionBorderColor,
+    selectionLineWidth: canvas.selectionLineWidth,
+    selectionDashArray: canvas.selectionDashArray,
+  };
+  const colors = readCanvasChromeColors(canvas.upperCanvasEl);
+  canvas.selectionColor = `color-mix(in srgb, ${colors.selection} 8%, transparent)`;
+  canvas.selectionBorderColor = colors.selection;
+  canvas.selectionLineWidth = CANVAS_SELECTION_METRICS.border;
+  canvas.selectionDashArray = [];
   Reflect.set(canvas, 'skipControlsDrawing', true);
   const selection = svgElement('g', {});
   selection.setAttribute('data-ui', 'editor.canvas.selection-controls');
@@ -262,6 +407,7 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
   const touchedControls = new Set<Control>();
   let hoverTarget: FabricObject | undefined;
   let previewSuspended = false;
+  let layerHoverTarget: FabricObject | undefined;
   const render = (event?: { ctx: CanvasRenderingContext2D }) => {
     if (event && event.ctx !== canvas.getContext() && event.ctx !== canvas.contextTop) return;
     const width = canvas.getWidth();
@@ -282,12 +428,27 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     appendGuides(guides, magnet, zoom * (canvas.viewportTransform?.[0] ?? 1));
     const previews = svgElement('g', { 'data-ui': 'editor.canvas.selection-preview' });
     if (canvas instanceof EditorCanvas && !previewSuspended) {
-      for (const object of canvas.getSelectionPreviewObjects(hoverTarget)) {
+      const candidates =
+        layerHoverTarget &&
+        layerHoverTarget.visible &&
+        !canvas.getActiveObjects().includes(layerHoverTarget)
+          ? [layerHoverTarget]
+          : canvas.getSelectionPreviewObjects(hoverTarget);
+      for (const object of candidates) {
         const bounds = projected?.resolve(object);
-        if (bounds !== null) appendSelectionBorder(previews, object, zoom, true, bounds);
+        if (bounds !== null)
+          appendSelectionBorder(
+            previews,
+            object,
+            zoom,
+            true,
+            bounds,
+            false,
+            object === layerHoverTarget
+          );
       }
     }
-    svg.replaceChildren(previews, selection, guides);
+    svg.replaceChildren(previews, guides, selection);
   };
   const updateHover = (object?: FabricObject) => {
     if (object === hoverTarget && !previewSuspended) return;
@@ -295,10 +456,42 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     hoverTarget = object;
     render();
   };
+  let layerHovering = false;
+  const layerHover = (event: PointerEvent) => {
+    if (event.buttons !== 0) return;
+    const marker =
+      event.target instanceof Element
+        ? event.target.closest<HTMLElement>('[data-editor-layer-id]')
+        : null;
+    if (!marker) {
+      if (layerHovering) {
+        layerHovering = false;
+        clearPreview();
+      }
+      return;
+    }
+    const find = (objects: FabricObject[]): FabricObject | undefined => {
+      for (const object of objects) {
+        if (object.sniptaleId === marker.dataset['editorLayerId']) return object;
+        const nested = object instanceof Group ? find(object.getObjects()) : undefined;
+        if (nested) return nested;
+      }
+      return undefined;
+    };
+    layerHovering = true;
+    const next = find(canvas.getObjects());
+    if (next !== layerHoverTarget) {
+      layerHoverTarget = next;
+      previewSuspended = false;
+      render();
+    }
+  };
+  canvas.upperCanvasEl.ownerDocument.addEventListener('pointermove', layerHover);
   const projected =
     canvas instanceof EditorCanvas ? mountProjectedSelection(canvas, render, updateHover) : null;
   const clearPreview = () => {
     hoverTarget = undefined;
+    layerHoverTarget = undefined;
     render();
   };
   const blurPreview = () => {
@@ -310,7 +503,7 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
       ? [
           canvas.on('mouse:move', ({ e, target }) => {
             const next = 'buttons' in e && e.buttons === 0 ? target : undefined;
-            if (next === hoverTarget && !previewSuspended) return;
+            layerHoverTarget = undefined;
             previewSuspended = false;
             hoverTarget = next;
             render();
@@ -324,6 +517,8 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
   const unsubscribe = canvas.on('after:render', render);
   mountedChrome.set(canvas, () => {
     disposeVisibility();
+    canvas.upperCanvasEl.ownerDocument.removeEventListener('pointermove', layerHover);
+    Object.assign(canvas, originalMarquee);
     projected?.dispose();
     for (const unsubscribePreview of previewSubscriptions) unsubscribePreview();
     window.removeEventListener('blur', blurPreview);
@@ -332,6 +527,7 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     for (const control of touchedControls) {
       const initial = controlGeometry.get(control);
       if (initial) Object.assign(control, initial);
+      controlGeometry.delete(control);
     }
     Reflect.set(canvas, 'skipControlsDrawing', false);
   });

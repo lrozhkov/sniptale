@@ -25,7 +25,11 @@ export function initializeObjectForController(
   syncEditorRasterEffects(object);
   prepareEditorObject(object, {
     onTextboxExitEmpty: (textbox) => {
-      controller.canvas?.remove(textbox);
+      const collection = textbox.parent ?? controller.canvas;
+      if (textbox.parent && controller.canvas?.getActiveObject() === textbox) {
+        controller.canvas.discardActiveObject();
+      }
+      collection?.remove(textbox);
       controller.canvas?.requestRenderAll();
       controller.syncRuntimeState();
     },

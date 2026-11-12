@@ -791,3 +791,13 @@ it('starts cleanup from Blur through the Simplify raster path while keeping the 
   );
   mocks.state.toolSettings.blur.clean = false;
 });
+
+it('restores a native transform on pointercancel without clearing its accepted selection', () => {
+  const instance = createBindings('select');
+  instance.canvas._currentTransform = {};
+  instance.handlers.handlePointerCancel(new Event('pointercancel') as PointerEvent);
+  expect(instance.canvas.endCurrentTransform).toHaveBeenCalledOnce();
+  expect(instance.bindings.syncRuntimeState).toHaveBeenCalledOnce();
+  expect(instance.bindings.cancelTransientInteraction).not.toHaveBeenCalled();
+  expect(instance.canvas.discardActiveObject).not.toHaveBeenCalled();
+});

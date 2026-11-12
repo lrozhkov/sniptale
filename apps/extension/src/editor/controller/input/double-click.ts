@@ -1,4 +1,5 @@
-import type { Canvas, FabricObject, TPointerEvent } from 'fabric';
+import { Group, type Canvas, type FabricObject, type TPointerEvent } from 'fabric';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import { isTextbox } from '../core/helpers';
 import { activateTextTarget } from '../events/text-target';
 
@@ -16,6 +17,10 @@ export function handleEditorDoubleClick(options: {
       activateTextTarget(canvas, target, syncRuntimeState, { event, selectAll: false });
     }
     return;
+  }
+
+  if (activeTool === 'select' && canvas instanceof EditorCanvas && target instanceof Group) {
+    if (canvas.enterSelectionGroup(target, event)) syncRuntimeState();
   }
 
   void canvas;

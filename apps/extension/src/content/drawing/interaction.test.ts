@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   resolveDrawingLinearPoint,
+  type DrawingObject,
   updateCreatedDrawingObject,
 } from '../../features/drawing/public';
 import {
@@ -667,3 +668,65 @@ for (const tool of ['simplify', 'blur'] as const)
     expect(session.getSnapshot().document.objects).toHaveLength(1);
     session.dispose();
   });
+
+it('keeps a20px selected object body movable while side handles remain reachable', () => {
+  const object = {
+    id: 'small',
+    kind: 'rectangle' as const,
+    bounds: { x: 100, y: 100, width: 20, height: 20 },
+    color: '#000',
+    width: 2,
+  };
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject(object);
+  session.setActiveTool('select');
+  session.setSelection([object.id]);
+  expect(
+    beginDrawingPointer({
+      point: { x: 110, y: 110 },
+      snapshot: session.getSnapshot(),
+      timestamp: 1,
+    }).draft?.kind
+  ).toBe('move');
+  expect(resolveDrawingResizeHandle(object, { x: 120, y: 110 })).toBe('e');
+  expect(resolveDrawingResizeHandle(object, { x: 100, y: 100 })).toBe('nw');
+});
+
+it('keeps a short uniform arrow movable between its endpoint controls', () => {
+  const arrow = {
+    id: 'short',
+    kind: 'arrow' as const,
+    start: { x: 100, y: 100 },
+    end: { x: 120, y: 100 },
+    color: '#000',
+    width: 2,
+    dynamicWidth: false,
+    design: 'standard' as const,
+  };
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject(arrow);
+  session.setActiveTool('select');
+  session.setSelection([arrow.id]);
+  expect(
+    beginDrawingPointer({
+      point: { x: 110, y: 100 },
+      snapshot: session.getSnapshot(),
+      timestamp: 1,
+    }).draft?.kind
+  ).toBe('move');
+  expect(resolveDrawingResizeHandle(arrow, { x: 100, y: 100 })).toBe('start');
+  expect(resolveDrawingResizeHandle(arrow, { x: 120, y: 100 })).toBe('end');
+});
+
+it('places rotation at a fixed local top-right diagonal offset for single and multi selections', () => {
+  const object: DrawingObject = {
+    id: 'rotation-offset',
+    kind: 'rectangle',
+    bounds: { x: 100, y: 100, width: 100, height: 60 },
+    color: '#000',
+    width: 2,
+    rotation: 90,
+  };
+  expect(getDrawingRotationHandlePoint(object, 'rotate-ne')).toEqual({ x: 200, y: 200 });
+  expect(getDrawingMultiRotationHandlePoint(object.bounds)).toEqual({ x: 220, y: 80 });
+});

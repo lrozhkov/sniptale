@@ -20,10 +20,31 @@ import {
 } from '../../../../features/drawing/public';
 import { readEditorDrawingObject, writeEditorDrawingObject } from '../metadata';
 import { createEditorDrawingFabricObject } from '../vector';
-import { DRAWING_SELECTION_ACCENT } from './chrome';
+import { DRAWING_SELECTION_ACCENT, isDrawingControlCaptured } from './chrome';
+import { renderCanvasSelectionHandle } from '../../../../ui/drawing-tools/selection-chrome';
 
 type DrawingArrow = Extract<DrawingObject, { kind: 'arrow' }>;
 type ArrowEndpoint = 'start' | 'end';
+export type EditorArrowPointSnap = (input: {
+  point: DrawingPoint;
+  origin: DrawingPoint;
+  excludeId?: string;
+  preserveAngle: boolean;
+  bypass: boolean;
+}) => DrawingPoint;
+const pointSnappers = new WeakMap<Canvas, EditorArrowPointSnap>();
+
+/** Bind the controller's magnet port without coupling drawing controls to controller state. */
+export function bindEditorDrawingArrowSnapping(
+  canvas: Canvas,
+  snap: EditorArrowPointSnap
+): () => void {
+  pointSnappers.set(canvas, snap);
+  return () => {
+    if (pointSnappers.get(canvas) === snap) pointSnappers.delete(canvas);
+  };
+}
+
 const arrowControlAnchors = new WeakMap<
   FabricObject,
   Record<ArrowEndpoint, Point> & { path: Path['path'] | null; sceneToObject: TMat2D }
@@ -39,14 +60,37 @@ type ArrowBendGesture = {
 };
 const bendGestures = new WeakMap<object, ArrowBendGesture>();
 
-export function syncDrawingArrowControlAnchors(object: FabricObject, drawing: DrawingArrow): void {
-  const sceneToObject = util.invertTransform(object.calcTransformMatrix());
+function setArrowControlAnchors(
+  object: FabricObject,
+  drawing: DrawingArrow,
+  sceneToObject: TMat2D
+): void {
   arrowControlAnchors.set(object, {
     path: object instanceof Path ? object.path : null,
     sceneToObject,
     start: new Point(drawing.start.x, drawing.start.y).transform(sceneToObject),
     end: new Point(drawing.end.x, drawing.end.y).transform(sceneToObject),
   });
+}
+
+export function syncDrawingArrowControlAnchors(object: FabricObject, drawing: DrawingArrow): void {
+  const reference = object.group ? createEditorDrawingFabricObject(drawing, 1) : object;
+  setArrowControlAnchors(object, drawing, util.invertTransform(reference.calcTransformMatrix()));
+}
+
+/** Maps retained drawing coordinates into the current scene without changing document metadata. */
+function getArrowDrawingPlane<
+  Props extends Partial<PathProps>,
+  SerializedProps extends SerializedPathProps,
+  Events extends ObjectEvents,
+>(object: Path<Props, SerializedProps, Events>, drawing: DrawingArrow): TMat2D | null {
+  if (!object.group) return null;
+  if (arrowControlAnchors.get(object)?.path !== object.path)
+    syncDrawingArrowControlAnchors(object, drawing);
+  const anchors = arrowControlAnchors.get(object);
+  return anchors
+    ? util.multiplyTransformMatrices(object.calcTransformMatrix(), anchors.sceneToObject)
+    : null;
 }
 
 function bendViewportPoint<
@@ -68,8 +112,16 @@ export function updateEditorDrawingArrowHover(canvas: Canvas, point: DrawingPoin
   if (bendGestures.has(canvas) || canvas._currentTransform) return;
   const object = canvas.getActiveObject();
   const drawing = object instanceof Path ? readEditorDrawingObject(object) : null;
+  const plane =
+    object instanceof Path && drawing?.kind === 'arrow'
+      ? getArrowDrawingPlane(object, drawing)
+      : null;
+  const drawingPoint =
+    point && plane ? new Point(point.x, point.y).transform(util.invertTransform(plane)) : point;
   const target =
-    point && drawing?.kind === 'arrow' ? resolveDrawingArrowBendTarget(drawing, point) : null;
+    drawingPoint && drawing?.kind === 'arrow'
+      ? resolveDrawingArrowBendTarget(drawing, drawingPoint)
+      : null;
   const previous = bendHover.get(canvas);
   if (target?.insert && object) bendHover.set(canvas, { object, target });
   else bendHover.delete(canvas);
@@ -124,6 +176,8 @@ function updateArrowPathInPlace<
   SerializedProps extends SerializedPathProps,
   Events extends ObjectEvents,
 >(object: Path<Props, SerializedProps, Events>, next: DrawingArrow): void {
+  const original = readEditorDrawingObject(object);
+  const plane = original?.kind === 'arrow' ? getArrowDrawingPlane(object, original) : null;
   const geometry = createEditorDrawingFabricObject(next, 1);
   if (!(geometry instanceof Path)) return;
   object.set({
@@ -139,9 +193,18 @@ function updateArrowPathInPlace<
     top: geometry.top,
     width: geometry.width,
   });
+  if (plane && object.group) {
+    const local = util.multiplyTransformMatrices(
+      util.invertTransform(object.group.calcTransformMatrix()),
+      util.multiplyTransformMatrices(plane, geometry.calcOwnMatrix())
+    );
+    util.applyTransformToObject(object, local);
+    setArrowControlAnchors(object, next, util.invertTransform(geometry.calcOwnMatrix()));
+  } else {
+    syncDrawingArrowControlAnchors(object, next);
+  }
   writeEditorDrawingObject(object, next);
   object.setCoords();
-  syncDrawingArrowControlAnchors(object, next);
   object.canvas?.requestRenderAll();
 }
 
@@ -174,21 +237,20 @@ function resolveMovedArrow(
 }
 
 function renderEndpoint(
+  this: Control,
   ctx: CanvasRenderingContext2D,
   left: number,
   top: number,
   _styleOverride: unknown,
   object: FabricObject
 ): void {
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(left, top, object.__corner ? 7 : 5.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#f8fafc';
-  ctx.strokeStyle = object.cornerStrokeColor || object.borderColor || DRAWING_SELECTION_ACCENT;
-  ctx.lineWidth = 1.6;
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  const key = Object.keys(object.controls).find((candidate) => object.controls[candidate] === this);
+  renderCanvasSelectionHandle(ctx, left, top, 'point', {
+    color: object.cornerStrokeColor || DRAWING_SELECTION_ACCENT,
+    active:
+      isDrawingControlCaptured(object, key) ||
+      (!object.canvas?._currentTransform && key !== 'bend-insert' && object.__corner === key),
+  });
 }
 
 function createArrowEndpointControl(endpoint: ArrowEndpoint): Control {
@@ -214,13 +276,35 @@ function createArrowEndpointControl(endpoint: ArrowEndpoint): Control {
       object.canvas?.setCursor('grabbing');
       const drawing = readEditorDrawingObject(object);
       if (!(object instanceof Path) || drawing?.kind !== 'arrow') return false;
+      const plane = getArrowDrawingPlane(object, drawing);
+      const scene = object.group
+        ? new Point(x, y).transform(object.group.calcTransformMatrix())
+        : new Point(x, y);
+      const pointer = plane ? scene.transform(util.invertTransform(plane)) : scene;
       const next = resolveMovedArrow(
         drawing,
         endpoint,
-        new Point(x, y),
+        pointer,
         event as MouseEvent | PointerEvent
       );
-      updateArrowPathInPlace(object, next);
+      const snap = object.canvas ? pointSnappers.get(object.canvas) : undefined;
+      const point = snap?.({
+        point: plane
+          ? new Point(next[endpoint].x, next[endpoint].y).transform(plane)
+          : next[endpoint],
+        origin: plane
+          ? new Point(
+              next[endpoint === 'start' ? 'end' : 'start'].x,
+              next[endpoint === 'start' ? 'end' : 'start'].y
+            ).transform(plane)
+          : next[endpoint === 'start' ? 'end' : 'start'],
+        ...(object.sniptaleId ? { excludeId: object.sniptaleId } : {}),
+        preserveAngle: event.shiftKey,
+        bypass: event.altKey,
+      });
+      const snapped =
+        point && plane ? new Point(point.x, point.y).transform(util.invertTransform(plane)) : point;
+      updateArrowPathInPlace(object, snapped ? { ...next, [endpoint]: snapped } : next);
       return true;
     },
     render: renderEndpoint as Control['render'],
@@ -232,14 +316,19 @@ function createArrowBendControl(index: number | null): Control {
   const targetAt = (object: FabricObject): DrawingArrowBendTarget | null => {
     const drawing = readEditorDrawingObject(object);
     if (drawing?.kind !== 'arrow' || drawing.design !== 'freehand') return null;
-    const point = index === null ? null : drawing.bendPoints?.[index];
+    const active = object.canvas ? bendGestures.get(object.canvas) : null;
+    const inserted =
+      active?.object === object && active.target.insert && active.current !== active.original;
+    const currentIndex =
+      index !== null && inserted && index >= active.target.index ? index + 1 : index;
+    const point = currentIndex === null ? null : drawing.bendPoints?.[currentIndex];
     const hover = object.canvas ? bendHover.get(object.canvas) : null;
     return index === null
       ? hover?.object === object
         ? hover.target
         : null
-      : point
-        ? { point, index, insert: false }
+      : point && currentIndex !== null
+        ? { point, index: currentIndex, insert: false }
         : null;
   };
   return new Control({
@@ -267,13 +356,14 @@ function createArrowBendControl(index: number | null): Control {
       const target = targetAt(object);
       if (!(object instanceof Path) || !object.canvas || drawing?.kind !== 'arrow' || !target)
         return false;
+      const plane = getArrowDrawingPlane(object, drawing);
       gesture = {
         canvas: object.canvas,
         object,
         original: drawing,
         current: drawing,
         target,
-        start: { x, y },
+        start: plane ? new Point(x, y).transform(util.invertTransform(plane)) : { x, y },
       };
       bendGestures.set(object.canvas, gesture);
       object.canvas.setCursor('none');
@@ -282,8 +372,18 @@ function createArrowBendControl(index: number | null): Control {
     actionHandler: (_event, _transform, x, y) => {
       if (!gesture || bendGestures.get(gesture.canvas) !== gesture) return false;
       gesture.canvas.setCursor('none');
-      const delta = { x: x - gesture.start.x, y: y - gesture.start.y };
-      const moved = Math.hypot(delta.x, delta.y) * gesture.canvas.getZoom() >= 4;
+      const object = gesture.object;
+      const plane = object instanceof Path ? getArrowDrawingPlane(object, gesture.current) : null;
+      const scene = object.group
+        ? new Point(x, y).transform(object.group.calcTransformMatrix())
+        : new Point(x, y);
+      const pointer = plane ? scene.transform(util.invertTransform(plane)) : scene;
+      const startScene = plane
+        ? new Point(gesture.start.x, gesture.start.y).transform(plane)
+        : gesture.start;
+      const delta = { x: pointer.x - gesture.start.x, y: pointer.y - gesture.start.y };
+      const moved =
+        Math.hypot(scene.x - startScene.x, scene.y - startScene.y) * gesture.canvas.getZoom() >= 4;
       const next = moved
         ? updateDrawingArrowBend(gesture.original, gesture.target, {
             x: gesture.target.point.x + delta.x,
@@ -301,6 +401,10 @@ function createArrowBendControl(index: number | null): Control {
         bendGestures.delete(gesture.canvas);
         bendHover.delete(gesture.canvas);
         gesture.canvas.setCursor('grab');
+        if (gesture.object.canvas === gesture.canvas) {
+          gesture.object.controls = createDrawingArrowControls(gesture.current);
+          gesture.object.setCoords();
+        }
       }
       gesture = null;
       return true;

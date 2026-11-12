@@ -1,4 +1,4 @@
-import { FabricObject, Point } from 'fabric';
+import { FabricObject, Group, Point } from 'fabric';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -159,4 +159,19 @@ it('preserves submitted Simplify work only for the window-blur route', () => {
   expect(mocks.cancelInteractionMock).toHaveBeenLastCalledWith(
     expect.objectContaining({ preservePendingSimplify: false })
   );
+});
+
+it('removes an empty edited child from its owning group and clears its active selection', () => {
+  const controller = createController();
+  const child = new FabricObject({ width: 30, height: 20 });
+  const parent = new Group([child]);
+  const discard = vi.fn();
+  Object.assign(controller.canvas, { getActiveObject: () => child, discardActiveObject: discard });
+  mocks.prepareObjectMock.mockImplementationOnce((_object, callbacks) => {
+    callbacks.onTextboxExitEmpty(child);
+  });
+  initializeObjectForController(controller, child);
+  expect(parent.getObjects()).toEqual([]);
+  expect(discard).toHaveBeenCalledOnce();
+  expect(controller.canvas.remove).not.toHaveBeenCalled();
 });

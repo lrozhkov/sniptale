@@ -797,3 +797,74 @@ it('commits a speed-sampled pencil object and becomes click-through outside Draw
   expect(session.getSnapshot().document.objects).toHaveLength(3);
   act(() => root.unmount());
 });
+
+it('keeps drawing content editable without invisible resize handles during recording', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    id: 'box',
+    kind: 'rectangle',
+    bounds: { x: 100, y: 100, width: 100, height: 60 },
+    color: '#f00',
+    fillColor: '#f00',
+    width: 2,
+  });
+  session.setActiveTool('select');
+  session.select('box');
+  const controller: ContentDrawingController = {
+    session,
+    getPalette: () => ['#f00'],
+    applyPalette: vi.fn(),
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+    finalizeInteraction: vi.fn(),
+  };
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const event = (type: string, clientX: number, clientY: number) => {
+    const value = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY });
+    Object.defineProperties(value, { pointerId: { value: 1 }, pointerType: { value: 'mouse' } });
+    return value;
+  };
+  try {
+    act(() =>
+      root.render(
+        <DrawingSurface active chromeHidden={false} serviceUiSuppressed controller={controller} />
+      )
+    );
+    const chrome = host.querySelector<HTMLCanvasElement>(
+      '[data-ui="content.drawing.selection-chrome"]'
+    )!;
+    const canvas =
+      host.querySelector<HTMLCanvasElement>('[data-ui="content.drawing.canvas"]') ??
+      host.querySelector<HTMLCanvasElement>('canvas')!;
+    expect(chrome.hidden).toBe(true);
+    act(() => canvas.dispatchEvent(event('pointerdown', 100, 100)));
+    act(() => canvas.dispatchEvent(event('pointermove', 120, 120)));
+    act(() => canvas.dispatchEvent(event('pointerup', 120, 120)));
+    const object = session.getSnapshot().document.objects[0]!;
+    expect(object.kind).toBe('rectangle');
+    if (object.kind !== 'rectangle') throw new Error('Expected rectangle');
+    expect(object.bounds).toEqual({ x: 120, y: 120, width: 100, height: 60 });
+    act(() =>
+      root.render(
+        <DrawingSurface
+          active
+          chromeHidden={false}
+          serviceUiSuppressed={false}
+          controller={controller}
+        />
+      )
+    );
+    expect(chrome.hidden).toBe(false);
+    act(() => canvas.dispatchEvent(event('pointerdown', 120, 120)));
+    act(() => canvas.dispatchEvent(event('pointermove', 100, 100)));
+    act(() => canvas.dispatchEvent(event('pointerup', 100, 100)));
+    const resized = session.getSnapshot().document.objects[0]!;
+    if (resized.kind !== 'rectangle') throw new Error('Expected rectangle');
+    expect(resized.bounds).toEqual({ x: 100, y: 100, width: 120, height: 80 });
+  } finally {
+    act(() => root.unmount());
+  }
+});

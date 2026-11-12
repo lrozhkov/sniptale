@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
-import { renderDrawingObject, renderDrawingSelection, renderDrawingHoverOutline } from './render';
+import {
+  renderDrawingObject,
+  renderDrawingSelection,
+  renderDrawingMultiSelection,
+  renderDrawingHoverOutline,
+} from './render';
 import type { DrawingObject } from '../../features/drawing/public';
+import { renderCanvasRotationHandle } from '../../ui/drawing-tools/selection-chrome';
 
 const stencilText: Extract<DrawingObject, { kind: 'text' }> = {
   id: 'stencil',
@@ -397,7 +403,7 @@ it.each(['rectangle', 'ellipse', 'triangle'] as const)(
   }
 );
 
-it('renders a dashed blue hover boundary without fill or handles and preserves canvas state', () => {
+it('shows a solid rectangle hover boundary without handles or source changes', () => {
   const context = createPixelCanvas();
   context.strokeStyle = '#ff0000';
   context.lineWidth = 3;
@@ -416,10 +422,7 @@ it('renders a dashed blue hover boundary without fill or handles and preserves c
   );
   const edge = context.getImageData(62, 59, 96, 1).data;
   const visible = Array.from({ length: 96 }, (_, index) => edge[index * 4 + 3]! > 0);
-  expect(visible.some(Boolean)).toBe(true);
-  expect(visible.some((value) => !value)).toBe(true);
-  const first = visible.findIndex(Boolean) * 4;
-  expect(Array.from(edge.slice(first, first + 3))).toEqual([37, 99, 235]);
+  expect(visible.every(Boolean)).toBe(true);
   expect(context.getImageData(90, 90, 1, 1).data[3]).toBe(0);
   expect(context.getImageData(57, 57, 1, 1).data[3]).toBe(0);
   expect(context.getLineDash()).toEqual([2, 1]);
@@ -484,4 +487,105 @@ it('paints pasted tab-separated text at native eight-space stops in capture', ()
   expect(fill.mock.calls.map((call) => call[0])).toEqual(['A', 'B', 'C']);
   expect(fill.mock.calls[1]![1] - fill.mock.calls[0]![1]).toBeCloseTo(stop, 4);
   expect(fill.mock.calls[2]![1] - fill.mock.calls[0]![1]).toBeCloseTo(stop * 2, 4);
+});
+
+it('fills only the ready arrow point on hover and draws an existing hovered bend once', () => {
+  const context = createPixelCanvas();
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    id: 'ready',
+    kind: 'arrow',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [
+      { x: 80, y: 80 },
+      { x: 180, y: 80 },
+    ],
+    color: '#f00',
+    width: 2,
+    dynamicWidth: false,
+  };
+  const arc = vi.spyOn(context, 'arc');
+  renderDrawingSelection(context, arrow, { x: 0, y: 0 }, arrow.bendPoints![1]);
+  expect(arc).toHaveBeenCalledTimes(4);
+  const ready = context.getImageData(180, 80, 1, 1).data;
+  expect(ready[2]! - ready[0]!).toBeGreaterThan(40);
+  expect(Array.from(context.getImageData(80, 80, 1, 1).data)).toEqual([255, 255, 255, 255]);
+});
+
+it('keeps the exact captured inserted bend blue and its old neighbors neutral', () => {
+  const context = createPixelCanvas();
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    id: 'captured',
+    kind: 'arrow',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [
+      { x: 80, y: 80 },
+      { x: 130, y: 180 },
+      { x: 180, y: 80 },
+    ],
+    color: '#f00',
+    width: 2,
+    dynamicWidth: false,
+  };
+  renderDrawingSelection(context, arrow, { x: 0, y: 0 }, arrow.bendPoints![2], false, 'bend:1');
+  const active = context.getImageData(130, 180, 1, 1).data;
+  expect(active[2]! - active[0]!).toBeGreaterThan(40);
+  for (const x of [80, 180])
+    expect(Array.from(context.getImageData(x, 80, 1, 1).data)).toEqual([255, 255, 255, 255]);
+});
+
+it.each(['single', 'multi'] as const)(
+  'keeps the shared rotation glyph upright outside a rotated %s selection',
+  (mode) => {
+    const context = createPixelCanvas();
+    const reference = createPixelCanvas();
+    const object: Extract<DrawingObject, { kind: 'rectangle' }> = {
+      id: 'upright',
+      kind: 'rectangle',
+      bounds: { x: 100, y: 100, width: 100, height: 60 },
+      color: '#000',
+      width: 2,
+      rotation: 90,
+    };
+    if (mode === 'single') renderDrawingSelection(context, object, { x: 0, y: 0 });
+    else
+      renderDrawingMultiSelection(
+        context,
+        [object],
+        { x: 0, y: 0 },
+        { bounds: object.bounds, angle: 90 }
+      );
+    renderCanvasRotationHandle(reference, 200, 200);
+    const actual = context.getImageData(188, 188, 24, 24).data;
+    const expected = reference.getImageData(188, 188, 24, 24).data;
+    expect(expected.some((channel, index) => index % 4 === 3 && channel > 0)).toBe(true);
+    expect(Array.from(actual)).toEqual(Array.from(expected));
+  }
+);
+
+it('keeps an insertion preview neutral until capture instead of treating it as a ready arrow point', () => {
+  const context = createPixelCanvas();
+  renderDrawingSelection(
+    context,
+    {
+      id: 'preview',
+      kind: 'arrow',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      bendPoints: [
+        { x: 80, y: 80 },
+        { x: 180, y: 80 },
+      ],
+      color: '#f00',
+      width: 2,
+      dynamicWidth: false,
+    },
+    { x: 0, y: 0 },
+    { x: 130, y: 100 }
+  );
+  expect(Array.from(context.getImageData(130, 100, 1, 1).data)).toEqual([255, 255, 255, 255]);
 });

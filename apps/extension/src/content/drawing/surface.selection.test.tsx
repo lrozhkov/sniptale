@@ -19,6 +19,7 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
     lineTo: vi.fn(),
     moveTo: vi.fn(),
     rect: vi.fn(),
+    roundRect: vi.fn(),
     restore: vi.fn(),
     save: vi.fn(),
     setLineDash: vi.fn(),
@@ -246,24 +247,24 @@ it('fades selected shape controls and hides the cursor only during its pointer d
   expect(chrome).not.toBeNull();
   expect(chrome?.style.pointerEvents).toBe('none');
 
-  act(() => canvas.dispatchEvent(pointer('pointerdown', 20, 30)));
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 70, 70)));
   expect(canvas.style.cursor).not.toBe('none');
   expect(chrome?.style.opacity).toBe('1');
-  act(() => canvas.dispatchEvent(pointer('pointermove', 22, 31)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 72, 71)));
   expect(chrome?.style.opacity).toBe('1');
-  act(() => canvas.dispatchEvent(pointer('pointerup', 22, 31)));
+  act(() => canvas.dispatchEvent(pointer('pointerup', 72, 71)));
   expect(chrome?.style.opacity).toBe('1');
-  act(() => canvas.dispatchEvent(pointer('pointerdown', 22, 31)));
-  act(() => canvas.dispatchEvent(pointer('pointermove', 60, 70)));
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 72, 71)));
+  act(() => canvas.dispatchEvent(pointer('pointermove', 110, 110)));
   expect(chrome?.style.opacity).toBe('0');
   expect(chrome?.style.transition).toContain('150ms');
   expect(canvas.style.cursor).toBe('none');
-  act(() => canvas.dispatchEvent(pointer('pointerup', 60, 70)));
+  act(() => canvas.dispatchEvent(pointer('pointerup', 110, 110)));
   expect(canvas.style.cursor).not.toBe('none');
   expect(chrome?.style.opacity).toBe('1');
   expect(chrome?.style.transition).toContain('50ms');
 
-  act(() => canvas.dispatchEvent(pointer('pointerdown', 60, 70)));
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 110, 110)));
   act(() => window.dispatchEvent(new Event('blur')));
   expect(canvas.style.cursor).not.toBe('none');
   expect(chrome?.style.opacity).toBe('1');

@@ -118,6 +118,7 @@ const zero = () => 0;
 
 /** Exposes operation feedback without exposing source or result pixels to the open UI tree. */
 export function DrawingSimplifyFeedback(props: {
+  suppressed?: boolean;
   controller: ContentDrawingController;
   projection: DrawingPoint;
 }) {
@@ -127,6 +128,7 @@ export function DrawingSimplifyFeedback(props: {
     runtime?.getRevision ?? zero,
     runtime?.getRevision ?? zero
   );
+  if (props.suppressed) return null;
   const feedback = runtime?.getFeedback();
   const key =
     feedback === 'too-small'

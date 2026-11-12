@@ -145,9 +145,11 @@ it.each([0.5, 2])('keeps resize handles below the number at zoom %s', (scale) =>
   expect(Number(handle!.parentElement!.style.zIndex)).toBeLessThan(
     Number(badgeLayer!.style.zIndex)
   );
+  const stroke = host.querySelector<HTMLElement>('.sniptale-interactive-frame-stroke')!;
+  expect(Number(handle!.parentElement!.style.zIndex)).toBeGreaterThan(Number(stroke.style.zIndex));
   expect(handle!.style.position).toBe('absolute');
   expect(handle!.parentElement!.style.transform).toBe(`scale(${1 / scale})`);
-  expect(handle!.style.width).toBe('11px');
+  expect(handle!.style.width).toBe('9px');
   act(() => handle!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
   expect(onResizeStart).toHaveBeenCalledWith(expect.anything(), 'se', null);
   act(() => root.unmount());

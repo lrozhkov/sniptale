@@ -11,6 +11,7 @@ import type { ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
 import { mousePointerEvent, setupAlignmentSurface } from './pointer-runtime.test-support';
 import * as trustedEvents from '../platform/trusted-events';
+import { useDrawingPointerRuntime } from './pointer-runtime';
 vi.mock('../platform/trusted-events', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/trusted-events')>()),
   isTrustedKeyboardEvent: vi.fn(() => true),
@@ -619,3 +620,152 @@ it.each([false, true])(
     scene.dispose();
   }
 );
+
+it.each(['arrow', 'select'] as const)(
+  'redraws only ready endpoint identity changes under the %s tool',
+  (tool) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject({
+      id: 'selected-arrow',
+      kind: 'arrow',
+      design: 'standard',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      color: '#000',
+      width: 2,
+      dynamicWidth: false,
+    });
+    session.commitObject({
+      id: 'other',
+      kind: 'rectangle',
+      bounds: { x: 300, y: 80, width: 100, height: 80 },
+      color: '#000',
+      width: 2,
+    });
+    session.setActiveTool(tool);
+    session.select('selected-arrow');
+    const controller: ContentDrawingController = {
+      session,
+      applyPalette: vi.fn(),
+      finalizeInteraction: vi.fn(),
+      getPalette: () => [],
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+    };
+    let renders = 0;
+    function Probe() {
+      renders++;
+      const pointer = useDrawingPointerRuntime({
+        active: true,
+        controller,
+        root: controller.getScrollRoot(),
+        onCancelText: () => undefined,
+        onText: () => undefined,
+      });
+      return (
+        <canvas
+          data-hover={JSON.stringify(pointer.hoverPointRef.current)}
+          onPointerMove={pointer.onPointerMove}
+        />
+      );
+    }
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => root.render(<Probe />));
+    const canvas = host.querySelector('canvas')!;
+    const move = (x: number, y: number) =>
+      act(() => canvas.dispatchEvent(mousePointerEvent('pointermove', x, y)));
+    move(120, 20);
+    expect(canvas.dataset['hover']).toBe(
+      tool === 'select' ? JSON.stringify({ clientX: 120, clientY: 20 }) : 'null'
+    );
+    move(21, 20);
+    expect(canvas.dataset['hover']).toBe(JSON.stringify({ clientX: 21, clientY: 20 }));
+    const readyRenders = renders;
+    move(22, 20);
+    expect(renders).toBe(readyRenders);
+    move(300, 100);
+    expect(canvas.dataset['hover']).toBe(
+      tool === 'select' ? JSON.stringify({ clientX: 300, clientY: 100 }) : 'null'
+    );
+    move(220, 20);
+    expect(canvas.dataset['hover']).toBe(JSON.stringify({ clientX: 220, clientY: 20 }));
+    act(() => session.setActiveTool('pencil'));
+    move(21, 20);
+    expect(canvas.dataset['hover']).toBe('null');
+    act(() => root.unmount());
+    session.dispose();
+  }
+);
+
+it.each(['arrow', 'select'] as const)(
+  'paints ready standard arrow endpoints through the real surface under %s',
+  (tool) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject({
+      id: 'painted-arrow',
+      kind: 'arrow',
+      design: 'standard',
+      start: { x: 80, y: 80 },
+      end: { x: 280, y: 80 },
+      color: '#000',
+      width: 2,
+      dynamicWidth: false,
+    });
+    session.setActiveTool(tool);
+    session.select('painted-arrow');
+    const controller: ContentDrawingController = {
+      session,
+      applyPalette: vi.fn(),
+      finalizeInteraction: vi.fn(),
+      getPalette: () => [],
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+    };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+    const canvas = host.querySelector('canvas')!;
+    const chrome = host.querySelector<HTMLCanvasElement>(
+      '[data-ui="content.drawing.selection-chrome"]'
+    )!;
+    const blue = () => {
+      const pixel = chrome.getContext('2d')!.getImageData(80, 80, 1, 1).data;
+      return pixel[2]! - pixel[0]!;
+    };
+    expect(blue()).toBe(0);
+    act(() => canvas.dispatchEvent(mousePointerEvent('pointermove', 81, 80)));
+    expect(blue()).toBeGreaterThan(40);
+    act(() => canvas.dispatchEvent(mousePointerEvent('pointermove', 180, 80)));
+    expect(blue()).toBe(0);
+    act(() => root.unmount());
+    session.dispose();
+  }
+);
+
+it('keeps captured resize controls visible when the pointer leaves the side handle', () => {
+  const scene = setupAlignmentSurface();
+  try {
+    const chrome = scene.host.querySelector<HTMLElement>(
+      '[data-ui="content.drawing.selection-chrome"]'
+    )!;
+    scene.event('pointerdown', 160, 110);
+    scene.event('pointermove', 200, 190);
+    expect(getComputedStyle(chrome).opacity).toBe('1');
+    scene.event('pointerup', 200, 190);
+    expect(getComputedStyle(chrome).opacity).toBe('1');
+  } finally {
+    scene.dispose();
+  }
+});

@@ -20,7 +20,11 @@ export function prepareEditorObject(
   applyEditorObjectInteractionControls(object);
 
   if (isGroup(object)) {
-    object.getObjects().forEach((child) => child.set({ selectable: false, evented: false }));
+    if (object.sniptaleType === 'group') {
+      object.getObjects().forEach((child) => prepareEditorObject(child, options));
+    } else {
+      object.getObjects().forEach((child) => child.set({ selectable: false, evented: false }));
+    }
   }
   applyLineLikeRichShapeControls(object);
 

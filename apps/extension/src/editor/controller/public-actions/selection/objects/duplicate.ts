@@ -1,4 +1,4 @@
-import { ActiveSelection, Group, type Canvas, type FabricObject } from 'fabric';
+import { ActiveSelection, Group, util, type Canvas, type FabricObject } from 'fabric';
 
 import { convertBackgroundDuplicateToAnnotation } from '../../../background';
 import { createObjectLabel, CUSTOM_JSON_PROPS, isSourceObject } from '../../../../document/model';
@@ -45,6 +45,7 @@ async function cloneEditorSelectionObject(args: {
   frameOrdering: number;
 }): Promise<FabricObject> {
   const clone = await args.object.clone([...CUSTOM_JSON_PROPS]);
+  if (args.object.parent) util.applyTransformToObject(clone, args.object.calcTransformMatrix());
   clone.set({
     left: (clone.left ?? 0) + 24,
     top: (clone.top ?? 0) + 24,
@@ -101,6 +102,7 @@ export async function duplicateEditorSelection(options: {
     return;
   }
 
+  const parent = activeObjects[0]?.parent;
   const clones: FabricObject[] = [];
   let frameOrdering =
     Math.max(
@@ -117,10 +119,24 @@ export async function duplicateEditorSelection(options: {
       frameOrdering,
     });
     if (readFrameAnnotationSnapshot(clone)) frameOrdering += 1;
-    canvas.add(clone);
     clones.push(clone);
   }
 
+  if (parent) {
+    let root: FabricObject = parent;
+    while (true) {
+      if (root.sniptaleLocked || root.visible === false) return;
+      if (!root.parent) break;
+      if (!root.parent.getObjects().includes(root)) return;
+      root = root.parent;
+    }
+    if (
+      !canvas.getObjects().includes(root) ||
+      activeObjects.some((object) => object.parent !== parent)
+    )
+      return;
+  }
+  clones.forEach((clone) => (parent ?? canvas).add(clone));
   const [singleClone] = clones;
   canvas.setActiveObject(
     clones.length === 1 && singleClone ? singleClone : new ActiveSelection(clones, { canvas })

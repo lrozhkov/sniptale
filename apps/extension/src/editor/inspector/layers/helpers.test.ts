@@ -63,3 +63,32 @@ describe('editor layers sidebar selection capabilities', () => {
     expect(canDeleteLayerSelection([lockedLayer] as never)).toBe(false);
   });
 });
+
+it('keeps nested selection commands available without treating the containing group as selected', () => {
+  const layers = [
+    {
+      id: 'group',
+      type: 'group',
+      locked: false,
+      selected: false,
+      containsSelection: true,
+      groupChildren: [
+        {
+          id: 'child',
+          type: 'shape',
+          name: 'Child',
+          typeLabel: 'Shape',
+          selected: true,
+          locked: false,
+        },
+      ],
+    },
+  ];
+  expect(canDeleteLayerSelection(layers as never)).toBe(true);
+  expect(canDuplicateLayerSelection(layers as never)).toBe(true);
+  expect(canReorderLayerSelection(layers as never)).toBe(true);
+  expect(canMergeLayerSelection(layers as never)).toBe(false);
+  layers[0]!.locked = true;
+  expect(canDeleteLayerSelection(layers as never)).toBe(false);
+  expect(canDuplicateLayerSelection(layers as never)).toBe(false);
+});

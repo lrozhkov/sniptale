@@ -69,3 +69,23 @@ it('wires shared drawing text commit and empty callbacks', () => {
   expect(onTextboxExitEmpty).toHaveBeenCalledWith(text);
   expect(onTextboxExitCommit).toHaveBeenCalledWith(text);
 });
+
+it('prepares semantic group children through their own adapters while retaining internal drawing groups', () => {
+  const text = new Textbox('Child text');
+  text.sniptaleType = 'text';
+  const internal = new Rect();
+  const drawing = new Group([internal]);
+  drawing.sniptaleType = 'arrow';
+  const group = new Group([text, drawing]);
+  group.sniptaleType = 'group';
+  prepareEditorObject(group, { onTextboxExitCommit: vi.fn(), onTextboxExitEmpty: vi.fn() });
+  expect(mocks.applyBaseInteractionPatch).toHaveBeenCalledWith(
+    text,
+    expect.objectContaining({ locked: false })
+  );
+  expect(mocks.attachEditorTextboxLifecycle).toHaveBeenCalledWith(text, expect.any(Object));
+  expect(internal.selectable).toBe(false);
+  expect(internal.evented).toBe(false);
+  expect(group.interactive).toBe(false);
+  expect(group.subTargetCheck).toBe(false);
+});

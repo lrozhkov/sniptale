@@ -4,7 +4,7 @@ import { expect } from '../support/extension-fixture';
 import type { BrowserContext } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 
-async function inspectRecordedSimplify(popup: Page, recordingId: string) {
+export async function readSavedRecordingAsset(popup: Page, recordingId: string) {
   return popup.evaluate(async (recordingId) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('sniptale-db');
@@ -39,94 +39,102 @@ async function inspectRecordedSimplify(popup: Page, recordingId: string) {
     } finally {
       database.close();
     }
-    const records = [reference];
-    for (const record of records) {
-      if (
-        typeof record !== 'object' ||
-        record === null ||
-        !('mimeType' in record) ||
-        typeof record.mimeType !== 'string' ||
-        !record.mimeType.startsWith('video/') ||
-        !('location' in record)
-      )
-        continue;
-      const location = record.location;
-      if (
-        typeof location !== 'object' ||
-        location === null ||
-        !('objectKey' in location) ||
-        typeof location.objectKey !== 'string'
-      )
-        continue;
-      const parts = location.objectKey.split('/');
-      const filename = parts.pop();
-      if (!filename || parts.some((part) => !part || part === '..'))
-        throw new Error('Invalid saved video location');
-      let directory = await (
-        await navigator.storage.getDirectory()
-      ).getDirectoryHandle('sniptale-assets');
-      for (const part of parts) directory = await directory.getDirectoryHandle(part);
-      const file = await (await directory.getFileHandle(filename)).getFile();
-      const url = URL.createObjectURL(new Blob([file], { type: record.mimeType }));
-      const video = document.createElement('video');
-      video.muted = true;
-      video.playbackRate = 4;
-      const canvas = document.createElement('canvas');
-      try {
-        await new Promise<void>((resolve, reject) => {
-          video.onloadeddata = () => resolve();
-          video.onerror = () => reject(new Error('Saved recording cannot decode'));
-          video.src = url;
-        });
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Video proof canvas missing');
-        let coral = 0;
-        await new Promise<void>((resolve, reject) => {
-          let finished = false;
-          const complete = () => {
-            if (finished) return;
-            finished = true;
-            video.pause();
-            resolve();
-          };
-          video.onended = complete;
-          video.onerror = () => reject(new Error('Saved recording playback failed'));
-          const frame = () => {
-            if (finished) return;
-            context.drawImage(video, 0, 0);
-            const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-            coral = 0;
-            for (let index = 0; index < pixels.length; index += 4)
-              if (
-                Math.abs(pixels[index]! - 255) <= 20 &&
-                Math.abs(pixels[index + 1]! - 127) <= 20 &&
-                Math.abs(pixels[index + 2]! - 80) <= 20
-              )
-                coral++;
-            if (coral > 1000) complete();
-            else video.requestVideoFrameCallback(frame);
-          };
-          video.requestVideoFrameCallback(frame);
-          void video.play().catch(reject);
-        });
-        return {
-          coral,
-          width: canvas.width,
-          height: canvas.height,
-          bytes: file.size,
-          frame: canvas.toDataURL('image/png'),
-        };
-      } finally {
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-        URL.revokeObjectURL(url);
-      }
-    }
-    throw new Error('Saved recording asset missing');
+    const record = reference;
+    if (
+      typeof record !== 'object' ||
+      record === null ||
+      !('mimeType' in record) ||
+      typeof record.mimeType !== 'string' ||
+      !record.mimeType.startsWith('video/') ||
+      !('location' in record)
+    )
+      throw new Error('Saved recording asset missing');
+    const location = record.location;
+    if (
+      typeof location !== 'object' ||
+      location === null ||
+      !('objectKey' in location) ||
+      typeof location.objectKey !== 'string'
+    )
+      throw new Error('Saved recording asset missing');
+    const parts = location.objectKey.split('/');
+    const filename = parts.pop();
+    if (!filename || parts.some((part) => !part || part === '..'))
+      throw new Error('Invalid saved video location');
+    let directory = await (
+      await navigator.storage.getDirectory()
+    ).getDirectoryHandle('sniptale-assets');
+    for (const part of parts) directory = await directory.getDirectoryHandle(part);
+    const file = await (await directory.getFileHandle(filename)).getFile();
+    return {
+      bytes: Array.from(new Uint8Array(await file.arrayBuffer())),
+      mimeType: record.mimeType,
+    };
   }, recordingId);
+}
+
+async function inspectRecordedSimplify(popup: Page, recordingId: string) {
+  const asset = await readSavedRecordingAsset(popup, recordingId);
+  return popup.evaluate(async ({ bytes, mimeType }) => {
+    const file = new Blob([new Uint8Array(bytes)], { type: mimeType });
+    const url = URL.createObjectURL(new Blob([file], { type: mimeType }));
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playbackRate = 4;
+    const canvas = document.createElement('canvas');
+    try {
+      await new Promise<void>((resolve, reject) => {
+        video.onloadeddata = () => resolve();
+        video.onerror = () => reject(new Error('Saved recording cannot decode'));
+        video.src = url;
+      });
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Video proof canvas missing');
+      let coral = 0;
+      await new Promise<void>((resolve, reject) => {
+        let finished = false;
+        const complete = () => {
+          if (finished) return;
+          finished = true;
+          video.pause();
+          resolve();
+        };
+        video.onended = complete;
+        video.onerror = () => reject(new Error('Saved recording playback failed'));
+        const frame = () => {
+          if (finished) return;
+          context.drawImage(video, 0, 0);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          coral = 0;
+          for (let index = 0; index < pixels.length; index += 4)
+            if (
+              Math.abs(pixels[index]! - 255) <= 20 &&
+              Math.abs(pixels[index + 1]! - 127) <= 20 &&
+              Math.abs(pixels[index + 2]! - 80) <= 20
+            )
+              coral++;
+          if (coral > 1000) complete();
+          else video.requestVideoFrameCallback(frame);
+        };
+        video.requestVideoFrameCallback(frame);
+        void video.play().catch(reject);
+      });
+      return {
+        coral,
+        width: canvas.width,
+        height: canvas.height,
+        bytes: file.size,
+        frame: canvas.toDataURL('image/png'),
+      };
+    } finally {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(url);
+    }
+  }, asset);
 }
 export async function startSimplifyRecording(
   context: BrowserContext,
@@ -160,7 +168,7 @@ export async function startSimplifyRecording(
   });
 }
 
-export async function assertSavedSimplifyRecording(page: Page, popup: Page, info: TestInfo) {
+export async function stopAndSaveDrawingRecording(page: Page, popup: Page) {
   await page.locator('[data-ui="content.toolbar.video-recording.stop"]').click();
   await expect
     .poll(
@@ -190,7 +198,11 @@ export async function assertSavedSimplifyRecording(page: Page, popup: Page, info
     typeof result.recordingId !== 'string'
   )
     throw new Error('Recording identity missing');
-  const recordingId = result.recordingId;
+  return result.recordingId;
+}
+
+export async function assertSavedSimplifyRecording(page: Page, popup: Page, info: TestInfo) {
+  const recordingId = await stopAndSaveDrawingRecording(page, popup);
   const recorded = await inspectRecordedSimplify(popup, recordingId);
   expect(recorded.coral, 'Saved recording must contain actual Simplify pixels').toBeGreaterThan(
     1000

@@ -15,6 +15,7 @@ type TextboxEditSnapshot = Pick<
   drawingJson: string | undefined;
   automaticWidth: boolean | undefined;
   maxWidth: number | undefined;
+  scenePosition?: ReturnType<Textbox['getXY']>;
 };
 
 const editSnapshots = new WeakMap<Textbox, TextboxEditSnapshot>();
@@ -33,6 +34,7 @@ export function beginEditorTextboxEditing(textbox: Textbox): void {
     text: textbox.text,
     top: textbox.top,
     width: textbox.width,
+    ...(textbox.group ? { scenePosition: textbox.getXY() } : {}),
   });
 }
 
@@ -73,6 +75,13 @@ export function cancelEditorTextboxEditing(textbox: Textbox): void {
     restoreTextboxLayoutMode(textbox, snapshot);
     synchronizeEditorDrawingTextLayout(textbox);
     textbox.set({ left: snapshot.left, top: snapshot.top });
+    if (snapshot.scenePosition && textbox.group) {
+      textbox.setXY(snapshot.scenePosition);
+      textbox.parent?.triggerLayout();
+      textbox.parent?.getObjects().forEach((object) => object.setCoords());
+      textbox.selectionStart = snapshot.selectionStart;
+      textbox.selectionEnd = snapshot.selectionEnd;
+    }
     textbox.setCoords();
     textbox.canvas?.requestRenderAll();
   }

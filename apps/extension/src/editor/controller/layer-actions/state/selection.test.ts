@@ -4,7 +4,8 @@ const mocks = vi.hoisted(() => ({
   isEditableObjectMock: vi.fn(() => true),
 }));
 
-vi.mock('fabric', () => ({
+vi.mock('fabric', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('fabric')>()),
   ActiveSelection: class ActiveSelection {
     objects: unknown[];
 

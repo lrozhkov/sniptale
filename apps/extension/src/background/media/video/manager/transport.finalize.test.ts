@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 
 const {
+  prepareDrawingCaptureMock,
+  restoreDrawingUiMock,
   attemptDiagnosticsStartMock,
   cancelVideoSourceReadyWaitMock,
   isStartCancelledMock,
@@ -11,6 +13,8 @@ const {
   supportsSystemAudioMock,
   waitForVideoSourceReadyMock,
 } = vi.hoisted(() => ({
+  prepareDrawingCaptureMock: vi.fn(),
+  restoreDrawingUiMock: vi.fn(),
   attemptDiagnosticsStartMock: vi.fn(),
   cancelVideoSourceReadyWaitMock: vi.fn(),
   isStartCancelledMock: vi.fn(),
@@ -19,6 +23,10 @@ const {
   sendOffscreenStartRecordingMock: vi.fn(),
   supportsSystemAudioMock: vi.fn(),
   waitForVideoSourceReadyMock: vi.fn(),
+}));
+
+vi.mock('../content-surface/runtime-state-sync', () => ({
+  prepareVideoRecordingSurfaceCapture: prepareDrawingCaptureMock,
 }));
 
 vi.mock('./diagnostics', () => ({ attemptDiagnosticsStart: attemptDiagnosticsStartMock }));
@@ -67,6 +75,8 @@ const settings = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  prepareDrawingCaptureMock.mockResolvedValue(restoreDrawingUiMock);
+  restoreDrawingUiMock.mockResolvedValue(undefined);
   supportsSystemAudioMock.mockReturnValue(true);
   isStartCancelledMock.mockReturnValue(false);
   waitForVideoSourceReadyMock.mockResolvedValue('stream-instance-1');
@@ -311,4 +321,45 @@ it('settles source validation when offscreen start delivery rejects', async () =
     'recording-42',
     expect.objectContaining({ message: 'offscreen unavailable' })
   );
+});
+
+it('does not acquire the source before drawing UI preparation resolves', async () => {
+  let ready!: () => void;
+  prepareDrawingCaptureMock.mockReturnValueOnce(
+    new Promise<() => Promise<void>>((resolve) => {
+      ready = () => resolve(restoreDrawingUiMock);
+    })
+  );
+  const pending = finalizeRecordingStart({
+    captureMode: CaptureMode.TAB,
+    captureSource: { mode: CaptureMode.TAB, streamId: 'tab-1' },
+    generation: 1,
+    recordingId: 'recording-42',
+    streamInstanceId: 'stream-instance-1',
+    settings,
+    surface: null,
+    tabId: 12,
+  });
+  await vi.waitFor(() => expect(prepareDrawingCaptureMock).toHaveBeenCalled());
+  expect(sendOffscreenStartRecordingMock).not.toHaveBeenCalled();
+  ready();
+  await pending;
+  expect(sendOffscreenStartRecordingMock).toHaveBeenCalledOnce();
+});
+
+it('does not dispatch a source when drawing UI readiness fails', async () => {
+  prepareDrawingCaptureMock.mockRejectedValueOnce(new Error('drawing surface unavailable'));
+  await expect(
+    finalizeRecordingStart({
+      captureMode: CaptureMode.TAB,
+      captureSource: { mode: CaptureMode.TAB, streamId: 'tab-1' },
+      generation: 1,
+      recordingId: 'recording-42',
+      streamInstanceId: 'stream-instance-1',
+      settings,
+      surface: null,
+      tabId: 12,
+    })
+  ).rejects.toThrow('drawing surface unavailable');
+  expect(sendOffscreenStartRecordingMock).not.toHaveBeenCalled();
 });

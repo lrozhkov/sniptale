@@ -1,4 +1,7 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { Canvas, Rect } from 'fabric';
+import { createEditorMagnetManager } from '../../magnet/manager';
 
 const storeState = {
   workspace: {
@@ -92,4 +95,52 @@ it('snaps resize edges when the grid is hidden and snapping remains enabled', ()
     rect: { x: 0, y: 0, width: 43, height: 50 },
   });
   expect(result).toEqual({ x: 0, y: 0, width: 48, height: 48 });
+});
+
+it('lets accepted relation-only feedback outrank grid without changing grid admission', async () => {
+  const canvas = new Canvas(document.createElement('canvas'), { width: 1000, height: 800 });
+  const make = (id: string, left: number, width: number, top = 0, height = 100) => {
+    const object = new Rect({
+      left,
+      top,
+      width,
+      height,
+      originX: 'left',
+      originY: 'top',
+      strokeWidth: 0,
+    });
+    object.sniptaleId = id;
+    object.sniptaleType = 'shape';
+    canvas.add(object);
+    return object;
+  };
+  const source = make('S', 35, 40, 30, 10);
+  make('A', 0, 20);
+  make('B', 100, 30);
+  storeState.workspace.magnetEnabled = true;
+  const manager = createEditorMagnetManager({
+    canvas,
+    getActiveTool: () => 'select',
+    getCanvasDocumentSize: () => ({ width: 1000, height: 800 }),
+    getCropGuide: () => null,
+    getWorkspace: () => ({ ...storeState.workspace, hideSelectionWhileDragging: true }),
+  });
+  try {
+    const result = manager.snapRect({
+      excludeId: 'S',
+      rect: { x: 35, y: 30, width: 40, height: 10 },
+    });
+    expect(result.x).toBe(40);
+    expect(manager.getVisualFeedback().guides).toEqual([]);
+    expect(manager.getVisualFeedback().relations).toMatchObject([{ kind: 'gap', value: 20 }]);
+    mocks.applyGridSnapMock.mockClear();
+    applyGridSnapForController({ magnetManager: manager } as never, source);
+    expect(mocks.applyGridSnapMock).not.toHaveBeenCalled();
+    manager.clearGuides();
+    applyGridSnapForController({ magnetManager: manager } as never, source);
+    expect(mocks.applyGridSnapMock).toHaveBeenCalledOnce();
+  } finally {
+    manager.dispose();
+    await canvas.dispose();
+  }
 });

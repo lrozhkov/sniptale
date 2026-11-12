@@ -25,7 +25,11 @@ async function inkBounds(dataUrl: string) {
   return { left, right, top, bottom };
 }
 
-async function selectionPaintBounds(png: Buffer, kind: 'selection' | 'background', filled = false) {
+async function selectionPaintBounds(
+  png: Buffer,
+  kind: 'selection' | 'background',
+  selectionColor: readonly number[] = [207, 221, 251]
+) {
   const image = await loadImage(png);
   const context = createCanvas(image.width, image.height).getContext('2d');
   context.drawImage(image, 0, 0);
@@ -42,9 +46,9 @@ async function selectionPaintBounds(png: Buffer, kind: 'selection' | 'background
         b = pixels[offset + 2]!;
       const matches =
         kind === 'selection'
-          ? Math.abs(r - 207) <= 3 &&
-            Math.abs(g - (filled ? 121 : 221)) <= 3 &&
-            Math.abs(b - (filled ? 114 : 251)) <= 3
+          ? Math.abs(r - selectionColor[0]!) <= 3 &&
+            Math.abs(g - selectionColor[1]!) <= 3 &&
+            Math.abs(b - selectionColor[2]!) <= 3
           : r > 240 && g > 90 && g < 180 && b < 110;
       if (!matches) continue;
       left = Math.min(left, x);
@@ -155,7 +159,17 @@ for (const viewport of [
               clip,
               fullPage: false,
             });
-            const selected = await selectionPaintBounds(png, 'selection', background);
+            const selectionColor = await input.evaluate((element, filled) => {
+              const canvas = document.createElement('canvas');
+              canvas.width = canvas.height = 1;
+              const context = canvas.getContext('2d')!;
+              context.fillStyle = filled ? '#ff7f50' : '#ffffff';
+              context.fillRect(0, 0, 1, 1);
+              context.fillStyle = getComputedStyle(element, '::selection').backgroundColor;
+              context.fillRect(0, 0, 1, 1);
+              return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3);
+            }, background);
+            const selected = await selectionPaintBounds(png, 'selection', selectionColor);
             const gaps = [
               clip.x + selected.left - frame.left,
               frame.left + frame.width - clip.x - selected.right,
