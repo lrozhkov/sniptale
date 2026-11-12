@@ -14,6 +14,7 @@ import {
   updateCreatedDrawingObject,
   resolveDrawingArrowBendTarget,
   updateDrawingArrowBend,
+  removeDrawingArrowBendAtPoint,
   type DrawingArrowBendTarget,
   type DrawingPoint,
   type DrawingObject,
@@ -133,6 +134,38 @@ export function updateEditorDrawingArrowHover(canvas: Canvas, point: DrawingPoin
     object?.setCoords();
     canvas.requestRenderAll();
   }
+}
+
+/** Removes one editable authored bend; the input owner publishes the history transaction. */
+export function removeEditorDrawingArrowBendAtPoint(canvas: Canvas, point: DrawingPoint): boolean {
+  if (
+    canvas._currentTransform ||
+    bendGestures.has(canvas) ||
+    canvas.getActiveObjects().length !== 1
+  )
+    return false;
+  const object = canvas.getActiveObject();
+  if (!(object instanceof Path) || !object.hasControls || !object.selectable) return false;
+  for (let current: FabricObject | undefined = object; current; current = current.parent) {
+    if (!current.visible || current.sniptaleLocked) return false;
+  }
+  const drawing = readEditorDrawingObject(object);
+  if (drawing?.kind !== 'arrow') return false;
+  const plane = getArrowDrawingPlane(object, drawing);
+  const authoredPoint = plane
+    ? new Point(point.x, point.y).transform(util.invertTransform(plane))
+    : point;
+  const next = removeDrawingArrowBendAtPoint(drawing, authoredPoint, (candidate) =>
+    bendViewportPoint(object, candidate)
+  );
+  if (next === drawing) return false;
+  bendHover.delete(canvas);
+  object.__corner = '';
+  updateArrowPathInPlace(object, next);
+  object.controls = createDrawingArrowControls(next);
+  object.setCoords();
+  canvas.requestRenderAll();
+  return true;
 }
 
 /** Cancels only this owner's live bend transaction, using the canvas as its identity. */

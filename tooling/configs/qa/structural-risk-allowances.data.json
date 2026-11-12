@@ -6716,11 +6716,11 @@
       "file": "apps/extension/src/content/drawing/surface.test.tsx",
       "symbol": "<file>",
       "owner": "extension:content:drawing",
-      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. The added recording-control proof uses the existing mounted surface, session, Canvas fixture and cleanup. The unchanged score and test-local receivers do not identify another production authority. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-12",
-      "astHash": "777186ddb1887254590572657f5d29c8bf598f7f623a6426123583d32c796b3c",
-      "signatureHash": "f8a2bd2eba941bc650ab879e884f5c5b3704325ca4eebaae1c3c29f922127480"
+      "reason": "tool-noise: Independent read-only diagnosis inspected the arrow-point deletion tests and mounted surface fixture. Each added case creates an isolated session and root using the existing Canvas fixture and cleanup. Commit spies and the commit recording array observe that session's single document transaction. These test-local receivers do not create an independent production writer, lifecycle, or fixture owner.",
+      "removalCondition": "Remove this exact allowance when its AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract, or fixture lifecycle. Remove when the analyzer models these isolated surface tests without this false positive.",
+      "astHash": "271209fb829be06d15a95236940fe64005ee2f6b107ea053e5cb869545dec944",
+      "signatureHash": "f8a2bd2eba941bc650ab879e884f5c5b3704325ca4eebaae1c3c29f922127480",
+      "reviewDate": "2026-11-13"
     },
     {
       "rule": "structural-function-risk",
@@ -6809,6 +6809,28 @@
       "reason": "tool-noise: The added cases prove pointer admission for existing arrow bends and endpoints through beginDrawingPointer and the existing local DrawingSession fixture. They check off-center capture, nearest-bend selection and endpoint-versus-bend priority. Each case creates one local session with the same synchronous commit callback used by adjacent selection and handle tests. No projection subscription, external resource, shared mutable fixture, additional service or independent cleanup lifetime is introduced. The score remains two, owner count remains two and cohesion remains one. The file crosses the line limit without adding an independent fixture responsibility.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent fixture setup or cleanup, projection subscription, external resource lifetime, service, shared mutable state or unrelated interaction contract. Remove when the analyzer models this cohesive pointer-admission proof scope. Final fresh architecture review must validate this exact binding.",
       "reviewDate": "2026-11-12"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/content/drawing/surface.tsx",
+      "symbol": "<file>",
+      "owner": "extension:content:drawing",
+      "reason": "tool-noise: Independent read-only diagnosis inspected the selected-arrow double-click adapter and existing surface composition. The private helper reads the existing controller.session, delegates geometry to the shared arrow owner, commits once through session.replaceObject, and clears the existing pointer hover presentation refs. The canvas dispatcher restores that canvas cursor. This operation adds no document authority, subscription, async publisher, resource lifetime, or independent state store.",
+      "removalCondition": "Remove this exact allowance when its AST or signature changes. Reassess any added document writer, independent state receiver, subscription, async publisher, resource lifetime, or recovery contract. Remove when the analyzer models this mounted surface transaction without this false positive.",
+      "astHash": "795b798c388a276a21fdd5dc34c43aee7d6123e8c1db1f470684cdb76263365c",
+      "signatureHash": "c5f7482f776cf340a26a80566154c022d74b0b011a0218ad37c42bc8cb64e212",
+      "reviewDate": "2026-11-13"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/content/drawing/surface.tsx",
+      "symbol": "DrawingCanvasLayer",
+      "owner": "extension:content:drawing",
+      "reason": "tool-noise: Independent read-only diagnosis inspected this canvas event dispatcher. The added arrow deletion branch uses the existing session and pointer runtime before the existing text branch, then restores the same canvas cursor. Its presentation state and restore listeners belong to the mounted canvas interaction lifetime. The operation adds no independently changing authority or resource lifetime that requires extraction.",
+      "removalCondition": "Remove this exact allowance when DrawingCanvasLayer AST or signature changes. Reassess any independent session writer, state store, listener lifetime, async publisher, or recovery contract. Do not extend this binding to another symbol. Remove when the analyzer models this canvas event composition without this false positive.",
+      "astHash": "424eb526bcf3d88e95adff3471466365e36cef71dd4d562d351f2b0076b7ead4",
+      "signatureHash": "54ce65c79c1adcb26df1edce625f19160d8d1f15c0dd8d807d51ab2410754611",
+      "reviewDate": "2026-11-13"
     }
   ]
 }

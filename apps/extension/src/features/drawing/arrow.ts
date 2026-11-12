@@ -170,6 +170,28 @@ export function resolveDrawingArrowBendTarget(
   return nearest;
 }
 
+/** Removes one nearest authored bend; endpoints, shaft clicks and unsupported designs are unchanged. */
+export function removeDrawingArrowBendAtPoint(
+  object: DrawingArrowObject,
+  point: DrawingPoint,
+  project: (point: DrawingPoint) => DrawingPoint = (point) => point
+): DrawingArrowObject {
+  const target = resolveDrawingArrowBendTarget(object, point, 9, project);
+  if (!target || target.insert) return object;
+  const pointer = project(point);
+  const distanceTo = (point: DrawingPoint) => {
+    const screen = project(point);
+    return Math.hypot(screen.x - pointer.x, screen.y - pointer.y);
+  };
+  const bendDistance = distanceTo(target.point);
+  if ([object.start, object.end].some((endpoint) => distanceTo(endpoint) <= bendDistance + 1e-6))
+    return object;
+  return {
+    ...object,
+    bendPoints: object.bendPoints?.filter((_point, index) => index !== target.index) ?? [],
+  };
+}
+
 /** Returns a new authored arrow without mutating its previous history entry. */
 export function updateDrawingArrowBend(
   object: DrawingArrowObject,

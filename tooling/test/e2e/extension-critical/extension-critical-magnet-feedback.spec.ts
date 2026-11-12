@@ -9,6 +9,95 @@ const GUIDE = '[data-ui="content.drawing.alignment-guides"]';
 const MARKER = '[data-ui="content.drawing.alignment-marker"]';
 const BRACKET = '[data-ui="content.drawing.alignment-bracket"]';
 
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  for (const mode of ['page', 'crop'] as const) {
+    test(`double-click removes only authored arrow bends ${mode} ${name}`, async ({
+      context,
+      extensionId,
+      hostOrigin,
+    }, info) => {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      try {
+        const { surface, toolbar } = await prepare(page, mode);
+        const arrow = toolbar.locator('[data-ui="content.toolbar.drawing.arrow"]');
+        await arrow.click();
+        const freehand = toolbar.locator(
+          '[data-ui="content.toolbar.drawing-options.arrow.freehand"]'
+        );
+        if (!(await freehand.isVisible())) await arrow.click();
+        await freehand.click();
+        const ink = surface.locator('canvas.sniptale-drawing-canvas').first();
+        const chrome = surface.locator('[data-ui="content.drawing.selection-chrome"]');
+        const pixels = () =>
+          ink.evaluate((node) => {
+            if (!(node instanceof HTMLCanvasElement)) throw new Error('Drawing canvas missing');
+            return node.toDataURL();
+          });
+        const redo = page.locator(
+          `[data-ui="${mode === 'crop' ? 'content.crop.redo' : 'content.toolbar.history-redo-button'}"]`
+        );
+        const objects = surface.getByRole('button', { name: /^Object \d+$/u });
+        await drag(page, { x: 400, y: 200 }, { x: 800, y: 200 });
+        await page.mouse.move(900, 420);
+        const straight = await pixels();
+        for (const point of [
+          { x: 400, y: 200 },
+          { x: 800, y: 200 },
+          { x: 500, y: 200 },
+        ]) {
+          await page.mouse.dblclick(point.x, point.y, { delay: 30 });
+          await expect.poll(pixels).toBe(straight);
+        }
+        await drag(page, { x: 600, y: 200 }, { x: 600, y: 280 });
+        await page.mouse.move(900, 420);
+        await expect
+          .poll(async () => (await corePixels(ink, { x: 600, y: 280 })).painted)
+          .toBeGreaterThan(0);
+        const bent = await pixels();
+        expect(bent).not.toBe(straight);
+        for (const point of [
+          { x: 400, y: 200 },
+          { x: 800, y: 200 },
+        ]) {
+          await page.mouse.dblclick(point.x, point.y, { delay: 30 });
+          await expect.poll(pixels).toBe(bent);
+        }
+        await page.mouse.dblclick(612, 280, { delay: 30 });
+        await expect.poll(pixels).toBe(straight);
+        await toolbar.locator('[data-ui="content.toolbar.drawing.select"]').click();
+        await expect(objects).toHaveCount(1);
+        await expect
+          .poll(async () => (await corePixels(chrome, { x: 600, y: 280 })).painted)
+          .toBe(0);
+        await page.screenshot({
+          path: info.outputPath('arrow-last-bend-removed.png'),
+          fullPage: false,
+        });
+        await undoDrawing(page, mode);
+        await expect.poll(pixels).toBe(bent);
+        await redo.click();
+        await expect.poll(pixels).toBe(straight);
+        await undoDrawing(page, mode);
+        await expect.poll(pixels).toBe(bent);
+        await page.mouse.click(600, 280);
+        await page.mouse.dblclick(600, 280, { delay: 30 });
+        await expect.poll(pixels).toBe(straight);
+        await undoDrawing(page, mode);
+        await expect.poll(pixels).toBe(bent);
+        await expect(objects).toHaveCount(1);
+        await page.screenshot({
+          path: info.outputPath('arrow-bend-removal-undo.png'),
+          fullPage: false,
+        });
+      } finally {
+        await page.mouse.up();
+        await popup.close();
+        await page.close();
+      }
+    });
+  }
+}
+
 async function drag(page: Page, start: Point, end: Point) {
   await page.mouse.move(start.x, start.y);
   await page.mouse.down();

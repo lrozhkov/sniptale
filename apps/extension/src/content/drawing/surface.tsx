@@ -4,6 +4,7 @@ import {
   getDrawingObjectRotation,
   getDrawingSelectionBounds,
   hitTestDrawingDocument,
+  removeDrawingArrowBendAtPoint,
   resolveDrawingToolCursor,
   type DrawingObject,
   type DrawingPoint,
@@ -62,6 +63,35 @@ function stopDrawingHostEvent(event: React.SyntheticEvent<Element>): void {
 function blockDrawingHostEvent(event: React.SyntheticEvent<HTMLCanvasElement>): void {
   event.preventDefault();
   event.stopPropagation();
+}
+
+function removeSelectedDrawingArrowBend(
+  args: {
+    active: boolean;
+    serviceUiSuppressed: boolean;
+    controller: ContentDrawingController;
+    pointer: DrawingPointerRuntime;
+  },
+  point: DrawingPoint
+): boolean {
+  if (!args.active || args.serviceUiSuppressed || args.pointer.draftRef.current) return false;
+  const snapshot = args.controller.session.getSnapshot();
+  if (
+    snapshot.selectedObjectIds.length !== 1 ||
+    (snapshot.activeTool !== 'select' && snapshot.activeTool !== 'arrow')
+  )
+    return false;
+  const selected = snapshot.document.objects.find(
+    (object) => object.id === snapshot.selectedObjectId
+  );
+  if (selected?.kind !== 'arrow') return false;
+  const next = removeDrawingArrowBendAtPoint(selected, point);
+  if (next === selected) return false;
+  args.controller.session.replaceObject(next);
+  args.pointer.hoverBendRef.current = null;
+  args.pointer.hoverPointRef.current = null;
+  args.pointer.changed();
+  return true;
 }
 
 function handleDrawingCanvasClick(args: {
@@ -395,6 +425,13 @@ function DrawingCanvasLayer(props: {
           event.preventDefault();
           event.stopPropagation();
           const point = toDrawingScenePoint(event, props.root);
+          if (removeSelectedDrawingArrowBend(props, point)) {
+            event.currentTarget.style.cursor = resolveDrawingCanvasCursor(
+              props.active,
+              props.controller.session.getSnapshot()
+            );
+            return;
+          }
           const object = hitTestDrawingDocument(props.snapshot.document.objects, point);
           if (object?.kind === 'text') {
             props.controller.session.select(object.id);

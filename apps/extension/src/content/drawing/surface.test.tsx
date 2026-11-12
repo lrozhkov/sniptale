@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createDrawingSession, resolveDrawingToolCursor } from '../../features/drawing/public';
+import type { DrawingDocumentCommit, DrawingTool } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface, getDrawingViewportProjection, toDrawingScenePoint } from './surface';
 
@@ -45,6 +46,177 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
 }
 
 const context = createCanvasContextFixture();
+
+it.each(['select', 'arrow'] as const)(
+  'removes a selected arrow bend once on a real double-click sequence in %s',
+  (tool) => {
+    const commits: DrawingDocumentCommit[] = [];
+    const session = createDrawingSession({
+      onDocumentCommit: (commit) => {
+        commits.push(commit);
+        return true;
+      },
+    });
+    const original = {
+      id: 'double-click-arrow',
+      kind: 'arrow' as const,
+      design: 'freehand' as const,
+      dynamicWidth: false,
+      start: { x: 40, y: 80 },
+      end: { x: 240, y: 80 },
+      bendPoints: [{ x: 140, y: 140 }],
+      color: '#ef4444',
+      width: 4,
+    };
+    session.commitObject(original);
+    session.setActiveTool(tool);
+    session.select(original.id);
+    const controller: ContentDrawingController = {
+      session,
+      getPalette: () => [],
+      applyPalette: vi.fn(),
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+      finalizeInteraction: vi.fn(),
+    };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+    const canvas = host.querySelector('canvas')!;
+    commits.length = 0;
+    try {
+      for (const detail of [1, 2]) {
+        for (const type of ['pointerdown', 'pointerup', 'click']) {
+          const event = new MouseEvent(type, {
+            bubbles: true,
+            cancelable: true,
+            clientX: 152,
+            clientY: 140,
+            button: 0,
+            detail,
+          });
+          Object.defineProperties(event, {
+            pointerId: { value: 1 },
+            pointerType: { value: 'mouse' },
+          });
+          act(() => canvas.dispatchEvent(event));
+        }
+      }
+      act(() =>
+        canvas.dispatchEvent(
+          new MouseEvent('dblclick', {
+            bubbles: true,
+            cancelable: true,
+            clientX: 152,
+            clientY: 140,
+            detail: 2,
+          })
+        )
+      );
+      expect(commits).toHaveLength(1);
+      const removed = { ...original, bendPoints: [] };
+      expect(session.getSnapshot().document.objects).toEqual([removed]);
+      expect(session.getSnapshot().selectedObjectId).toBe(original.id);
+      act(() => commits[0]!.replay(commits[0]!.before));
+      expect(session.getSnapshot().document.objects).toEqual([original]);
+      act(() => commits[0]!.replay(commits[0]!.after));
+      expect(session.getSnapshot().document.objects).toEqual([removed]);
+      expect(commits).toHaveLength(1);
+      act(() => session.select(original.id));
+      for (const point of [original.start, original.end, { x: 140, y: 80 }]) {
+        act(() =>
+          canvas.dispatchEvent(
+            new MouseEvent('dblclick', {
+              bubbles: true,
+              clientX: point.x,
+              clientY: point.y,
+              detail: 2,
+            })
+          )
+        );
+      }
+      expect(commits).toHaveLength(1);
+      expect(session.getSnapshot().selectedObjectId).toBe(original.id);
+    } finally {
+      act(() => root.unmount());
+    }
+  }
+);
+
+it.each([
+  { active: false, suppressed: false, tool: 'select', liveDraft: false },
+  { active: true, suppressed: true, tool: 'select', liveDraft: false },
+  { active: true, suppressed: false, tool: 'pencil', liveDraft: false },
+  { active: true, suppressed: false, tool: 'select', liveDraft: true },
+] satisfies Array<{ active: boolean; suppressed: boolean; tool: DrawingTool; liveDraft: boolean }>)(
+  'does not remove an unavailable arrow point: %j',
+  ({ active, suppressed, tool, liveDraft }) => {
+    const commit = vi.fn(() => true);
+    const session = createDrawingSession({ onDocumentCommit: commit });
+    session.commitObject({
+      id: 'guarded-arrow',
+      kind: 'arrow',
+      design: 'freehand',
+      dynamicWidth: false,
+      color: '#ef4444',
+      width: 4,
+      start: { x: 40, y: 80 },
+      end: { x: 240, y: 80 },
+      bendPoints: [{ x: 140, y: 140 }],
+    });
+    session.setActiveTool(tool);
+    session.select('guarded-arrow');
+    const before = session.getCommittedDocument();
+    const controller: ContentDrawingController = {
+      session,
+      getPalette: () => [],
+      applyPalette: vi.fn(),
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+      finalizeInteraction: vi.fn(),
+    };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() =>
+      root.render(
+        <DrawingSurface
+          active={active}
+          chromeHidden={false}
+          serviceUiSuppressed={suppressed}
+          controller={controller}
+        />
+      )
+    );
+    commit.mockClear();
+    if (liveDraft) {
+      const event = new MouseEvent('pointerdown', {
+        bubbles: true,
+        clientX: 140,
+        clientY: 140,
+        button: 0,
+      });
+      Object.defineProperties(event, { pointerId: { value: 1 }, pointerType: { value: 'mouse' } });
+      act(() => host.querySelector('canvas')!.dispatchEvent(event));
+    }
+    act(() =>
+      host.querySelector('canvas')!.dispatchEvent(
+        new MouseEvent('dblclick', {
+          bubbles: true,
+          clientX: 140,
+          clientY: 140,
+          detail: 2,
+        })
+      )
+    );
+    expect(session.getCommittedDocument()).toBe(before);
+    expect(commit).not.toHaveBeenCalled();
+    act(() => root.unmount());
+  }
+);
 
 function inputText(editor: HTMLTextAreaElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;

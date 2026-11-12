@@ -113,8 +113,8 @@ async function handle(page: Page, key: string) {
   return center(controls(page).locator(`[data-control="${key}"]`));
 }
 
-async function arrowControlGeometry(page: Page) {
-  return page.evaluate(() => {
+async function arrowControlGeometry(page: Page, keys = ['start', 'end', 'bend-0']) {
+  return page.evaluate((keys) => {
     const svg = document.querySelector<SVGSVGElement>(
       '[data-ui="editor.canvas.selection-chrome"]'
     )!;
@@ -123,7 +123,7 @@ async function arrowControlGeometry(page: Page) {
       .transform.baseVal.consolidate()!.matrix;
     const screen = svg.getScreenCTM()!;
     const points = Object.fromEntries(
-      ['start', 'end', 'bend-0'].map((key) => {
+      keys.map((key) => {
         const circle = svg.querySelector<SVGCircleElement>(`[data-control="${key}"]`)!;
         const point = new DOMPoint(
           circle.cx.baseVal.value,
@@ -134,7 +134,7 @@ async function arrowControlGeometry(page: Page) {
     );
     const matrix = (value: DOMMatrix) => [value.a, value.b, value.c, value.d, value.e, value.f];
     return { points, viewport: matrix(viewport), screen: matrix(screen) };
-  });
+  }, keys);
 }
 
 async function panArrowPointIntoView(page: Page, point: Locator) {
@@ -670,6 +670,80 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
 }
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`double click deletes only an authored arrow bend with one Undo ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const origin = await openEditor(page, hostOrigin, size, true);
+    await page.locator('[data-ui="editor.floating.tool-rail.arrow"]').click();
+    await page.locator('[data-ui="content.toolbar.drawing-options.arrow.freehand"]').click();
+    const start = { x: origin.x + 20, y: origin.y + 25 };
+    await drag(page, start, { x: start.x + 300, y: start.y });
+    const arrowId = (await objects(page)).find((object) => object['sniptaleType'] === 'arrow')?.[
+      'sniptaleId'
+    ];
+    if (typeof arrowId !== 'string') throw new Error('Arrow identity missing');
+    await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+    await selectLayer(page, arrowId);
+    const straightPixels = await rendered(page);
+    const middle = { x: start.x + 150, y: start.y };
+    await drag(page, middle, { x: middle.x, y: middle.y + 55 });
+    const bend = controls(page).locator('[data-control="bend-0"]');
+    await expect(bend).toBeVisible();
+    const accepted = await history(page);
+    const bentPixels = await rendered(page);
+    for (const key of ['start', 'end']) {
+      const point = await handle(page, key);
+      await page.mouse.dblclick(point.x, point.y);
+      expect(await history(page)).toBe(accepted);
+      await expect(bend).toBeVisible();
+      await assertRestoredPng(page, bentPixels, info, `protected-${key}`);
+    }
+    const shaft = { x: start.x + 300 * 0.21875, y: start.y + 55 * 0.5625 };
+    await page.mouse.dblclick(shaft.x, shaft.y);
+    expect(await history(page)).toBe(accepted);
+    await expect(controls(page).locator('circle')).toHaveCount(3);
+    for (const zoom of [0.2, 1, 4]) {
+      await page.evaluate((value) => window.__sniptaleEditorHarness!.setZoomLevel(value), zoom);
+      await panArrowPointIntoView(page, bend);
+      const before = await arrowControlGeometry(page);
+      expect(before.viewport[0]).toBeCloseTo(zoom, 5);
+      const point = await center(bend);
+      await page.mouse.dblclick(point.x + 6, point.y);
+      await expect.poll(() => history(page)).toBe(accepted + 1);
+      await expect(controls(page).locator('circle')).toHaveCount(2);
+      const after = await arrowControlGeometry(page, ['start', 'end']);
+      for (const key of ['start', 'end'])
+        expect(
+          Math.hypot(
+            after.points[key]!.x - before.points[key]!.x,
+            after.points[key]!.y - before.points[key]!.y
+          )
+        ).toBeLessThanOrEqual(0.001);
+      await assertRestoredPng(page, straightPixels, info, `straight-after-delete-${zoom}`);
+      await page.screenshot({
+        path: info.outputPath(`arrow-bend-deleted-${zoom}.png`),
+        fullPage: false,
+      });
+      await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+      await expect.poll(() => history(page)).toBe(accepted);
+      await selectLayer(page, arrowId);
+      await expect(bend).toBeVisible();
+      await assertRestoredPng(page, bentPixels, info, `restored-bend-${zoom}`);
+      await page.locator('[data-ui="editor.floating.tool-rail.history.redo"]').click();
+      await expect.poll(() => history(page)).toBe(accepted + 1);
+      await selectLayer(page, arrowId);
+      await expect(bend).toHaveCount(0);
+      await assertRestoredPng(page, straightPixels, info, `redone-delete-${zoom}`);
+      await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+      await expect.poll(() => history(page)).toBe(accepted);
+      await selectLayer(page, arrowId);
+      await expect(bend).toBeVisible();
+    }
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   test(`arrow existing points win nearby hits and insertion stays unmarked ${name}`, async ({
     page,
     hostOrigin,
@@ -960,6 +1034,21 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     expect(
       Math.hypot(cancelledBend.x - actualBend.x, cancelledBend.y - actualBend.y)
     ).toBeLessThanOrEqual(0.5);
+    const beforeDeletion = await rendered(page);
+    await page.mouse.dblclick(cancelledBend.x, cancelledBend.y);
+    await expect.poll(() => history(page)).toBe(bendHistory + 2);
+    await expect(controls(page).locator('[data-control="bend-0"]')).toHaveCount(0);
+    await expect(controls(page).locator('circle')).toHaveCount(2);
+    await page.screenshot({
+      path: info.outputPath('grouped-arrow-bend-deleted.png'),
+      fullPage: false,
+    });
+    await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+    await expect.poll(() => history(page)).toBe(bendHistory + 1);
+    await selectLayer(page, group);
+    await selectLayer(page, arrowId);
+    await expect(controls(page).locator('[data-control="bend-0"]')).toBeVisible();
+    await assertRestoredPng(page, beforeDeletion, info, 'grouped-arrow-delete-undo');
     await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
     await expect.poll(() => history(page)).toBe(bendHistory);
     await selectLayer(page, group);
