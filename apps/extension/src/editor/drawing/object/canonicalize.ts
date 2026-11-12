@@ -27,7 +27,16 @@ function createCanonicalObject(
     if (!source) return null;
     return createEditorDrawingBlurObject({ drawing, labelIndex: 1, source });
   }
-  return createEditorDrawingFabricObject(drawing, 1, { preserveTextWidth: true });
+  return createEditorDrawingFabricObject(drawing, 1, {
+    preserveTextWidth: true,
+    ...(drawing.kind === 'text'
+      ? {
+          textAutoWidth: drawing.autoWidth ?? original?.sniptaleDrawingTextAutoWidth ?? false,
+          textMaxWidth:
+            drawing.wrapWidth ?? original?.sniptaleDrawingTextMaxWidth ?? drawing.bounds.width,
+        }
+      : {}),
+  });
 }
 
 export function replaceEditorDrawingObjectWithCanonicalGeometry(args: {

@@ -1,22 +1,24 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { DEFAULT_COLOR_INFO_STRONG } from '@sniptale/ui/default-colors/constants';
 import {
-  clampDrawingTextWidth,
-  resolveDrawingTextNaturalWidth,
+  DRAWING_TEXT_INPUT_PAINT_STYLE,
+  DRAWING_TEXT_INPUT_SELECTION_CSS,
+} from '../../ui/drawing-tools/text-style';
+import {
+  createDrawingId,
   resolveDrawingTextFontFamily,
-  resolveDrawingTextHeight,
   type DrawingObject,
   type DrawingPoint,
+  type DrawingTextInkLayout,
 } from '../../features/drawing/public';
 import { translate } from '../../platform/i18n';
 import type { ContentDrawingController } from './controller';
-import { measureDrawingTextFittedWidth } from './text-measurement';
-import { createDrawingId } from '../../features/drawing/public';
+import { measureContentDrawingTextLayout } from './text-measurement';
 import {
   DrawingTextBackgrounds,
-  resolveDrawingTextDomValue,
   resolveDrawingTextContentStyle,
-  useDrawingTextBackgroundRects,
+  resolveDrawingTextDomValue,
+  useDrawingTextLayout,
   type DrawingTextVisualStyle,
 } from './text-content';
 
@@ -30,7 +32,29 @@ export type DrawingTextDraft = {
   height?: number;
   value: string;
   width?: number;
+  originX?: number;
+  firstBaseline?: number;
 };
+
+function keepTextOrigin(
+  point: DrawingPoint,
+  previous: { width: number; height: number; originX: number; firstBaseline: number },
+  next: DrawingTextInkLayout,
+  rotation = 0
+): DrawingPoint {
+  const radians = (rotation * Math.PI) / 180;
+  const dx = previous.originX - previous.width / 2 - next.originX + next.width / 2;
+  const dy = previous.firstBaseline - previous.height / 2 - next.firstBaseline + next.height / 2;
+  return {
+    x:
+      point.x + (previous.width - next.width) / 2 + dx * Math.cos(radians) - dy * Math.sin(radians),
+    y:
+      point.y +
+      (previous.height - next.height) / 2 +
+      dx * Math.sin(radians) +
+      dy * Math.cos(radians),
+  };
+}
 
 export function useDrawingTextEditor(controller: ContentDrawingController) {
   const [draft, setDraftState] = useState<DrawingTextDraft | null>(null);
@@ -39,99 +63,96 @@ export function useDrawingTextEditor(controller: ContentDrawingController) {
     (next: DrawingTextDraft | null) => {
       draftRef.current = next;
       setDraftState(next);
-      const text = next?.value.trim() ?? '';
+      const text = next?.value ?? '';
       const previous = next?.id
         ? controller.session.getSnapshot().document.objects.find((object) => object.id === next.id)
         : null;
       controller.setPendingTextChange?.(
-        Boolean(text && (!previous || previous.kind !== 'text' || previous.text !== text))
+        Boolean(text.trim() && (!previous || previous.kind !== 'text' || previous.text !== text))
       );
     },
     [controller]
   );
   const cancel = useCallback(() => setDraft(null), [setDraft]);
   useEffect(() => () => controller.setPendingTextChange?.(false), [controller]);
-
   const commit = useCallback(() => {
     const current = draftRef.current;
     if (!current) return;
-    const text = current.value.trim();
-    if (text) {
-      const snapshot = controller.session.getSnapshot();
-      const defaults = snapshot.defaults.text;
-      const existing = current.id
-        ? snapshot.document.objects.find(
-            (object) => object.id === current.id && object.kind === 'text'
-          )
-        : null;
-      const style =
-        existing?.kind === 'text'
-          ? {
-              color: existing.color,
-              backgroundColor: existing.backgroundColor,
-              fontFamily: existing.fontFamily ?? 'sans',
-              fontSize: existing.fontSize,
-            }
-          : defaults;
-      const width =
-        current.fittedWidth ??
-        clampDrawingTextWidth(
-          text,
-          style.fontSize,
-          current.width ??
-            (existing?.kind === 'text'
-              ? existing.bounds.width
-              : resolveDrawingTextNaturalWidth(text, style.fontSize, current.maxWidth ?? 640)),
-          current.autoWidth ? current.maxWidth : Number.POSITIVE_INFINITY
-        );
-      const originalWidth = current.width ?? width;
-      const halfShrink = (originalWidth - width) / 2;
-      const radians = ((current.rotation ?? 0) * Math.PI) / 180;
-      const object = {
-        id: current.id ?? createDrawingId(),
-        kind: 'text' as const,
-        text,
-        bounds: {
-          // Keep the rotated text origin fixed when its transform center moves.
-          x: current.point.x + halfShrink * (1 - Math.cos(radians)),
-          y: current.point.y - halfShrink * Math.sin(radians),
-          width,
-          height: current.height ?? resolveDrawingTextHeight(text, style.fontSize, width),
-        },
-        ...(existing?.kind === 'text' && existing.rotation !== undefined
-          ? { rotation: existing.rotation }
-          : {}),
-        ...style,
-      };
-      if (current.id) controller.session.replaceObject(object);
-      else controller.session.commitObject(object);
-      if (controller.session.getSnapshot().document.objects.some((entry) => entry === object)) {
-        setDraft(null);
-      }
-    } else {
+    if (!current.value.trim()) {
+      if (current.id) controller.session.deleteObjects([current.id]);
       setDraft(null);
+      return;
     }
+    const snapshot = controller.session.getSnapshot();
+    const previous = current.id
+      ? snapshot.document.objects.find((object) => object.id === current.id)
+      : null;
+    const style =
+      previous?.kind === 'text'
+        ? {
+            color: previous.color,
+            backgroundColor: previous.backgroundColor,
+            fontFamily: previous.fontFamily ?? 'sans',
+            fontSize: previous.fontSize,
+          }
+        : snapshot.defaults.text;
+    const automatic = current.autoWidth ?? false;
+    const wrapWidth = automatic
+      ? (current.maxWidth ?? current.width ?? 640)
+      : (current.width ?? 320);
+    const layout = measureContentDrawingTextLayout({
+      ...style,
+      text: current.value,
+      wrapWidth,
+      autoWidth: automatic,
+    });
+    const point =
+      current.originX !== undefined && current.firstBaseline !== undefined
+        ? keepTextOrigin(
+            current.point,
+            {
+              width: current.fittedWidth ?? layout.width,
+              height: current.height ?? layout.height,
+              originX: current.originX,
+              firstBaseline: current.firstBaseline,
+            },
+            layout,
+            current.rotation
+          )
+        : current.point;
+    const object = {
+      id: current.id ?? createDrawingId(),
+      kind: 'text' as const,
+      text: current.value,
+      bounds: { ...point, width: layout.width, height: layout.height },
+      autoWidth: automatic,
+      wrapWidth,
+      ...(current.rotation === undefined ? {} : { rotation: current.rotation }),
+      ...style,
+    };
+    if (current.id) controller.session.replaceObject(object);
+    else controller.session.commitObject(object);
+    if (controller.session.getSnapshot().document.objects.some((entry) => entry === object))
+      setDraft(null);
   }, [controller, setDraft]);
-
   const edit = useCallback(
     (object: Extract<DrawingObject, { kind: 'text' }>) => {
       setDraft({
         id: object.id,
         point: object.bounds,
-        ...(object.rotation === undefined ? {} : { rotation: object.rotation }),
         value: object.text,
-        width: object.bounds.width,
-        autoWidth: false,
+        ...(object.rotation === undefined ? {} : { rotation: object.rotation }),
+        width: object.wrapWidth ?? object.bounds.width,
+        maxWidth: object.wrapWidth ?? object.bounds.width,
+        autoWidth: object.autoWidth ?? false,
       });
     },
     [setDraft]
   );
-
   const finalize = useCallback(() => {
     if (draftRef.current?.value.trim()) commit();
     else setDraft(null);
   }, [commit, setDraft]);
-
   return { cancel, commit, draft, edit, finalize, setDraft };
 }
 
@@ -145,21 +166,79 @@ type DrawingTextEditorProps = {
   onCommit: () => void;
 };
 
+type TextLayoutSnapshot = {
+  layout: DrawingTextInkLayout;
+  value: string;
+  font: string;
+  ready: boolean;
+};
+
+function resolveDraftWrapWidth(draft: DrawingTextDraft): number {
+  return draft.autoWidth ? (draft.maxWidth ?? draft.width ?? 640) : (draft.width ?? 320);
+}
+
+function resolveDraftAnchor(
+  previous: TextLayoutSnapshot | null,
+  draft: DrawingTextDraft,
+  font: string,
+  ready: boolean,
+  style: DrawingTextVisualStyle
+): DrawingTextInkLayout | null {
+  if (!previous && draft.id)
+    return measureContentDrawingTextLayout({
+      fontFamily: style.fontFamily,
+      fontSize: style.fontSize,
+      text: draft.value,
+      wrapWidth: resolveDraftWrapWidth(draft),
+      autoWidth: draft.autoWidth ?? false,
+    });
+  if (
+    !previous ||
+    previous.font !== font ||
+    previous.ready !== ready ||
+    previous.value === draft.value
+  )
+    return null;
+  return previous.layout;
+}
+
+function draftMatchesLayout(
+  draft: DrawingTextDraft,
+  layout: DrawingTextInkLayout,
+  point: DrawingPoint
+): boolean {
+  return (
+    draft.fittedWidth === layout.width &&
+    draft.height === layout.height &&
+    draft.width === layout.logicalWidth &&
+    draft.originX === layout.originX &&
+    draft.firstBaseline === layout.firstBaseline &&
+    Math.abs(draft.point.x - point.x) < 0.01 &&
+    Math.abs(draft.point.y - point.y) < 0.01
+  );
+}
+
 function useDrawingTextEditorLayout(props: DrawingTextEditorProps) {
   const editorRef = useRef<HTMLTextAreaElement>(null);
-  const mirrorRef = useRef<HTMLSpanElement>(null);
-  const measurementRef = useRef<HTMLSpanElement>(null);
-  const initialValueLengthRef = useRef(props.draft.value.length);
-  const resolvedFontFamily = resolveDrawingTextFontFamily(props.style.fontFamily);
-  const draft = props.draft;
-  const fontSize = props.style.fontSize;
-  const onChange = props.onChange;
-  const backgroundRects = useDrawingTextBackgroundRects({
-    contentRef: mirrorRef,
-    fontFamily: resolvedFontFamily,
-    fontSize: props.style.fontSize,
-    value: props.draft.value,
+  const initialLength = useRef(props.draft.value.length);
+  const { draft, style, onChange, layoutRevision } = props;
+  const fontFamily = resolveDrawingTextFontFamily(style.fontFamily);
+  const fontKey = `${style.fontSize}px ${fontFamily}`;
+  const layout = useDrawingTextLayout({
+    fontFamily,
+    fontSize: style.fontSize,
+    value: draft.value,
+    wrapWidth: resolveDraftWrapWidth(draft),
+    autoWidth: draft.autoWidth ?? false,
+    editing: true,
   });
+  const previous = useRef<TextLayoutSnapshot | null>(null);
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    editor.focus();
+    editor.setSelectionRange(initialLength.current, initialLength.current);
+  }, []);
   useLayoutEffect(() => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -168,90 +247,31 @@ function useDrawingTextEditorLayout(props: DrawingTextEditorProps) {
       if (editorRef.current === editor) editor.scrollTop = 0;
     });
     return () => cancelAnimationFrame(frame);
-  }, [draft.value, props.layoutRevision]);
-
+  }, [draft.value, layoutRevision]);
   useLayoutEffect(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    editor.focus();
-    editor.setSelectionRange(initialValueLengthRef.current, initialValueLengthRef.current);
-  }, []);
-
-  useLayoutEffect(() => {
-    let active = true;
-    const synchronizeBounds = () => {
-      if (!active) return;
-      const mirror = mirrorRef.current;
-      const measuredHeight = mirror
-        ? Math.ceil(parseFloat(getComputedStyle(mirror).height)) || 0
-        : 0;
-      const measurer = measurementRef.current;
-      const measuredWidth = measurer
-        ? Math.ceil(parseFloat(getComputedStyle(measurer).width)) || 0
-        : 0;
-      const nextHeight = measuredHeight > 0 ? measuredHeight : draft.height;
-      const nextWidth =
-        draft.autoWidth && measuredWidth > 0
-          ? clampDrawingTextWidth(draft.value, fontSize, measuredWidth, draft.maxWidth)
-          : draft.width;
-      const fittedWidth = mirror
-        ? measureDrawingTextFittedWidth(mirror, draft.value.trim())
-        : undefined;
-      if (
-        nextHeight === draft.height &&
-        nextWidth === draft.width &&
-        fittedWidth === draft.fittedWidth
-      )
-        return;
-      onChange({
-        ...draft,
-        fittedWidth,
-        ...(nextHeight === undefined ? {} : { height: nextHeight }),
-        ...(nextWidth === undefined ? {} : { width: nextWidth }),
-      });
-    };
-    synchronizeBounds();
-    void document.fonts
-      ?.load(`${fontSize}px ${resolvedFontFamily}`, draft.value || 'M')
-      .then(synchronizeBounds);
-    return () => {
-      active = false;
-    };
-  }, [draft, fontSize, onChange, resolvedFontFamily]);
-
-  return { backgroundRects, editorRef, measurementRef, mirrorRef };
-}
-
-function resolveChangedTextDraft(args: {
-  draft: DrawingTextDraft;
-  fontSize: number;
-  measurementElement: HTMLSpanElement | null;
-  value: string;
-}): DrawingTextDraft {
-  const { draft, fontSize, measurementElement, value } = args;
-  if (measurementElement) measurementElement.textContent = value || '\u200b';
-  const measuredWidth = measurementElement
-    ? Math.ceil(parseFloat(getComputedStyle(measurementElement).width)) || 0
-    : 0;
-  return {
-    ...draft,
-    value,
-    fittedWidth: undefined,
-    ...(draft.autoWidth
-      ? {
-          width:
-            measuredWidth > 0
-              ? clampDrawingTextWidth(value, fontSize, measuredWidth, draft.maxWidth)
-              : resolveDrawingTextNaturalWidth(value, fontSize, draft.maxWidth ?? 640),
-        }
-      : {}),
-  };
+    const ready = document.fonts?.check?.(fontKey, draft.value || 'M') ?? true;
+    const anchor = resolveDraftAnchor(previous.current, draft, fontKey, ready, style);
+    const point = anchor
+      ? keepTextOrigin(draft.point, anchor, layout, draft.rotation)
+      : draft.point;
+    previous.current = { layout, value: draft.value, font: fontKey, ready };
+    if (draftMatchesLayout(draft, layout, point)) return;
+    onChange({
+      ...draft,
+      point,
+      width: layout.logicalWidth,
+      fittedWidth: layout.width,
+      height: layout.height,
+      originX: layout.originX,
+      firstBaseline: layout.firstBaseline,
+    });
+  }, [draft, layout, fontKey, onChange, style]);
+  return { layout, editorRef };
 }
 
 export function DrawingTextEditor(props: DrawingTextEditorProps) {
-  const { backgroundRects, editorRef, measurementRef, mirrorRef } =
-    useDrawingTextEditorLayout(props);
-
+  const { layout, editorRef } = useDrawingTextEditorLayout(props);
+  const textStyle = resolveDrawingTextContentStyle(props.style, layout);
   return (
     <div
       data-ui="content.drawing.text-editor"
@@ -262,8 +282,8 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
         position: 'fixed',
         left: props.draft.point.x - props.projection.x,
         top: props.draft.point.y - props.projection.y,
-        width: props.draft.width ?? 320,
-        maxWidth: props.draft.maxWidth,
+        width: layout.width,
+        height: layout.height,
         minHeight: 0,
         fontSize: 0,
         lineHeight: 0,
@@ -273,86 +293,58 @@ export function DrawingTextEditor(props: DrawingTextEditorProps) {
         zIndex: 'var(--sniptale-drawing-editor-layer, 2)',
       }}
     >
+      <style>{DRAWING_TEXT_INPUT_SELECTION_CSS}</style>
       <DrawingTextBackgrounds
         color={props.style.backgroundColor}
-        rects={backgroundRects}
+        rects={layout.backgrounds}
         text={{
-          contentRef: mirrorRef,
-          value: props.draft.value,
+          layout,
           color: props.style.color,
           fontFamily: props.style.fontFamily,
           fontSize: props.style.fontSize,
         }}
       />
       <span
-        ref={mirrorRef}
-        data-ui="content.drawing.text-mirror"
         aria-hidden="true"
         style={{
-          ...resolveDrawingTextContentStyle(props.style),
-          color: 'transparent',
+          ...textStyle,
+          whiteSpace: 'pre',
+          overflowWrap: 'normal',
           pointerEvents: 'none',
+          userSelect: 'none',
         }}
       >
-        {resolveDrawingTextDomValue(props.draft.value)}
+        {resolveDrawingTextDomValue(layout.lines.join('\n'))}
       </span>
       <textarea
+        data-sniptale-drawing-input=""
         ref={editorRef}
         data-ui="content.drawing.text-input"
         aria-label={translate('content.toolbar.drawingTextInput')}
         value={props.draft.value}
-        onChange={(event) => {
-          props.onChange(
-            resolveChangedTextDraft({
-              draft: props.draft,
-              fontSize: props.style.fontSize,
-              measurementElement: measurementRef.current,
-              value: event.currentTarget.value,
-            })
-          );
-        }}
+        onChange={(event) => props.onChange({ ...props.draft, value: event.currentTarget.value })}
         onBlur={props.onCommit}
         onKeyDown={(event) => {
           event.stopPropagation();
           if (event.key === 'Escape') {
             event.preventDefault();
             props.onCancel();
-          } else if (event.key === 'Enter' && event.shiftKey && !event.nativeEvent.isComposing) {
-            // Keep the native textarea insertion/input sequence so the caret and scroll position
-            // are reconciled in the same layout pass as the controlled value update.
-            return;
           } else if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
             event.preventDefault();
             props.onCommit();
           }
         }}
         style={{
-          ...resolveDrawingTextContentStyle(props.style),
+          ...textStyle,
+          ...DRAWING_TEXT_INPUT_PAINT_STYLE,
           background: 'transparent',
           border: 0,
           caretColor: DEFAULT_COLOR_INFO_STRONG,
-          height: '100%',
-          inset: 0,
           outline: 'none',
           overflow: 'hidden',
-          position: 'absolute',
           resize: 'none',
         }}
       />
-      <span
-        ref={measurementRef}
-        aria-hidden="true"
-        style={{
-          ...resolveDrawingTextContentStyle(props.style),
-          left: -100000,
-          position: 'fixed',
-          visibility: 'hidden',
-          whiteSpace: 'pre',
-          width: 'max-content',
-        }}
-      >
-        {resolveDrawingTextDomValue(props.draft.value)}
-      </span>
     </div>
   );
 }

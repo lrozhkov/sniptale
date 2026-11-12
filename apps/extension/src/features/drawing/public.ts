@@ -10,4 +10,5 @@ export * from './updates';
 export * from './selection';
 export * from './session';
 export * from './text-layout';
+export * from './text-ink';
 export { parseDrawingDocument, parseDrawingSimplifySnapshot } from './parser';

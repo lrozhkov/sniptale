@@ -160,3 +160,47 @@ it.each([false, true])(
     owner.dispose();
   }
 );
+
+it('does not restart recording expiry when a pending font updates text geometry', async () => {
+  vi.useFakeTimers();
+  let ready = false;
+  let finish!: (faces: unknown[]) => void;
+  const pending = new Promise<unknown[]>((resolve) => {
+    finish = resolve;
+  });
+  vi.stubGlobal('document', {
+    fonts: { check: () => ready, load: () => pending },
+    createElement: () => ({
+      getContext: () => ({
+        font: '',
+        measureText: (value: string) => ({ width: value.length * 10 }),
+      }),
+    }),
+  });
+  const owner = createRecordingDrawingOwner({ initialAutoHideDelay: 3 });
+  try {
+    owner.setClockRunning(true);
+    owner.controller.session.commitObject({
+      id: 'late-text',
+      kind: 'text',
+      text: 'Text',
+      fontSize: 24,
+      color: '#111111',
+      backgroundColor: null,
+      autoWidth: true,
+      wrapWidth: 300,
+      bounds: { x: 10, y: 20, width: 200, height: 90 },
+    });
+    vi.advanceTimersByTime(1000);
+    ready = true;
+    finish([{}]);
+    await pending;
+    await Promise.resolve();
+    expect(owner.controller.session.getSnapshot().document.objects).toHaveLength(1);
+    vi.advanceTimersByTime(2000);
+    expect(owner.controller.session.getSnapshot().document.objects).toEqual([]);
+  } finally {
+    owner.dispose();
+    vi.unstubAllGlobals();
+  }
+});

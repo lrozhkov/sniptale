@@ -74,9 +74,9 @@ it('keeps canvas text backgrounds joined in local coordinates after rotation', (
     { x: 0, y: 0 }
   );
   expect(context.rotate).toHaveBeenCalledWith(Math.PI / 4);
-  expect(context.moveTo).toHaveBeenCalledWith(169, 102);
-  expect(context.arcTo).toHaveBeenNthCalledWith(1, 172, 102, 172, 127, 3);
-  expect(context.arcTo).toHaveBeenNthCalledWith(2, 172, 127, 152, 127, 3);
+  expect(context.moveTo).toHaveBeenCalledWith(169, 100);
+  expect(context.arcTo).toHaveBeenNthCalledWith(1, 172, 100, 172, 137, 3);
+  expect(context.arcTo).toHaveBeenNthCalledWith(2, 172, 137, 152, 137, 3);
   expect(context.roundRect).not.toHaveBeenCalled();
 });
 

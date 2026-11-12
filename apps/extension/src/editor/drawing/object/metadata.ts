@@ -247,12 +247,21 @@ export function synchronizeEditorDrawingObjectFromFabric(
       ...rotation,
       ...(skewX ? { skewX } : {}),
     };
-  } else if (drawing.kind === 'text' && target instanceof Textbox && sceneTransform) {
+  } else if (drawing.kind === 'text' && target instanceof Textbox) {
     next = {
       ...drawing,
       bounds,
       ...rotation,
-      fontSize: target.fontSize * target.getObjectScaling().y,
+      autoWidth:
+        (target.sniptaleDrawingTextAutoWidth ?? drawing.autoWidth ?? false) &&
+        (sceneTransform !== undefined || Math.abs(target.getObjectScaling().x - 1) < 0.0001),
+      wrapWidth:
+        (target.sniptaleDrawingTextAutoWidth ?? drawing.autoWidth ?? false) &&
+        (sceneTransform !== undefined || Math.abs(target.getObjectScaling().x - 1) < 0.0001)
+          ? (target.sniptaleDrawingTextMaxWidth ?? drawing.wrapWidth ?? bounds.width) *
+            (sceneTransform ? target.getObjectScaling().x : 1)
+          : bounds.width,
+      ...(sceneTransform ? { fontSize: target.fontSize * target.getObjectScaling().y } : {}),
     };
   } else {
     next = { ...drawing, bounds, ...rotation };
@@ -289,16 +298,20 @@ export function syncEditorDrawingTextObject(textbox: Textbox): boolean {
   const drawing = readEditorDrawingObject(textbox);
   if (drawing?.kind !== 'text') return false;
   const height = Math.max(1, textbox.height);
-  const width = Math.max(40, textbox.width);
+  const width = Math.max(1, textbox.width);
   const center = textbox.getCenterPoint();
   const bounds =
     textbox.angle || drawing.rotation
       ? { height, width, x: center.x - width / 2, y: center.y - height / 2 }
-      : { ...drawing.bounds, height, width };
+      : { height, width, x: textbox.left, y: textbox.top };
   writeEditorDrawingObject(textbox, {
     ...drawing,
     bounds,
     rotation: Number(textbox.angle),
+    autoWidth: textbox.sniptaleDrawingTextAutoWidth ?? drawing.autoWidth ?? false,
+    wrapWidth: textbox.sniptaleDrawingTextAutoWidth
+      ? (textbox.sniptaleDrawingTextMaxWidth ?? drawing.wrapWidth ?? width)
+      : width,
     text: textbox.text ?? '',
   });
   return true;

@@ -107,6 +107,9 @@ export interface DrawingBlurObject extends DrawingRotatableObjectBase {
 }
 
 export interface DrawingTextObject extends DrawingRotatableObjectBase {
+  /** Logical wrap column, separate from fitted visible bounds. */
+  readonly wrapWidth?: number;
+  readonly autoWidth?: boolean;
   readonly kind: 'text';
   readonly bounds: DrawingBounds;
   readonly text: string;

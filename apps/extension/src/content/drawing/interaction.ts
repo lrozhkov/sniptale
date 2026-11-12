@@ -1,5 +1,4 @@
 import {
-  clampDrawingTextWidth,
   getDrawingBoundsCenter,
   getDrawingObjectBounds,
   getDrawingObjectRotation,
@@ -8,12 +7,10 @@ import {
   getDrawingSelectionBounds,
   hitTestDrawingDocument,
   replaceDrawingObjectBounds,
-  resolveDrawingTextFontFamily,
   resolveDrawingLinearPoint,
   transformDrawingObjectPoint,
   transformDrawingObjectVector,
   untransformDrawingObjectVector,
-  resolveDrawingTextHeight,
   rotateDrawingObjectAround,
   type DrawingBounds,
   type DrawingObject,
@@ -28,6 +25,7 @@ import {
   type DrawingArrowBendTarget,
 } from '../../features/drawing/public';
 import { readPageScroll, type PageScrollRoot } from '../platform/page-scroll';
+import { measureContentDrawingTextLayout } from './text-measurement';
 import { resizeDrawingBox } from './box-resize';
 import { constrainDrawingSimplifyResize } from './simplify-object';
 
@@ -98,14 +96,6 @@ const MAGNETIC_ANGLE_STEP = 45;
 const MAGNETIC_ANGLE_TOLERANCE = 5;
 const ROTATION_HANDLE_OFFSET = 18;
 const ROTATION_HANDLE_RADIUS = 9;
-let drawingTextMeasurementContext: CanvasRenderingContext2D | null | undefined;
-
-function getDrawingTextMeasurementContext(): CanvasRenderingContext2D | null {
-  if (drawingTextMeasurementContext !== undefined) return drawingTextMeasurementContext;
-  drawingTextMeasurementContext =
-    typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
-  return drawingTextMeasurementContext;
-}
 
 export function getDrawingViewportProjection(root: PageScrollRoot): Readonly<DrawingPoint> {
   const scroll = readPageScroll(root);
@@ -357,30 +347,23 @@ function resizeDrawingTextGeometry(
   const originalHandleX = draft.handle === 'w' ? bounds.x : right;
   const targetX = originalHandleX + point.x - draft.start.x;
   const requestedWidth = draft.handle === 'w' ? right - targetX : targetX - bounds.x;
-  const width = clampDrawingTextWidth(
-    original.text,
-    original.fontSize,
-    requestedWidth,
-    Number.POSITIVE_INFINITY
-  );
-  const measurementContext = getDrawingTextMeasurementContext();
-  if (measurementContext) {
-    measurementContext.font = `${original.fontSize}px ${resolveDrawingTextFontFamily(
-      original.fontFamily
-    )}`;
-  }
+  const width = Math.max(1, requestedWidth);
+  const layout = measureContentDrawingTextLayout({
+    text: original.text,
+    fontSize: original.fontSize,
+    ...(original.fontFamily ? { fontFamily: original.fontFamily } : {}),
+    wrapWidth: width,
+    autoWidth: false,
+  });
   return {
     ...original,
+    autoWidth: false,
+    wrapWidth: layout.logicalWidth,
     bounds: {
-      x: draft.handle === 'w' ? right - width : bounds.x,
+      x: draft.handle === 'w' ? right - layout.width : bounds.x,
       y: bounds.y,
-      width,
-      height: resolveDrawingTextHeight(
-        original.text,
-        original.fontSize,
-        width,
-        measurementContext ? (line) => measurementContext.measureText(line).width : undefined
-      ),
+      width: layout.width,
+      height: layout.height,
     },
   };
 }

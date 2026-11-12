@@ -169,6 +169,9 @@ function isDrawingObject(value: unknown): value is DrawingObject {
         value['fontFamily'] === 'serif' ||
         value['fontFamily'] === 'mono' ||
         value['fontFamily'] === 'handwritten') &&
+      (value['autoWidth'] === undefined || typeof value['autoWidth'] === 'boolean') &&
+      (value['wrapWidth'] === undefined ||
+        (isFiniteBoundedNumber(value['wrapWidth']) && value['wrapWidth'] > 0)) &&
       isPositiveSize(value['fontSize']) &&
       hasValidRotation(value)
     );
@@ -233,6 +236,15 @@ function assertDrawingFabricObject(value: UnknownRecord): void {
   const drawing = parseEditorDrawingMetadata(serializedMetadata);
   if (!drawing) {
     throw new Error('Invalid editor drawing metadata');
+  }
+  if (drawing.kind === 'text') {
+    const automatic = value['sniptaleDrawingTextAutoWidth'];
+    const maxWidth = value['sniptaleDrawingTextMaxWidth'];
+    if (
+      (automatic !== undefined && typeof automatic !== 'boolean') ||
+      (maxWidth !== undefined && (!isFiniteBoundedNumber(maxWidth) || maxWidth <= 0))
+    )
+      throw new Error('Invalid text layout metadata');
   }
   if (drawing.kind === 'simplify') {
     const result = parseDrawingSimplifySnapshot({

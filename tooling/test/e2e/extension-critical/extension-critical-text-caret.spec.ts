@@ -114,6 +114,7 @@ for (const viewport of [
               observed = await caretInkGap(
                 await page.screenshot({
                   path: info.outputPath(`caret-${word}-${edge}.png`),
+                  caret: 'initial',
                   clip,
                   fullPage: false,
                 }),
@@ -123,18 +124,33 @@ for (const viewport of [
             })
             .toBeGreaterThan(5);
           expect(observed.ink).toBeGreaterThan(4);
+          const expectedGap = await page.evaluate(
+            ({ word, edge }) => {
+              const input = document.querySelector<HTMLTextAreaElement>(
+                'textarea[data-fabric="textarea"]'
+              )!;
+              const style = getComputedStyle(input);
+              const context = document.createElement('canvas').getContext('2d')!;
+              context.font = `${style.fontSize} ${style.fontFamily}`;
+              const metrics = context.measureText(word);
+              return edge === 'end'
+                ? metrics.width - metrics.actualBoundingBoxRight
+                : -metrics.actualBoundingBoxLeft - 1;
+            },
+            { word, edge }
+          );
+          // Native caret follows the browser advance; italic ink can cross that advance.
           expect(
-            observed.gap,
-            `${word} ${edge}: caret must clear the glyph`
-          ).toBeGreaterThanOrEqual(1);
-          expect(
-            observed.gap,
-            `${word} ${edge}: caret must stay near the glyph`
-          ).toBeLessThanOrEqual(3);
+            Math.abs(observed.gap - expectedGap),
+            `${word} ${edge}: native advance alignment`
+          ).toBeLessThanOrEqual(2);
         }
       }
       await page.keyboard.press('Control+a');
       await page.keyboard.insertText('тс\nтс\nтс');
+      const lineHeight = await input.evaluate((element) =>
+        parseFloat(getComputedStyle(element).lineHeight)
+      );
       await page.keyboard.press('Enter');
       await expect(input).toHaveCount(0);
       const exported = await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage());
@@ -168,8 +184,8 @@ for (const viewport of [
         }
       }
       expect(bands).toHaveLength(3);
-      expect(bands[1]! - bands[0]!).toBe(30);
-      expect(bands[2]! - bands[1]!).toBe(30);
+      expect(bands[1]! - bands[0]!).toBeCloseTo(lineHeight, 0);
+      expect(bands[2]! - bands[1]!).toBeCloseTo(lineHeight, 0);
       expect(errors).toEqual([]);
       await page.screenshot({
         path: info.outputPath('handwritten-three-lines.png'),

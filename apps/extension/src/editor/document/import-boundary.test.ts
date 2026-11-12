@@ -293,3 +293,28 @@ it('admits cleanup as a Blur layer only with validated Simplify erase metadata a
     )
   ).toThrow('Mismatched editor drawing metadata');
 });
+
+it('admits optional text layout flags and rejects malformed values before restore', () => {
+  const text = objects.find((object) => object.kind === 'text')!;
+  const serialize = (flags: Record<string, unknown>) =>
+    JSON.stringify({ objects: [{ ...fabricObject(text), ...flags }] });
+  for (const flags of [
+    {},
+    { sniptaleDrawingTextAutoWidth: true, sniptaleDrawingTextMaxWidth: 640 },
+    { sniptaleDrawingTextAutoWidth: false },
+  ]) {
+    expect(() => assertValidEditorDrawingCanvasJson(serialize(flags))).not.toThrow();
+  }
+  for (const flags of [
+    { sniptaleDrawingTextAutoWidth: 'true' },
+    { sniptaleDrawingTextAutoWidth: null },
+    { sniptaleDrawingTextMaxWidth: '640' },
+    { sniptaleDrawingTextMaxWidth: 0 },
+    { sniptaleDrawingTextMaxWidth: -1 },
+    { sniptaleDrawingTextMaxWidth: 131073 },
+  ]) {
+    expect(() => assertValidEditorDrawingCanvasJson(serialize(flags))).toThrow(
+      'Invalid text layout metadata'
+    );
+  }
+});

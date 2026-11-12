@@ -64,7 +64,13 @@ const scaleYProportionally = createProportionalSideScale('y');
 const changeTextWidth = controlsUtils.wrapWithFireEvent('resizing', ((_event, transform, x, y) => {
   const { target, originX } = transform;
   const anchor = target.getPositionByOrigin(originX, 'top');
+  const automaticWidth = target.sniptaleDrawingTextAutoWidth;
+  target.sniptaleDrawingTextAutoWidth = false;
   const changed = controlsUtils.changeObjectWidth(_event, transform, x, y);
+  if (!changed) {
+    if (automaticWidth === undefined) delete target.sniptaleDrawingTextAutoWidth;
+    else target.sniptaleDrawingTextAutoWidth = automaticWidth;
+  }
   target.setPositionByOrigin(anchor, transform.originX, 'top');
   return changed;
 }) satisfies TransformActionHandler);

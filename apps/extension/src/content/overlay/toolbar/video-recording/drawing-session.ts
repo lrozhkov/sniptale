@@ -1,3 +1,4 @@
+import { ContentDrawingTextProjection } from '../../../drawing/text-measurement';
 import { setUIHidden } from '../../../selection/locker';
 import {
   createContentSimplifyDependencies,
@@ -127,8 +128,14 @@ export function createRecordingDrawingOwner(options?: {
     return true;
   };
 
+  const textProjection = new ContentDrawingTextProjection();
   controller = createContentDrawingController(
-    createDrawingSession({ autoSelectCreatedObjects: false, onDocumentCommit: acceptCommit }),
+    createDrawingSession({
+      autoSelectCreatedObjects: false,
+      onDocumentCommit: acceptCommit,
+      objectProjection: textProjection,
+      onDispose: () => textProjection.dispose(),
+    }),
     preserveRecordingMasks(options?.simplifyDependencies)
   );
 

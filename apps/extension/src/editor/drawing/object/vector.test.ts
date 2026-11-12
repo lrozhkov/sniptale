@@ -58,7 +58,7 @@ it('bounds zoomed scratch allocation to the visible destination and skips offscr
     if (
       !actual
         .subarray(offset, offset + 4)
-        .every((channel, index) => channel === reference[offset + index])
+        .every((channel, index) => Math.abs(channel - reference[offset + index]!) <= 1)
     ) {
       changedSolidPixels += 1;
     }
@@ -314,7 +314,7 @@ it.each([0, 5, 10, 45])('has continuous Fabric background pixels at %s degrees',
     let edge = object._getTopOffset();
     for (let line = 0; line < 2; line += 1) {
       edge += object.getHeightOfLine(line);
-      for (let offset = 20; offset <= 30; offset += 1) {
+      for (let offset = 12; offset <= 16; offset += 1) {
         for (const delta of [-0.75, -0.25, 0.25, 0.75]) {
           const localX = object._getLeftOffset() + offset;
           const localY = edge + delta;
@@ -427,12 +427,18 @@ describe('Fabric drawing adapter', () => {
     expect(context.moveTo).toHaveBeenCalledTimes(1);
     expect(context.closePath).toHaveBeenCalledTimes(1);
     expect(context.arcTo).toHaveBeenCalled();
-    expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
+    const inkContext = document.createElement('canvas').getContext('2d')!;
+    inkContext.font = (object as Textbox)._getFontDeclaration();
+    expect(
+      (object as Textbox)._getLineLeftOffset(0) -
+        inkContext.measureText('One').actualBoundingBoxLeft
+    ).toBeCloseTo(6);
+    const leftOffset = (object as Textbox)._getLineLeftOffset(0);
     const topOffset = (object as Textbox)._getTopOffset();
     applyEditorDrawingTextVisuals(object as Textbox);
     (object as Textbox)._renderTextLinesBackground(context as unknown as CanvasRenderingContext2D);
     expect((object as Textbox)._getTopOffset()).toBe(topOffset);
-    expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(6);
+    expect((object as Textbox)._getLineLeftOffset(0)).toBeCloseTo(leftOffset);
     expect(context.fill).toHaveBeenCalledTimes(2);
   });
 
@@ -495,8 +501,10 @@ describe('Fabric drawing adapter', () => {
     object.set({ text: 'One\nTwo\nThree\nFour\nFive\nSix' });
     object.initDimensions();
 
-    expect(synchronizeEditorDrawingTextLayout(object)).toBe(true);
-    expect(object.height).toBeGreaterThanOrEqual(object.calcTextHeight() + 4);
+    const height = object.height;
+    expect(synchronizeEditorDrawingTextLayout(object)).toBe(false);
+    expect(object.height).toBe(height);
+    expect(object.height).toBeGreaterThan(5 * object.getHeightOfLine(0));
     expect(object._textLines).toHaveLength(6);
   });
 

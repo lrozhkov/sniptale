@@ -102,6 +102,9 @@ it.each([
   { version: 1, objects: [{ ...objects[7], amount: -1 }] },
   { version: 1, objects: [{ ...objects[8], fontSize: 0 }] },
   { version: 1, objects: [{ ...objects[8], fontFamily: 'url(remote)' }] },
+  ...[{ autoWidth: 'true' }, { wrapWidth: 0 }, { wrapWidth: Infinity }, { wrapWidth: 131073 }].map(
+    (fields) => ({ version: 1, objects: [{ ...objects[8], ...fields }] })
+  ),
 ])('refuses malformed drawing input %j', (raw) => {
   expect(parseDrawingDocument(raw)).toBeNull();
 });
@@ -341,3 +344,11 @@ it('round-trips cleanup metadata and rejects invalid erase or retained strength 
     })
   ).toBeNull();
 });
+
+it.each([true, false])(
+  'preserves explicit text wrapping and the logical column %s',
+  (autoWidth) => {
+    const object = { ...objects[8], autoWidth, wrapWidth: 320 };
+    expect(parseDrawingDocument({ version: 1, objects: [object] })?.objects[0]).toEqual(object);
+  }
+);

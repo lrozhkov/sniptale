@@ -272,7 +272,10 @@ function text(value: Record<string, unknown>, id: string, budget: Budget): Drawi
     !isColor(value['color']) ||
     !isPositive(value['fontSize']) ||
     (background !== null && !isColor(background)) ||
-    (font !== undefined && family === undefined)
+    (font !== undefined && family === undefined) ||
+    (value['autoWidth'] !== undefined && typeof value['autoWidth'] !== 'boolean') ||
+    (value['wrapWidth'] !== undefined &&
+      (!isPositive(value['wrapWidth']) || value['wrapWidth'] > 131072))
   )
     return null;
   budget.text -= content.length;
@@ -286,6 +289,8 @@ function text(value: Record<string, unknown>, id: string, budget: Budget): Drawi
     fontSize: value['fontSize'],
     ...angle,
     ...(family === undefined ? {} : { fontFamily: family }),
+    ...(typeof value['autoWidth'] === 'boolean' ? { autoWidth: value['autoWidth'] } : {}),
+    ...(isNumber(value['wrapWidth']) ? { wrapWidth: value['wrapWidth'] } : {}),
   };
 }
 function object(value: unknown, budget: Budget): DrawingObject | null {

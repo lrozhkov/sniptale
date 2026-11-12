@@ -1,10 +1,11 @@
 import type { Locator, Page } from '@playwright/test';
+import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { expect, test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 
-const TEXT = 'A longer first line\nShort\nA final line';
+const TEXT = 'A\tlonger first line\nShort\nA final line';
 
 async function checkCompactMixedSelection(page: Page, viewport: { width: number; height: number }) {
   await page.setViewportSize({ width: 1024, height: 560 });
@@ -40,7 +41,7 @@ for (const viewport of [
       if ((await background.getAttribute('aria-pressed')) !== 'true') await background.click();
       await page
         .locator(
-          '[data-ui="content.toolbar.drawing-options.text.background-colors"] button[title="#f97316"]'
+          '[data-ui="content.toolbar.drawing-options.text.background-colors"] button[title="#ff7f50"]'
         )
         .click();
       await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
@@ -207,7 +208,7 @@ test('rotated text backgrounds have continuous raster coverage at line joins', a
     if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
     await page
       .locator(
-        '[data-ui="content.toolbar.drawing-options.text.background-colors"] button[title="#f97316"]'
+        '[data-ui="content.toolbar.drawing-options.text.background-colors"] button[title="#ff7f50"]'
       )
       .click();
     await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
@@ -267,9 +268,9 @@ test('rotated text backgrounds have continuous raster coverage at line joins', a
               const offset = (row * canvas.width + column) * 4;
               errors.push(
                 Math.max(
-                  Math.abs(pixels[offset]! - 249),
-                  Math.abs(pixels[offset + 1]! - 115),
-                  Math.abs(pixels[offset + 2]! - 22)
+                  Math.abs(pixels[offset]! - 255),
+                  Math.abs(pixels[offset + 1]! - 127),
+                  Math.abs(pixels[offset + 2]! - 80)
                 )
               );
               const error = errors[errors.length - 1]!;
@@ -312,6 +313,20 @@ for (const viewport of [
       test.setTimeout(120_000);
       const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
       try {
+        if (mode === 'video-recording') {
+          await popup.evaluate(async (defaults) => {
+            await chrome.storage.local.set({
+              sniptale_video_settings: {
+                ...defaults,
+                microphoneEnabled: false,
+                webcamEnabled: false,
+                systemAudioEnabled: false,
+                warnWithoutMicrophone: false,
+                countdownSeconds: 0,
+              },
+            });
+          }, DEFAULT_VIDEO_SETTINGS);
+        }
         await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
         await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
         if (mode === 'video-recording') {
@@ -352,11 +367,17 @@ for (const viewport of [
         const object = page.locator('[data-ui="content.drawing.text-object"]');
         await expect(object).toHaveCount(1);
         const baseline = await backgroundPath(object);
+        if (mode === 'video-recording') {
+          await page.locator('[data-ui="content.toolbar.drawing.select"]').click();
+          const box = (await object.boundingBox())!;
+          await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        }
         for (const degrees of [45, 90]) {
           const center = await rotateContentText(page, object, degrees);
           expect.soft(await input.count(), 'rotation release must not create or edit text').toBe(0);
           if (await input.count()) await input.press('Escape');
-          await page.mouse.click(center.x, center.y);
+          if (mode === 'video-recording') await page.mouse.dblclick(center.x, center.y);
+          else await page.mouse.click(center.x, center.y);
           await expect(input).toHaveValue(TEXT);
           const editor = page.locator('[data-ui="content.drawing.text-editor"]');
           expect(await backgroundPath(editor)).toBe(baseline);
@@ -364,6 +385,8 @@ for (const viewport of [
           await input.press('Enter');
           await expect(input).toHaveCount(0);
         }
+        if (mode === 'video-recording')
+          await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
         await page.mouse.click(700, 400);
         await expect(input).toHaveValue('');
         await input.press('Escape');
@@ -460,7 +483,7 @@ for (const viewport of [
     const start = { x: box.x + box.width / 2 - 80, y: box.y + box.height / 2 };
     await page.mouse.click(start.x, start.y);
     await page.keyboard.insertText(TEXT);
-    await page.keyboard.press('Escape');
+    await page.keyboard.press('Enter');
     const objects = await page.evaluate(() => window.__sniptaleEditorHarness!.getCanvasObjects());
     const text = objects.find((object) => object['sniptaleType'] === 'text')!;
     expect(text).toBeDefined();
@@ -503,7 +526,7 @@ for (const { width, height } of [
       const start = { x: box.x + box.width * 0.5 - 90, y: box.y + box.height * 0.5 - 30 };
       await page.mouse.click(start.x, start.y);
       await page.keyboard.insertText('Mixed text');
-      await page.keyboard.press('Escape');
+      await page.keyboard.press('Enter');
       await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
       await page.mouse.move(start.x, start.y + 70);
       await page.mouse.down();
@@ -570,8 +593,7 @@ for (const viewport of [
               '[data-ui="content.drawing.text-background"]'
             )!;
             const content =
-              node.querySelector<HTMLElement>('[data-ui="content.drawing.text-mirror"]') ??
-              node.querySelector('span')!;
+              node.querySelector<HTMLElement>('textarea') ?? node.querySelector('span')!;
             const lineHeight = parseFloat(getComputedStyle(content).lineHeight);
             return [0, 1, 2, 3, 4, 5].map((index) =>
               path.isPointInFill(new DOMPoint(3, 2 + (index + 0.5) * lineHeight))
@@ -718,6 +740,23 @@ for (const viewport of [
         .locator('[data-ui="content.toolbar.drawing-options.text.font-handwritten"]')
         .click();
       await page.locator('[data-ui="content.toolbar.drawing-options.text.size-36"]').click();
+      const font = await page.evaluate(async () => {
+        const faces = await document.fonts.load('36px "Sniptale Handwritten"', 'Привет мир');
+        const context = document.createElement('canvas').getContext('2d')!;
+        context.font = '36px "Sniptale Handwritten"';
+        const handwritten = context.measureText('Привет мир').width;
+        context.font = '36px serif';
+        return {
+          faces: faces.length,
+          handwritten,
+          fallback: context.measureText('Привет мир').width,
+        };
+      });
+      expect(
+        font.faces,
+        'the bundled drawing face must be registered in the page document'
+      ).toBeGreaterThan(0);
+      expect(font.handwritten).not.toBe(font.fallback);
       const fill = page.locator('[data-ui="content.toolbar.drawing-options.text.background-none"]');
       if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
       await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
@@ -729,30 +768,33 @@ for (const viewport of [
         value += letter;
         await expect(input).toHaveValue(value);
         const layout = await page
-          .locator('[data-ui="content.drawing.text-mirror"]')
+          .locator('[data-ui="content.drawing.text-input"]')
           .evaluate((element) => {
             const style = getComputedStyle(element);
             return {
-              height: element.getBoundingClientRect().height,
+              height:
+                element.getBoundingClientRect().height -
+                parseFloat(style.paddingTop) -
+                parseFloat(style.paddingBottom),
               lineHeight: parseFloat(style.lineHeight),
             };
           });
         expect(layout.height).toBeLessThan(layout.lineHeight * 1.5);
       }
-      const before = await page
-        .locator(
-          '[data-ui="content.drawing.text-editor"] [data-ui="content.drawing.text-background"]'
-        )
-        .getAttribute('d');
+      const background = page.locator(
+        '[data-ui="content.drawing.text-editor"] [data-ui="content.drawing.text-background"]'
+      );
+      const worldBounds = () =>
+        background.evaluate((node) => {
+          const { x, y, width, height } = node.getBoundingClientRect();
+          return { x, y, width, height };
+        });
+      const before = await worldBounds();
       await input.press('Shift+Enter');
       await expect(input).toHaveValue(`${value}\n`);
-      expect(
-        await page
-          .locator(
-            '[data-ui="content.drawing.text-editor"] [data-ui="content.drawing.text-background"]'
-          )
-          .getAttribute('d')
-      ).toBe(before);
+      const after = await worldBounds();
+      for (const key of ['x', 'y', 'width', 'height'] as const)
+        expect(after[key], `empty row preserves background ${key}`).toBeCloseTo(before[key], 5);
       await page.keyboard.insertText('Я');
       await input.press('Enter');
       await expect(input).toHaveCount(0);

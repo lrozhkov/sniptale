@@ -152,6 +152,7 @@ it('keeps the text top steady while a side handle changes wrapping width', () =>
   canvas.add(object);
   object.controls = createDrawingTextControls(object);
   object.setCoords();
+  object.set({ fontFamily: 'sans-serif' });
   const originalTop = object.top;
   const originalHeight = object.height;
 

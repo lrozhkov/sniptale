@@ -437,7 +437,7 @@ export function replaceDrawingObjectBounds(
     };
   }
   if (object.kind === 'text') {
-    return { ...object, bounds: target };
+    return { ...object, bounds: target, autoWidth: false, wrapWidth: target.width };
   }
   return { ...object, bounds: target };
 }

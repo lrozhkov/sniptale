@@ -176,7 +176,10 @@ it('bounds zoomed stencil allocation to the visible scene without changing visib
       if (background) backgroundPixels += 1;
       if (
         (background || source) &&
-        channels.some((channel) => actual[offset + channel] !== expected[offset + channel])
+        // Scratch compositing can round an antialias channel by one byte.
+        channels.some(
+          (channel) => Math.abs(actual[offset + channel]! - expected[offset + channel]!) > 1
+        )
       )
         mismatchedPixels += 1;
     }
@@ -442,11 +445,43 @@ it.each(['#111111', '#00000000'])(
       },
       { x: 0, y: 0 }
     );
-    for (const index of [0, 2, 3, 5])
-      expect(context.getImageData(12, 24 + index * 25, 1, 1).data[3], `blank row ${index}`).toBe(0);
-    for (const index of [1, 4])
-      expect(context.getImageData(12, 24 + index * 25, 1, 1).data[3], `text row ${index}`).toBe(
-        255
-      );
+    const bands: Array<{ top: number; bottom: number }> = [];
+    for (let y = 0; y < 200; y++) {
+      if (!context.getImageData(12, y, 1, 1).data[3]) continue;
+      const previous = bands.at(-1);
+      if (previous?.bottom === y) previous.bottom = y + 1;
+      else bands.push({ top: y, bottom: y + 1 });
+    }
+    expect(bands).toHaveLength(2);
+    expect(bands[0]!.top).toBe(10);
+    expect(bands[1]!.top - bands[0]!.top).toBe(75);
+    expect(bands[1]!.top - bands[0]!.bottom).toBe(38);
+    expect(context.getImageData(12, bands[1]!.bottom, 1, 1).data[3]).toBe(0);
   }
 );
+
+it('paints pasted tab-separated text at native eight-space stops in capture', () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 500;
+  canvas.height = 100;
+  const context = canvas.getContext('2d')!;
+  const fill = vi.spyOn(context, 'fillText');
+  renderDrawingObject(
+    context,
+    {
+      id: 'tabs',
+      kind: 'text',
+      text: 'A\tB\tC',
+      fontFamily: 'sans',
+      fontSize: 24,
+      color: '#111111',
+      backgroundColor: null,
+      bounds: { x: 0, y: 0, width: 500, height: 60 },
+    },
+    { x: 0, y: 0 }
+  );
+  const stop = context.measureText(' ').width * 8;
+  expect(fill.mock.calls.map((call) => call[0])).toEqual(['A', 'B', 'C']);
+  expect(fill.mock.calls[1]![1] - fill.mock.calls[0]![1]).toBeCloseTo(stop, 4);
+  expect(fill.mock.calls[2]![1] - fill.mock.calls[0]![1]).toBeCloseTo(stop * 2, 4);
+});

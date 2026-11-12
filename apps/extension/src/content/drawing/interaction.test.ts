@@ -484,7 +484,7 @@ it('resizes a text box by width only without scaling its font', () => {
   expect(narrowed).toMatchObject({ fontSize: 20, bounds: { x: 20, y: 30 } });
   expect(widened).toMatchObject({ fontSize: 20, bounds: { x: 20, y: 30 } });
   if (narrowed.kind !== 'text' || widened.kind !== 'text') throw new Error('Expected text');
-  expect(narrowed.bounds.width).toBeGreaterThanOrEqual(80);
+  expect(narrowed.bounds.width).toBe(23); // One fallback advance cell and the shared horizontal padding.
   expect(widened.bounds.width).toBeGreaterThan(640);
   expect(narrowed.bounds.height).toBeGreaterThan(widened.bounds.height);
 });

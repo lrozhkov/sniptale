@@ -18,6 +18,8 @@ export const CUSTOM_JSON_PROPS = [
   'sniptaleBackgroundGradientAngle',
   'sniptaleBackgroundGradient',
   'sniptaleDrawingJson',
+  'sniptaleDrawingTextAutoWidth',
+  'sniptaleDrawingTextMaxWidth',
   'sniptaleScenarioBlurJson',
   'sniptaleImageOpacity',
   'sniptaleImageRadius',

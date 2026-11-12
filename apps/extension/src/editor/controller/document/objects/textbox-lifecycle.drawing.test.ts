@@ -18,5 +18,75 @@ it('commits non-empty drawing text and removes empty text through one lifecycle'
   textbox.fire('editing:exited');
   expect(onCommit).toHaveBeenCalledOnce();
   expect(onCommit).toHaveBeenCalledWith(textbox);
-  expect(textbox.sniptaleDrawingTextAutoWidth).toBe(false);
+  expect(textbox.sniptaleDrawingTextAutoWidth).toBe(true);
+});
+
+it('restores fitted pixels, coordinates and automatic wrapping after edit-cancel-re-edit', async () => {
+  const { Canvas } = await import('fabric');
+  const { createEditorDrawingFabricObject } = await import('../../../drawing/object/vector');
+  const { beginEditorTextboxEditing, cancelEditorTextboxEditing } =
+    await import('./textbox-lifecycle');
+  const canvas = new Canvas(document.createElement('canvas'));
+  try {
+    const textbox = createEditorDrawingFabricObject(
+      {
+        id: 'cancel-fitted',
+        kind: 'text',
+        text: 'Original  \n\n',
+        fontFamily: 'sans',
+        fontSize: 24,
+        color: '#111111',
+        backgroundColor: '#f97316',
+        bounds: { x: 20, y: 30, width: 400, height: 60 },
+      },
+      1
+    );
+    if (!(textbox instanceof Textbox)) throw new Error('Expected textbox');
+    // Node Canvas needs an installed family instead of the browser font stack.
+    textbox.set({ fontFamily: 'sans-serif' });
+    canvas.add(textbox);
+    const onCommit = vi.fn();
+    attachEditorTextboxLifecycle(textbox, { onEmpty: vi.fn(), onCommit });
+    const snapshot = {
+      left: textbox.left,
+      top: textbox.top,
+      width: textbox.width,
+      height: textbox.height,
+      text: textbox.text,
+      metadata: textbox.sniptaleDrawingJson,
+      maxWidth: textbox.sniptaleDrawingTextMaxWidth,
+    };
+    const pixels = () => {
+      const image = textbox.toCanvasElement();
+      return Buffer.from(
+        image.getContext('2d')!.getImageData(0, 0, image.width, image.height).data
+      );
+    };
+    const before = pixels();
+    beginEditorTextboxEditing(textbox);
+    textbox.enterEditing();
+    textbox.set({ text: 'A longer replacement' });
+    textbox.hiddenTextarea!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true })
+    );
+    expect(textbox.isEditing).toBe(true);
+    cancelEditorTextboxEditing(textbox);
+    expect(textbox.sniptaleDrawingTextAutoWidth).toBe(true);
+    expect(textbox.sniptaleDrawingTextMaxWidth).toBe(snapshot.maxWidth);
+    expect(textbox.text).toBe(snapshot.text);
+    expect(textbox.sniptaleDrawingJson).toBe(snapshot.metadata);
+    expect(textbox.left).toBeCloseTo(snapshot.left, 4);
+    expect(textbox.top).toBeCloseTo(snapshot.top, 4);
+    expect(textbox.width).toBeCloseTo(snapshot.width, 4);
+    expect(textbox.height).toBeCloseTo(snapshot.height, 4);
+    expect(pixels().equals(before)).toBe(true);
+    expect(onCommit).not.toHaveBeenCalled();
+    textbox.enterEditing();
+    textbox.set({ text: 'A longer replacement' });
+    expect(textbox.width).toBeGreaterThan(snapshot.width);
+    expect(textbox._textLines).toHaveLength(1);
+    cancelEditorTextboxEditing(textbox);
+  } finally {
+    await canvas.dispose();
+  }
 });

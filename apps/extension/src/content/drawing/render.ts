@@ -2,9 +2,6 @@ import {
   buildDrawingStrokeOutline,
   buildDrawingArrowOutline,
   createDrawingBounds,
-  DRAWING_TEXT_HORIZONTAL_PADDING,
-  DRAWING_TEXT_LINE_HEIGHT_FACTOR,
-  DRAWING_TEXT_VERTICAL_PADDING,
   getDrawingBoundsCenter,
   getDrawingEllipsePoints,
   getDrawingObjectBounds,
@@ -15,6 +12,9 @@ import {
   isDrawingTextStencil,
   resolveDrawingTextFontFamily,
   traceDrawingTextBackground,
+  resolveDrawingTextInkLayout,
+  measureDrawingTextWithTabs,
+  resolveDrawingTextRuns,
   transformDrawingPoint,
   type DrawingObject,
   type DrawingBounds,
@@ -83,41 +83,25 @@ function drawText(
   const y = bounds.y - projection.y;
   context.font = `${object.fontSize}px ${resolveDrawingTextFontFamily(object.fontFamily)}`;
   context.textBaseline = 'alphabetic';
-  const lineHeight = object.fontSize * DRAWING_TEXT_LINE_HEIGHT_FACTOR;
-  const maxWidth = Math.max(1, bounds.width - DRAWING_TEXT_HORIZONTAL_PADDING);
-  const lines: string[] = [];
-  object.text.split('\n').forEach((paragraph) => {
-    const words = paragraph.split(/\s+/);
-    let line = '';
-    words.forEach((word) => {
-      const candidate = line ? `${line} ${word}` : word;
-      if (line && context.measureText(candidate).width > maxWidth) {
-        lines.push(line);
-        line = word;
-      } else line = candidate;
-    });
-    lines.push(line);
+  context.textAlign = 'left';
+  context.direction = 'ltr';
+  const layout = resolveDrawingTextInkLayout({
+    text: object.text,
+    fontSize: object.fontSize,
+    wrapWidth: object.wrapWidth ?? bounds.width,
+    autoWidth: object.autoWidth ?? false,
+    measure: (text) => measureDrawingTextWithTabs(text, (part) => context.measureText(part)),
   });
-  const backgrounds = lines.flatMap((line, index) =>
-    line.trim()
-      ? [
-          {
-            left: x,
-            top: y + DRAWING_TEXT_VERTICAL_PADDING + index * lineHeight,
-            width: Math.min(bounds.width, Math.max(12, context.measureText(line).width + 12)),
-            height: lineHeight,
-          },
-        ]
-      : []
-  );
-  const metrics = context.measureText('Mg');
-  const fontBoxAscent = metrics.fontBoundingBoxAscent ?? object.fontSize * 0.8;
-  const fontBoxDescent = metrics.fontBoundingBoxDescent ?? object.fontSize * 0.2;
-  const leading = Math.max(0, lineHeight - fontBoxAscent - fontBoxDescent) / 2;
-  const firstBaseline = y + DRAWING_TEXT_VERTICAL_PADDING + leading + fontBoxAscent;
+  const backgrounds = layout.backgrounds.map((rect) => ({
+    ...rect,
+    left: rect.left + x,
+    top: rect.top + y,
+  }));
   const paint = (target: CanvasRenderingContext2D, stencil: boolean) => {
     target.font = context.font;
     target.textBaseline = context.textBaseline;
+    target.textAlign = 'left';
+    target.direction = 'ltr';
     if (object.backgroundColor) {
       target.fillStyle = object.backgroundColor;
       target.beginPath();
@@ -126,22 +110,24 @@ function drawText(
     }
     target.fillStyle = stencil ? '#000000' : object.color;
     if (stencil) target.globalCompositeOperation = 'destination-out';
-    lines.forEach((line, index) =>
-      target.fillText(
-        line,
-        x + DRAWING_TEXT_HORIZONTAL_PADDING / 2,
-        firstBaseline + index * lineHeight
+    layout.lines.forEach((line, index) =>
+      resolveDrawingTextRuns(line, (part) => target.measureText(part)).forEach((run) =>
+        target.fillText(
+          run.text,
+          x + layout.originX + run.left,
+          y + layout.firstBaseline + index * layout.lineHeight
+        )
       )
     );
   };
   if (isDrawingTextStencil(object.color, object.backgroundColor)) {
     const transform = context.getTransform();
-    const height = lines.length * lineHeight;
+    const height = layout.height;
     const corners = [
-      { x, y: y + DRAWING_TEXT_VERTICAL_PADDING },
-      { x: x + bounds.width, y: y + DRAWING_TEXT_VERTICAL_PADDING },
-      { x, y: y + DRAWING_TEXT_VERTICAL_PADDING + height },
-      { x: x + bounds.width, y: y + DRAWING_TEXT_VERTICAL_PADDING + height },
+      { x, y },
+      { x: x + layout.width, y },
+      { x, y: y + height },
+      { x: x + layout.width, y: y + height },
     ].map((point) => transformDrawingPoint(point, transform));
     const left = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.x))) - 1);
     const top = Math.max(0, Math.floor(Math.min(...corners.map((point) => point.y))) - 1);
