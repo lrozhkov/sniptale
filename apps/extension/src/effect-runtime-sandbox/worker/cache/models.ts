@@ -1,6 +1,8 @@
 interface EffectRuntimePreparedModelCache<T> {
   clear(): void;
   get(id: string): T | null;
+  find(predicate: (model: T) => boolean): T | null;
+  deleteWhere(predicate: (model: T) => boolean): void;
   set(id: string, model: T): boolean;
   snapshot(): { entries: number; weight: number };
 }
@@ -32,6 +34,18 @@ export function createEffectRuntimePreparedModelCache<T>(
       entries.delete(id);
       entries.set(id, entry);
       return entry.model;
+    },
+    find(predicate) {
+      for (const [id, entry] of entries) {
+        if (!predicate(entry.model)) continue;
+        entries.delete(id);
+        entries.set(id, entry);
+        return entry.model;
+      }
+      return null;
+    },
+    deleteWhere(predicate) {
+      for (const [id, entry] of [...entries]) if (predicate(entry.model)) remove(id);
     },
     set(id, model) {
       const weight = options.weight?.(model) ?? 0,

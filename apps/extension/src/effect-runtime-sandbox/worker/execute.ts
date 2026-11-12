@@ -15,6 +15,7 @@ import { EFFECT_RUNTIME_RESOURCE_LIMITS, EffectRuntimeResourceError } from './re
 
 type Renderer = Awaited<ReturnType<typeof createLottieFrameRenderer>>;
 interface PreparedModel {
+  documentId: string;
   document: EffectRuntimeWorkerRequest['document'];
   sourceBytes: number;
   retainedBytes: number;
@@ -51,7 +52,7 @@ export function createEffectRuntimeWorkerExecutionState(
     try {
       const resolution = resolveEffectRuntimeWorkerRequest(value, {
         getAssets: (id) => assets.get(id) ?? null,
-        getDocument: (id) => models.get(id)?.document ?? null,
+        getDocument: (id) => models.find((model) => model.documentId === id)?.document ?? null,
         setAssets(id, supplied) {
           if (Object.keys(supplied).length) return false;
           assets.delete(id);
@@ -63,19 +64,9 @@ export function createEffectRuntimeWorkerExecutionState(
           assets.set(id, {});
           return true;
         },
-        setDocument(id, document) {
-          const sourceBytes = new TextEncoder().encode(JSON.stringify(document)).byteLength;
-          if (
-            !models.set(id, {
-              document,
-              sourceBytes,
-              retainedBytes: 0,
-              renderer: null,
-              loading: null,
-              retired: false,
-            })
-          )
-            throw new EffectRuntimeResourceError();
+        setDocument(id) {
+          // A full immutable replacement retires every mutable instance of that document.
+          models.deleteWhere((model) => model.documentId === id);
         },
       });
       if (!resolution.ok) {
@@ -84,12 +75,22 @@ export function createEffectRuntimeWorkerExecutionState(
         closeEffectRuntimeBitmaps(value);
         return createEffectRuntimeFailure(value, resolution.code);
       }
-      const request = resolution.request,
-        model = models.get(request.documentId);
-      if (!model) return createEffectRuntimeFailure(request, 'crashed');
+      const request = resolution.request;
+      const modelKey = JSON.stringify([request.documentId, request.effectInstanceId]);
+      const retained = models.get(modelKey);
+      // Count shared document bytes per instance conservatively within the existing total budget.
+      const model: PreparedModel = retained ?? {
+        documentId: request.documentId,
+        document: request.document,
+        sourceBytes: new TextEncoder().encode(JSON.stringify(request.document)).byteLength,
+        retainedBytes: 0,
+        renderer: null,
+        loading: null,
+        retired: false,
+      };
       const previousBytes = model.retainedBytes;
       model.retainedBytes = request.renderWidth * request.renderHeight * 4;
-      if (!models.set(request.documentId, model)) {
+      if (!models.set(modelKey, model)) {
         model.retainedBytes = previousBytes;
         throw new EffectRuntimeResourceError();
       }

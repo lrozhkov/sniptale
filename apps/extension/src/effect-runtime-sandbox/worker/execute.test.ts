@@ -191,3 +191,124 @@ it('closes a malformed raster and classifies resource identity refusal', async (
     code: 'inputRejected',
   });
 });
+
+it('retains distinct mutable players when instances alternate the same document', async () => {
+  const first = dependencies(),
+    second = dependencies(),
+    createRenderer = vi
+      .fn()
+      .mockResolvedValueOnce({ render: first.render, dispose: first.dispose })
+      .mockResolvedValueOnce({ render: second.render, dispose: second.dispose });
+  const state = createEffectRuntimeWorkerExecutionState({ createRenderer }),
+    input = request();
+  const document = parseRuntimeAnimationDocument({
+    ...input.documentRef.document,
+    controls: [{ id: 'opacity', kind: 'number', defaultValue: 100, min: 0, max: 100 }],
+  });
+  if (!document) throw new Error('Invalid controlled animation.');
+  try {
+    for (let index = 0; index < 4; index++) {
+      const result = await state.execute({
+        ...input,
+        requestId: `request-${index}`,
+        effectInstanceId: index % 2 ? 'instance-b' : 'instance-a',
+        documentRef: {
+          id: input.documentRef.id,
+          ...(index === 0 ? { document } : {}),
+        },
+        assetSelectionRef: {
+          id: input.assetSelectionRef.id,
+          ...(index === 0 ? { assets: {} } : {}),
+        },
+        controls: { opacity: index % 2 ? 80 : 20 },
+        time: index / 60,
+        progress: index / 120,
+        frameIndex: index,
+      });
+      expect(result).toMatchObject({ kind: 'frame', requestId: `request-${index}` });
+    }
+    expect(createRenderer).toHaveBeenCalledTimes(2);
+    expect(first.render).toHaveBeenCalledTimes(2);
+    expect(second.render).toHaveBeenCalledTimes(2);
+    expect(first.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({ values: { opacity: 20 } })
+    );
+    expect(second.render).toHaveBeenLastCalledWith(
+      expect.objectContaining({ values: { opacity: 80 } })
+    );
+  } finally {
+    state.dispose();
+  }
+  expect(first.dispose).toHaveBeenCalledOnce();
+  expect(second.dispose).toHaveBeenCalledOnce();
+});
+
+it('keeps eight instance players and preserves their shared immutable document reference', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  for (let index = 0; index < 9; index++) {
+    expect(
+      await state.execute({
+        ...input,
+        requestId: `request-${index}`,
+        effectInstanceId: `instance-${index}`,
+        documentRef: index ? { id: input.documentRef.id } : input.documentRef,
+        assetSelectionRef: index ? { id: input.assetSelectionRef.id } : input.assetSelectionRef,
+      })
+    ).toMatchObject({ kind: 'frame' });
+  }
+  expect(deps.createRenderer).toHaveBeenCalledTimes(9);
+  expect(deps.dispose).toHaveBeenCalledOnce();
+  expect(state.snapshot().canvases.entries).toBe(8);
+  state.dispose();
+  expect(deps.dispose).toHaveBeenCalledTimes(9);
+});
+
+it('applies the existing raster byte budget across instances of one document', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  for (let index = 0; index < 5; index++) {
+    expect(
+      await state.execute({
+        ...input,
+        requestId: `request-${index}`,
+        effectInstanceId: `instance-${index}`,
+        documentRef: index ? { id: input.documentRef.id } : input.documentRef,
+        assetSelectionRef: index ? { id: input.assetSelectionRef.id } : input.assetSelectionRef,
+        renderWidth: 3840,
+        renderHeight: 2160,
+      })
+    ).toMatchObject({ kind: 'frame' });
+  }
+  expect(state.snapshot().models.entries).toBe(4);
+  expect(state.snapshot().models.weight).toBeLessThanOrEqual(128 * 1024 * 1024);
+  expect(deps.dispose).toHaveBeenCalledOnce();
+  state.dispose();
+  expect(deps.dispose).toHaveBeenCalledTimes(5);
+});
+
+it('retires every instance on a full document replacement and recovers reference-only requests', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  expect(await state.execute(input)).toMatchObject({ kind: 'frame' });
+  const second = {
+    ...input,
+    effectInstanceId: 'instance-2',
+    documentRef: { id: input.documentRef.id },
+    assetSelectionRef: { id: input.assetSelectionRef.id },
+  };
+  expect(await state.execute(second)).toMatchObject({ kind: 'frame' });
+  expect(deps.createRenderer).toHaveBeenCalledTimes(2);
+  expect(await state.execute({ ...input, requestId: 'replacement' })).toMatchObject({
+    kind: 'frame',
+  });
+  expect(deps.dispose).toHaveBeenCalledTimes(2);
+  expect(state.snapshot().models.entries).toBe(1);
+  expect(await state.execute(second)).toMatchObject({ kind: 'frame' });
+  expect(deps.createRenderer).toHaveBeenCalledTimes(4);
+  state.dispose();
+  expect(deps.dispose).toHaveBeenCalledTimes(4);
+});

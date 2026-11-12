@@ -39,3 +39,28 @@ it('retires evicted, replaced and cleared players once while preserving rejected
   expect(dispose.mock.calls).toEqual([[a], [b], [replacement]]);
   expect(cache.snapshot()).toEqual({ entries: 0, weight: 0 });
 });
+
+it('finds immutable sources without exceeding LRU bounds and retires matching instances only', () => {
+  const dispose = vi.fn();
+  const cache = createEffectRuntimePreparedModelCache<{ document: string; bytes: number }>({
+    dispose,
+    weight: (model) => model.bytes,
+    maximumWeight: 16,
+  });
+  const a = { document: 'shared', bytes: 4 },
+    b = { document: 'shared', bytes: 4 },
+    c = { document: 'other', bytes: 4 };
+  cache.set('a', a);
+  cache.set('b', b);
+  cache.set('c', c);
+  expect(cache.find((model) => model.document === 'shared')).toBe(a);
+  expect(cache.find((model) => model.document === 'missing')).toBeNull();
+  cache.deleteWhere((model) => model.document === 'shared');
+  expect(dispose.mock.calls.map(([model]) => model)).toEqual([b, a]);
+  expect(cache.get('c')).toBe(c);
+  expect(cache.snapshot()).toEqual({ entries: 1, weight: 4 });
+  cache.deleteWhere((model) => model.document === 'shared');
+  expect(dispose).toHaveBeenCalledTimes(2);
+  cache.clear();
+  expect(dispose).toHaveBeenCalledTimes(3);
+});
