@@ -119,8 +119,10 @@ export function updateEditorDrawingArrowHover(canvas: Canvas, point: DrawingPoin
   const drawingPoint =
     point && plane ? new Point(point.x, point.y).transform(util.invertTransform(plane)) : point;
   const target =
-    drawingPoint && drawing?.kind === 'arrow'
-      ? resolveDrawingArrowBendTarget(drawing, drawingPoint)
+    drawingPoint && drawing?.kind === 'arrow' && object instanceof Path
+      ? resolveDrawingArrowBendTarget(drawing, drawingPoint, 9, (candidate) =>
+          bendViewportPoint(object, candidate)
+        )
       : null;
   const previous = bendHover.get(canvas);
   if (target?.insert && object) bendHover.set(canvas, { object, target });
@@ -245,6 +247,7 @@ function renderEndpoint(
   object: FabricObject
 ): void {
   const key = Object.keys(object.controls).find((candidate) => object.controls[candidate] === this);
+  if (key === 'bend-insert') return;
   renderCanvasSelectionHandle(ctx, left, top, 'point', {
     color: object.cornerStrokeColor || DRAWING_SELECTION_ACCENT,
     active:
@@ -261,8 +264,8 @@ function createArrowEndpointControl(endpoint: ArrowEndpoint): Control {
       transform.target.canvas?.setCursor('grabbing');
       return true;
     },
-    sizeX: 20,
-    sizeY: 20,
+    sizeX: 28,
+    sizeY: 28,
     touchSizeX: 28,
     touchSizeY: 28,
     positionHandler: (_dimensions, _matrix, object) => {
@@ -334,8 +337,8 @@ function createArrowBendControl(index: number | null): Control {
   return new Control({
     actionName: 'modifyDrawingArrowBend',
     cursorStyle: 'grab',
-    sizeX: 18,
-    sizeY: 18,
+    sizeX: 28,
+    sizeY: 28,
     touchSizeX: 28,
     touchSizeY: 28,
     getVisibility: (object) => object instanceof Path && targetAt(object) !== null,
@@ -366,12 +369,12 @@ function createArrowBendControl(index: number | null): Control {
         start: plane ? new Point(x, y).transform(util.invertTransform(plane)) : { x, y },
       };
       bendGestures.set(object.canvas, gesture);
-      object.canvas.setCursor('none');
+      object.canvas.setCursor(target.insert ? 'grabbing' : 'none');
       return true;
     },
     actionHandler: (_event, _transform, x, y) => {
       if (!gesture || bendGestures.get(gesture.canvas) !== gesture) return false;
-      gesture.canvas.setCursor('none');
+      gesture.canvas.setCursor(gesture.target.insert ? 'grabbing' : 'none');
       const object = gesture.object;
       const plane = object instanceof Path ? getArrowDrawingPlane(object, gesture.current) : null;
       const scene = object.group

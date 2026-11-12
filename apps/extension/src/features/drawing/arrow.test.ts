@@ -19,6 +19,57 @@ function createArrow(dynamicWidth: boolean) {
   };
 }
 
+it('protects the nearest existing bend when the pointer misses its visible circle', () => {
+  const arrow = {
+    ...createArrow(false),
+    design: 'freehand' as const,
+    bendPoints: [
+      { x: 96, y: 80 },
+      { x: 104, y: 80 },
+    ],
+  };
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 102, y: 80 })).toEqual({
+    point: arrow.bendPoints[1],
+    index: 1,
+    insert: false,
+  });
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 96, y: 94 })).toMatchObject({
+    point: arrow.bendPoints[0],
+    index: 0,
+    insert: false,
+  });
+});
+
+it.each([0.2, 1, 4])('keeps bend protection14 screen pixels at zoom %s', (zoom) => {
+  const arrow = {
+    ...createArrow(false),
+    design: 'freehand' as const,
+    bendPoints: [{ x: 100, y: 80 }],
+  };
+  const project = (point: { x: number; y: number }) => ({
+    x: 400 + point.x * zoom,
+    y: 250 + point.y * zoom,
+  });
+  expect(
+    resolveDrawingArrowBendTarget(arrow, { x: 100, y: 80 + 14 / zoom }, 9, project)
+  ).toMatchObject({ index: 0, insert: false });
+  expect(
+    resolveDrawingArrowBendTarget(arrow, { x: 100, y: 80 + 14.1 / zoom }, 9, project)
+  ).not.toMatchObject({ insert: false });
+});
+
+it('tests the actual projected shaft instead of stretching its hit tolerance with the object', () => {
+  const arrow = { ...createArrow(false), design: 'freehand' as const };
+  const project = (point: { x: number; y: number }) => ({ x: point.x * 0.2, y: point.y * 4 });
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 100, y: 2 }, 9, project)).toEqual({
+    point: { x: 100, y: 0 },
+    index: 0,
+    insert: true,
+  });
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 100, y: 3 }, 9, project)).toBeNull();
+  expect(resolveDrawingArrowBendTarget(arrow, { x: 50, y: 0 }, 9, project)).toBeNull();
+});
+
 it('mirrors the editor arrow profile by widening the shaft toward the head', () => {
   const dynamic = buildDrawingArrowOutline(createArrow(true));
   const uniform = buildDrawingArrowOutline(createArrow(false));

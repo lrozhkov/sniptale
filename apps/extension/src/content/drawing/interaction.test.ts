@@ -26,6 +26,40 @@ import {
   rotateDrawingPoint,
 } from '../../features/drawing/public';
 
+it.each([
+  { bends: [{ x: 120, y: 120 }], point: { x: 132, y: 120 }, index: 0 },
+  {
+    bends: [
+      { x: 100, y: 100 },
+      { x: 110, y: 100 },
+    ],
+    point: { x: 107, y: 100 },
+    index: 1,
+  },
+])(
+  'grabs the nearest existing bend from an imprecise pointer instead of inserting',
+  ({ bends, point, index }) => {
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject({
+      id: 'protected-bend',
+      kind: 'arrow',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      bendPoints: bends,
+      color: '#000',
+      width: 2,
+      dynamicWidth: false,
+    });
+    session.setActiveTool('select');
+    session.setSelection(['protected-bend']);
+    const result = beginDrawingPointer({ point, snapshot: session.getSnapshot(), timestamp: 0 });
+    expect(result.draft?.kind).toBe('bend');
+    if (result.draft?.kind !== 'bend') throw new Error('Existing bend was not captured');
+    expect(result.draft.target).toEqual({ point: bends[index], index, insert: false });
+  }
+);
+
 it('rotates a multi-selection from fixed original geometry with one commit and no empty gesture', () => {
   const onDocumentCommit = vi.fn(() => true);
   const session = createDrawingSession({ onDocumentCommit });
@@ -81,6 +115,54 @@ it('rotates a multi-selection from fixed original geometry with one commit and n
   expect(onDocumentCommit).toHaveBeenCalledOnce();
   expect(session.getSnapshot().selectedObjectIds).toEqual(['one', 'two']);
   expect(session.getSnapshot().document.objects[0]).toMatchObject({ rotation: 50 });
+});
+
+it.each([
+  { point: { x: 32, y: 20 }, handle: 'start' },
+  { point: { x: 208, y: 20 }, handle: 'end' },
+])(
+  'captures the existing arrow $handle endpoint from a twelve-pixel near miss',
+  ({ point, handle }) => {
+    const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+      id: 'protected-endpoint',
+      kind: 'arrow',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      color: '#000',
+      width: 2,
+      dynamicWidth: false,
+    };
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject(arrow);
+    session.setActiveTool('select');
+    session.setSelection([arrow.id]);
+    expect(resolveDrawingResizeHandle(arrow, point)).toBe(handle);
+    const result = beginDrawingPointer({ point, snapshot: session.getSnapshot(), timestamp: 0 });
+    expect(result.draft).toMatchObject({ kind: 'resize', handle, original: arrow });
+  }
+);
+
+it('prefers a closer existing bend over a nearby arrow endpoint', () => {
+  const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
+    id: 'crowded-points',
+    kind: 'arrow',
+    design: 'freehand',
+    start: { x: 20, y: 20 },
+    end: { x: 220, y: 20 },
+    bendPoints: [{ x: 32, y: 20 }],
+    color: '#000',
+    width: 2,
+    dynamicWidth: false,
+  };
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject(arrow);
+  session.setActiveTool('select');
+  session.setSelection([arrow.id]);
+  const point = { x: 31, y: 20 };
+  expect(resolveDrawingResizeHandle(arrow, point)).toBeNull();
+  const result = beginDrawingPointer({ point, snapshot: session.getSnapshot(), timestamp: 0 });
+  expect(result.draft).toMatchObject({ kind: 'bend', target: { index: 0, insert: false } });
 });
 
 afterEach(() => {

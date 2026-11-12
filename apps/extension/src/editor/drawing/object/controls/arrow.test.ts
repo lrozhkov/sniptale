@@ -80,11 +80,12 @@ it('inserts a bend only after a drag and cancels its transform without a modifie
   const transform = createTypedTestFixture<Transform>({ target: arrow, actionPerformed: false });
   const event = new MouseEvent('mousemove');
   control.mouseDownHandler!(event, transform, 120, 20);
+  expect(canvas.upperCanvasEl.style.cursor).toBe('grabbing');
   expect(control.actionHandler(event, transform, 120, 22)).toBe(false);
   expect(readEditorDrawingObject(arrow)).toEqual(drawing);
   expect(control.actionHandler(event, transform, 120, 100)).toBe(true);
   expect(readEditorDrawingObject(arrow)).toMatchObject({ bendPoints: [{ x: 120, y: 100 }] });
-  expect(canvas.upperCanvasEl.style.cursor).toBe('none');
+  expect(canvas.upperCanvasEl.style.cursor).toBe('grabbing');
   const modified = vi.fn();
   canvas.on('object:modified', modified);
   canvas._currentTransform = transform;
@@ -271,3 +272,42 @@ it.each(['start', 'end'] as const)(
     canvas.dispose();
   }
 );
+
+it('does not paint a virtual point before or during an insertion gesture', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const arrow = createEditorDrawingFabricObject(
+    {
+      kind: 'arrow',
+      id: 'unmarked-insert',
+      design: 'freehand',
+      start: { x: 20, y: 20 },
+      end: { x: 220, y: 20 },
+      color: '#f97316',
+      width: 4,
+      dynamicWidth: false,
+    },
+    1
+  );
+  canvas.add(arrow);
+  canvas.setActiveObject(arrow);
+  applyEditorDrawingInteractionControls(arrow);
+  updateEditorDrawingArrowHover(canvas, { x: 120, y: 20 });
+  const insert = arrow.controls['bend-insert']!;
+  expect(insert.getVisibility(arrow, 'bend-insert')).toBe(true);
+  const context = canvas.getTopContext();
+  const paint = vi.spyOn(context, 'arc');
+  insert.render(context, 120, 20, {}, arrow);
+  expect(paint).not.toHaveBeenCalled();
+  const event = new MouseEvent('mousemove');
+  const transform = createTypedTestFixture<Transform>({ target: arrow, corner: 'bend-insert' });
+  canvas._currentTransform = transform;
+  insert.mouseDownHandler!(event, transform, 120, 20);
+  insert.actionHandler(event, transform, 120, 80);
+  expect(readEditorDrawingObject(arrow)).toMatchObject({ bendPoints: [{ x: 120, y: 80 }] });
+  insert.render(context, 120, 80, {}, arrow);
+  expect(paint).not.toHaveBeenCalled();
+  expect(cancelEditorDrawingArrowBend(canvas)).toBe(true);
+  canvas._currentTransform = null;
+  paint.mockRestore();
+  void canvas.dispose();
+});

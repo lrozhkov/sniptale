@@ -130,7 +130,7 @@ function resolveDrawingCanvasHoverCursor(args: {
   const baseCursor = resolveDrawingCanvasCursor(args.active, args.snapshot);
   if (!args.active || args.serviceUiSuppressed) return baseCursor;
   const draft = args.pointer.draftRef.current;
-  if (draft?.kind === 'bend') return 'none';
+  if (draft?.kind === 'bend') return draft.target.insert ? 'grabbing' : 'none';
   if (draft?.kind === 'rotate' || draft?.kind === 'rotate-selection') return 'grabbing';
   if (draft?.kind === 'resize')
     return resolveDrawingResizeCursor(draft.handle, true, getDrawingObjectRotation(draft.original));

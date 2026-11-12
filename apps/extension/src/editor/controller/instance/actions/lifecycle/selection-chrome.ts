@@ -1,4 +1,4 @@
-import { Group, IText, type Canvas, type Control, type FabricObject } from 'fabric';
+import { FabricObject, Group, IText, type Canvas, type Control } from 'fabric';
 import { resolveDrawingAlignmentFeedback } from '../../../../../features/drawing/public';
 import { readCanvasChromeColors } from '../../../../../ui/drawing-tools/selection-chrome';
 import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
@@ -150,9 +150,20 @@ function updateControlHitGeometry(
       control.shouldActivate = function (key, target, pointer, corners) {
         if (!activate.call(this, key, target, pointer, corners)) return false;
         const positions = target.calcOCoords();
-        const candidates = Object.keys(target.controls).filter(
+        let candidates = Object.keys(target.controls).filter(
           (candidate) => target.isControlVisible(candidate) && positions[candidate]
         );
+        if (target instanceof FabricObject && target.sniptaleType === 'arrow') {
+          const existingPoints = candidates.filter(
+            (candidate) =>
+              /^(start|end|bend-\d+)$/.test(candidate) &&
+              Math.hypot(
+                pointer.x - positions[candidate]!.x,
+                pointer.y - positions[candidate]!.y
+              ) <= 14
+          );
+          if (existingPoints.length) candidates = existingPoints;
+        }
         candidates.sort((a, b) => {
           const first = positions[a]!,
             second = positions[b]!;
@@ -206,6 +217,7 @@ function appendSelectionControl(
   point: { x: number; y: number },
   zoom: number
 ): void {
+  if (key === 'bend-insert') return;
   const color =
     object.sniptaleRole === 'crop-guide'
       ? object.cornerStrokeColor || object.borderColor

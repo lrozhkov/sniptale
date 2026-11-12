@@ -144,7 +144,14 @@ export function resolveDrawingResizeHandle(
       point.x - (object.start.x + object.end.x) / 2,
       point.y - (object.start.y + object.end.y) / 2
     );
-    return endpointDistance <= 11 && endpointDistance <= bodyDistance ? nearest[0] : null;
+    const closerBend =
+      object.design === 'freehand' &&
+      object.bendPoints?.some(
+        (bend) => Math.hypot(point.x - bend.x, point.y - bend.y) < endpointDistance
+      );
+    return endpointDistance <= 14 && endpointDistance <= bodyDistance && !closerBend
+      ? nearest[0]
+      : null;
   }
   const bounds = getDrawingObjectBounds(object);
   const candidates: Array<[DrawingResizeHandle, DrawingPoint]> =

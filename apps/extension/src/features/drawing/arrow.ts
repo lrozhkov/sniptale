@@ -110,38 +110,58 @@ export type DrawingArrowBendTarget = {
   readonly insert: boolean;
 };
 
-/** Finds an existing bend or a new insertion point on the shaft, never inside its empty bounds. */
+/** Tests screen distances through an optional affine projection; returned points stay authored. */
 export function resolveDrawingArrowBendTarget(
   object: DrawingArrowObject,
   point: DrawingPoint,
-  tolerance = 9
+  tolerance = 9,
+  project: (point: DrawingPoint) => DrawingPoint = (point) => point
 ): DrawingArrowBendTarget | null {
   if (object.design !== 'freehand') return null;
+  const pointer = project(point);
+  const distanceTo = (point: DrawingPoint) => {
+    const screen = project(point);
+    return Math.hypot(pointer.x - screen.x, pointer.y - screen.y);
+  };
   const bends = object.bendPoints ?? [];
-  const existing = bends.findIndex(
-    (bend) => Math.hypot(point.x - bend.x, point.y - bend.y) <= tolerance
-  );
+  let existing = -1;
+  let bendDistance = 14 + 1e-6;
+  bends.forEach((bend, index) => {
+    const distance = distanceTo(bend);
+    if (distance < bendDistance) {
+      existing = index;
+      bendDistance = distance;
+    }
+  });
   if (existing >= 0) return { point: bends[existing]!, index: existing, insert: false };
   if (bends.length >= MAX_DRAWING_ARROW_BENDS) return null;
-  if ([object.start, object.end].some((end) => Math.hypot(point.x - end.x, point.y - end.y) <= 16))
-    return null;
+  if ([object.start, object.end].some((end) => distanceTo(end) <= 16)) return null;
   const samples = sampleArrowShaft(object);
   let nearest: DrawingArrowBendTarget | null = null;
   let distance = tolerance;
   for (let index = 1; index < samples.length; index += 1) {
     const start = samples[index - 1]!.point;
     const end = samples[index]!.point;
-    const delta = { x: end.x - start.x, y: end.y - start.y };
+    const screenStart = project(start);
+    const screenEnd = project(end);
+    const delta = { x: screenEnd.x - screenStart.x, y: screenEnd.y - screenStart.y };
     const square = delta.x * delta.x + delta.y * delta.y;
     const ratio =
       square === 0
         ? 0
         : Math.max(
             0,
-            Math.min(1, ((point.x - start.x) * delta.x + (point.y - start.y) * delta.y) / square)
+            Math.min(
+              1,
+              ((pointer.x - screenStart.x) * delta.x + (pointer.y - screenStart.y) * delta.y) /
+                square
+            )
           );
-    const projected = { x: start.x + ratio * delta.x, y: start.y + ratio * delta.y };
-    const candidateDistance = Math.hypot(point.x - projected.x, point.y - projected.y);
+    const projected = {
+      x: start.x + ratio * (end.x - start.x),
+      y: start.y + ratio * (end.y - start.y),
+    };
+    const candidateDistance = distanceTo(projected);
     if (candidateDistance <= distance) {
       distance = candidateDistance;
       nearest = { point: projected, index: samples[index]!.span, insert: true };

@@ -63,13 +63,14 @@ it('renders the curved shaft and bend chrome without filling the empty selection
   const nearVertex = context.getImageData(114, 114, 12, 12).data;
   expect([...nearVertex].some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
   expect(context.getImageData(120, 20, 1, 1).data[3]).toBe(0);
+  const shaftBeforeSelection = Array.from(context.getImageData(70, 80, 1, 1).data);
   renderDrawingSelection(context, arrow, { x: 0, y: 0 }, { x: 70, y: 80 });
   expect(context.getImageData(120, 120, 1, 1).data[3]).toBeGreaterThan(0);
-  expect(context.getImageData(70, 80, 1, 1).data[3]).toBeGreaterThan(0);
+  expect(Array.from(context.getImageData(70, 80, 1, 1).data)).toEqual(shaftBeforeSelection);
   expect(context.getImageData(20, 120, 1, 1).data[3]).toBe(0);
 });
 
-it('shows only the transient bend marker when ordinary selection chrome is suppressed', () => {
+it('does not draw a prospective bend when ordinary selection chrome is suppressed', () => {
   const context = createPixelCanvas();
   const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
     kind: 'arrow',
@@ -84,7 +85,7 @@ it('shows only the transient bend marker when ordinary selection chrome is suppr
   renderDrawingSelection(context, arrow, { x: 0, y: 0 }, undefined, true);
   expect(context.getImageData(0, 0, 500, 500).data.every((value) => value === 0)).toBe(true);
   renderDrawingSelection(context, arrow, { x: 0, y: 0 }, { x: 120, y: 20 }, true);
-  expect(context.getImageData(120, 20, 1, 1).data[3]).toBeGreaterThan(0);
+  expect(context.getImageData(120, 20, 1, 1).data[3]).toBe(0);
   expect(context.getImageData(20, 20, 1, 1).data[3]).toBe(0);
   expect(context.getImageData(220, 20, 1, 1).data[3]).toBe(0);
 });
@@ -513,7 +514,7 @@ it('fills only the ready arrow point on hover and draws an existing hovered bend
   expect(Array.from(context.getImageData(80, 80, 1, 1).data)).toEqual([255, 255, 255, 255]);
 });
 
-it('keeps the exact captured inserted bend blue and its old neighbors neutral', () => {
+it('keeps an existing captured bend blue and its neighbors neutral', () => {
   const context = createPixelCanvas();
   const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
     id: 'captured',
@@ -566,7 +567,7 @@ it.each(['single', 'multi'] as const)(
   }
 );
 
-it('keeps an insertion preview neutral until capture instead of treating it as a ready arrow point', () => {
+it('does not add an insertion preview to the existing arrow point handles', () => {
   const context = createPixelCanvas();
   renderDrawingSelection(
     context,
@@ -587,5 +588,5 @@ it('keeps an insertion preview neutral until capture instead of treating it as a
     { x: 0, y: 0 },
     { x: 130, y: 100 }
   );
-  expect(Array.from(context.getImageData(130, 100, 1, 1).data)).toEqual([255, 255, 255, 255]);
+  expect(Array.from(context.getImageData(130, 100, 1, 1).data)).toEqual([0, 0, 0, 0]);
 });

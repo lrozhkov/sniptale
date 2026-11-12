@@ -328,8 +328,6 @@ export function renderDrawingSelection(
         })
       );
     }
-    if (hovered && !handles.some((handle) => samePoint(handle.point, hovered)))
-      handles.push({ point: hovered, id: 'bend:pending', kind: 'point' });
   } else {
     const points =
       object.kind === 'text'
@@ -373,9 +371,7 @@ export function renderDrawingSelection(
       color: readCanvasChromeColors(context.canvas).selection,
       active: activeHandle
         ? handle.id === activeHandle
-        : object.kind === 'arrow' &&
-          handle.id !== 'bend:pending' &&
-          Boolean(hovered && samePoint(handle.point, hovered)),
+        : object.kind === 'arrow' && Boolean(hovered && samePoint(handle.point, hovered)),
     });
   }
   context.restore();

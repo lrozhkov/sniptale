@@ -84,7 +84,7 @@ it('drops a hover marker after its immutable arrow version changes', () => {
     expect.anything(),
     arrow,
     expect.anything(),
-    target.point,
+    undefined,
     undefined,
     undefined
   );
@@ -495,7 +495,7 @@ it('projects and clips a hover outline to its scrolled element root', () => {
 });
 
 it.each([false, true])(
-  'keeps captured inserted bend identity ahead of stale hover; inserted=%s',
+  'keeps an insertion draft marker-free ahead of stale hover; inserted=%s',
   (inserted) => {
     const arrow: Extract<DrawingObject, { kind: 'arrow' }> = {
       id: 'captured',
@@ -532,11 +532,11 @@ it.each([false, true])(
     });
     expect(renderDrawingSelection).toHaveBeenLastCalledWith(
       expect.anything(),
-      object,
+      arrow,
       expect.anything(),
-      inserted ? captured : target.point,
       undefined,
-      inserted ? 'bend:1' : 'bend:pending'
+      undefined,
+      undefined
     );
   }
 );

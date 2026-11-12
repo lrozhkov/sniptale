@@ -113,6 +113,59 @@ async function handle(page: Page, key: string) {
   return center(controls(page).locator(`[data-control="${key}"]`));
 }
 
+async function arrowControlGeometry(page: Page) {
+  return page.evaluate(() => {
+    const svg = document.querySelector<SVGSVGElement>(
+      '[data-ui="editor.canvas.selection-chrome"]'
+    )!;
+    const viewport = svg
+      .querySelector<SVGGElement>('g[transform^="matrix"]')!
+      .transform.baseVal.consolidate()!.matrix;
+    const screen = svg.getScreenCTM()!;
+    const points = Object.fromEntries(
+      ['start', 'end', 'bend-0'].map((key) => {
+        const circle = svg.querySelector<SVGCircleElement>(`[data-control="${key}"]`)!;
+        const point = new DOMPoint(
+          circle.cx.baseVal.value,
+          circle.cy.baseVal.value
+        ).matrixTransform(viewport.inverse());
+        return [key, { x: point.x, y: point.y }];
+      })
+    );
+    const matrix = (value: DOMMatrix) => [value.a, value.b, value.c, value.d, value.e, value.f];
+    return { points, viewport: matrix(viewport), screen: matrix(screen) };
+  });
+}
+
+async function panArrowPointIntoView(page: Page, point: Locator) {
+  const originalObjects = await objects(page);
+  const originalHistory = await history(page);
+  const viewport = (await page.locator('[data-ui="editor.canvas.viewport"]').boundingBox())!;
+  const target = { x: viewport.x + viewport.width / 2, y: viewport.y + viewport.height / 2 };
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const actual = await center(point);
+    const delta = { x: target.x - actual.x, y: target.y - actual.y };
+    if (Math.hypot(delta.x, delta.y) < 2) break;
+    await page.mouse.move(target.x, target.y);
+    await page.mouse.down({ button: 'middle' });
+    await page.mouse.move(
+      target.x + Math.max(-220, Math.min(220, delta.x)),
+      target.y + Math.max(-160, Math.min(160, delta.y)),
+      { steps: 4 }
+    );
+    await page.mouse.up({ button: 'middle' });
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+  }
+  await expect(point).toBeInViewport({ ratio: 1 });
+  expect(await objects(page)).toEqual(originalObjects);
+  expect(await history(page)).toBe(originalHistory);
+}
+
 async function selectionGeometry(page: Page) {
   const [tl, tr, br, bl] = await Promise.all(
     ['tl', 'tr', 'br', 'bl'].map((key) => handle(page, key))
@@ -617,7 +670,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
 }
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
-  test(`arrow ready points and captured inserted bend retain identity ${name}`, async ({
+  test(`arrow existing points win nearby hits and insertion stays unmarked ${name}`, async ({
     page,
     hostOrigin,
   }, info) => {
@@ -636,8 +689,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     const ghost = controls(page).locator('[data-control="bend-insert"]');
     const middle = { x: start.x + 150, y: start.y };
     await page.mouse.move(middle.x, middle.y);
-    await expect(ghost).toHaveAttribute('fill', '#fff');
-    await expect(ghost).toHaveAttribute('r', '5');
+    await expect(ghost).toHaveCount(0);
     await drag(page, middle, { x: middle.x, y: middle.y + 55 });
     await page.mouse.move(start.x + 350, start.y + 140);
     const oldBend = controls(page).locator('[data-control="bend-0"]');
@@ -659,16 +711,17 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     });
     const candidate = { x: start.x + 300 * 0.21875, y: start.y + 55 * 0.5625 };
     await page.mouse.move(candidate.x, candidate.y);
-    await expect(ghost).toHaveAttribute('fill', '#fff');
+    await expect(ghost).toHaveCount(0);
     await expect(oldBend).toHaveAttribute('fill', '#fff');
-    const insertion = await center(ghost);
+    const insertion = candidate;
     const before = await history(page);
     await page.mouse.move(insertion.x, insertion.y);
     await page.mouse.down();
     await page.mouse.move(insertion.x - 10, insertion.y + 35, { steps: 5 });
+    await expect(page.locator('canvas.upper-canvas')).toHaveCSS('cursor', 'grabbing');
     await expect(controls(page)).toHaveCSS('opacity', '1');
-    await expect(ghost).toHaveCSS('opacity', '1');
-    await expect(ghost).toHaveAttribute('fill', accent);
+    await expect(ghost).toHaveCount(0);
+    await expect(points).toHaveCount(3);
     await expect(oldBend).toHaveAttribute('fill', '#fff');
     const retained = await center(oldBend);
     expect(Math.hypot(retained.x - oldCenter.x, retained.y - oldCenter.y)).toBeLessThanOrEqual(0.5);
@@ -679,8 +732,8 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
       );
     await page.mouse.move(insertion.x + 5, insertion.y + 75, { steps: 5 });
     await expect(controls(page)).toHaveCSS('opacity', '1');
-    await expect(ghost).toHaveCSS('opacity', '1');
-    await expect(ghost).toHaveAttribute('fill', accent);
+    await expect(ghost).toHaveCount(0);
+    await expect(points).toHaveCount(3);
     await expect(oldBend).toHaveAttribute('fill', '#fff');
     expect(await history(page)).toBe(before);
     await page.screenshot({
@@ -702,6 +755,93 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expect(controls(page).locator('[data-control="bend-1"]')).toHaveCount(0);
     const restored = await center(controls(page).locator('[data-control="bend-0"]'));
     expect(Math.hypot(restored.x - oldCenter.x, restored.y - oldCenter.y)).toBeLessThanOrEqual(0.5);
+    for (const zoom of [0.2, 1, 4]) {
+      await page.evaluate((value) => window.__sniptaleEditorHarness!.setZoomLevel(value), zoom);
+      const point = controls(page).locator('[data-control="bend-0"]');
+      await panArrowPointIntoView(page, point);
+      const initial = await center(point);
+      const capturedHistory = await history(page);
+      const originalGeometry = await arrowControlGeometry(page);
+      expect(originalGeometry.viewport[0]).toBeCloseTo(zoom, 5);
+      const originalObject = (await objects(page)).find(
+        (object) => object['sniptaleId'] === arrowId
+      );
+      const originalPixels = await rendered(page);
+      await page.mouse.move(initial.x + 12, initial.y);
+      await expect(point).toHaveAttribute('fill', accent);
+      await expect(ghost).toHaveCount(0);
+      await page.mouse.down();
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => window.__sniptaleEditorHarness!.getInteractionState().transform?.corner
+          )
+        )
+        .toBe('bend-0');
+      await page.mouse.move(initial.x + 42, initial.y + 25, { steps: 5 });
+      await expect(point).toHaveAttribute('fill', accent);
+      await expect(points).toHaveCount(3);
+      await expect(ghost).toHaveCount(0);
+      const actual = await center(point);
+      expect(Math.hypot(actual.x - initial.x - 30, actual.y - initial.y - 25)).toBeLessThanOrEqual(
+        0.5
+      );
+      expect(await history(page)).toBe(capturedHistory);
+      await page.screenshot({
+        path: info.outputPath(`arrow-existing-offset-captured-${zoom}.png`),
+        fullPage: false,
+      });
+      await page.mouse.up();
+      await expect.poll(() => history(page)).toBe(capturedHistory + 1);
+      await expect(points).toHaveCount(3);
+      await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
+      await expect.poll(() => history(page)).toBe(capturedHistory);
+      await selectLayer(page, arrowId);
+      const restoredPoint = await center(point);
+      const restoredGeometry = await arrowControlGeometry(page);
+      const restoredObject = (await objects(page)).find(
+        (object) => object['sniptaleId'] === arrowId
+      );
+      await writeFile(
+        info.outputPath(`arrow-undo-projection-${zoom}.json`),
+        JSON.stringify(
+          {
+            zoom,
+            originalGeometry,
+            restoredGeometry,
+            originalObject,
+            restoredObject,
+          },
+          null,
+          2
+        )
+      );
+      expect(restoredObject).toEqual(originalObject);
+      for (const key of ['start', 'end', 'bend-0']) {
+        const original = originalGeometry.points[key]!;
+        const restored = restoredGeometry.points[key]!;
+        expect(Math.hypot(restored.x - original.x, restored.y - original.y)).toBeLessThanOrEqual(
+          0.001
+        );
+      }
+      const expected = await page.evaluate(
+        ({ world, viewport, screen }) => {
+          const point = new DOMPoint(world.x, world.y)
+            .matrixTransform(new DOMMatrix(viewport))
+            .matrixTransform(new DOMMatrix(screen));
+          return { x: point.x, y: point.y };
+        },
+        {
+          world: originalGeometry.points['bend-0']!,
+          viewport: restoredGeometry.viewport,
+          screen: restoredGeometry.screen,
+        }
+      );
+      expect(
+        Math.hypot(restoredPoint.x - expected.x, restoredPoint.y - expected.y)
+      ).toBeLessThanOrEqual(0.5);
+      await assertRestoredPng(page, originalPixels, info, `arrow-offset-undo-${zoom}`);
+    }
   });
 }
 
@@ -779,14 +919,16 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     };
     await page.mouse.move(midpoint.x, midpoint.y);
     const ghost = controls(page).locator('[data-control="bend-insert"]');
-    await expect(ghost).toHaveAttribute('fill', '#fff');
-    const pending = await center(ghost);
+    await expect(ghost).toHaveCount(0);
+    const pending = midpoint;
     const bend = { x: pending.x + 12, y: pending.y + 28 };
     const bendHistory = await history(page);
     await page.mouse.move(pending.x, pending.y);
     await page.mouse.down();
     await page.mouse.move(bend.x, bend.y, { steps: 6 });
-    await expect(ghost).toHaveAttribute('fill', (await ghost.getAttribute('stroke')) ?? '');
+    await expect(page.locator('canvas.upper-canvas')).toHaveCSS('cursor', 'grabbing');
+    await expect(ghost).toHaveCount(0);
+    await expect(controls(page).locator('circle')).toHaveCount(2);
     await page.screenshot({
       path: info.outputPath('nested-arrow-bend-captured.png'),
       fullPage: false,
@@ -795,6 +937,29 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expect.poll(() => history(page)).toBe(bendHistory + 1);
     const actualBend = await handle(page, 'bend-0');
     expect(Math.hypot(actualBend.x - bend.x, actualBend.y - bend.y)).toBeLessThanOrEqual(0.5);
+    const bendControl = controls(page).locator('[data-control="bend-0"]');
+    const bendAccent = await bendControl.getAttribute('stroke');
+    await page.mouse.move(actualBend.x + 12, actualBend.y);
+    await expect(bendControl).toHaveAttribute('fill', bendAccent ?? '');
+    await page.mouse.down();
+    await page.mouse.move(actualBend.x + 32, actualBend.y + 20, { steps: 5 });
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().transform?.corner)
+      )
+      .toBe('bend-0');
+    await expect(controls(page).locator('circle')).toHaveCount(3);
+    const movedBend = await center(bendControl);
+    expect(
+      Math.hypot(movedBend.x - actualBend.x - 20, movedBend.y - actualBend.y - 20)
+    ).toBeLessThanOrEqual(0.5);
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    expect(await history(page)).toBe(bendHistory + 1);
+    const cancelledBend = await center(bendControl);
+    expect(
+      Math.hypot(cancelledBend.x - actualBend.x, cancelledBend.y - actualBend.y)
+    ).toBeLessThanOrEqual(0.5);
     await page.locator('[data-ui="editor.floating.tool-rail.history.undo"]').click();
     await expect.poll(() => history(page)).toBe(bendHistory);
     await selectLayer(page, group);

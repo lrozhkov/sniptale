@@ -6,6 +6,9 @@ import { EditorCanvas } from '../../../../document/canvas-surface/render-region'
 import type { EditorMagnetManager } from '../../../magnet';
 import { useEditorStore } from '../../../../state/useEditorStore';
 import { patchEdgeControl } from '../../../document/interaction-border-controls';
+import { createEditorDrawingFabricObject } from '../../../../drawing/object/vector';
+import { applyEditorDrawingInteractionControls } from '../../../../drawing/object/controls/apply';
+import { updateEditorDrawingArrowHover } from '../../../../drawing/object/controls/arrow';
 import {
   disposeEditorSelectionChrome,
   mountEditorSelectionChrome,
@@ -859,3 +862,59 @@ it('keeps selected controls and accepted magnet feedback out of actual PNG and S
   void canvas.dispose();
   vi.unstubAllGlobals();
 });
+
+it.each([0.2, 1, 4])(
+  'keeps an off-center existing arrow point ahead of insertion at zoom%s',
+  (zoom) => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    const canvas = new EditorCanvas(document.createElement('canvas'), { width: 1000, height: 700 });
+    const arrow = createEditorDrawingFabricObject(
+      {
+        kind: 'arrow',
+        id: 'point-hit',
+        design: 'freehand',
+        start: { x: 20, y: 20 },
+        end: { x: 220, y: 20 },
+        bendPoints: [{ x: 120, y: 80 }],
+        color: '#f97316',
+        width: 4,
+        dynamicWidth: false,
+      },
+      1
+    );
+    applyEditorDrawingInteractionControls(arrow);
+    canvas.add(arrow);
+    canvas.setActiveObject(arrow);
+    canvas.setZoom(zoom);
+    mountEditorSelectionChrome(canvas, {
+      getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }),
+    } as never);
+    canvas.renderAll();
+    const point = arrow.calcOCoords()['bend-0']!;
+    const pointer = new Point(point.x + 12, point.y);
+    updateEditorDrawingArrowHover(
+      canvas,
+      zoom === 1 ? { x: 136, y: 80 } : { x: pointer.x / zoom, y: pointer.y / zoom }
+    );
+    canvas.renderAll();
+    if (zoom === 1)
+      expect(arrow.controls['bend-insert']!.getVisibility(arrow, 'bend-insert')).toBe(true);
+    expect(arrow.findControl(pointer)?.key).toBe('bend-0');
+    const root = canvas.upperCanvasEl.parentElement!;
+    expect(root.querySelector('[data-control="bend-insert"]')).toBeNull();
+    arrow.__corner = 'bend-0';
+    canvas.renderAll();
+    const handle = root.querySelector('[data-control="bend-0"]')!;
+    expect(handle.getAttribute('fill')).toBe(handle.getAttribute('stroke'));
+    disposeEditorSelectionChrome(canvas);
+    void canvas.dispose();
+    vi.unstubAllGlobals();
+  }
+);

@@ -716,7 +716,7 @@ async function corePixels(canvas: Locator, point: Point) {
 
 for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
   for (const mode of ['page', 'crop'] as const) {
-    test(`new arrow point hover and captured identity after two bends ${mode} ${name}`, async ({
+    test(`existing arrow points win near misses and insertions stay marker-free ${mode} ${name}`, async ({
       context,
       extensionId,
       hostOrigin,
@@ -757,6 +757,40 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           path: info.outputPath('arrow-existing-point-ready-blue.png'),
           fullPage: false,
         });
+        const originalInk = await ink.evaluate((node) => {
+          if (!(node instanceof HTMLCanvasElement)) throw new Error('Drawing canvas missing');
+          return node.toDataURL();
+        });
+        await page.mouse.move(412, 200);
+        await expect
+          .poll(async () => (await corePixels(chrome, { x: 400, y: 200 })).blue)
+          .toBeGreaterThan(0);
+        expect((await corePixels(chrome, { x: 412, y: 200 })).painted).toBe(0);
+        const nearExisting = { x: first.x + 12, y: first.y };
+        await page.mouse.move(nearExisting.x, nearExisting.y);
+        await expect.poll(async () => (await corePixels(chrome, first)).blue).toBeGreaterThan(0);
+        expect((await corePixels(chrome, nearExisting)).painted).toBe(0);
+        await page.mouse.down();
+        await page.mouse.move(nearExisting.x + 20, nearExisting.y + 30, { steps: 5 });
+        const movedExisting = { x: first.x + 20, y: first.y + 30 };
+        await expect
+          .poll(async () => (await corePixels(chrome, movedExisting)).blue)
+          .toBeGreaterThan(0);
+        expect((await corePixels(chrome, second)).blue).toBe(0);
+        await page.screenshot({
+          path: info.outputPath('arrow-existing-point-captured-from-near-miss.png'),
+          fullPage: false,
+        });
+        await page.keyboard.press('Escape');
+        await page.mouse.up();
+        await expect
+          .poll(() =>
+            ink.evaluate((node) => {
+              if (!(node instanceof HTMLCanvasElement)) throw new Error('Drawing canvas missing');
+              return node.toDataURL();
+            })
+          )
+          .toBe(originalInk);
         // This shaft location is between the two authored bends. Confirm actual ink before insertion.
         const insertion = { x: 663.3, y: 292.8 };
         await expect
@@ -764,35 +798,37 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           .toBeGreaterThan(0);
         await page.mouse.move(insertion.x, insertion.y);
         await expect(ink).toHaveCSS('cursor', 'grab');
-        await expect
-          .poll(async () => (await corePixels(chrome, insertion)).painted)
-          .toBeGreaterThan(0);
+        await expect.poll(async () => (await corePixels(chrome, insertion)).painted).toBe(0);
         expect((await corePixels(chrome, insertion)).blue).toBe(0);
         expect((await corePixels(chrome, first)).blue).toBe(0);
         expect((await corePixels(chrome, second)).blue).toBe(0);
         expect((await corePixels(chrome, first)).painted).toBeGreaterThan(0);
         expect((await corePixels(chrome, second)).painted).toBeGreaterThan(0);
         await page.screenshot({
-          path: info.outputPath('arrow-insertion-preview-neutral.png'),
+          path: info.outputPath('arrow-insertion-hover-no-marker.png'),
           fullPage: false,
         });
         await page.mouse.down();
-        await expect(ink).toHaveCSS('cursor', 'none');
+        await expect(ink).toHaveCSS('cursor', 'grabbing');
         const captured = { x: 650, y: 360 };
         await page.mouse.move(captured.x, captured.y, { steps: 5 });
-        await expect.poll(async () => (await corePixels(chrome, captured)).blue).toBeGreaterThan(0);
+        await expect(ink).toHaveCSS('cursor', 'grabbing');
+        await expect.poll(async () => (await corePixels(chrome, captured)).painted).toBe(0);
         expect((await corePixels(chrome, first)).blue).toBe(0);
         expect((await corePixels(chrome, second)).blue).toBe(0);
         expect((await corePixels(chrome, first)).painted).toBeGreaterThan(0);
         expect((await corePixels(chrome, second)).painted).toBeGreaterThan(0);
         await expect.poll(async () => (await corePixels(ink, captured)).painted).toBeGreaterThan(0);
         await page.screenshot({
-          path: info.outputPath('arrow-inserted-point-only-captured-blue.png'),
+          path: info.outputPath('arrow-insertion-drag-no-marker.png'),
           fullPage: false,
         });
         await page.mouse.up();
         await page.mouse.move(900, 420);
         await expect.poll(async () => (await corePixels(chrome, captured)).blue).toBe(0);
+        await expect
+          .poll(async () => (await corePixels(chrome, captured)).painted)
+          .toBeGreaterThan(0);
         await page
           .locator(
             mode === 'crop'
@@ -803,6 +839,14 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
         await expect.poll(async () => (await corePixels(ink, captured)).painted).toBe(0);
         expect((await corePixels(ink, first)).painted).toBeGreaterThan(0);
         expect((await corePixels(ink, second)).painted).toBeGreaterThan(0);
+        await expect
+          .poll(() =>
+            ink.evaluate((node) => {
+              if (!(node instanceof HTMLCanvasElement)) throw new Error('Drawing canvas missing');
+              return node.toDataURL();
+            })
+          )
+          .toBe(originalInk);
       } catch (error) {
         await page.screenshot({
           path: info.outputPath('arrow-captured-point-failure.png'),

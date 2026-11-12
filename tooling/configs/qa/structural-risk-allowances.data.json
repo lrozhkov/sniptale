@@ -6702,17 +6702,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/content/drawing/frame.ts",
-      "symbol": "drawDrawingFrame",
-      "owner": "extension:content:drawing",
-      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. One Canvas frame transaction owns projection, clipping, artwork and gated chrome. Added hover and capture feedback do not add a document writer or another effect authority. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-12",
-      "astHash": "c540726aa0e0da8ceeb11c1c9c930062a38639cdc1b23d68fc75ea7dbb496a6d",
-      "signatureHash": "11201056d62d2bb555677aeec7cedd0b061c0f23f4cb9fbfc5cb7d8a852b839e"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/content/drawing/pointer-runtime.ts",
       "symbol": "useDrawingPointerRuntime",
       "owner": "extension:content:drawing",
@@ -6771,11 +6760,11 @@
       "file": "apps/extension/src/editor/controller/instance/actions/lifecycle/selection-chrome.test.ts",
       "symbol": "<file>",
       "owner": "extension:editor:controller",
-      "reason": "tool-noise: Part3 updates the existing manager mocks from getVisualGuides to the explicit getVisualFeedback envelope and extends the existing clean-PNG/SVG test with one dimension witness and its displayed measurement. It reuses that test’s real EditorCanvas, authored shape, baseline PNG, mounted chrome and dispose lifecycle. The existing test proves the measurement is painted in the external overlay but is absent from scene PNG/SVG. No test service, global mutable fixture, second resource lifecycle or production dependency direction is introduced.",
-      "removalCondition": "Remove this exact file allowance when its AST/signature changes. Reassess any independent fixture setup/cleanup, service or capture lifetime, replacement export implementation or unrelated production contract. It does not authorize an allowance for appendGuides or any production symbol. Remove it when the analyzer models this cohesive chrome proof scope without the false positive.",
+      "reason": "tool-noise: The added parameterized test observes native authored-point priority and corresponding selection chrome at three zoom levels. Each case uses one local EditorCanvas, one authored arrow and the existing chrome mount/dispose lifecycle. Drawing imports construct the real hit surface required by the proof. No independent service, shared mutable fixture, capture lifetime or production authority is introduced. Score remains four and cohesion remains one.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent fixture setup/cleanup, service, capture lifetime, export replacement or unrelated contract. Remove when the analyzer models this cohesive chrome proof scope. Final fresh architecture review must validate this binding.",
       "reviewDate": "2026-11-12",
-      "astHash": "348a83e90eb142f9861d1ba434dad4e02b450c07b365ec846bc14a29f88efebd",
-      "signatureHash": "cf9ef95ec902f9446c5bb9e58bf655c0a39152e773b0070c92e06322dd7a8259"
+      "astHash": "6f08f0e7355383be164d5752c2aa9c4ba2a38437ee13fc20e32542287ae23689",
+      "signatureHash": "7a45cea346373b8a69cf26c486cfd76f66e9d0ce4a5efe33d10616241d040330"
     },
     {
       "rule": "structural-function-risk",
@@ -6809,6 +6798,17 @@
       "reviewDate": "2026-11-12",
       "astHash": "e147f1b6069d11b8cf6efcb94b332e5f2d82c93ec87bfb0220e15fe690fced0d",
       "signatureHash": "5fa10cbdae06d0bbd1ca1f024a068c9ea783f5d00232843760bdadcecb74e573"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/content/drawing/interaction.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:content:drawing",
+      "astHash": "f0c6caed111c1b371ffe1d93d1d230ab9263b0adbbe989c6b66d983071290ab6",
+      "signatureHash": "b92a17b640563af9ba6140b1acd213b9e0d04a870d5cbbd0fa50e518911f84ff",
+      "reason": "tool-noise: The added cases prove pointer admission for existing arrow bends and endpoints through beginDrawingPointer and the existing local DrawingSession fixture. They check off-center capture, nearest-bend selection and endpoint-versus-bend priority. Each case creates one local session with the same synchronous commit callback used by adjacent selection and handle tests. No projection subscription, external resource, shared mutable fixture, additional service or independent cleanup lifetime is introduced. The score remains two, owner count remains two and cohesion remains one. The file crosses the line limit without adding an independent fixture responsibility.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent fixture setup or cleanup, projection subscription, external resource lifetime, service, shared mutable state or unrelated interaction contract. Remove when the analyzer models this cohesive pointer-admission proof scope. Final fresh architecture review must validate this exact binding.",
+      "reviewDate": "2026-11-12"
     }
   ]
 }

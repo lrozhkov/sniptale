@@ -131,33 +131,28 @@ export function drawDrawingFrame(args: {
     }
     if (selected.length === 1) {
       const capturedBend = draft?.kind === 'bend' ? draft : null;
-      const inserted =
-        capturedBend &&
-        (capturedBend.object.bendPoints?.length ?? 0) >
-          (capturedBend.original.bendPoints?.length ?? 0);
       const capturedIndex =
-        capturedBend && (!capturedBend.target.insert || inserted)
-          ? capturedBend.target.index
-          : null;
+        capturedBend && !capturedBend.target.insert ? capturedBend.target.index : null;
       const hoverPoint = capturedBend
         ? capturedIndex === null
-          ? capturedBend.target.point
+          ? undefined
           : capturedBend.object.bendPoints?.[capturedIndex]
         : (endpointPoint ??
-          (!draft && args.hoverBend && args.hoverBend.object === selected[0]
+          (!draft &&
+          args.hoverBend &&
+          !args.hoverBend.target.insert &&
+          args.hoverBend.object === selected[0]
             ? args.hoverBend.target.point
             : undefined));
       const activeHandle =
         draft?.kind === 'resize'
           ? draft.handle
-          : capturedBend
-            ? capturedIndex === null
-              ? 'bend:pending'
-              : `bend:${capturedIndex}`
+          : capturedIndex !== null
+            ? `bend:${capturedIndex}`
             : undefined;
       renderDrawingSelection(
         context,
-        selected[0]!,
+        capturedBend?.target.insert ? capturedBend.original : selected[0]!,
         projection,
         hoverPoint,
         args.bendOnly,
