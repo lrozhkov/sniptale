@@ -37,6 +37,12 @@ export function useReviewTransport(args: {
   silent?: boolean;
 }) {
   const { session, source } = args.resource;
+  const playbackAudio = useRef<ReturnType<typeof useReviewEditorAudioRuntime> | null>(null);
+  function failTransport(reason?: ReviewActionAudioUnavailable['reason']) {
+    playbackAudio.current?.stopPlayback();
+    video.current?.pause();
+    args.onTransportFailure(reason);
+  }
   const {
     video,
     time,
@@ -62,7 +68,9 @@ export function useReviewTransport(args: {
     retainCutTime: args.silent ?? false,
     boundaries: args.boundaries,
     onSeek: args.onSeek,
-    onFailure: args.onTransportFailure,
+    onFailure: failTransport,
+    prepareAfterSeek: () => playbackAudio.current?.preparePlayback() ?? Promise.resolve(true),
+    onPreparedPlay: () => playbackAudio.current?.startPlayback(),
     onRecovered: args.onTransportRecovered,
     onInvalidRange: args.onInvalidRange,
   });
@@ -102,8 +110,8 @@ export function useReviewTransport(args: {
     request: typeof recordingAudioRequest;
     source: RecordingProjectActionAudioSource | null;
   } | null>(null);
-  const onFailure = useRef(args.onTransportFailure);
-  onFailure.current = args.onTransportFailure;
+  const onFailure = useRef(failTransport);
+  onFailure.current = failTransport;
   useEffect(() => {
     if (!recordingAudioRequest) {
       setRecordingAudio(null);
@@ -128,14 +136,20 @@ export function useReviewTransport(args: {
     sourceToResult: timeline.toOutputTime,
     seekRevision,
     originalAudio: args.originalAudio,
+    originalSource: {
+      file: args.resource.file,
+      segments: timeline.timeMap.getSegments(),
+      edits: args.edits,
+    },
     voiceover: args.voiceover,
     music: args.music,
     actionPlan,
     ...(recordingActionSource ? { recordingActionSource } : {}),
     sessionKey: session.getSnapshot().snapshot.workspace.aggregateId,
-    onFailure: args.onTransportFailure,
+    onFailure: failTransport,
     onActionAudioRecovered: args.onActionAudioRecovered,
   });
+  playbackAudio.current = actionSoundPreview;
   return {
     actionSoundPreview,
     video,
@@ -149,7 +163,7 @@ export function useReviewTransport(args: {
     play: async () => {
       if (video.current?.paused && !args.silent) {
         if (!(await actionSoundPreview.preparePlayback())) return;
-      }
+      } else if (!video.current?.paused) actionSoundPreview.stopPlayback();
       play();
     },
     timeline,

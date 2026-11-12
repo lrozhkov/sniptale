@@ -107,8 +107,10 @@ function usePreviewMediaSynchronization(
     syncedClips: media.videoBankClips,
     videoRefs: media.videoRefs,
   });
-  usePreviewStageAudioSync({
+  const processedAudio = usePreviewStageAudioSync({
     audioRefs: media.audioRefs,
+    assetUrls: params.assetUrls,
+    retryVersion: params.effectRuntimeFeedback.retryVersion,
     currentTime: params.currentTime,
     isPlaying: params.isPlaying,
     mutePreviewAudio: params.mutePreviewAudio ?? false,
@@ -116,6 +118,7 @@ function usePreviewMediaSynchronization(
     syncedClips: media.audioBankClips,
   });
   return usePreviewEffectAudio({
+    processedAudio,
     assetUrls: params.assetUrls,
     currentTime: params.currentTime,
     feedback: params.effectRuntimeFeedback,

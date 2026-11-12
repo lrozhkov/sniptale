@@ -237,9 +237,12 @@
 }
 
 /* The viewport owns the edge gutter so rail targets and heading hover surfaces are not clipped. */
-.review-inspector-scroll {
+.review-inspector-scroll,
+.review-track-items-host {
   margin-inline: -12px;
   padding-inline: 12px;
+}
+.review-inspector-scroll {
   overflow-x: hidden;
 }
 

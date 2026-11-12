@@ -16,6 +16,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
     'styles.palettes',
     'styles.surfaces',
     'styles.gradients',
+    'styles.audio-effects',
   ],
   'ai-connections': ['ai.providers', 'ai.models', 'ai.chrome'],
   'ai-prompts': ['ai.prompts', 'ai.prompt-templates'],
@@ -39,6 +40,7 @@ export const SETTINGS_TRANSFER_VIEW_COVERAGE = {
     palettes: 'styles.palettes',
     surfaces: 'styles.surfaces',
     gradients: 'styles.gradients',
+    audio: 'styles.audio-effects',
   },
   annotations: {
     borders: 'styles.borders',

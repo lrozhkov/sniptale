@@ -32,3 +32,7 @@ packages/runtime-contracts/src/animation-template/lottie-schema.generated.js
 # The GL catalogue retains canonical bytes from build/gl-transitions.ts.
 # Remove this entry when the generator and formatter produce identical bytes.
 apps/extension/src/features/video/project/transition/gl-catalog.generated.json
+
+# Audio catalog bytes belong to build/audio-effects.ts.
+# Remove this entry when the generator and formatter produce identical bytes.
+apps/extension/src/features/video/audio/effects/catalog.generated.json

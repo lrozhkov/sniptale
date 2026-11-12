@@ -62,6 +62,7 @@ export async function writeReviewPackets(args: {
   );
   if (!segments.length) throw new Error('The edited video is empty.');
   const speedExists = segments.some((part) => part.kind === 'speed');
+  const clipRenderer = createReviewAudioClipRenderer();
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
   const dispose = () => input.dispose();
   signal.addEventListener('abort', dispose, { once: true });
@@ -101,7 +102,6 @@ export async function writeReviewPackets(args: {
       outputAudioCodec: processedAudio ?? index.audioCodec,
     };
     const clock = { time: 0 };
-    const clipRenderer = createReviewAudioClipRenderer();
     const tracks = await reviewExportPhase(signal, 'encode', () =>
       createReviewMediaOutput({
         index,
@@ -187,6 +187,7 @@ export async function writeReviewPackets(args: {
     return await cleanupReviewExportFailure(error, () => output?.cancel());
   } finally {
     args.onTimeEstimate?.(null);
+    clipRenderer.dispose?.();
     signal.removeEventListener('abort', dispose);
     input.dispose();
   }

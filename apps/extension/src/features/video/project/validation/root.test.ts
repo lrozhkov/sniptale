@@ -668,7 +668,7 @@ it('requires schema29 for explicit text duration modes and retains old roots wit
   };
   expect(isHydratableVideoProject({ ...project, version: 29, textDocuments: [entry] })).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 28, textDocuments: [entry] })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 53, textDocuments: [entry] })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 54, textDocuments: [entry] })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -708,7 +708,7 @@ it('requires schema30 for explicit audio duration modes', async () => {
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
     expect(isHydratableVideoProject({ ...project, version })).toBe(true);
   }
-  expect(isHydratableVideoProject({ ...changed, version: 53 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 54 })).toBe(false);
   expect(applyVideoProjectMutationPatch(changed, { clips: [] }).version).toBe(30);
 });
 
@@ -755,7 +755,7 @@ it('admits complete source cursor observations only at schema33 without changing
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 33; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 53 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 54 })).toBe(false);
   expect(isHydratableVideoProject(project)).toBe(true);
   for (const time of [9, 86400]) {
     const beyondMedia = {
@@ -955,7 +955,7 @@ it('fences explicit effect attachment at schema38 and retains dormant source pla
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   for (let version = 2; version < 38; version++)
     expect(isHydratableVideoProject({ ...changed, version })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 53 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 54 })).toBe(false);
   expect(isHydratableVideoProject({ ...changed, clips: [host] })).toBe(true);
   for (const attachment of [
     null,
@@ -1060,7 +1060,7 @@ it('fences retained experimental watermark metadata at schema42 without discardi
   expect(isHydratableVideoProject(project)).toBe(true);
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(project)))).toBe(true);
   expect(isHydratableVideoProject({ ...project, version: 41 })).toBe(false);
-  expect(isHydratableVideoProject({ ...project, version: 53 })).toBe(false);
+  expect(isHydratableVideoProject({ ...project, version: 54 })).toBe(false);
   expect(
     isHydratableVideoProject({
       ...project,
@@ -1118,7 +1118,7 @@ it('fences known source filters at schema fifty-two and refuses unsupported sour
   expect(changed.version).toBe(52);
   expect(isHydratableVideoProject(JSON.parse(JSON.stringify(changed)))).toBe(true);
   expect(isHydratableVideoProject({ ...changed, version: 51 })).toBe(false);
-  expect(isHydratableVideoProject({ ...changed, version: 53 })).toBe(false);
+  expect(isHydratableVideoProject({ ...changed, version: 54 })).toBe(false);
   for (const sourceFilters of [
     null,
     { ...stack, version: 2 },
@@ -1140,4 +1140,39 @@ it('fences known source filters at schema fifty-two and refuses unsupported sour
   const removed = applyVideoProjectMutationPatch(changed, { clips: project.clips });
   expect(removed.version).toBe(52);
   expect(project.clips.some((clip) => 'sourceFilters' in clip)).toBe(false);
+});
+
+it('retains placement audio processing only at schema 53 and preserves the fence after removal', async () => {
+  const { createVideoProjectFromRecording } = await import('../factories/creation');
+  const { parseHydratableVideoProject } = await import('./root');
+  const base = createVideoProjectFromRecording({
+    recordingId: 'audio-source',
+    filename: 'Source.webm',
+    width: 640,
+    height: 360,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 100,
+    hasAudio: true,
+  });
+  const processing = { version: 1 as const, bypassed: false, effects: [] };
+  const clips = base.clips.map((clip) =>
+    clip.type === 'VIDEO' || clip.type === 'AUDIO' ? { ...clip, audioProcessing: processing } : clip
+  );
+  const project = applyVideoProjectMutationPatch(base, { clips });
+  expect(project.version).toBe(53);
+  expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(project)))).toEqual(project);
+  expect(isHydratableVideoProject({ ...project, version: 52 })).toBe(false);
+  const invalid = {
+    ...project,
+    clips: project.clips.map((clip) => ({
+      ...clip,
+      audioProcessing: { ...processing, arbitraryCode: 'forbidden' },
+    })),
+  };
+  expect(isHydratableVideoProject(invalid)).toBe(false);
+  const removed = applyVideoProjectMutationPatch(project, { clips: base.clips });
+  expect(removed.version).toBe(53);
+  expect(isHydratableVideoProject(removed)).toBe(true);
+  expect(base.clips.every((clip) => !('audioProcessing' in clip))).toBe(true);
 });

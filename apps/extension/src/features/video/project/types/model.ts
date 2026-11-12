@@ -256,6 +256,8 @@ export interface VideoProjectUtilityLanes {
 }
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
+  /** Authored placement processing; source-level edits update bound placements explicitly. */
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   sourceFilters?: import('../../../image-filters/contract').SourceImageFilterStack;
   cameraShadowDirection?: CameraShadowDirection;
   cameraSplit?: CameraSplitSide | undefined;
@@ -278,6 +280,7 @@ export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjec
 }
 
 export interface VideoProjectAudioClip extends VideoProjectBaseClip {
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   /** Retain the full take without extending the montage when set to project. */
   durationMode?: VideoProjectDurationMode;
   /** Independent attenuation follows this take; targets confer no resource ownership. */
@@ -413,7 +416,8 @@ export interface VideoProject {
     | 49
     | 50
     | 51
-    | 52;
+    | 52
+    | 53;
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

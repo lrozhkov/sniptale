@@ -66,6 +66,7 @@ export async function writeReviewFrames(
   const adaptiveBudget = createAdaptiveComparisonBudget();
   let source: ReviewRenderSource | null = null;
   let main: Awaited<ReturnType<typeof createReviewPresentationMain>> | null = null;
+  const clipRenderer = createReviewAudioClipRenderer();
   const enhancement = createReviewExportSampling(args.renderSettings?.detailEnhancement);
   try {
     source = await reviewExportPhase(args.signal, 'decode', () =>
@@ -85,7 +86,6 @@ export async function writeReviewFrames(
       videoReencoded: true,
     };
     const clock = { time: 0 };
-    const clipRenderer = createReviewAudioClipRenderer();
     const outputSource = source;
     const tracks = await reviewExportPhase(args.signal, 'encode', () =>
       createReviewFrameOutput(args, preparation, outputSource, (packet) => {
@@ -167,6 +167,7 @@ export async function writeReviewFrames(
   } catch (error) {
     return await cleanupReviewExportFailure(error, () => outputLifetime?.cancel());
   } finally {
+    clipRenderer.dispose?.();
     if (enhancement) await enhancement.dispose();
     args.onTimeEstimate?.(null);
     main?.dispose();

@@ -85,3 +85,42 @@ it('roundtrips lane masters and locks without adding defaults to legacy UI', () 
     loadQuickEditAdvancedState({ ...state, ui: { ...ui, tracks: { ...ui.tracks, music: 1 } } })
   ).toBeNull();
 });
+
+it('retains audio snapshots in schema 31 without silently admitting them in historical schemas', () => {
+  const base = createQuickEditAdvancedContent();
+  const audioProcessing = { version: 1 as const, bypassed: false, effects: [] };
+  const clip = {
+    id: 'take',
+    assetId: 'audio',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    audioProcessing,
+  };
+  for (const audio of [
+    { ...base.audio, original: { ...base.audio.original, audioProcessing } },
+    { ...base.audio, voiceover: [clip] },
+    { ...base.audio, music: [clip] },
+  ]) {
+    const content = { ...base, audio };
+    expect(content.schemaVersion).toBe(31);
+    expect(loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))).toEqual(content);
+    expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 30 })).toBeNull();
+  }
+  expect(loadQuickEditAdvancedContentState({ ...base, schemaVersion: 30 })).toEqual(base);
+  const invalid = {
+    ...base,
+    audio: {
+      ...base.audio,
+      original: {
+        ...base.audio.original,
+        audioProcessing: { ...audioProcessing, script: 'forbidden' },
+      },
+    },
+  };
+  expect(loadQuickEditAdvancedContentState(invalid)).toBeNull();
+});

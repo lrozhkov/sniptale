@@ -130,6 +130,7 @@ function isTransition(value: unknown): boolean {
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['audioProcessing'] !== undefined) return 53;
   if (value['sourceFilters'] !== undefined) return 52;
   if (value['transcript'] !== undefined) return 44;
   if (value['playbackWindow'] !== undefined) return 43;
@@ -197,8 +198,16 @@ function minimumMotionSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 52) &&
+    isBoundedNumber(version, 2, 53) &&
     Number.isInteger(version) &&
+    (version >= 53 ||
+      !Array.isArray(value['sourceVoiceoverDocuments']) ||
+      value['sourceVoiceoverDocuments'].every(
+        (document: unknown) =>
+          !isRecord(document) ||
+          !isRecord(document['take']) ||
+          document['take']['audioProcessing'] === undefined
+      )) &&
     (version >= 51 ||
       !isRecord(value['sceneBackground']) ||
       value['sceneBackground']['motion'] === undefined) &&

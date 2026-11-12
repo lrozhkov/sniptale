@@ -45,7 +45,11 @@ Evaluate optional permissions independently. Do not infer optional status for `d
 
 The tour preview sandbox receives a bounded prepared guide or tour HTML Blob from its owning scenario frame. It has no privileged API or automatic network authority. The nested file retains its own hashed script CSP.
 
-The shared manifest policy permits local inline content and data fonts. The shared manifest policy also permits embedded WASM initialization. Only the effect sandbox permits WASM compilation. Its head meta permits `connect-src data:` for the bundled runtime. Runtime guards deny network and storage APIs before a request executes.
+The shared sandbox policy permits local inline content, data fonts, and embedded WASM initialization. The effect sandbox head permits WASM compilation and `connect-src data:`. Its runtime guards deny network and storage APIs before execution.
+
+Extension pages permit WASM compilation through `wasm-unsafe-eval`. The audio processing owner loads only fixed local DSP modules and checks their byte lengths and SHA256 values before compilation. Project and preset imports cannot select executable bytes or module URLs. The compiler remains a build dependency and does not ship in release artifacts.
+
+The extension page policy retains `script-src 'self'` and `object-src 'self'`. It does not permit JavaScript string evaluation, inline scripts, or remote scripts. This uses the [documented Chrome MV3 WASM policy](https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy). It adds no host grant or web-accessible resource.
 
 The tour sandbox head meta retains its former restrictions. It blocks WASM compilation and all connections. Check both head policies in release artifacts. Neither sandbox is web-accessible. Explicit tour URL actions may open parser-checked HTTP(S) destinations in a new tab with no opener.
 

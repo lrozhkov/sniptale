@@ -1,3 +1,5 @@
+import { hasReviewAudioProcessing } from '../../../../workflows/video-review/audio-clip-processing';
+import type { QuickEditAudioPlanEntry } from '../../../../features/video/review/advanced/audio-plan';
 import {
   createReviewAudioClipRenderer,
   REVIEW_AUDIO_CLIP_PADDING_SECONDS,
@@ -56,8 +58,44 @@ export async function scheduleOfflineAudioClipMix(
   const coveredEnd = coveredStart + mediaDuration / rate;
   const voice = 'sourceKind' in clip && clip.sourceKind === 'source-voiceover' ? clip : null;
   const localFrom = voice ? (clip.sourceStart - voice.playbackEntry.sourceOffset) / rate : 0;
-  const prepared =
-    rate === 1
+  const processing =
+    voice?.playbackEntry.audioProcessing ??
+    ('audioProcessing' in clip ? clip.audioProcessing : undefined);
+  const processingSource = clip.audioProcessingSource ?? {
+    start: clip.sourceStart,
+    duration: clip.sourceDuration,
+  };
+  const processingStart = timing
+    ? Math.max(0, processingSource.start - timing.offsetSeconds)
+    : processingSource.start;
+  const processingEnd = timing
+    ? Math.min(
+        buffer.length / buffer.sampleRate,
+        processingSource.start - timing.offsetSeconds + processingSource.duration
+      )
+    : processingSource.start + processingSource.duration;
+  const processedEntry: QuickEditAudioPlanEntry | null = hasReviewAudioProcessing(processing)
+    ? voice
+      ? voice.playbackEntry
+      : 'assetId' in clip
+        ? {
+            lane: 'voiceover',
+            clipId: clip.id,
+            source: { kind: 'project', assetId: clip.assetId },
+            timelineStart: coveredStart,
+            sourceOffset: processingStart,
+            duration: (processingEnd - processingStart) / rate,
+            playbackRate: rate,
+            volume: 1,
+            fadeIn: 0,
+            fadeOut: 0,
+            ...(processing ? { audioProcessing: processing } : {}),
+          }
+        : null
+    : null;
+  const prepared = processedEntry
+    ? null
+    : rate === 1
       ? buffer
       : voice
         ? await createReviewAudioClipRenderer().render(
@@ -77,12 +115,14 @@ export async function scheduleOfflineAudioClipMix(
             signal
           );
   signal?.throwIfAborted();
-  const source = offlineContext.createBufferSource();
-  source.buffer = prepared;
-  source.playbackRate.value = 1;
+  const source = prepared ? offlineContext.createBufferSource() : null;
+  if (source) {
+    source.buffer = prepared;
+    source.playbackRate.value = 1;
+  }
   const gain = offlineContext.createGain();
   gain.gain.setValueAtTime(0, 0);
-  source.connect(gain);
+  source?.connect(gain);
   const faded = connectAudioFade(offlineContext, gain, clip);
   const output = connectOriginalAudioAttenuation(offlineContext, faded, clip);
   if (clip.audioTransitions?.length) {
@@ -145,8 +185,37 @@ export async function scheduleOfflineAudioClipMix(
       : voice
         ? Math.round(buffer.sampleRate * REVIEW_AUDIO_CLIP_PADDING_SECONDS) / buffer.sampleRate
         : 0;
-  source.start(clipStart, offset, mediaDuration / rate);
-  source.stop(clipEnd);
+  if (processedEntry) {
+    const renderer = createReviewAudioClipRenderer(),
+      requestSignal = signal ?? new AbortController().signal;
+    const origin = voice ? localFrom : (mediaStart - processingStart) / rate;
+    const duration = Math.min(mediaDuration / rate, clipEnd - clipStart);
+    try {
+      for (let from = 0; from < duration; from += 1) {
+        requestSignal.throwIfAborted();
+        const to = Math.min(duration, from + 1);
+        const pcm = await renderer.render(
+          processedEntry,
+          buffer,
+          origin + from,
+          origin + to,
+          requestSignal
+        );
+        requestSignal.throwIfAborted();
+        const node = offlineContext.createBufferSource();
+        node.buffer = pcm;
+        node.playbackRate.value = 1;
+        node.connect(gain);
+        node.start(clipStart + from, REVIEW_AUDIO_CLIP_PADDING_SECONDS, to - from);
+        node.stop(clipStart + to);
+      }
+    } finally {
+      renderer.dispose?.();
+    }
+  } else if (source) {
+    source.start(clipStart, offset, mediaDuration / rate);
+    source.stop(clipEnd);
+  }
 }
 
 /** A separate stage preserves the manual envelope and its fade/transition automation. */

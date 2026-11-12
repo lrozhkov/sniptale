@@ -1,3 +1,7 @@
+import {
+  parseAudioPresetCatalog,
+  restoreAudioPresetCatalog,
+} from '../../composition/persistence/audio-presets/catalog';
 import type { SettingsTransferDomainPayload } from '../../contracts/settings-transfer';
 import { parseGradientPresetCatalog } from '../../composition/persistence/gradient-presets/parser';
 import { parseStoredSurfaceStylePresetState } from '../../composition/persistence/surface-style-presets/parser';
@@ -8,6 +12,9 @@ import { hasOnlyKnownFavoriteIds, normalizeSurfaceCatalogForParsing } from './st
 export function assertDurableSettingsTransferCatalogs(
   domains: Record<string, SettingsTransferDomainPayload>
 ): void {
+  const audio = domains['styles.audio-effects'];
+  if (audio && !restoreAudioPresetCatalog(parseAudioPresetCatalog(undefined)!, audio.data))
+    failSettingsTransferDomain('styles.audio-effects');
   const gradients = domains['styles.gradients'];
   if (gradients) {
     const value = asRecord(gradients.data);

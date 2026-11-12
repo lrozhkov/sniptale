@@ -354,7 +354,7 @@ it.each(['voice', 'source', 'original'] as const)(
     const before = useVideoEditorStore.getState().project;
     const history = useVideoEditorStore.getState().projectHistory;
     const switches = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')];
-    expect(switches).toHaveLength(2);
+    expect(switches).toHaveLength(5);
     for (const toggle of switches) {
       expect(toggle.disabled).toBe(true);
       act(() => toggle.click());

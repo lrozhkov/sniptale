@@ -1,3 +1,4 @@
+import { AudioPresetsSettings } from './audio/view';
 import { BackgroundPresetsSettings } from './backgrounds/view';
 import { translate } from '../../../../platform/i18n';
 import { SettingsSubpageTabs, settingsSectionClassName } from '../../../section-surface';
@@ -10,7 +11,10 @@ export function EditorResourcesContent(props: {
   view?: string;
 }) {
   const view =
-    props.view === 'surfaces' || props.view === 'gradients' || props.view === 'backgrounds'
+    props.view === 'surfaces' ||
+    props.view === 'gradients' ||
+    props.view === 'backgrounds' ||
+    props.view === 'audio'
       ? props.view
       : 'palettes';
   return (
@@ -22,11 +26,14 @@ export function EditorResourcesContent(props: {
           { id: 'palettes', label: translate('settings.navigation.views.palettes') },
           { id: 'surfaces', label: translate('settings.navigation.views.surfaces') },
           { id: 'gradients', label: translate('settings.navigation.views.gradients') },
+          { id: 'audio', label: translate('settings.navigation.views.audio') },
           { id: 'backgrounds', label: translate('settings.navigation.views.backgrounds') },
         ]}
         onChange={props.onViewChange}
       />
-      {view === 'backgrounds' ? (
+      {view === 'audio' ? (
+        <AudioPresetsSettings />
+      ) : view === 'backgrounds' ? (
         <BackgroundPresetsSettings />
       ) : view === 'surfaces' ? (
         <SurfaceStylePresetsSettings />

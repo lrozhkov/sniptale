@@ -20,7 +20,7 @@ export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 30;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 31;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -193,6 +193,7 @@ export type QuickEditBackgroundSettings = {
 /** One voiceover or music clip; timeline coordinates are seconds like the video domain. */
 
 export interface QuickEditAudioClip {
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   /** Immutable text association; deleting or editing text does not delete this audio. */
   textSnapshot?: import('../text-types').ReviewVoiceTextSnapshot;
   /** Optional native-asset transcript and immutable accepted speech replacements. */
@@ -225,6 +226,7 @@ export type QuickEditOriginalAudioMute =
   | (QuickEditOriginalAudioRange & { kind: 'range' });
 
 export interface QuickEditOriginalAudio {
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
   /** Source seconds, independent of result-time edits. */
   ranges?: QuickEditOriginalAudioRange[];
   /** Independent overlays preserve the authored manual gain envelope underneath. */

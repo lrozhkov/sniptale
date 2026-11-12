@@ -437,6 +437,14 @@ export function resolveQuickEditExportPlan(args: {
   if (features.musicApplied && effective.music.length > 0) audio.push('music');
   if (features.actionsApplied && args.actionAudioPresent) audio.push('action-audio');
   if (
+    (effective.originalAudio.audioProcessing !== undefined &&
+      !effective.originalAudio.audioProcessing.bypassed &&
+      (effective.originalAudio.audioProcessing.denoise?.enabled ||
+        (effective.originalAudio.audioProcessing.pitch?.enabled &&
+          effective.originalAudio.audioProcessing.pitch.semitones !== 0) ||
+        effective.originalAudio.audioProcessing.effects.some(
+          (effect) => effect.enabled && effect.wet > 0
+        ))) ||
     effective.originalAudio.muted ||
     args.advanced.audio.original.volume !== 1 ||
     effective.originalAudio.ranges?.some(

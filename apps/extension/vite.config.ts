@@ -1,3 +1,4 @@
+import { audioEffects } from './build/audio-effects.ts';
 import { glTransitions } from './build/gl-transitions.ts';
 import { lottieSchema } from './build/lottie-schema.ts';
 import { normalizeMediabunny } from '../../tooling/ci/mediabunny/normalize.mjs';
@@ -154,6 +155,7 @@ export default defineConfig(({ mode }) => ({
     videoEffectResources(join(APP_ROOT, 'public/video-effects')),
     lottieSchema(),
     glTransitions(),
+    audioEffects(),
     extensionHtmlInputs(BUILD_LAYOUT),
     copyDevExtensionFonts(),
     tailwindcss(),

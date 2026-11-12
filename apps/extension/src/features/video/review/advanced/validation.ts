@@ -1,3 +1,4 @@
+import { parseAudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
 import { parseSourceImageFilterStack } from '../../../image-filters/contract';
 import { parseCursorMotions } from '../../project/cursor-motion';
 import { parseReviewAudioClip } from '../audio-clip-validation';
@@ -438,6 +439,11 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
     !isBoundedNumber(value['volume'], 0, MAX_QUICK_EDIT_CLIP_VOLUME)
   )
     return null;
+  const audioProcessing =
+    value['audioProcessing'] === undefined
+      ? undefined
+      : parseAudioProcessing(value['audioProcessing']);
+  if (audioProcessing === null) return null;
   const ranges =
     value['ranges'] === undefined ? undefined : parseSourceAudioGainRanges(value['ranges']);
   const mutes = value['mutes'] === undefined ? undefined : parseOriginalAudioMutes(value['mutes']);
@@ -445,6 +451,7 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
   return {
     muted: value['muted'],
     volume: value['volume'],
+    ...(audioProcessing ? { audioProcessing } : {}),
     ...(ranges ? { ranges } : {}),
     ...(mutes ? { mutes } : {}),
   };
@@ -594,6 +601,13 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
   )
     return null;
   const audio = parseAudioState(raw['audio'], supportsAdvancedSchema(raw['schemaVersion'], 7));
+  if (
+    audio &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 31) &&
+    (audio.original.audioProcessing !== undefined ||
+      [...audio.voiceover, ...audio.music].some((clip) => clip.audioProcessing !== undefined))
+  )
+    return null;
   const actionsEnabled = raw['actionsEnabled'];
   if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
   const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
@@ -724,7 +738,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 28, 29,
+      27, 28, 29, 30,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

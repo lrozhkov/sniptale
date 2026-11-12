@@ -526,6 +526,10 @@ it('dismisses and repeats gain feedback without changing source selection', asyn
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')?.textContent
     ).not.toContain('gallery.videoReview.originalAudioOverlap');
+    await fixture.click('play');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')?.textContent
+    ).not.toContain('gallery.videoReview.playbackFailed');
   } finally {
     await fixture.cleanup();
   }

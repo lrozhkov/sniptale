@@ -72,7 +72,8 @@
     "./scenario/tour-parser": "./src/scenario/tour-parser.ts",
     "./window-header": "./src/window-header.ts",
     "./effect-controls": "./src/effect-controls/index.ts",
-    "./animation-template": "./src/animation-template/index.ts"
+    "./animation-template": "./src/animation-template/index.ts",
+    "./audio-effects": "./src/audio-effects/index.ts"
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",

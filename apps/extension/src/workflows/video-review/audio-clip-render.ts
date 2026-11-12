@@ -1,3 +1,6 @@
+import { hasReviewAudioProcessing, createReviewProcessedClip } from './audio-clip-processing';
+import { CANONICAL_AUDIO_RATE } from '../../features/video/audio/effects/source';
+import type { AudioProcessingRenderer } from '../../features/video/audio/effects/prepare';
 import { readReviewAudioClipRange, type ReviewAudioClipInput } from './audio-clip-source';
 import { createTempoProcessor } from '../../features/video/audio/tempo';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
@@ -7,6 +10,8 @@ export const REVIEW_AUDIO_CLIP_PADDING_SECONDS = 0.02;
 
 /** Job-local external audio processing; spans are output seconds relative to the clip. */
 export interface ReviewAudioClipRenderer {
+  /** Releases job-owned processing state; never closes borrowed source decoders. */
+  dispose?(): void;
   render(
     entry: QuickEditAudioPlanEntry,
     buffer: ReviewAudioClipInput,
@@ -23,8 +28,89 @@ export interface ReviewAudioClipRenderer {
  */
 export function createReviewAudioClipRenderer(): ReviewAudioClipRenderer {
   const states = new Map<QuickEditAudioPlanEntry, ReturnType<typeof createClipTempo>>();
+  const processed = new Map<
+    QuickEditAudioPlanEntry,
+    {
+      buffer: ReviewAudioClipInput;
+      signal: AbortSignal;
+      signature: string;
+      promise: Promise<AudioProcessingRenderer>;
+      release(): void;
+    }
+  >();
+  let disposed = false;
   return {
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      states.clear();
+      for (const state of processed.values()) state.release();
+      processed.clear();
+    },
     async render(entry, buffer, from, to, signal) {
+      if (disposed) throw new Error('Audio clip renderer is disposed.');
+      if (hasReviewAudioProcessing(entry.audioProcessing)) {
+        signal.throwIfAborted();
+        const signature = JSON.stringify([
+          entry.audioProcessing,
+          entry.sourceOffset,
+          entry.duration,
+          entry.playbackRate,
+        ]);
+        let state = processed.get(entry);
+        if (
+          !state ||
+          state.buffer !== buffer ||
+          state.signal !== signal ||
+          state.signature !== signature
+        ) {
+          state?.release();
+          let released = false;
+          const promise = createReviewProcessedClip(entry, buffer, signal).then((renderer) => {
+            if (released) {
+              renderer.dispose();
+              throw new Error('Audio clip renderer is disposed.');
+            }
+            return renderer;
+          });
+          const next = {
+            buffer,
+            signal,
+            signature,
+            promise,
+            release() {
+              if (released) return;
+              released = true;
+              void promise.then(
+                (renderer) => renderer.dispose(),
+                () => {}
+              );
+            },
+          };
+          state = next;
+          processed.set(entry, state);
+          void promise.catch(() => {
+            if (processed.get(entry) === next) processed.delete(entry);
+          });
+        }
+        const renderer = await state.promise;
+        const padding = Math.round(CANONICAL_AUDIO_RATE * REVIEW_AUDIO_CLIP_PADDING_SECONDS);
+        const start = Math.round(from * CANONICAL_AUDIO_RATE) - padding;
+        const end = Math.round(to * CANONICAL_AUDIO_RATE) + padding;
+        const planes = await renderer.render(start, end);
+        signal.throwIfAborted();
+        if (disposed) throw new Error('Audio clip renderer is disposed.');
+        const output = new AudioBuffer({
+          length: end - start,
+          sampleRate: CANONICAL_AUDIO_RATE,
+          numberOfChannels: planes.length,
+        });
+        for (let channel = 0; channel < planes.length; channel++)
+          output.getChannelData(channel).set(planes[channel]!);
+        return output;
+      }
+      processed.get(entry)?.release();
+      processed.delete(entry);
       signal.throwIfAborted();
       const padding = Math.round(buffer.sampleRate * REVIEW_AUDIO_CLIP_PADDING_SECONDS);
       const start = Math.round(from * buffer.sampleRate) - padding;

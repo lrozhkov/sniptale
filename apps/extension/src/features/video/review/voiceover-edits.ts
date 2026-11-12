@@ -428,6 +428,7 @@ export function areReviewVoiceoverSlicesContinuous(
   slice: QuickEditAudioClip
 ): boolean {
   return (
+    JSON.stringify(previous.audioProcessing) === JSON.stringify(slice.audioProcessing) &&
     Math.abs(previous.playbackRate! - slice.playbackRate!) < REVIEW_VOICEOVER_CONTINUITY_EPSILON &&
     Math.abs(previous.timelineStart + previous.duration - slice.timelineStart) <
       REVIEW_VOICEOVER_CONTINUITY_EPSILON &&

@@ -841,3 +841,21 @@ it.each(['basic', 'advanced'] as const)(
     });
   }
 );
+
+it('requires audio encoding for active original processing and preserves packet-copy for explicit bypass', async () => {
+  const { createAudioEffectInstance } = await import('../../audio/effects/catalog');
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.original.audioProcessing = {
+    version: 1,
+    bypassed: false,
+    effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+  };
+  const document = { edits: [], canvasComments: [] };
+  expect(
+    resolveQuickEditExportPlan({ document, advanced, audioProcessingAvailable: true })
+  ).toMatchObject({ audio: 'process' });
+  advanced.audio.original.audioProcessing.bypassed = true;
+  expect(
+    resolveQuickEditExportPlan({ document, advanced, audioProcessingAvailable: true })
+  ).toMatchObject({ audio: 'copy' });
+});

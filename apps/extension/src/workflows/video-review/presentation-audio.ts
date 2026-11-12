@@ -267,51 +267,55 @@ export async function* renderPresentationAudio(
 ): AsyncGenerator<AudioSample> {
   const window = audioWindow(args);
   const clipRenderer = createReviewAudioClipRenderer();
-  for (const placement of args.plan.segments) {
-    let cursor = Math.max(placement.audioStart, window.start);
-    const placementEnd = Math.min(placement.audioEnd, window.end);
-    if (placementEnd <= cursor) continue;
-    const contentEnd = Math.min(
-      placementEnd,
-      placement.audioStart + Math.round(placement.contentDuration * sampleRate)
-    );
-    for (const part of audioParts(args, placement)) {
-      if (cursor >= contentEnd) break;
-      args.signal.throwIfAborted();
-      if (!hasOriginal(part) && !hasClips(part)) continue;
-      for await (const input of renderReviewAudio(
-        part.track,
-        part.segment,
-        part.muted,
-        args.signal,
-        part.exportAudio,
-        clipRenderer
-      )) {
+  try {
+    for (const placement of args.plan.segments) {
+      let cursor = Math.max(placement.audioStart, window.start);
+      const placementEnd = Math.min(placement.audioEnd, window.end);
+      if (placementEnd <= cursor) continue;
+      const contentEnd = Math.min(
+        placementEnd,
+        placement.audioStart + Math.round(placement.contentDuration * sampleRate)
+      );
+      for (const part of audioParts(args, placement)) {
+        if (cursor >= contentEnd) break;
         args.signal.throwIfAborted();
-        const inputStart = placement.audioStart + Math.round(input.timestamp * sampleRate);
-        const start = Math.max(cursor, inputStart);
-        const end = Math.min(contentEnd, inputStart + input.numberOfFrames);
-        if (end <= start) continue;
-        yield* silence(args, cursor, start);
-        for (let frame = start; frame < end; frame += sampleRate) {
+        if (!hasOriginal(part) && !hasClips(part)) continue;
+        for await (const input of renderReviewAudio(
+          part.track,
+          part.segment,
+          part.muted,
+          args.signal,
+          part.exportAudio,
+          clipRenderer
+        )) {
           args.signal.throwIfAborted();
-          const count = Math.min(sampleRate, end - frame);
-          const sample = outputSample(
-            args.plan,
-            frame,
-            stereoFrames(input, frame - inputStart, count)
-          );
-          try {
-            yield sample;
-          } finally {
-            sample.close();
+          const inputStart = placement.audioStart + Math.round(input.timestamp * sampleRate);
+          const start = Math.max(cursor, inputStart);
+          const end = Math.min(contentEnd, inputStart + input.numberOfFrames);
+          if (end <= start) continue;
+          yield* silence(args, cursor, start);
+          for (let frame = start; frame < end; frame += sampleRate) {
+            args.signal.throwIfAborted();
+            const count = Math.min(sampleRate, end - frame);
+            const sample = outputSample(
+              args.plan,
+              frame,
+              stereoFrames(input, frame - inputStart, count)
+            );
+            try {
+              yield sample;
+            } finally {
+              sample.close();
+            }
           }
+          cursor = end;
+          if (cursor >= contentEnd) break;
         }
-        cursor = end;
         if (cursor >= contentEnd) break;
       }
-      if (cursor >= contentEnd) break;
+      yield* silence(args, cursor, placementEnd);
     }
-    yield* silence(args, cursor, placementEnd);
+  } finally {
+    clipRenderer.dispose?.();
   }
 }

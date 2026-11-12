@@ -395,3 +395,136 @@ describe('named palette restore selection', () => {
     });
   });
 });
+
+import { listBuiltInAudioPresets } from '../../features/video/audio/effects/presets';
+const audioPreset = (id: string, name = 'Voice') => ({
+  id,
+  name,
+  preset: { ...structuredClone(listBuiltInAudioPresets()[0]!.preset), name },
+});
+const audioDomain = (value: unknown) => ({
+  'styles.audio-effects': {
+    schemaVersion: 1,
+    data: cloneSettingsTransferJsonValue(value),
+  },
+});
+it('exports one audio preset without catalogue preferences or local write tokens', () => {
+  const a = audioPreset('a'),
+    b = audioPreset('b');
+  const domains = audioDomain({
+    presets: [a, b],
+    preferences: { defaultId: 'a', disabledIds: [] },
+  });
+  const tree = buildSettingsTransferTree(
+    [a, b].map((item) => ({
+      collectionNodeId: 'styles.audio-effects.items',
+      id: item.id,
+      label: item.name,
+    }))
+  );
+  const built = buildSettingsTransferPackage({
+    appVersion: '1',
+    domains,
+    exportKind: 'selective',
+    selectedNodeIds: ['styles.audio-effects.items.b'],
+    tree,
+  });
+  expect(built.package.domains['styles.audio-effects']?.data).toEqual({ presets: [b] });
+  expect(parseSettingsTransferDomains(built.package.domains)).toEqual(
+    audioDomain({ presets: [b] })
+  );
+});
+it('remaps imported audio default and disabled references when a conflicting preset becomes a copy', () => {
+  const current = audioDomain({
+    presets: [audioPreset('a', 'Local')],
+    preferences: { defaultId: null, disabledIds: [] },
+  });
+  const imported = audioDomain({
+    presets: [audioPreset('a', 'Imported')],
+    preferences: { defaultId: 'a', disabledIds: [] },
+  });
+  const plan = planSettingsTransfer({ current, imported, strategy: 'safe-merge' });
+  expect(plan.domains['styles.audio-effects']?.data).toEqual({
+    presets: [audioPreset('a', 'Local'), audioPreset('a-imported', 'Imported')],
+    preferences: { defaultId: 'a-imported', disabledIds: [] },
+  });
+  expect(plan.conflicts.find((item) => item.kind === 'item')?.nodeId).toBe(
+    'styles.audio-effects.items.a'
+  );
+  expect(() =>
+    assertDurableSettingsTransferCatalogs(parseSettingsTransferDomains(plan.domains))
+  ).not.toThrow();
+  const disabled = planSettingsTransfer({
+    current,
+    imported: audioDomain({
+      presets: [audioPreset('a', 'Imported')],
+      preferences: { defaultId: 'builtin:speech', disabledIds: ['a'] },
+    }),
+    strategy: 'safe-merge',
+  });
+  expect(disabled.domains['styles.audio-effects']?.data).toMatchObject({
+    preferences: { defaultId: 'builtin:speech', disabledIds: ['a-imported'] },
+  });
+});
+it('keeps unselected audio sources during preference-only exact restore', () => {
+  const a = audioPreset('a');
+  const current = audioDomain({ presets: [a], preferences: { defaultId: null, disabledIds: [] } });
+  const imported = audioDomain({
+    presets: [],
+    preferences: { defaultId: 'builtin:speech', disabledIds: [] },
+  });
+  const tree = buildSettingsTransferTree([]);
+  const selected = buildExactRestoreDomainsBySelection({
+    current,
+    imported,
+    selectedNodeIds: ['styles.audio-effects.preferences'],
+    tree,
+  });
+  const plan = planSettingsTransfer({ current, imported: selected, strategy: 'exact-restore' });
+  expect(plan.domains['styles.audio-effects']?.data).toEqual({
+    presets: [a],
+    preferences: { defaultId: 'builtin:speech', disabledIds: [] },
+  });
+  expect(() => assertDurableSettingsTransferCatalogs(plan.domains)).not.toThrow();
+});
+it('rejects audio preset source extras and dangling durable preferences before apply', () => {
+  for (const value of [
+    { presets: [{ ...audioPreset('a'), incarnation: 'local-token' }] },
+    { presets: [], code: 'arbitrary' },
+  ])
+    expect(() => parseSettingsTransferDomains(audioDomain(value))).toThrow();
+  expect(() =>
+    assertDurableSettingsTransferCatalogs(
+      audioDomain({ presets: [], preferences: { defaultId: 'missing', disabledIds: [] } })
+    )
+  ).toThrow();
+  expect(() =>
+    assertDurableSettingsTransferCatalogs(
+      audioDomain({
+        presets: [audioPreset('a')],
+        preferences: { defaultId: 'a', disabledIds: ['a'] },
+      })
+    )
+  ).toThrow();
+});
+
+it('keeps copied audio IDs within the admitted source identity budget', () => {
+  const id = 'a'.repeat(192);
+  const plan = planSettingsTransfer({
+    current: audioDomain({
+      presets: [audioPreset(id, 'Local')],
+      preferences: { defaultId: null, disabledIds: [] },
+    }),
+    imported: audioDomain({
+      presets: [audioPreset(id, 'Imported')],
+      preferences: { defaultId: id, disabledIds: [] },
+    }),
+    strategy: 'safe-merge',
+  });
+  expect(() =>
+    assertDurableSettingsTransferCatalogs(parseSettingsTransferDomains(plan.domains))
+  ).not.toThrow();
+  expect(plan.domains['styles.audio-effects']?.data).toMatchObject({
+    preferences: { defaultId: 'a'.repeat(183) + '-imported' },
+  });
+});

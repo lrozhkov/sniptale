@@ -1,3 +1,7 @@
+import { useAudioPresets } from '../../composition/audio-preset-resources/use-audio-presets';
+import { AudioPresetControls } from '../../ui/audio/preset-controls';
+import { AudioProcessingFields } from '../../ui/audio/processing-fields';
+import type { AudioProcessing } from '@sniptale/runtime-contracts/audio-effects';
 import type { useReviewEditorState } from './use-editor-state';
 import type { useReviewAudio } from './use-review-audio';
 import type { LoadedReview } from './use-session';
@@ -33,7 +37,8 @@ const buttonClass = reviewTextButtonClassName + ' !h-auto min-h-8! whitespace-no
 /** Original gain stays under the ordinary audio owner while recognition only proposes text. */
 export function ReviewOriginalSpeechPanel(
   props: Omit<Props, 'target' | 'sound'> & {
-    masterAudio: { volume: number; muted: boolean };
+    masterAudio: { volume: number; muted: boolean; audioProcessing?: AudioProcessing };
+    onProcessingChange?(value: AudioProcessing | undefined): void;
     onMasterVolumeChange(volume: number): void;
     masterDisabled: boolean;
     recognitionEnabled?: boolean;
@@ -41,26 +46,49 @@ export function ReviewOriginalSpeechPanel(
 ) {
   const {
     masterAudio,
+    onProcessingChange,
     onMasterVolumeChange,
     masterDisabled,
     recognitionEnabled = true,
     ...speech
   } = props;
+  const ownerKey = JSON.stringify(['gallery-original', props.original?.sourceAssetId]);
+  const presets = useAudioPresets(ownerKey, masterAudio.audioProcessing);
   const sound = (applying: boolean) => (
-    <ReviewPreviewNumberRow
-      label={translate('gallery.videoReview.volume')}
-      unit="%"
-      min={0}
-      max={200}
-      step={1}
-      precision={0}
-      enterBehavior="blur"
-      disabled={masterDisabled || applying}
-      value={masterAudio.muted ? 0 : masterAudio.volume * 100}
-      onChange={(value) => {
-        if (!masterDisabled && !applying) onMasterVolumeChange(value / 100);
-      }}
-    />
+    <>
+      <ReviewPreviewNumberRow
+        label={translate('gallery.videoReview.volume')}
+        unit="%"
+        min={0}
+        max={200}
+        step={1}
+        precision={0}
+        enterBehavior="blur"
+        disabled={masterDisabled || applying}
+        value={masterAudio.muted ? 0 : masterAudio.volume * 100}
+        onChange={(value) => {
+          if (!masterDisabled && !applying) onMasterVolumeChange(value / 100);
+        }}
+      />
+      {onProcessingChange ? (
+        <>
+          <AudioPresetControls
+            key={ownerKey}
+            {...presets}
+            hasValue={!!masterAudio.audioProcessing}
+            disabled={masterDisabled || applying}
+            onApply={(value) => onProcessingChange(value)}
+          />
+          <AudioProcessingFields
+            key={props.original?.sourceAssetId}
+            createDefaultProcessing={presets.createDefaultProcessing}
+            value={masterAudio.audioProcessing}
+            disabled={masterDisabled || applying}
+            onChange={onProcessingChange}
+          />
+        </>
+      ) : null}
+    </>
   );
   if (!recognitionEnabled) return sound(false);
   return <ReviewSpeechPanel {...speech} target={{ kind: 'original' }} sound={sound} />;
@@ -605,6 +633,11 @@ export function ReviewSourceSpeechBinding({
       masterAudio={editor.advanced.audio.original}
       masterDisabled={editor.busy}
       onMasterVolumeChange={(volume) => audio.setOriginal({ volume })}
+      onProcessingChange={(audioProcessing) =>
+        audio.setOriginal({
+          audioProcessing: audioProcessing ?? { version: 1, bypassed: true, effects: [] },
+        })
+      }
       onJump={(time) => {
         editor.video.current?.pause();
         editor.seek(time, false);

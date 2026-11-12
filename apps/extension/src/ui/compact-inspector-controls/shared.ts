@@ -14,6 +14,8 @@ export type CompactInspectorUnit =
   | 'hz'
   | 'ratio'
   | 'count'
+  | 'db'
+  | 'semitones'
   | 'x'
   | '';
 
@@ -39,6 +41,8 @@ export function clampNumber(value: number, min?: number, max?: number): number {
 }
 
 export function resolveCompactUnitLabel(unit: CompactInspectorUnit = ''): string {
+  if (unit === 'db') return translate('common.units.db');
+  if (unit === 'semitones') return translate('common.units.semitones');
   if (unit === 'hz') return translate('common.units.hz');
   if (unit === 'count') return translate('common.units.count');
   if (unit === 'ratio') return '×';

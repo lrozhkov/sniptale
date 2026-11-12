@@ -449,3 +449,41 @@ it.each(['success', 'failure'] as const)(
     }
   }
 );
+
+it('retains the full source map and an owned original processing snapshot in fragment export preparation', async () => {
+  const { args, deps } = fixture();
+  const { createAudioEffectInstance } = await import('../../features/video/audio/effects/catalog');
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.audio.original.audioProcessing = {
+    version: 1,
+    bypassed: false,
+    effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+  };
+  const sourceMap = buildReviewTimeMap(6, [
+    { id: 'cut', kind: 'cut', start: 2, end: 3, requestedStart: 2, requestedEnd: 3 },
+  ]);
+  const input = {
+    advanced,
+    sourceMap,
+    signal: args.signal,
+    fragmentOffset: 1,
+    readProjectAsset: deps.readProjectAsset,
+  };
+  const result = await buildReviewExportClipPlan(input, { openAudioSource: deps.openAudioSource });
+  try {
+    expect(result.originalProcessing).toEqual({
+      configuration: advanced.audio.original.audioProcessing,
+      segments: sourceMap,
+    });
+    expect(result.originalProcessing?.configuration).not.toBe(
+      advanced.audio.original.audioProcessing
+    );
+    expect(result.originalProcessing?.segments).not.toBe(sourceMap);
+    const { sourceMap: _omittedSourceMap, ...withoutSourceMap } = input;
+    await expect(
+      buildReviewExportClipPlan(withoutSourceMap, { openAudioSource: deps.openAudioSource })
+    ).rejects.toThrow('full source map');
+  } finally {
+    result.dispose?.();
+  }
+});

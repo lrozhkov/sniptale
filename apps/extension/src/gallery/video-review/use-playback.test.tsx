@@ -698,3 +698,145 @@ it('keeps presented-time callbacks stable and uses the current duration without 
     test.dispose();
   }
 });
+
+it('clears a previous transport failure only after an explicit Play succeeds', async () => {
+  const test = playbackHarness();
+  const recovered = vi.fn(),
+    failure = vi.fn();
+  let accept!: () => void;
+  test.play.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        accept = resolve;
+      })
+  );
+  try {
+    test.update({ onRecovered: recovered, onFailure: failure });
+    act(() => test.hook.play());
+    expect(recovered).not.toHaveBeenCalled();
+    await act(async () => accept());
+    expect(recovered).toHaveBeenCalledOnce();
+    expect(failure).not.toHaveBeenCalled();
+    test.play.mockRejectedValueOnce(new Error('Playback refused'));
+    await act(async () => test.hook.play());
+    expect(recovered).toHaveBeenCalledOnce();
+    expect(failure).toHaveBeenCalledOnce();
+  } finally {
+    test.dispose();
+  }
+});
+
+it('ignores late Play success after the playback owner unmounts', async () => {
+  const test = playbackHarness();
+  const recovered = vi.fn(),
+    failure = vi.fn();
+  let accept!: () => void;
+  test.play.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        accept = resolve;
+      })
+  );
+  test.update({ onRecovered: recovered, onFailure: failure });
+  act(() => test.hook.play());
+  test.dispose();
+  await act(async () => accept());
+  expect(recovered).not.toHaveBeenCalled();
+  expect(failure).not.toHaveBeenCalled();
+});
+
+it('holds an automatic loop at its exact target until audio is prepared', async () => {
+  const test = playbackHarness();
+  let paused = true;
+  let accept!: (ready: boolean) => void;
+  const prepareAfterSeek = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        accept = resolve;
+      })
+  );
+  const node = test.hook.video.current!;
+  Object.defineProperty(node, 'paused', { configurable: true, get: () => paused });
+  test.pause.mockImplementation(() => {
+    paused = true;
+  });
+  test.play.mockImplementation(async () => {
+    paused = false;
+  });
+  try {
+    test.update({ prepareAfterSeek, edits: [] });
+    act(() => test.hook.setPlaybackRange({ start: 1, end: 2 }));
+    paused = false;
+    act(() => test.hook.setPlaying(true));
+    await act(async () => test.hook.onTime(2.1));
+    expect(paused).toBe(true);
+    expect(node.currentTime).toBe(1);
+    expect(prepareAfterSeek).toHaveBeenCalledOnce();
+    expect(test.play).not.toHaveBeenCalled();
+    await act(async () => accept(true));
+    expect(test.play).toHaveBeenCalledOnce();
+    expect(node.currentTime).toBe(1);
+  } finally {
+    test.dispose();
+  }
+});
+it('replaces pending seek preparation without allowing an old result to resume playback', async () => {
+  const test = playbackHarness();
+  let paused = false;
+  const gates: ((ready: boolean) => void)[] = [];
+  const prepareAfterSeek = vi.fn(() => new Promise<boolean>((resolve) => gates.push(resolve)));
+  const node = test.hook.video.current!;
+  Object.defineProperty(node, 'paused', { configurable: true, get: () => paused });
+  test.pause.mockImplementation(() => {
+    paused = true;
+  });
+  test.play.mockImplementation(async () => {
+    paused = false;
+  });
+  try {
+    test.update({ prepareAfterSeek, edits: [] });
+    await act(async () => test.hook.seek(3, false));
+    expect(prepareAfterSeek).toHaveBeenCalledOnce();
+    expect(paused).toBe(true);
+    await act(async () => test.hook.seek(5, false));
+    expect(prepareAfterSeek).toHaveBeenCalledTimes(2);
+    await act(async () => gates[0]!(true));
+    expect(test.play).not.toHaveBeenCalled();
+    await act(async () => gates[1]!(true));
+    expect(test.play).toHaveBeenCalledOnce();
+    expect(node.currentTime).toBe(5);
+  } finally {
+    test.dispose();
+  }
+});
+it('keeps a refused audio seek paused and ignores a preparation result after unmount', async () => {
+  const test = playbackHarness();
+  let paused = false;
+  let accept!: (ready: boolean) => void;
+  const prepareAfterSeek = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        accept = resolve;
+      })
+  );
+  const node = test.hook.video.current!;
+  Object.defineProperty(node, 'paused', { configurable: true, get: () => paused });
+  test.pause.mockImplementation(() => {
+    paused = true;
+  });
+  try {
+    test.update({ prepareAfterSeek, edits: [] });
+    await act(async () => test.hook.seek(3, false));
+    await act(async () => accept(false));
+    expect(test.play).not.toHaveBeenCalled();
+    expect(paused).toBe(true);
+    paused = false;
+    await act(async () => test.hook.seek(5, false));
+    test.dispose();
+    await act(async () => accept(true));
+    expect(test.play).not.toHaveBeenCalled();
+  } catch (error) {
+    test.dispose();
+    throw error;
+  }
+});

@@ -841,3 +841,79 @@ it('reads archived action cues once per PCM window on the global fragment clock 
     fixture.cleanup();
   }
 });
+
+it.each([1, 1.5])(
+  'uses the full source processing interval for a clipped original-audio export at %sx',
+  async (rate) => {
+    const fixture = await audioFixture();
+    const { readAudioFixtureAsset } = await import('sniptale:audio-test-assets');
+    const { createAudioEffectInstance } =
+      await import('../../features/video/audio/effects/catalog');
+    const { createReviewProcessedClip } = await import('./audio-clip-processing');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: URL) => new Response(readAudioFixtureAsset(url.pathname.slice(1))))
+    );
+    audioMock.packets = Array.from({ length: 60 }, (_, i) => ({
+      timestamp: i * 0.02,
+      duration: 0.02,
+      data: new Uint8Array([0xf8, 0]),
+    }));
+    audioMock.samples.mockImplementation((start: number, end: number) => [
+      decodedSample(start, end - start),
+    ]);
+    const configuration = {
+      version: 1 as const,
+      bypassed: false,
+      effects: [createAudioEffectInstance('saturation', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+    };
+    const segment = {
+      kind: 'speed' as const,
+      rate,
+      sourceStart: 0.4,
+      sourceEnd: 0.4 + 0.15 * rate,
+      resultStart: 0,
+      resultEnd: 0.15,
+    };
+    const origin = {
+      ...segment,
+      sourceStart: 0.1,
+      sourceEnd: 1,
+      resultStart: 0,
+      resultEnd: 0.9 / rate,
+    };
+    const signal = new AbortController().signal;
+    const buffer = new AudioBuffer({ numberOfChannels: 1, length: 48000, sampleRate: 48000 });
+    buffer.getChannelData(0).fill(0.25);
+    const reference = await createReviewProcessedClip(
+      {
+        audioProcessing: configuration,
+        sourceOffset: 0.1,
+        duration: 0.9 / rate,
+        playbackRate: rate,
+      },
+      buffer,
+      signal,
+      async (asset) => readAudioFixtureAsset(asset.path)
+    );
+    try {
+      for await (const sample of renderReviewAudio(fixture.track, segment, false, signal, {
+        entries: [],
+        buffers: new Map(),
+        originalVolume: 0.7,
+        originalMuted: false,
+        originalProcessing: { configuration, segments: [origin] },
+      }))
+        expect(sample.numberOfFrames).toBe(7200);
+      const actual = fixture.windows[0]!.sources![0]!.buffer!;
+      const first = Math.round(((segment.sourceStart - origin.sourceStart) / rate) * 48000);
+      const expected = await reference.render(first - 960, first + 7200 + 960);
+      expect(actual.sampleRate).toBe(48000);
+      expect(actual.getChannelData(0)).toEqual(expected[0]);
+      expect(fixture.windows[0]!.gains?.[0]!.gain.value).toBe(0.7);
+    } finally {
+      reference.dispose();
+      fixture.cleanup();
+    }
+  }
+);

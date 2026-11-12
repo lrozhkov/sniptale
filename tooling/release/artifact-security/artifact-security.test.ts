@@ -623,3 +623,17 @@ it.each(['missing', 'wasm', 'connection'] as const)(
     );
   }
 );
+
+it('accepts fixed local audio WASM while retaining all forbidden JavaScript and remote CSP checks', async () => {
+  const repoRoot = await createRepoRoot();
+  const manifest = {
+    ...baseManifest,
+    content_security_policy: {
+      ...baseManifest.content_security_policy,
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+    },
+  };
+  await expect(
+    verifyReleaseArtifactFiles({ files: createFiles({ manifest }), repoRoot })
+  ).resolves.toBeUndefined();
+});

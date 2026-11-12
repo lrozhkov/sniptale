@@ -172,7 +172,7 @@ beforeEach(() => {
 
 it('reads every visible domain while removing secret and device-bound state', async () => {
   const snapshot = await readSettingsTransferSnapshot();
-  expect(Object.keys(snapshot.domains)).toHaveLength(24);
+  expect(Object.keys(snapshot.domains)).toHaveLength(25);
   expect(snapshot.domains['ai.providers']?.data).toEqual({
     items: [
       {
@@ -808,4 +808,45 @@ it('exports configured model properties and audio without catalog cache or desti
   expect(snapshot.domains['ai.providers']?.data).toMatchObject({
     items: [{ management: 'manual', enabled: false }],
   });
+});
+
+import {
+  parseAudioPresetCatalog,
+  restoreAudioPresetCatalog,
+  AUDIO_PRESET_STORAGE_KEY,
+} from '../audio-presets/catalog';
+import { listBuiltInAudioPresets } from '../../../features/video/audio/effects/presets';
+it('includes source-only audio presets and attaches only user preference dependencies', async () => {
+  const preset = listBuiltInAudioPresets()[0]!.preset;
+  const catalogue = restoreAudioPresetCatalog(parseAudioPresetCatalog(undefined)!, {
+    presets: [{ id: 'user-a', name: preset.name, preset }],
+    preferences: { defaultId: 'user-a', disabledIds: ['builtin:room'] },
+  })!;
+  mocks.localGet.mockResolvedValue({ [AUDIO_PRESET_STORAGE_KEY]: catalogue });
+  const snapshot = await readSettingsTransferSnapshot();
+  expect(snapshot.domains['styles.audio-effects']?.data).toEqual({
+    presets: [{ id: 'user-a', name: preset.name, preset }],
+    preferences: catalogue.preferences,
+  });
+  expect(snapshot.dynamicItems).toContainEqual({
+    collectionNodeId: 'styles.audio-effects.items',
+    id: 'user-a',
+    label: preset.name,
+    dependencies: [],
+  });
+  expect(snapshot.dependencies['styles.audio-effects.preferences']).toEqual([
+    'styles.audio-effects.items.user-a',
+  ]);
+  expect(JSON.stringify(snapshot.domains['styles.audio-effects'])).not.toContain(
+    catalogue.generation
+  );
+  expect(JSON.stringify(snapshot.domains['styles.audio-effects'])).not.toContain(
+    catalogue.presets[0]!.incarnation
+  );
+});
+it('refuses a malformed audio catalogue without writing replacement defaults during Settings export', async () => {
+  mocks.localGet.mockResolvedValue({ [AUDIO_PRESET_STORAGE_KEY]: { version: 999 } });
+  await expect(readSettingsTransferSnapshot()).rejects.toThrow(
+    'Audio preset catalogue is unavailable.'
+  );
 });

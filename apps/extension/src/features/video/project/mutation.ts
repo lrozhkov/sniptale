@@ -67,6 +67,13 @@ function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoP
 }
 
 function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
+  if (
+    clips.some(
+      (clip) =>
+        (clip.type === 'VIDEO' || clip.type === 'AUDIO') && clip.audioProcessing !== undefined
+    )
+  )
+    return 53;
   if (clips.some((clip) => clip.type === 'VIDEO' && clip.sourceFilters !== undefined)) return 52;
   if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraShadowDirection !== undefined))
     return 47;
@@ -153,6 +160,12 @@ function projectSchemaRequirement(
   project: VideoProject,
   patch: MutationPatch
 ): VideoProject['version'] {
+  if (
+    (patch.sourceVoiceoverDocuments ?? project.sourceVoiceoverDocuments)?.some(
+      (document) => document.take.audioProcessing !== undefined
+    )
+  )
+    return 53;
   if ((patch.actionFeedback ?? project.actionFeedback)?.some((group) => group.events !== undefined))
     return 50;
   if (

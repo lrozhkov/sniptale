@@ -45,6 +45,12 @@ import { serializeStepBadgePresetCatalog } from '../step-badge-presets/migration
 import { loadSurfaceStylePresetCatalog } from '../surface-style-presets';
 import { serializeSurfaceStylePresetCatalog } from '../surface-style-presets/parser';
 
+import {
+  AUDIO_PRESET_STORAGE_KEY,
+  parseAudioPresetCatalog,
+  projectAudioPresetTransfer,
+} from '../audio-presets/catalog';
+
 const THEME_STORAGE_KEY = 'sniptale-theme-preference';
 const LOCALE_STORAGE_KEY = 'sniptale-locale-preference';
 
@@ -91,7 +97,7 @@ export async function readSettingsTransferSnapshot(
     loadAISettings(),
     getPromptTemplates(),
     loadTemplateOrder(),
-    browserStorage.local.get([THEME_STORAGE_KEY, LOCALE_STORAGE_KEY]),
+    browserStorage.local.get([THEME_STORAGE_KEY, LOCALE_STORAGE_KEY, AUDIO_PRESET_STORAGE_KEY]),
   ]);
 
   const [effectCatalogs, glCatalogs, visualPreferences] = await Promise.all([
@@ -100,7 +106,10 @@ export async function readSettingsTransferSnapshot(
     readVisualCatalogPreferences(permit),
   ]);
   const effects = await Promise.all(effectCatalogs.map(encodeEffectSettingsEntry));
+  const audioPresets = parseAudioPresetCatalog(preferences[AUDIO_PRESET_STORAGE_KEY]);
+  if (!audioPresets) throw new TypeError('Audio preset catalogue is unavailable.');
   const domains: Record<string, SettingsTransferDomainPayload> = {
+    'styles.audio-effects': payload(projectAudioPresetTransfer(audioPresets)),
     'interface.preferences': payload({
       theme: preferences[THEME_STORAGE_KEY] ?? 'system',
       locale: preferences[LOCALE_STORAGE_KEY] ?? 'ru',
@@ -251,6 +260,16 @@ export function collectSettingsTransferDependencies(
     );
     if (dependencies.length > 0) result[`${domainId}.defaults`] = dependencies;
   }
+  const audio = asRecord(domains['styles.audio-effects']?.data);
+  const audioPreferences = asRecord(audio?.['preferences']);
+  const rawDisabledIds = audioPreferences?.['disabledIds'];
+  const disabledAudioIds: unknown[] = Array.isArray(rawDisabledIds) ? rawDisabledIds : [];
+  const audioDependencies = availableReferences(
+    [audioPreferences?.['defaultId'], ...disabledAudioIds],
+    itemIds(audio?.['presets']),
+    'styles.audio-effects.items.'
+  );
+  if (audioDependencies.length) result['styles.audio-effects.preferences'] = audioDependencies;
   return result;
 }
 
@@ -330,6 +349,7 @@ export function collectSettingsTransferDynamicItems(
   addItems(result, domains, 'styles.video-effects', 'items', locale);
   addItems(result, domains, 'styles.video-effects', 'transitionItems', locale);
   addItems(result, domains, 'styles.gradients', 'presets', locale);
+  addItems(result, domains, 'styles.audio-effects', 'presets', locale);
   addItems(result, domains, 'ai.providers', 'items', locale);
   addItems(result, domains, 'ai.models', 'items', locale, (item) =>
     typeof item['providerId'] === 'string' ? [`ai.providers.items.${item['providerId']}`] : []

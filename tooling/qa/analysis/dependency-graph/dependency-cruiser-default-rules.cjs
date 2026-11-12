@@ -117,10 +117,12 @@ module.exports = [
     from: {},
     to: {
       couldNotResolve: true,
-      // Vite embeds this exact declared package asset before sandbox startup.
+      // Vite embeds the exact declared resource and provides these fixed audio module IDs.
       pathNot:
         '[?](?:inline|raw|url)$' +
-        '|^@lottiefiles/dotlottie-web/dotlottie-player[.]wasm[?]url&inline$',
+        '|^@lottiefiles/dotlottie-web/dotlottie-player[.]wasm[?]url&inline$' +
+        '|^sniptale:audio-runtime/(?:faust|rnnoise|pitch)$' +
+        '|^sniptale:audio-test-assets$',
     },
   },
   {

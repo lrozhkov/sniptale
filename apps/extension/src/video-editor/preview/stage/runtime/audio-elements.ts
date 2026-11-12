@@ -1,3 +1,4 @@
+import { hasReviewAudioProcessing } from '../../../../workflows/video-review/audio-clip-processing';
 import { hasCameraMediaAt } from '../../../../features/video/project/camera/animation';
 import { getVideoProjectSceneEdgeAudioGain } from '../../../../features/video/project/scene/edge-fades';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -20,6 +21,7 @@ import {
   ensurePreviewAudioGraphNode,
   setPreviewAudioClipGain,
   setPreviewAudioNodeGain,
+  setPreviewAudioNodeProcessing,
   type PreviewAudioGraphState,
 } from './playback/audio-graph';
 import {
@@ -80,6 +82,8 @@ function syncPreviewAudioClip(params: PreviewStageAudioClipSyncParams): void {
     return;
   }
 
+  const processed = hasReviewAudioProcessing(clip.audioProcessing);
+  setPreviewAudioNodeProcessing(node, processed);
   const gain =
     !params.mutePreviewAudio && isClipActive
       ? getClipCompositeAudioGain(project, clip, currentTime) *
@@ -87,7 +91,7 @@ function syncPreviewAudioClip(params: PreviewStageAudioClipSyncParams): void {
       : 0;
   setPreviewAudioNodeGain(node, gain);
 
-  if (isPlaying && isClipActive && gain > 0) {
+  if (!processed && isPlaying && isClipActive && gain > 0) {
     requestPreviewAudioDriverPlayback(audioGraphState, clip.id, audio, logger);
     return;
   }

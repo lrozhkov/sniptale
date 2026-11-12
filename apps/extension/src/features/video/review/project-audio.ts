@@ -407,6 +407,7 @@ function convertResultClip(args: {
   const converted: VideoProjectAudioClip = {
     id,
     sourceInstanceId: id,
+    ...(clip.audioProcessing ? { audioProcessing: structuredClone(clip.audioProcessing) } : {}),
     type: 'AUDIO',
     trackId: track.id,
     timelineLaneId: track.logicalLanes?.[0]?.id ?? null,

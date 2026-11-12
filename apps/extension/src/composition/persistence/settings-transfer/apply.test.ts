@@ -50,6 +50,7 @@ beforeEach(() => {
   mocks.syncSet.mockResolvedValue(undefined);
   mocks.syncRemove.mockResolvedValue(undefined);
   mocks.localRemove.mockResolvedValue(undefined);
+  mocks.localSet.mockResolvedValue(undefined);
 });
 
 describe('settings transfer AI owner transaction', () => {
@@ -782,3 +783,98 @@ it('applies full-page defaults without changing regular image defaults', async (
     undefined
   );
 });
+
+import {
+  parseAudioPresetCatalog,
+  restoreAudioPresetCatalog,
+  AUDIO_PRESET_STORAGE_KEY,
+} from '../audio-presets/catalog';
+import { listBuiltInAudioPresets } from '../../../features/video/audio/effects/presets';
+it(
+  'applies audio preferences without replacing unchanged ' +
+    'source incarnations and invalidates stale writers',
+  async () => {
+    const preset = listBuiltInAudioPresets()[0]!.preset;
+    const current = restoreAudioPresetCatalog(parseAudioPresetCatalog(undefined)!, {
+      presets: [{ id: 'a', name: preset.name, preset }],
+      preferences: { defaultId: null, disabledIds: [] },
+    })!;
+    mocks.localGet.mockResolvedValue({ [AUDIO_PRESET_STORAGE_KEY]: current });
+    await applySettingsTransferDomains({
+      domains: {
+        'styles.audio-effects': {
+          schemaVersion: 1,
+          data: { preferences: { defaultId: 'a', disabledIds: [] } },
+        },
+      },
+      summary: emptySummary(),
+    });
+    const saved = mocks.localSet.mock.calls.at(-1)![0][AUDIO_PRESET_STORAGE_KEY];
+    expect(parseAudioPresetCatalog(saved)).not.toBeNull();
+    expect(saved.preferences).toEqual({ defaultId: 'a', disabledIds: [] });
+    expect(saved.presets).toEqual(current.presets);
+    expect(saved.generation).not.toBe(current.generation);
+  }
+);
+it('refuses an invalid audio default before any local or sync writes', async () => {
+  await expect(
+    applySettingsTransferDomains({
+      domains: {
+        'styles.audio-effects': {
+          schemaVersion: 1,
+          data: { presets: [], preferences: { defaultId: 'missing', disabledIds: [] } },
+        },
+      },
+      summary: emptySummary(),
+    })
+  ).rejects.toThrow('Audio preset references are invalid.');
+  expect(mocks.localSet).not.toHaveBeenCalled();
+  expect(mocks.syncSet).not.toHaveBeenCalled();
+});
+it('does not touch audio catalogue or tokens when another Settings domain is selected', async () => {
+  await applySettingsTransferDomains({
+    domains: { 'interface.preferences': { schemaVersion: 1, data: { theme: 'dark' } } },
+    summary: emptySummary(),
+  });
+  expect(mocks.localSet.mock.calls[0]![0]).not.toHaveProperty(AUDIO_PRESET_STORAGE_KEY);
+});
+
+it(
+  'restores audio values and tokens after a partially committed ' +
+    'local write and accepts an explicit retry',
+  async () => {
+    const preset = listBuiltInAudioPresets()[0]!.preset;
+    const current = restoreAudioPresetCatalog(parseAudioPresetCatalog(undefined)!, {
+      presets: [{ id: 'a', name: preset.name, preset }],
+      preferences: { defaultId: null, disabledIds: [] },
+    })!;
+    const stored: Record<string, unknown> = {
+      [AUDIO_PRESET_STORAGE_KEY]: structuredClone(current),
+    };
+    mocks.localGet.mockImplementation(async (keys: string[]) =>
+      Object.fromEntries(keys.filter((key) => key in stored).map((key) => [key, stored[key]]))
+    );
+    mocks.localSet.mockImplementation(async (values: Record<string, unknown>) => {
+      Object.assign(stored, structuredClone(values));
+    });
+    mocks.localSet.mockImplementationOnce(async (values: Record<string, unknown>) => {
+      Object.assign(stored, structuredClone(values));
+      throw new Error('Partial audio write');
+    });
+    const domains = {
+      'styles.audio-effects': {
+        schemaVersion: 1,
+        data: { preferences: { defaultId: 'a', disabledIds: [] } },
+      },
+    };
+    await expect(
+      applySettingsTransferDomains({ domains, summary: emptySummary() })
+    ).rejects.toThrow('Partial audio write');
+    expect(stored[AUDIO_PRESET_STORAGE_KEY]).toEqual(current);
+    await applySettingsTransferDomains({ domains, summary: emptySummary() });
+    const accepted = parseAudioPresetCatalog(stored[AUDIO_PRESET_STORAGE_KEY])!;
+    expect(accepted.preferences.defaultId).toBe('a');
+    expect(accepted.presets).toEqual(current.presets);
+    expect(accepted.generation).not.toBe(current.generation);
+  }
+);

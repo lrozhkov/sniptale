@@ -36,7 +36,9 @@
   "common": {
     "units": {
       "count": "items",
-      "hz": "Hz"
+      "hz": "Hz",
+      "db": "dB",
+      "semitones": "st"
     },
     "actions": {
       "details": "Details",
@@ -639,7 +641,8 @@
         "telemetry": "Action history",
         "permissions": "Permissions",
         "privacy": "Privacy",
-        "secretProtection": "Secret protection"
+        "secretProtection": "Secret protection",
+        "audio": "Audio"
       },
       "documentTitle": "Sniptale — Settings",
       "appearance": "Interface",
@@ -1682,7 +1685,8 @@
         "aiPromptTemplates": "Prompt templates",
         "systemVoice": "Voice input",
         "systemNative": "Sniptale app",
-        "accessCaptureAssets": "Capture assets"
+        "accessCaptureAssets": "Capture assets",
+        "stylesAudioEffects": "Audio presets"
       },
       "fields": {
         "animationItems": "Lottie animation packages",
@@ -11086,6 +11090,77 @@
       "fitToWidth": "Fit to window width",
       "loading": "Loading snapshot...",
       "missingSnapshotId": "Missing snapshot id."
+    }
+  },
+  "audioProcessing": {
+    "title": "Audio processing",
+    "denoise": "Noise reduction",
+    "pitchEnabled": "Pitch shift",
+    "pitch": "Pitch",
+    "addEffect": "Add effect",
+    "chooseEffect": "Choose effect",
+    "wet": "Wet signal",
+    "parameters": "Parameters",
+    "moveUp": "Move effect up",
+    "moveDown": "Move effect down",
+    "remove": "Remove effect",
+    "reset": "Reset effect",
+    "resetAll": "Clear processing",
+    "mixed": "These source fragments have different processing. Changes here apply to all of them.",
+    "sourceScope": "Applies to all fragments of this source.",
+    "unavailable": "This saved processor version is unavailable. Bypass, remove or reset it to continue.",
+    "invalid": "These processing settings are invalid. Restore the previous values.",
+    "refused": "Could not apply processing. Check the selected source and track locks.",
+    "effects": {
+      "eq": "Equalizer",
+      "highpass": "High-pass filter",
+      "lowpass": "Low-pass filter",
+      "compressor": "Compressor",
+      "limiter": "Limiter",
+      "delay": "Delay",
+      "reverb": "Reverb",
+      "saturation": "Saturation"
+    },
+    "controls": {
+      "frequency": "Frequency",
+      "gain": "Gain",
+      "q": "Bandwidth Q",
+      "attack": "Attack",
+      "release": "Release",
+      "threshold": "Threshold",
+      "ratio": "Ratio",
+      "ceiling": "Ceiling",
+      "duration": "Delay time",
+      "feedback": "Feedback",
+      "damping": "Damping",
+      "drive": "Drive"
+    },
+    "presets": {
+      "title": "Sound preset",
+      "custom": "Custom sound",
+      "modified": "Modified",
+      "save": "Save as new preset",
+      "rename": "Rename preset",
+      "remove": "Delete preset",
+      "export": "Export current sound",
+      "import": "Import preset",
+      "importFile": "Audio preset file",
+      "name": "Preset name",
+      "cancel": "Cancel",
+      "confirm": "Save preset",
+      "loadFailed": "Could not load audio presets. The current project is unchanged.",
+      "writeFailed": "Could not save the preset. The catalog may have changed. Retry with the current values.",
+      "retry": "Reload presets",
+      "fileName": "Audio preset",
+      "speech": "Speech",
+      "telephone": "Telephone",
+      "echo": "Echo",
+      "room": "Room",
+      "user": "User preset",
+      "builtin": "Built-in preset",
+      "notAvailable": "Unavailable",
+      "clearDefault": "No default preset",
+      "exportPreset": "Download preset"
     }
   }
 }

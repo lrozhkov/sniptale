@@ -982,6 +982,29 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       );
     },
   },
+  contractOnlyMigration({
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 34, to: 35 },
+      { domainId: 'videoProjects', from: 11, to: 12 },
+    ],
+    fromDatabaseVersion: 56,
+    toDatabaseVersion: 57,
+    stores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+      VIDEO_PROJECTS_STORE,
+      VIDEO_PROJECT_REVISIONS_STORE,
+    ],
+    validationStores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+      VIDEO_PROJECTS_STORE,
+      VIDEO_PROJECT_REVISIONS_STORE,
+    ],
+    diagnostic: 'Audio processing project stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

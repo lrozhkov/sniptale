@@ -186,13 +186,14 @@ export function useReviewAdvancedContent(
     flush,
     endTyping,
     reset,
-    commands: reviewContentCommands(stage),
+    commands: reviewContentCommands(stage, endTyping),
   };
 }
 
 /** Authored mutations share the debounced history writer, independent of its React lifecycle. */
 function reviewContentCommands(
-  stage: (mutation: ContentMutation, typing?: ReviewTextTypingTarget) => void
+  stage: (mutation: ContentMutation, typing?: ReviewTextTypingTarget) => void,
+  endTyping: () => void
 ) {
   return {
     setCameraFollowDefaults: (
@@ -315,7 +316,12 @@ function reviewContentCommands(
         return canvas ? { ...rest, canvas } : rest;
       }),
     setAudio: (
-      update: (audio: QuickEditAdvancedState['audio']) => QuickEditAdvancedState['audio']
-    ) => stage((content) => ({ ...content, audio: update(content.audio) })),
+      update: (audio: QuickEditAdvancedState['audio']) => QuickEditAdvancedState['audio'],
+      discrete = false
+    ) => {
+      if (discrete) endTyping();
+      stage((content) => ({ ...content, audio: update(content.audio) }));
+      if (discrete) endTyping();
+    },
   };
 }

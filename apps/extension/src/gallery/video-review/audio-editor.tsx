@@ -1,3 +1,5 @@
+import { useAudioPresets } from '../../composition/audio-preset-resources/use-audio-presets';
+import { AudioPresetControls } from '../../ui/audio/preset-controls';
 import { AudioTakeLevelFields, AudioTakeFadeFields } from '../../ui/audio/take-fields';
 import {
   reviewInspectorActions,
@@ -32,6 +34,8 @@ export function ReviewAudioClipEditor(props: {
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
   onDelete(): void;
 }) {
+  const ownerKey = JSON.stringify(['gallery-take', props.clip.id, props.clip.assetId]);
+  const presets = useAudioPresets(ownerKey, props.clip.audioProcessing);
   const map = useContext(ReviewIntervalMap);
   const sections = [
     {
@@ -42,6 +46,16 @@ export function ReviewAudioClipEditor(props: {
         <>
           <ReviewInspectorColumns>
             <AudioTakeLevelFields
+              presetControls={
+                <AudioPresetControls
+                  key={ownerKey}
+                  {...presets}
+                  hasValue={!!props.clip.audioProcessing}
+                  disabled={props.busy}
+                  onApply={(audioProcessing) => props.onPatch({ audioProcessing })}
+                />
+              }
+              createDefaultProcessing={presets.createDefaultProcessing}
               clip={props.clip}
               disabled={props.busy}
               showTempo={props.lane === 'voiceover'}

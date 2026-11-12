@@ -11,6 +11,7 @@ vi.mock('./palettes/view', () => ({ PalettesSettings: () => <div>palettes-owner<
 vi.mock('./surface-styles/view', () => ({
   SurfaceStylePresetsSettings: () => <div>surfaces-owner</div>,
 }));
+vi.mock('./audio/view', () => ({ AudioPresetsSettings: () => <div>audio-owner</div> }));
 vi.mock('./gradients/view', () => ({
   GradientPresetsSettings: () => <div>gradients-owner</div>,
 }));
@@ -67,3 +68,14 @@ it.each(['tools', 'unknown', undefined])(
     act(() => root.unmount());
   }
 );
+
+it('opens the audio preset collection through its shared resource route', () => {
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  act(() => root.render(<EditorResourcesContent view="audio" />));
+  expect(host.textContent).toContain('audio-owner');
+  expect(host.querySelector('[aria-current="page"]')?.textContent).toBe(
+    'settings.navigation.views.audio'
+  );
+  act(() => root.unmount());
+});

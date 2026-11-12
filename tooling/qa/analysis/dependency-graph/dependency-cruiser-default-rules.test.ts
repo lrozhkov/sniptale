@@ -167,3 +167,26 @@ it('recognizes only the exact packaged Lottie inline WASM query', () => {
   ])
     expect(new RegExp(pattern).test(other)).toBe(false);
 });
+
+it('recognizes only the four fixed audio modules owned by the Vite build plugin', () => {
+  const rules = loadRules();
+  const pattern: unknown = rules.find((rule) => rule.name === 'not-to-unresolvable')?.to.pathNot;
+  if (typeof pattern !== 'string') throw new Error('Missing resource recognition.');
+  const matches = new RegExp(pattern);
+  for (const id of [
+    'sniptale:audio-runtime/faust',
+    'sniptale:audio-runtime/rnnoise',
+    'sniptale:audio-runtime/pitch',
+    'sniptale:audio-test-assets',
+  ])
+    expect(matches.test(id)).toBe(true);
+  for (const id of [
+    'sniptale:audio-runtime/other',
+    'sniptale:audio-runtime/faust/other',
+    'sniptale:audio-runtime/faust?remote=1',
+    'sniptale:audio-test-assets/other',
+    'https://example.com/sniptale:audio-runtime/faust',
+    'missing-module',
+  ])
+    expect(matches.test(id)).toBe(false);
+});

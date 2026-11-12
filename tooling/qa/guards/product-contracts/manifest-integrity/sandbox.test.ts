@@ -68,7 +68,7 @@ function createBaseManifest() {
     },
     background: { service_worker: 'apps/extension/src/background/index.ts' },
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'self';",
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
       sandbox: SANDBOX_CSP,
     },
     icons: { 16: 'icons/icon-16.png' },

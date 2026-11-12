@@ -1,10 +1,15 @@
+import { createAudioEffectInstance } from '../../features/video/audio/effects/catalog';
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ReviewAudioClipBuffer } from '../../workflows/video-review/audio-playback-engine';
+import type {
+  ReviewAudioEngine,
+  ReviewAudioPreparedClip,
+  ReviewAudioClipBuffer,
+} from '../../workflows/video-review/audio-playback-engine';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
-import { createReviewTimeMap } from '../../features/video/review/timeline';
+import { buildReviewTimeMap, createReviewTimeMap } from '../../features/video/review/timeline';
 import { FakeEngine, renderRuntime } from './review-audio-runtime.test-support';
 
 const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
@@ -712,4 +717,366 @@ it('ignores an unmapped cut sample and resumes clock comparison on the next reta
   video.currentTime = 6.2;
   await act(async () => root.render(<Harness outputTime={3.2} />));
   expect(engine.scheduled).toHaveLength(1);
+});
+
+it('primes processed music at1x before Play and adopts it without a second preparation', async () => {
+  const engine = new FakeEngine();
+  const dispose = vi.fn(),
+    schedule = vi.fn(
+      (_: import('../../features/video/review/advanced/audio-plan').QuickEditClipSchedule) => ({
+        stop: vi.fn(),
+      })
+    );
+  const prepareProcessedClip = vi.fn(async () => ({ dispose, schedule }));
+  Object.assign(engine, { prepareProcessedClip });
+  const decode = vi.spyOn(engine, 'decode');
+  const music = [
+    clip({
+      timelineStart: 0,
+      audioProcessing: {
+        version: 1,
+        bypassed: false,
+        effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+      },
+    }),
+  ];
+  const video = document.createElement('video');
+  video.currentTime = 1.03;
+  const f = renderRuntime({
+    createEngine: () => engine,
+    playing: false,
+    outputTime: 1,
+    music,
+    video: { current: video },
+    sourceToResult: (time) => time,
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+  expect(prepareProcessedClip).toHaveBeenCalledOnce();
+  expect(decode).not.toHaveBeenCalled();
+  expect(schedule).not.toHaveBeenCalled();
+  const stops = engine.stops;
+  await act(async () => root.render(<f.Harness playing />));
+  expect(engine.stops).toBe(stops);
+  expect(prepareProcessedClip).toHaveBeenCalledOnce();
+  expect(schedule).toHaveBeenCalledOnce();
+  const selected = schedule.mock.calls[0]!;
+  expect(selected).toHaveLength(1);
+  // Audio-clock subtraction can differ by floating-point ULPs, far below one PCM sample.
+  expect(selected[0]!.offset).toBeCloseTo(1.03, 12);
+  expect(selected[0]!.duration).toBeCloseTo(2.97, 12);
+  await act(async () => root.render(<f.Harness playing={false} />));
+  expect(dispose).toHaveBeenCalledOnce();
+});
+
+it('discards cancelled processed preparation and preserves the unprocessed schedule for explicit bypass', async () => {
+  const engine = new FakeEngine();
+  const schedule = vi.fn(() => ({ stop: vi.fn() })),
+    dispose = vi.fn();
+  let resolve!: (value: ReviewAudioPreparedClip) => void;
+  const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+    () =>
+      new Promise((yes) => {
+        resolve = yes;
+      })
+  );
+  Object.assign(engine, { prepareProcessedClip });
+  const processing = {
+    version: 1 as const,
+    bypassed: false,
+    effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+  };
+  const music = [clip({ timelineStart: 0, audioProcessing: processing })];
+  const onFailure = vi.fn();
+  const f = renderRuntime({
+    createEngine: () => engine,
+    outputTime: 1,
+    music,
+    resolveAsset: async () => new Blob(),
+    onFailure,
+  });
+  await act(async () => root.render(<f.Harness />));
+  let ready!: Promise<boolean>;
+  await act(async () => {
+    ready = f.controls.preparePlayback();
+  });
+  expect(prepareProcessedClip).toHaveBeenCalledOnce();
+  await act(async () => root.render(<f.Harness seekRevision={1} outputTime={1.1} />));
+  expect(prepareProcessedClip.mock.calls[0]![3].aborted).toBe(true);
+  await act(async () => {
+    resolve({ schedule, dispose });
+    expect(await ready).toBe(false);
+  });
+  expect(schedule).not.toHaveBeenCalled();
+  expect(dispose).toHaveBeenCalled();
+  expect(onFailure).not.toHaveBeenCalled();
+  await act(async () =>
+    root.render(
+      <f.Harness
+        playing
+        seekRevision={1}
+        music={[{ ...music[0]!, audioProcessing: { ...processing, bypassed: true } }]}
+      />
+    )
+  );
+  expect(engine.scheduled).toHaveLength(1);
+});
+it('limits processed preparation to the current lookahead and releases it on Worklet failure', async () => {
+  vi.useFakeTimers();
+  try {
+    const engine = new FakeEngine();
+    const dispose = vi.fn(),
+      schedule = vi.fn(() => ({ stop: vi.fn() }));
+    const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+      async () => ({ dispose, schedule })
+    );
+    Object.assign(engine, { prepareProcessedClip });
+    const music = [
+      clip({
+        timelineStart: 4,
+        audioProcessing: {
+          version: 1,
+          bypassed: false,
+          effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+        },
+      }),
+    ];
+    const onFailure = vi.fn();
+    const f = renderRuntime({
+      createEngine: () => engine,
+      outputTime: 0,
+      music,
+      resolveAsset: async () => new Blob(),
+      onFailure,
+    });
+    await act(async () => root.render(<f.Harness />));
+    await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+    expect(prepareProcessedClip).not.toHaveBeenCalled();
+    await act(async () => root.render(<f.Harness playing />));
+    engine.currentTime = 102.5;
+    await act(async () => vi.advanceTimersByTimeAsync(250));
+    expect(prepareProcessedClip).toHaveBeenCalledOnce();
+    expect(schedule).toHaveBeenCalledWith(
+      expect.objectContaining({ when: 104, offset: 0, duration: 4 })
+    );
+    await act(async () => prepareProcessedClip.mock.calls[0]![4](new Error('underrun')));
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(engine.scheduled).toHaveLength(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('prepares original source at whole cut/rate intervals and bypass alone restores the raw route', async () => {
+  const engine = new FakeEngine();
+  const setOriginalProcessing = vi.fn(),
+    dispose = vi.fn();
+  const scheduled: {
+    entry: import('../../features/video/review/advanced/audio-plan').QuickEditAudioPlanEntry;
+    schedule: import('../../features/video/review/advanced/audio-plan').QuickEditClipSchedule;
+  }[] = [];
+  const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+    async (_blob, entry) => ({
+      dispose,
+      schedule(schedule) {
+        scheduled.push({ entry, schedule });
+        return { stop: vi.fn() };
+      },
+    })
+  );
+  Object.assign(engine, { prepareProcessedClip, setOriginalProcessing });
+  const resolveAsset = vi.fn();
+  const source = new Blob(['QA source']);
+  const edits = [
+    { id: 'cut', kind: 'cut' as const, start: 2, end: 3, requestedStart: 2, requestedEnd: 3 },
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 3,
+      end: 7,
+      requestedStart: 3,
+      requestedEnd: 7,
+      rate: 2 as const,
+      audio: 'speed' as const,
+    },
+  ];
+  const processing = {
+    version: 1 as const,
+    bypassed: false,
+    effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+  };
+  const original = {
+    muted: false,
+    volume: 0.8,
+    audioProcessing: processing,
+    ranges: [{ id: 'r', start: 4, end: 5, volume: 0.25 }],
+  };
+  const f = renderRuntime({
+    createEngine: () => engine,
+    outputTime: 2.25,
+    original,
+    originalSource: { file: source, segments: buildReviewTimeMap(10, edits), edits },
+    resolveAsset,
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+  expect(setOriginalProcessing).toHaveBeenLastCalledWith(true);
+  expect(prepareProcessedClip).toHaveBeenCalledTimes(2);
+  expect(prepareProcessedClip.mock.calls[0]!.slice(0, 3)).toEqual([
+    source,
+    expect.objectContaining({ lane: 'original', sourceOffset: 3, duration: 2, playbackRate: 2 }),
+    0.25,
+  ]);
+  expect(resolveAsset).not.toHaveBeenCalled();
+  await act(async () => root.render(<f.Harness playing />));
+  expect(prepareProcessedClip).toHaveBeenCalledTimes(2);
+  expect(scheduled[0]!.schedule).toMatchObject({
+    offset: 3.5,
+    duration: 3.5,
+    envelopeMode: 'step',
+    envelope: [
+      [100, 0.8],
+      [100.25, 0.2],
+      [100.75, 0.8],
+    ],
+  });
+  await act(async () =>
+    root.render(
+      <f.Harness
+        playing
+        original={{ ...original, audioProcessing: { ...processing, bypassed: true } }}
+      />
+    )
+  );
+  expect(setOriginalProcessing).toHaveBeenLastCalledWith(false);
+  expect(dispose).toHaveBeenCalledTimes(2);
+  expect(engine.scheduled).toHaveLength(0);
+});
+it('refuses original processing without its declared source instead of starting dry playback', async () => {
+  const onFailure = vi.fn(),
+    createEngine = vi.fn(() => new FakeEngine());
+  const f = renderRuntime({
+    createEngine,
+    onFailure,
+    original: {
+      muted: false,
+      volume: 1,
+      audioProcessing: {
+        version: 1,
+        bypassed: false,
+        effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+      },
+    },
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(false));
+  expect(onFailure).toHaveBeenCalledOnce();
+  expect(createEngine).not.toHaveBeenCalled();
+});
+
+it.each(['bypass', 'all-effects-disabled'] as const)(
+  'cancels the playing DSP stream for %s and ignores its late failure',
+  async (mode) => {
+    const engine = new FakeEngine();
+    const dispose = vi.fn(),
+      schedule = vi.fn(() => ({ stop: vi.fn() }));
+    const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+      async () => ({ dispose, schedule })
+    );
+    Object.assign(engine, { prepareProcessedClip });
+    const effect = createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1');
+    const processing = { version: 1 as const, bypassed: false, effects: [effect] };
+    const originalClip = clip({ timelineStart: 0, duration: 10, audioProcessing: processing });
+    const onFailure = vi.fn();
+    const f = renderRuntime({
+      createEngine: () => engine,
+      playing: true,
+      outputTime: 0,
+      voiceover: [originalClip],
+      resolveAsset: async () => new Blob(),
+      onFailure,
+    });
+    await act(async () => root.render(<f.Harness />));
+    expect(schedule).toHaveBeenCalledOnce();
+    const active = prepareProcessedClip.mock.calls[0]!;
+    engine.currentTime += 1.5;
+    const inactive =
+      mode === 'bypass'
+        ? { ...processing, bypassed: true }
+        : { ...processing, effects: [{ ...effect, enabled: false }] };
+    await act(async () =>
+      root.render(
+        <f.Harness outputTime={1.5} voiceover={[{ ...originalClip, audioProcessing: inactive }]} />
+      )
+    );
+    expect(active[3].aborted).toBe(true);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(prepareProcessedClip).toHaveBeenCalledOnce();
+    expect(engine.scheduled).toHaveLength(1);
+    await act(async () => active[4](new Error('Audio processing underrun.')));
+    expect(onFailure).not.toHaveBeenCalled();
+    expect(engine.scheduled).toHaveLength(1);
+  }
+);
+
+it('retains one media-element graph across effect replay and releases it on real unmount', async () => {
+  const engine = new FakeEngine();
+  const createEngine = vi.fn(() => engine);
+  const f = renderRuntime({
+    createEngine,
+    playing: true,
+    outputTime: 0,
+    voiceover: [clip({ timelineStart: 0 })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () =>
+    root.render(
+      <StrictMode>
+        <f.Harness />
+      </StrictMode>
+    )
+  );
+  expect(createEngine).toHaveBeenCalledOnce();
+  expect(engine.dispose).not.toHaveBeenCalled();
+  await act(async () => root.render(null));
+  expect(engine.dispose).toHaveBeenCalledOnce();
+});
+
+it('starts prepared audio before the native Play request and adopts it on the later React playing commit', async () => {
+  const engine = new FakeEngine(),
+    schedule = vi.fn(() => ({ stop: vi.fn() })),
+    dispose = vi.fn();
+  const prepareProcessedClip = vi.fn<NonNullable<ReviewAudioEngine['prepareProcessedClip']>>(
+    async () => ({ schedule, dispose })
+  );
+  Object.assign(engine, { prepareProcessedClip });
+  const voiceover = [
+    clip({
+      timelineStart: 0,
+      audioProcessing: {
+        version: 1,
+        bypassed: false,
+        effects: [createAudioEffectInstance('eq', 'b1b80118-71a9-4e59-89d2-a95ba0139aa1')],
+      },
+    }),
+  ];
+  const f = renderRuntime({
+    createEngine: () => engine,
+    outputTime: 0,
+    voiceover,
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<f.Harness />));
+  await act(async () => expect(await f.controls.preparePlayback()).toBe(true));
+  await act(async () => f.controls.startPlayback());
+  expect(schedule).toHaveBeenCalledOnce();
+  expect(dispose).not.toHaveBeenCalled();
+  engine.currentTime += 0.8;
+  await act(async () => root.render(<f.Harness playing outputTime={0.8} />));
+  expect(schedule).toHaveBeenCalledOnce();
+  expect(prepareProcessedClip).toHaveBeenCalledOnce();
+  await act(async () => root.render(<f.Harness playing={false} outputTime={0.8} />));
+  expect(dispose).toHaveBeenCalledOnce();
 });

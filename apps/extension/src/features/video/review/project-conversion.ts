@@ -286,41 +286,52 @@ export function planReviewProjectConversion(args: {
   const originalAudioEnabled = application.originalAudioApplied && !original.muted;
   const master = <T extends VideoProjectVideoClip | VideoProjectAudioClip>(clip: T) => ({
     ...clip,
+    ...(original.audioProcessing && (clip.type === 'AUDIO' || timeline.audioClips.length === 0)
+      ? { audioProcessing: structuredClone(original.audioProcessing) }
+      : {}),
     volume: original.volume,
     audioGainStart: original.volume,
     audioGainEnd: original.volume,
     muted: clip.muted || (clip.type === 'VIDEO' && !originalAudioEnabled),
   });
-  const contentVersion = camera.clips.some((clip) => clip.cameraShadowDirection !== undefined)
-    ? 47
-    : camera.clips.some(
-          (clip) =>
-            clip.cameraScreenBehavior !== undefined ||
-            clip.cameraPositions?.some((position) => position.cameraScreenBehavior !== undefined)
-        )
-      ? 46
-      : externalAudio.clips.some((clip) => clip.transcript !== undefined)
-        ? 44
-        : compositionJoins.length
-          ? 40
-          : annotations.clips.length
-            ? 38
-            : cursor?.sourceObservations
-              ? 33
-              : camera.clips.length
-                ? 32
-                : externalAudio.sourceVoiceoverDocuments.length ||
-                    externalAudio.originalSpeech !== undefined
-                  ? 31
-                  : externalAudio.clips.length
-                    ? 30
-                    : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
-                      ? 29
-                      : original.ranges?.length || sourceMutes.length
-                        ? 28
-                        : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
-                          ? 27
-                          : 26;
+  const hasAudioProcessing =
+    original.audioProcessing !== undefined ||
+    externalAudio.clips.some((clip) => clip.audioProcessing !== undefined) ||
+    externalAudio.sourceVoiceoverDocuments.some(
+      (document) => document.take.audioProcessing !== undefined
+    );
+  const contentVersion = hasAudioProcessing
+    ? 53
+    : camera.clips.some((clip) => clip.cameraShadowDirection !== undefined)
+      ? 47
+      : camera.clips.some(
+            (clip) =>
+              clip.cameraScreenBehavior !== undefined ||
+              clip.cameraPositions?.some((position) => position.cameraScreenBehavior !== undefined)
+          )
+        ? 46
+        : externalAudio.clips.some((clip) => clip.transcript !== undefined)
+          ? 44
+          : compositionJoins.length
+            ? 40
+            : annotations.clips.length
+              ? 38
+              : cursor?.sourceObservations
+                ? 33
+                : camera.clips.length
+                  ? 32
+                  : externalAudio.sourceVoiceoverDocuments.length ||
+                      externalAudio.originalSpeech !== undefined
+                    ? 31
+                    : externalAudio.clips.length
+                      ? 30
+                      : documents.textDocuments.some((entry) => entry.durationMode !== undefined)
+                        ? 29
+                        : original.ranges?.length || sourceMutes.length
+                          ? 28
+                          : timeline.videoClips.some((clip) => (clip.playbackRate ?? 1) < 0.1)
+                            ? 27
+                            : 26;
   const sceneVersion = minimumConvertedSceneSchemaVersion(scene);
   const minimumVersion = sceneVersion > contentVersion ? sceneVersion : contentVersion;
   let project: VideoProject = {

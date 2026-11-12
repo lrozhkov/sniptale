@@ -1,5 +1,8 @@
+import { sourceAudioGainAtTime, type AudioGainRange } from '../../audio/source-attenuation';
+import type { ReviewTimeSegment } from '../time-segment';
+import type { ReviewEdit } from '../types';
 import { buildAudioFadeEnvelope } from '../../audio/fades';
-import type { QuickEditAudioClip } from './types';
+import type { QuickEditOriginalAudio, QuickEditAudioClip } from './types';
 import type { ActionSoundSampleId } from '../action-audio-catalog';
 import { iterateReviewActionAudioCues, type ReviewActionAudioPlan } from '../action-audio';
 
@@ -26,7 +29,9 @@ export interface QuickEditActionAudioSchedule {
 
 /** One scheduled external-audio entry in output time; consumed by preview and export. */
 export interface QuickEditAudioPlanEntry {
-  lane: 'voiceover' | 'music' | 'action';
+  audioProcessing?: import('@sniptale/runtime-contracts/audio-effects').AudioProcessing;
+  lane: 'voiceover' | 'music' | 'action' | 'original';
+  sourceGainRanges?: readonly AudioGainRange[];
   clipId: string;
   source: QuickEditAudioSource;
   timelineStart: number;
@@ -50,6 +55,7 @@ export function buildQuickEditAudioPlan(args: {
   return (['voiceover', 'music'] as const).flatMap((lane) =>
     args[lane].map((clip) => ({
       lane,
+      ...(clip.audioProcessing ? { audioProcessing: structuredClone(clip.audioProcessing) } : {}),
       clipId: clip.id,
       source: { kind: 'project' as const, assetId: clip.assetId },
       timelineStart: clip.timelineStart,
@@ -62,6 +68,50 @@ export function buildQuickEditAudioPlan(args: {
       ...(clip.fadePhase ? { fadePhase: clip.fadePhase } : {}),
     }))
   );
+}
+
+/** Original DSP retains each whole visible source interval, independent of the requested seek. */
+export function buildQuickEditOriginalAudioPlan(args: {
+  original: QuickEditOriginalAudio;
+  segments: readonly ReviewTimeSegment[];
+  edits: readonly ReviewEdit[];
+  sourceId: string;
+}): QuickEditAudioPlanEntry[] {
+  if (!args.original.audioProcessing) return [];
+  return args.segments
+    .filter((segment) => segment.kind !== 'cut')
+    .map((segment) => ({
+      lane: 'original',
+      clipId: `original:${segment.sourceStart}:${segment.sourceEnd}:${segment.rate}`,
+      source: { kind: 'project', assetId: args.sourceId },
+      timelineStart: segment.resultStart,
+      duration: segment.resultEnd - segment.resultStart,
+      sourceOffset: segment.sourceStart,
+      playbackRate: segment.rate,
+      volume:
+        args.original.muted ||
+        args.edits.some(
+          (edit) =>
+            edit.kind === 'speed' &&
+            edit.audio === 'mute' &&
+            edit.start <= segment.sourceStart &&
+            edit.end >= segment.sourceEnd
+        )
+          ? 0
+          : args.original.volume,
+      fadeIn: 0,
+      fadeOut: 0,
+      audioProcessing: structuredClone(args.original.audioProcessing!),
+      ...(args.original.ranges
+        ? {
+            sourceGainRanges: args.original.ranges.map(({ start, end, volume }) => ({
+              start,
+              end,
+              volume,
+            })),
+          }
+        : {}),
+    }));
 }
 
 /** Exhaust every bounded batch; seeking and window partitioning preserve cue identity and phase. */
@@ -140,6 +190,8 @@ export interface QuickEditClipSchedule {
   playbackRate?: number;
   /** Audio-clock gain automation points. */
   envelope: QuickEditAudioEnvelope;
+  /** Original authored gain ranges change at their exact half-open source boundary. */
+  envelopeMode?: 'step';
 }
 
 /**
@@ -156,13 +208,29 @@ export function planQuickEditClipPlayback(args: {
   if (args.entry.volume <= 0 || elapsed >= args.entry.duration) return null;
   const remaining = args.entry.duration - Math.max(0, elapsed);
   const when = args.audioNow + Math.max(0, -elapsed);
-  const envelope = buildQuickEditClipEnvelope({
+  let envelope = buildQuickEditClipEnvelope({
     entry: args.entry,
     duration: args.entry.duration,
     elapsed: Math.max(0, elapsed),
   }).map(([local, value]) => [when + (local - Math.max(0, elapsed)), value] as const);
+  if (args.entry.lane === 'original') {
+    const first = args.entry.sourceOffset + Math.max(0, elapsed) * (args.entry.playbackRate ?? 1);
+    const last = first + remaining * (args.entry.playbackRate ?? 1);
+    const ranges = args.entry.sourceGainRanges ?? [];
+    const boundaries = [...new Set(ranges.flatMap((range) => [range.start, range.end]))]
+      .filter((at) => at > first && at < last)
+      .sort((a, b) => a - b);
+    envelope = [first, ...boundaries].map(
+      (sourceTime) =>
+        [
+          when + (sourceTime - first) / (args.entry.playbackRate ?? 1),
+          args.entry.volume * sourceAudioGainAtTime(ranges, sourceTime),
+        ] as const
+    );
+  }
   return {
     when,
+    ...(args.entry.lane === 'original' ? { envelopeMode: 'step' as const } : {}),
     offset: args.entry.sourceOffset + Math.max(0, elapsed) * (args.entry.playbackRate ?? 1),
     duration: remaining * (args.entry.playbackRate ?? 1),
     ...(args.entry.playbackRate ? { playbackRate: args.entry.playbackRate } : {}),

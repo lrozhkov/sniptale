@@ -423,7 +423,8 @@ it('preserves Gallery phase policy on resize, persistence and raw phase editing'
   expect(isHydratableVideoProject({ ...saved, version: 39 })).toBe(true);
   expect(isHydratableVideoProject({ ...saved, version: 40 })).toBe(true);
   expect(isHydratableVideoProject({ ...saved, version: 52 })).toBe(true);
-  expect(isHydratableVideoProject({ ...saved, version: 53 })).toBe(false);
+  expect(isHydratableVideoProject({ ...saved, version: 53 })).toBe(true);
+  expect(isHydratableVideoProject({ ...saved, version: 54 })).toBe(false);
   expect(parseMotionSourceBinding({ ...bound.sourceBinding, phaseProjection: 'other' })).toBeNull();
   expect(parseMotionSourceBinding({ ...bound.sourceBinding, phaseProjection: null })).toBeNull();
   expect(parseMotionSourceBinding(bound.sourceBinding)).toEqual(bound.sourceBinding);

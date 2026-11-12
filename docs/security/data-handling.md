@@ -86,6 +86,10 @@ Parsed SDK error metadata remains inside the bounded background receiver. Only f
 
 Settings transfer excludes credentials, local observations, cached catalog facts and runtime approval state. Export retains a disabled flag for known lifecycle blocks when it omits catalog evidence. Imported configuration carries no request approval. See [AI persistence](../architecture/persistence-contracts.md#ai-settings-graph-and-alpha-reset) for alpha reset and transfer admission.
 
+## Audio effect presets
+
+Audio presets retain names and fixed processor settings in local storage under `sniptale_audio_presets`. The catalogue permits at most 100 user presets and 2 MiB of stored data. Each source preset permits at most 16 KiB of JSON. Presets contain no recordings, decoded samples, project identities, file paths, executable code or WASM. Settings transfer includes selected preset sources and preferences. Project backups retain the accepted processing settings inside each project. Catalogue changes do not change processing settings in existing projects. Import validates source data before storage. Unknown implementations remain unavailable and never authorize code loading. Local data erasure removes this catalogue unless the user preserves preferences. Diagnostics and traces exclude preset names and settings.
+
 ## Import and export
 
 Media backup payload layouts `library-folders-v2`, `library-folders-v3` and `library-folders-v4` treat authored strings as text rather than binary signatures. Canonical domain owners check resource roles and portable references. Image-document Canvas source/background/blur slots still require declared object references. Restrict PNG window-header transport to the existing normalized PNG/64-pixel decoration profile. Import revalidates the declared JSON/PNG inventory, MIME, UTF-8 and expanded metadata limits directly in the ZIP before runtime staging.

@@ -3,6 +3,7 @@ import {
   decodeGlPresetSettingsEntry,
   parseVisualSettingsPreferences,
 } from '../../composition/persistence/effect-bundles/settings-transfer';
+import { parseAudioPresetTransfer } from '../../composition/persistence/audio-presets/catalog';
 import { parsePaint } from '@sniptale/foundation/paint';
 import type { SettingsTransferJsonValue } from '../../contracts/settings-transfer';
 import { parseAnnotationTemplateTagState } from '../../composition/persistence/annotation-template-tags';
@@ -34,6 +35,11 @@ export function parseSettingsTransferStyleDomain(
   value: Record<string, unknown>
 ): SettingsTransferJsonValue {
   switch (domainId) {
+    case 'styles.audio-effects': {
+      const parsed = parseAudioPresetTransfer(value);
+      if (!parsed) return failSettingsTransferDomain(domainId);
+      return json(parsed);
+    }
     case 'styles.video-effects': {
       for (const field of ['items', 'transitionItems']) {
         const entries = value[field];

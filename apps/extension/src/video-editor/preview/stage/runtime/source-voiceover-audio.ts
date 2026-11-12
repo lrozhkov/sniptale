@@ -1,7 +1,9 @@
+import { hasReviewAudioProcessing } from '../../../../workflows/video-review/audio-clip-processing';
 import {
   createReviewAudioEngine,
   type ReviewAudioClipBuffer,
   type ReviewAudioEngine,
+  type ReviewAudioPreparedClip,
 } from '../../../../workflows/video-review/audio-playback-engine';
 import {
   planQuickEditClipPlayback,
@@ -41,6 +43,7 @@ class ProjectSourceVoiceoverAudioRuntime {
   private readonly buffers = new Map<string, ReviewAudioClipBuffer>();
   private readonly decoding = new Map<string, { request: Promise<ReviewAudioClipBuffer> }>();
   private readonly prepared = new Map<string, ReviewAudioClipBuffer>();
+  private readonly processed = new Map<string, Promise<ReviewAudioPreparedClip>>();
   private readonly pending = new Map<string, Promise<void>>();
   private readonly failures = new Map<string, unknown>();
   private readonly active = new Map<string, { stop(): void }>();
@@ -91,13 +94,14 @@ class ProjectSourceVoiceoverAudioRuntime {
     }
     const jobs: Promise<void>[] = [];
     for (const entry of input.entries) {
+      if (entry.volume <= 0 || entry.timelineStart + entry.duration <= this.desiredTime) continue;
+      if (this.failures.has(entry.clipId)) throw this.failures.get(entry.clipId);
       if (
-        entry.volume <= 0 ||
-        entry.timelineStart + entry.duration <= this.desiredTime ||
+        (hasReviewAudioProcessing(entry.audioProcessing) &&
+          entry.timelineStart > this.desiredTime + 2) ||
         this.active.has(entry.clipId)
       )
         continue;
-      if (this.failures.has(entry.clipId)) throw this.failures.get(entry.clipId);
       let pending = this.pending.get(entry.clipId);
       if (!pending) {
         pending = this.start(entry, input.assetUrls, engine, generation, this.controller.signal);
@@ -116,7 +120,11 @@ class ProjectSourceVoiceoverAudioRuntime {
     if (this.closed || requestSignal.aborted) return;
     this.configure(input);
     const entries = input.entries.filter(
-      (entry) => entry.volume > 0 && entry.timelineStart + entry.duration > input.currentTime
+      (entry) =>
+        entry.volume > 0 &&
+        entry.timelineStart + entry.duration > input.currentTime &&
+        (!hasReviewAudioProcessing(entry.audioProcessing) ||
+          entry.timelineStart <= input.currentTime + 2)
     );
     if (!entries.length) return;
     const engine = this.engine ?? this.createEngine();
@@ -129,7 +137,16 @@ class ProjectSourceVoiceoverAudioRuntime {
       signal.throwIfAborted();
       await Promise.all(
         entries.map((entry) =>
-          this.prepareBuffer(entry, input.assetUrls, engine, generation, signal)
+          hasReviewAudioProcessing(entry.audioProcessing)
+            ? this.prepareProcessed(
+                entry,
+                input.assetUrls,
+                engine,
+                generation,
+                signal,
+                input.currentTime
+              )
+            : this.prepareBuffer(entry, input.assetUrls, engine, generation, signal)
         )
       );
     } catch (error) {
@@ -176,6 +193,12 @@ class ProjectSourceVoiceoverAudioRuntime {
     this.controller.abort();
     this.controller = new AbortController();
     this.engine?.stopAll();
+    for (const pending of this.processed.values())
+      void pending.then(
+        (value) => value.dispose(),
+        () => {}
+      );
+    this.processed.clear();
     this.active.clear();
     this.pending.clear();
     this.decoding.clear();
@@ -212,6 +235,48 @@ class ProjectSourceVoiceoverAudioRuntime {
     }
   }
 
+  private prepareProcessed(
+    entry: QuickEditAudioPlanEntry,
+    urls: Readonly<Record<string, string>>,
+    engine: ReviewAudioEngine,
+    generation: number,
+    signal: AbortSignal,
+    outputTime: number
+  ): Promise<ReviewAudioPreparedClip> {
+    const existing = this.processed.get(entry.clipId);
+    if (existing) return existing;
+    const pending = (async () => {
+      if (entry.source.kind !== 'project' || !engine.prepareProcessedClip)
+        throw new Error('Source voiceover processing is unavailable.');
+      const url = urls[entry.source.assetId];
+      if (!url) throw new Error('Source voiceover material is unavailable');
+      const response = await this.fetchBytes(url, { signal });
+      if (!response.ok) throw new Error('Source voiceover material could not be read');
+      const blob = await response.blob();
+      signal.throwIfAborted();
+      const prepared = await engine.prepareProcessedClip(
+        blob,
+        entry,
+        Math.max(0, outputTime - entry.timelineStart),
+        signal,
+        (error) => {
+          if (!this.closed && generation === this.generation)
+            this.failures.set(entry.clipId, error);
+        }
+      );
+      if (this.closed || generation !== this.generation || signal.aborted) {
+        prepared.dispose();
+        throw new Error('Source voiceover preparation is stale.');
+      }
+      return prepared;
+    })();
+    this.processed.set(entry.clipId, pending);
+    void pending.catch(() => {
+      if (this.processed.get(entry.clipId) === pending) this.processed.delete(entry.clipId);
+    });
+    return pending;
+  }
+
   private async prepareBuffer(
     entry: QuickEditAudioPlanEntry,
     urls: Readonly<Record<string, string>>,
@@ -244,8 +309,13 @@ class ProjectSourceVoiceoverAudioRuntime {
     signal: AbortSignal
   ): Promise<void> {
     try {
-      const prepared = await this.prepareBuffer(entry, urls, engine, generation, signal);
-      if (!prepared) return;
+      const processed = hasReviewAudioProcessing(entry.audioProcessing)
+        ? await this.prepareProcessed(entry, urls, engine, generation, signal, this.desiredTime)
+        : null;
+      const prepared = processed
+        ? null
+        : await this.prepareBuffer(entry, urls, engine, generation, signal);
+      if (!prepared && !processed) return;
       const rate = entry.playbackRate ?? 1;
       if (!this.current(generation) || !this.anchor || this.active.has(entry.clipId)) return;
       const now = engine.now();
@@ -257,17 +327,19 @@ class ProjectSourceVoiceoverAudioRuntime {
       if (schedule)
         this.active.set(
           entry.clipId,
-          engine.scheduleClip(
-            rate === 1
-              ? schedule
-              : {
-                  ...schedule,
-                  offset: (schedule.offset - entry.sourceOffset) / rate,
-                  duration: schedule.duration / rate,
-                  playbackRate: 1,
-                },
-            prepared
-          )
+          processed
+            ? processed.schedule(schedule)
+            : engine.scheduleClip(
+                rate === 1
+                  ? schedule
+                  : {
+                      ...schedule,
+                      offset: (schedule.offset - entry.sourceOffset) / rate,
+                      duration: schedule.duration / rate,
+                      playbackRate: 1,
+                    },
+                prepared!
+              )
         );
     } catch (error) {
       if (!this.current(generation)) return;

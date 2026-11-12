@@ -53,7 +53,7 @@ describe('settings route codec', () => {
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
       saving: ['settings', 'files', 'drafts', 'storage', 'templates', 'queue', 'connection'],
-      'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds'],
+      'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'audio', 'backgrounds'],
       'ai-connections': ['integrations', 'chrome-ai'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
       'native-app': ['connection'],

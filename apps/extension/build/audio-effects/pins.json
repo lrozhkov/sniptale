@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "compiler": "2.90.19",
+  "compileArgs": "-I libraries/ -ftz 2",
+  "packages": {
+    "@grame/faustwasm": {
+      "version": "0.20.2",
+      "integrity": "sha512-Xtr5w73+3SVfXDA7HMATxQJy5wjfDRH10b6nHv1iximJQz4vnOh9D1f5z+l2kFKmuo5ZzkIOx9y5WI2/vtEI7w==",
+      "files": {
+        "package.json": "c5a610bc31181e753bd9fccb9a88f4c493250ee1a55a9db56066830a418770dc",
+        "dist/esm/index.js": "aab25a0e405586b6ce614788f2edc473d7241d523f2a61fbf020ada14655ff1a",
+        "dist/esm/index.js.map": "89378855b7ec759a894a947844618f530670f60b451f1337b559f04f68986bd4",
+        "libfaust-wasm/libfaust-wasm.js": "82b9fe95a126afab27ccd8bdc0ac9f6c7191db569fef3d1b59cb873508797acc",
+        "libfaust-wasm/libfaust-wasm.wasm": "b047d7c2dd1e77392ee352a95db9df4bd81458c5ca58ccc67631476fe4b59573",
+        "libfaust-wasm/libfaust-wasm.data": "7f338f4d5006608241c875c38363348d42f9aeed5cbfa5cbb63828e5d4f912ed",
+        "COPYING.txt": "5af8efd745a8c91bf99443662e85708866807dc2e01b08045f338d63e2839916"
+      }
+    },
+    "signalsmith-stretch": {
+      "version": "1.3.2",
+      "integrity": "sha512-tJqRbwPCoWLSHXwO29UQ75u72IwPsHns3RG+TKzuOAp7OduJiJMzEtz32JEFbPFQcTR7aiKCIVc+/Kzw8bMZUw==",
+      "files": {
+        "package.json": "cdb829028989a8d676482539991d89cab752b07c867d4040ebf98ed0dba00567",
+        "SignalsmithStretch.mjs": "97530b11d5bc01015af4cde40d6aa55ff10c40aa1294ca4c8c5762027d517a46"
+      },
+      "wasmSha256": "83869197b3c5ebf9fc8c517a1586aef1ecf77404842218d62b9c0e82882d8ca3"
+    },
+    "@jitsi/rnnoise-wasm": {
+      "version": "0.2.1",
+      "integrity": "sha512-iEj77www43pS2Yq+cfLZb+hFuI7L5ccisBzzPMcOjjLsG4/LAlkD1CY58/8gc84nHdLBGmD/OPIWGnvYnXvB0A==",
+      "files": {
+        "package.json": "2f210b224b46b72bc621c7957ae4827d452d07f0855c32536f7f1fa499f16895",
+        "dist/rnnoise-sync.js": "05a553f523d59502d133a6d05dbf1878137c9e7bcff06edf5561f7001b62f95f",
+        "LICENSE": "4646d0ab74a05730f8b3b12b6376ddccb7f0905ee5b69265b3d873b97ace3e94"
+      },
+      "wasmSha256": "4f513a50613de74378331237886138eab52fa2650e8b1a41eb587d932d9b8850"
+    }
+  },
+  "sources": {
+    "compressor.dsp": "965e8ac143221e7cc4103996a6555f6a0d7b95bc412415de6498b05de2935b75",
+    "delay.dsp": "ac58dab25a032faed99c4768723a6b0195b2a30e647c65e8fe3ab38646450bdb",
+    "eq.dsp": "2cb464712b827e3a9a4aeb80dce05af1600dfb0c52f808a79a5350b1ba1ac66f",
+    "highpass.dsp": "b2064cf72fd9a0b4069e8a8ec1f862ceded51143b3fde74ded14298b251dbcee",
+    "limiter.dsp": "ff61605cc9a60b81e6e7d78e619c4213136e291b6b4f4006763a150effab8819",
+    "lowpass.dsp": "051056f920da8df191b6dcfab7fe01a2dd9d353af7419e8ee217106db8b7bf9b",
+    "reverb.dsp": "bf76af9e301706b72cd8393a303358ed282ba26a257b767327cd794da8c22ee2",
+    "saturation.dsp": "f5237ac553bb387b49bcc393636baa75529c405634e669f23ab9f75f4417727e"
+  },
+  "licenses": {
+    "RNNoise-BSD-3-Clause.txt": "45d37ca1cdb278c088e1aa85e0e65ca3a534ed86a28dcc96ca16810248a61d35",
+    "STK.txt": "e9477339bf6da3441a16cdbe196d6796e5b72542cb00fbcf074f10d203104482",
+    "Signalsmith-MIT.txt": "7154ecf162d91232235c9ba4619d95b30c7f1f904a39e0f22eaf914e208cb69b",
+    "GPL-3.0.txt": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+  }
+}

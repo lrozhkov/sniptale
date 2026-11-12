@@ -1,9 +1,13 @@
+import type { ReviewTimeSegment } from '../../features/video/review/time-segment';
+import type { ReviewEdit } from '../../features/video/review/types';
+import { hasReviewAudioProcessing } from '../../workflows/video-review/audio-clip-processing';
 import type { RecordingProjectActionAudioSource } from '../../workflows/video-review/recording-action-audio';
 import {
   BrowserReviewAudioBuffer,
   createReviewAudioEngine,
   type ReviewAudioClipBuffer,
   type ReviewAudioEngine,
+  type ReviewAudioPreparedClip,
 } from '../../workflows/video-review/audio-playback-engine';
 import { decodeReviewAudioClipBuffer } from '../../workflows/video-review/audio-clip-source';
 import {
@@ -22,6 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, type RefObject } from 'react';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import {
   buildQuickEditAudioPlan,
+  buildQuickEditOriginalAudioPlan,
   quickEditAudioSourceKey,
   hasQuickEditActionAudio,
   iterateQuickEditActionAudioPlan,
@@ -40,7 +45,13 @@ const SEEK_RESCHEDULE_SECONDS = 0.15;
 /** One Web Audio owner per element; the context outlives switched resources. */
 const elementEngines = new WeakMap<HTMLMediaElement, ReviewAudioEngine>();
 
+interface OriginalAudioSource {
+  file: Blob;
+  segments: readonly ReviewTimeSegment[];
+  edits: readonly ReviewEdit[];
+}
 interface ReviewAudioRuntimeProps {
+  originalSource?: OriginalAudioSource;
   video: RefObject<HTMLVideoElement | null>;
   playing: boolean;
   silent?: boolean;
@@ -64,6 +75,7 @@ interface ReviewAudioRuntimeProps {
 function useElementAudioEngine(latest: { current: ReviewAudioRuntimeProps }) {
   const engineRef = useRef<ReviewAudioEngine | null>(null);
   const elementRef = useRef<HTMLMediaElement | null>(null);
+  const effectLifetime = useRef({ revision: 0, releasing: false });
   const dispose = useCallback(() => {
     const engine = engineRef.current;
     const element = elementRef.current;
@@ -74,6 +86,7 @@ function useElementAudioEngine(latest: { current: ReviewAudioRuntimeProps }) {
     engine.dispose();
   }, []);
   const peek = useCallback((): ReviewAudioEngine | null => {
+    if (effectLifetime.current.releasing) return null;
     const element = latest.current.video.current;
     if (engineRef.current && elementRef.current === element) return engineRef.current;
     if (engineRef.current) dispose();
@@ -95,7 +108,20 @@ function useElementAudioEngine(latest: { current: ReviewAudioRuntimeProps }) {
     elementRef.current = element;
     return created;
   }, [latest, peek]);
-  useEffect(() => () => dispose(), [dispose]);
+  useEffect(() => {
+    const ownership = effectLifetime.current;
+    const lifetime = ++ownership.revision;
+    ownership.releasing = false;
+    return () => {
+      const engine = engineRef.current;
+      ownership.releasing = true;
+      // React can replay effects while retaining the media element. Its source node
+      // cannot be recreated; release the graph only after that replay boundary.
+      queueMicrotask(() => {
+        if (ownership.revision === lifetime && engineRef.current === engine) dispose();
+      });
+    };
+  }, [dispose]);
   return { peek, get };
 }
 
@@ -105,6 +131,7 @@ function useElementAudioEngine(latest: { current: ReviewAudioRuntimeProps }) {
  * effective configuration. Stale decodes and switched resources never connect.
  */
 export function useReviewEditorAudioRuntime(args: {
+  originalSource?: OriginalAudioSource;
   video: RefObject<HTMLVideoElement | null>;
   playing: boolean;
   silent?: boolean;
@@ -129,6 +156,7 @@ export function useReviewEditorAudioRuntime(args: {
     sourceToResult: args.sourceToResult,
     seekRevision: args.seekRevision,
     original: args.originalAudio,
+    ...(args.originalSource ? { originalSource: args.originalSource } : {}),
     voiceover: args.voiceover,
     music: args.music,
     ...(args.actionPlan ? { actionPlan: args.actionPlan } : {}),
@@ -143,6 +171,20 @@ export function useReviewEditorAudioRuntime(args: {
 class ReviewAudioPlaybackSession {
   private buffers = new Map<string, Promise<ReviewAudioClipBuffer | null>>();
   private prepared = new Map<string, ReviewAudioClipBuffer>();
+  private processed = new Map<
+    string,
+    {
+      entry: QuickEditAudioPlanEntry;
+      pending: Promise<ReviewAudioPreparedClip>;
+      scheduled: boolean;
+    }
+  >();
+  private processedTimer: ReturnType<typeof setTimeout> | null = null;
+  private stagedProcessingKey = '';
+  private requestedPlayback = false;
+  private requestedProcessingKey = '';
+  private stagedProcessingTime = 0;
+  private stagedSourceFile: Blob | undefined;
   private actionBuffers = new Map<ActionSoundSampleId, ReviewAudioClipBuffer>();
   private planKey = '';
   private generation = 0;
@@ -164,13 +206,24 @@ class ReviewAudioPlaybackSession {
     private engines: { get(): ReviewAudioEngine | null; peek(): ReviewAudioEngine | null }
   ) {}
 
-  stop() {
+  stop(stopEngine = true) {
     this.generation += 1;
+    this.requestedPlayback = false;
+    this.requestedProcessingKey = '';
     this.auditionActive = false;
     this.preparation?.abort();
+    this.stagedProcessingKey = '';
+    if (this.processedTimer !== null) clearTimeout(this.processedTimer);
+    this.processedTimer = null;
+    for (const value of this.processed.values())
+      void value.pending.then(
+        (clip) => clip.dispose(),
+        () => {}
+      );
+    this.processed.clear();
     this.clearActionResources();
     this.anchor = null;
-    this.engines.peek()?.stopAll();
+    if (stopEngine) this.engines.peek()?.stopAll();
   }
   pausePlayback() {
     if (!this.auditionActive) this.stop();
@@ -180,9 +233,22 @@ class ReviewAudioPlaybackSession {
   }
   async preparePlayback(): Promise<boolean> {
     this.stop();
-    const current = this.latest.current;
+    const current = {
+      ...this.latest.current,
+      outputTime: this.readOutputTime(this.latest.current) ?? this.latest.current.outputTime,
+    };
     const plan = current.actionPlan;
-    if (current.silent || (!plan?.descriptors.length && !current.recordingActionSource))
+    let processedEntries: readonly QuickEditAudioPlanEntry[];
+    try {
+      processedEntries = this.processingEntries(current);
+    } catch {
+      current.onFailure();
+      return false;
+    }
+    if (
+      current.silent ||
+      (!plan?.descriptors.length && !current.recordingActionSource && !processedEntries.length)
+    )
       return true;
     const controller = new AbortController();
     this.preparation = controller;
@@ -194,9 +260,36 @@ class ReviewAudioPlaybackSession {
       this.latest.current.actionPlan === plan &&
       this.latest.current.recordingActionSource === current.recordingActionSource &&
       this.latest.current.seekRevision === current.seekRevision &&
-      this.latest.current.silent === current.silent;
+      this.latest.current.silent === current.silent &&
+      this.latest.current.voiceover === current.voiceover &&
+      this.latest.current.music === current.music &&
+      JSON.stringify(this.latest.current.original) === JSON.stringify(current.original) &&
+      this.latest.current.originalSource?.file === current.originalSource?.file &&
+      this.latest.current.originalSource?.segments === current.originalSource?.segments;
     try {
       await this.loadActions(current, controller.signal, valid);
+      if (!valid()) return false;
+      if (processedEntries.length) {
+        const engine = this.engines.get();
+        if (!engine) throw new Error('Processed audio preview is unavailable.');
+        this.configureOriginal(engine, current);
+        await engine.resume();
+        for (const entry of processedEntries) {
+          if (!valid()) return false;
+          if (entry.timelineStart <= current.outputTime + 2)
+            await this.prepareProcessed(
+              entry,
+              current,
+              engine,
+              controller.signal,
+              current.outputTime
+            );
+        }
+        if (!valid()) return false;
+        this.stagedProcessingKey = this.processingKey(current);
+        this.stagedProcessingTime = current.outputTime;
+        this.stagedSourceFile = current.originalSource?.file;
+      }
       return valid();
     } catch (error) {
       if (valid()) {
@@ -288,16 +381,34 @@ class ReviewAudioPlaybackSession {
     });
     return pending;
   }
-  schedule(planKey: string) {
+  confirmPlayback(planKey: string) {
+    const requested = this.requestedPlayback;
+    this.requestedPlayback = false;
+    return (
+      requested &&
+      this.anchor !== null &&
+      this.planKey === planKey &&
+      this.requestedProcessingKey === this.processingKey(this.latest.current)
+    );
+  }
+  schedule(planKey: string, requested = false) {
     this.auditionActive = false;
     const current = {
       ...this.latest.current,
+      ...(requested ? { playing: true } : {}),
       outputTime: this.readOutputTime(this.latest.current) ?? this.latest.current.outputTime,
     };
+    const staged =
+      this.stagedProcessingKey === this.processingKey(current) &&
+      this.preparation !== null &&
+      !this.preparation.signal.aborted &&
+      Math.abs(current.outputTime - this.stagedProcessingTime) < SEEK_RESCHEDULE_SECONDS &&
+      this.stagedSourceFile === current.originalSource?.file;
+    this.stagedProcessingKey = '';
+    if (!staged) this.stop(false);
     const generation = ++this.generation;
-    this.preparation?.abort();
     this.clearActionResources();
-    const controller = new AbortController();
+    const controller = staged ? this.preparation! : new AbortController();
     this.preparation = controller;
     const engine = this.engines.get();
     if (!engine) {
@@ -310,8 +421,17 @@ class ReviewAudioPlaybackSession {
       this.prepared.clear();
       this.planKey = planKey;
     }
+    this.requestedPlayback = requested;
+    this.requestedProcessingKey = this.processingKey(current);
     this.anchor = { outputTime: current.outputTime, audioNow: engine.now() };
-    engine.stopAll();
+    if (!staged) engine.stopAll();
+    try {
+      this.configureOriginal(engine, current);
+    } catch {
+      this.stop();
+      current.onFailure();
+      return;
+    }
     engine.setOriginalGain(
       current.silent
         ? 0
@@ -327,7 +447,7 @@ class ReviewAudioPlaybackSession {
       !job.signal.aborted &&
       job.generation === this.generation &&
       !!job.audition === this.auditionActive &&
-      (job.audition || this.latest.current.playing) &&
+      (job.audition || this.latest.current.playing || this.requestedPlayback) &&
       this.latest.current.sessionKey === job.current.sessionKey &&
       (job.audition ||
         this.latest.current.recordingActionSource === job.current.recordingActionSource)
@@ -337,6 +457,8 @@ class ReviewAudioPlaybackSession {
     try {
       await job.engine.resume();
       if (!this.active(job)) return;
+      await this.startProcessed(job);
+      if (!this.active(job)) return;
       await this.startActions(job);
       if (!this.active(job)) return;
       const plan = buildQuickEditAudioPlan({
@@ -344,6 +466,7 @@ class ReviewAudioPlaybackSession {
         music: job.current.music,
       });
       for (const entry of plan) {
+        if (hasReviewAudioProcessing(entry.audioProcessing)) continue;
         const buffer = await this.resolveBuffer(entry);
         if (!this.active(job)) return;
         if (!buffer) continue;
@@ -383,6 +506,140 @@ class ReviewAudioPlaybackSession {
     } catch (error) {
       this.fail(job, error);
     }
+  }
+  private configureOriginal(engine: ReviewAudioEngine, current: ReviewAudioRuntimeProps) {
+    const active = hasReviewAudioProcessing(current.original.audioProcessing);
+    if (active && !engine.setOriginalProcessing)
+      throw new Error('Original audio processing is unavailable.');
+    engine.setOriginalProcessing?.(active);
+  }
+  private processingEntries(current: ReviewAudioRuntimeProps) {
+    if (current.silent) return [];
+    let original: QuickEditAudioPlanEntry[] = [];
+    if (hasReviewAudioProcessing(current.original.audioProcessing)) {
+      if (!current.originalSource)
+        throw new Error('Processed original audio source is unavailable.');
+      original = buildQuickEditOriginalAudioPlan({
+        original: current.original,
+        segments: current.originalSource.segments,
+        edits: current.originalSource.edits,
+        sourceId: current.sessionKey,
+      });
+    }
+    return [...original, ...buildQuickEditAudioPlan(current)].filter(
+      (entry) =>
+        entry.volume > 0 &&
+        entry.timelineStart + entry.duration > current.outputTime &&
+        hasReviewAudioProcessing(entry.audioProcessing)
+    );
+  }
+  private processingKey(current: ReviewAudioRuntimeProps) {
+    return JSON.stringify([
+      current.sessionKey,
+      current.seekRevision,
+      current.silent,
+      current.voiceover,
+      current.music,
+      current.original,
+      current.originalSource?.segments,
+      current.originalSource?.edits,
+    ]);
+  }
+  private prepareProcessed(
+    entry: QuickEditAudioPlanEntry,
+    current: ReviewAudioRuntimeProps,
+    engine: ReviewAudioEngine,
+    signal: AbortSignal,
+    outputTime: number
+  ) {
+    const cached = this.processed.get(entry.clipId);
+    if (cached) return cached.pending;
+    const pending = (async () => {
+      if (entry.source.kind !== 'project' || !engine.prepareProcessedClip)
+        throw new Error('Processed audio preview is unavailable.');
+      const blob =
+        entry.lane === 'original'
+          ? current.originalSource?.file
+          : await current.resolveAsset(entry.source.assetId);
+      signal.throwIfAborted();
+      if (!blob) throw new Error('Processed audio material is unavailable.');
+      const clip = await engine.prepareProcessedClip(
+        blob,
+        entry,
+        Math.max(0, outputTime - entry.timelineStart),
+        signal,
+        () => {
+          if (!signal.aborted && this.preparation?.signal === signal) {
+            this.stop();
+            current.onFailure();
+          }
+        }
+      );
+      if (signal.aborted) {
+        clip.dispose();
+        signal.throwIfAborted();
+      }
+      return clip;
+    })();
+    const owned = { entry, pending, scheduled: false };
+    this.processed.set(entry.clipId, owned);
+    void pending.catch(() => {
+      if (this.processed.get(entry.clipId) === owned) this.processed.delete(entry.clipId);
+    });
+    return pending;
+  }
+  private async startProcessed(job: PlaybackJob) {
+    const entries = this.processingEntries(job.current);
+    if (!entries.length) return;
+    const pump = async () => {
+      if (!this.active(job) || !this.anchor) return;
+      const outputTime = this.anchor.outputTime + job.engine.now() - this.anchor.audioNow;
+      for (const [id, owned] of this.processed) {
+        if (owned.entry.timelineStart + owned.entry.duration <= outputTime) {
+          this.processed.delete(id);
+          void owned.pending.then(
+            (clip) => clip.dispose(),
+            () => {}
+          );
+        }
+      }
+      for (const entry of entries) {
+        if (!this.active(job) || !this.anchor) return;
+        if (
+          entry.timelineStart > outputTime + 2 ||
+          entry.timelineStart + entry.duration <= outputTime ||
+          this.processed.get(entry.clipId)?.scheduled
+        )
+          continue;
+        const clip = await this.prepareProcessed(
+          entry,
+          job.current,
+          job.engine,
+          job.signal,
+          outputTime
+        );
+        if (!this.active(job) || !this.anchor) return;
+        const now = job.engine.now();
+        const schedule = planQuickEditClipPlayback({
+          entry,
+          audioNow: now,
+          outputTime: this.anchor.outputTime + now - this.anchor.audioNow,
+        });
+        if (schedule) {
+          clip.schedule(schedule);
+          const owned = this.processed.get(entry.clipId);
+          if (owned) owned.scheduled = true;
+        }
+      }
+      if (
+        this.active(job) &&
+        entries.some((entry) => entry.timelineStart + entry.duration > outputTime)
+      )
+        this.processedTimer = setTimeout(() => {
+          void pump().catch((error: unknown) => this.fail(job, error));
+        }, 250);
+    };
+    await pump();
   }
   private fail(job: PlaybackJob, error: unknown) {
     if (!this.active(job)) return;
@@ -517,8 +774,23 @@ type PlaybackJob = {
 
 export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
   const planKey = useMemo(
-    () => JSON.stringify([props.voiceover, props.music, props.actionPlan]),
-    [props.voiceover, props.music, props.actionPlan]
+    () =>
+      JSON.stringify([
+        props.voiceover,
+        props.music,
+        props.actionPlan,
+        props.original,
+        props.originalSource?.segments,
+        props.originalSource?.edits,
+      ]),
+    [
+      props.voiceover,
+      props.music,
+      props.actionPlan,
+      props.original,
+      props.originalSource?.segments,
+      props.originalSource?.edits,
+    ]
   );
   const session = useRef<ReviewAudioPlaybackSession | null>(null);
   const latest = useRef(props);
@@ -533,9 +805,18 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     };
   }, [get, peek, props.sessionKey]);
   useEffect(() => {
-    if (props.playing) session.current?.schedule(planKey);
-    else session.current?.pausePlayback();
-  }, [planKey, props.playing, props.sessionKey, props.seekRevision, props.recordingActionSource]);
+    if (props.playing) {
+      if (!session.current?.confirmPlayback(planKey)) session.current?.schedule(planKey);
+    } else session.current?.pausePlayback();
+  }, [
+    planKey,
+    props.playing,
+    props.sessionKey,
+    props.seekRevision,
+    props.recordingActionSource,
+    props.originalSource?.file,
+    props.silent,
+  ]);
   useEffect(() => {
     session.current?.cancelAudition();
   }, [planKey, props.seekRevision, props.recordingActionSource]);
@@ -543,6 +824,9 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     if (session.current?.needsSeek()) session.current.schedule(planKey);
   }, [props.outputTime, planKey]);
   useEffect(() => {
+    peek()?.setOriginalProcessing?.(
+      hasReviewAudioProcessing(latest.current.original.audioProcessing)
+    );
     peek()?.setOriginalGain(
       latest.current.silent
         ? 0
@@ -565,5 +849,7 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
     const current = session.current;
     return current ? current.preparePlayback() : Promise.resolve(false);
   }, []);
-  return { audition, stopAudition, preparePlayback };
+  const startPlayback = useCallback(() => session.current?.schedule(planKey, true), [planKey]);
+  const stopPlayback = useCallback(() => session.current?.stop(), []);
+  return { audition, stopAudition, preparePlayback, startPlayback, stopPlayback };
 }
