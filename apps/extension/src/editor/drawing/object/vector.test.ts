@@ -650,3 +650,37 @@ it('does not paint Fabric text backgrounds for empty or whitespace-only rows', (
     top += advance;
   }
 });
+
+it.each(['', '\n', '\n \t\n'])(
+  'keeps the last populated text background unchanged when empty suffix is %j',
+  (suffix) => {
+    const make = (text: string) => {
+      const textbox = createEditorDrawingFabricObject(
+        {
+          id: 'line-height',
+          kind: 'text',
+          bounds: { x: 10, y: 10, width: 240, height: 160 },
+          text,
+          color: '#111111',
+          backgroundColor: '#ff8800',
+          fontFamily: 'handwritten',
+          fontSize: 24,
+        },
+        1
+      ) as Textbox;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 300;
+      const context = canvas.getContext('2d')!;
+      context.translate(10 - textbox._getLeftOffset(), 10 - textbox._getTopOffset());
+      renderEditorDrawingTextBackground(textbox, context);
+      return context.getImageData(0, 0, 300, 300).data;
+    };
+    const actual = make(`Привет${suffix}`);
+    const baseline = make('Привет');
+    const changed = actual.reduce(
+      (count, channel, index) => count + Number(channel !== baseline[index]),
+      0
+    );
+    expect(changed).toBe(0);
+  }
+);

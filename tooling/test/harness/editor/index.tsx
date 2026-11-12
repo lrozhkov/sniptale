@@ -5,6 +5,7 @@ import { CommandPressScope } from '@sniptale/ui/control-language/press';
 import { InspectorLayout } from '../../../../apps/extension/src/ui/compact-inspector-controls/layout';
 import '../../../../apps/extension/src/ui/compact-inspector-controls/inspector-surface.css';
 import '../../../../apps/extension/src/editor/image-surface.css';
+import '../../../../apps/extension/src/features/highlighter/frame-annotation/callout/font.css';
 import { harnessReady } from '../browser-mocks/browser-mocks';
 import '@sniptale/ui/styles';
 import '@sniptale/ui/styles/ai-modal';

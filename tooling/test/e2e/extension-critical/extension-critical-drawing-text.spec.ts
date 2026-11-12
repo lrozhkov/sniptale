@@ -607,3 +607,166 @@ for (const viewport of [
     }
   });
 }
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`handwritten Cyrillic typing commits and empty newline preserves pixels ${viewport.width}`, async ({
+    context,
+    hostOrigin,
+  }, info) => {
+    const page = await context.newPage();
+    await page.setViewportSize(viewport);
+    await applyHarnessBootstrap(page, {});
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    try {
+      await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+      await expect
+        .poll(() =>
+          page.evaluate(() => window.__sniptaleEditorHarness?.getInteractionState().historyReady)
+        )
+        .toBe(true);
+      expect(
+        await page.evaluate(
+          async () => (await document.fonts.load('24px "Sniptale Handwritten"', 'Привет Я')).length
+        )
+      ).toBeGreaterThan(0);
+      await page.locator('[data-ui="editor.floating.tool-rail.text"]').click();
+      await page
+        .locator('[data-ui="content.toolbar.drawing-options.text.font-handwritten"]')
+        .click();
+      await page.locator('[data-ui="content.toolbar.drawing-options.text.size-24"]').click();
+      const fill = page.locator('[data-ui="content.toolbar.drawing-options.text.background-none"]');
+      if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
+      const box = (await page
+        .locator('[data-ui="editor.canvas.layer"] canvas.upper-canvas')
+        .boundingBox())!;
+      await page.mouse.click(box.x + box.width / 2 - 100, box.y + box.height / 2 - 60);
+      const input = page.locator('textarea[data-fabric="textarea"]');
+      let value = '';
+      for (const letter of 'Привет мир') {
+        await page.keyboard.insertText(letter);
+        value += letter;
+        await expect(input).toHaveValue(value);
+        const text = await page.evaluate(() =>
+          window
+            .__sniptaleEditorHarness!.getCanvasObjects()
+            .find((object) => object['sniptaleType'] === 'text')
+        );
+        expect(Number(text?.['height'])).toBeLessThan(48);
+      }
+      await page.keyboard.press('Enter');
+      await expect(input).toHaveCount(0);
+      const accepted = await page.evaluate(() =>
+        window
+          .__sniptaleEditorHarness!.getCanvasObjects()
+          .filter((object) => object['sniptaleType'] === 'text')
+      );
+      expect(accepted).toHaveLength(1);
+      await page.keyboard.press('Enter');
+      await expect(input).toHaveValue(value);
+      await page.keyboard.press('End');
+      const before = await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage());
+      await page.keyboard.press('Shift+Enter');
+      await expect(input).toHaveValue(`${value}\n`);
+      const after = await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage());
+      expect(after === before, 'empty newline must not enlarge the preceding background').toBe(
+        true
+      );
+      await page.keyboard.insertText('Я');
+      await expect(input).toHaveValue(`${value}\nЯ`);
+      expect(
+        (await page.evaluate(() => window.__sniptaleEditorHarness!.renderImage())) === before
+      ).toBe(false);
+      await page.keyboard.press('Enter');
+      expect(
+        await page.evaluate(() =>
+          window
+            .__sniptaleEditorHarness!.getCanvasObjects()
+            .filter((object) => object['sniptaleType'] === 'text')
+            .map((object) => object['sniptaleId'])
+        )
+      ).toEqual([accepted[0]?.['sniptaleId']]);
+      expect(errors).toEqual([]);
+      await page.screenshot({
+        path: info.outputPath('handwritten-cyrillic-committed.png'),
+        fullPage: false,
+      });
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`page handwritten Cyrillic grows and Enter retains text ${viewport.width}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, viewport);
+    try {
+      await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+      await page.locator('[data-ui="content.toolbar.mode-option.drawing"]').click();
+      await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+      await page
+        .locator('[data-ui="content.toolbar.drawing-options.text.font-handwritten"]')
+        .click();
+      await page.locator('[data-ui="content.toolbar.drawing-options.text.size-36"]').click();
+      const fill = page.locator('[data-ui="content.toolbar.drawing-options.text.background-none"]');
+      if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
+      await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+      await page.mouse.click(400, 200);
+      const input = page.locator('[data-ui="content.drawing.text-input"]');
+      let value = '';
+      for (const letter of 'Привет мир') {
+        await page.keyboard.insertText(letter);
+        value += letter;
+        await expect(input).toHaveValue(value);
+        const layout = await page
+          .locator('[data-ui="content.drawing.text-mirror"]')
+          .evaluate((element) => {
+            const style = getComputedStyle(element);
+            return {
+              height: element.getBoundingClientRect().height,
+              lineHeight: parseFloat(style.lineHeight),
+            };
+          });
+        expect(layout.height).toBeLessThan(layout.lineHeight * 1.5);
+      }
+      const before = await page
+        .locator(
+          '[data-ui="content.drawing.text-editor"] [data-ui="content.drawing.text-background"]'
+        )
+        .getAttribute('d');
+      await input.press('Shift+Enter');
+      await expect(input).toHaveValue(`${value}\n`);
+      expect(
+        await page
+          .locator(
+            '[data-ui="content.drawing.text-editor"] [data-ui="content.drawing.text-background"]'
+          )
+          .getAttribute('d')
+      ).toBe(before);
+      await page.keyboard.insertText('Я');
+      await input.press('Enter');
+      await expect(input).toHaveCount(0);
+      await expect(page.locator('[data-ui="content.drawing.text-object"]')).toHaveCount(1);
+      await expect(page.locator('[data-ui="content.drawing.text-object"]')).toContainText(
+        `${value}\nЯ`
+      );
+      await page.screenshot({
+        path: info.outputPath('page-handwritten-cyrillic.png'),
+        fullPage: false,
+      });
+    } finally {
+      await page.close();
+      await popup.close();
+    }
+  });
+}

@@ -189,7 +189,8 @@ export function renderEditorDrawingTextBackground(
   let top = textbox._getTopOffset();
   const lines = textbox._textLines.flatMap((line, index) => {
     const advance = textbox.getHeightOfLine(index);
-    const height = index === textbox._textLines.length - 1 ? advance / textbox.lineHeight : advance;
+    const nextHasText = Boolean(textbox._textLines[index + 1]?.join('').trim());
+    const height = nextHasText ? advance : advance / textbox.lineHeight;
     const width = Math.min(textbox.width, Math.max(12, textbox.getLineWidth(index) + 12));
     const rect = { left, top, width, height };
     top += advance;
