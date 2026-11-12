@@ -8,7 +8,6 @@ import { createExportStateActions } from '../../../state/export-state';
 import type { VideoEditorState } from '../../../state/types';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
-import { resolveEffectInstanceTime } from '../../../../features/video/project/effect-instance/timing';
 import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { createVideoProjectCursorTrack } from '../../../../features/video/project/defaults';
 import { planTypingCompression } from './source-range';
@@ -238,79 +237,4 @@ it('remaps the selected action pair through the canonical split without selectin
     startTime: 10,
     sourceInstanceId: 'repeat-instance',
   });
-});
-
-it('preserves clip effect document time across both compression splits and the accelerated middle', () => {
-  const { store, request, video } = fixture();
-  const project = store.getState().project!;
-  store.setState({
-    project: {
-      ...project,
-      effectInstances: [
-        {
-          id: 'effect',
-          kind: 'targetEffect',
-          snapshotId: 'snapshot',
-          enabled: true,
-          controls: {},
-          target: { kind: 'clip', clipId: video.id },
-          startTime: 0,
-          duration: 6,
-          playbackRate: 2,
-        },
-      ],
-    },
-  });
-  expect(store.getState().applyTypingCompression(request, store.getState().project!).status).toBe(
-    'applied'
-  );
-  const after = store.getState().project!;
-  const parts = after.clips
-    .filter((clip) => clip.type === 'VIDEO')
-    .filter((clip) => clip.id !== 'repeat');
-  const effects = after.effectInstances!;
-  expect(effects).toHaveLength(3);
-  for (const [index, time, expected] of [
-    [0, 1, 2],
-    [1, 2.25, 6],
-    [2, 3.5, 10],
-  ]) {
-    const effect = effects.find(
-      (item) => item.target.kind === 'clip' && item.target.clipId === parts[index!]!.id
-    )!;
-    expect(effect).toBeDefined();
-    expect(resolveEffectInstanceTime(effect, 12, time!)).toMatchObject({ effectTime: expected });
-  }
-});
-
-it('restores scoped FX interval edits together with typing compression in one Undo/Redo step', () => {
-  const { store, request, video } = fixture();
-  const project = store.getState().project!;
-  store.setState({
-    project: {
-      ...project,
-      effectInstances: [
-        {
-          id: 'track-fx',
-          kind: 'targetEffect',
-          target: { kind: 'track', trackId: video.trackId },
-          snapshotId: 'snapshot',
-          controls: {},
-          enabled: true,
-          startTime: 0,
-          duration: 6,
-          playbackRate: 1,
-          rangeMode: 'interval',
-        },
-      ],
-    },
-  });
-  const before = store.getState().project!;
-  expect(store.getState().applyTypingCompression(request, before).status).toBe('applied');
-  const after = store.getState().project!;
-  expect(after.effectInstances).toHaveLength(3);
-  store.getState().undoProject();
-  expect(store.getState().project!.effectInstances).toEqual(before.effectInstances);
-  store.getState().redoProject();
-  expect(store.getState().project!.effectInstances).toEqual(after.effectInstances);
 });

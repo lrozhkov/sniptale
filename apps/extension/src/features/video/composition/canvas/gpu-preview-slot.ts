@@ -1,3 +1,6 @@
+import { createSourceImageFilterGpu } from '../../../image-filters/gpu';
+import type { SourceImageFilterProgram } from '../../../image-filters/plan';
+import type { createGlTransitionGpu } from './gl-transition';
 import { rasterizeGpuPreviewPaint } from './gpu-preview-primitive';
 import { GpuPreviewDeviceError } from './gpu-preview-device-error';
 import type { GpuPreviewLayer, GpuPreviewGroup, GpuPreviewPaintSource } from './gpu-preview-types';
@@ -16,7 +19,6 @@ import {
   validateGpuPreviewFrame,
   omitLeadingGroupCopies,
   needsNativeRgbSource,
-  requiresRasterSource,
   requiresGpuPreviewFilter,
   type Raster,
   type GpuPreviewRequest,
@@ -35,7 +37,9 @@ export async function createGpuPreviewSlot({
   check,
   drain,
   preparePipelines,
+  glTransitions,
 }: {
+  glTransitions: ReturnType<typeof createGlTransitionGpu>;
   device: GPUDevice;
   format: GPUTextureFormat;
   sampler: GPUSampler;
@@ -61,6 +65,7 @@ export async function createGpuPreviewSlot({
     bytes: number;
   };
   const textures = new Map<string, TextureEntry>();
+  const transitionResources: { release(): void }[] = [];
   const pendingPaintRasters: { canvas: OffscreenCanvas; reservation: Reservation }[] = [];
   const targets = new Map<
     string,
@@ -77,6 +82,7 @@ export async function createGpuPreviewSlot({
     throw error;
   });
   let cssFilter: Awaited<ReturnType<typeof createGpuPreviewCssFilter>> | null = null;
+  let imageFilter: Awaited<ReturnType<typeof createSourceImageFilterGpu>> | null = null;
   const dropTexture = (key: string, entry: TextureEntry) => {
     textures.delete(key);
     entry.texture.destroy();
@@ -91,6 +97,7 @@ export async function createGpuPreviewSlot({
     targets.clear();
     filter.dispose();
     cssFilter?.dispose();
+    imageFilter?.dispose();
     for (const entry of uniforms.splice(0)) {
       entry.buffer.destroy();
       entry.reservation.release();
@@ -180,6 +187,14 @@ export async function createGpuPreviewSlot({
     request: GpuPreviewRequest,
     pipelines: ReadonlyMap<string, GPURenderPipeline>,
     nativeFrames: ReadonlySet<VideoFrame>,
+    transitionPlans: ReadonlyMap<
+      GpuPreviewGroup,
+      {
+        composition: NonNullable<GpuPreviewGroup['composition']>;
+        prepared: Awaited<ReturnType<typeof glTransitions.prepare>>;
+      }
+    >,
+    imageFilterPlans: ReadonlyMap<GpuPreviewLayer, SourceImageFilterProgram>,
     outputTexture?: () => GPUTexture
   ) => {
     const drawBounds = createGpuPreviewDrawBounds();
@@ -233,23 +248,46 @@ export async function createGpuPreviewSlot({
       output: Size,
       logical: Size,
       prefix: string,
-      destination: GPUTexture
+      destination: GPUTexture,
+      startIndex = 0
     ) => {
       const sources = layers.map((layer, index) => {
-        const path = `${prefix}/${index}`;
+        const path = `${prefix}/${index + startIndex}`;
         let source: GPUTexture;
         if (isGroup(layer.source)) {
           const group = layer.source;
           source = renderedGroups.get(group) ?? targetFor(path, group.output);
           if (!renderedGroups.has(group)) {
-            renderLayers(group.layers, group.output, group.logical, path, source);
+            const transition = transitionPlans.get(group);
+            if (transition) {
+              const from = targetFor(`${path}/gl-from`, group.output),
+                to = targetFor(`${path}/gl-to`, group.output);
+              renderLayers([group.layers[0]!], group.output, group.logical, path, from);
+              renderLayers([group.layers[1]!], group.output, group.logical, path, to, 1);
+              transitionResources.push(
+                glTransitions.encode({
+                  encoder,
+                  prepared: transition.prepared,
+                  selection: transition.composition.selection,
+                  progress: transition.composition.progress,
+                  ratio: group.logical.width / group.logical.height,
+                  from,
+                  to,
+                  destination: source,
+                })
+              );
+            } else renderLayers(group.layers, group.output, group.logical, path, source);
             renderedGroups.set(group, source);
           }
         } else if (layer.source instanceof VideoFrame) {
           const prepared = preparedFrames.get(layer.source);
           if (prepared) source = prepared;
           else {
-            if (!requiresRasterSource(layer))
+            if (
+              !requiresGpuPreviewFilter(layer) &&
+              !layer.cssFilter &&
+              !imageFilterPlans.has(layer)
+            )
               return device.importExternalTexture({
                 source: layer.source,
               });
@@ -274,6 +312,11 @@ export async function createGpuPreviewSlot({
             );
           }
         } else source = rasterFor(layer, path);
+        const imageFilterPlan = imageFilterPlans.get(layer);
+        if (imageFilterPlan) {
+          if (!imageFilter) throw new Error('GPU source image filter is unavailable.');
+          source = imageFilter.encode(encoder, source, path, imageFilterPlan);
+        }
         if (layer.cssFilter) {
           if (!cssFilter) throw new Error('GPU preview CSS filter is unavailable.');
           source = cssFilter.prepare(encoder, source, path, layer.cssFilter);
@@ -283,12 +326,15 @@ export async function createGpuPreviewSlot({
       });
       const masks = layers.map((layer, index) =>
         layer.alphaMask
-          ? rasterFor(layer.alphaMask, `${prefix}/${index}/alpha-mask`).createView()
+          ? rasterFor(layer.alphaMask, `${prefix}/${index + startIndex}/alpha-mask`).createView()
           : null
       );
       const operationClips = layers.map((layer, index) =>
         layer.operationClip
-          ? rasterFor(layer.operationClip, `${prefix}/${index}/operation-clip`).createView()
+          ? rasterFor(
+              layer.operationClip,
+              `${prefix}/${index + startIndex}/operation-clip`
+            ).createView()
           : null
       );
       const pass = encoder.beginRenderPass({
@@ -321,12 +367,19 @@ export async function createGpuPreviewSlot({
         const preparedNative =
           layer.source instanceof VideoFrame && preparedFrames.has(layer.source);
         const samplingLayer =
-          preparedNative && !requiresRasterSource(layer)
+          preparedNative &&
+          !requiresGpuPreviewFilter(layer) &&
+          !layer.cssFilter &&
+          !imageFilterPlans.has(layer)
             ? { ...layer, clampSourceEdges: ['left', 'top', 'right', 'bottom'] as const }
             : layer;
         device.queue.writeBuffer(uniform.buffer, 0, layerValues(samplingLayer, output, logical));
         const external =
-          layer.source instanceof VideoFrame && !preparedNative && !requiresRasterSource(layer);
+          layer.source instanceof VideoFrame &&
+          !preparedNative &&
+          !requiresGpuPreviewFilter(layer) &&
+          !layer.cssFilter &&
+          !imageFilterPlans.has(layer);
         const pipeline = pipelines.get(previewPipelineKey(previewPipelineVariant(layer, external)));
         const pixels = sources[index];
         const mask = masks[index];
@@ -411,6 +464,17 @@ export async function createGpuPreviewSlot({
       let scopeOpen = true;
       try {
         const pipelines = await preparePipelines(plan.pipelines);
+        const transitionPlans = new Map(
+          await Promise.all(
+            [...plan.glTransitions].map(
+              async ([group, composition]) =>
+                [
+                  group,
+                  { composition, prepared: await glTransitions.prepare(composition.selection) },
+                ] as const
+            )
+          )
+        );
         if (!cssFilter && plan.hasCssFilter)
           cssFilter = await createGpuPreviewCssFilter(device, reserve).catch((error: unknown) => {
             if (
@@ -423,9 +487,24 @@ export async function createGpuPreviewSlot({
               });
             throw error;
           });
+        if (!imageFilter && plan.imageFilters.size)
+          imageFilter = await createSourceImageFilterGpu(device, reserve).catch(
+            (error: unknown) => {
+              if (
+                typeof GPUPipelineError !== 'undefined' &&
+                error instanceof GPUPipelineError &&
+                error.reason === 'internal'
+              )
+                throw new GpuPreviewDeviceError('GPU preview pipeline device failure.', {
+                  cause: error,
+                });
+              throw error;
+            }
+          );
         check(request.signal);
         filter.beginFrame();
         cssFilter?.beginFrame();
+        imageFilter?.beginFrame();
         if (
           !outputTexture &&
           (surface.width !== request.output.width ||
@@ -448,7 +527,16 @@ export async function createGpuPreviewSlot({
             entry.texture.destroy();
             entry.reservation.release();
           }
-        device.queue.submit([encodeFrame(request, pipelines, plan.nativeFrames, outputTexture)]);
+        device.queue.submit([
+          encodeFrame(
+            request,
+            pipelines,
+            plan.nativeFrames,
+            transitionPlans,
+            plan.imageFilters,
+            outputTexture
+          ),
+        ]);
         request.onSubmitted?.();
         scopeOpen = false;
         // Both completions retain borrowed sources; a rejection must not release the other barrier.
@@ -484,12 +572,14 @@ export async function createGpuPreviewSlot({
               await validation;
             }
           } finally {
+            for (const resource of transitionResources.splice(0)) resource.release();
             for (const retained of pendingPaintRasters.splice(0)) {
               retained.canvas.width = retained.canvas.height = 0;
               retained.reservation.release();
             }
             filter.endFrame();
             cssFilter?.endFrame();
+            imageFilter?.endFrame();
           }
         }
       }

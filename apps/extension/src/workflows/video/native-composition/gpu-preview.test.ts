@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
+import { createHash } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createProject,
+  createTrack,
   createVideoClip,
 } from '../../../features/video/project/timeline/project-meta.test.helpers';
 import { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
@@ -10,6 +12,7 @@ import {
   type GpuPreviewRenderer,
 } from '../../../features/video/composition/canvas/gpu-preview';
 import { createNativeGpuPreviewRenderer } from './gpu-preview';
+import { createEffectHostClip } from '../../../features/video/project/factories/overlay-clip';
 import * as effectPreparation from './effect-preparation';
 import { projectQuickEditPoint } from '../../../features/video/composition/motion/spatial-geometry';
 import type { renderNativeCompositionScene } from './render-scene';
@@ -554,7 +557,7 @@ it('propagates graph failures rather than silently switching a valid GPU to the 
 });
 
 it.each(['clip', 'video-group', 'transition', 'chain'] as const)(
-  'prepares %s EffectV1 inputs through the Native GPU entry without Canvas media materialization',
+  'refuses retired %s EffectV1 inputs before Native GPU materialization',
   async (kind) => {
     const f = fixture();
     const timeline = await import('../../../features/video/composition/timeline/render');
@@ -677,22 +680,119 @@ it.each(['clip', 'video-group', 'transition', 'chain'] as const)(
         };
       }),
     };
-    await expect(
-      renderNativeCompositionScene({ ...f.input, gpuPreview: f.owner })
-    ).resolves.not.toBe(false);
+    await expect(renderNativeCompositionScene({ ...f.input, gpuPreview: f.owner })).rejects.toThrow(
+      'EFFECT_RUNTIME_ANIMATION_INPUT_REJECTED'
+    );
     expect(draw).not.toHaveBeenCalled();
-    expect(f.render.mock.calls.length).toBe(kind === 'transition' ? 3 : 2);
-    const inputs = f.render.mock.calls.slice(0, -1);
-    expect(
-      inputs.every(([request]) => request.output.width === 8 && request.output.height === 4)
-    ).toBe(true);
+    expect(f.render).not.toHaveBeenCalled();
+    expect(f.input.effectRuntimeExecutor.renderFrame).not.toHaveBeenCalled();
+    expect(f.captured).toHaveLength(2);
     for (const captured of f.captured) {
       expect(captured.copyTo).not.toHaveBeenCalled();
       expect(captured.close).toHaveBeenCalledOnce();
     }
-    for (const bitmap of outputs) expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(outputs).toHaveLength(0);
   }
 );
+
+it('composes current standalone Lottie with GPU video and releases its owned bitmap', async () => {
+  const f = fixture();
+  const { renderNativeCompositionScene } = await import('./render-scene');
+  const source = JSON.stringify({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'native-gpu',
+    label: { en: 'Native GPU' },
+    controls: [],
+    bindings: [],
+    resources: [],
+    animation: { v: '5.12.2', w: 8, h: 4, fr: 30, ip: 0, op: 60, assets: [], layers: [] },
+  });
+  const sha256 = createHash('sha256').update(source).digest('hex');
+  const snapshotId = 'effect:' + sha256;
+  const track = createTrack('lottie-track', -1);
+  const host = createEffectHostClip({
+    duration: 2,
+    effectInstanceId: 'current-lottie',
+    name: 'Lottie',
+    projectWidth: 8,
+    projectHeight: 4,
+    startTime: 0,
+    trackId: track.id,
+    dimensions: { width: 8, height: 4 },
+  });
+  host.transform = { x: 0, y: 0, width: 8, height: 4, rotation: 0, opacity: 1 };
+  f.input.project.version = 52;
+  f.input.project.tracks.push(track);
+  f.input.project.clips.push(host);
+  f.input.project.effectSnapshots = [
+    {
+      id: snapshotId,
+      sha256,
+      source,
+      documentId: 'native-gpu',
+      schemaVersion: 'sniptale.animation.v1',
+      kind: 'standalone',
+      retainedByteLength: new TextEncoder().encode(source).byteLength,
+      assets: [],
+    },
+  ];
+  f.input.project.effectInstances = [
+    {
+      id: 'current-lottie',
+      kind: 'standalone',
+      snapshotId,
+      enabled: true,
+      startTime: 0,
+      duration: 2,
+      playbackRate: 1,
+      target: { kind: 'scene' },
+      controls: {},
+    },
+  ];
+  const bitmap = Object.assign(document.createElement('canvas'), { close: vi.fn() });
+  bitmap.width = 8;
+  bitmap.height = 4;
+  const renderFrame = vi.fn<
+    import('../../../contracts/effect-runtime/types').EffectRuntimeSandboxExecutor['renderFrame']
+  >(async (request) => {
+    expect(request.inputFrames).toEqual({});
+    return {
+      kind: 'frame',
+      bitmap,
+      width: 8,
+      height: 4,
+      requestId: request.requestId,
+      sequenceId: request.sequenceId,
+      effectInstanceId: request.effectInstanceId,
+      snapshotId: request.snapshotId,
+      acknowledged: {
+        assetSelectionId: request.assetSelectionRef.id,
+        documentId: request.documentRef.id,
+      },
+    };
+  });
+  f.input.effectRuntimeExecutor = { renderFrame, dispose: vi.fn() };
+  await expect(renderNativeCompositionScene({ ...f.input, gpuPreview: f.owner })).resolves.not.toBe(
+    false
+  );
+  expect(renderFrame).toHaveBeenCalledOnce();
+  expect(f.render).toHaveBeenCalledOnce();
+  const walk = (
+    nodes: readonly import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[]
+  ): import('../../../features/video/composition/canvas/gpu-preview').GpuPreviewLayer[] =>
+    nodes.flatMap((node) => [
+      node,
+      ...('kind' in node.source && node.source.kind === 'group' ? walk(node.source.layers) : []),
+    ]);
+  expect(walk(f.render.mock.calls[0]![0].layers).some((layer) => layer.source === bitmap)).toBe(
+    true
+  );
+  expect(f.captured).toHaveLength(1);
+  expect(f.captured[0]!.copyTo).not.toHaveBeenCalled();
+  expect(f.captured[0]!.close).toHaveBeenCalledOnce();
+  expect(bitmap.close).toHaveBeenCalledOnce();
+});
 
 it('remembers typed input device failure even when an effect driver wraps the error', async () => {
   const f = fixture();

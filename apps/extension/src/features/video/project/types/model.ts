@@ -27,13 +27,8 @@ import type {
   VideoProjectTrack,
   VideoProjectTransform,
 } from './layout';
-import type {
-  VideoTemplateDirection,
-  VideoTemplateIntensity,
-  VideoTransitionRenderKind,
-} from './templates';
 import type { VideoProjectMediaVisualFields } from './media';
-import { VideoTransitionTemplateKind } from './templates';
+import type { GlTransitionSelection } from '../transition/gl-catalog';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
@@ -124,7 +119,8 @@ export type VideoClipTransitionKind =
   (typeof VideoClipTransitionKind)[keyof typeof VideoClipTransitionKind];
 
 export const VideoTransitionKind = {
-  ...VideoTransitionTemplateKind,
+  GL: 'gl',
+  AUDIO: 'audio',
 } as const;
 
 export type VideoTransitionKind = (typeof VideoTransitionKind)[keyof typeof VideoTransitionKind];
@@ -227,19 +223,16 @@ interface VideoProjectBaseClip {
   transform: VideoProjectTransform;
 }
 
-export interface VideoProjectTransition {
+interface VideoProjectTransitionBoundary {
   id: string;
   leadingClipId: string;
   trailingClipId: string;
-  kind: VideoTransitionKind;
   duration: number;
   easing: VideoTransitionEasing;
-  templateKind?: VideoTransitionTemplateKind;
-  renderKind?: VideoTransitionRenderKind;
-  direction?: VideoTemplateDirection;
-  intensity?: VideoTemplateIntensity;
-  highlightColor?: string;
 }
+
+export type VideoProjectTransition = VideoProjectTransitionBoundary &
+  ({ kind: 'gl'; selection: GlTransitionSelection; presetId?: string } | { kind: 'audio' });
 
 export interface VideoProjectTransitionSegment {
   end: number;
@@ -263,6 +256,7 @@ export interface VideoProjectUtilityLanes {
 }
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
+  sourceFilters?: import('../../../image-filters/contract').SourceImageFilterStack;
   cameraShadowDirection?: CameraShadowDirection;
   cameraSplit?: CameraSplitSide | undefined;
   cameraScreenBehavior?: CameraScreenBehavior | undefined;
@@ -418,7 +412,8 @@ export interface VideoProject {
     | 48
     | 49
     | 50
-    | 51;
+    | 51
+    | 52;
   sourceVoiceoverDocuments?: VideoProjectSourceVoiceoverDocument[];
   sourceAudioDocuments?: VideoProjectSourceAudioDocument[];
   commentDocuments?: import('../comments/types').VideoProjectCommentDocument[];

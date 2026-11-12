@@ -1,3 +1,4 @@
+import { parseSourceImageFilterStack } from '../../features/image-filters/contract';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../features/video/review/advanced/types';
 import { authoredCursorFocusPath } from '../../features/video/project/cursor-focus-path/authoring';
 import { loadQuickEditAdvancedContentState } from '../../features/video/review/advanced/validation';
@@ -287,6 +288,14 @@ function reviewContentCommands(
         schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
         cursorMotions,
       })),
+    setSourceFilters: (value: QuickEditAdvancedState['sourceFilters']) => {
+      const sourceFilters = value === undefined ? undefined : parseSourceImageFilterStack(value);
+      if (sourceFilters === null) return;
+      stage((content) => {
+        const { sourceFilters: _previous, ...rest } = content;
+        return sourceFilters ? { ...rest, sourceFilters } : rest;
+      });
+    },
     setWindowHeader: (windowHeader: QuickEditAdvancedState['windowHeader']) =>
       stage((content) => {
         const { windowHeader: _previous, ...rest } = content;

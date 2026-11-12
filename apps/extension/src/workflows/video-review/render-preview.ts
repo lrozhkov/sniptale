@@ -1,3 +1,6 @@
+import { hasMagnificationDemand } from '../../features/video/composition/export-enhancement/prepared-source';
+import { hasSourceImageFilters } from '../../features/image-filters/contract';
+import { createGlTransitionCanvas } from '../../features/video/composition/canvas/gl-transition';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import { createReviewPreviewFrameExecution } from './preview-frame-execution';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
@@ -156,6 +159,7 @@ type Allocation = {
   replaceLimits(limits: { maximumManagedBytes: number; maximumCanvases: number }): void;
 };
 type Assets = {
+  glJoin?: ReturnType<typeof createGlTransitionCanvas>;
   borrowers: number;
   retired: boolean;
   closed: boolean;
@@ -214,6 +218,8 @@ function disposeAssets(assets: Assets) {
   assets.header?.close();
   assets.header = null;
   assets.painter.dispose();
+  assets.glJoin?.dispose();
+  delete assets.glJoin;
   assets.spatial?.dispose();
   assets.spatial = undefined;
   for (const reservation of assets.reservations.splice(0)) reservation.release();
@@ -611,14 +617,14 @@ async function drawPreparedCanvasFrame(
     if (
       frame.transition &&
       frame.exportEnhancer &&
-      frame.transition.blend.plan.type !== 'dissolve'
+      frame.transition.blend.plan.type === 'fade-black'
     ) {
       sample = selectReviewCutTransitionSource(
         frame.transition.blend,
         frame.transition.frames,
         knownTransitionSource(frame.source)
       );
-    } else if (frame.transition && frame.transition.blend.plan.type !== 'dissolve') {
+    } else if (frame.transition && frame.transition.blend.plan.type === 'fade-black') {
       validSize(frame.source.backing);
       transition = resources.canvas('preview-transition-source', frame.source.backing);
       paintReviewCutTransition(
@@ -645,6 +651,8 @@ async function drawPreparedCanvasFrame(
         throw new Error('Preview spatial preparation is unavailable.');
       const drawScene = {
         canvas,
+        sourceFilters: scene.sourceFilters,
+        sourceSize: scene.source,
         backgroundCacheContext: output.context,
         layout: request.layout,
         background: request.background,
@@ -703,6 +711,7 @@ async function drawPreparedCanvasFrame(
             enhancer: frame.exportEnhancer,
             scene: {
               sourceSize: scene.source,
+              sourceFilters: scene.sourceFilters,
               ...(scene.canvas ? { baseCanvas: scene.canvas } : {}),
               windowHeader: scene.windowHeader,
               background: scene.background,
@@ -724,9 +733,10 @@ async function drawPreparedCanvasFrame(
             ? { layout: enhanced.plan.layout, exportSampling: { frame: enhanced } }
             : {}),
           spatialRenderer: assets.spatial,
-          windowRaster: enhanced
-            ? undefined
-            : retainedWindowRaster(scene, assets, frame, request.layout, resources),
+          windowRaster:
+            enhanced || (scene.sourceFilters && hasSourceImageFilters(scene.sourceFilters))
+              ? undefined
+              : retainedWindowRaster(scene, assets, frame, request.layout, resources),
           windowRasterBacking: reviewWindowRasterBacking({
             windowRect: request.layout.windowRect,
             sourceWidth: scene.source.width * (request.layout.sourceCrop?.width ?? 1),
@@ -769,7 +779,7 @@ async function drawPreparedCanvasFrame(
       }
       return reviewPresentedGeometry(scene, dimensions, frame.resultTime, request.camera);
     };
-    if (frame.transition?.blend.plan.type === 'dissolve') {
+    if (frame.transition && frame.transition.blend.plan.type !== 'fade-black') {
       geometry = reviewPresentedGeometry(scene, dimensions, frame.resultTime, request.camera);
       const { blend, frames, resultOffset } = frame.transition;
       const sides = reviewCutTransitionSides(
@@ -780,21 +790,39 @@ async function drawPreparedCanvasFrame(
         resultOffset
       );
       transition = resources.canvas('preview-transition-source', dimensions.backing);
-      await paintReviewCutDissolve(
-        context,
-        transition,
-        blend.incoming,
-        async (target, surface, side) => {
-          const endpoint = sides[side];
-          await draw(
-            target,
-            surface,
-            { ...frame, resultTime: endpoint.resultTime, sourceTime: endpoint.sample.timestamp },
-            { draw: endpoint.sample.draw.bind(endpoint.sample) }
-          );
-        },
-        canvas
-      );
+      const drawEndpoint = async (
+        target: CanvasRenderingContext2D,
+        surface: HTMLCanvasElement,
+        side: 0 | 1
+      ) => {
+        const endpoint = sides[side];
+        await draw(
+          target,
+          surface,
+          { ...frame, resultTime: endpoint.resultTime, sourceTime: endpoint.sample.timestamp },
+          { draw: endpoint.sample.draw.bind(endpoint.sample) }
+        );
+      };
+      if (blend.plan.type === 'gl') {
+        await drawEndpoint(context, canvas, 0);
+        await drawEndpoint(transition.context, transition.canvas, 1);
+        assets.glJoin ??= createGlTransitionCanvas({
+          ownerDocument: document,
+          reserve: (bytes) => resources.bytes('preview-gl-transition', bytes),
+        });
+        await assets.glJoin.render({
+          context,
+          from: canvas,
+          to: transition.canvas,
+          width: canvas.width,
+          height: canvas.height,
+          selection: blend.plan.selection,
+          progress: blend.incoming,
+          ratio: dimensions.canonical.width / dimensions.canonical.height,
+          signal,
+        });
+      } else
+        await paintReviewCutDissolve(context, transition, blend.incoming, drawEndpoint, canvas);
     } else geometry = await draw(context, canvas, frame, sample);
     signal.throwIfAborted();
     const splitScreen = reviewSplitScreenAt(scene.webcam, frame.sourceTime, !!frame.camera);
@@ -877,6 +905,7 @@ function admitRender(
     const plan = planReviewExportSource({
       scene: {
         sourceSize: prepared.scene.source,
+        sourceFilters: prepared.scene.sourceFilters,
         ...(prepared.scene.canvas ? { baseCanvas: prepared.scene.canvas } : {}),
         windowHeader: prepared.scene.windowHeader,
         background: prepared.scene.background,
@@ -894,6 +923,30 @@ function admitRender(
       resultTime: frame?.resultTime ?? 0,
       ...(frame?.cameraTransform ? { camera: frame.cameraTransform } : {}),
     });
+    if (base.scene.sourceFilter) {
+      const magnified = plan.demands.filter((demand) => hasMagnificationDemand([demand]));
+      if (magnified.length) {
+        const source = plan.identity.sourceSize;
+        const density = Math.max(
+          ...magnified.flatMap((demand) => [
+            demand.targetRasterSize.width / demand.originalPixelROI.width,
+            demand.targetRasterSize.height / demand.originalPixelROI.height,
+          ])
+        );
+        // Full-source tile materialization rounds first; its reconstruction uses the rounded density.
+        const preparedDensity = Math.max(
+          Math.ceil(source.width * density) / source.width,
+          Math.ceil(source.height * density) / source.height
+        );
+        base.scene.sourceFilter = {
+          ...base.scene.sourceFilter,
+          preparedRaster: {
+            width: Math.ceil(source.width * preparedDensity),
+            height: Math.ceil(source.height * preparedDensity),
+          },
+        };
+      }
+    }
     const physical = reviewExportSamplingAllocation(
       plan,
       prepared.dimensions.backing,
@@ -921,7 +974,7 @@ function admitRender(
     };
   }
   const candidates = [calculatePreviewRenderAllocation(base)];
-  if (frame?.transition?.blend.plan.type === 'dissolve') {
+  if (frame?.transition && frame.transition.blend.plan.type !== 'fade-black') {
     const sides = reviewCutTransitionSides(
       frame.transition.blend,
       frame.transition.frames,

@@ -358,6 +358,7 @@ export function runWithPersistentDataErasureBarrier<T>(
 }
 
 export type PersistenceMutationDomain =
+  | 'animation-catalog'
   | 'annotation-template-tags'
   | 'callout-presets'
   | 'drawing-palette'

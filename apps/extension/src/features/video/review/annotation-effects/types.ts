@@ -41,7 +41,7 @@ export interface ReviewAnnotationEffectAsset {
 /** Immutable verified source outside history; history stores snapshot identities only. */
 export interface ReviewAnnotationEffectSnapshot {
   id: string;
-  schemaVersion: 'sniptale.effect.v1';
+  schemaVersion: 'sniptale.animation.v1';
   kind: 'standalone';
   documentId: string;
   sha256: string;

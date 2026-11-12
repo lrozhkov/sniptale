@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  resolveEffectV1ControlDefault,
-  resolveEffectV1ObjectRenderBounds,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+  resolveAnimationObjectRenderBounds,
+  validateAnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import { quickEditPlaneProjection } from '../../composition/motion/spatial-geometry';
 import {
   initializeReviewAnnotationEffectAnchors,
@@ -21,25 +21,22 @@ const transform = { x: 0.2, y: 0.3, width: 0.3, height: 0.12, rotation: 0.1 };
 function builtin(name: string) {
   const raw: unknown = JSON.parse(
     readFileSync(
-      resolve(
-        'apps/extension/public/video-effects/effects/annotations',
-        `sniptale-${name}/effect.sniptale-effect.json`
-      ),
+      resolve('apps/extension/public/video-effects/animations', `${name}.sniptale-animation.json`),
       'utf8'
     )
   );
-  const result = validateEffectV1Document(raw);
-  if (!result.ok || !result.document) throw Error('Invalid test fixture');
-  return result.document;
+  const result = validateAnimationTemplate(raw);
+  if (!result.ok || !result.template) throw Error('Invalid test fixture');
+  return result.template;
 }
 
 describe('annotation canonical geometry', () => {
-  it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
+  it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arrow'])(
     'uses the declared geometry and controls for %s',
     (name) => {
       const document = builtin(name);
       const controls = Object.fromEntries(
-        document.controls.map((c) => [c.id, resolveEffectV1ControlDefault(c, 'ru')])
+        document.controls.map((c) => [c.id, resolveEffectControlDefault(c, 'ru')])
       );
       const anchors = initializeReviewAnnotationEffectAnchors(document, transform, controls, plane);
       const annotation: ReviewAnnotationEffect = {
@@ -60,9 +57,7 @@ describe('annotation canonical geometry', () => {
         expect(resolved[h.xControl]).toBeCloseTo(Number(controls[h.xControl]));
         expect(resolved[h.yControl]).toBeCloseTo(Number(controls[h.yControl]));
       }
-      expect(
-        resolveEffectV1ObjectRenderBounds(document.objectLayout!, resolved).width
-      ).toBeGreaterThan(0);
+      expect(resolveAnimationObjectRenderBounds(document, resolved).width).toBeGreaterThan(0);
       expect(resolveReviewAnnotationEffectBox(transform, plane)).toMatchObject({
         x: 384,
         y: 324,
@@ -75,10 +70,10 @@ describe('annotation canonical geometry', () => {
     const document = builtin('callout'),
       h = document.objectLayout!.handles![0]!;
     const controls = Object.fromEntries(
-      document.controls.map((c) => [c.id, resolveEffectV1ControlDefault(c, 'en')])
+      document.controls.map((c) => [c.id, resolveEffectControlDefault(c, 'en')])
     );
-    controls[h.xControl] = document.objectLayout!.width * 2;
-    controls[h.yControl] = -document.objectLayout!.height;
+    controls[h.xControl] = document.animation.w * 2;
+    controls[h.yControl] = -document.animation.h;
     const anchors = initializeReviewAnnotationEffectAnchors(document, transform, controls, plane)!;
     const instance: ReviewAnnotationEffect = {
       id: 'callout',
@@ -96,9 +91,9 @@ describe('annotation canonical geometry', () => {
     const resolved = resolveReviewAnnotationEffectControls(document, moved, plane);
     expect(moved.anchors).toBe(anchors);
     expect(resolved[h.xControl]).not.toBe(controls[h.xControl]);
-    expect(
-      resolveEffectV1ObjectRenderBounds(document.objectLayout!, resolved).width
-    ).toBeGreaterThan(document.objectLayout!.width);
+    expect(resolveAnimationObjectRenderBounds(document, resolved).width).toBeGreaterThan(
+      document.animation.w
+    );
     const { anchors: _anchors, ...withoutAnchors } = instance;
     expect(() => resolveReviewAnnotationEffectControls(document, withoutAnchors, plane)).toThrow(
       'Missing annotation anchor'

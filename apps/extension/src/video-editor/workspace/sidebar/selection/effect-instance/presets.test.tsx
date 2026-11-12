@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { applyEffectCatalogDocument } from '../../../../../features/video/project/effect-instance/apply';
 import { act, useState } from 'react';
 import { createEffectInstanceGroups } from './groups';
 import { EffectPresetEditingProvider } from './editing';
 import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import type { EffectBundleCatalogEntry } from '../../../../../features/video/project/effect-bundle/catalog';
 import type { EffectPresetPreferences } from '../../../../../features/video/project/effect-bundle/catalog/presets';
 import { EffectVisualPresets } from './presets';
@@ -55,10 +57,13 @@ vi.mock('../shared/controls', async (original) => ({
   ),
 }));
 const source = readFileSync(
-  'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
   'utf8'
 );
-const doc = parseEffectV1Source(source).document!;
+const accepted = parseAnimationTemplateSource(source);
+if (!accepted.ok) throw new Error(JSON.stringify(accepted.diagnostics));
+const doc = accepted.template;
+const sourceSha256 = createHash('sha256').update(source).digest('hex');
 const catalog: EffectBundleCatalogEntry = {
   packId: 'raw.callout',
   documents: [
@@ -66,8 +71,8 @@ const catalog: EffectBundleCatalogEntry = {
       id: doc.id,
       kind: 'standalone',
       source,
-      sha256: 'a'.repeat(64),
-      schemaVersion: 'sniptale.effect.v1',
+      sha256: sourceSha256,
+      schemaVersion: 'sniptale.animation.v1',
       assets: [],
     },
   ],
@@ -76,8 +81,8 @@ const catalog: EffectBundleCatalogEntry = {
   label: { en: 'Callout', ru: 'Выноска' },
   description: { en: '', ru: '' },
   source: 'raw-json',
-  sourceSha256: 'a'.repeat(64),
-  retainedByteLength: source.length,
+  sourceSha256,
+  retainedByteLength: Buffer.byteLength(source),
   createdAt: 0,
   updatedAt: 0,
   version: '1',
@@ -127,7 +132,7 @@ it('switches styles, saves and removes presets, chooses defaults and reports per
       root.render(
         <EffectVisualPresets
           document={doc}
-          sourceSha256={'a'.repeat(64)}
+          sourceSha256={sourceSha256}
           controls={controls}
           disabled={false}
           onChange={update}
@@ -143,10 +148,10 @@ it('switches styles, saves and removes presets, chooses defaults and reports per
     host.querySelector<HTMLSelectElement>(
       '[aria-label="videoEditor.effectsLibrary.defaultPreset"]'
     )!;
-  await change(style(), 'builtin:sniptale-orange-light');
+  await change(style(), `builtin:${doc.controlPresets![0]!.id}`);
   expect(update.mock.calls[0]![0]['title']).toBe('User text');
   await render();
-  expect(style().value).toBe('builtin:sniptale-orange-light');
+  expect(style().value).toBe(`builtin:${doc.controlPresets![0]!.id}`);
   await act(async () => button('videoEditor.effectsLibrary.savePreset').click());
   await change(host.querySelector('input')!, 'My style');
   await act(async () =>
@@ -164,11 +169,11 @@ it('switches styles, saves and removes presets, chooses defaults and reports per
   await act(async () => button('common.actions.delete').click());
   expect(mocks.save.mock.calls.at(-1)![3]).toEqual({ presets: [] });
   mocks.save.mockRejectedValueOnce(new Error('quota'));
-  await change(defaults(), 'builtin:sniptale-orange-dark');
+  await change(defaults(), `builtin:${doc.controlPresets![1]!.id}`);
   expect(host.querySelector('[role=alert]')?.textContent).toBe(
     'videoEditor.effectsLibrary.updateFailed'
   );
-  await change(defaults(), 'builtin:sniptale-orange-light');
+  await change(defaults(), `builtin:${doc.controlPresets![0]!.id}`);
   expect(host.querySelector('[role=alert]')).toBeNull();
   await change(defaults(), 'template');
   expect(mocks.save.mock.calls.at(-1)![3]).toEqual({ presets: [] });
@@ -182,7 +187,7 @@ it('retains snapshot styles but disables library writes when the catalog cannot 
     root.render(
       <EffectVisualPresets
         document={doc}
-        sourceSha256={'a'.repeat(64)}
+        sourceSha256={sourceSha256}
         controls={{ title: 'Saved' }}
         disabled
         onChange={vi.fn()}
@@ -204,7 +209,7 @@ it('keeps the committed selection while preview controls cross another preset', 
         <EffectVisualPresets
           {...{ matchingControls }}
           document={doc}
-          sourceSha256={'a'.repeat(64)}
+          sourceSha256={sourceSha256}
           controls={controls}
           disabled={false}
           onChange={vi.fn()}
@@ -219,15 +224,17 @@ it('keeps the committed selection while preview controls cross another preset', 
   expect(host.querySelector('select')!.value).toBe(`builtin:${second.id}`);
 });
 
-it.each(['sniptale-callout', 'sniptale-video-blur', 'sniptale-transition-blur'])(
+it.each(['callout', 'frame', 'arrow'])(
   'retains the preset across separated parameter sections for %s',
   async (fixture) => {
-    const original = parseEffectV1Source(
+    const parsed = parseAnimationTemplateSource(
       readFileSync(
-        `packages/runtime-contracts/src/effect-v1/fixtures/collection/${fixture}.sniptale-effect.json`,
+        `apps/extension/public/video-effects/animations/${fixture}.sniptale-animation.json`,
         'utf8'
       )
-    ).document!;
+    );
+    if (!parsed.ok) throw new Error(JSON.stringify(parsed.diagnostics));
+    const original = parsed.template;
     const control = original.controls.find(
       (item) => item.kind === 'number' && item.min !== undefined && item.max !== undefined
     )!;
@@ -253,40 +260,44 @@ it.each(['sniptale-callout', 'sniptale-video-blur', 'sniptale-transition-blur'])
       ],
     };
     const source = JSON.stringify(document);
-    expect(parseEffectV1Source(source).ok, JSON.stringify(parseEffectV1Source(source))).toBe(true);
-    const initial = createEmptyVideoProject('Preset test');
-    const target =
-      document.kind === 'transition'
-        ? { kind: 'transition' as const, transitionId: 'junction' }
-        : { kind: 'scene' as const };
-    initial.effectSnapshots = [
-      {
-        id: 'snapshot',
-        documentId: document.id,
-        kind: document.kind,
-        source,
-        sha256: 'a'.repeat(64),
-        schemaVersion: 'sniptale.effect.v1',
-        retainedByteLength: source.length,
-        assets: [],
-      },
-    ];
-    initial.effectInstances = [
-      {
-        id: 'effect',
-        snapshotId: 'snapshot',
-        kind: document.kind,
-        controls: {
-          ...Object.fromEntries(document.controls.map((item) => [item.id, item.defaultValue])),
-          [control.id]: first,
-        },
-        target,
-        startTime: 0,
-        duration: 4,
-        playbackRate: 1,
+    const validation = parseAnimationTemplateSource(source);
+    expect(validation.ok, JSON.stringify(validation.diagnostics)).toBe(true);
+    const hash = createHash('sha256').update(source).digest('hex');
+    const base = createEmptyVideoProject('Preset test');
+    base.version = 52;
+    base.duration = 4;
+    const target = { kind: 'scene' as const };
+    const initial = await applyEffectCatalogDocument({
+      project: base,
+      documentId: document.id,
+      instanceId: 'effect',
+      startTime: 0,
+      standaloneDuration: 4,
+      target,
+      catalog: {
+        packId: `preset-${fixture}`,
+        source: 'raw-json',
+        sourceSha256: hash,
+        version: '1',
         enabled: true,
+        createdAt: 0,
+        updatedAt: 0,
+        assets: [],
+        label: { en: document.label.en, ru: document.label.ru ?? document.label.en },
+        description: { en: '', ru: '' },
+        retainedByteLength: Buffer.byteLength(source),
+        documents: [
+          {
+            id: document.id,
+            kind: 'standalone',
+            schemaVersion: 'sniptale.animation.v1',
+            source,
+            sha256: hash,
+            assets: [],
+          },
+        ],
       },
-    ];
+    });
     function Inspector() {
       const [project, setProject] = useState(initial);
       const groups = createEffectInstanceGroups({

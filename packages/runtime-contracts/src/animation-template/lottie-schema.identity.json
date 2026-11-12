@@ -1,0 +1,14 @@
+{
+  "source": "https://lottiefiles.github.io/lottie-docs/lottie.schema.json",
+  "sha256": "e0fb9177ea9f3477a851fa716aae51d96d8725719763ccf693fb7ef90adf5567",
+  "bytes": 241196,
+  "license": "CC-BY-4.0",
+  "attribution": "LottieFiles and contributors, lottie-docs",
+  "compiler": "ajv@8.20.0",
+  "changes": "Standalone validation is compiled from the unchanged pinned source with a strict image/precomposition-only asset union. Audio and external data assets are unsupported; the upstream broad sound branch otherwise makes normal images fail oneOf.",
+  "profile": {
+    "assetTypes": ["precomposition", "image"],
+    "excludedAssetTypes": ["sound", "data-source"],
+    "reason": "Upstream all-assets.oneOf accepts ordinary images as both image and sound; Sniptale supports neither audio nor external data assets."
+  }
+}

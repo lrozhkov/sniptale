@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { describe, expect, it } from 'vitest';
 
 import type {
@@ -7,18 +10,25 @@ import type {
 import { createEmptyVideoProject } from '../factories/creation';
 import { hydrateVideoProject } from './index';
 
-const SNAPSHOT_SHA256 = 'a'.repeat(64);
+const SOURCE = readFileSync(
+  'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
+  'utf8'
+);
+const SNAPSHOT_SHA256 = createHash('sha256').update(SOURCE).digest('hex');
+const parsed = parseAnimationTemplateSource(SOURCE);
+if (!parsed.ok) throw new Error('Expected valid shipped animation.');
+const DOCUMENT_ID = parsed.template.id;
 
 function createEffectSnapshot(): VideoProjectEffectSnapshot {
   return {
     assets: [],
-    documentId: 'hydration-effect',
+    documentId: DOCUMENT_ID,
     id: `effect:${SNAPSHOT_SHA256}`,
     kind: 'standalone',
-    retainedByteLength: 2,
-    schemaVersion: 'sniptale.effect.v1',
+    retainedByteLength: Buffer.byteLength(SOURCE),
+    schemaVersion: 'sniptale.animation.v1',
     sha256: SNAPSHOT_SHA256,
-    source: '{}',
+    source: SOURCE,
   };
 }
 
@@ -37,7 +47,7 @@ function createEffectInstance(snapshotId: string): VideoProjectEffectInstance {
   };
 }
 
-describe('EffectV1 project hydration', () => {
+describe('animation project hydration', () => {
   it('preserves persisted snapshots and instances without creating a second authority', () => {
     const project = createEmptyVideoProject('effect-hydration');
     const snapshot = createEffectSnapshot();
@@ -51,7 +61,7 @@ describe('EffectV1 project hydration', () => {
     expect(hydrated.effectInstances).toEqual([instance]);
   });
 
-  it('defaults absent EffectV1 branches to empty collections', () => {
+  it('defaults absent animation branches to empty collections', () => {
     const project = createEmptyVideoProject('effect-hydration-defaults');
     const { effectInstances: _instances, effectSnapshots: _snapshots, ...withoutEffects } = project;
 

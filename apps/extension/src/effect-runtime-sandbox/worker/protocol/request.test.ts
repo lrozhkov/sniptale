@@ -1,202 +1,171 @@
-import { expect, it, vi } from 'vitest';
-
-import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
-
+import { expect, it } from 'vitest';
+import { parseRuntimeAnimationDocument } from '../../../contracts/effect-runtime/animation';
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
   EFFECT_RUNTIME_WORKER_REQUEST,
   type EffectRuntimeWorkerMessage,
+  type EffectRuntimeWorkerAsset,
 } from '../../../contracts/effect-runtime/types';
-import { createDocument } from '../interpreter/support.test-support';
-import { parseWorkerAssets } from './request-assets';
-import { parseEffectRuntimeWorkerRequest } from './request';
+import { parseEffectRuntimeWorkerRequest, resolveEffectRuntimeWorkerRequest } from './request';
 
-class FakeBitmap implements ImageBitmap {
-  readonly close = vi.fn();
-  constructor(
-    readonly width: number,
-    readonly height: number
-  ) {}
+function createRequest(): EffectRuntimeWorkerMessage {
+  const document = parseRuntimeAnimationDocument({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'boundary-proof',
+    label: { en: 'Boundary proof' },
+    controls: [
+      { id: 'amount', kind: 'number', defaultValue: 1, min: 0, max: 2 },
+      { id: 'accent', kind: 'color', defaultValue: '#ffffff' },
+    ],
+    bindings: [
+      { kind: 'scalar', slot: 'amount', control: 'amount' },
+      { kind: 'color', slot: 'accent', control: 'accent' },
+    ],
+    resources: [],
+    animation: {
+      v: '5.12.2',
+      w: 320,
+      h: 180,
+      fr: 30,
+      ip: 30,
+      op: 90,
+      layers: [],
+      assets: [],
+      slots: { amount: { p: { a: 0, k: 1 } }, accent: { p: { a: 0, k: [1, 1, 1] } } },
+    },
+  });
+  if (!document) throw new Error('Invalid boundary fixture');
+  const documentId = 'c'.repeat(64);
+  return {
+    type: EFFECT_RUNTIME_WORKER_REQUEST,
+    protocolVersion: EFFECT_RUNTIME_PROTOCOL_VERSION,
+    documentRef: { id: documentId, document },
+    assetSelectionRef: { id: 'd'.repeat(64), assets: {} },
+    snapshotId: `effect:${documentId}`,
+    effectInstanceId: 'instance',
+    requestId: 'request',
+    sequenceId: 1,
+    controls: { amount: 1, accent: '#ffffff' },
+    width: 320,
+    height: 180,
+    renderWidth: 160,
+    renderHeight: 90,
+    duration: 2,
+    time: 1,
+    progress: 0.5,
+    frameIndex: 30,
+    fps: 30,
+    inputFrames: {},
+  };
 }
 
-it('rejects identity, timing, dimensions, controls, and input contract drift', () => {
+it('accepts an immutable local Lottie package with intrinsic geometry and its exact source clock', () => {
+  const request = createRequest(),
+    before = structuredClone(request);
+  expect(parseEffectRuntimeWorkerRequest(request)).toMatchObject({
+    controls: request.controls,
+    time: 1,
+    progress: 0.5,
+    duration: 2,
+    width: 320,
+    height: 180,
+    renderWidth: 160,
+    renderHeight: 90,
+    document: request.documentRef.document,
+    assets: {},
+    inputFrames: {},
+  });
+  expect(request).toEqual(before);
+});
+
+it('rejects identity, timing, dimensions, controls and input contract drift', () => {
   const base = createRequest();
-  const variants = [
+  for (const value of [
     null,
     { ...base, extra: true },
     { ...base, protocolVersion: 1 },
     { ...base, documentRef: { document: {}, id: base.documentRef.id } },
+    { ...base, snapshotId: `effect:${'a'.repeat(64)}` },
     { ...base, duration: 3 },
     { ...base, fps: 0 },
     { ...base, frameIndex: -1 },
     { ...base, time: 3 },
     { ...base, progress: 0.25 },
     { ...base, width: 0 },
+    { ...base, width: 321 },
+    { ...base, renderWidth: 0 },
+    { ...base, renderHeight: Infinity },
     { ...base, controls: { extra: 1 } },
+    { ...base, controls: { amount: 3, accent: '#ffffff' } },
+    { ...base, controls: { amount: '1', accent: '#ffffff' } },
+    { ...base, controls: { amount: 1, accent: 1 } },
     { ...base, inputFrames: { source: {} } },
-  ];
-
-  for (const variant of variants) expect(parseEffectRuntimeWorkerRequest(variant)).toBeNull();
+  ])
+    expect(parseEffectRuntimeWorkerRequest(value), JSON.stringify(value)?.slice(0, 180)).toBeNull();
 });
 
-it('accepts bounded controls and exact target input while rejecting value drift', () => {
-  const request = createRequest();
-  request.documentRef.document!.kind = 'targetEffect';
-  request.documentRef.document!.controls = [
-    { defaultValue: 1, id: 'amount', kind: 'number', max: 2, min: 0 },
-    { defaultValue: '#fff', id: 'color', kind: 'color' },
-  ];
-  request.documentRef.document!.program.commands = [
-    {
-      height: 10,
-      input: 'source',
-      op: 'image',
-      width: 10,
-      x: { op: 'read', path: 'controls.amount' },
-      y: 0,
-    },
-    {
-      fill: { op: 'read', path: 'controls.color' },
-      height: 1,
-      op: 'fillRect',
-      width: 1,
-      x: 0,
-      y: 0,
-    },
-  ];
-  request.controls = { amount: 1, color: '#fff' };
-  const bitmap = new FakeBitmap(10, 10);
-  request.inputFrames = { source: { bitmap, height: 10, width: 10 } };
-
-  expect(parseEffectRuntimeWorkerRequest(request)).toMatchObject({ controls: request.controls });
-  expect(
-    parseEffectRuntimeWorkerRequest({ ...request, controls: { amount: 3, color: '#fff' } })
-  ).toBeNull();
-  expect(
-    parseEffectRuntimeWorkerRequest({
-      ...request,
-      controls: { amount: 1, color: 'x'.repeat(4097) },
-    })
-  ).toBeNull();
-  request.inputFrames.source!.width = 9;
-  expect(parseEffectRuntimeWorkerRequest(request)).toBeNull();
-});
-
-it('accepts only the explicit GPU plan selector and preserves the default request shape', () => {
-  const request = createRequest();
-  expect(parseEffectRuntimeWorkerRequest(request)?.renderTarget).toBeUndefined();
-  expect(parseEffectRuntimeWorkerRequest({ ...request, renderTarget: 'gpu-plan' })).toMatchObject({
-    renderTarget: 'gpu-plan',
-  });
-  for (const renderTarget of ['canvas', '', null, 1, {}]) {
-    expect(parseEffectRuntimeWorkerRequest({ ...request, renderTarget })).toBeNull();
+it.each(['gpu-plan', 'canvas', '', null, 1, {}])(
+  'refuses the removed renderTarget selector %j',
+  (renderTarget) => {
+    expect(parseEffectRuntimeWorkerRequest({ ...createRequest(), renderTarget })).toBeNull();
   }
-  expect(
-    parseEffectRuntimeWorkerRequest({ ...request, renderTarget: 'gpu-plan', extra: true })
-  ).toBeNull();
-});
+);
 
-it('parses exact image, SVG, and ignored audio declarations', () => {
-  const image = new FakeBitmap(10, 10);
-  const document = createAssetDocument();
-  const assets = {
-    image: {
-      bitmap: image,
-      cacheKey: 'a'.repeat(64),
-      height: 10,
-      id: 'image',
-      kind: 'image',
-      mimeType: 'image/png',
-      width: 10,
+it.each(['image', 'svg', 'audio'])(
+  'refuses detached %s assets instead of acquiring them',
+  (kind) => {
+    const request = createRequest();
+    expect(
+      parseEffectRuntimeWorkerRequest({
+        ...request,
+        assetSelectionRef: {
+          id: request.assetSelectionRef.id,
+          assets: { foreign: { kind, id: 'foreign' } },
+        },
+      })
+    ).toBeNull();
+  }
+);
+
+it('retains acknowledgement cache identity and classifies a genuinely missing reference', () => {
+  const request = createRequest(),
+    document = request.documentRef.document;
+  if (!document) throw new Error('Missing document');
+  const documents = new Map<string, typeof document>();
+  const assets = new Map<string, Record<string, EffectRuntimeWorkerAsset>>();
+  const cache = {
+    getDocument: (id: string) => documents.get(id) ?? null,
+    getAssets: (id: string) => assets.get(id) ?? null,
+    setDocument: (id: string, value: typeof document) => {
+      documents.set(id, value);
     },
-    svg: {
-      cacheKey: 'b'.repeat(64),
-      height: 10,
-      id: 'svg',
-      kind: 'svg',
-      mimeType: 'image/svg+xml',
-      svgVector: { height: 10, parts: [], width: 10 },
-      width: 10,
+    setAssets: (id: string, value: Record<string, EffectRuntimeWorkerAsset>) => {
+      assets.set(id, value);
+      return true;
     },
   };
-
-  expect(parseWorkerAssets(assets, document)).toMatchObject({
-    image: { bitmap: image },
-    svg: { kind: 'svg' },
+  expect(resolveEffectRuntimeWorkerRequest(request, cache).ok).toBe(true);
+  const referenced = {
+    ...request,
+    documentRef: { id: request.documentRef.id },
+    assetSelectionRef: { id: request.assetSelectionRef.id },
+  };
+  expect(resolveEffectRuntimeWorkerRequest(referenced, cache)).toMatchObject({
+    ok: true,
+    request: { document, assets: {}, time: 1 },
   });
-  expect(parseWorkerAssets(null, document)).toBeNull();
-  expect(parseWorkerAssets({}, document)).toBeNull();
-  expect(
-    parseWorkerAssets({ ...assets, image: { ...assets.image, cacheKey: 'bad' } }, document)
-  ).toBeNull();
-  expect(
-    parseWorkerAssets({ ...assets, image: { ...assets.image, width: 9 } }, document)
-  ).toBeNull();
-  expect(
-    parseWorkerAssets({ ...assets, svg: { ...assets.svg, mimeType: 'image/png' } }, document)
-  ).toBeNull();
-  expect(
-    parseWorkerAssets({ ...assets, svg: { ...assets.svg, svgVector: null } }, document)
-  ).toBeNull();
-  expect(parseWorkerAssets({ ...assets, svg: { ...assets.svg, width: 9 } }, document)).toBeNull();
+  documents.clear();
+  expect(resolveEffectRuntimeWorkerRequest(referenced, cache)).toEqual({
+    ok: false,
+    code: 'cacheMiss',
+    missingRef: 'document',
+  });
+  documents.set(request.documentRef.id, document);
+  assets.clear();
+  expect(resolveEffectRuntimeWorkerRequest(referenced, cache)).toEqual({
+    ok: false,
+    code: 'cacheMiss',
+    missingRef: 'assetSelection',
+  });
 });
-
-function createRequest(): EffectRuntimeWorkerMessage {
-  const documentId = 'c'.repeat(64);
-  return {
-    assetSelectionRef: { assets: {}, id: 'd'.repeat(64) },
-    controls: {},
-    documentRef: { document: createDocument([{ op: 'clear' }]), id: documentId },
-    duration: 2,
-    effectInstanceId: 'instance',
-    fps: 30,
-    frameIndex: 30,
-    height: 10,
-    inputFrames: {},
-    progress: 0.5,
-    protocolVersion: EFFECT_RUNTIME_PROTOCOL_VERSION,
-    renderHeight: 10,
-    renderWidth: 10,
-    requestId: 'request',
-    sequenceId: 1,
-    snapshotId: `effect:${documentId}`,
-    time: 1,
-    type: EFFECT_RUNTIME_WORKER_REQUEST,
-    width: 10,
-  };
-}
-
-function createAssetDocument(): EffectV1Document {
-  const document = createDocument([{ op: 'clear' }]);
-  document.assets = [
-    {
-      byteLength: 10,
-      height: 10,
-      id: 'image',
-      kind: 'image',
-      mimeType: 'image/png',
-      path: 'runtime-assets/image',
-      sha256: 'a'.repeat(64),
-      width: 10,
-    },
-    {
-      byteLength: 10,
-      height: 10,
-      id: 'svg',
-      kind: 'svg',
-      mimeType: 'image/svg+xml',
-      path: 'runtime-assets/svg',
-      sha256: 'b'.repeat(64),
-      width: 10,
-    },
-    {
-      byteLength: 10,
-      id: 'audio',
-      kind: 'audio',
-      mimeType: 'audio/wav',
-      path: 'runtime-assets/audio',
-      sha256: 'c'.repeat(64),
-    },
-  ];
-  return document;
-}

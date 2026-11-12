@@ -96,7 +96,7 @@ let failRead = false;
 const save = vi.fn();
 function setup() {
   const text = readFileSync(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
     'utf8'
   );
   const advanced = createQuickEditAdvancedState();
@@ -113,6 +113,7 @@ function setup() {
         enabled: true,
         transform: { x: 0.1, y: 0.1, width: 0.4, height: 0.2, rotation: 0 },
         controls: { title: 'Persisted title' },
+        anchors: { tip: { x: 0.5, y: 0.5 } },
         order: 0,
       },
     ],
@@ -132,9 +133,9 @@ function setup() {
           id: `effect:${'a'.repeat(64)}`,
           sha256: 'a'.repeat(64),
           source: text,
-          schemaVersion: 'sniptale.effect.v1',
+          schemaVersion: 'sniptale.animation.v1',
           kind: 'standalone',
-          documentId: 'sniptale-title',
+          documentId: 'sniptale-callout',
           retainedByteLength: new TextEncoder().encode(text).byteLength,
           assets: [],
         },
@@ -276,7 +277,7 @@ it('passes the coherent EffectV1 snapshots into the Gallery presentation preview
   expect(observed.preview?.effectSnapshots).toBe(
     state().snapshot.snapshot.workspace.effectSnapshots
   );
-  expect(observed.preview?.effectSnapshots?.[0]?.documentId).toBe('sniptale-title');
+  expect(observed.preview?.effectSnapshots?.[0]?.documentId).toBe('sniptale-callout');
 });
 
 it('routes rare commands into one More menu in Basic and Advanced without permanent project actions', async () => {

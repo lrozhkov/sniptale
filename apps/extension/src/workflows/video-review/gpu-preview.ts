@@ -1,3 +1,4 @@
+import { glTransitionUniforms } from '../../features/video/project/transition/gl-catalog';
 import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 import { prepareReviewExportSourceSampling } from './export-source-sampling';
@@ -503,6 +504,7 @@ export function createReviewGpuPreview(args: {
               budget: samplingBudget,
               scene: {
                 sourceSize: current.source,
+                sourceFilters: current.sourceFilters,
                 ...(current.canvas ? { baseCanvas: current.canvas } : {}),
                 windowHeader: current.windowHeader,
                 background: current.background,
@@ -523,7 +525,17 @@ export function createReviewGpuPreview(args: {
         return buildReviewGpuScene({ ...sceneInput, sampling });
       };
       let main: GpuPreviewGroup;
-      if (input.transition?.blend.plan.type === 'dissolve') {
+      if (input.transition && input.transition.blend.plan.type !== 'fade-black') {
+        const transition = input.transition.blend;
+        if (
+          transition.plan.type === 'gl' &&
+          !glTransitionUniforms(
+            transition.plan.selection,
+            transition.incoming,
+            dimensions.canonical.width / dimensions.canonical.height
+          )
+        )
+          throw new Error('GL transition settings are unavailable.');
         const sides = reviewCutTransitionSides(
           input.transition.blend,
           input.transition.frames,
@@ -589,11 +601,20 @@ export function createReviewGpuPreview(args: {
           kind: 'group',
           output: dimensions.backing,
           logical: dimensions.canonical,
+          ...(transition.plan.type === 'gl'
+            ? {
+                composition: {
+                  kind: 'gl-transition' as const,
+                  selection: transition.plan.selection,
+                  progress: transition.incoming,
+                },
+              }
+            : {}),
           layers: sources.map((source, index) => ({
             source,
             rect: full,
             inverse: identity,
-            opacity: index === 0 ? 1 : input.transition!.blend.incoming,
+            opacity: transition.plan.type === 'gl' || index === 0 ? 1 : transition.incoming,
           })),
         };
       } else {

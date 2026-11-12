@@ -2,6 +2,8 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { SettingsCollectionProps } from '../../../section-surface';
 import type { EffectBundleCatalogEntry } from '../../../../features/video/project/effect-bundle/catalog';
@@ -40,25 +42,33 @@ vi.mock('../../../section-surface', async (original) => ({
 }));
 afterEach(() => vi.clearAllMocks());
 it('shows one row per document, routes toggles independently and keeps disabled effects recoverable', async () => {
-  const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
-    'utf8'
+  const accepted = parseAnimationTemplateSource(
+    readFileSync(
+      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+      'utf8'
+    )
   );
-  const doc = {
-    id: 'callout',
-    source,
-    assets: [],
-    kind: 'standalone' as const,
-    schemaVersion: 'sniptale.effect.v1' as const,
-    sha256: 'a'.repeat(64),
+  if (!accepted.ok) throw new Error(JSON.stringify(accepted.diagnostics));
+  const entry = (id: string) => {
+    const source = JSON.stringify({ ...accepted.template, id });
+    return {
+      id,
+      source,
+      assets: [],
+      kind: 'standalone' as const,
+      schemaVersion: 'sniptale.animation.v1' as const,
+      sha256: createHash('sha256').update(source).digest('hex'),
+    };
   };
+  const first = entry('callout'),
+    second = entry('another');
   const catalog: EffectBundleCatalogEntry = {
     packId: 'builtin:base',
     source: 'builtin',
     sourceSha256: 'a'.repeat(64),
     documents: [
-      { ...doc, enabled: false },
-      { ...doc, id: 'another', enabled: true },
+      { ...first, enabled: false },
+      { ...second, enabled: true },
     ],
     enabled: true,
     assets: [],
@@ -67,7 +77,7 @@ it('shows one row per document, routes toggles independently and keeps disabled 
     version: '1',
     label: { en: 'Base', ru: 'База' },
     description: { en: '', ru: '' },
-    retainedByteLength: 0,
+    retainedByteLength: Buffer.byteLength(first.source) + Buffer.byteLength(second.source),
   };
   const summary = {
     status: 'ready',

@@ -1,12 +1,9 @@
-import type {
-  EffectV1Document,
-  EffectV1RuntimeInputName,
-} from '@sniptale/runtime-contracts/effect-v1';
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 
 import type { SerializedSvgVector } from './svg-vector';
 import type { EffectRuntimeGpuResource, EffectRuntimeGpuPass } from './gpu-plan';
 
-export const EFFECT_RUNTIME_PROTOCOL_VERSION = 6 as const;
+export const EFFECT_RUNTIME_PROTOCOL_VERSION = 7 as const;
 export const EFFECT_RUNTIME_SANDBOX_CONNECTION_FRAGMENT_KEY = 'connectionNonce' as const;
 export const EFFECT_RUNTIME_SANDBOX_CONNECT_MESSAGE = 'sniptale:effect-runtime:connect' as const;
 export const EFFECT_RUNTIME_SANDBOX_READY_MESSAGE = 'sniptale:effect-runtime:ready' as const;
@@ -50,7 +47,7 @@ export interface EffectRuntimeFrameInput {
 }
 
 export type EffectRuntimeFrameInputs = Partial<
-  Record<EffectV1RuntimeInputName, EffectRuntimeFrameInput>
+  Record<'source' | 'from' | 'to', EffectRuntimeFrameInput>
 >;
 
 export interface EffectRuntimeDocumentReference {
@@ -94,7 +91,7 @@ export interface EffectRuntimeRenderCommand extends EffectRuntimeFrameRequestFie
   materializeImmutablePayloads(): Promise<EffectRuntimeImmutablePayloads>;
 }
 
-/** Exact protocol-v5 message crossing from the parent into the sandbox. */
+/** Exact protocol-v7 message crossing from the parent into the sandbox. */
 export interface EffectRuntimeRenderMessage extends EffectRuntimeFrameRequestFields {
   assetSelectionRef: EffectRuntimeAssetSelectionReference;
   documentRef: EffectRuntimeDocumentReference;
@@ -107,7 +104,7 @@ export interface EffectRuntimeRenderRequest extends EffectRuntimeFrameRequestFie
   assets: EffectRuntimeVisualAssetPayload[];
   assetSelectionId: string;
   assetSelectionPayloadIncluded: boolean;
-  document: EffectV1Document;
+  document: AnimationTemplate;
   documentId: string;
   documentPayloadIncluded: boolean;
   kind: 'renderFrame' | 'prepareGpuFrame';
@@ -142,13 +139,12 @@ export interface EffectRuntimeWorkerAssetSelectionReference {
 }
 
 export interface EffectRuntimeWorkerDocumentReference {
-  document?: EffectV1Document;
+  document?: AnimationTemplate;
   id: string;
 }
 
-/** Exact protocol-v5 broker-to-worker message. */
+/** Exact protocol-v7 broker-to-worker message. */
 export interface EffectRuntimeWorkerMessage extends EffectRuntimeFrameRequestFields {
-  renderTarget?: 'gpu-plan';
   assetSelectionRef: EffectRuntimeWorkerAssetSelectionReference;
   documentRef: EffectRuntimeWorkerDocumentReference;
   protocolVersion: typeof EFFECT_RUNTIME_PROTOCOL_VERSION;
@@ -157,10 +153,9 @@ export interface EffectRuntimeWorkerMessage extends EffectRuntimeFrameRequestFie
 
 /** Worker-resolved request used by the interpreter. */
 export interface EffectRuntimeWorkerRequest extends EffectRuntimeFrameRequestFields {
-  renderTarget?: 'gpu-plan';
   assets: Record<string, EffectRuntimeWorkerAsset>;
   assetSelectionId: string;
-  document: EffectV1Document;
+  document: AnimationTemplate;
   documentId: string;
   protocolVersion: typeof EFFECT_RUNTIME_PROTOCOL_VERSION;
   type: typeof EFFECT_RUNTIME_WORKER_REQUEST;
@@ -208,7 +203,7 @@ export interface EffectRuntimeWorkerResponseEnvelope {
 
 /** Worker output. The broker forwards bounded plans only on a negotiated scene connection. */
 export type EffectRuntimeSceneResult = EffectRuntimeFrameResult | EffectRuntimeGpuPlanResult;
-export type EffectRuntimeWorkerResult = EffectRuntimeSceneResult;
+export type EffectRuntimeWorkerResult = EffectRuntimeFrameResult;
 
 /** Closed evaluated data. Each receiver checks identity, dimensions, operations and resources. */
 export interface EffectRuntimeGpuPlanResult extends EffectRuntimeFrameIdentity {
@@ -221,5 +216,5 @@ export interface EffectRuntimeGpuPlanResult extends EffectRuntimeFrameIdentity {
   resources: EffectRuntimeGpuResource[];
   passes: EffectRuntimeGpuPass[];
   rootPass: number;
-  inputResources: Partial<Record<EffectV1RuntimeInputName, number>>;
+  inputResources: Partial<Record<'source' | 'from' | 'to', number>>;
 }

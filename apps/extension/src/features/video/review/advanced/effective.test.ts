@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../../image-filters/contract';
 import { createQuickEditWatermark } from '../../project/scene/watermark';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { reviewAdvancedContentBaseline } from '../document';
@@ -804,3 +805,39 @@ it('admits alpha replacement metadata without another audio lane or implicit gai
     expect(state.audio).toEqual(before.audio);
   }
 });
+
+it.each(['basic', 'advanced'] as const)(
+  'applies source color independently of %s presentation and forces rendered export only for active filters',
+  (mode) => {
+    const state = createQuickEditAdvancedState();
+    state.ui.mode = mode;
+    const color = createSourceImageFilter('color', 'color');
+    if (color.kind !== 'color') throw new Error('Expected color.');
+    state.sourceFilters = { version: 1, filters: [color] };
+    const document = { edits: [], canvasComments: [] };
+    expect(resolveQuickEditEffectiveState(state).sourceFilters).toEqual(state.sourceFilters);
+    expect(resolveQuickEditExportPlan({ advanced: state, document })).toEqual({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+      reasons: [],
+    });
+    color.parameters.exposure = 1;
+    expect(resolveQuickEditExportPlan({ advanced: state, document })).toEqual({
+      kind: 'ready',
+      video: 'render',
+      audio: 'copy',
+      reasons: ['source-filters'],
+    });
+    expect(
+      resolveQuickEditExportPlan({ advanced: state, document, videoRenderAvailable: false })
+    ).toMatchObject({ kind: 'unavailable' });
+    color.enabled = false;
+    expect(resolveQuickEditExportPlan({ advanced: state, document })).toEqual({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+      reasons: [],
+    });
+  }
+);

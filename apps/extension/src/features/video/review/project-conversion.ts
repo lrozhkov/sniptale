@@ -68,6 +68,7 @@ type ReviewProjectConversionPlan =
 function minimumConvertedSceneSchemaVersion(
   scene: Extract<ReturnType<typeof planReviewProjectScene>, { status: 'prepared' }>
 ): VideoProject['version'] {
+  if (scene.video.sourceFilters !== undefined) return 52;
   const background = scene.scene.sceneBackground;
   if (background?.motion !== undefined) return 51;
   if (background?.zoomBehavior !== undefined) return 37;
@@ -550,6 +551,7 @@ function pendingContent(): ReviewProjectConversionIssue[] {
     zoom: false,
     background: false,
     audio: false,
+    sourceFilters: false,
     canvas: false,
     windowHeader: false,
     webcam: false,

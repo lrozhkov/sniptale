@@ -29,7 +29,7 @@ import {
 } from '../../../apps/extension/src/features/video/project/text/authoring';
 import { editReviewTextFragment } from '../../../apps/extension/src/features/video/review/text-document';
 import { addVideoProjectCommentDocument } from '../../../apps/extension/src/features/video/project/comments/authoring';
-import { importEffectBundleZip } from '../../../apps/extension/src/features/video/project/effect-bundle/import/zip';
+import { importAnimationArtifactBytes } from '../../../apps/extension/src/features/video/project/effect-bundle/lottie-profile';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../apps/extension/src/features/video/project/effect-instance/integrity';
 import {
   commitProjectAggregatePresentation,
@@ -186,10 +186,10 @@ async function retainedGraph(project: VideoProject) {
 }
 
 async function retainFullGraph(project: VideoProject, bytes: number[]) {
-  const imported = await importEffectBundleZip(Uint8Array.from(bytes));
-  check(imported.ok, 'Asset-bearing corpus import failed.');
-  const document = imported.bundle.documents[0];
-  check(document && document.assets.length > 0, 'Corpus has no retained resources.');
+  const imported = await importAnimationArtifactBytes(Uint8Array.from(bytes));
+  check(imported.ok, 'Self-contained animation import failed.');
+  const document = imported.documents[0];
+  check(document && document.template.resources.length > 0, 'Animation has no embedded resources.');
   const overlay = {
     ...structuredClone(project.tracks[0]!),
     id: crypto.randomUUID(),
@@ -235,22 +235,13 @@ async function retainFullGraph(project: VideoProject, bytes: number[]) {
   project.effectSnapshots = [
     {
       id: snapshotId,
-      documentId: document.document.id,
-      kind: document.document.kind,
-      schemaVersion: 'sniptale.effect.v1',
+      documentId: document.template.id,
+      kind: 'standalone',
+      schemaVersion: 'sniptale.animation.v1',
       source: document.source,
       sha256: document.sha256,
-      retainedByteLength:
-        new TextEncoder().encode(document.source).byteLength +
-        document.assets.reduce((total, asset) => total + asset.byteLength, 0),
-      assets: document.assets.map((asset) => ({
-        id: asset.id,
-        kind: asset.kind,
-        mimeType: asset.mimeType,
-        byteLength: asset.byteLength,
-        sha256: asset.sha256,
-        blob: new Blob([Uint8Array.from(asset.bytes).buffer], { type: asset.mimeType }),
-      })),
+      retainedByteLength: new TextEncoder().encode(document.source).byteLength,
+      assets: [],
     },
   ];
   const instanceId = crypto.randomUUID();
@@ -258,8 +249,9 @@ async function retainFullGraph(project: VideoProject, bytes: number[]) {
     {
       id: instanceId,
       snapshotId,
-      kind: document.document.kind,
+      kind: 'standalone',
       controls: {},
+      sceneAnchors: { tip: { x: 0.5, y: 0.5 } },
       duration: 2,
       startTime: 0,
       playbackRate: 1,
@@ -271,7 +263,7 @@ async function retainFullGraph(project: VideoProject, bytes: number[]) {
     createEffectHostClip({
       duration: 2,
       effectInstanceId: instanceId,
-      name: 'Retained corpus effect',
+      name: 'Retained animation',
       projectHeight: project.height,
       projectWidth: project.width,
       startTime: 0,

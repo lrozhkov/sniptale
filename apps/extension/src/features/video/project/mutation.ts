@@ -67,6 +67,7 @@ function motionSchemaRequirement(regions: VideoProject['motionRegions']): VideoP
 }
 
 function clipSchemaRequirement(clips: VideoProject['clips']): VideoProject['version'] {
+  if (clips.some((clip) => clip.type === 'VIDEO' && clip.sourceFilters !== undefined)) return 52;
   if (clips.some((clip) => clip.type === 'VIDEO' && clip.cameraShadowDirection !== undefined))
     return 47;
   if (

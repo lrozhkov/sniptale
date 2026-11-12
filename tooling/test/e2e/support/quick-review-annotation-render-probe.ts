@@ -6,11 +6,10 @@ import {
 import { createQuickEditZoomRegion } from '../../../../apps/extension/src/features/video/review/advanced/zoom';
 import { quickEditSpatialTargetCamera } from '../../../../apps/extension/src/features/video/review/advanced/spatial';
 import { DEFAULT_CAMERA_PERSPECTIVE as DEFAULT_QUICK_EDIT_PERSPECTIVE } from '../../../../apps/extension/src/features/video/project/motion/spatial';
-import {
-  sha256EffectV1Bytes,
-  resolveEffectV1ControlDefault,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { validateAnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
+import { sha256 as hashSha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import type { ReviewAnnotationEffectSnapshot } from '../../../../apps/extension/src/features/video/review/annotation-effects/types';
 import { initializeReviewAnnotationEffectAnchors } from '../../../../apps/extension/src/features/video/review/annotation-effects/layout';
 import { createReviewPreviewRenderer } from '../../../../apps/extension/src/workflows/video-review/render-preview';
@@ -58,27 +57,25 @@ const names = ['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'
 async function definitions() {
   return Promise.all(
     names.map(async (name) => {
-      const response = await fetch(
-        `/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`
-      );
+      const response = await fetch(`/video-effects/animations/${name}.sniptale-animation.json`);
       if (!response.ok) throw new Error('Builtin source unavailable');
       const source = await response.text();
       const raw: unknown = JSON.parse(source);
-      const result = validateEffectV1Document(raw);
-      if (!result.ok || !result.document) throw new Error('Builtin source invalid');
+      const result = validateAnimationTemplate(raw);
+      if (!result.ok || !result.template) throw new Error('Builtin source invalid');
       const bytes = new TextEncoder().encode(source);
-      const sha256 = await sha256EffectV1Bytes(bytes);
+      const sha256 = bytesToHex(hashSha256(bytes));
       const snapshot: ReviewAnnotationEffectSnapshot = {
         id: `effect:${sha256}`,
         sha256,
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         kind: 'standalone',
-        documentId: result.document.id,
+        documentId: result.template.id,
         source,
         retainedByteLength: bytes.byteLength,
         assets: [],
       };
-      return { document: result.document, snapshot };
+      return { document: result.template, snapshot };
     })
   );
 }
@@ -112,17 +109,16 @@ function fixture(
           const controls = Object.fromEntries(
             document.controls.map((control) => [
               control.id,
-              resolveEffectV1ControlDefault(control, 'en'),
+              resolveEffectControlDefault(control, 'en'),
             ])
           );
           const bounds = plane === 'content' ? sourceSize : size;
           const layout = document.objectLayout;
-          if (!layout) throw new Error('Builtin object layout unavailable');
           const transform = {
             x: 0.12,
             y: 0.1 + index * 0.08,
-            width: layout.width / sourceSize.width,
-            height: layout.height / sourceSize.height,
+            width: document.animation.w / sourceSize.width,
+            height: document.animation.h / sourceSize.height,
             rotation: 0,
           };
           const anchors = initializeReviewAnnotationEffectAnchors(
@@ -148,7 +144,7 @@ function fixture(
             controls: Object.fromEntries(
               Object.entries(controls).filter(
                 ([id]) =>
-                  !layout.handles?.some(
+                  !layout?.handles?.some(
                     (handle) => handle.xControl === id || handle.yControl === id
                   )
               )

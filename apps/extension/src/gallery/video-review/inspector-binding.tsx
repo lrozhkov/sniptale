@@ -116,6 +116,7 @@ type InspectorState = Pick<
   | 'setCanvas'
   | 'setCaptions'
   | 'setWindowHeader'
+  | 'setSourceFilters'
   | 'setOverlaysVisible'
   | 'resetAdvanced'
   | 'setCameraFollowDefaults'
@@ -649,6 +650,8 @@ function ReviewScenePropertiesBinding({
         onRetry: state.watermark.retry,
         imagePreviewUrl: state.watermark.imagePreviewUrl,
       }}
+      sourceFilters={state.advanced.sourceFilters}
+      onSourceFilters={state.setSourceFilters}
       windowHeader={state.advanced.windowHeader}
       onWindowHeader={state.setWindowHeader}
       audio={state.advanced.audio}

@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.2` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `53` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `56` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -45,6 +45,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/editor-resource-admission.tsx`
 - `apps/extension/src/composition/frame-annotation-controls`
 - `apps/extension/src/composition/frame-annotation-raster-client`
+- `apps/extension/src/composition/gl-transition-presets`
 - `apps/extension/src/composition/gradient-preset-resources`
 - `apps/extension/src/composition/inspector-disclosures`
 - `apps/extension/src/composition/library-preview`
@@ -135,6 +136,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/features/editor-history`
 - `apps/extension/src/features/file-naming`
 - `apps/extension/src/features/highlighter`
+- `apps/extension/src/features/image-filters`
 - `apps/extension/src/features/keyboard-shortcuts`
 - `apps/extension/src/features/media-hub`
 - `apps/extension/src/features/prompt-templates`
@@ -179,6 +181,10 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/effect-catalog.css`
 - `apps/extension/src/ui/effect-control-presentation`
 - `apps/extension/src/ui/focus-appearance`
+- `apps/extension/src/ui/gl-transition-choices.test.ts`
+- `apps/extension/src/ui/gl-transition-choices.ts`
+- `apps/extension/src/ui/gl-transition-fields.test.tsx`
+- `apps/extension/src/ui/gl-transition-fields.tsx`
 - `apps/extension/src/ui/glass-select`
 - `apps/extension/src/ui/gradient-preset-grid`
 - `apps/extension/src/ui/highlighter-preset-editor`
@@ -202,6 +208,8 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/recording-camera-controls.tsx`
 - `apps/extension/src/ui/recording-icon.test.tsx`
 - `apps/extension/src/ui/recording-icon.tsx`
+- `apps/extension/src/ui/source-image-filter-fields.test.tsx`
+- `apps/extension/src/ui/source-image-filter-fields.tsx`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/sync-cache-feedback.tsx`
 - `apps/extension/src/ui/text-document.test.tsx`

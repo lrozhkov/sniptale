@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../../../features/video/project/transition/gl-catalog';
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
@@ -5,13 +6,7 @@ import {
 } from '../../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
 import { syncProjectDuration } from '../../../../../features/video/project/timeline';
-import {
-  VideoProjectAssetType,
-  VideoTrackKind,
-  VideoTransitionKind,
-  VideoTransitionRenderKind,
-  VideoTransitionTemplateKind,
-} from '../../../../../features/video/project/types';
+import { VideoProjectAssetType, VideoTrackKind } from '../../../../../features/video/project/types';
 
 export function createTimelineZoneProject() {
   const project = createEmptyVideoProject('Track zones', 1280, 720);
@@ -53,10 +48,10 @@ export function createTimelineZoneProject() {
         duration: 1,
         easing: 'LINEAR',
         id: 'transition-1',
-        kind: VideoTransitionKind.CROSSFADE,
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         leadingClipId: 'clip-a',
-        renderKind: VideoTransitionRenderKind.COMPOSITE,
-        templateKind: VideoTransitionTemplateKind.CROSSFADE,
+
         trailingClipId: 'clip-b',
       },
     ],

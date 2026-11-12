@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../../image-filters/contract';
 import { replayReviewHistory } from '../document';
 import { describe, expect, it } from 'vitest';
 import type { Gradient } from '@sniptale/foundation/paint';
@@ -672,4 +673,61 @@ it('rejects unsupported schema identities and UI-bearing history content while r
     'background',
     'audio',
   ]);
+});
+
+it('retains the complete source filter stack in saved content and reversible history', () => {
+  const before = createQuickEditAdvancedContent();
+  const color = createSourceImageFilter('color', 'color');
+  if (color.kind !== 'color') throw new Error('Expected color.');
+  color.parameters.exposure = 0.5;
+  const after = {
+    ...before,
+    sourceFilters: {
+      version: 1 as const,
+      filters: [
+        createSourceImageFilter('bloom', 'bloom'),
+        { ...createSourceImageFilter('blur', 'blur'), enabled: false },
+        color,
+      ],
+    },
+  };
+  const parsed = loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(after)));
+  expect(parsed).toEqual(after);
+  expect(parsed?.sourceFilters).not.toBe(after.sourceFilters);
+  expect(
+    loadQuickEditAdvancedState({ ...after, ui: createQuickEditAdvancedState().ui })?.sourceFilters
+  ).toEqual(after.sourceFilters);
+  const history = [{ id: 'filters', at: 1, target: 'advancedContent' as const, before, after }];
+  const source = { width: 640, height: 360, duration: 8, mimeType: 'video/webm', size: 100 };
+  expect(replayReviewHistory(history, 1, source, before).advancedContent.sourceFilters).toEqual(
+    after.sourceFilters
+  );
+  expect(
+    replayReviewHistory(history, 0, source, before).advancedContent.sourceFilters
+  ).toBeUndefined();
+  expect(replayReviewHistory(history, 1, source, before).advancedContent.sourceFilters).toEqual(
+    after.sourceFilters
+  );
+});
+it('refuses unsupported source filters and declared historical versions without mutating the document', () => {
+  const sourceFilters = { version: 1, filters: [createSourceImageFilter('blur', 'blur')] };
+  const content = { ...createQuickEditAdvancedContent(), sourceFilters };
+  for (const stack of [
+    null,
+    { ...sourceFilters, version: 2 },
+    {
+      version: 1,
+      filters: [{ id: 'future', kind: 'custom', enabled: true, intensity: 1, parameters: {} }],
+    },
+    { version: 1, filters: [{ ...sourceFilters.filters[0], parameters: { radius: Infinity } }] },
+  ]) {
+    const raw = { ...content, sourceFilters: stack };
+    const before = structuredClone(raw);
+    expect(loadQuickEditAdvancedContentState(raw)).toBeNull();
+    expect(raw).toEqual(before);
+  }
+  for (const schemaVersion of [1, 2, 29])
+    expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion })).toBeNull();
+  const older = { ...createQuickEditAdvancedContent(), schemaVersion: 29 };
+  expect(loadQuickEditAdvancedContentState(older)?.schemaVersion).toBe(30);
 });

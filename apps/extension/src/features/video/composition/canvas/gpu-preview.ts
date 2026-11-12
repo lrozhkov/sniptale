@@ -1,3 +1,4 @@
+import { createGlTransitionGpu, loadLocalGlTransitionAsset } from './gl-transition';
 import { GpuPreviewDeviceError } from './gpu-preview-device-error';
 export { GpuPreviewDeviceError } from './gpu-preview-device-error';
 import { createGpuPreviewSlot } from './gpu-preview-slot';
@@ -154,6 +155,7 @@ export async function createGpuPreviewRenderer(
         return;
       destroyed = true;
       for (const slot of slots) slot.value?.clean();
+      void glTransitions.dispose();
       device.removeEventListener('uncapturederror', uncaptured);
       device.destroy();
     };
@@ -248,8 +250,23 @@ export async function createGpuPreviewRenderer(
         },
       };
     };
+    const glTransitions = createGlTransitionGpu({
+      device,
+      format,
+      load: loadLocalGlTransitionAsset,
+      reserve,
+    });
     const createSlot = () =>
-      createGpuPreviewSlot({ device, format, sampler, reserve, check, drain, preparePipelines });
+      createGpuPreviewSlot({
+        device,
+        format,
+        sampler,
+        reserve,
+        check,
+        drain,
+        preparePipelines,
+        glTransitions,
+      });
     slots[0]!.value = await createSlot();
     const execute = async (request: GpuPreviewRequest, outputTexture?: () => GPUTexture) => {
       check(request.signal);

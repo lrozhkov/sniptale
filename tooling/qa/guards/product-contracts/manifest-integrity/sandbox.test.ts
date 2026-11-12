@@ -42,7 +42,7 @@ function createSandboxPolicyMutations(): Array<(manifest: SandboxManifest) => vo
       manifest.sandbox.pages = ['apps/extension/src/effect-runtime-sandbox/other.html'];
     },
     replaceSandboxCsp('allow-scripts', 'allow-scripts allow-same-origin'),
-    replaceSandboxCsp("connect-src 'none'", 'connect-src https:'),
+    replaceSandboxCsp('connect-src data:', 'connect-src https:'),
     replaceSandboxCsp('worker-src blob:', "worker-src 'self'"),
     replaceSandboxCsp('worker-src blob:', 'worker-src blob: data:'),
     replaceSandboxCsp('child-src blob:', 'child-src https:'),

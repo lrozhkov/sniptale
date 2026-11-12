@@ -1,3 +1,4 @@
+import type { GlTransitionSelection } from '../project/transition/gl-catalog';
 import {
   constrainPresentationEnvelope,
   presentationEnvelopeOpacity as opacity,
@@ -41,15 +42,21 @@ type Segment = {
   audioEnd: number;
 };
 /** Transition endpoints are existing complete compositions on the same output lattice. */
-export interface PresentationJoin {
-  type: 'dissolve' | 'fade-black';
-  color: string;
+export type PresentationJoin = (
+  | { type: 'dissolve' | 'fade-black'; color: string }
+  | {
+      type: 'gl';
+      selection: GlTransitionSelection;
+      easing: 'LINEAR' | 'EASE_IN_OUT';
+      color?: never;
+    }
+) & {
   seamUs: number;
   beforeUs: number;
   afterUs: number;
   outgoingTick: number;
   incomingTick: number;
-}
+};
 /** Derived placement only; authored trim and main clocks are never retimed. */
 export interface PresentationSequencePlan {
   /** Retains omission intent even when a full sequence has no media bookends. */
@@ -270,8 +277,9 @@ function planJoins(settings: QuickEditPresentationSettings, segments: readonly S
       outgoing.name === 'intro' ? settings.introTransition : settings.outroTransition;
     if (!authored) continue;
     joins.push({
-      type: authored.type,
-      color: authored.color ?? '#000000',
+      ...(authored.type === 'gl'
+        ? { type: authored.type, selection: authored.selection, easing: authored.easing }
+        : { type: authored.type, color: authored.color ?? '#000000' }),
       seamUs: incoming.startUs,
       beforeUs: Math.min(authored.before * 1_000_000, outgoing.endUs - outgoing.startUs),
       afterUs: Math.min(authored.after * 1_000_000, incoming.endUs - incoming.startUs),

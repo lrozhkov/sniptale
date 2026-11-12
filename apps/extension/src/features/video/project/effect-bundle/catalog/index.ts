@@ -1,8 +1,14 @@
+import type { LocaleText } from '@sniptale/runtime-contracts/effect-controls';
 import type { EffectCatalogPresentation } from './presentation';
 import type { EffectPresetPreferences } from './presets';
-import type { EffectV1Kind } from '@sniptale/runtime-contracts/effect-v1';
 
-export type EffectBundleCatalogSource = 'bundle-zip' | 'raw-json' | 'builtin';
+export type EffectBundleCatalogSource =
+  | 'bundle-zip'
+  | 'raw-json'
+  | 'builtin'
+  | 'lottie-json'
+  | 'dotlottie'
+  | 'sniptale-animation';
 
 export interface EffectBundleCatalogAssetEntry {
   blob: Blob;
@@ -25,8 +31,8 @@ export interface EffectBundleCatalogDocumentEntry {
   previewPresetId?: string;
   assets: EffectBundleCatalogAssetReference[];
   id: string;
-  kind: EffectV1Kind;
-  schemaVersion: 'sniptale.effect.v1';
+  kind: 'standalone';
+  schemaVersion: 'sniptale.animation.v1';
   sha256: string;
   source?: string;
   presentation?: EffectCatalogPresentation;
@@ -51,7 +57,7 @@ export interface EffectBundleCatalogEntry {
 
 interface EffectBundleCatalogSummary {
   createdAt: number;
-  documentKinds: EffectV1Kind[];
+  documentKinds: 'standalone'[];
   enabled: boolean;
   entry: EffectBundleCatalogEntry;
   label: { en: string; ru: string };
@@ -71,3 +77,23 @@ interface InvalidEffectBundleCatalogSummary {
 export type EffectBundleCatalogListItem =
   | EffectBundleCatalogSummary
   | InvalidEffectBundleCatalogSummary;
+
+/** Durable animation packages use their own namespace; legacy EffectV1 rows remain opaque. */
+export interface AnimationCatalogDocument {
+  id: string;
+  sha256: string;
+  source: string;
+}
+export interface AnimationCatalogEntry {
+  format: 'sniptale-animation-catalog';
+  version: 2;
+  packId: string;
+  source: 'lottie-json' | 'dotlottie' | 'sniptale-animation';
+  sourceSha256: string;
+  label: LocaleText & { en: string };
+  description?: LocaleText | undefined;
+  documents: AnimationCatalogDocument[];
+  retainedByteLength: number;
+  createdAt: number;
+  updatedAt: number;
+}

@@ -1,3 +1,4 @@
+import { createGlTransitionCanvas } from '../../features/video/composition/canvas/gl-transition';
 import { createPresentationGpu } from './presentation-gpu';
 import { resolveMediaFitFrame } from '../../features/video/project/window-geometry';
 import type { GpuPreviewLayer } from '../../features/video/composition/canvas/gpu-preview';
@@ -124,6 +125,7 @@ class PresentationRenderer {
   private disposed = false;
   private busy = false;
   private readonly gpu;
+  private glJoin: ReturnType<typeof createGlTransitionCanvas> | undefined;
 
   constructor(
     private readonly args: ReviewPresentationRendererInput,
@@ -133,7 +135,11 @@ class PresentationRenderer {
     const { backing } = args.main.dimensions;
     this.resources = createPreviewRenderResources({
       maximumCanvases: plan.joins?.length ? 4 : 1,
-      maximumManagedBytes: backing.width * backing.height * (plan.joins?.length ? 16 : 4),
+      maximumManagedBytes:
+        backing.width *
+          backing.height *
+          (plan.joins?.some((join) => join.type === 'gl') ? 28 : plan.joins?.length ? 16 : 4) +
+        (plan.joins?.some((join) => join.type === 'gl') ? 32768 : 0),
     });
     this.joinEndpoints = createCompositionJoinEndpoints({
       resources: this.resources,
@@ -219,15 +225,17 @@ class PresentationRenderer {
     try {
       const selected = this.joinAt(candidate.timestampUs);
       const join = selected?.join;
-      if (join?.type !== 'dissolve') this.joinEndpoints.clear();
-      if (selected?.join.type === 'dissolve')
+      if (join?.type !== 'dissolve' && join?.type !== 'gl') this.joinEndpoints.clear();
+      if (selected?.join.type === 'gl')
+        output = await this.gl(selected.join, selected.blend.incoming);
+      else if (selected?.join.type === 'dissolve')
         output = await this.dissolve(selected.join, selected.blend.incoming);
       else {
         output = await this.renderContent(candidate);
       }
       this.assertLive();
       const colors = [
-        ...(selected && selected.join.type !== 'dissolve'
+        ...(selected && selected.join.type === 'fade-black'
           ? [{ opacity: selected.blend.black, color: selected.join.color ?? '#000000' }]
           : []),
         {
@@ -279,7 +287,13 @@ class PresentationRenderer {
 
   private joinAt(timeUs: number) {
     for (const join of this.plan.joins ?? []) {
-      const blend = evaluateCompositionJoin(timeUs, join.seamUs, join.beforeUs, join.afterUs);
+      const blend = evaluateCompositionJoin(
+        timeUs,
+        join.seamUs,
+        join.beforeUs,
+        join.afterUs,
+        join.type === 'gl' ? join.easing : 'LINEAR'
+      );
       if (blend) return { join, blend };
     }
     return null;
@@ -356,6 +370,63 @@ class PresentationRenderer {
     return this.renderContent(candidate.value);
   }
 
+  private async gl(
+    join: Extract<PresentationJoin, { type: 'gl' }>,
+    progress: number
+  ): Promise<RenderCanvasLease> {
+    this.assertLive();
+    const size = this.args.main.dimensions.backing;
+    const output = this.resources.canvas('presentation-join', size);
+    const signal = this.controller.signal;
+    try {
+      await this.joinEndpoints.withEndpoints(
+        {
+          key: join,
+          outgoingTime: join.outgoingTick,
+          incomingTime: join.incomingTick,
+          incomingWeight: progress,
+        },
+        signal,
+        async ({ outgoing, incoming }) => {
+          const source = {
+            kind: 'group' as const,
+            output: size,
+            logical: size,
+            composition: { kind: 'gl-transition' as const, selection: join.selection, progress },
+            layers: [this.layer(outgoing), this.layer(incoming)],
+          };
+          const rendered = await this.gpu?.render({
+            output: size,
+            context: output.context,
+            signal,
+            prepare: () => ({ layers: [this.layer(source)], release() {} }),
+          });
+          if (!rendered) {
+            this.glJoin ??= createGlTransitionCanvas({
+              ownerDocument: document,
+              reserve: (bytes) => this.resources.bytes('presentation-gl-transition', bytes),
+            });
+            await this.glJoin.render({
+              context: output.context,
+              from: outgoing,
+              to: incoming,
+              ...size,
+              selection: join.selection,
+              progress,
+              ratio: size.width / size.height,
+              signal,
+            });
+          }
+        }
+      );
+      this.assertLive();
+      return output;
+    } catch (error) {
+      output.release();
+      throw error;
+    }
+  }
+
   private async dissolve(join: PresentationJoin, incoming: number): Promise<RenderCanvasLease> {
     this.assertLive();
     const output = this.resources.canvas('presentation-join', this.args.main.dimensions.backing);
@@ -425,6 +496,8 @@ class PresentationRenderer {
   private retire() {
     this.children.abort();
     this.gpu?.dispose();
+    this.glJoin?.dispose();
+    this.glJoin = undefined;
     this.front?.release();
     this.front = null;
     this.joinEndpoints.dispose();

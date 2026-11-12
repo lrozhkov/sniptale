@@ -183,6 +183,7 @@ class PresentationMain {
       throw new Error('Fragment overlays require the full document time map.');
     this.scene = {
       source,
+      sourceFilters: effective.sourceFilters,
       ...(effective.canvas ? { canvas: effective.canvas } : {}),
       background: effective.background,
       windowHeader: effective.windowHeader,

@@ -1,3 +1,4 @@
+import type { createNativeGlTrackCanvas } from './gl-track-canvas';
 import type { CameraOutputViewport } from '../../../features/video/project/export/output-dimensions';
 import type { PreviewSourceDemand, PreviewSourceAcquireOptions } from '../preview-source';
 import type { PreparedPreviewSourceLease } from '../preview-html-source';
@@ -157,6 +158,7 @@ export type PreviewSceneRenderInput = {
   /** The preview runtime owns this reusable transaction canvas. */
   stagingCanvas?: () => HTMLCanvasElement;
   spatialRenderer?: () => ReviewSpatialRenderer;
+  transitionRenderer?: () => ReturnType<typeof createNativeGlTrackCanvas>;
   currentTime: number;
   /** Complete borrowed source map for composition endpoint sampling. */
   assetUrls?: Record<string, string>;

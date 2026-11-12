@@ -1,16 +1,11 @@
+import { createGlTransitionSelection } from '../../../../features/video/project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import {
   createEmptyVideoProject,
   createVideoProjectTrack,
 } from '../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
-import {
-  VideoTrackKind,
-  VideoTransitionKind,
-  VideoTransitionEasing,
-  VideoTransitionRenderKind,
-  VideoTransitionTemplateKind,
-} from '../../../../features/video/project/types';
+import { VideoTrackKind, VideoTransitionEasing } from '../../../../features/video/project/types';
 import { TRACK_ROW_HEIGHT } from '../interaction-state/helpers';
 import {
   buildTimelineTrackLayoutModel,
@@ -212,10 +207,10 @@ function createTransition(id: string, leadingClipId: string, trailingClipId: str
     duration: 1,
     easing: VideoTransitionEasing.LINEAR,
     id,
-    kind: VideoTransitionKind.CROSSFADE,
+    kind: 'gl' as const,
+    selection: createGlTransitionSelection('Fade')!,
     leadingClipId,
-    renderKind: VideoTransitionRenderKind.COMPOSITE,
-    templateKind: VideoTransitionTemplateKind.CROSSFADE,
+
     trailingClipId,
   };
 }

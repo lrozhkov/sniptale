@@ -1,31 +1,35 @@
-import { readFileSync } from 'node:fs';
-
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import { createEffectBundleFailure } from '../../diagnostics';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../../../../../tooling/test/support/effect-v1-corpus.test-support';
-import { importEffectArtifactInCurrentThread } from '../artifact';
+import { importAnimationArtifactBytes } from '../../lottie-profile';
 import { parseImportFailure } from './diagnostics';
 import {
-  collectEffectImportResultTransferables,
-  createEffectImportWorkerRequest,
-  createEffectImportWorkerResponse,
-  parseEffectImportWorkerRequest,
-  parseEffectImportWorkerResponse,
+  createAnimationImportWorkerRequest,
+  createAnimationImportWorkerResponse,
+  parseAnimationImportWorkerRequest,
+  parseAnimationImportWorkerResponse,
 } from './protocol';
-import { parseEffectImportResult } from './result';
-
-const HASH = 'a'.repeat(64);
+import { parseAnimationImportResult } from './result';
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();
 });
-
-describe('EffectV1 import worker diagnostic boundary', () => {
+function input() {
+  return new TextEncoder().encode(
+    JSON.stringify({
+      v: '5.12.2',
+      fr: 30,
+      ip: 0,
+      op: 60,
+      w: 320,
+      h: 180,
+      ddd: 0,
+      assets: [],
+      layers: [],
+    })
+  );
+}
+describe('animation import worker diagnostic boundary', () => {
   it('accepts only exact bounded failures', () => {
     const failure = createEffectBundleFailure('BUNDLE_DOCUMENT_INVALID', '$document', 'safe');
     const withEffectDiagnostics = {
@@ -63,147 +67,55 @@ describe('EffectV1 import worker diagnostic boundary', () => {
   });
 });
 
-describe('EffectV1 import worker protocol', () => {
-  it('round-trips one exact request and rejects malformed authority fields', () => {
-    const bytes = Uint8Array.from([0x7b, 0x7d]);
-    const request = createEffectImportWorkerRequest('request-1', 'raw-json', bytes);
-
-    expect(parseEffectImportWorkerRequest(request)).toEqual(request);
-    expect(parseEffectImportWorkerRequest({ ...request, requestId: 'invalid id' })).toBeNull();
-    expect(parseEffectImportWorkerRequest({ ...request, bytes: new Uint8Array() })).toBeNull();
-    expect(parseEffectImportWorkerRequest({ ...request, kind: 'legacy' })).toBeNull();
-    expect(parseEffectImportWorkerRequest({ ...request, extra: true })).toBeNull();
+describe('animation import worker protocol', () => {
+  it('accepts exact bounded requests and refuses the retired protocol', () => {
+    const request = createAnimationImportWorkerRequest('request-1', input());
+    expect(parseAnimationImportWorkerRequest(request)).toEqual({
+      requestId: request.requestId,
+      bytes: request.bytes,
+    });
+    for (const invalid of [
+      { ...request, requestId: 'invalid id' },
+      { ...request, bytes: new Uint8Array() },
+      { ...request, extra: true },
+      { ...request, token: 'sniptale:effect-bundle:import-v1' },
+      { ...request, type: 'sniptale:effect-bundle:import-request', kind: 'raw-json' },
+    ])
+      expect(parseAnimationImportWorkerRequest(invalid)).toBeNull();
   });
-
-  it('round-trips a successful result and rejects mismatched responses', async () => {
-    const result = await importEffectArtifactInCurrentThread('raw-json', readRawFixture());
-    expect(result.ok).toBe(true);
-    const response = createEffectImportWorkerResponse('request-1', result);
-
-    expect(parseEffectImportWorkerResponse(response, 'request-1')).toEqual(result);
-    expect(parseEffectImportWorkerResponse(response, 'request-2')).toBeNull();
-    expect(
-      parseEffectImportWorkerResponse({ ...response, token: 'wrong' }, 'request-1')
-    ).toBeNull();
-    expect(parseEffectImportResult({ ...result, extra: true })).toBeNull();
-    expect(parseEffectImportResult({ artifact: { kind: 'unknown' }, ok: true })).toBeNull();
-  });
-});
-
-describe('EffectV1 import worker bundle result validation', () => {
-  it('revalidates bundle documents and materialized assets after structured clone', async () => {
-    const corpusCase = EFFECT_BUNDLE_CORPUS.find(
-      ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
-    )!;
-    const result = await importEffectArtifactInCurrentThread(
-      'bundle-zip',
-      readEffectBundleCorpusArchive(corpusCase)
-    );
-    if (!result.ok || result.artifact.kind !== 'bundle-zip') {
-      throw new Error('Expected accepted asset-bearing bundle');
-    }
-
-    expect(parseEffectImportResult(result)).toEqual(result);
-    expect(
-      parseEffectImportResult({
-        ...result,
-        artifact: {
-          ...result.artifact,
-          bundle: { ...result.artifact.bundle, archiveSha256: 'invalid' },
-        },
-      })
-    ).toBeNull();
-    expect(
-      parseEffectImportResult({
-        ...result,
-        artifact: {
-          ...result.artifact,
-          bundle: { ...result.artifact.bundle, documents: [] },
-        },
-      })
-    ).toBeNull();
-    const document = result.artifact.bundle.documents[0]!;
-    expect(
-      parseEffectImportResult({
-        ...result,
-        artifact: {
-          ...result.artifact,
-          bundle: {
-            ...result.artifact.bundle,
-            documents: [{ ...document, assets: [{ ...document.assets[0], path: '../escape' }] }],
-          },
-        },
-      })
-    ).toBeNull();
-  });
-});
-
-describe('EffectV1 import worker raw result validation', () => {
-  it('rejects malformed raw document envelopes and assets', async () => {
-    const result = await importEffectArtifactInCurrentThread('raw-json', readRawFixture());
-    if (!result.ok || result.artifact.kind !== 'raw-json') throw new Error('Expected raw fixture');
-    const imported = result.artifact.document;
-
-    expect(
-      parseEffectImportResult({
-        ...result,
-        artifact: { ...result.artifact, document: { ...imported, sourceSha256: 'invalid' } },
-      })
-    ).toBeNull();
-    expect(
-      parseEffectImportResult({
-        ...result,
-        artifact: {
-          ...result.artifact,
-          document: { ...imported, document: { ...imported.document, document: {} } },
-        },
-      })
-    ).toBeNull();
-    expect(
-      parseEffectImportResult({
-        ...result,
-        artifact: {
-          ...result.artifact,
-          document: {
-            ...imported,
-            document: { ...imported.document, assets: 'invalid' },
-          },
-        },
-      })
-    ).toBeNull();
-  });
-});
-
-describe('EffectV1 import worker transfer ownership', () => {
-  it('collects unique asset buffers only from successful artifacts', async () => {
-    const result = await importEffectArtifactInCurrentThread('raw-json', readRawFixture());
-    if (!result.ok || result.artifact.kind !== 'raw-json') throw new Error('Expected raw fixture');
-    const bytes = Uint8Array.from([1, 2, 3]);
-    const asset = {
-      byteLength: bytes.byteLength,
-      bytes,
-      id: 'asset',
-      kind: 'image' as const,
-      mimeType: 'image/png',
-      sha256: HASH,
-    };
-    result.artifact.document.document.assets = [asset, { ...asset, id: 'asset-copy' }];
-
-    expect(collectEffectImportResultTransferables(result)).toEqual([bytes.buffer]);
-    expect(
-      collectEffectImportResultTransferables(
-        createEffectBundleFailure('BUNDLE_ARCHIVE_INVALID', '$archive')
+  it('revalidates source bytes and exact result authority in the parent', async () => {
+    const result = await importAnimationArtifactBytes(input());
+    if (!result.ok) throw Error('Invalid fixture');
+    const response = createAnimationImportWorkerResponse('request-1', result);
+    await expect(
+      parseAnimationImportWorkerResponse(response, 'request-1', result.archiveSha256)
+    ).resolves.toEqual(result);
+    await expect(
+      parseAnimationImportWorkerResponse(response, 'request-2', result.archiveSha256)
+    ).resolves.toBeNull();
+    await expect(
+      parseAnimationImportWorkerResponse(
+        { ...response, token: 'wrong' },
+        'request-1',
+        result.archiveSha256
       )
-    ).toEqual([]);
+    ).resolves.toBeNull();
+    for (const invalid of [
+      { ...response.result, extra: true },
+      { ...response.result, archiveSha256: '0'.repeat(64) },
+      { ...response.result, documents: [{ source: '{}', sha256: '0'.repeat(64) }] },
+      { ...response.result, documents: [...result.documents, ...result.documents] },
+      { ...response.result, kind: 'unknown' },
+    ])
+      await expect(parseAnimationImportResult(invalid, result.archiveSha256)).resolves.toBeNull();
   });
 });
-
-describe('EffectV1 import worker single-use lifecycle', () => {
+describe('animation import worker single-use lifecycle', () => {
   it('posts one parsed response, closes, and rejects a second capability use', async () => {
     const scope = createWorkerScopeStub();
     vi.stubGlobal('self', scope);
     await import('./index');
-    const request = createEffectImportWorkerRequest('request-1', 'raw-json', readRawFixture());
+    const request = createAnimationImportWorkerRequest('request-1', input());
 
     scope.onmessage?.(new MessageEvent('message', { data: request, ports: [] }));
     scope.onmessage?.(new MessageEvent('message', { data: request, ports: [] }));
@@ -223,6 +135,23 @@ describe('EffectV1 import worker single-use lifecycle', () => {
     expect(scope.close).toHaveBeenCalledOnce();
   });
 
+  it('closes transferred ports without executing their packet', async () => {
+    const scope = createWorkerScopeStub();
+    vi.stubGlobal('self', scope);
+    await import('./index');
+    const channel = new MessageChannel(),
+      close = vi.spyOn(channel.port1, 'close');
+    scope.onmessage?.(
+      new MessageEvent('message', {
+        data: createAnimationImportWorkerRequest('request-1', input()),
+        ports: [channel.port1],
+      })
+    );
+    expect(close).toHaveBeenCalledOnce();
+    expect(scope.postMessage).not.toHaveBeenCalled();
+    expect(scope.close).toHaveBeenCalledOnce();
+    channel.port2.close();
+  });
   it('closes without executing messages carrying a window origin', async () => {
     const scope = createWorkerScopeStub();
     vi.stubGlobal('self', scope);
@@ -230,7 +159,7 @@ describe('EffectV1 import worker single-use lifecycle', () => {
 
     scope.onmessage?.(
       new MessageEvent('message', {
-        data: createEffectImportWorkerRequest('request-1', 'raw-json', readRawFixture()),
+        data: createAnimationImportWorkerRequest('request-1', input()),
         origin: 'https://attacker.invalid',
       })
     );
@@ -248,16 +177,4 @@ interface WorkerScopeStub {
 
 function createWorkerScopeStub(): WorkerScopeStub {
   return { close: vi.fn(), onmessage: null, postMessage: vi.fn() };
-}
-
-function readRawFixture(): Uint8Array {
-  return new Uint8Array(
-    readFileSync(
-      new URL(
-        '../../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/' +
-          'neutral-standalone.sniptale-effect.json',
-        import.meta.url
-      )
-    )
-  );
 }

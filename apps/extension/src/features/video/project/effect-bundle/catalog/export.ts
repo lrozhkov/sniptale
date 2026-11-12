@@ -1,65 +1,72 @@
-import { writeEffectBundleArchive } from '../archive-writer';
-import {
-  parseEffectV1Source,
-  sha256EffectV1Bytes,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import JSZip from 'jszip';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import { parseAnimationTemplateJson } from '@sniptale/runtime-contracts/animation-template';
+import { parseAnimationPackManifest } from '../manifest';
+import { EFFECT_BUNDLE_LIMITS } from '../limits';
+import { assertEffectBundleZipLimits } from '../import/zip/archive';
 import type { EffectBundleCatalogEntry } from './index';
-import type { EffectBundleManifest } from '../manifest';
 
-/** Export the portable bundle contract, including asset bytes; catalog UI state stays local. */
+/** Export complete authored packages; project references and catalogue preferences stay local. */
 export async function exportEffectCatalog(
   catalog: EffectBundleCatalogEntry
 ): Promise<{ blob: Blob; filename: string }> {
-  const files = catalog.assets.map((asset) => ({ asset, path: `assets/${asset.sha256}` }));
-  const documents = await Promise.all(
-    catalog.documents.map(async (entry, index) => {
-      if (!entry.source) throw new Error('Catalog document is not loaded');
-      const document = parseEffectV1Source(entry.source, {
-        presentationPolicy: 'retained',
-      }).document;
-      if (!document) throw new Error('Invalid catalog document');
-      for (const declaration of document.assets) {
-        const reference = entry.assets.find((asset) => asset.id === declaration.id);
-        const file = files.find((item) => item.asset.sha256 === reference?.sha256);
-        if (!file) throw new Error('Missing catalog asset');
-        delete declaration.dataUrl;
-        delete declaration.svgText;
-        declaration.path = file.path;
-      }
-      if (!validateEffectV1Document(document, { presentationPolicy: 'retained' }).ok)
-        throw new Error('Invalid exported document');
-      const source = JSON.stringify(document);
-      const bytes = new TextEncoder().encode(source);
-      return {
-        source,
-        id: document.id,
-        path: `effects/effect-${index}.sniptale-effect.json`,
-        schemaVersion: document.schemaVersion,
-        byteLength: bytes.byteLength,
-        sha256: await sha256EffectV1Bytes(bytes),
-      };
-    })
-  );
-  const basename = catalog.packId.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 100);
-  if (documents.length === 1 && !files.length && catalog.source === 'raw-json')
-    return {
-      blob: new Blob([documents[0]!.source], { type: 'application/json' }),
-      filename: `${basename}.sniptale-effect.json`,
-    };
-  const manifest: Omit<EffectBundleManifest, 'assets'> = {
-    manifestVersion: 'sniptale.bundle.v1',
-    engineVersion: '2.0',
-    packId: catalog.packId,
-    version: catalog.version,
-    label: catalog.label,
-    ...(catalog.description.en || catalog.description.ru
-      ? { description: catalog.description }
-      : {}),
-    effectDocuments: documents.map(({ source: _source, ...entry }) => entry),
-  };
+  if (
+    catalog.source === 'builtin' ||
+    catalog.assets.length ||
+    !catalog.documents.length ||
+    catalog.documents.length > EFFECT_BUNDLE_LIMITS.maxDocuments
+  )
+    throw new Error('Animation pack is unavailable.');
+  const zip = new JSZip(),
+    documents = [];
+  let retained = 0;
+  for (const [index, entry] of catalog.documents.entries()) {
+    if (
+      !entry.source ||
+      entry.schemaVersion !== 'sniptale.animation.v1' ||
+      entry.kind !== 'standalone' ||
+      entry.assets.length
+    )
+      throw new Error('Animation pack is unavailable.');
+    const bytes = new TextEncoder().encode(entry.source);
+    retained += bytes.byteLength;
+    if (
+      retained > EFFECT_BUNDLE_LIMITS.maxInflatedBytes ||
+      bytes.byteLength > EFFECT_BUNDLE_LIMITS.maxJsonBytes ||
+      bytesToHex(sha256(bytes)) !== entry.sha256
+    )
+      throw new Error('Animation pack integrity failed.');
+    const parsed = await parseAnimationTemplateJson(entry.source);
+    if (!parsed.ok || parsed.template.id !== entry.id)
+      throw new Error('Animation pack integrity failed.');
+    const path = `animations/${index}.sniptale-animation.json`;
+    documents.push({ id: entry.id, path, byteLength: bytes.byteLength, sha256: entry.sha256 });
+    zip.file(path, bytes, { createFolders: false });
+  }
+  const manifest = parseAnimationPackManifest({
+    format: 'sniptale-animation-pack',
+    version: 1,
+    metadata: {
+      packId: catalog.packId,
+      label: catalog.label,
+      description: catalog.description,
+    },
+    documents,
+  });
+  if (!manifest) throw new Error('Animation pack metadata is invalid.');
+  zip.file('manifest.json', JSON.stringify(manifest));
+  let bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
+  try {
+    assertEffectBundleZipLimits(bytes);
+  } catch {
+    // Repetitive keyframes can exceed the import ratio limit. Retry without compression,
+    // and apply the same size/path/ratio limits to the replacement archive.
+    bytes = await zip.generateAsync({ type: 'uint8array', compression: 'STORE' });
+    assertEffectBundleZipLimits(bytes);
+  }
   return {
-    blob: await writeEffectBundleArchive({ manifest, documents, files }),
-    filename: `${basename}.sniptale-bundle.zip`,
+    blob: new Blob([bytes.slice().buffer], { type: 'application/zip' }),
+    filename: `${manifest.metadata.packId}.sniptale-animations.zip`,
   };
 }

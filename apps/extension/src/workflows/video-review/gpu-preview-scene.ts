@@ -1,3 +1,4 @@
+import { sourceImageFilterPlaneSize } from '../../features/image-filters/contract';
 import { cursorMotionArtwork } from '../../features/video/project/cursor-motion/paint';
 import { resolveGpuPreviewGroupRasters } from '../../features/video/composition/canvas/gpu-preview-plan';
 import { preparedSourceGpuLayers } from '../../features/video/composition/export-enhancement/prepared-source';
@@ -196,6 +197,15 @@ export async function buildReviewGpuScene(args: {
       : []),
     {
       source,
+      ...(currentScene.sourceFilters
+        ? {
+            imageFilters: {
+              stack: currentScene.sourceFilters,
+              projectTime: args.resultTime,
+              logical: sourceImageFilterPlaneSize(currentScene.source, orientation?.rotation),
+            },
+          }
+        : {}),
       rect: base.videoRect,
       inverse: identity,
       ...(orientation ? { orientation } : {}),
@@ -317,7 +327,13 @@ export async function buildReviewGpuScene(args: {
           const id = demandFor(sourceExposures.get(layer) ?? 0);
           // A lens outside the source aperture retains the header and artwork, without video.
           if (!sampling.plan.demands.some((demand) => demand.id === id)) return [];
-          const prepared = preparedSourceGpuLayers(sampling.sampling, id, layer.rect);
+          const prepared = preparedSourceGpuLayers(
+            sampling.sampling,
+            id,
+            layer.rect,
+            currentScene.sourceFilters,
+            args.resultTime
+          );
           if (!prepared) return [layer];
           density = Math.max(density, prepared.density);
           const { orientation: _orientation, ...placement } = layer;

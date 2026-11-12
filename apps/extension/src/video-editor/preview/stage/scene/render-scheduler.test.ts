@@ -1058,3 +1058,56 @@ it('does not infer advisory provenance from an arbitrary render project', async 
   expect(render.mock.calls[0]![0]).not.toHaveProperty('effectPreparation');
   scheduler.dispose();
 });
+
+it('waits for the newest paused decoded-source preparation while the canceled predecessor settles', async () => {
+  type Input = Parameters<Parameters<typeof createPreviewSceneRenderScheduler>[0]['render']>[0];
+  type Frame = { input: Input; release: () => void };
+  const older = Promise.withResolvers<Frame>();
+  const newest = Promise.withResolvers<Frame>();
+  const oldRelease = vi.fn();
+  const newRelease = vi.fn();
+  const prepare = vi
+    .fn((_input: Input): Promise<Frame> => older.promise)
+    .mockImplementationOnce(() => older.promise)
+    .mockImplementationOnce(() => newest.promise);
+  const render = vi.fn(async (input: Input) => ({
+    camera: resolveVideoCompositionRenderPasses(input.project, input.currentTime).overlayFrame
+      .camera,
+    time: input.currentTime,
+  }));
+  const onSuccess = vi.fn();
+  const onError = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({ prepare, render, onSuccess, onError });
+  const first = {
+    ...createJob(1, false),
+    project: createProject([]),
+    sourceRuntime: {
+      selected: true,
+      prepare: vi.fn(async () => 'ready' as const),
+      acquire: vi.fn(async () => null),
+    },
+  };
+  const second = { ...first, currentTime: 2, controller: new AbortController() };
+  scheduler.enqueue(first);
+  scheduler.enqueue(second);
+  expect(first.controller.signal.aborted).toBe(true);
+  await admit();
+  expect(render).not.toHaveBeenCalled();
+  expect(prepare).toHaveBeenCalledOnce();
+  older.resolve({ input: prepare.mock.calls[0]![0], release: oldRelease });
+  await admit();
+  expect(oldRelease).toHaveBeenCalledOnce();
+  expect(prepare).toHaveBeenCalledTimes(2);
+  expect(prepare.mock.calls[1]![0].currentTime).toBe(2);
+  expect(render).not.toHaveBeenCalled();
+  const readyInput = { ...prepare.mock.calls[1]![0], decodedVideoFrames: new Map() };
+  newest.resolve({ input: readyInput, release: newRelease });
+  await admit();
+  expect(render).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ currentTime: 2, decodedVideoFrames: readyInput.decodedVideoFrames })
+  );
+  expect(onSuccess).toHaveBeenCalledExactlyOnceWith(second, expect.objectContaining({ time: 2 }));
+  expect(newRelease).toHaveBeenCalledOnce();
+  expect(onError).not.toHaveBeenCalled();
+  scheduler.dispose();
+});

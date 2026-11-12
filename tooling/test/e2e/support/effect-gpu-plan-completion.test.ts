@@ -6,7 +6,11 @@ afterEach(() => {
   JSON.stringify = nativeStringify;
   vi.unstubAllGlobals();
 });
-function fixture() {
+function fixture(
+  kind: 'gpu-plan' | 'frame' = 'gpu-plan',
+  correlated = true,
+  mismatch: 'port' | 'ack' | null = null
+) {
   class Canvas {
     constructor(
       public width: number,
@@ -16,6 +20,7 @@ function fixture() {
   class Bitmap {}
   class Frame {}
   class Port {
+    postMessage(_message: unknown, _transfer?: readonly object[]) {}
     private listener: ((event: { data: unknown }) => void) | null = null;
     get onmessage() {
       return this.listener;
@@ -26,6 +31,10 @@ function fixture() {
     receive(data: unknown) {
       this.listener?.({ data });
     }
+  }
+  class Channel {
+    port1 = new Port();
+    port2 = new Port();
   }
   class Texture {
     createView() {
@@ -77,6 +86,7 @@ function fixture() {
     ImageBitmap: Bitmap,
     VideoFrame: Frame,
     MessagePort: Port,
+    MessageChannel: Channel,
     GPUTexture: Texture,
     GPUDevice: Device,
     GPUCommandEncoder: Encoder,
@@ -85,12 +95,47 @@ function fixture() {
   }))
     vi.stubGlobal(name, value);
   installEffectGpuPlanCompletionObserver('receivePlan');
+  const ActualChannel = globalThis.MessageChannel as unknown as typeof Channel;
+  const reply = new ActualChannel();
   const queue = new Queue(),
     device = new Device(),
     bitmap = new Bitmap(),
-    port = new Port();
+    port = mismatch === 'port' ? new ActualChannel().port1 : reply.port1;
+  const control = new Port();
   port.onmessage = () => {};
-  port.receive({ kind: 'gpu-plan', requestId: 'request', resources: [{ bitmap }] });
+  const identity = {
+    requestId: 'request',
+    effectInstanceId: 'annotation',
+    snapshotId: 'snapshot',
+    sequenceId: 0,
+  };
+  if (kind === 'frame' && correlated)
+    control.postMessage(
+      {
+        type: 'sniptale:effect-runtime:render',
+        request: {
+          kind: 'renderFrame',
+          protocolVersion: 7,
+          ...identity,
+          documentRef: { id: 'a'.repeat(64) },
+          assetSelectionRef: { id: 'b'.repeat(64) },
+        },
+      },
+      [reply.port2]
+    );
+  port.receive(
+    kind === 'frame'
+      ? {
+          kind,
+          ...identity,
+          bitmap,
+          acknowledged: {
+            documentId: (mismatch === 'ack' ? 'c' : 'a').repeat(64),
+            assetSelectionId: 'b'.repeat(64),
+          },
+        }
+      : { kind, requestId: 'request', resources: [{ bitmap }] }
+  );
   const submit = (video: boolean, draw = true) => {
     const texture = new Texture();
     queue.copyExternalImageToTexture({ source: bitmap }, { texture });
@@ -185,3 +230,54 @@ it('does not attribute an unrelated allocation to a serialized paint plan', asyn
   await Promise.resolve();
   expect(f.receive).not.toHaveBeenCalledWith(['paint-unused']);
 });
+
+it('tracks bitmap-only Lottie output through the submitted parent video scene and completion fence', async () => {
+  const f = fixture('frame');
+  f.submit(true);
+  expect(f.receive).not.toHaveBeenCalled();
+  f.resolve();
+  await Promise.resolve();
+  expect(f.receive).toHaveBeenCalledExactlyOnceWith(['request']);
+});
+it.each(['unrelated', 'no-draw', 'failed'] as const)(
+  'refuses %s GPU evidence for bitmap-only Lottie output',
+  async (kind) => {
+    const f = fixture('frame');
+    f.submit(kind !== 'unrelated', kind !== 'no-draw');
+    if (kind === 'failed') f.reject();
+    else f.resolve();
+    await Promise.resolve();
+    expect(f.receive).not.toHaveBeenCalled();
+  }
+);
+
+it('does not attribute an uncorrelated bitmap reply to annotation GPU work', async () => {
+  const f = fixture('frame', false);
+  f.submit(true);
+  f.resolve();
+  await Promise.resolve();
+  expect(f.receive).not.toHaveBeenCalled();
+});
+
+it('keeps attributing a retained Lottie bitmap when placement updates submit another parent scene', async () => {
+  const f = fixture('frame');
+  f.submit(true);
+  f.resolve();
+  await Promise.resolve();
+  expect(f.receive).toHaveBeenCalledTimes(1);
+  f.submit(true);
+  await Promise.resolve();
+  expect(f.receive).toHaveBeenCalledTimes(2);
+  expect(f.receive.mock.calls).toEqual([[['request']], [['request']]]);
+});
+
+it.each(['port', 'ack'] as const)(
+  'does not attribute a bitmap with mismatched %s evidence',
+  async (mismatch) => {
+    const f = fixture('frame', true, mismatch);
+    f.submit(true);
+    f.resolve();
+    await Promise.resolve();
+    expect(f.receive).not.toHaveBeenCalled();
+  }
+);

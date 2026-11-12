@@ -1,3 +1,9 @@
+import { useGlTransitionCatalog } from '../../../../../composition/gl-transition-presets/catalog';
+import {
+  createGlCatalogFixture,
+  createImportedGlCatalogFixture,
+} from '../../../../../composition/gl-transition-presets/catalog.test-support';
+import { createGlTransitionSelection } from '../../../../../features/video/project/transition/gl-catalog';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -58,7 +64,7 @@ function click(label: string) {
 }
 it.each([false, true])(
   'edits held and moving join settings without changing their recipe (%s)',
-  (moving) => {
+  async (moving) => {
     if (moving) {
       const project = useVideoEditorStore.getState().project!;
       useVideoEditorStore.getState().setProject({
@@ -69,7 +75,7 @@ it.each([false, true])(
     }
     render();
     const before = useVideoEditorStore.getState();
-    click('gallery.videoReview.cutDissolve');
+    await chooseJoin('gallery.videoReview.cutDissolve');
     const after = useVideoEditorStore.getState();
     expect(after.project!.compositionJoins![0]).toMatchObject({
       id: 'join',
@@ -79,7 +85,7 @@ it.each([false, true])(
     expect(after.project!.clips).toEqual(before.project!.clips);
     expect(after.project!.bookendPresets).toEqual(before.project!.bookendPresets);
     expect(after.projectHistory.past).toHaveLength(before.projectHistory.past.length + 1);
-    click('gallery.videoReview.transitionNone');
+    await chooseJoin('gallery.videoReview.transitionNone');
     expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual(
       before.project!.compositionJoins
     );
@@ -102,19 +108,19 @@ it('seeks the actual clip edge after a move without changing selection or histor
   expect(useVideoEditorStore.getState().selection).toBe(current.selection);
   expect(useVideoEditorStore.getState().projectHistory).toBe(current.projectHistory);
 });
-it('refuses a foreign history lease, keeps accepted state and supports retry', () => {
+it('refuses a foreign history lease, keeps accepted state and supports retry', async () => {
   render();
   let lease: symbol | null = null;
   act(() => {
     lease = useVideoEditorStore.getState().beginProjectHistoryTransaction({ onlyIfIdle: true });
   });
   const before = useVideoEditorStore.getState();
-  click('gallery.videoReview.cutFadeColor');
+  await chooseJoin('gallery.videoReview.cutFadeColor');
   expect(useVideoEditorStore.getState().project).toBe(before.project);
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
   if (!lease) throw new Error('Missing lease');
   act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease!));
-  click('gallery.videoReview.cutFadeColor');
+  await chooseJoin('gallery.videoReview.cutFadeColor');
   expect(useVideoEditorStore.getState().project!.compositionJoins![0]!.transition!.type).toBe(
     'fade-black'
   );
@@ -133,7 +139,7 @@ it('clears the disposable preview on project replacement and panel unmount', () 
   expect(preview).toHaveBeenLastCalledWith(null);
 });
 
-it('edits retained cut settings as source metadata without inventing a seek position', () => {
+it('edits retained cut settings as source metadata without inventing a seek position', async () => {
   const project = useVideoEditorStore.getState().project!,
     source = project.assets[0]!;
   const sourceRange = {
@@ -148,12 +154,12 @@ it('edits retained cut settings as source metadata without inventing a seek posi
   expect(host.querySelector('[aria-label="videoEditor.sidebar.compositionJoinSeek"]')).toBeNull();
   expect(host.textContent).toContain('videoEditor.sidebar.sourceIn');
   expect(host.textContent).toContain('videoEditor.sidebar.sourceOut');
-  click('gallery.videoReview.cutDissolve');
+  await chooseJoin('gallery.videoReview.cutDissolve');
   expect(useVideoEditorStore.getState().project!.compositionJoins![0]).toEqual({
     ...join,
     transition: { type: 'dissolve', before: 0.2, after: 0.2 },
   });
-  click('gallery.videoReview.transitionNone');
+  await chooseJoin('gallery.videoReview.transitionNone');
   expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual([join]);
 });
 
@@ -163,4 +169,125 @@ it('keeps per-boundary disclosures free of repeated section glyphs', () => {
   expect(boundary).not.toBeNull();
   expect(boundary.querySelectorAll('svg')).toHaveLength(1);
   expect(boundary.querySelector('svg')!.classList.contains('lucide-chevron-down')).toBe(true);
+});
+
+async function importPresetFile(
+  parent: ParentNode,
+  selection: ReturnType<typeof createGlTransitionSelection>,
+  name = 'Imported'
+) {
+  if (!selection) throw new Error('Missing preset selection');
+  const source = JSON.stringify({
+    format: 'sniptale-gl-preset',
+    version: 1,
+    name,
+    transition: selection,
+  });
+  const file = new File([source], 'imported.sniptale-gl-preset.json');
+  Object.defineProperty(file, 'arrayBuffer', {
+    value: async () => new TextEncoder().encode(source).buffer,
+  });
+  const input = parent.querySelector<HTMLInputElement>('input[type=file]');
+  if (!input) throw new Error('Missing preset file input');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+}
+
+it.each([false, true])(
+  'imports a GL scene preset through existing history and handles refusal (%s)',
+  async (refused) => {
+    const project = useVideoEditorStore.getState().project!,
+      initial = {
+        type: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
+        easing: 'EASE_IN_OUT' as const,
+        before: 0.2,
+        after: 0.3,
+      };
+    useVideoEditorStore.getState().setProject({
+      ...project,
+      version: 40,
+      compositionJoins: project.compositionJoins!.map((join) => ({
+        ...join,
+        transition: initial,
+      })),
+    });
+    render();
+    const before = useVideoEditorStore.getState(),
+      selection = createGlTransitionSelection('CrossZoom')!;
+    let lease: symbol | null = null;
+    if (refused)
+      act(() => {
+        lease = useVideoEditorStore.getState().beginProjectHistoryTransaction({ onlyIfIdle: true });
+      });
+    expect(host.querySelector('[data-gl-preset-owner]')?.getAttribute('data-gl-preset-owner')).toBe(
+      `${project.id}:join:join`
+    );
+    await importPresetFile(host, selection);
+    if (refused) {
+      expect(useVideoEditorStore.getState().project).toBe(before.project);
+      expect(host.querySelector('[role=alert]')).not.toBeNull();
+      if (lease) act(() => useVideoEditorStore.getState().endProjectHistoryTransaction(lease!));
+    } else {
+      expect(useVideoEditorStore.getState().project!.compositionJoins![0]!.transition).toEqual({
+        ...initial,
+        selection,
+      });
+      expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(
+        before.projectHistory.past.length + 1
+      );
+      act(() => useVideoEditorStore.getState().undoProject());
+      expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual(
+        before.project!.compositionJoins
+      );
+    }
+  }
+);
+
+async function chooseJoin(label: string) {
+  const trigger = host.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.presentation-join-fields"] button[aria-haspopup="listbox"]'
+  );
+  if (!trigger) throw new Error('Missing transition choice');
+  await act(async () => {
+    trigger.click();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
+  const option = [...document.querySelectorAll<HTMLButtonElement>('[role=option]')].find(
+    (item) => item.textContent === label
+  );
+  if (!option) throw new Error(`Missing transition option: ${label}`);
+  await act(async () => option.click());
+}
+
+vi.mock('../../../../../composition/gl-transition-presets/catalog', async () => {
+  const { createGlCatalogFixture } =
+    await import('../../../../../composition/gl-transition-presets/catalog.test-support');
+  return { useGlTransitionCatalog: vi.fn(createGlCatalogFixture) };
+});
+
+it('applies a saved catalogue scene join through history and restores it with Undo', async () => {
+  const { catalog, selection } = createImportedGlCatalogFixture();
+  vi.mocked(useGlTransitionCatalog).mockReturnValue(catalog);
+  try {
+    render();
+    const before = useVideoEditorStore.getState();
+    await chooseJoin('Saved zoom');
+    const after = useVideoEditorStore.getState();
+    expect(after.project!.compositionJoins![0]!.transition).toEqual({
+      type: 'gl',
+      selection,
+      easing: 'LINEAR',
+      before: 0.2,
+      after: 0.2,
+    });
+    expect(after.projectHistory.past).toHaveLength(before.projectHistory.past.length + 1);
+    expect(after.project!.clips).toEqual(before.project!.clips);
+    act(() => useVideoEditorStore.getState().undoProject());
+    expect(useVideoEditorStore.getState().project!.compositionJoins).toEqual(
+      before.project!.compositionJoins
+    );
+  } finally {
+    vi.mocked(useGlTransitionCatalog).mockImplementation(createGlCatalogFixture);
+  }
 });

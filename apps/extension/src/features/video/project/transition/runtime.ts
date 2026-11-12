@@ -1,21 +1,5 @@
 import { clampNumber } from '../timeline/basics';
-import type {
-  VideoProjectClip,
-  VideoProjectTransitionSegment,
-  VideoTemplateDirection,
-  VideoTemplateIntensity,
-  VideoTransitionEasing,
-} from '../types/index';
-
-const TRANSITION_INTENSITY_MULTIPLIER = {
-  SOFT: 0.72,
-  BALANCED: 1,
-  BOLD: 1.32,
-} as const satisfies Record<VideoTemplateIntensity, number>;
-
-export function getTransitionIntensityMultiplier(intensity: VideoTemplateIntensity): number {
-  return TRANSITION_INTENSITY_MULTIPLIER[intensity];
-}
+import type { VideoProjectTransitionSegment, VideoTransitionEasing } from '../types';
 
 export function getTransitionProgress(
   segment: Pick<VideoProjectTransitionSegment, 'start' | 'end'> & {
@@ -33,32 +17,6 @@ export function getTransitionProgress(
     1
   );
   return applyTransitionEasing(rawProgress, segment.transition.easing);
-}
-
-export function getIncomingOffset(
-  direction: VideoTemplateDirection,
-  distance: number
-): { x: number; y: number } {
-  switch (direction) {
-    case 'LEFT':
-      return { x: distance, y: 0 };
-    case 'RIGHT':
-      return { x: -distance, y: 0 };
-    case 'UP':
-      return { x: 0, y: distance };
-    case 'DOWN':
-      return { x: 0, y: -distance };
-  }
-}
-
-export function resolveDirectionalDistance(
-  clip: VideoProjectClip,
-  direction: VideoTemplateDirection,
-  multiplier: number
-): number {
-  const axisSize =
-    direction === 'LEFT' || direction === 'RIGHT' ? clip.transform.width : clip.transform.height;
-  return Math.max(axisSize * multiplier, 1);
 }
 
 function applyTransitionEasing(progress: number, easing: VideoTransitionEasing): number {

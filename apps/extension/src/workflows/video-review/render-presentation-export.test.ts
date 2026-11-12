@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { writeReviewPresentationFrames } from './render-presentation-export';
 import type { writeReviewFrames } from './render-export';
@@ -10,6 +13,23 @@ import { parseReviewProvenance } from '../../features/video/review/provenance';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createReviewExportDiagnostics } from './export-diagnostics';
 
+const FRAME_SOURCE = readFileSync(
+  'apps/extension/public/video-effects/animations/frame.sniptale-animation.json',
+  'utf8'
+);
+const FRAME_DOCUMENT = parseAnimationTemplateSource(FRAME_SOURCE);
+if (!FRAME_DOCUMENT.ok) throw new Error('Expected valid shipped frame animation.');
+const FRAME_HASH = createHash('sha256').update(FRAME_SOURCE).digest('hex');
+const FRAME_SNAPSHOT = {
+  id: `effect:${FRAME_HASH}`,
+  schemaVersion: 'sniptale.animation.v1' as const,
+  kind: 'standalone' as const,
+  documentId: FRAME_DOCUMENT.template.id,
+  sha256: FRAME_HASH,
+  source: FRAME_SOURCE,
+  retainedByteLength: Buffer.byteLength(FRAME_SOURCE),
+  assets: [],
+};
 const io = vi.hoisted(() => ({
   open: vi.fn<(args: ReviewPresentationRendererInput) => Promise<unknown>>(),
   render:
@@ -218,24 +238,13 @@ afterEach(() => vi.restoreAllMocks());
 it('renders the complete rational sequence with explicit geometry and a partial final video sample', async () => {
   const args = fixture();
   args.captionTimeMap = buildReviewTimeMap(args.index.duration, []);
-  args.effectSnapshots = [
-    {
-      id: 'effect:frame',
-      schemaVersion: 'sniptale.effect.v1',
-      kind: 'standalone',
-      documentId: 'frame',
-      sha256: '0'.repeat(64),
-      source: '{}',
-      retainedByteLength: 2,
-      assets: [],
-    },
-  ];
+  args.effectSnapshots = [{ ...FRAME_SNAPSHOT }];
   args.advanced.annotationEffects = {
     enabled: true,
     instances: [
       {
         id: 'frame',
-        snapshotId: 'effect:frame',
+        snapshotId: FRAME_SNAPSHOT.id,
         enabled: true,
         start: 0,
         end: 2,

@@ -632,6 +632,7 @@ function reviewAdvancedControls(
     previewBackground: advancedState.previewBackground,
     setCanvas: advancedState.setCanvas,
     setWindowHeader: advancedState.setWindowHeader,
+    setSourceFilters: advancedState.setSourceFilters,
     setCursorMotions: advancedState.setCursorMotions,
     setCursorMotionEnabled: advancedState.setCursorMotionEnabled,
     setText: advancedState.setText,

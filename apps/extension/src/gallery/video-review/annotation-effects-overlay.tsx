@@ -1,3 +1,4 @@
+import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   useEffect,
@@ -6,10 +7,8 @@ import {
   useRef,
   type PointerEvent,
 } from 'react';
-import {
-  resolveEffectLocaleText,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectLocaleText } from '@sniptale/runtime-contracts/effect-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type {
   ReviewAnnotationEffect,
@@ -45,7 +44,7 @@ export type ReviewAnnotationEditing = {
 };
 type Drag = {
   instance: ReviewAnnotationEffect;
-  document: EffectV1Document;
+  document: AnimationTemplate;
   geometry: ReviewAnnotationGeometry;
   start: Point;
   point: Point;
@@ -125,7 +124,7 @@ export function ReviewAnnotationOverlay({
   const begin = (
     event: PointerEvent<SVGElement>,
     instance: ReviewAnnotationEffect,
-    document: EffectV1Document,
+    document: AnimationTemplate,
     kind: Drag['kind']
   ) => {
     if (event.button !== 0 || binding.busy || binding.editor.pending || drag.current) return;
@@ -164,7 +163,7 @@ export function ReviewAnnotationOverlay({
   const keyboard = (
     event: ReactKeyboardEvent<SVGElement>,
     instance: ReviewAnnotationEffect,
-    document: EffectV1Document,
+    document: AnimationTemplate,
     kind: Drag['kind'],
     point: Point
   ) => {
@@ -311,7 +310,7 @@ export function ReviewAnnotationOverlay({
           !document ||
           !sampleReviewAnnotationEffect(
             projectReviewAnnotationEffect(instance, binding.segments),
-            document.duration,
+            animationRuntimeDuration(document),
             binding.time
           )
         )

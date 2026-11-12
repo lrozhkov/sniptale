@@ -8,7 +8,8 @@ import {
   initDB,
   MEDIA_LIBRARY_STORE,
   SCENARIO_PROJECTS_STORE,
-  VIDEO_EFFECT_BUNDLES_STORE,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
   VIDEO_PROJECTS_STORE,
 } from '../../../composition/persistence/infrastructure/indexed-db/core';
 import type { ArchiveRestoreStrategy } from '../../../composition/persistence/assets';
@@ -244,12 +245,25 @@ export async function inspectMediaHubBackup(file: Blob): Promise<MediaHubBackupS
   const db = await initDB();
   const conflicts: string[] = [];
   for (const key of inspection.rootKeys) {
-    const { id, prefix } = keyParts(key);
+    const { id: portableId, prefix } = keyParts(key);
+    const visual = prefix === 'media:effect-bundle:';
+    const visualKind = portableId.startsWith('animation:')
+      ? 'animation'
+      : portableId.startsWith('transition:')
+        ? 'transition'
+        : null;
+    if (visual && !visualKind)
+      throw new Error('Inspected visual catalogue root identity is invalid.');
+    const id = visual
+      ? portableId.slice(visualKind === 'animation' ? 'animation:'.length : 'transition:'.length)
+      : portableId;
     const store =
       prefix === 'media:library-item:'
         ? MEDIA_LIBRARY_STORE
         : prefix === 'media:effect-bundle:'
-          ? VIDEO_EFFECT_BUNDLES_STORE
+          ? visualKind === 'animation'
+            ? VIDEO_ANIMATION_PACKAGES_STORE
+            : VIDEO_GL_TRANSITION_PRESETS_STORE
           : prefix === 'video-project:'
             ? VIDEO_PROJECTS_STORE
             : SCENARIO_PROJECTS_STORE;

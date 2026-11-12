@@ -1,3 +1,4 @@
+import { sourceImageFilterTick } from '../../features/image-filters/plan';
 import { useContext } from 'react';
 import { ReviewPreviewRendererContext } from './use-preview-preferences';
 import { createZoomPreviewPaintOwner } from './zoom-preview-paint-owner';
@@ -317,14 +318,31 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
   };
 }
 
+function sourceFilterClock(props: Pick<ZoomPreviewGpuInput, 'sourceFilters' | 'currentTime'>) {
+  const animated = props.sourceFilters?.filters.some(
+    (filter) =>
+      filter.kind === 'grain' &&
+      filter.enabled &&
+      filter.intensity > 0 &&
+      filter.parameters.amount > 0
+  );
+  return animated ? sourceImageFilterTick(props.currentTime ?? 0) : null;
+}
+
 function areaRasterKey(
-  props: Pick<ZoomCanvasProps, 'background' | 'layout' | 'cornerRadius'> & {
+  props: Pick<
+    ZoomCanvasProps,
+    'background' | 'layout' | 'cornerRadius' | 'sourceFilters' | 'sourceSize' | 'currentTime'
+  > & {
     previewScale: number | undefined;
   },
   canvas: HTMLCanvasElement,
   retry: number
 ) {
   return JSON.stringify([
+    props.sourceFilters,
+    sourceFilterClock(props),
+    props.sourceSize,
     props.background,
     props.layout.videoRect,
     props.layout.windowRect,
@@ -358,6 +376,9 @@ function zoomPaintKey(props: ZoomPreviewGpuInput, canvas: HTMLCanvasElement, ret
   if (props.view === 'area')
     return areaRasterKey(
       {
+        sourceFilters: props.sourceFilters,
+        currentTime: props.currentTime,
+        sourceSize: props.sourceSize,
         background: props.background,
         layout: props.layout,
         cornerRadius: props.cornerRadius,
@@ -367,6 +388,9 @@ function zoomPaintKey(props: ZoomPreviewGpuInput, canvas: HTMLCanvasElement, ret
       retry
     );
   return JSON.stringify([
+    props.sourceFilters,
+    sourceFilterClock(props),
+    props.sourceSize,
     props.background,
     props.layout,
     props.camera,
@@ -465,6 +489,9 @@ export function useZoomPreviewCanvasPaint(
             if (restoreZoomPaint(context, canvas, cache.current, key, input)) return;
             cache.current.painted = null;
             paintZoomPreview(context, {
+              currentTime: input.currentTime,
+              sourceFilters: input.sourceFilters,
+              sourceSize: input.sourceSize,
               spatialRenderer: renderer.current ?? undefined,
               background: input.background,
               accent: '#4f7cff',

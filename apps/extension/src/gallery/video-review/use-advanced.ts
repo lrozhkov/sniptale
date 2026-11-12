@@ -104,6 +104,7 @@ export function useReviewAdvanced(session: Session) {
   const content = contentState.content;
   const advanced = useMemo<QuickEditAdvancedState>(() => {
     const {
+      sourceFilters: _baselineSourceFilters,
       cursorFocusPath: _baselineCursorFocusPath,
       cursorMotions: _baselineCursorMotions,
       cursorMotionEnabled: _baselineCursorMotionEnabled,

@@ -1,3 +1,4 @@
+import { sourceImageFilterPlaneSize } from '../../../features/image-filters/contract';
 import { preparedSourceGpuLayers } from '../../../features/video/composition/export-enhancement/prepared-source';
 import { sourceClickSamplingDemandId } from '../../../features/video/composition/draw/effects/actions';
 import { resolveVideoMediaShadowParams } from '../../../features/video/composition/canvas/media-shadow';
@@ -583,6 +584,21 @@ export function createNativeGpuVideoLayerBuilder(args: {
     };
     const source = selected.frames.get(layer.clipId);
     if (!source) throw new Error('GPU video source is unavailable.');
+    const filters = sourceOwner.clip.sourceFilters;
+    const original = selected.media.get(layer.clipId);
+    const logical = isVideoCompositionFrameSource(original)
+      ? { width: original.sourceWidth, height: original.sourceHeight }
+      : { width: source.displayWidth, height: source.displayHeight };
+    const sourceFilter = (orientation?: GpuPreviewLayer['orientation']) =>
+      filters
+        ? {
+            imageFilters: {
+              stack: filters,
+              projectTime: time,
+              logical: sourceImageFilterPlaneSize(logical, orientation?.rotation),
+            },
+          }
+        : {};
     const inverse = args.inverse(layer);
     if (!inverse) throw new Error('Visual layer projection is unavailable.');
     let frameBodies = bodies.get(frame);
@@ -631,6 +647,7 @@ export function createNativeGpuVideoLayerBuilder(args: {
         )
           return {
             source,
+            ...sourceFilter(orientation),
             rect: content,
             inverse: sourceInverse,
             ...(orientation ? { orientation } : {}),
@@ -656,7 +673,9 @@ export function createNativeGpuVideoLayerBuilder(args: {
                   shape: 'hard-rect' as const,
                 }
               : undefined;
-          const prepared = sampling ? preparedSourceGpuLayers(sampling, 'body', destination) : null;
+          const prepared = sampling
+            ? preparedSourceGpuLayers(sampling, 'body', destination, filters, time)
+            : null;
           if (prepared) {
             args.density(prepared.density);
             if (prepared.layers.length === 1) {
@@ -687,6 +706,7 @@ export function createNativeGpuVideoLayerBuilder(args: {
               [
                 {
                   source,
+                  ...sourceFilter(orientation),
                   rect: destination,
                   inverse: IDENTITY,
                   ...(orientation ? { orientation } : {}),

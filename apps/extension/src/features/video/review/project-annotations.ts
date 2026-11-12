@@ -1,3 +1,4 @@
+import { animationRuntimeDuration } from '../../../contracts/effect-runtime/animation';
 import type { VideoProject, VideoProjectEffectClip, VideoProjectTrack } from '../project/types';
 import type {
   VideoProjectEffectInstance,
@@ -75,7 +76,7 @@ export function planReviewProjectAnnotations(args: {
       enabled: annotation.enabled,
       startTime,
       duration,
-      playbackRate: document.duration / duration,
+      playbackRate: animationRuntimeDuration(document) / duration,
       sourceStart: 0,
       ...(annotation.anchors
         ? {

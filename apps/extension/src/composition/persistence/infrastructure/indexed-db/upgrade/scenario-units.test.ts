@@ -2,6 +2,9 @@ import { SYNC_QUEUE_SUMMARY_INDEXES } from '../sync-queue-index-migration';
 import { expect, it, vi } from 'vitest';
 import {
   DB_VERSION,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
   ASSET_RESIDENCY_STORE,
   SYNC_CAPTURE_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
@@ -66,6 +69,9 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    [VIDEO_ANIMATION_PACKAGES_STORE, { keyPath: 'packId' }],
+    [VIDEO_VISUAL_PREFERENCES_STORE, { keyPath: ['kind', 'packId'] }],
+    [VIDEO_GL_TRANSITION_PRESETS_STORE, { keyPath: 'id' }],
   ]);
   expect(createIndex.mock.calls).toEqual([
     ['projectId', 'projectId'],
@@ -104,9 +110,12 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     ['kind', 'kind'],
     ['timeBuckets', 'timeBuckets', { multiEntry: true }],
     ['snapshotAssetId', 'snapshotAssetId'],
+    ['enabled', 'enabled'],
+    ['updatedAt', 'updatedAt'],
+    ['updatedAt', 'updatedAt'],
   ]);
   await vi.waitFor(() =>
-    expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 1)
+    expect(openCursor).toHaveBeenCalledTimes(REFERENCE_INDEX_STORES.length + 2)
   );
   expect(tx.objectStore.mock.calls).toEqual([
     [SYNC_OUTBOX_STORE],
@@ -118,12 +127,14 @@ it('adds empty scenario units and DB48 reference indexes before publishing curre
     ['recording_cursor_trajectories'],
     ['recordings'],
     ['recording_events'],
+    [VIDEO_ANIMATION_PACKAGES_STORE],
+    [VIDEO_VISUAL_PREFERENCES_STORE],
     ['schema_contracts'],
     ...REFERENCE_INDEX_STORES.slice(1).map((name) => [name]),
     ['video_workspaces'],
     ['video_workspace_history'],
   ]);
-  expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[]]));
+  expect(openCursor.mock.calls).toEqual(REFERENCE_INDEX_STORES.map(() => []).concat([[], []]));
   expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 10 });
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(getAll).not.toHaveBeenCalled();

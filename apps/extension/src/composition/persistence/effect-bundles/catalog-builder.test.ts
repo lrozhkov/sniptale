@@ -1,59 +1,131 @@
+import { importAnimationArtifactBytes } from '../../../features/video/project/effect-bundle/lottie-profile';
+import { createAnimationCatalogEntry } from './catalog-builder';
+import { parseAnimationCatalogEntry, parseStoredAnimationCatalogEntry } from './entry';
+import { assertAnimationCatalogIntegrity } from './integrity';
 import { expect, it } from 'vitest';
 
-import type { ImportedEffectArtifact } from '../../../features/video/project/effect-bundle/import/artifact';
-import { createEffectCatalogEntry } from './catalog-builder';
-import { readValidBundleArtifact } from './fixture.test-support';
+import { createRetainedTitleCatalogEntry } from './fixture.test-support';
 
-it('deduplicates byte-identical assets across bundle documents', async () => {
-  const artifact = await readValidBundleArtifact();
-  const document = artifact.bundle.documents[0]!;
-  artifact.bundle.documents.push({ ...document, document: { ...document.document, id: 'copy' } });
+async function animationArtifact() {
+  const imported = await importAnimationArtifactBytes(
+    new TextEncoder().encode(
+      JSON.stringify({
+        v: '5.12.2',
+        fr: 30,
+        ip: 0,
+        op: 60,
+        w: 320,
+        h: 180,
+        nm: 'Imported caption',
+        ddd: 0,
+        assets: [],
+        layers: [],
+      })
+    )
+  );
+  if (!imported.ok) throw new Error('Invalid animation fixture');
+  return imported;
+}
 
-  const entry = await createEffectCatalogEntry(artifact, 123);
-
-  expect(entry.assets).toHaveLength(1);
-  expect(entry.documents).toHaveLength(2);
+it('builds a detached animation catalog with exact retained bytes and verified document hashes', async () => {
+  const imported = await animationArtifact();
+  const entry = await createAnimationCatalogEntry(imported, 123);
+  expect(entry).toMatchObject({
+    format: 'sniptale-animation-catalog',
+    version: 2,
+    source: 'lottie-json',
+    createdAt: 123,
+    updatedAt: 123,
+  });
+  expect('enabled' in entry).toBe(false);
+  expect(
+    entry.documents.every(
+      (document) => !('enabled' in document) && !('presetPreferences' in document)
+    )
+  ).toBe(true);
+  expect(entry.retainedByteLength).toBe(
+    entry.documents.reduce(
+      (sum, document) => sum + new TextEncoder().encode(document.source).byteLength,
+      0
+    )
+  );
+  expect(parseAnimationCatalogEntry(JSON.parse(JSON.stringify(entry)))).toEqual(entry);
+  await expect(assertAnimationCatalogIntegrity(entry)).resolves.toBeUndefined();
+  imported.documents[0]!.template.label.en = 'Changed outside the catalog';
+  expect(entry.label.en).toBe('Imported caption');
 });
 
-it('rejects equal asset digests that carry different retained bytes', async () => {
-  const artifact = await readValidBundleArtifact();
-  const document = artifact.bundle.documents[0]!;
-  const asset = document.assets[0]!;
-  const conflicting = {
-    ...document,
-    assets: [{ ...asset, bytes: Uint8Array.of(...asset.bytes, 0) }],
-    document: { ...document.document, id: 'conflicting' },
-  };
-  artifact.bundle.documents.push(conflicting);
+it(
+  'refuses legacy rows, unknown formats, duplicate identities and ' +
+    'incorrect retained measurements in the animation namespace',
+  async () => {
+    const entry = await createAnimationCatalogEntry(await animationArtifact(), 123);
+    const legacy = await createRetainedTitleCatalogEntry();
+    expect(parseAnimationCatalogEntry(legacy)).toBeNull();
+    for (const invalid of [
+      { ...entry, version: 99 },
+      { ...entry, source: 'builtin' },
+      { ...entry, retainedByteLength: entry.retainedByteLength + 1 },
+      {
+        ...entry,
+        documents: [...entry.documents, ...entry.documents],
+        retainedByteLength: entry.retainedByteLength * 2,
+      },
+      {
+        ...entry,
+        documents: entry.documents.map((document) => ({ ...document, id: 'different' })),
+      },
+    ])
+      expect(parseAnimationCatalogEntry(invalid)).toBeNull();
+  }
+);
 
-  await expect(createEffectCatalogEntry(artifact, 123)).rejects.toMatchObject({
+it('verifies hashes before a prepared animation package can reach storage', async () => {
+  const imported = await animationArtifact();
+  imported.documents[0]!.sha256 = '0'.repeat(64);
+  await expect(createAnimationCatalogEntry(imported, 123)).rejects.toMatchObject({
     code: 'catalogIntegrityFailure',
   });
+  const entry = await createAnimationCatalogEntry(await animationArtifact(), 123);
+  await expect(
+    assertAnimationCatalogIntegrity({
+      ...entry,
+      documents: entry.documents.map((document) => ({ ...document, sha256: '0'.repeat(64) })),
+    })
+  ).rejects.toMatchObject({ code: 'catalogIntegrityFailure' });
 });
 
-it('materializes raw JSON catalog identity and locale fallbacks without assets', async () => {
-  const artifact = await readValidBundleArtifact();
-  const imported = artifact.bundle.documents[0]!;
-  const document = {
-    ...imported.document,
-    assets: [],
-    description: { ru: 'Описание' },
-    id: 'raw-effect',
-    label: { en: 'Raw effect' },
+it('reads DB54 prototype resources while stripping preference authority and measuring source bytes', async () => {
+  const current = await createAnimationCatalogEntry(await animationArtifact(), 123);
+  const preferences = { presets: [{ id: 'saved', name: 'Saved', values: {} }] };
+  const prototype = {
+    ...current,
+    version: 1,
+    enabled: false,
+    documents: current.documents.map((document) => ({
+      ...document,
+      enabled: false,
+      presetPreferences: preferences,
+    })),
+    retainedByteLength:
+      current.retainedByteLength + new TextEncoder().encode(JSON.stringify(preferences)).byteLength,
   };
-  const raw: ImportedEffectArtifact = {
-    document: {
-      document: { ...imported, assets: [], document },
-      sourceSha256: imported.sha256,
-    },
-    kind: 'raw-json',
-  };
-
-  await expect(createEffectCatalogEntry(raw, 456)).resolves.toMatchObject({
-    description: { en: 'Описание', ru: 'Описание' },
-    label: { en: 'Raw effect', ru: 'Raw effect' },
-    packId: 'raw.raw-effect',
-    source: 'raw-json',
-    version: '0.0.0',
-  });
+  expect(parseAnimationCatalogEntry(prototype)).toBeNull();
+  expect(parseStoredAnimationCatalogEntry(prototype)).toEqual(current);
+  const { presetPreferences: _preferences, ...document } = prototype.documents[0]!;
+  expect(
+    parseStoredAnimationCatalogEntry({
+      ...prototype,
+      documents: [document],
+      retainedByteLength: current.retainedByteLength,
+    })
+  ).toEqual(current);
+  for (const invalid of [
+    { ...prototype, retainedByteLength: prototype.retainedByteLength + 1 },
+    { ...prototype, documents: [{ ...prototype.documents[0], presetPreferences: null }] },
+    { ...prototype, documents: [{ ...prototype.documents[0], id: 'wrong' }] },
+    { ...prototype, documents: [{ ...prototype.documents[0], source: '{}' }] },
+    { ...prototype, documents: [...prototype.documents, ...prototype.documents] },
+  ])
+    expect(parseStoredAnimationCatalogEntry(invalid)).toBeNull();
 });

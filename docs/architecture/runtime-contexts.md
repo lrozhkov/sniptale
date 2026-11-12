@@ -104,7 +104,7 @@ Only the exact top-level Settings document can use the private history Port. Ret
 
 ## Effect sandbox
 
-`apps/extension/src/effect-runtime-sandbox/index.html` is the manifest sandbox for EffectV1 frame evaluation. It has no extension API authority. [EffectV1 bundles](video-effect-bundles.md#runtime) owns its runtime contract.
+`apps/extension/src/effect-runtime-sandbox/index.html` is the manifest sandbox for checked Lottie frame rendering. It has no extension API authority. [Effect runtime](video-effect-bundles.md#runtime) owns its runtime contract.
 
 ## State and egress
 

@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { createAnnotationClip } from '../factories/overlay-clip';
 import { hydrateVideoProject } from './index';
@@ -6,7 +7,7 @@ import {
   resolveVideoAnnotationTemplate,
 } from '../annotation-engine';
 import { createProject, createTextClip } from '../timeline/project-meta.test.helpers.ts';
-import { VideoClipTransitionKind, VideoTransitionKind } from '../types/index';
+import { VideoClipTransitionKind } from '../types/index';
 
 function createInvalidAnnotationProject() {
   const project = createProject([createTextClip()]);
@@ -39,7 +40,8 @@ function createInvalidAnnotationProject() {
       duration: 0.5,
       easing: 'LINEAR',
       id: 'transition-annotation',
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: annotationClip.id,
       trailingClipId: trailingClip.id,
     } as never,

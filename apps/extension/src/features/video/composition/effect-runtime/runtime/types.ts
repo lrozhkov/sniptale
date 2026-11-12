@@ -4,7 +4,7 @@ import type {
   VideoProjectEffectTarget,
 } from '../../../project/effect-instance/types';
 
-export interface EffectRuntimeFrameDimensions {
+interface EffectRuntimeFrameDimensions {
   height: number;
   width: number;
 }

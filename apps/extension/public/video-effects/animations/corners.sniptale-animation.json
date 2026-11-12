@@ -1,0 +1,402 @@
+{
+  "format": "sniptale-animation",
+  "version": 1,
+  "id": "sniptale-corners",
+  "label": {
+    "en": "Corners",
+    "ru": "Уголки"
+  },
+  "description": {
+    "en": "Local Lottie animation with editable parameters.",
+    "ru": "Локальная Lottie-анимация с редактируемыми параметрами."
+  },
+  "tags": ["sniptale", "corners"],
+  "animation": {
+    "w": 640,
+    "h": 360,
+    "fr": 30,
+    "ip": 0,
+    "op": 90,
+    "layers": [
+      {
+        "ty": 3,
+        "ind": 1,
+        "ddd": 0,
+        "sr": 1,
+        "ip": 0,
+        "op": 90,
+        "st": 0,
+        "ks": {
+          "p": {
+            "a": 0,
+            "k": [0, 0]
+          },
+          "a": {
+            "a": 0,
+            "k": [0, 0]
+          },
+          "s": {
+            "a": 0,
+            "k": [100, 100]
+          },
+          "r": {
+            "a": 0,
+            "k": 0
+          },
+          "o": {
+            "a": 0,
+            "k": 100,
+            "sid": "wholeOpacity"
+          }
+        }
+      },
+      {
+        "ty": 4,
+        "ind": 2,
+        "parent": 1,
+        "ddd": 0,
+        "sr": 1,
+        "ip": 0,
+        "op": 90,
+        "st": 0,
+        "bm": 0,
+        "ao": 0,
+        "ks": {
+          "p": {
+            "a": 0,
+            "k": [0, 0]
+          },
+          "a": {
+            "a": 0,
+            "k": [0, 0]
+          },
+          "s": {
+            "a": 0,
+            "k": [100, 100]
+          },
+          "r": {
+            "a": 0,
+            "k": 0
+          },
+          "o": {
+            "a": 1,
+            "k": [
+              {
+                "t": 0,
+                "s": [0],
+                "e": [100],
+                "o": {
+                  "x": 0.2,
+                  "y": 0
+                },
+                "i": {
+                  "x": 0.7,
+                  "y": 1
+                }
+              },
+              {
+                "t": 8,
+                "s": [100]
+              },
+              {
+                "t": 80,
+                "s": [100],
+                "e": [0],
+                "o": {
+                  "x": 0.3,
+                  "y": 0
+                },
+                "i": {
+                  "x": 0.8,
+                  "y": 1
+                }
+              },
+              {
+                "t": 89,
+                "s": [0]
+              }
+            ]
+          }
+        },
+        "shapes": [
+          {
+            "ty": "sh",
+            "ks": {
+              "a": 0,
+              "k": {
+                "i": [
+                  [0, 0],
+                  [0, 0],
+                  [0, 0]
+                ],
+                "o": [
+                  [0, 0],
+                  [0, 0],
+                  [0, 0]
+                ],
+                "v": [
+                  [18, 56],
+                  [18, 18],
+                  [56, 18]
+                ],
+                "c": false
+              }
+            }
+          },
+          {
+            "ty": "sh",
+            "ks": {
+              "a": 0,
+              "k": {
+                "i": [
+                  [0, 0],
+                  [0, 0],
+                  [0, 0]
+                ],
+                "o": [
+                  [0, 0],
+                  [0, 0],
+                  [0, 0]
+                ],
+                "v": [
+                  [622, 56],
+                  [622, 18],
+                  [584, 18]
+                ],
+                "c": false
+              }
+            }
+          },
+          {
+            "ty": "sh",
+            "ks": {
+              "a": 0,
+              "k": {
+                "i": [
+                  [0, 0],
+                  [0, 0],
+                  [0, 0]
+                ],
+                "o": [
+                  [0, 0],
+                  [0, 0],
+                  [0, 0]
+                ],
+                "v": [
+                  [622, 304],
+                  [622, 342],
+                  [584, 342]
+                ],
+                "c": false
+              }
+            }
+          },
+          {
+            "ty": "sh",
+            "ks": {
+              "a": 0,
+              "k": {
+                "i": [
+                  [0, 0],
+                  [0, 0],
+                  [0, 0]
+                ],
+                "o": [
+                  [0, 0],
+                  [0, 0],
+                  [0, 0]
+                ],
+                "v": [
+                  [18, 304],
+                  [18, 342],
+                  [56, 342]
+                ],
+                "c": false
+              }
+            }
+          },
+          {
+            "ty": "st",
+            "c": {
+              "a": 0,
+              "k": [0.9607843137254902, 0.6039215686274509, 0.27058823529411763],
+              "sid": "accent"
+            },
+            "o": {
+              "a": 0,
+              "k": 100
+            },
+            "w": {
+              "a": 0,
+              "k": 6,
+              "sid": "stroke"
+            },
+            "lc": 2,
+            "lj": 2,
+            "ml": 4,
+            "bm": 0
+          }
+        ]
+      }
+    ],
+    "v": "5.12.2",
+    "ddd": 0,
+    "nm": "Corners",
+    "assets": [],
+    "slots": {
+      "wholeOpacity": {
+        "p": {
+          "a": 0,
+          "k": 100
+        }
+      },
+      "accent": {
+        "p": {
+          "a": 0,
+          "k": [0.9607843137254902, 0.6039215686274509, 0.27058823529411763]
+        }
+      },
+      "stroke": {
+        "p": {
+          "a": 0,
+          "k": 6
+        }
+      }
+    }
+  },
+  "resources": [],
+  "bindings": [
+    {
+      "kind": "scalar",
+      "slot": "wholeOpacity",
+      "control": "opacity"
+    },
+    {
+      "kind": "color",
+      "slot": "accent",
+      "control": "accent"
+    },
+    {
+      "kind": "scalar",
+      "slot": "stroke",
+      "control": "stroke"
+    }
+  ],
+  "controls": [
+    {
+      "id": "opacity",
+      "label": {
+        "en": "Opacity",
+        "ru": "Непрозрачность"
+      },
+      "presentation": "slider",
+      "group": "appearance",
+      "kind": "number",
+      "defaultValue": 100,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "percent"
+    },
+    {
+      "id": "accent",
+      "label": {
+        "en": "Accent",
+        "ru": "Акцент"
+      },
+      "group": "appearance",
+      "kind": "color",
+      "defaultValue": "#f59a45"
+    },
+    {
+      "id": "stroke",
+      "label": {
+        "en": "Border width",
+        "ru": "Толщина линии"
+      },
+      "presentation": "slider",
+      "group": "appearance",
+      "kind": "number",
+      "defaultValue": 6,
+      "min": 1,
+      "max": 18,
+      "step": 1,
+      "unit": "px"
+    }
+  ],
+  "controlPresets": [
+    {
+      "id": "midnight-amber",
+      "label": {
+        "en": "Midnight · Amber",
+        "ru": "Полночь · Янтарь"
+      },
+      "theme": {
+        "id": "midnight",
+        "label": {
+          "en": "Midnight",
+          "ru": "Полночь"
+        }
+      },
+      "style": {
+        "id": "amber",
+        "label": {
+          "en": "Amber",
+          "ru": "Янтарь"
+        }
+      },
+      "values": {
+        "accent": "#f59a45"
+      }
+    },
+    {
+      "id": "midnight-blue",
+      "label": {
+        "en": "Midnight · Blue",
+        "ru": "Полночь · Синий"
+      },
+      "theme": {
+        "id": "midnight",
+        "label": {
+          "en": "Midnight",
+          "ru": "Полночь"
+        }
+      },
+      "style": {
+        "id": "blue",
+        "label": {
+          "en": "Blue",
+          "ru": "Синий"
+        }
+      },
+      "values": {
+        "accent": "#73acff"
+      }
+    },
+    {
+      "id": "midnight-mint",
+      "label": {
+        "en": "Midnight · Mint",
+        "ru": "Полночь · Мятный"
+      },
+      "theme": {
+        "id": "midnight",
+        "label": {
+          "en": "Midnight",
+          "ru": "Полночь"
+        }
+      },
+      "style": {
+        "id": "mint",
+        "label": {
+          "en": "Mint",
+          "ru": "Мятный"
+        }
+      },
+      "values": {
+        "accent": "#72d3b3"
+      }
+    }
+  ],
+  "defaultControlPresetId": "midnight-amber"
+}

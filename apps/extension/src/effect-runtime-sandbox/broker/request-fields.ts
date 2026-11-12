@@ -1,19 +1,11 @@
-import {
-  resolveEffectV1InputContract,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
-
-import { isImageBitmap } from '../../contracts/effect-runtime/bitmap-lifetime';
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
+import { parseEffectControlValues } from '@sniptale/runtime-contracts/effect-controls';
 import { hasExactKeys, isRecord } from '../../contracts/effect-runtime/identity';
 import type {
-  EffectRuntimeFrameInput,
   EffectRuntimeFrameInputs,
   EffectRuntimeRenderRequest,
 } from '../../contracts/effect-runtime/types';
 import { assertEffectDecodedRaster } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
-
-const INPUT_KEYS = ['bitmap', 'height', 'width'] as const;
-const MAX_CONTROL_STRING_LENGTH = 4_096;
 
 export function parseRenderDimensions(
   width: unknown,
@@ -101,67 +93,15 @@ function hasValidTiming(values: {
 
 export function parseControls(
   value: unknown,
-  document: EffectV1Document
+  document: AnimationTemplate
 ): Record<string, number | string> | null {
-  if (!isRecord(value)) return null;
-  const definitions = new Map(document.controls.map((control) => [control.id, control]));
-  if (!hasExactKeys(value, [...definitions.keys()])) return null;
-  const controls: Record<string, number | string> = {};
-  for (const [id, definition] of definitions) {
-    const control = value[id];
-    if (!isValidControlValue(control, definition)) return null;
-    controls[id] = control;
-  }
-  return controls;
-}
-
-function isValidControlValue(
-  value: unknown,
-  definition: EffectV1Document['controls'][number]
-): value is number | string {
-  if (definition.kind !== 'number') {
-    return typeof value === 'string' && value.length <= MAX_CONTROL_STRING_LENGTH;
-  }
-  return (
-    typeof value === 'number' &&
-    Number.isFinite(value) &&
-    (definition.min === undefined || value >= definition.min) &&
-    (definition.max === undefined || value <= definition.max)
-  );
+  return parseEffectControlValues(document, value);
 }
 
 export function parseInputFrames(
   value: unknown,
-  document: EffectV1Document,
+  _document: AnimationTemplate,
   dimensions: { height: number; width: number } | null
 ): EffectRuntimeFrameInputs | null {
-  if (!dimensions || !isRecord(value)) return null;
-  const contract = resolveEffectV1InputContract(document.kind);
-  if (!hasExactKeys(value, contract.required)) return null;
-  const result: EffectRuntimeFrameInputs = {};
-  for (const name of contract.required) {
-    const input = parseFrameInput(value[name], dimensions);
-    if (!input) return null;
-    result[name] = input;
-  }
-  const bitmaps = Object.values(result).map(({ bitmap }) => bitmap);
-  return new Set(bitmaps).size === bitmaps.length ? result : null;
-}
-
-function parseFrameInput(
-  value: unknown,
-  dimensions: { height: number; width: number }
-): EffectRuntimeFrameInput | null {
-  if (!isRecord(value) || !hasExactKeys(value, INPUT_KEYS) || !isImageBitmap(value['bitmap'])) {
-    return null;
-  }
-  if (
-    value['width'] !== dimensions.width ||
-    value['height'] !== dimensions.height ||
-    value['bitmap'].width !== dimensions.width ||
-    value['bitmap'].height !== dimensions.height
-  ) {
-    return null;
-  }
-  return { bitmap: value['bitmap'], height: dimensions.height, width: dimensions.width };
+  return dimensions && isRecord(value) && hasExactKeys(value, []) ? {} : null;
 }

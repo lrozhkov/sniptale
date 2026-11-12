@@ -1,11 +1,8 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { getClipTransitionMultiplier, getClipTransitionOverlapDurations } from './presentation';
 import { createProject, createVideoClip } from './project-meta.test.helpers.ts';
-import {
-  VideoClipTransitionKind,
-  VideoTransitionEasing,
-  VideoTransitionKind,
-} from '../types/index';
+import { VideoClipTransitionKind, VideoTransitionEasing } from '../types/index';
 
 it('keeps transition values stable when no overlapping neighbours exist', () => {
   const isolatedClip = createVideoClip({
@@ -42,7 +39,8 @@ it('reads overlap durations and multipliers from normalized project transition o
       duration: 1,
       easing: VideoTransitionEasing.LINEAR,
       id: 'transition-1',
-      kind: VideoTransitionKind.CROSSFADE,
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'incoming',
       trailingClipId: 'target',
     },

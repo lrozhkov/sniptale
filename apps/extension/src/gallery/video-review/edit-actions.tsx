@@ -33,6 +33,7 @@ import {
 } from './controls';
 
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
+  'source-filters': 'videoEditor.sidebar.sourceFiltersTitle',
   canvas: 'gallery.videoReview.canvas',
   'canvas-size': 'gallery.videoReview.exportBlockerCanvasSize',
   'key-animations': 'gallery.videoReview.keyDisplay',

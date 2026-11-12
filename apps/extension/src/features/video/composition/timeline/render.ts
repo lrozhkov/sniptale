@@ -3,7 +3,7 @@ import type { VideoProjectRenderScope } from '../../project/export/render-scope'
 import { getClipPlaybackOffset, normalizeClipPlaybackRate } from '../../project/timeline/rate';
 import { materializeVideoProjectCursorSourceObservations } from '../../project/cursor-source-observations';
 import { getClipVisualOpacity } from '../../project/timeline/presentation.gain';
-import { resolveClipTransitionVisualState } from '../../project/transition/presentation';
+import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types';
 import type { VideoProjectClip, VideoProjectVideoClip } from '../../project/types';
 import { resolveMotionSourcePlayback } from '../../project/motion/source-playback';
 import { resolveVideoCompositionCamera } from '../motion';
@@ -13,7 +13,6 @@ import { motionBlurSampleBounds } from '../motion/camera-interval';
 import type { CameraOutputViewport } from '../../project/export/output-dimensions';
 import type { VideoProject } from '../../project/types/index';
 import { motionBlurSamples } from '../motion/blur';
-import { resolveTransitionOverlays } from '../../project/transition/presentation';
 import {
   createVideoCompositionTimelineIndex,
   resolveVideoCompositionFrame,
@@ -74,10 +73,7 @@ function createVisualPass(params: {
         ...(params.cameraOverride ? { cameraOverride: params.cameraOverride } : {}),
       }),
     time: params.currentTime,
-    transitionOverlays: resolveTransitionOverlays(
-      params.transitionProject ?? params.project,
-      params.currentTime
-    ),
+    transitionOverlays: [],
   };
 }
 
@@ -205,7 +201,7 @@ function preservePhysicalTransitionState(
       const before = clips.get(layer.clipId),
         after = exposed.get(layer.clipId);
       if (!before || !after || before === after) return layer;
-      const renderState = resolveClipTransitionVisualState(original, before, time);
+      const renderState = IDENTITY_TRANSITION_VISUAL_STATE;
       const opacity =
         getClipVisualOpacity(before.playbackWindow?.fadePhase ? after : before, time) *
         renderState.opacityMultiplier;

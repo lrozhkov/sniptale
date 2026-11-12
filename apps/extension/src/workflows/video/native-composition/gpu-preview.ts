@@ -1,3 +1,4 @@
+import { hasSourceImageFilters } from '../../../features/image-filters/contract';
 import { resolveProjectOutputTransform } from '../../../features/video/project/export/output-dimensions';
 import type { EffectRuntimeInputComposition } from '../../../features/video/composition/effect-runtime/frame/inputs';
 import { isPreviewFrameGpuIsolated } from './source-frames';
@@ -58,6 +59,7 @@ function admittedLayer(input: Input, passes: Passes, depth = false): VideoLayer 
     !layer ||
     layer.kind !== 'video' ||
     layer.trackRole === 'CAMERA' ||
+    !!(layer.clip.sourceFilters && hasSourceImageFilters(layer.clip.sourceFilters)) ||
     layer.opacity !== 1 ||
     layer.effectViewportRaster ||
     layer.effectActionsOnly ||

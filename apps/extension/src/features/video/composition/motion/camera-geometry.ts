@@ -24,12 +24,6 @@ import { VideoTemporalEasing } from '../../project/types';
 import { getMotionAnimationTime } from '../../project/motion/timing';
 import { cameraFollowMotionLimits } from '../../project/camera/cursor-policy';
 import type { ResolvedCameraFollowPolicy } from '../../project/camera/cursor-policy';
-import { buildProjectTransitionSegments } from '../../project/transition/project';
-import { getTransitionProgress } from '../../project/transition/runtime';
-import {
-  resolveTransitionVisualStateForRole,
-  transitionVisualAffineBreaks,
-} from '../../project/transition/visual-resolvers';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types';
 import { getFittedMediaContentFrame, getFittedMediaWindowFrame } from '../draw/fitted-media';
 import {
@@ -303,89 +297,6 @@ function nativeSourceRasterBounds(
   };
 }
 
-function sourceTransitionStateAt(
-  clip: VideoProject['clips'][number],
-  transitions: readonly ReturnType<typeof buildProjectTransitionSegments>[number][],
-  time: number
-) {
-  const transition = transitions.find(
-    (item) =>
-      time >= item.start &&
-      (time < item.end || (time === item.end && time === clip.startTime + clip.duration))
-  );
-  if (!transition) return IDENTITY_TRANSITION_VISUAL_STATE;
-  const progress = time === transition.end ? 1 : getTransitionProgress(transition, time);
-  return progress === null
-    ? IDENTITY_TRANSITION_VISUAL_STATE
-    : resolveTransitionVisualStateForRole(
-        clip,
-        transition.leadingClipId === clip.id ? 'leading' : 'trailing',
-        transition,
-        progress
-      );
-}
-
-function sourceVisualLayerBounds(
-  clip: VideoProject['clips'][number],
-  transitions: readonly ReturnType<typeof buildProjectTransitionSegments>[number][],
-  start: number,
-  end: number,
-  cameraBounds?: ReturnType<typeof boundCameraSourceGeometry> | null
-) {
-  const geometryClip = cameraBounds
-    ? {
-        ...clip,
-        transform: {
-          ...clip.transform,
-          width: cameraBounds.width[1],
-          height: cameraBounds.height[1],
-        },
-      }
-    : clip;
-  const middle = (start + end) / 2;
-  const transition = transitions.find(
-    (item) =>
-      middle >= item.start &&
-      (middle < item.end || (middle === item.end && middle === clip.startTime + clip.duration))
-  );
-  const states = [sourceTransitionStateAt(geometryClip, transitions, middle)];
-  if (transition) {
-    if (
-      ['RADIAL_REVEAL', 'DISPLACEMENT_WARP', 'LINEAR_WIPE', 'CARD_FLIP_REVEAL'].includes(
-        transition.transition.kind
-      )
-    )
-      return null;
-    const role = transition.leadingClipId === clip.id ? 'leading' : 'trailing';
-    const progressValues: number[] = [];
-    for (const time of [start, middle, end]) {
-      const progress = time === transition.end ? 1 : getTransitionProgress(transition, time);
-      if (progress !== null) {
-        progressValues.push(progress);
-        states.push(resolveTransitionVisualStateForRole(geometryClip, role, transition, progress));
-      }
-    }
-    if (Math.min(...progressValues) <= 0.5 && Math.max(...progressValues) >= 0.5)
-      states.push(resolveTransitionVisualStateForRole(geometryClip, role, transition, 0.5));
-  }
-  const bounds = (key: 'translateX' | 'translateY' | 'scaleX' | 'scaleY'): Range => [
-    Math.min(...states.map((state) => state[key])),
-    Math.max(...states.map((state) => state[key])),
-  ];
-  return {
-    translateX: product(
-      bounds('translateX'),
-      cameraBounds ? [cameraBounds.width[0] / cameraBounds.width[1], 1] : [1, 1]
-    ),
-    translateY: product(
-      bounds('translateY'),
-      cameraBounds ? [cameraBounds.height[0] / cameraBounds.height[1], 1] : [1, 1]
-    ),
-    scaleX: bounds('scaleX'),
-    scaleY: bounds('scaleY'),
-  };
-}
-
 /** Resolve the retained monotone easing at exact proof edges, before source projection. */
 function sourceCursorIntervalBounds(
   project: VideoProject,
@@ -407,7 +318,7 @@ function sourceCursorIntervalBounds(
   return { nativeX, nativeY };
 }
 
-/** Supply the rendered source affine and its existing transition clock to window admission. */
+/** Supply source placement to window admission; GL changes the composite, not the source affine. */
 export function createProjectWindowPlaneProjection(
   project: VideoProject,
   region: VideoProjectMotionRegion,
@@ -450,74 +361,13 @@ export function createProjectWindowPlaneProjection(
       1,
     ];
   };
-  const transitions = buildProjectTransitionSegments(project).filter(
-    (item) => item.leadingClipId === clip.id || item.trailingClipId === clip.id
-  );
-  const pieces = transitions.map((segment) => {
-    const phase = easingPieces(
-      segment.start,
-      segment.end,
-      segment.transition.easing === 'LINEAR'
-        ? VideoTemporalEasing.LINEAR
-        : VideoTemporalEasing.EASE_IN_OUT,
-      true
-    );
-    const knots = transitionVisualAffineBreaks(segment);
-    const inverseProgress = (value: number) =>
-      segment.transition.easing === 'LINEAR'
-        ? value
-        : value <= 0.5
-          ? Math.cbrt(value / 4)
-          : 1 - Math.cbrt((1 - value) / 4);
-    return {
-      segment,
-      phase,
-      knots,
-      breaks: knots.map(
-        (value) => segment.start + inverseProgress(value) * (segment.end - segment.start)
-      ),
-    };
-  });
-  const planeBreaks = pieces.flatMap((item) => [
-    ...item.breaks,
-    ...item.phase.flatMap((phase) => [phase.start, phase.end]),
-  ]);
+  const planeBreaks: number[] = [];
   const intervalPlane = (
-    start: number,
-    end: number
-  ): Pick<QuickEditCameraProjectionInterval, 'planeTransform' | 'planeTransition'> | null => {
-    if (planeBreaks.some((time) => start < time && time < end)) return null;
-    const time = (start + end) / 2;
-    const piece = pieces.find((item) => time >= item.segment.start && time < item.segment.end);
-    if (!piece) return { planeTransform: matrix(IDENTITY_TRANSITION_VISUAL_STATE) };
-    const { segment } = piece;
-    const progress = getTransitionProgress(segment, time);
-    if (progress === null) return null;
-    const index = Math.max(
-      0,
-      piece.knots.findLastIndex((value) => value <= progress)
-    );
-    const low = piece.knots[Math.min(index, piece.knots.length - 2)]!,
-      high = piece.knots[Math.min(index + 1, piece.knots.length - 1)]!;
-    const role = segment.leadingClipId === clip.id ? 'leading' : 'trailing';
-    const a = matrix(resolveTransitionVisualStateForRole(clip, role, segment, low));
-    const b = matrix(resolveTransitionVisualStateForRole(clip, role, segment, high));
-    const value = (index: number, at: number) =>
-      a[index]! + ((b[index]! - a[index]!) * (at - low)) / (high - low);
-    const endpoint = (at: number): QuickEditHomography => [
-      value(0, at),
-      value(1, at),
-      value(2, at),
-      value(3, at),
-      value(4, at),
-      value(5, at),
-      0,
-      0,
-      1,
-    ];
-    const phase = piece.phase.find((phase) => time >= phase.start && time <= phase.end);
-    return phase ? { planeTransition: { from: endpoint(0), to: endpoint(1), phase } } : null;
-  };
+    _start: number,
+    _end: number
+  ): Pick<QuickEditCameraProjectionInterval, 'planeTransform' | 'planeTransition'> => ({
+    planeTransform: matrix(IDENTITY_TRANSITION_VISUAL_STATE),
+  });
   return { planeBreaks, intervalPlane };
 }
 
@@ -610,7 +460,6 @@ export function createProjectWorkingZoneCameraGeometry(input: {
   });
   const { perspective, reference, projectPoint } = cursorProjection;
 
-  const transitions = buildProjectTransitionSegments(project);
   const clips = new Map(project.clips.map((clip) => [clip.id, clip]));
   const mappings = new Map(
     [
@@ -625,14 +474,6 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       const mapping = resolveCursorSourcePointMapping(project, clipId, input.region.startTime);
       return mapping ? [[clipId, mapping] as const] : [];
     })
-  );
-  const transitionsByClip = new Map(
-    [...mappings.keys()].map((clipId) => [
-      clipId,
-      transitions.filter(
-        (transition) => transition.leadingClipId === clipId || transition.trailingClipId === clipId
-      ),
-    ])
   );
   const domain = (scale: number): CameraPanBounds => ({
     minX: 0,
@@ -653,15 +494,7 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       ? resolveCursorSourcePointMapping(project, clipId, time)
       : mappings.get(clipId);
     if (!mapping) return null;
-    const mapped = mapCursorFocusControlPoint(
-      camera
-        ? mapping
-        : {
-            ...mapping,
-            renderState: sourceTransitionStateAt(clip!, transitionsByClip.get(clipId) ?? [], time),
-          },
-      point
-    );
+    const mapped = mapCursorFocusControlPoint(mapping, point);
     return { x: mapped.x * scaleX, y: mapped.y * scaleY };
   };
   const sourceBounds = (
@@ -706,24 +539,11 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       : null;
     const { center, rotatedX, rotatedY, raster } =
       cameraBounds ?? nativeSourceRasterBounds(mapping, nativeX, nativeY);
-    const visual = sourceVisualLayerBounds(
-      clip,
-      transitionsByClip.get(clipId) ?? [],
-      start,
-      end,
-      cameraBounds
-    );
-    if (!visual) return null;
-    const layerX = visual.scaleX,
-      layerY = visual.scaleY;
     return {
-      x: multiply(sum(sum(center.x, visual.translateX), product(layerX, rotatedX)), scaleX),
-      y: multiply(sum(sum(center.y, visual.translateY), product(layerY, rotatedY)), scaleY),
+      x: multiply(sum(center.x, rotatedX), scaleX),
+      y: multiply(sum(center.y, rotatedY), scaleY),
       raster,
-      rasterScale: [
-        Math.min(layerX[0] * scaleX, layerY[0] * scaleY),
-        Math.max(layerX[1] * scaleX, layerY[1] * scaleY),
-      ] as Range,
+      rasterScale: [Math.min(scaleX, scaleY), Math.max(scaleX, scaleY)] as Range,
     };
   };
   return {
@@ -734,11 +554,6 @@ export function createProjectWorkingZoneCameraGeometry(input: {
       ...phase.breaks,
       ...(orientationPlan?.breaks ?? []),
       ...project.clips.flatMap((clip) => [clip.startTime, clip.startTime + clip.duration]),
-      ...transitions.flatMap((transition) => [
-        transition.start,
-        (transition.start + transition.end) / 2,
-        transition.end,
-      ]),
       ...project.clips.flatMap((clip) =>
         clip.type === 'VIDEO' &&
         project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')

@@ -1,3 +1,10 @@
+import {
+  hasSourceImageFilters,
+  SourceImageFilterError,
+  type SourceImageFilterStack,
+} from '../../features/image-filters/contract';
+import { withSourceImageFilterCanvas } from '../../features/video/composition/canvas/source-image-filter';
+import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { reviewSpatialOverlayBounds } from './spatial-overlay-bounds';
 import { resolveReviewSpatialFilterLevels } from '../../features/video/composition/canvas/spatial-filter-levels';
 import { reviewSpatialSourceRect } from './scene-shadow';
@@ -227,6 +234,9 @@ export async function prepareReviewExportSourceSampling(args: {
       identity,
       source: raw,
       demands: plan.demands,
+      fullSourceSupport: !!(
+        args.scene.sourceFilters && hasSourceImageFilters(args.scene.sourceFilters)
+      ),
       signal: args.signal,
     });
     args.signal.throwIfAborted();
@@ -251,8 +261,51 @@ export function drawReviewPreparedSource(
   context: CanvasRenderingContext2D,
   sampling: PreparedSourceSampling,
   id: string,
-  destination: SourceSamplingRect
+  destination: SourceSamplingRect,
+  filters?: SourceImageFilterStack,
+  resources?: RenderResources,
+  projectTime = 0
 ): boolean {
+  if (filters && hasSourceImageFilters(filters)) {
+    let density = 0;
+    const applied = sampling.visitPreparedTiles(id, (tile) => {
+      density = Math.max(
+        density,
+        tile.physicalSourceRect.width / tile.originalPixelROI.width,
+        tile.physicalSourceRect.height / tile.originalPixelROI.height
+      );
+    });
+    if (!applied) return false;
+    const logical = sampling.sourceSize;
+    withSourceImageFilterCanvas(
+      {
+        stack: filters,
+        projectTime,
+        logical,
+        raster: {
+          width: Math.ceil(logical.width * density),
+          height: Math.ceil(logical.height * density),
+        },
+        resources,
+        ownerDocument: context.canvas.ownerDocument,
+        paint(target, size) {
+          if (
+            !sampling.drawPrepared(id, target, { x: 0, y: 0, ...logical }, { x: 0, y: 0, ...size })
+          )
+            throw new SourceImageFilterError();
+        },
+      },
+      (canvas) =>
+        context.drawImage(
+          canvas,
+          destination.x,
+          destination.y,
+          destination.width,
+          destination.height
+        )
+    );
+    return true;
+  }
   return sampling.visitPreparedTiles(id, (tile) => {
     const source = tile.physicalSourceRect,
       roi = tile.originalPixelROI;

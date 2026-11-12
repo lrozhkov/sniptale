@@ -1,3 +1,6 @@
+import type { createPresentationGpu } from './presentation-gpu';
+import type { GpuPreviewGroup } from '../../features/video/composition/canvas/gpu-preview';
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createReviewPresentationRenderer,
@@ -609,12 +612,21 @@ it('keeps legacy free of GPU initialization and forwards GPU only to the selecte
   expect(io.main.mock.calls[1]![0].renderer).toBe('gpu');
 });
 
-it.each(['dissolve', 'fade-black'] as const)(
+it.each(['dissolve', 'fade-black', 'gl'] as const)(
   'routes GPU bookends, watermark, %s and final fades through complete layer plans',
   async (type) => {
     const args = fixture();
     args.renderer = 'gpu';
-    args.settings.introTransition = { type, before: 0.25, after: 0.25, color: '#ffffff' };
+    args.settings.introTransition =
+      type === 'gl'
+        ? {
+            type,
+            before: 0.25,
+            after: 0.25,
+            selection: createGlTransitionSelection('BowTie')!,
+            easing: 'EASE_IN_OUT',
+          }
+        : { type, before: 0.25, after: 0.25, color: '#ffffff' };
     const planned = planReviewPresentationSequence({
       settings: args.settings,
       mainDuration: 1,
@@ -632,15 +644,30 @@ it.each(['dissolve', 'fade-black'] as const)(
       release: io.frameRelease,
     }));
     const layers: unknown[][] = [];
-    io.gpuRender.mockImplementation(async (request) => {
-      const prepared = request.prepare({
-        color: (color: string, opacity: number) => ({ color, opacity }),
-        raster: () => ({ watermark: true }),
-      });
-      layers.push(prepared.layers);
-      prepared.release();
-      return true;
-    });
+    const groups: GpuPreviewGroup[] = [];
+    io.gpuRender.mockImplementation(
+      async (request: Parameters<ReturnType<typeof createPresentationGpu>['render']>[0]) => {
+        const layer = {
+          source: document.createElement('canvas'),
+          rect: { x: 0, y: 0, ...args.main.dimensions.backing },
+          inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1] as const,
+        };
+        const prepared = request.prepare({
+          color: (color: string, opacity: number) => ({ ...layer, color, opacity }),
+          raster: () => ({ ...layer, watermark: true }),
+        });
+        for (const item of prepared.layers)
+          if (
+            'kind' in item.source &&
+            item.source.kind === 'group' &&
+            item.source.composition?.kind === 'gl-transition'
+          )
+            groups.push(item.source);
+        layers.push([...prepared.layers]);
+        prepared.release();
+        return true;
+      }
+    );
     const owner = await open(args);
     for (const candidate of iteratePresentationCandidates(args.plan)) {
       const frame = await owner.render(candidate);
@@ -660,6 +687,18 @@ it.each(['dissolve', 'fade-black'] as const)(
       const join = layers.find((plan) => Object(plan[1]).blend === 'add')!;
       expect(join).toHaveLength(2);
       expect(Object(join[0]).opacity + Object(join[1]).opacity).toBe(1);
+    } else if (type === 'gl') {
+      expect(groups.map((group) => group.composition?.progress)).toEqual([0, 0.5]);
+      const group = groups[1]!;
+      expect(group).toBeDefined();
+      expect(group.composition?.selection).toEqual(createGlTransitionSelection('BowTie'));
+      expect(group.composition?.progress).toBeCloseTo(0.5, 12);
+      expect(group.layers).toHaveLength(2);
+      expect(
+        group.layers.every(
+          (layer: { opacity?: number }) => layer.opacity === undefined || layer.opacity === 1
+        )
+      ).toBe(true);
     } else
       expect(layers.some((plan) => plan.some((layer) => Object(layer).color === '#ffffff'))).toBe(
         true

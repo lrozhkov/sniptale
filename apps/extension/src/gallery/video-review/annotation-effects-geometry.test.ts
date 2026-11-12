@@ -1,9 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import {
-  resolveEffectV1ControlDefault,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { validateAnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
@@ -39,17 +37,17 @@ const transform = { x: 0.3, y: 0.3, width: 0.3, height: 0.2, rotation: 0.15 };
 function builtin(name: string) {
   const raw: unknown = JSON.parse(
     readFileSync(
-      `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
+      `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
       'utf8'
     )
   );
-  const result = validateEffectV1Document(raw);
-  if (!result.ok || !result.document) throw new Error('Invalid builtin fixture');
-  return result.document;
+  const result = validateAnimationTemplate(raw);
+  if (!result.ok || !result.template) throw new Error('Invalid builtin fixture');
+  return result.template;
 }
 function instance(document = builtin('callout')): ReviewAnnotationEffect {
   const values = Object.fromEntries(
-    document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
   );
   const bound = new Set(
     document.objectLayout?.handles?.flatMap((handle) => [handle.xControl, handle.yControl])

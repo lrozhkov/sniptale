@@ -59,6 +59,7 @@ type PreviewState = Pick<
     | 'cursorMotions'
     | 'webcam'
     | 'canvas'
+    | 'sourceFilters'
     | 'windowHeader'
     | 'zoomRegions'
     | 'background'
@@ -372,6 +373,7 @@ function ReviewPreviewStage({
       url={resource.url}
       source={state.source}
       canvas={features.canvas}
+      sourceFilters={features.sourceFilters}
       windowHeader={features.windowHeader}
       video={state.video}
       drawing={!!composer.annotation && !state.playing && !busy}

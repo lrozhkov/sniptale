@@ -102,7 +102,10 @@ function mergeValue(args: {
 function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJsonValue[] {
   const current = args.current as SettingsTransferJsonValue[];
   const imported = args.imported as SettingsTransferJsonValue[];
-  if (args.path === 'styles.video-effects.preferences')
+  if (
+    args.path === 'styles.video-effects.preferences' ||
+    args.path === 'styles.video-effects.transitionPreferences'
+  )
     return mergeEffectPreferences(args, current, imported);
   if (!current.every(hasStringId) || !imported.every(hasStringId)) {
     const decision = registerConflict(args, 'scalar');
@@ -126,7 +129,10 @@ function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJso
       continue;
     }
     const currentItem = result[index]!;
-    if (deepEqual(currentItem, importedRecord)) {
+    if (
+      deepEqual(currentItem, importedRecord) ||
+      sameImmutableGlPreset(args.path, currentItem, importedRecord)
+    ) {
       args.summary.unchanged += 1;
       continue;
     }
@@ -148,6 +154,23 @@ function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJso
     args.summary.updated += 1;
   }
   return result;
+}
+
+/** Content IDs exclude timestamps; identical GL source does not create a false copied identity. */
+function sameImmutableGlPreset(
+  path: string,
+  current: SettingsTransferJsonValue,
+  imported: SettingsTransferJsonValue
+): boolean {
+  return (
+    path === 'styles.video-effects.transitionItems' &&
+    isRecord(current) &&
+    isRecord(imported) &&
+    typeof current['source'] === 'string' &&
+    typeof current['sourceSha256'] === 'string' &&
+    current['source'] === imported['source'] &&
+    current['sourceSha256'] === imported['sourceSha256']
+  );
 }
 
 function mergeEffectPreferences(
@@ -256,7 +279,12 @@ function collectValueCopyRemaps(args: {
     const reservedIds = new Set([...args.current, ...args.imported].map((item) => item.id));
     for (const importedItem of args.imported) {
       const currentItem = args.current.find((item) => item.id === importedItem.id);
-      if (!currentItem || deepEqual(currentItem, importedItem)) continue;
+      if (
+        !currentItem ||
+        deepEqual(currentItem, importedItem) ||
+        sameImmutableGlPreset(args.path, currentItem, importedItem)
+      )
+        continue;
       const conflictPath = `${args.path}.${importedItem.id}`;
       const requested = args.decisions[conflictPath];
       const decision =
@@ -378,6 +406,8 @@ function remapContextMenuCommand(command: string, remaps: CollectionRemaps): str
 
 function referenceTargetCollection(path: string): string | null {
   if (path === 'styles.video-effects.preferences.packId') return 'styles.video-effects.items';
+  if (path === 'styles.video-effects.transitionPreferences.packId')
+    return 'styles.video-effects.transitionItems';
   if (path.startsWith('capture.quick-actions.items.') && path.endsWith('.viewportPresetId'))
     return 'capture.viewport-presets.items';
   if (path === 'capture.viewport-presets.defaultId') return 'capture.viewport-presets.items';

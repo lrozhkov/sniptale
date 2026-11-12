@@ -1,9 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
-import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
+import { readValidAnimationSnapshot } from '../effect-bundles/fixture.test-support';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
 import { createReviewWorkspaceStoreFixture } from '../review-workspaces/store.test-support';
@@ -88,41 +84,7 @@ async function setup(withEffects = true) {
       lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2 },
     },
   };
-  if (withEffects) {
-    const corpus = EFFECT_BUNDLE_CORPUS.find(
-      ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
-    );
-    if (!corpus) throw new Error('Missing asset-bearing corpus');
-    const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
-    if (!imported.ok) throw new Error('Expected accepted asset-bearing corpus');
-    const document = imported.bundle.documents[0]!;
-    const snapshotId = `effect:${document.sha256}`;
-    root.entry.project.effectSnapshots = [
-      {
-        assets: document.assets.map((asset) => ({
-          id: asset.id,
-          byteLength: asset.byteLength,
-          kind: asset.kind,
-          mimeType: asset.mimeType,
-          sha256: asset.sha256,
-        })),
-        documentId: document.document.id,
-        id: snapshotId,
-        kind: document.document.kind,
-        retainedByteLength:
-          new TextEncoder().encode(document.source).byteLength +
-          document.assets.reduce((size, asset) => size + asset.byteLength, 0),
-        schemaVersion: 'sniptale.effect.v1',
-        sha256: document.sha256,
-        source: document.source,
-      },
-    ];
-    root.snapshotRefs = document.assets.map((asset, index) => ({
-      snapshotId,
-      assetId: asset.id,
-      ref: stage(`effect-${index}`, asset.bytes, asset.mimeType),
-    }));
-  }
+  if (withEffects) root.entry.project.effectSnapshots = [await readValidAnimationSnapshot()];
   const thumbnailRef = stage('thumbnail', new TextEncoder().encode('new-thumbnail'), 'image/png');
   const presentationRef = stage(
     'presentation',
@@ -222,7 +184,9 @@ it('publishes effect and sidecar Blobs independently of staging and replays rece
   const entry = parseVideoProjectEntry(fixture.table('video_projects').get(projectId));
   if (!entry) throw new Error('Expected native project publication');
   expect(entry.workspaceRevision).toBe(1);
-  expect(entry.project.effectSnapshots![0]!.assets.length).toBeGreaterThan(0);
+  expect(entry.project.effectSnapshots![0]!.source).toBe(
+    fixture.input.root.entry.project.effectSnapshots![0]!.source
+  );
   fixture.files.clear();
   await expect(verifyVideoProjectEffectSnapshotIntegrity(entry.project)).resolves.toBeUndefined();
   const presentation = fixture.table('aggregate_presentations').get(projectId);
@@ -274,13 +238,9 @@ it.each(['missing', 'corrupt'] as const)(
   'refuses %s effect bytes before opening a native write transaction',
   async (change) => {
     const fixture = await setup();
-    const ref = fixture.input.root.snapshotRefs![0]!.ref;
-    if (change === 'missing') fixture.files.delete(ref.assetId);
-    else
-      fixture.files.set(
-        ref.assetId,
-        new File([new Uint8Array(ref.size)], 'corrupt', { type: ref.mimeType })
-      );
+    const snapshot = fixture.input.root.entry.project.effectSnapshots![0]!;
+    if (change === 'missing') snapshot.source = '{}';
+    else snapshot.sha256 = '0'.repeat(64);
     const before = structuredClone(fixture.rows);
     await expect(applyPreparedVideoProjectRevision(fixture.input)).rejects.toThrow();
     expect(fixture.transaction.mock.calls.some(([, mode]) => mode === 'readwrite')).toBe(false);

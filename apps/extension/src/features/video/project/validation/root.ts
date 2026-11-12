@@ -1,3 +1,7 @@
+import {
+  parseVideoProjectTransition,
+  hasValidVideoProjectTransitionReferences,
+} from '../transition/contract';
 import { requiresExtendedBorderSchema } from '../scene/focus-appearance';
 import { mapProjectTimeToSourcePoint } from '../timeline/source-time';
 import { hasValidVideoProjectCursorSourceObservations } from '../cursor-source-observations';
@@ -42,8 +46,6 @@ import {
   VideoProjectSourceKind,
   VideoSceneBackgroundKind,
   VideoTimelinePlacementMode,
-  VideoTransitionEasing,
-  VideoTransitionKind,
 } from '../types/index';
 import { isVideoProjectAsset } from './assets';
 import { isVideoProjectClip } from './clips';
@@ -122,20 +124,13 @@ function isActionEventCollection(value: unknown, feedback: unknown): boolean {
 }
 
 function isTransition(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    isString(value['id']) &&
-    isString(value['leadingClipId']) &&
-    isString(value['trailingClipId']) &&
-    isEnumValue(value['kind'], VideoTransitionKind) &&
-    isBoundedNumber(value['duration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
-    isEnumValue(value['easing'], VideoTransitionEasing)
-  );
+  return parseVideoProjectTransition(value) !== null;
 }
 
 /** Minimum schema for present clip fields, independent of later shape admission. */
 function minimumClipSchemaVersion(value: unknown): number {
   if (!isRecord(value)) return 2;
+  if (value['sourceFilters'] !== undefined) return 52;
   if (value['transcript'] !== undefined) return 44;
   if (value['playbackWindow'] !== undefined) return 43;
   if (value['attachment'] !== undefined || value['sourceRange'] !== undefined) return 38;
@@ -202,7 +197,7 @@ function minimumMotionSchemaVersion(value: unknown): number {
 function isProjectSchemaCompatible(value: Record<string, unknown>): boolean {
   const version = value['version'];
   return (
-    isBoundedNumber(version, 2, 51) &&
+    isBoundedNumber(version, 2, 52) &&
     Number.isInteger(version) &&
     (version >= 51 ||
       !isRecord(value['sceneBackground']) ||
@@ -383,7 +378,6 @@ function isHydratableProjectShape(value: unknown, effectMode: 'native' | 'metada
 function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
   const assetIds = new Set(project.assets.map((asset) => asset.id));
   const trackIds = new Set(project.tracks.map((track) => track.id));
-  const clipIds = new Set(project.clips.map((clip) => clip.id));
   const occurrences = resolveVideoProjectActionOccurrences(project);
 
   return (
@@ -392,10 +386,7 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
     (!project.watermark?.image || getVideoProjectWatermarkAsset(project) !== undefined) &&
     hasValidVideoProjectBookendReferences(project) &&
     hasValidVideoProjectCompositionJoinReferences(project) &&
-    (project.transitions ?? []).every(
-      (transition) =>
-        clipIds.has(transition.leadingClipId) && clipIds.has(transition.trailingClipId)
-    ) &&
+    hasValidVideoProjectTransitionReferences(project) &&
     (project.motionRegions ?? []).every(
       (region) =>
         ((region.borderTarget !== 'window' &&

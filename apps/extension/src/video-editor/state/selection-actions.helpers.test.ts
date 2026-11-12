@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import { createSelectionStateActions, resolveInitialSelectedClipId } from './selection-actions';
@@ -92,7 +93,8 @@ it('resolves transition ownership from the leading or trailing clip track', () =
       duration: 0.6,
       easing: 'LINEAR',
       id: 'transition-1',
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'clip-a',
       trailingClipId: 'clip-b',
     },
@@ -100,7 +102,8 @@ it('resolves transition ownership from the leading or trailing clip track', () =
       duration: 0.6,
       easing: 'LINEAR',
       id: 'transition-2',
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'missing',
       trailingClipId: 'clip-b',
     },

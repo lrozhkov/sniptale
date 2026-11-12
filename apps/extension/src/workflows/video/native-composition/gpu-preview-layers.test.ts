@@ -1,3 +1,6 @@
+import { createSourceImageFilter } from '../../../features/image-filters/contract';
+import { normalizeVideoProjectCursorSkin } from '../../../features/video/project/cursor';
+import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import {
@@ -2110,4 +2113,142 @@ it('keeps destination-in clearing when its unread source group lowers to transpa
     inverse: identity,
     source: { output: { width: 1, height: 1 }, layers: [] },
   });
+});
+
+it('executes the canonical physical-track GL states with interleaved occlusion and borrowed video frames', async () => {
+  const f = fixture();
+  const original = f.input.project.clips[0]!;
+  const a = { ...original, id: 'A', startTime: 0, duration: 10 };
+  const x = { ...original, id: 'X', startTime: 1, duration: 12, timelineLaneId: 'other' };
+  const b = { ...original, id: 'B', startTime: 5, duration: 10 };
+  const selection = createGlTransitionSelection('CrossZoom')!;
+  f.input.project.clips = [a, x, b];
+  f.input.project.transitions = [
+    {
+      id: 'AB',
+      leadingClipId: 'A',
+      trailingClipId: 'B',
+      duration: 5,
+      easing: 'LINEAR',
+      kind: 'gl',
+      selection,
+    },
+  ];
+  f.input.project.cursorTrack = {
+    captureMode: 'separate',
+    skin: normalizeVideoProjectCursorSkin(undefined),
+    samples: [
+      {
+        id: 'cursor-A',
+        time: 6,
+        x: 8,
+        y: 4,
+        recordingPoint: { x: 0.25, y: 0.25 },
+        visible: true,
+        sourceAnchor: {
+          kind: 'recording-source',
+          recordingId: 'recording',
+          sourceClipId: 'A',
+          sourceTime: 6,
+        },
+      },
+      {
+        id: 'cursor-B',
+        time: 6,
+        x: 24,
+        y: 12,
+        recordingPoint: { x: 0.75, y: 0.75 },
+        visible: true,
+        sourceAnchor: {
+          kind: 'recording-source',
+          recordingId: 'recording',
+          sourceClipId: 'B',
+          sourceTime: 1,
+        },
+      },
+    ],
+  };
+  f.input.currentTime = 6;
+  const aSource = new VideoFrame(f.input.canvas, { timestamp: 6_000_000 });
+  const xSource = new VideoFrame(f.input.canvas, { timestamp: 5_000_000 });
+  const bSource = new VideoFrame(f.input.canvas, { timestamp: 1_000_000 });
+  f.sources = new Map([
+    ['A', aSource],
+    ['X', xSource],
+    ['B', bSource],
+  ]);
+  f.media = new Map([
+    ['A', f.borrowed],
+    ['X', f.borrowed],
+    ['B', f.borrowed],
+  ]);
+  f.passes = resolveVideoCompositionRenderPasses(f.input.project, 6);
+  expect(f.passes.overlayFrame.glTrackPlans?.size).toBe(1);
+  expect([...f.passes.overlayFrame.sourceCursors!.keys()]).toEqual(['A', 'B']);
+  expect(f.passes.overlayFrame.sourceCursors!.get('A')?.x).not.toBe(
+    f.passes.overlayFrame.sourceCursors!.get('B')?.x
+  );
+  expect(f.passes.overlayFrame.cursor).toBeNull();
+  const plan = await buildNativeGpuPreviewLayers(f);
+  plans.push(plan);
+  const gl = flatten(plan.layers).find(
+    (layer) => 'kind' in layer.source && layer.source.kind === 'group' && layer.source.composition
+  );
+  if (!gl || !('kind' in gl.source) || gl.source.kind !== 'group')
+    throw new Error('Expected production GL group.');
+  expect(gl.source.composition).toEqual({ kind: 'gl-transition', selection, progress: 0.2 });
+  const before = gl.source.layers[0]!,
+    after = gl.source.layers[1]!;
+  expect(flatten([before]).map((layer) => layer.source)).toContain(aSource);
+  expect(flatten([before]).map((layer) => layer.source)).toContain(xSource);
+  expect(flatten([before]).map((layer) => layer.source)).not.toContain(bSource);
+  expect(flatten([after]).map((layer) => layer.source)).not.toContain(aSource);
+  expect(flatten([after]).map((layer) => layer.source)).toContain(xSource);
+  expect(flatten([after]).map((layer) => layer.source)).toContain(bSource);
+  plan.release();
+  expect(aSource.close).not.toHaveBeenCalled();
+  expect(xSource.close).not.toHaveBeenCalled();
+  expect(bSource.close).not.toHaveBeenCalled();
+});
+
+it('attaches source image filters only to the decoded video leaf in the actual Native GPU plan', async () => {
+  const f = fixture(),
+    layer = f.passes.overlayFrame.visualLayers[0];
+  if (layer?.kind !== 'video') throw new Error('Expected video');
+  const filters = { version: 1 as const, filters: [createSourceImageFilter('blur', 'blur')] };
+  layer.clip = { ...layer.clip, sourceFilters: filters };
+  const plan = await buildNativeGpuPreviewLayers(f);
+  plans.push(plan);
+  const nodes = flatten(plan.layers),
+    filtered = nodes.filter((node) => node.imageFilters);
+  expect(filtered).toHaveLength(1);
+  expect(filtered[0]!.source).toBe(f.source);
+  expect(filtered[0]!.imageFilters).toEqual({
+    stack: filters,
+    logical: { width: 32, height: 16 },
+    projectTime: f.input.currentTime,
+  });
+  expect(nodes.filter((node) => node.source !== f.source).every((node) => !node.imageFilters)).toBe(
+    true
+  );
+  expect(f.borrowed.draw).not.toHaveBeenCalled();
+});
+
+it('uses the unrotated source filter extent for a quarter-turn Native frame', async () => {
+  const f = fixture(),
+    layer = f.passes.overlayFrame.visualLayers[0];
+  if (layer?.kind !== 'video') throw new Error('Expected video');
+  const filters = { version: 1 as const, filters: [createSourceImageFilter('blur', 'blur')] };
+  layer.clip = { ...layer.clip, sourceFilters: filters };
+  f.media.set(layer.clipId, {
+    ...f.borrowed,
+    sourceWidth: 16,
+    sourceHeight: 32,
+    orientation: { rotation: 90, flip: false },
+  });
+  const plan = await buildNativeGpuPreviewLayers(f);
+  plans.push(plan);
+  const source = flatten(plan.layers).find((node) => node.source === f.source);
+  expect(source?.orientation).toEqual({ rotation: 90, flip: false });
+  expect(source?.imageFilters?.logical).toEqual({ width: 32, height: 16 });
 });

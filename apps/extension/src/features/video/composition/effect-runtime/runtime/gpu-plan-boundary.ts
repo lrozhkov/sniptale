@@ -2,7 +2,7 @@ import {
   EFFECT_RUNTIME_GPU_PAINT_LIMITS,
   parseEffectRuntimeGpuPaint,
 } from '../../../../../contracts/effect-runtime/gpu-plan';
-import { EFFECT_V1_GRAPH_LIMITS } from '@sniptale/runtime-contracts/effect-v1';
+import { EFFECT_RUNTIME_GPU_PLAN_LIMITS } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { EFFECT_SVG_VECTOR_LIMITS } from '../../../../../contracts/effect-runtime/svg-vector';
 import { isImageBitmap } from '../../../../../contracts/effect-runtime/bitmap-lifetime';
 import {
@@ -44,10 +44,10 @@ type PlanExpectation = Pick<
 
 // Scalar commands can emit fill and stroke for every admitted SVG part.
 const MAX_NATIVE_PAINTS =
-  EFFECT_V1_GRAPH_LIMITS.expandedCommands * 2 * EFFECT_SVG_VECTOR_LIMITS.maxParts;
+  EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations * 2 * EFFECT_SVG_VECTOR_LIMITS.maxParts;
 const MAX_PLAN_RESOURCES =
   MAX_NATIVE_PAINTS +
-  EFFECT_V1_GRAPH_LIMITS.expandedCommands +
+  EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations +
   EFFECT_RUNTIME_RESOURCE_LIMITS.maxInputFrames +
   EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterEntries +
   1;
@@ -233,7 +233,7 @@ function parsePasses(
   if (
     !Array.isArray(value) ||
     value.length === 0 ||
-    value.length > EFFECT_V1_GRAPH_LIMITS.expandedCommands
+    value.length > EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations
   )
     return null;
   const resourcesById = new Map(resources.map((resource) => [resource.id, resource]));
@@ -307,10 +307,10 @@ function parsePasses(
         }
       }
       if (operation.op === 'clear') scalarOperations += 1;
-      if (scalarOperations > EFFECT_V1_GRAPH_LIMITS.expandedCommands) return null;
+      if (scalarOperations > EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations) return null;
       parsed.push(operation);
     }
-    if (depth > EFFECT_V1_GRAPH_LIMITS.graphDepth) return null;
+    if (depth > EFFECT_RUNTIME_GPU_PLAN_LIMITS.depth) return null;
     depths.set(pass['id'], depth);
     passes.push({
       id: pass['id'],

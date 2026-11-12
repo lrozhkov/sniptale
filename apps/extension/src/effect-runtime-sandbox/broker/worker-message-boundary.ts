@@ -1,5 +1,4 @@
 import { closeEffectRuntimeGpuPlanResources } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
-import { parseEffectRuntimeGpuPlan } from '../../features/video/composition/effect-runtime/runtime/gpu-plan-boundary';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import { hasExactKeys, isRecord } from '../../contracts/effect-runtime/identity';
 import { parseEffectRuntimeFrameResult } from '../../contracts/effect-runtime/result-boundary';
@@ -29,12 +28,10 @@ export function parseEffectRuntimeWorkerResponse(
 ): EffectRuntimeWorkerResult | null;
 export function parseEffectRuntimeWorkerResponse(
   value: unknown,
-  expected?: EffectRuntimeWorkerMessage
+  _expected?: EffectRuntimeWorkerMessage
 ): EffectRuntimeWorkerResult | null {
   if (!isRecord(value) || !hasExactKeys(value, ['result', 'type'])) return null;
   if (value['type'] !== EFFECT_RUNTIME_WORKER_RESPONSE || !isRecord(value['result'])) return null;
-  if (value['result']['kind'] === 'gpu-plan')
-    return expected ? parseEffectRuntimeGpuPlan(value['result'], expected) : null;
   return parseEffectRuntimeFrameResult(value['result']);
 }
 

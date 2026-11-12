@@ -148,3 +148,22 @@ it('keeps the fake IndexedDB export exception closed without an installed packag
     rules.find((candidate) => candidate.name === 'no-non-package-json')?.to?.pathNot?.[1]
   ).toBe('(?!)');
 });
+
+it('recognizes only the exact packaged Lottie inline WASM query', () => {
+  const rules = loadRules();
+  const pattern: unknown = rules.find((rule) => rule.name === 'not-to-unresolvable')?.to.pathNot;
+  if (typeof pattern !== 'string') throw new Error('Missing Vite resource pattern');
+  const resource = '@lottiefiles/dotlottie-web/dotlottie-player.wasm?url&inline';
+  expect(fs.existsSync(require.resolve('@lottiefiles/dotlottie-web/dotlottie-player.wasm'))).toBe(
+    true
+  );
+  expect(new RegExp(pattern).test(resource)).toBe(true);
+  for (const other of [
+    '@lottiefiles/dotlottie-web/other.wasm?url&inline',
+    '@other/dotlottie-web/dotlottie-player.wasm?url&inline',
+    'https://example.com/@lottiefiles/dotlottie-web/dotlottie-player.wasm?url&inline',
+    resource + '&remote=1',
+    resource + '/other',
+  ])
+    expect(new RegExp(pattern).test(other)).toBe(false);
+});

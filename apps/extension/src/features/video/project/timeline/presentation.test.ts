@@ -39,7 +39,10 @@ describe('video project timeline presentation', () => {
     'resolves incoming and outgoing crossfade multipliers and overlap durations',
     verifyTransitionEdges
   );
-  it('combines fade and transition multipliers for composite values', verifyCompositeValues);
+  it(
+    'applies GL Fade weight once after source opacity and retains audio gain',
+    verifyCompositeValues
+  );
   it(
     'keeps composite values stable when no transition segment is active',
     verifyStableCompositeValues
@@ -157,7 +160,9 @@ function verifyCompositeValues(): void {
   });
   const project = syncProjectTransitions(createProject([previousClip, targetClip]));
 
-  expect(getClipCompositeVisualOpacity(project, targetClip, 3.25)).toBeCloseTo(0.1);
+  const sourceOpacity = getClipCompositeVisualOpacity(project, targetClip, 3.25);
+  expect(sourceOpacity).toBeCloseTo(0.4);
+  expect(sourceOpacity * getClipTransitionMultiplier(project, targetClip, 3.25)).toBeCloseTo(0.1);
   expect(getClipCompositeAudioGain(project, targetClip, 3.25)).toBeCloseTo(0.1875);
 }
 

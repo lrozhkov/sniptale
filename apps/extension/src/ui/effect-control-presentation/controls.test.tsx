@@ -5,11 +5,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { EffectControlChoices, EffectControlFrame, EffectControlTextarea } from './controls';
 import { EffectControlTree } from './groups';
 import {
-  validateEffectV1Document,
-  parseEffectV1Source,
-  type ControlDefinition,
-} from '@sniptale/runtime-contracts/effect-v1';
-import { readFileSync } from 'node:fs';
+  parseEffectControlSet,
+  type EffectControlSet,
+} from '@sniptale/runtime-contracts/effect-controls';
+import { type ControlDefinition } from '@sniptale/runtime-contracts/effect-controls';
 const locale = vi.hoisted(() => ({ value: 'en' }));
 vi.mock('../../platform/i18n', () => ({
   translate: (key: string) =>
@@ -116,30 +115,22 @@ it('does not dispatch changes through a disabled toggle', () => {
 });
 
 it('retains the declared hierarchy, order and collapsed contents', () => {
-  const source = parseEffectV1Source(
-    readFileSync(
-      'apps/extension/public/video-effects/effects/annotations/sniptale-callout/effect.sniptale-effect.json',
-      'utf8'
-    )
-  );
-  if (!source.document) throw new Error('Missing callout fixture');
-  source.document.controlGroups?.push({
-    id: 'detail',
-    parentId: 'tracing',
-    label: { en: 'Detail' },
-    collapsed: true,
+  const document = parseEffectControlSet({
+    controls: [
+      { id: 'traceShare', kind: 'number', defaultValue: 50, min: 0, max: 100, group: 'detail' },
+    ],
+    controlGroups: [
+      { id: 'tracing', parentId: 'animation', label: { en: 'Tracing' }, order: 1 },
+      { id: 'detail', parentId: 'tracing', label: { en: 'Detail' }, collapsed: true },
+    ],
   });
-  const amount = source.document.controls.find((control) => control.id === 'traceShare');
-  if (!amount) throw new Error('Missing tracing control');
-  amount.group = 'detail';
-  const parsed = validateEffectV1Document(source.document);
-  if (!parsed.ok || !parsed.document) throw new Error('Missing valid nested fixture');
+  if (!document) throw new Error('Missing valid nested metadata');
   act(() =>
     root.render(
       <EffectControlTree
-        document={parsed.document!}
+        document={document}
         parentId="animation"
-        controls={parsed.document!.controls}
+        controls={document.controls}
         renderControl={(control) => <input aria-label={control.id} defaultValue="retained" />}
         renderGroup={(group, children) => (
           <details open={!group.collapsed} data-group={group.id}>
@@ -205,22 +196,28 @@ it('uses ordinary parameter rows without an icon column even when retained metad
 });
 
 it('omits conflicting retained disclosure icons without modifying saved metadata', () => {
-  const source = JSON.parse(
-    readFileSync(
-      'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
-      'utf8'
-    )
-  );
-  source.controlGroups[0].icon = 'type';
-  const saved = JSON.stringify(source);
-  const parsed = parseEffectV1Source(saved, { presentationPolicy: 'retained' });
-  if (!parsed.document) throw new Error('Missing retained title');
+  const document: EffectControlSet = {
+    controls: [
+      { id: 'title', kind: 'text', defaultValue: 'Title', group: 'retained-content' },
+      { id: 'fontSize', kind: 'number', defaultValue: 16, group: 'typography' },
+    ],
+    controlGroups: [
+      {
+        id: 'retained-content',
+        parentId: 'content',
+        label: { en: 'Retained content' },
+        icon: 'type',
+      },
+    ],
+  };
+  const saved = JSON.stringify(document);
+  expect(parseEffectControlSet(document)).toBeNull();
   act(() =>
     root.render(
       <EffectControlTree
-        document={parsed.document!}
+        document={document}
         parentId="content"
-        controls={parsed.document!.controls}
+        controls={document.controls}
         renderControl={(control) => <input aria-label={control.id} />}
         renderGroup={(group, children) => (
           <details open>
@@ -237,5 +234,35 @@ it('omits conflicting retained disclosure icons without modifying saved metadata
   expect(host.querySelector('summary')).not.toBeNull();
   expect(host.querySelector('summary [data-icon]')).toBeNull();
   expect(host.querySelector('input[aria-label="title"]')).not.toBeNull();
-  expect(JSON.stringify(parsed.document)).toBe(saved);
+  expect(JSON.stringify(document)).toBe(saved);
+});
+
+it('renders admitted control metadata without a V1 document or drawing-language fields', async () => {
+  const document = {
+    controls: [
+      { id: 'caption', kind: 'text' as const, defaultValue: 'Текст', group: 'content' },
+      {
+        id: 'opacity',
+        kind: 'number' as const,
+        defaultValue: 100,
+        min: 0,
+        max: 100,
+        group: 'appearance',
+      },
+    ],
+    controlGroups: [],
+  };
+  act(() =>
+    root.render(
+      <EffectControlTree
+        document={document}
+        parentId="content"
+        controls={document.controls}
+        renderControl={(control) => <span>{control.id}</span>}
+        renderGroup={(_group, children) => <div>{children}</div>}
+      />
+    )
+  );
+  expect(host.textContent).toBe('caption');
+  expect(JSON.stringify(document)).not.toContain('schemaVersion');
 });

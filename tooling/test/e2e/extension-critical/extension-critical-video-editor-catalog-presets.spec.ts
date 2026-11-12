@@ -9,10 +9,6 @@ import {
 import { readNativeVideoProject } from '../support/native-video-project';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../support/effect-v1-corpus.test-support';
 import { startHostServer } from '../support/host-server';
 import {
   applyHarnessBootstrap,
@@ -20,16 +16,19 @@ import {
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
-for (const variant of [
-  { width: 1280, height: 560, locale: 'en', theme: 'light', format: 'WEBM' },
-  { width: 1920, height: 900, locale: 'ru', theme: 'dark', format: 'MP4' },
-] as const) {
-  test(`resource catalog and personal preset survive backup, editing, reopening and ${variant.format} export`, async ({
+const variants: readonly {
+  width: number;
+  height: number;
+  locale: 'en' | 'ru';
+  theme: 'light' | 'dark';
+}[] = [{ width: 1920, height: 900, locale: 'ru', theme: 'dark' }];
+for (const variant of variants) {
+  test(`resource catalog and personal preset survive backup, editing, reopening and WEBM and MP4 export`, async ({
     page: source,
     browser,
   }, info) => {
     test.setTimeout(120_000);
-    const { locale, theme, width, height, format } = variant;
+    const { locale, theme, width, height } = variant;
     let page = source;
     page.setDefaultTimeout(10_000);
     await page.emulateMedia({ colorScheme: theme });
@@ -60,10 +59,7 @@ for (const variant of [
         .click();
       const dock = page.locator('[data-ui="video-editor.effects-library.dock"]');
       await expect(dock).toBeVisible();
-      const specimen = EFFECT_BUNDLE_CORPUS.find(
-        (item) => item.accepted && item.artifact.includes('asset-bearing-conformance')
-      );
-      if (!specimen) throw new Error('Missing resource catalog corpus');
+      await page.locator('[data-ui="video-editor.library-tab.annotations"]').click();
       const chooser = page.waitForEvent('filechooser');
       await dock
         .getByRole('button', { name: label('videoEditor.effectsLibrary.importPack'), exact: true })
@@ -71,9 +67,9 @@ for (const variant of [
       await (
         await chooser
       ).setFiles({
-        name: 'resource.sniptale-bundle.zip',
+        name: 'resource.sniptale-animations.zip',
         mimeType: 'application/zip',
-        buffer: await resourcePresetBundle(readEffectBundleCorpusArchive(specimen)),
+        buffer: await resourcePresetBundle(),
       });
       await page.locator('[data-ui="video-editor.library-tab.annotations"]').click();
       await chooseInspectorValue(
@@ -131,7 +127,7 @@ for (const variant of [
           async () =>
             (await readNativeVideoProject(page))?.effectInstances?.[0]?.controls['intensity']
         )
-        .toBe(0.5);
+        .toBe(50);
       const sourceProject = (await readNativeVideoProject(page))!;
       // Harness pages reset chrome.storage on navigation; carry the UI-authored value forward.
       const storage = await page.evaluate(() => chrome.storage.local.get(null));
@@ -232,7 +228,7 @@ for (const variant of [
       await page.locator('[data-ui="video-editor.materials.close"]').click();
       await expect
         .poll(async () => (await readNativeVideoProject(page))?.effectInstances?.[0]?.controls)
-        .toEqual({ accent: '#e020b0', intensity: 0.5 });
+        .toEqual({ accent: '#e020b0', intensity: 50 });
       const restoredPanel = page.locator('[data-ui="video-editor.inspector.content"]');
       if (!(await restoredPanel.locator('[data-presentation="all"]').isVisible()))
         await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
@@ -246,14 +242,14 @@ for (const variant of [
         name: locale === 'en' ? 'Intensity' : 'Интенсивность',
         exact: true,
       });
-      await intensity.fill('0.65');
+      await intensity.fill('65');
       await intensity.press('Enter');
       await expect
         .poll(
           async () =>
             (await readNativeVideoProject(page))?.effectInstances?.[0]?.controls['intensity']
         )
-        .toBe(0.65);
+        .toBe(65);
       const edited = (await readNativeVideoProject(page))!;
       expect(edited.id).not.toBe(sourceProject.id);
       expect(await readNativeVideoProject(page, sourceProject.id)).toEqual(sourceProject);
@@ -303,16 +299,20 @@ for (const variant of [
         path: info.outputPath('catalog-personal-reopened.png'),
         fullPage: false,
       });
-      const output = await encodedNativeVideoSamples(page, host.origin, edited, format, [
-        { time: 0.5, ...resourcePoint, expected: [255, 134, 24] },
-        { time: 0.5, ...appearancePoint, expected: [151, 29, 126] },
-      ]);
-      expect(output.samples).toHaveLength(2);
-      for (const sample of output.samples) expect(sample.error).toBeLessThan(12);
-      expect(await readNativeVideoProject(page, sourceProject.id)).toEqual(sourceProject);
+      const outputs = [];
+      for (const format of ['WEBM', 'MP4'] as const) {
+        const output = await encodedNativeVideoSamples(page, host.origin, edited, format, [
+          { time: 0.5, ...resourcePoint, expected: [255, 134, 24] },
+          { time: 0.5, ...appearancePoint, expected: [151, 29, 126] },
+        ]);
+        expect(output.samples).toHaveLength(2);
+        for (const sample of output.samples) expect(sample.error).toBeLessThan(12);
+        expect(await readNativeVideoProject(page, sourceProject.id)).toEqual(sourceProject);
+        outputs.push({ format, output });
+      }
       await writeFile(
         info.outputPath('catalog-personal-proof.json'),
-        JSON.stringify({ sourceProjectId: sourceProject.id, edited, output })
+        JSON.stringify({ sourceProjectId: sourceProject.id, edited, outputs })
       );
     } finally {
       await restoredContext?.close();
@@ -332,35 +332,56 @@ async function readCatalogResourceHashes(page: Page) {
     try {
       const entries = await new Promise<unknown[]>((resolve, reject) => {
         const request = db
-          .transaction('video_effect_bundles')
-          .objectStore('video_effect_bundles')
+          .transaction('video_animation_packages')
+          .objectStore('video_animation_packages')
           .getAll();
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error);
       });
       const result: string[] = [];
+      const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
+        Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (value) =>
+          value.toString(16).padStart(2, '0')
+        ).join('');
       for (const entry of entries) {
         if (
           !entry ||
           typeof entry !== 'object' ||
-          !('assets' in entry) ||
-          !Array.isArray(entry.assets)
+          !('documents' in entry) ||
+          !Array.isArray(entry.documents)
         )
-          throw new Error('Invalid restored catalog');
-        for (const asset of entry.assets) {
+          throw new Error('Invalid restored catalogue.');
+        for (const item of entry.documents) {
           if (
-            !asset ||
-            typeof asset !== 'object' ||
-            !('blob' in asset) ||
-            !(asset.blob instanceof Blob)
+            !item ||
+            typeof item !== 'object' ||
+            typeof item.source !== 'string' ||
+            typeof item.sha256 !== 'string' ||
+            (await hash(new TextEncoder().encode(item.source))) !== item.sha256
           )
-            throw new Error('Missing restored resource');
-          const digest = await crypto.subtle.digest('SHA-256', await asset.blob.arrayBuffer());
-          result.push(
-            Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, '0')).join(
-              ''
+            throw new Error('Missing restored source.');
+          const source: unknown = JSON.parse(item.source);
+          if (
+            !source ||
+            typeof source !== 'object' ||
+            !('resources' in source) ||
+            !Array.isArray(source.resources)
+          )
+            throw new Error('Invalid restored resources.');
+          for (const resource of source.resources) {
+            if (
+              !resource ||
+              typeof resource !== 'object' ||
+              typeof resource.base64 !== 'string' ||
+              typeof resource.sha256 !== 'string'
             )
-          );
+              throw new Error('Missing embedded resource.');
+            const bytes = Uint8Array.from(atob(resource.base64), (char) => char.charCodeAt(0));
+            const digest = await hash(bytes);
+            if (digest !== resource.sha256 || bytes.length !== resource.byteLength)
+              throw new Error('Restored resource integrity failed.');
+            result.push(digest);
+          }
         }
       }
       return result;

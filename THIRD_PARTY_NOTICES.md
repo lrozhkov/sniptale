@@ -73,6 +73,45 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/realtimeVideoUpscaler.js | `58dd6544858039b4f8ba7a6cf469a4ed22aadc8588c7483ca7b4af2901ac4742` | `c096435fa3aab07a086e72b26a819312383e29f2bd807131c6c190f90f9aa86c` |
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/runtimeCapabilities.js | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` |
 
+## Golos Text 2.004 in Lottie templates
+
+- Attribution: Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text)
+- Source: https://github.com/googlefonts/golos-text
+- License: `OFL-1.1`
+- License text: [`apps/extension/public/video-effects/fonts/OFL.txt`](apps/extension/public/video-effects/fonts/OFL.txt)
+- License SHA-256: `ff532f9e8789f09a9fdffc3c0954eedfb0a48be77b2e2eb90f5f82e4f347f50c`
+- Notice text: [`apps/extension/public/video-effects/fonts/NOTICE.txt`](apps/extension/public/video-effects/fonts/NOTICE.txt)
+- Notice SHA-256: `7fc56df9fae16e89186f10c2104828777864f552e187319bcfd17b56b212379f`
+- Provenance record: [`apps/extension/public/video-effects/fonts/identity.json`](apps/extension/public/video-effects/fonts/identity.json)
+- Provenance SHA-256: `a70b698451327b25a6c7c9ae52cb9b059a098b7c80e3a94998e39b3fcbe4e01f`
+- Local changes: The font bytes do not change. Sniptale animation files embed the bytes as base64. The OFL license applies to the font bytes.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/public/video-effects/animations/callout.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `7638aac7a193c14792950668081a780685c2995a12206e4b446c5c600ef17cce` |
+| `apps/extension/public/video-effects/animations/chapters.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `e2147d13b77e5e5d67ef738d8a7518e3b72d07bd4c1d573011b14817e9705d01` |
+| `apps/extension/public/video-effects/animations/frame.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `d4a52d535d3fc657ca5387b8ec97bcfdde6e8dae2b8e0e8f29871477c18a42a3` |
+| `apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `9021a55d065bd9f0be93387ac2f1f8a58cbf18a9b670bd1e72d6cb5b77c7f845` |
+| `apps/extension/public/video-effects/animations/title.sniptale-animation.json` | https://github.com/googlefonts/golos-text | `17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063` | `547f8ef191b5c52fc780c993f773cefbfd52028c26d29f01e1590e392de20abc` |
+
+## Pixi Filters source image kernels v6.1.5
+
+- Attribution: Copyright (c) 2013-2025 Mathew Groves, Chad Engler
+- Source: https://github.com/pixijs/filters/tree/e9d1ca987864f121680bb0d7e9612c05b37748de
+- License: `MIT`
+- License text: [`apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE`](apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE)
+- License SHA-256: `d554721b2cd409d9bc075d743bb34f960e05ba55de1818a62fa60caf21ca6188`
+- Notice text: [`apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt`](apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt)
+- Notice SHA-256: `7035cbca1a28d7ce44138d9e672106d35854bb8ef7a6b566f34ea434eead220c`
+- Provenance record: [`apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json`](apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json)
+- Provenance SHA-256: `0978ccc5143e059d0b17b93bcaeede34f5c881ecae0113c9301e598f598bd25d`
+- Local changes: Adapt adjustment, clamped Kawase blur and bloom for the existing compositor device. Add Sniptale monochrome, sepia, sharpen, pixelate, vignette and deterministic grain. Reconstruct canonical source texels before interpolation. Use explicit logical coordinates, project time and valid premultiplied alpha. Provide an independent CPU image reference.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/src/features/image-filters/reference.ts` | https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de | `35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9` | `450a1a4383b8472e4be3fca49ad42c266f0694647d236ce316640a16a7597186` |
+| `apps/extension/src/features/image-filters/shader.ts` | https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de | `35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9` | `10284e4e4823c336cbf1279fcb93016f16363e5d1d3bd2ad6b7eea5b39a739d5` |
+
 ## Production dependency licenses
 
 ### `@ai-sdk/alibaba` 2.0.69
@@ -332,6 +371,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/@iconify__types-2.0.0.txt`](LICENSES/dependencies/@iconify__types-2.0.0.txt)
 - License text SHA-256: `045ce74712fc613fdd74d1c55f5140a08d623836ff2aca44132b38d68fbc67ad`
 - Repository/source: https://github.com/iconify/iconify.git
+
+### `@lottiefiles/dotlottie-web` 0.82.1
+
+- Installed path: `node_modules/@lottiefiles/dotlottie-web`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@lottiefiles/dotlottie-web/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt`](LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt)
+- License text SHA-256: `779cec663b3c6590082566f2a000170d7a4d1a4bfc6f954e61efa4adddc652a8`
+- Repository/source: https://github.com/LottieFiles/dotlottie-web.git
 
 ### `@noble/hashes` 2.4.0
 

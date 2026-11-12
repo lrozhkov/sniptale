@@ -1,3 +1,4 @@
+import { hasSourceImageFilters } from '../../../features/image-filters/contract';
 import type { VideoSample } from 'mediabunny';
 import {
   prepareDecodedVideoSample,
@@ -529,6 +530,13 @@ export function createProjectExportSourceSampling(args: {
           identity,
           source: raster.raw,
           demands: plan.demands.map((demand) => ({ ...demand, sourceKey: identity.sourceKey })),
+          fullSourceSupport: input.project.clips.some(
+            (clip) =>
+              clip.id === plan.clipId &&
+              clip.type === 'VIDEO' &&
+              !!clip.sourceFilters &&
+              hasSourceImageFilters(clip.sourceFilters)
+          ),
           signal,
           ...(args.ownerDocument ? { document: args.ownerDocument } : {}),
         });

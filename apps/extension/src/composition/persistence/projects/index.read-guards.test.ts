@@ -166,11 +166,7 @@ it('keeps hydratable persisted video projects visible before export-ready valida
 
 it('lists project metadata but refuses a corrupt EffectV1 snapshot when opening it', async () => {
   const source = readFileSync(
-    new URL(
-      '../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/' +
-        'neutral-standalone.sniptale-effect.json',
-      import.meta.url
-    ),
+    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
     'utf8'
   );
   const document = JSON.parse(source) as { id: string };
@@ -183,7 +179,7 @@ it('lists project metadata but refuses a corrupt EffectV1 snapshot when opening 
         id: `effect:${sha256}`,
         kind: 'standalone',
         retainedByteLength: new TextEncoder().encode(source).byteLength,
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         sha256,
         source,
       },
@@ -192,6 +188,7 @@ it('lists project metadata but refuses a corrupt EffectV1 snapshot when opening 
   mocks.dbGetAll.mockResolvedValue([entry]);
   const { listVideoProjects, getVideoProject } = await import('./index');
   await expect(listVideoProjects()).resolves.toEqual([expect.objectContaining({ id: entry.id })]);
+  entry.project.effectSnapshots![0]!.source = '{}';
   mocks.dbGet.mockResolvedValue(entry);
   await expect(getVideoProject(entry.id)).resolves.toMatchObject({ status: 'invalid' });
 });

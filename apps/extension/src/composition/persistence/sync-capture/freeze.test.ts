@@ -1,11 +1,7 @@
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
-import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
+import { readValidAnimationSnapshot } from '../effect-bundles/fixture.test-support';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { workspace as reviewWorkspace } from '../review-workspaces/backup-restore.test-support';
@@ -386,38 +382,12 @@ it('freezes project thumbnail and presentation preview bytes as independent reta
 
 it('freezes an immutable native effect snapshot from the asset-bearing corpus', async () => {
   const data = fixture();
-  const corpus = EFFECT_BUNDLE_CORPUS.find(
-    ({ accepted, artifact }) => accepted && artifact.includes('asset-bearing-conformance')
-  );
-  if (!corpus) throw new Error('Expected asset-bearing corpus fixture');
-  const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(corpus));
-  if (!imported.ok) throw new Error('Expected accepted asset-bearing effect corpus');
-  const document = imported.bundle.documents[0]!;
-  const snapshot = {
-    assets: document.assets.map((asset) => ({
-      id: asset.id,
-      kind: asset.kind,
-      mimeType: asset.mimeType,
-      byteLength: asset.byteLength,
-      sha256: asset.sha256,
-      blob: new Blob([Uint8Array.from(asset.bytes).buffer], { type: asset.mimeType }),
-    })),
-    documentId: document.document.id,
-    id: `effect:${document.sha256}`,
-    kind: document.document.kind,
-    retainedByteLength:
-      new TextEncoder().encode(document.source).byteLength +
-      document.assets.reduce((sum, asset) => sum + asset.byteLength, 0),
-    schemaVersion: 'sniptale.effect.v1' as const,
-    sha256: document.sha256,
-    source: document.source,
-  };
+  const snapshot = await readValidAnimationSnapshot();
   data.project.project.effectSnapshots = [snapshot];
   expect(parseVideoProjectEntry(data.project)).not.toBeNull();
   const rows = await freezeVideoProjectInTransaction(data.tx, data.project.id);
-  expect(rows.project.project.effectSnapshots![0]!.assets.length).toBeGreaterThan(0);
+  expect(rows.project.project.effectSnapshots![0]!.source).toBe(snapshot.source);
   snapshot.source = '{}';
-  snapshot.assets[0]!.blob = new Blob(['changed-after-freeze']);
   snapshot.assets.length = 0;
   data.stores.projects.rows.clear();
   expect(parseVideoProjectEntry(rows.project)).not.toBeNull();

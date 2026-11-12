@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../project/transition/gl-catalog';
 import { createWindowCameraLinkGeometry } from './window-camera-geometry';
 import { motionWindowFocusToComposition } from './source-window';
 import { mapCompositionPointThroughCamera } from './index';
@@ -13,7 +14,6 @@ import {
   VideoMediaFitMode,
   VideoMotionFocusMode,
   VideoTemporalEasing,
-  VideoTransitionKind,
 } from '../../project/types';
 import { normalizeVideoProjectCursorSkin } from '../../project/cursor';
 import { createProjectWorkingZoneCameraGeometry } from './camera-geometry';
@@ -371,7 +371,7 @@ it('bounds the original eased source cursor at recursive proof interval edges', 
   }
 });
 
-it.each(['PUSH', 'SLIDE'] as const)(
+it.each(['Directional', 'CrossZoom'] as const)(
   'bounds changing camera sizes during a %s transition',
   async (kind) => {
     const { resolveCursorSourcePointMapping, mapCursorFocusControlPoint } =
@@ -415,10 +415,10 @@ it.each(['PUSH', 'SLIDE'] as const)(
         id: 'push',
         leadingClipId: clip.id,
         trailingClipId: 'following',
-        kind,
+        kind: 'gl',
+        selection: createGlTransitionSelection(kind)!,
         duration: 1,
         easing: 'LINEAR',
-        direction: 'RIGHT',
       },
     ];
     const geometry = createProjectWorkingZoneCameraGeometry({
@@ -613,7 +613,7 @@ it('admits a real perspective CURSOR plan and keeps the rendered observation vis
 });
 
 it.each(
-  Object.values(VideoTransitionKind).flatMap((kind) =>
+  (['Fade', 'Directional', 'CrossZoom'] as const).flatMap((kind) =>
     (['LINEAR', 'EASE_IN_OUT'] as const).flatMap((easing) =>
       [false, true].map((trailing) => [kind, easing, trailing] as const)
     )
@@ -645,11 +645,10 @@ it.each(
         id: 'moving-source',
         leadingClipId: trailing ? 'previous-video' : clip.id,
         trailingClipId: trailing ? clip.id : 'next-video',
-        kind,
+        kind: 'gl',
+        selection: createGlTransitionSelection(kind)!,
         duration: 1,
-        intensity: 'BOLD',
         easing,
-        direction: 'RIGHT',
       },
     ];
     const selected = {

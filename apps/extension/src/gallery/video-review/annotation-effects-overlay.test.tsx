@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { resolveEffectV1ControlDefault } from '@sniptale/runtime-contracts/effect-v1';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import { readReviewAnnotationEffectDocument } from '../../features/video/review/annotation-effects/validation';
 import { initializeReviewAnnotationEffectAnchors } from '../../features/video/review/annotation-effects/layout';
 import type { ReviewAnnotationEffect } from '../../features/video/review/annotation-effects/types';
@@ -27,13 +27,13 @@ const geometry = createReviewAnnotationGeometry({
 })!;
 function fixture(name = 'callout', attachment: ReviewAnnotationEffect['attachment'] = 'content') {
   const text = readFileSync(
-    `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
+    `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
     'utf8'
   );
   const document = readReviewAnnotationEffectDocument(text)!;
   const transform = { x: 0.3, y: 0.3, width: 0.4, height: 0.2, rotation: 0 };
   const controls = Object.fromEntries(
-    document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
   );
   const anchors = initializeReviewAnnotationEffectAnchors(
     document,
@@ -83,7 +83,7 @@ function fixture(name = 'callout', attachment: ReviewAnnotationEffect['attachmen
     snapshots: [
       {
         id: 'immutable',
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         kind: 'standalone',
         documentId: document.id,
         sha256: '0'.repeat(64),
@@ -258,7 +258,7 @@ it('moves only a fixed tip and supports keyboard body, resize and rotation comma
   const resized = vi.mocked(binding.editor.previewGesture).mock.lastCall?.[0]?.transform;
   if (!resized) throw new Error('Resize gesture did not preview a transform.');
   expect((resized.width * source.width) / (resized.height * source.height)).toBeCloseTo(
-    document.objectLayout!.width / document.objectLayout!.height
+    document.animation.w / document.animation.h
   );
   const rotate = host.querySelector('[data-handle="rotate"]')!;
   act(() =>

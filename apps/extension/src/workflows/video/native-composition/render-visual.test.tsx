@@ -1,3 +1,7 @@
+import { createNativeGlTrackCanvas } from './gl-track-canvas';
+import { buildGlTrackPlan } from '../../../features/video/project/transition/gl-track-plan';
+import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
+import { drawEffectRuntimeVisualLayer } from '../../../features/video/composition/draw';
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
@@ -305,4 +309,74 @@ it('refuses spatial multi-pass rendering when an exposure buffer cannot be acqui
     })
   ).rejects.toThrow('Motion blur buffer');
   expect(drawSpatialCompositionGroup).not.toHaveBeenCalled();
+});
+
+it('feeds canonical A/X/B states to the retained Canvas GL owner and publishes only the completed result', async () => {
+  const main = createCanvasContext(),
+    canvas = createPreviewCanvas(main);
+  const prototype = vi
+    .spyOn(HTMLCanvasElement.prototype, 'getContext')
+    .mockImplementation(function (this: HTMLCanvasElement) {
+      return { ...createCanvasContext(), canvas: this } as unknown as CanvasRenderingContext2D;
+    });
+  drawEffectRuntimeVisualLayerMock.mockClear();
+  const project = createEmptyVideoProject('Native GL', 200, 100),
+    trackId = project.tracks[0]!.id;
+  const base = createEffectLayer();
+  const layers = ['A', 'X', 'B'].map((id) => ({
+    ...base,
+    clipId: id,
+    clip: { ...base.clip, id, trackId },
+  }));
+  project.clips = layers.map((layer) => layer.clip);
+  const selection = createGlTransitionSelection('CrossZoom')!;
+  const plan = buildGlTrackPlan(
+    ['A', 'X', 'B'],
+    [{ id: 'AB', leadingClipId: 'A', trailingClipId: 'B', start: 0, progress: 0.3, selection }],
+    { layersPerPass: 64, totalLayers: 512, groupDepth: 16 }
+  );
+  if (!plan.ok) throw new Error('Expected GL track plan.');
+  const render = vi.fn<
+    ReturnType<
+      typeof import('../../../features/video/composition/canvas/gl-transition').createGlTransitionCanvas
+    >['render']
+  >(async (request) => {
+    const calls = vi.mocked(drawEffectRuntimeVisualLayer).mock.calls;
+    expect(
+      calls
+        .filter(([args]) => args.context.canvas === request.from)
+        .map(([args]) => args.layer.clipId)
+    ).toEqual(['A', 'X']);
+    expect(
+      calls
+        .filter(([args]) => args.context.canvas === request.to)
+        .map(([args]) => args.layer.clipId)
+    ).toEqual(['X', 'B']);
+    expect(request.selection).toEqual(selection);
+    expect(request.progress).toBe(0.3);
+  });
+  const owner = createNativeGlTrackCanvas(document, () => ({ render, dispose: vi.fn() }));
+  const normal = createPass(1, 1, 0, 0);
+  const frame = {
+    ...normal.frame,
+    visualLayers: layers,
+    glTrackPlans: new Map([[trackId, plan.root]]),
+  };
+  try {
+    await drawPreviewVisualPasses({
+      canvas,
+      project,
+      overlayFrame: frame,
+      passes: [{ ...normal, alpha: 1, frame }],
+      clipMediaElements: new Map(),
+      imageBank: {},
+      stage: null,
+      transitionRenderer: () => owner,
+    });
+    expect(render).toHaveBeenCalledOnce();
+    expect(main.drawImage).toHaveBeenCalled();
+  } finally {
+    owner.dispose();
+    prototype.mockRestore();
+  }
 });

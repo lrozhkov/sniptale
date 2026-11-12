@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { createHash } from 'node:crypto';
+import { animationRuntimeDuration } from '../../../contracts/effect-runtime/animation';
 import { createEffectRuntimeFailure } from '../../../contracts/effect-runtime/identity';
 import type {
   EffectRuntimeSceneResult,
@@ -165,11 +167,11 @@ it('rolls back partial captures when a later source is unavailable', () => {
 function futureFixture() {
   const f = fixture();
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
   );
   const document = parseEffectRuntimeSnapshotDocument({ source });
-  const id = 'a'.repeat(64);
+  const id = createHash('sha256').update(source).digest('hex');
   f.input.project.effectSnapshots = [
     {
       id: `effect:${id}`,
@@ -178,7 +180,7 @@ function futureFixture() {
       documentId: document.id,
       assets: [],
       kind: 'standalone',
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       retainedByteLength: new TextEncoder().encode(source).byteLength,
     },
   ];
@@ -187,7 +189,7 @@ function futureFixture() {
       id: 'future',
       snapshotId: `effect:${id}`,
       controls: {},
-      duration: document.duration,
+      duration: animationRuntimeDuration(document),
       enabled: true,
       kind: 'standalone',
       playbackRate: 1,
@@ -199,7 +201,7 @@ function futureFixture() {
     effectInstanceId: 'future',
     name: 'Future',
     startTime: 2,
-    duration: document.duration,
+    duration: animationRuntimeDuration(document),
     trackId: f.input.project.tracks[0]!.id,
     projectWidth: f.input.project.width,
     projectHeight: f.input.project.height,

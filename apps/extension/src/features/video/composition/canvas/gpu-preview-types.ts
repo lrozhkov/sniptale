@@ -1,3 +1,5 @@
+import type { SourceImageFilterStack } from '../../../image-filters/contract';
+import type { GlTransitionSelection } from '../../project/transition/gl-catalog';
 import type { EffectRuntimeGpuPaint } from '../../../../contracts/effect-runtime/gpu-plan';
 import type { CameraSpatialFrame, CameraSpatialRect } from '../../project/motion/spatial';
 import type { QuickEditHomography } from '../motion/spatial-geometry';
@@ -18,6 +20,8 @@ export interface GpuPreviewGroup {
   output: Size;
   logical: Size;
   layers: readonly GpuPreviewLayer[];
+  /** Two prepared child images are combined by the pinned shader, not source-over. */
+  composition?: { kind: 'gl-transition'; selection: GlTransitionSelection; progress: number };
 }
 
 /** A layer borrows its source through completion; inverse maps output logical points to its plane. */
@@ -51,6 +55,8 @@ export interface GpuPreviewLayer {
     cache?: { key: string; revision: object | string | number };
   };
   blend?: 'over' | 'add' | 'mask' | 'erase' | 'screen' | 'atop';
+  /** Source-plane processing precedes camera, masks, and independent overlay layers. */
+  imageFilters?: { stack: SourceImageFilterStack; logical: Size; projectTime?: number | undefined };
   cssFilter?: { blur?: number; brightness?: number; saturate?: number };
   tint?: readonly [number, number, number, number];
   /** Coverage of the destination operation, not a mask in the source plane. */

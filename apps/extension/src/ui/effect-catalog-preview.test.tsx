@@ -4,8 +4,7 @@ import { Blob as NodeBlob } from 'node:buffer';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { createEffectCatalogEntry } from '../composition/persistence/effect-bundles/catalog-builder';
-import { readValidBundleArtifact } from '../composition/persistence/effect-bundles/fixture.test-support';
+import { readValidAnimationCatalog } from '../composition/persistence/effect-bundles/fixture.test-support';
 import type {
   EffectRuntimeFrameResult,
   EffectRuntimeRenderCommand,
@@ -48,7 +47,7 @@ it.each([false, true])(
         disconnect() {}
       }
     );
-    const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+    const catalog = await readValidAnimationCatalog();
     const entry = catalog.documents.find((document) => document.kind === 'standalone')!;
     let finish!: (value: EffectRuntimeFrameResult) => void;
     mocks.render.mockImplementation(
@@ -120,7 +119,7 @@ it('draws visible posters, scrubs and recovers after a failed frame without chan
     drawImage: draw,
     clearRect: vi.fn(),
   } as unknown as CanvasRenderingContext2D);
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+  const catalog = await readValidAnimationCatalog();
   const entry = catalog.documents[0]!;
   const close = vi.fn();
   mocks.render.mockImplementation(async (command: EffectRuntimeRenderCommand) => ({
@@ -183,7 +182,7 @@ it('restores a persisted cover without starting a renderer and ignores catalog i
     clearRect: vi.fn(),
   } as unknown as CanvasRenderingContext2D);
   mocks.load.mockResolvedValue(new Blob(['cover'], { type: 'image/webp' }));
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+  const catalog = await readValidAnimationCatalog();
   const entry = catalog.documents[0]!;
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -230,7 +229,7 @@ it('restores a catalog on each mount without entering a blocked renderer queue',
   vi.stubGlobal('crypto', webcrypto);
   vi.stubGlobal('Blob', NodeBlob);
   const { createEffectPreviewSession } = await import('./effect-catalog-preview-session');
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+  const catalog = await readValidAnimationCatalog();
   const draw = vi.fn();
   const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     drawImage: draw,
@@ -251,7 +250,6 @@ it('restores a catalog on each mount without entering a blocked renderer queue',
           queue: { enqueue },
           key: `cover-${index}`,
           readDocument: () => ({ catalog, entry: catalog.documents[0]! }),
-          readSource: () => null,
         })
       );
       sessions.forEach((session) => session.render(0.5, true));
@@ -273,7 +271,7 @@ it.each(['missing', 'unavailable', 'corrupt'])(
     const { createEffectPreviewSession } = await import('./effect-catalog-preview-session');
     vi.stubGlobal('crypto', webcrypto);
     vi.stubGlobal('Blob', NodeBlob);
-    const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+    const catalog = await readValidAnimationCatalog();
     const entry = catalog.documents.find((document) => document.kind === 'standalone')!;
     const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
       drawImage: vi.fn(),
@@ -304,7 +302,6 @@ it.each(['missing', 'unavailable', 'corrupt'])(
       queue: { enqueue },
       key: failure,
       readDocument: () => ({ catalog, entry }),
-      readSource: () => null,
     });
     try {
       session.render(0.5, true);
@@ -342,7 +339,6 @@ it('releases a restored bitmap if the preview is disposed during decoding', asyn
     readDocument: () => {
       throw new Error('Cached covers do not resolve documents');
     },
-    readSource: () => null,
   });
   try {
     session.render(0.5, true);
@@ -356,6 +352,181 @@ it('releases a restored bitmap if the preview is disposed during decoding', asyn
   } finally {
     session.dispose();
     mocks.load.mockResolvedValue(null);
+    vi.unstubAllGlobals();
+  }
+});
+
+it('closes a superseded preview frame without painting it before the newest request', async () => {
+  const { createEffectPreviewSession } = await import('./effect-catalog-preview-session');
+  vi.stubGlobal('crypto', webcrypto);
+  const catalog = await readValidAnimationCatalog(),
+    entry = catalog.documents[0]!;
+  const draw = vi.fn();
+  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: draw,
+    clearRect: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  const requests: Array<{
+    command: EffectRuntimeRenderCommand;
+    resolve(value: EffectRuntimeFrameResult): void;
+  }> = [];
+  const renderFrame = vi.fn((command: EffectRuntimeRenderCommand) => {
+    const gate = Promise.withResolvers<EffectRuntimeFrameResult>();
+    requests.push({ command, resolve: gate.resolve });
+    return gate.promise;
+  });
+  const queue = {
+    enqueue(
+      task: Parameters<import('./effect-catalog-preview-session').PreviewQueue['enqueue']>[0]
+    ) {
+      void task(() => ({ renderFrame, dispose: vi.fn() }));
+    },
+  };
+  const target = document.createElement('canvas');
+  const session = createEffectPreviewSession({
+    target,
+    queue,
+    key: 'supersession',
+    readDocument: () => ({ catalog, entry }),
+  });
+  class Bitmap implements ImageBitmap {
+    close = vi.fn();
+    readonly width = 320;
+    readonly height = 180;
+  }
+  const old = new Bitmap(),
+    latest = new Bitmap();
+  const respond = (index: number, bitmap: ImageBitmap) => {
+    const request = requests[index]!;
+    request.resolve({
+      effectInstanceId: request.command.effectInstanceId,
+      snapshotId: request.command.snapshotId,
+      requestId: request.command.requestId,
+      sequenceId: request.command.sequenceId,
+      kind: 'frame',
+      bitmap,
+      width: bitmap.width,
+      height: bitmap.height,
+      acknowledged: {
+        documentId: request.command.documentRef.id,
+        assetSelectionId: request.command.assetSelectionRef.id,
+      },
+    });
+  };
+  try {
+    session.render(0.25);
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    session.render(0.75);
+    respond(0, old);
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    expect(old.close).toHaveBeenCalledOnce();
+    expect(draw).not.toHaveBeenCalled();
+    expect(requests[1]!.command.progress).toBe(0.75);
+    respond(1, latest);
+    await vi.waitFor(() => expect(draw).toHaveBeenCalledOnce());
+    expect(draw.mock.calls[0]![0]).toBe(latest);
+    expect(latest.close).toHaveBeenCalledOnce();
+  } finally {
+    session.dispose();
+    context.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('publishes a cold hover frame when autoplay ticks arrive before rendering completes', async () => {
+  vi.clearAllMocks();
+  mocks.load.mockResolvedValue(null);
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('crypto', webcrypto);
+  vi.stubGlobal('Blob', NodeBlob);
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  let tick!: () => void;
+  let now = 1000;
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const interval = vi.spyOn(window, 'setInterval').mockImplementation((handler: TimerHandler) => {
+    if (typeof handler !== 'function') throw new Error('Expected autoplay callback.');
+    tick = () => handler();
+    // jsdom uses browser interval IDs, while the shared TS environment adds Node overloads.
+    return 123 as unknown as ReturnType<typeof window.setInterval>;
+  });
+  const stop = vi.spyOn(window, 'clearInterval').mockImplementation(() => undefined);
+  const draw = vi.fn();
+  const context = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: draw,
+    clearRect: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  const requests: Array<{
+    command: EffectRuntimeRenderCommand;
+    finish(value: EffectRuntimeFrameResult): void;
+  }> = [];
+  mocks.render.mockImplementation((command: EffectRuntimeRenderCommand) => {
+    const gate = Promise.withResolvers<EffectRuntimeFrameResult>();
+    requests.push({ command, finish: gate.resolve });
+    return gate.promise;
+  });
+  const catalog = await readValidAnimationCatalog();
+  const entry = catalog.documents[0]!;
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const respond = (index: number) => {
+    const { command, finish } = requests[index]!;
+    const bitmap = { width: 320, height: 180, close: vi.fn() } as unknown as ImageBitmap;
+    finish({
+      ...command,
+      kind: 'frame',
+      bitmap,
+      width: 320,
+      height: 180,
+      acknowledged: {
+        documentId: command.documentRef.id,
+        assetSelectionId: command.assetSelectionRef.id,
+      },
+    });
+    return bitmap;
+  };
+  try {
+    await act(async () =>
+      root.render(
+        <EffectCatalogPreviewProvider>
+          <EffectCatalogPreview catalog={catalog} document={entry} />
+        </EffectCatalogPreviewProvider>
+      )
+    );
+    const canvas = host.querySelector('canvas')!;
+    act(() => canvas.dispatchEvent(new MouseEvent('pointerover', { bubbles: true, clientX: 160 })));
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    act(() => {
+      now += 67;
+      tick();
+      now += 67;
+      tick();
+    });
+    const first = respond(0);
+    await vi.waitFor(() => expect(draw).toHaveBeenCalledOnce());
+    expect(draw.mock.calls[0]![0]).toBe(first);
+    expect(first.close).toHaveBeenCalledOnce();
+    expect(requests).toHaveLength(1);
+    act(() => {
+      now += 67;
+      tick();
+    });
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    const second = respond(1);
+    await vi.waitFor(() => expect(draw).toHaveBeenCalledTimes(2));
+    expect(second.close).toHaveBeenCalledOnce();
+    expect(canvas.dataset['previewState']).toBe('ready');
+  } finally {
+    act(() => root.unmount());
+    context.mockRestore();
+    interval.mockRestore();
+    stop.mockRestore();
+    clock.mockRestore();
     vi.unstubAllGlobals();
   }
 });

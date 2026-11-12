@@ -511,6 +511,8 @@ function ReviewStageNativeEffects({
     <>
       {(!props.drawing || sceneLayout?.spatial) && props.scene && sceneLayout ? (
         <ReviewMotionBlurPreview
+          sourceFilters={props.scene.sourceFilters}
+          sourceSize={props.source}
           scene={{ ...props.scene, source: props.source }}
           focus={props.scene.focus}
           camera={props.scene.camera}

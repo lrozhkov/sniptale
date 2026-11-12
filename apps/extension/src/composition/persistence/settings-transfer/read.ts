@@ -1,12 +1,13 @@
 import { normalizePageLaunchPreferences } from '../../../contracts/page-launch';
 import { projectQuickActionAppearanceForTransfer } from '../../../contracts/quick-action-appearance';
-import {
-  collectEffectCatalogPreferences,
-  readEffectCatalogPreferences,
-} from '../effect-bundles/preferences';
+import { readVisualCatalogPreferences } from '../effect-bundles/preferences';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
-import { listImportedEffectBundles } from '../effect-bundles';
-import { encodeEffectSettingsEntry } from '../effect-bundles/settings-transfer';
+import { listAnimationCatalogEntries } from '../effect-bundles';
+import { listGlPresetCatalogEntries } from '../effect-bundles/gl-presets';
+import {
+  encodeEffectSettingsEntry,
+  encodeGlPresetSettingsEntry,
+} from '../effect-bundles/settings-transfer';
 import type {
   SettingsTransferDomainPayload,
   SettingsTransferDynamicItem,
@@ -93,14 +94,12 @@ export async function readSettingsTransferSnapshot(
     browserStorage.local.get([THEME_STORAGE_KEY, LOCALE_STORAGE_KEY]),
   ]);
 
-  const effectCatalogs = await listImportedEffectBundles(permit);
-  if (effectCatalogs.some((entry) => entry.status !== 'ready'))
-    throw new Error('Invalid effect catalog cannot be backed up');
-  const effects = await Promise.all(
-    effectCatalogs.flatMap((entry) =>
-      entry.status === 'ready' ? [encodeEffectSettingsEntry(entry.entry)] : []
-    )
-  );
+  const [effectCatalogs, glCatalogs, visualPreferences] = await Promise.all([
+    listAnimationCatalogEntries(permit),
+    listGlPresetCatalogEntries(permit),
+    readVisualCatalogPreferences(permit),
+  ]);
+  const effects = await Promise.all(effectCatalogs.map(encodeEffectSettingsEntry));
   const domains: Record<string, SettingsTransferDomainPayload> = {
     'interface.preferences': payload({
       theme: preferences[THEME_STORAGE_KEY] ?? 'system',
@@ -159,10 +158,9 @@ export async function readSettingsTransferSnapshot(
     'styles.gradients': payload(gradients),
     'styles.video-effects': payload({
       items: effects,
-      preferences: collectEffectCatalogPreferences(
-        effectCatalogs.flatMap((item) => (item.status === 'ready' ? [item.entry] : [])),
-        await readEffectCatalogPreferences()
-      ),
+      preferences: visualPreferences.filter((row) => row.kind === 'animation'),
+      transitionItems: glCatalogs.map(encodeGlPresetSettingsEntry),
+      transitionPreferences: visualPreferences.filter((row) => row.kind === 'transition'),
     }),
     ...collectAITransferDomains(ai, promptTemplates, templateOrder),
     'system.voice': payload({
@@ -330,6 +328,7 @@ export function collectSettingsTransferDynamicItems(
   addPaletteItems(result, domains);
   addItems(result, domains, 'styles.surfaces', 'presets', locale);
   addItems(result, domains, 'styles.video-effects', 'items', locale);
+  addItems(result, domains, 'styles.video-effects', 'transitionItems', locale);
   addItems(result, domains, 'styles.gradients', 'presets', locale);
   addItems(result, domains, 'ai.providers', 'items', locale);
   addItems(result, domains, 'ai.models', 'items', locale, (item) =>

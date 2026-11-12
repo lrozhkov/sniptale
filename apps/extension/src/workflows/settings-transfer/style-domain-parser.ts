@@ -1,5 +1,8 @@
-import { parseEffectCatalogPreferences } from '../../composition/persistence/effect-bundles/preferences';
-import { decodeEffectSettingsEntry } from '../../composition/persistence/effect-bundles/settings-transfer';
+import {
+  decodeEffectSettingsEntry,
+  decodeGlPresetSettingsEntry,
+  parseVisualSettingsPreferences,
+} from '../../composition/persistence/effect-bundles/settings-transfer';
 import { parsePaint } from '@sniptale/foundation/paint';
 import type { SettingsTransferJsonValue } from '../../contracts/settings-transfer';
 import { parseAnnotationTemplateTagState } from '../../composition/persistence/annotation-template-tags';
@@ -32,19 +35,36 @@ export function parseSettingsTransferStyleDomain(
 ): SettingsTransferJsonValue {
   switch (domainId) {
     case 'styles.video-effects': {
-      if (value['items'] !== undefined && !Array.isArray(value['items']))
-        return failSettingsTransferDomain(domainId);
-      const ids = new Set<string>();
-      for (const item of (value['items'] as unknown[] | undefined) ?? []) {
-        const entry = decodeEffectSettingsEntry(item);
-        if (ids.has(entry.packId)) return failSettingsTransferDomain(domainId);
-        ids.add(entry.packId);
+      for (const field of ['items', 'transitionItems']) {
+        const entries = value[field];
+        if (entries === undefined) continue;
+        if (!Array.isArray(entries)) return failSettingsTransferDomain(domainId);
+        const ids = new Set<string>();
+        for (const item of entries) {
+          const id =
+            field === 'items'
+              ? decodeEffectSettingsEntry(item).packId
+              : decodeGlPresetSettingsEntry(item).id;
+          if (ids.has(id)) return failSettingsTransferDomain(domainId);
+          ids.add(id);
+        }
       }
       return json({
         ...(value['items'] === undefined ? {} : { items: value['items'] }),
+        ...(value['transitionItems'] === undefined
+          ? {}
+          : { transitionItems: value['transitionItems'] }),
         ...(value['preferences'] === undefined
           ? {}
-          : { preferences: parseEffectCatalogPreferences(value['preferences']) }),
+          : { preferences: parseVisualSettingsPreferences(value['preferences'], 'animation') }),
+        ...(value['transitionPreferences'] === undefined
+          ? {}
+          : {
+              transitionPreferences: parseVisualSettingsPreferences(
+                value['transitionPreferences'],
+                'transition'
+              ),
+            }),
       });
     }
     case 'styles.borders': {

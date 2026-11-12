@@ -1,3 +1,5 @@
+import { createSourceImageFilter } from '../../features/image-filters/contract';
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { REVIEW_CLICK_DEFAULT } from '../../features/video/review/advanced/click-animation';
 import * as sourceSampling from './export-source-sampling';
 import { planReviewExportSource } from './export-source-plan';
@@ -2132,4 +2134,122 @@ it('selects separate prepared source demands for body, scene lens and pointer le
     f.owner.dispose();
     vi.unstubAllGlobals();
   }
+});
+
+it('submits both decorated cut endpoints as one pinned GL operation without alpha-dissolve substitution', async () => {
+  const f = fixture();
+  const input = await dissolveInput(f);
+  const selection = createGlTransitionSelection('BowTie')!;
+  const { color: _color, ...timing } = input.transition.blend.plan;
+  const plan = { ...timing, type: 'gl' as const, selection, easing: 'LINEAR' as const };
+  const sceneAt = vi.fn(async () => scene);
+  const output = await f.owner.render({
+    ...input,
+    sceneAt,
+    transition: { ...input.transition, blend: { ...input.transition.blend, plan } },
+  });
+  expect(io.render).toHaveBeenCalledOnce();
+  expect(sceneAt).toHaveBeenCalledTimes(2);
+  const main = io.render.mock.calls[0]![0].layers[0]!.source;
+  if (!('kind' in main) || main.kind !== 'group') throw new Error('Expected GL group');
+  expect(main.composition).toEqual({
+    kind: 'gl-transition',
+    selection,
+    progress: input.transition.blend.incoming,
+  });
+  expect(main.layers).toHaveLength(2);
+  expect(main.layers.map((layer: GpuPreviewLayer) => layer.opacity)).toEqual([1, 1]);
+  expect(output).toBe(true);
+  f.owner.dispose();
+});
+
+it(
+  'refuses a mismatched GL implementation before GPU submission ' +
+    'instead of taking another transition route',
+  async () => {
+    const f = fixture();
+    const input = await dissolveInput(f);
+    const selection = { ...createGlTransitionSelection('BowTie')!, wgslSha256: '0'.repeat(64) };
+    const { color: _color, ...timing } = input.transition.blend.plan;
+    const plan = { ...timing, type: 'gl' as const, selection, easing: 'LINEAR' as const };
+    await expect(
+      f.owner.render({
+        ...input,
+        transition: { ...input.transition, blend: { ...input.transition.blend, plan } },
+      })
+    ).rejects.toThrow('GL transition settings are unavailable');
+    expect(io.render).not.toHaveBeenCalled();
+    expect(f.frame.close).not.toHaveBeenCalled();
+    f.owner.dispose();
+  }
+);
+
+it('keeps source image filters on the Gallery video plane and leaves independent artwork unfiltered', async () => {
+  const f = fixture();
+  const filters = { version: 1 as const, filters: [createSourceImageFilter('blur', 'blur')] };
+  const captured: { request?: Parameters<GpuPreviewRenderer['render']>[0] } = {};
+  io.render.mockImplementationOnce((request: Parameters<GpuPreviewRenderer['render']>[0]) => {
+    captured.request = request;
+    return Promise.resolve(f.bitmap);
+  });
+  await expect(
+    f.owner.render({ ...f.input, scene: { ...f.input.scene, sourceFilters: filters } })
+  ).resolves.toBe(true);
+  const layers: GpuPreviewLayer[] = [],
+    seen = new Set<object>();
+  const visit = (items: readonly GpuPreviewLayer[]) => {
+    for (const layer of items) {
+      layers.push(layer);
+      if ('kind' in layer.source && layer.source.kind === 'group' && !seen.has(layer.source)) {
+        seen.add(layer.source);
+        visit(layer.source.layers);
+      }
+    }
+  };
+  if (!captured.request) throw new Error('Expected production GPU request');
+  visit(captured.request.layers);
+  const filtered = layers.filter((layer) => layer.imageFilters);
+  expect(filtered).toHaveLength(1);
+  expect(filtered[0]!.source).toBe(f.frame);
+  expect(filtered[0]!.imageFilters).toEqual({
+    stack: filters,
+    logical: f.input.scene.source,
+    projectTime: f.input.geometry.resultTime,
+  });
+  expect(
+    layers.filter((layer) => layer.source !== f.frame).every((layer) => !layer.imageFilters)
+  ).toBe(true);
+  f.owner.dispose();
+});
+
+it('uses the original source filter axes before a Gallery quarter-turn', async () => {
+  const f = fixture();
+  const filters = { version: 1 as const, filters: [createSourceImageFilter('bloom', 'bloom')] };
+  const rotated = { ...f.input.scene, source: { width: 360, height: 640 }, sourceFilters: filters };
+  const captured: { request?: Parameters<GpuPreviewRenderer['render']>[0] } = {};
+  io.render.mockImplementationOnce((request: Parameters<GpuPreviewRenderer['render']>[0]) => {
+    captured.request = request;
+    return Promise.resolve(f.bitmap);
+  });
+  await f.owner.render({
+    ...f.input,
+    scene: rotated,
+    geometry: reviewPresentedGeometry(rotated, dimensions, 2),
+    orientation: { rotation: 90, flip: false },
+  });
+  const seen = new Set<object>();
+  let found: GpuPreviewLayer | undefined;
+  const visit = (layers: readonly GpuPreviewLayer[]) => {
+    for (const layer of layers) {
+      if (layer.source === f.frame) found = layer;
+      else if ('kind' in layer.source && layer.source.kind === 'group' && !seen.has(layer.source)) {
+        seen.add(layer.source);
+        visit(layer.source.layers);
+      }
+    }
+  };
+  if (!captured.request) throw new Error('Expected request');
+  visit(captured.request.layers);
+  expect(found?.imageFilters?.logical).toEqual({ width: 640, height: 360 });
+  f.owner.dispose();
 });

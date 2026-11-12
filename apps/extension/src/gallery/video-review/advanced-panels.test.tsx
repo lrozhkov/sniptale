@@ -1,3 +1,4 @@
+import { translate } from '../../platform/i18n';
 // @vitest-environment jsdom
 import { createQuickEditBorder } from '../../features/video/project/scene/focus-appearance';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -601,4 +602,39 @@ it('keeps computer admission cancellation reachable while Scene controls are dis
   expect(host.querySelector('fieldset')?.disabled).toBe(true);
   act(() => button.click());
   expect(cancel).toHaveBeenCalledOnce();
+});
+
+it('dispatches shared source filter controls through the Gallery content adapter', () => {
+  const advanced = createQuickEditAdvancedState(),
+    onSourceFilters = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewSceneProperties
+        background={advanced.background}
+        canvas={advanced.canvas}
+        source={{ width: 320, height: 180 }}
+        audio={advanced.audio}
+        hasOriginalAudio={false}
+        onCanvas={vi.fn()}
+        onOriginalVolume={vi.fn()}
+        onLaneVolume={vi.fn()}
+        busy={false}
+        pending={false}
+        failed={false}
+        onImportImage={vi.fn()}
+        setBackground={vi.fn()}
+        sourceFilters={undefined}
+        onSourceFilters={onSourceFilters}
+      />
+    )
+  );
+  const add = [...host.querySelectorAll('button')].find(
+    (item) => item.textContent === translate('videoEditor.sidebar.sourceFiltersAddBloom')
+  );
+  if (!add) throw new Error('Missing shared source filter controls');
+  act(() => add.click());
+  expect(onSourceFilters).toHaveBeenCalledWith({
+    version: 1,
+    filters: [expect.objectContaining({ kind: 'bloom', enabled: true, intensity: 1 })],
+  });
 });

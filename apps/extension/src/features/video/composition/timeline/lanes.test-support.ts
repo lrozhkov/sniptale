@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../project/transition/gl-catalog';
 import { createEmptyVideoProject, createVideoProjectAsset } from '../../project/factories/creation';
 import { createVideoClipFromAsset } from '../../project/factories/clip';
 import { createVideoProjectCursorTrack } from '../../project/defaults';
@@ -11,7 +12,6 @@ import {
   VideoProjectAssetType,
   VideoTemporalEasing,
   VideoTransitionEasing,
-  VideoTransitionKind,
   type VideoProject,
 } from '../../project/types/index';
 
@@ -88,7 +88,8 @@ function createLaneTemporalOwners() {
         duration: 1,
         easing: VideoTransitionEasing.LINEAR,
         id: 'transition-1',
-        kind: VideoTransitionKind.CROSSFADE,
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         leadingClipId: 'clip-a',
         trailingClipId: 'clip-b',
       },

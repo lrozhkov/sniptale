@@ -1,17 +1,11 @@
 import { isClipActiveAtTime } from '../../../project/timeline/basics';
 import { resolveEffectSourceClip } from '../../../project/effect-instance/placement';
-import { resolveEffectOwner, isVideoEffectTrack } from '../../../project/effect-instance/owner';
 import type { VideoProjectEffectInstance } from '../../../project/effect-instance/types';
 import { isEffectHostTimingValid } from '../../../project/effect-instance/timing';
-import type {
-  VideoProject,
-  VideoProjectEffectClip,
-  VideoProjectTransitionSegment,
-} from '../../../project/types/index';
+import type { VideoProject, VideoProjectEffectClip } from '../../../project/types/index';
 import type { EffectRuntimeFramePlacement } from '../runtime/types';
-import { resolveEffectTargetTrackAvailability } from './target-availability';
 
-export type UnindexedEffectRuntimeFrameTarget =
+type UnindexedEffectRuntimeFrameTarget =
   | { kind: 'track'; trackId: string; clipIds: string[] }
   | { kind: 'video-group'; clipIds: string[] }
   | { clipId: string; kind: 'scene'; placement: EffectRuntimeFramePlacement }
@@ -26,7 +20,6 @@ export type UnindexedEffectRuntimeFrameTarget =
 export function resolveEffectRuntimeFrameTarget(
   project: VideoProject,
   instance: VideoProjectEffectInstance,
-  transitionSegments: readonly VideoProjectTransitionSegment[],
   projectTime: number
 ): UnindexedEffectRuntimeFrameTarget | null | undefined {
   const { kind, target } = instance;
@@ -45,52 +38,7 @@ export function resolveEffectRuntimeFrameTarget(
       ? { clipId: host.id, kind: 'scene', placement: resolveClipPlacement(host.transform) }
       : null;
   }
-  if (kind === 'targetEffect') {
-    if (target.kind === 'track' || target.kind === 'video-group') {
-      const owner = resolveEffectOwner(project, target);
-      if (!owner) return undefined;
-      if (!owner.visible || owner.bypassed) return null;
-      const ids = new Set(
-        project.tracks
-          .filter(
-            (track) =>
-              track.visible &&
-              isVideoEffectTrack(track) &&
-              (target.kind === 'video-group' || track.id === target.trackId)
-          )
-          .map((track) => track.id)
-      );
-      const clipIds = project.clips
-        .filter((clip) => ids.has(clip.trackId) && isClipActiveAtTime(clip, projectTime))
-        .map((clip) => clip.id);
-      if (!clipIds.length) return null;
-      return { ...target, clipIds };
-    }
-    if (target.kind !== 'clip') return undefined;
-    const clip = project.clips.find(({ id }) => id === target.clipId);
-    if (!clip) return undefined;
-    if (clip.effectsBypassed) return null;
-    if (!isClipActiveAtTime(clip, projectTime)) return null;
-    const track = project.tracks.find(({ id }) => id === clip.trackId);
-    return track?.visible === true
-      ? { clipId: clip.id, kind: 'clip', placement: resolveClipPlacement(clip.transform) }
-      : null;
-  }
-  if (target.kind !== 'transition') return undefined;
-  const segment = transitionSegments.find(({ id }) => id === target.transitionId);
-  if (!segment) return undefined;
-  const availability = resolveEffectTargetTrackAvailability(project, [
-    segment.leadingClipId,
-    segment.trailingClipId,
-  ]);
-  if (availability === 'invalid') return undefined;
-  if (availability === 'hidden') return null;
-  return {
-    kind: 'transition',
-    leadingClipId: segment.leadingClipId,
-    trailingClipId: segment.trailingClipId,
-    transitionId: segment.id,
-  };
+  return undefined;
 }
 
 function resolveClipPlacement(

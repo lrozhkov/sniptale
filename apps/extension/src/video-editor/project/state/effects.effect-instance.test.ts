@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createVideoProjectAsset } from '../../../features/video/project/factories/creation';
 import { createBookendImagePresentation } from '../../../features/video/project/scene/bookend-media';
 import { createNeutralPresentationSettings } from '../../../features/video/review/advanced/presentation';
@@ -5,10 +6,7 @@ import { resolveEffectRuntimeFramePlans } from '../../../features/video/composit
 import { isExportReadyVideoProject } from '../../../features/video/project/validation/root';
 import { hydrateVideoProject } from '../../../features/video/project/hydration';
 import { readFileSync } from 'node:fs';
-import {
-  sha256EffectV1Bytes,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import { readReviewAnnotationEffectDocument } from '../../../features/video/review/annotation-effects/validation';
 import { initializeReviewAnnotationEffectAnchors } from '../../../features/video/review/annotation-effects/layout';
 import { fixture } from '../../../features/video/review/project-conversion.test-support';
@@ -70,7 +68,7 @@ describe('editor EffectV1 instance lifecycle mutations', () => {
     const store = createStoreWithEffects();
 
     store.getState().deleteEffectInstance('missing');
-    expect(store.getState().project?.effectInstances).toHaveLength(4);
+    expect(store.getState().project?.effectInstances).toHaveLength(2);
     store.getState().deleteEffectInstance('scene-a');
     expect(store.getState().project?.effectSnapshots?.map(({ id }) => id)).toContain('snapshot-a');
     store.getState().deleteEffectInstance('scene-b');
@@ -156,9 +154,7 @@ describe('editor EffectV1 instance ordering and updates', () => {
     store.getState().moveEffectInstance('scene-a', 'down');
     expect(store.getState().project?.effectInstances?.map(({ id }) => id)).toEqual([
       'scene-b',
-      'clip',
       'scene-a',
-      'transition',
     ]);
     store.getState().moveEffectInstance('scene-b', 'up');
     expect(store.getState().project?.effectInstances?.[0]?.id).toBe('scene-b');
@@ -172,15 +168,11 @@ describe('editor EffectV1 instance ordering and updates', () => {
       enabled: false,
       startTime: -5,
     });
-    store.getState().updateEffectInstance('transition', { startTime: 99 });
     store.getState().updateEffectInstance('missing', { enabled: false });
 
     expect(store.getState().project?.effectInstances?.find(({ id }) => id === 'scene-a')).toEqual(
       expect.objectContaining({ controls: { accent: 2 }, enabled: false, startTime: 1 })
     );
-    expect(
-      store.getState().project?.effectInstances?.find(({ id }) => id === 'transition')?.startTime
-    ).toBe(4);
   });
 });
 
@@ -270,12 +262,15 @@ it('selects FX without seeking and bypasses a clip without rewriting individual 
   const store = createStoreWithEffects();
   store.getState().setCurrentTime(3.5);
   store.getState().selectEffectInstance('missing');
-  store.getState().selectEffectInstance('clip');
-  expect(store.getState().selection).toEqual({ kind: 'effect-instance', effectInstanceId: 'clip' });
+  store.getState().selectEffectInstance('scene-a');
+  expect(store.getState().selection).toEqual({
+    kind: 'effect-instance',
+    effectInstanceId: 'scene-a',
+  });
   expect(store.getState().currentTime).toBe(3.5);
   expect(
     resolveSelectedTrackIdFromSelection(store.getState().project!, store.getState().selection)
-  ).toBe(store.getState().project!.clips.find((clip) => clip.id === 'clip-a')!.trackId);
+  ).toBeNull();
   const controls = store
     .getState()
     .project!.effectInstances!.map(({ id, controls, enabled }) => ({ id, controls, enabled }));
@@ -296,7 +291,7 @@ it('selects FX without seeking and bypasses a clip without rewriting individual 
   );
   store.getState().toggleTrackLock(clip.trackId);
   store.getState().setClipEffectsBypassed(clip.id, false);
-  store.getState().deleteEffectInstance('clip');
+  store.getState().deleteEffectInstance('scene-a');
   expect(store.getState().selection.kind).toBe('scene');
   expect(
     resolveSelectedTrackIdFromSelection(project, {
@@ -316,13 +311,13 @@ async function attachmentStoreFixture(lateAnnotation = false) {
   input.document.edits = [];
   input.document.advancedContent.canvas = { width: 320, height: 180 };
   const source = readFileSync(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-callout/effect.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
     'utf8'
   );
   const document = readReviewAnnotationEffectDocument(source)!;
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+  const sha256 = await createHash('sha256').update(new TextEncoder().encode(source)).digest('hex');
   const controls = Object.fromEntries(
-    document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+    document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
   );
   const transform = { x: 0.1, y: 0.2, width: 0.5, height: 0.2, rotation: 0.1 };
   const anchors = initializeReviewAnnotationEffectAnchors(
@@ -340,7 +335,7 @@ async function attachmentStoreFixture(lateAnnotation = false) {
     sha256,
     source,
     documentId: document.id,
-    schemaVersion: 'sniptale.effect.v1' as const,
+    schemaVersion: 'sniptale.animation.v1' as const,
     kind: 'standalone' as const,
     retainedByteLength: new TextEncoder().encode(source).byteLength,
     assets: [],

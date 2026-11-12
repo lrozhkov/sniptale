@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 import {
   createCameraFollowSettings,
   resolveCameraFollowPolicy,
@@ -25,7 +26,6 @@ import {
   VideoTemporalEasing,
   VideoTimelinePlacementMode,
   VideoTransitionEasing,
-  VideoTransitionKind,
 } from '../../../features/video/project/types';
 import { createVideoEditorProjectTestStore } from './test-store.test-support';
 import type { VideoEditorProjectState } from './contracts';
@@ -334,16 +334,15 @@ function createEffectMotionRegion() {
 
 function createEffectTransition(): VideoProjectTransition {
   return {
-    direction: 'LEFT',
     duration: 1,
     easing: VideoTransitionEasing.LINEAR,
-    highlightColor: '#f97316',
+
     id: 'transition-1',
-    kind: VideoTransitionKind.CROSSFADE,
-    intensity: 'BALANCED',
+    kind: 'gl' as const,
+    selection: createGlTransitionSelection('Fade')!,
+
     leadingClipId: 'clip-a',
-    renderKind: 'COMPOSITE',
-    templateKind: 'CROSSFADE',
+
     trailingClipId: 'clip-b',
   };
 }
@@ -379,9 +378,7 @@ function applyEffectMutations(store: ReturnType<typeof createStoreState>) {
   store.getState().updateTransitionEasing('transition-1', VideoTransitionEasing.EASE_IN_OUT);
   store.getState().updateTransitionDuration('transition-1', 0.5);
   store.getState().updateTransitionTemplate('transition-1', {
-    direction: 'RIGHT',
-    intensity: 'BOLD',
-    templateKind: 'LIGHT_SWEEP',
+    selection: createGlTransitionSelection('CrossZoom')!,
   });
   store.getState().updateCursorSampleVisibility('sample-1', false);
   store.getState().updateCursorSampleInterpolation('sample-1', VideoTemporalEasing.EASE_OUT);
@@ -407,12 +404,9 @@ function applyEffectMutations(store: ReturnType<typeof createStoreState>) {
 function expectEffectMutationResults(nextProject: NonNullable<VideoEditorProjectState['project']>) {
   expect(nextProject.transitions).toEqual([
     expect.objectContaining({
-      direction: 'RIGHT',
       easing: VideoTransitionEasing.EASE_IN_OUT,
-      intensity: 'BOLD',
-      kind: 'LIGHT_SWEEP',
-      renderKind: 'CSS_LIKE',
-      templateKind: 'LIGHT_SWEEP',
+      kind: 'gl',
+      selection: createGlTransitionSelection('CrossZoom')!,
     }),
   ]);
   expect(nextProject.clips.find((clip) => clip.id === 'clip-b')?.startTime).toBe(2.5);
@@ -477,7 +471,9 @@ function verifyEffectNoOpBranches() {
   store.getState().setProject(createEffectProject());
 
   store.getState().updateTransitionDuration('missing', 1);
-  store.getState().updateTransitionTemplate('missing', { templateKind: 'PUSH' });
+  store.getState().updateTransitionTemplate('missing', {
+    selection: createGlTransitionSelection('Directional')!,
+  });
   store.getState().updateCursorSampleVisibility('missing', false);
   store.getState().updateCursorSampleSkinOverride('missing', { color: '#ff00aa' });
   store.getState().clearCursorSampleSkinOverride('missing');
@@ -702,4 +698,36 @@ it('retains local camera policy through history and hydration, then reset restor
   expect(resolveCameraFollowPolicy({ defaults: reset.cameraFollowDefaults! }).settings).toEqual(
     defaults
   );
+});
+
+it('retains exact GL identity and uniforms through the real command, Undo and Redo', () => {
+  const store = createStoreState();
+  const project = createEffectProject();
+  store.getState().setProject(project);
+  const before = structuredClone(store.getState().project!);
+  const selection = createGlTransitionSelection('CrossZoom')!;
+  selection.values['strength'] = 0.73;
+  store.getState().updateTransitionTemplate('transition-1', { selection, presetId: 'local-style' });
+  const edited = store.getState().project!;
+  expect(edited.transitions![0]).toMatchObject({ kind: 'gl', selection, presetId: 'local-style' });
+  expect(edited.transitions![0]!.duration).toBe(before.transitions![0]!.duration);
+  expect(edited.transitions![0]!.easing).toBe(before.transitions![0]!.easing);
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, edited);
+  if (undo?.status !== 'applied') throw new Error('Expected GL selection undo');
+  expect(undo.project.transitions).toEqual(before.transitions);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected GL selection redo');
+  expect(redo.project.transitions).toEqual(edited.transitions);
+});
+
+it('refuses an unavailable GL implementation without publishing a project or history mutation', () => {
+  const store = createStoreState();
+  store.getState().setProject(createEffectProject());
+  const before = store.getState().project,
+    history = store.getState().projectHistory;
+  const selection = createGlTransitionSelection('CrossZoom')!;
+  selection.wgslSha256 = '0'.repeat(64);
+  store.getState().updateTransitionTemplate('transition-1', { selection });
+  expect(store.getState().project).toBe(before);
+  expect(store.getState().projectHistory).toBe(history);
 });

@@ -1,124 +1,71 @@
 import { vi } from 'vitest';
-
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { parseRuntimeAnimationDocument } from '../../contracts/effect-runtime/animation';
 import { createEffectRuntimeAssetSelectionId } from '../../contracts/effect-runtime/immutable-refs';
-
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
   type EffectRuntimeRenderMessage,
 } from '../../contracts/effect-runtime/types';
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 
 export class FakeImageBitmap implements ImageBitmap {
   readonly close = vi.fn();
-
   constructor(
     readonly width: number,
     readonly height: number
   ) {}
 }
 
-export async function createEffectRuntimeRenderMessage(
-  kind: 'standalone' | 'targetEffect' | 'transition',
-  assetBytes?: Uint8Array
-): Promise<EffectRuntimeRenderMessage> {
-  const assets = assetBytes
-    ? [
-        {
-          byteLength: assetBytes.byteLength,
-          dataUrl: `data:image/png;base64,${toBase64(assetBytes)}`,
-          height: 1,
-          id: 'texture',
-          kind: 'image' as const,
-          mimeType: 'image/png',
-          sha256: await sha256EffectV1Bytes(assetBytes),
-          width: 1,
-        },
-      ]
-    : [];
-  const documentSource = JSON.stringify({
-    assets,
-    clips: [],
-    controls: [],
-    duration: 2,
+export function createAnimationDocument(width = 1280, height = 720): AnimationTemplate {
+  const document = parseRuntimeAnimationDocument({
+    format: 'sniptale-animation',
+    version: 1,
     id: 'safe-effect',
-    kind,
-    label: { en: 'Safe effect', ru: 'Безопасный эффект' },
-    layers: [],
-    program: { commands: createCommands(kind), kind: 'graph', version: 1 },
-    scenes: [{ duration: 2, id: 'main', start: 0 }],
-    schemaVersion: 'sniptale.effect.v1',
-    timeline: { phases: [], tracks: [] },
+    label: { en: 'Safe effect' },
+    controls: [],
+    bindings: [],
+    resources: [],
+    animation: { v: '5.12.2', w: width, h: height, fr: 30, ip: 30, op: 90, layers: [], assets: [] },
   });
-  const documentSha256 = await sha256EffectV1Bytes(new TextEncoder().encode(documentSource));
-  const assetSelectionId = await createEffectRuntimeAssetSelectionId(
-    assets.map(({ id, sha256 }) => ({ id, sha256 }))
-  );
-  return createRuntimeMessage(
-    documentSource,
-    documentSha256,
-    assetSelectionId,
-    assetBytes,
-    assets[0]?.sha256
-  );
+  if (!document) throw new Error('Invalid animation fixture.');
+  return document;
 }
 
-function createRuntimeMessage(
-  documentSource: string,
-  documentSha256: string,
-  assetSelectionId: string,
-  assetBytes?: Uint8Array,
-  assetSha256?: string
-): EffectRuntimeRenderMessage {
+export async function sourceDigest(source: string): Promise<string> {
+  return Array.from(
+    new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))),
+    (value) => value.toString(16).padStart(2, '0')
+  ).join('');
+}
+
+export async function createEffectRuntimeRenderMessage(
+  document = createAnimationDocument()
+): Promise<EffectRuntimeRenderMessage> {
+  const source = JSON.stringify(document),
+    id = await sourceDigest(source);
   return {
     assetSelectionRef: {
-      assets: assetBytes
-        ? [
-            {
-              byteLength: assetBytes.byteLength,
-              bytes: assetBytes.slice().buffer,
-              id: 'texture',
-              kind: 'image',
-              mimeType: 'image/png',
-              sha256: assetSha256!,
-            },
-          ]
-        : [],
-      id: assetSelectionId,
+      assets: [],
+      id: await createEffectRuntimeAssetSelectionId(
+        document.resources.map(({ path, sha256 }) => ({ id: path, sha256 }))
+      ),
     },
     controls: {},
-    documentRef: { id: documentSha256, source: documentSource },
+    documentRef: { id, source },
     duration: 2,
     effectInstanceId: 'instance-1',
     fps: 30,
     frameIndex: 15,
-    height: 720,
+    height: document.animation.h,
     inputFrames: {},
     kind: 'renderFrame',
     progress: 0.25,
     protocolVersion: EFFECT_RUNTIME_PROTOCOL_VERSION,
-    renderHeight: 720,
-    renderWidth: 1280,
+    renderHeight: document.animation.h,
+    renderWidth: document.animation.w,
     requestId: 'request-1',
     sequenceId: 1,
-    snapshotId: `effect:${documentSha256}`,
+    snapshotId: `effect:${id}`,
     time: 0.5,
-    width: 1280,
+    width: document.animation.w,
   };
-}
-
-function createCommands(kind: 'standalone' | 'targetEffect' | 'transition') {
-  if (kind === 'standalone') return [{ color: '#000', op: 'clear' }];
-  const inputs = kind === 'targetEffect' ? ['source'] : ['from', 'to'];
-  return inputs.map((input, index) => ({
-    height: 720,
-    input,
-    op: 'image',
-    width: 1280,
-    x: 0,
-    y: index * 2,
-  }));
-}
-
-function toBase64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes));
 }

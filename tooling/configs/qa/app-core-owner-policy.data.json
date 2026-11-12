@@ -63,6 +63,10 @@
     "apps/extension/src/features/highlighter/contracts/index.ts",
     "apps/extension/src/features/highlighter/style/public.ts",
     "apps/extension/src/features/highlighter/surface-style/surface-css.ts",
+    "apps/extension/src/features/image-filters/contract.ts",
+    "apps/extension/src/features/image-filters/gpu.ts",
+    "apps/extension/src/features/image-filters/plan.ts",
+    "apps/extension/src/features/image-filters/reference.ts",
     "apps/extension/src/features/simplify/raster.ts",
     "apps/extension/src/features/simplify/settings.ts",
     "apps/extension/src/features/video/project/public.ts"

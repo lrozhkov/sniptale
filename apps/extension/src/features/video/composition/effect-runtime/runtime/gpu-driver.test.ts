@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effect-runtime/types';
 import type { EffectRuntimeFramePlan } from './types';
@@ -12,12 +13,23 @@ class Bitmap implements ImageBitmap {
 }
 beforeEach(() => vi.stubGlobal('ImageBitmap', Bitmap));
 afterEach(() => vi.unstubAllGlobals());
+const source = JSON.stringify({
+  format: 'sniptale-animation',
+  version: 1,
+  id: 'gpu-lifecycle',
+  label: { en: 'GPU lifecycle' },
+  controls: [],
+  bindings: [],
+  resources: [],
+  animation: { v: '5.12.2', w: 8, h: 8, fr: 30, ip: 0, op: 30, assets: [], layers: [] },
+});
+const sha256 = createHash('sha256').update(source).digest('hex');
 function plan(id = 'effect'): EffectRuntimeFramePlan {
   return {
     effectInstanceId: id,
-    snapshotId: 'effect:' + 'a'.repeat(64),
-    documentSha256: 'a'.repeat(64),
-    documentSource: '{}',
+    snapshotId: 'effect:' + sha256,
+    documentSha256: sha256,
+    documentSource: source,
     assets: [],
     controls: {},
     dimensions: { width: 8, height: 8 },

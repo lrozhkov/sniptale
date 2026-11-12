@@ -1,147 +1,141 @@
-import { browserStorage } from '../infrastructure/browser-storage';
+import { initDB, VIDEO_VISUAL_PREFERENCES_STORE } from '../infrastructure/indexed-db/core';
 import {
-  runWithPersistenceMutationPermit,
-  type PersistenceMutationPermit,
+  runWithPersistenceDomainMutationLock,
+  isActivePersistenceMutationPermit,
 } from '../infrastructure/mutation-barrier';
 import {
-  parseStoredEffectPresetPreferences,
-  type EffectPresetPreferences,
+  parseVisualCatalogPreference,
+  resolveVisualCatalogDocumentPreference,
+  type VisualCatalogPreference,
 } from '../../../features/video/project/effect-bundle/catalog/presets';
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 
-export const EFFECT_PREFERENCES_KEY = 'videoEffectPreferences';
-export interface EffectCatalogPreference {
-  packId: string;
-  enabled?: boolean;
-  documentEnabled?: Record<string, boolean>;
-  documents: Record<string, EffectPresetPreferences>;
-}
-export function parseEffectCatalogPreferences(value: unknown): EffectCatalogPreference[] {
-  if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 256) throw new Error('Invalid effect preferences');
-  if (JSON.stringify(value).length > 1024 * 1024)
-    throw new Error('Effect preferences quota exceeded');
-  const seen = new Set<string>();
-  return value.map((row) => {
-    if (
-      !record(row) ||
-      typeof row['packId'] !== 'string' ||
-      !/^(builtin:)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(row['packId']) ||
-      seen.has(row['packId']) ||
-      !record(row['documents']) ||
-      Object.keys(row['documents']).length > 128 ||
-      (row['enabled'] !== undefined && typeof row['enabled'] !== 'boolean')
-    )
-      throw new Error('Invalid effect preference');
-    const availability = row['documentEnabled'];
-    if (
-      availability !== undefined &&
-      (!record(availability) ||
-        Object.keys(availability).length > 128 ||
-        Object.entries(availability).some(
-          ([id, enabled]) =>
-            !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(id) || typeof enabled !== 'boolean'
-        ))
-    )
-      throw new Error('Invalid effect availability');
-    seen.add(row['packId']);
-    const documents: Record<string, EffectPresetPreferences> = {};
-    for (const [id, value] of Object.entries(row['documents'])) {
-      const parsed = parseStoredEffectPresetPreferences(value);
-      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(id) || !parsed)
-        throw new Error('Invalid effect preset');
-      Object.defineProperty(documents, id, {
-        value: parsed,
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
-    }
-    return {
-      packId: row['packId'],
-      documents,
-      ...(record(availability)
-        ? {
-            documentEnabled: Object.fromEntries(
-              Object.entries(availability).map(([id, enabled]) => [id, enabled === true])
-            ),
-          }
-        : {}),
-      ...(typeof row['enabled'] === 'boolean' ? { enabled: row['enabled'] } : {}),
-    };
-  });
-}
-export async function readEffectCatalogPreferences() {
-  return parseEffectCatalogPreferences(
-    (await browserStorage.local.get(EFFECT_PREFERENCES_KEY))[EFFECT_PREFERENCES_KEY]
-  );
-}
-export async function writeEffectCatalogPreferences(
-  value: EffectCatalogPreference[],
+export function runVisualCatalogMutation<T>(
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>,
   permit?: PersistenceMutationPermit
-) {
-  await browserStorage.local.set(
-    { [EFFECT_PREFERENCES_KEY]: parseEffectCatalogPreferences(value) },
-    permit
-  );
+): Promise<T> {
+  if (permit !== undefined) {
+    if (!isActivePersistenceMutationPermit(permit))
+      return Promise.reject(new Error('Visual catalog mutation permit is no longer active.'));
+    return Promise.resolve().then(() => operation(permit));
+  }
+  return runWithPersistenceDomainMutationLock('animation-catalog', operation);
 }
-export async function mutateEffectCatalogPreference(
+export function admitVisualCatalogPreferences(value: unknown): VisualCatalogPreference[] {
+  if (!Array.isArray(value) || value.length > 256 || JSON.stringify(value).length > 1024 * 1024)
+    throw new Error('Visual preferences quota exceeded.');
+  const result: VisualCatalogPreference[] = [],
+    ids = new Set<string>();
+  for (const row of value) {
+    const parsed = parseVisualCatalogPreference(row);
+    if (!parsed || ids.has(`${parsed.kind}:${parsed.packId}`))
+      throw new Error('Invalid visual catalog preferences.');
+    ids.add(`${parsed.kind}:${parsed.packId}`);
+    result.push(parsed);
+  }
+  return result;
+}
+export async function readVisualCatalogPreferences(
+  permit?: PersistenceMutationPermit
+): Promise<VisualCatalogPreference[]> {
+  const db = await initDB(permit);
+  const rows: unknown = await db.getAll(VIDEO_VISUAL_PREFERENCES_STORE);
+  return admitVisualCatalogPreferences(rows);
+}
+/** Settings restore supplies a complete admitted set and owns the exclusive workflow permit. */
+export async function replaceVisualCatalogPreferences(
+  value: unknown,
+  permit: PersistenceMutationPermit
+): Promise<void> {
+  const rows = admitVisualCatalogPreferences(value);
+  if (!isActivePersistenceMutationPermit(permit))
+    throw new Error('Visual catalog mutation permit is no longer active.');
+  const db = await initDB(permit),
+    tx = db.transaction(VIDEO_VISUAL_PREFERENCES_STORE, 'readwrite');
+  try {
+    const current = admitVisualCatalogPreferences(await tx.store.getAll());
+    const nextKeys = new Set(rows.map((row) => `${row.kind}:${row.packId}`));
+    for (const row of current)
+      if (!nextKeys.has(`${row.kind}:${row.packId}`)) await tx.store.delete([row.kind, row.packId]);
+    for (const row of rows) {
+      const previous = current.find((item) => item.kind === row.kind && item.packId === row.packId);
+      if (JSON.stringify(previous) !== JSON.stringify(row)) await tx.store.put(row);
+    }
+    await tx.done;
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      /* A failed native request can already have aborted it. */
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
+}
+export async function mutateVisualCatalogPreference(
+  kind: VisualCatalogPreference['kind'],
   packId: string,
-  update: (current: EffectCatalogPreference) => EffectCatalogPreference
-) {
-  return runWithPersistenceMutationPermit((permit) =>
-    navigator.locks.request('sniptale-effect-preferences', async () => {
-      const current = await readEffectCatalogPreferences();
-      const next = update(
-        current.find((row) => row.packId === packId) ?? { packId, documents: {} }
-      );
-      await writeEffectCatalogPreferences(
-        [...current.filter((row) => row.packId !== packId), next],
-        permit
-      );
-    })
-  );
-}
-export function overlayEffectPreferences(
-  entry: EffectBundleCatalogEntry,
-  preferences: EffectCatalogPreference[]
-): EffectBundleCatalogEntry {
-  const preference = preferences.find((row) => row.packId === entry.packId);
-  const documents = entry.documents.map((document) => ({
-    ...document,
-    enabled:
-      preference?.documentEnabled && Object.hasOwn(preference.documentEnabled, document.id)
-        ? preference.documentEnabled[document.id]!
-        : (preference?.enabled ?? entry.enabled),
-    ...(preference && Object.hasOwn(preference.documents, document.id)
-      ? { presetPreferences: preference.documents[document.id] }
-      : {}),
-  }));
-  return { ...entry, documents, enabled: documents.some((document) => document.enabled) };
-}
-function record(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
+  update: (current: VisualCatalogPreference | undefined) => VisualCatalogPreference,
+  permit?: PersistenceMutationPermit
+): Promise<void> {
+  return runVisualCatalogMutation(async (activePermit) => {
+    const db = await initDB(activePermit);
+    const previous: unknown = await db.get(VIDEO_VISUAL_PREFERENCES_STORE, [kind, packId]);
+    const current = previous === undefined ? undefined : parseVisualCatalogPreference(previous);
+    if (current === null) throw new Error('Invalid visual catalog preferences.');
+    const next = parseVisualCatalogPreference(update(current));
+    if (!next || next.kind !== kind || next.packId !== packId)
+      throw new Error('Visual preference identity changed.');
+    const tx = db.transaction(VIDEO_VISUAL_PREFERENCES_STORE, 'readwrite');
+    try {
+      const rows: unknown = await tx.store.getAll();
+      if (!Array.isArray(rows)) throw new Error('Invalid visual catalog preferences.');
+      const preferenceRows: unknown[] = rows;
+      admitVisualCatalogPreferences([
+        ...preferenceRows.filter(
+          (row) => !record(row) || row['kind'] !== kind || row['packId'] !== packId
+        ),
+        next,
+      ]);
+      await tx.store.put(next);
+      await tx.done;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* The native transaction can already be aborted. */
+      }
+      await tx.done.catch(() => undefined);
+      throw error;
+    }
+  }, permit);
 }
 
-/** Export a complete preference view, including preferences retained with an imported catalog. */
-export function collectEffectCatalogPreferences(
-  entries: readonly EffectBundleCatalogEntry[],
-  preferences: EffectCatalogPreference[]
-): EffectCatalogPreference[] {
-  const result = new Map(preferences.map((preference) => [preference.packId, preference]));
-  for (const entry of entries) {
-    const current = result.get(entry.packId);
-    const retained = Object.fromEntries(
-      entry.documents.flatMap((document) =>
-        document.presetPreferences ? [[document.id, document.presetPreferences]] : []
-      )
+/** Resolve disposable catalogue presentation from exact package/document digests, never legacy preferences. */
+export function overlayVisualAnimationPreferences(
+  entry: EffectBundleCatalogEntry,
+  preferences: readonly VisualCatalogPreference[]
+): EffectBundleCatalogEntry {
+  const documents = entry.documents.map((document) => {
+    const resolved = resolveVisualCatalogDocumentPreference(
+      {
+        kind: 'animation',
+        packId: entry.packId,
+        documentId: document.id,
+        sourceSha256: document.sha256,
+      },
+      preferences
     );
-    result.set(entry.packId, {
-      packId: entry.packId,
-      enabled: current?.enabled ?? entry.enabled,
-      documents: { ...retained, ...current?.documents },
-      ...(current?.documentEnabled ? { documentEnabled: current.documentEnabled } : {}),
-    });
-  }
-  return parseEffectCatalogPreferences([...result.values()]);
+    return {
+      ...document,
+      enabled: resolved.enabled,
+      ...(resolved.presetPreferences ? { presetPreferences: resolved.presetPreferences } : {}),
+    };
+  });
+  return { ...entry, documents, enabled: documents.some((document) => document.enabled) };
+}
+
+function record(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

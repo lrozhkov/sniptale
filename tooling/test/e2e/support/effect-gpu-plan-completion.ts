@@ -80,6 +80,68 @@ export function installEffectGpuPlanCompletionObserver(binding: string): void {
       if (paint && object(texture) && width === paint.width && height === paint.height)
         paintTextures.set(texture, paint);
     });
+  const peers = new WeakMap<object, object>();
+  const NativeChannel = MessageChannel;
+  Reflect.set(
+    globalThis,
+    'MessageChannel',
+    class extends NativeChannel {
+      constructor() {
+        super();
+        peers.set(this.port1, this.port2);
+        peers.set(this.port2, this.port1);
+      }
+    }
+  );
+  const requests = new WeakMap<
+    object,
+    Map<
+      string,
+      {
+        effectInstanceId: string;
+        snapshotId: string;
+        sequenceId: number;
+        documentId: string;
+        assetSelectionId: string;
+      }
+    >
+  >();
+  hook(MessagePort.prototype, 'postMessage', (_port, args) => {
+    if (get(args[0], 'type') !== 'sniptale:effect-runtime:render') return;
+    const transfers = Array.isArray(args[1]) ? args[1] : get(args[1], 'transfer');
+    const transferred = Array.isArray(transfers) ? transfers[0] : undefined;
+    const port = object(transferred) ? peers.get(transferred) : undefined;
+    if (!port) return;
+    const message = get(args[0], 'request'),
+      id = get(message, 'requestId'),
+      kind = get(message, 'kind'),
+      effectInstanceId = get(message, 'effectInstanceId'),
+      snapshotId = get(message, 'snapshotId'),
+      sequenceId = get(message, 'sequenceId'),
+      documentId = get(get(message, 'documentRef'), 'id'),
+      assetSelectionId = get(get(message, 'assetSelectionRef'), 'id');
+    if (
+      (kind !== 'renderFrame' && kind !== 'prepareGpuFrame') ||
+      get(message, 'protocolVersion') !== 7 ||
+      typeof id !== 'string' ||
+      typeof effectInstanceId !== 'string' ||
+      typeof snapshotId !== 'string' ||
+      typeof sequenceId !== 'number' ||
+      !Number.isSafeInteger(sequenceId) ||
+      typeof documentId !== 'string' ||
+      typeof assetSelectionId !== 'string'
+    )
+      return;
+    const pending = requests.get(port) ?? new Map();
+    pending.set(id, {
+      effectInstanceId,
+      snapshotId,
+      sequenceId,
+      documentId,
+      assetSelectionId,
+    });
+    requests.set(port, pending);
+  });
   const descriptor = Object.getOwnPropertyDescriptor(MessagePort.prototype, 'onmessage');
   const setter = descriptor?.set;
   if (!descriptor || !setter) throw new Error('Effect result observation is unavailable.');
@@ -93,6 +155,23 @@ export function installEffectGpuPlanCompletionObserver(binding: string): void {
               const result = event.data,
                 id = get(result, 'requestId'),
                 rasters = get(result, 'resources');
+              const bitmap = get(result, 'bitmap'),
+                pending = typeof id === 'string' ? requests.get(this)?.get(id) : undefined;
+              if (
+                get(result, 'kind') === 'frame' &&
+                typeof id === 'string' &&
+                bitmap instanceof ImageBitmap &&
+                pending &&
+                get(result, 'effectInstanceId') === pending.effectInstanceId &&
+                get(result, 'snapshotId') === pending.snapshotId &&
+                get(result, 'sequenceId') === pending.sequenceId &&
+                get(get(result, 'acknowledged'), 'documentId') === pending.documentId &&
+                get(get(result, 'acknowledged'), 'assetSelectionId') === pending.assetSelectionId
+              ) {
+                requests.get(this)?.delete(id);
+                counters.plans++;
+                resources.set(bitmap, { ids: new Set([id]), video: false });
+              }
               if (
                 get(result, 'kind') === 'gpu-plan' &&
                 typeof id === 'string' &&

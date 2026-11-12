@@ -8,11 +8,12 @@ import { createPreviewEffectRuntimeFeedbackTestStub } from '../scene/test-suppor
 import { createVideoPreviewExactFrameCache } from '../../cache/exact-frame-cache';
 import { usePreviewStageCanvasScene } from '../scene/index';
 vi.mock('../scene/index', () => ({ usePreviewStageCanvasScene: vi.fn() }));
-import { isValidElement } from 'react';
+import { Children, isValidElement, type ReactNode } from 'react';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { createPreviewStageSelectionOverlay, PreviewStageRoot } from './root';
-import { PreviewEffectEditorRegion } from './editor-region';
-it('routes FX selection to its region instead of a source-clip transform, only in editor mode', () => {
+import { PreviewEffectHandles } from './effect-handles';
+import { PreviewStageSelectionOverlay } from './selection-overlay';
+it('composes supported body selection and object handles only in editor mode', () => {
   const props: Parameters<typeof createPreviewStageSelectionOverlay>[0] = {
     mode: 'editor',
     project: createEmptyVideoProject('region'),
@@ -37,8 +38,8 @@ it('routes FX selection to its region instead of a source-clip transform, only i
   props.project.effectInstances = [
     {
       id: 'fx',
-      kind: 'targetEffect',
-      target: { kind: 'video-group' },
+      kind: 'standalone',
+      target: { kind: 'scene' },
       snapshotId: 'snapshot',
       startTime: 0,
       duration: 4,
@@ -48,11 +49,12 @@ it('routes FX selection to its region instead of a source-clip transform, only i
     },
   ];
   const result = createPreviewStageSelectionOverlay(props);
-  expect(isValidElement(result) && result.type).toBe(PreviewEffectEditorRegion);
+  expect(isValidElement<{ children: ReactNode }>(result)).toBe(true);
+  if (!isValidElement<{ children: ReactNode }>(result)) throw new Error('Missing selection layers');
+  expect(
+    Children.toArray(result.props.children).map((child) => isValidElement(child) && child.type)
+  ).toEqual([PreviewStageSelectionOverlay, PreviewEffectHandles]);
   expect(createPreviewStageSelectionOverlay({ ...props, mode: 'player' })).toBeNull();
-  props.project.effectInstances[0]!.kind = 'standalone';
-  const annotation = createPreviewStageSelectionOverlay(props);
-  expect(isValidElement(annotation) && annotation.type).not.toBe(PreviewEffectEditorRegion);
 });
 
 function createCamera(): PreviewStageRootSurfaceProps['camera'] {

@@ -1,11 +1,11 @@
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import {
-  assertEffectV1AssetSignature,
-  sha256EffectV1Bytes,
-  validateEffectV1Document,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+  parseAnimationTemplateSource,
+  verifyAnimationResource,
+  type AnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
-import { parseBoundedEffectJson } from '../../project/effect-bundle/json-structure';
 import { EFFECT_BUNDLE_LIMITS } from '../../project/effect-bundle/limits';
 import type {
   ReviewAnnotationEffect,
@@ -144,58 +144,16 @@ export function parseReviewAnnotationEffects(raw: unknown): ReviewAnnotationEffe
   return { enabled: raw['enabled'], instances: instances.sort((a, b) => a.order - b.order) };
 }
 
-function parseAsset(raw: unknown): ReviewAnnotationEffectAsset | null {
-  if (
-    !isRecord(raw) ||
-    !identity(raw['id']) ||
-    typeof raw['assetId'] !== 'string' ||
-    !/^project-asset:\S{1,242}$/u.test(raw['assetId']) ||
-    !digest(raw['sha256']) ||
-    !finite(raw['byteLength'], 1, EFFECT_BUNDLE_LIMITS.maxEntryBytes) ||
-    !Number.isSafeInteger(raw['byteLength']) ||
-    typeof raw['mimeType'] !== 'string' ||
-    !(
-      (raw['kind'] === 'image' && /^image\/(?:jpeg|png|webp)$/u.test(raw['mimeType'])) ||
-      (raw['kind'] === 'svg' && raw['mimeType'] === 'image/svg+xml')
-    )
-  )
-    return null;
-  return {
-    id: raw['id'],
-    assetId: raw['assetId'],
-    kind: raw['kind'],
-    mimeType: raw['mimeType'],
-    byteLength: raw['byteLength'],
-    sha256: raw['sha256'],
-  };
-}
-
-/** Validated visual source; full-scene documents have no implicit local object box. */
-export function readReviewAnnotationEffectDocument(source: string): EffectV1Document | null {
-  try {
-    const result = validateEffectV1Document(
-      parseBoundedEffectJson(new TextEncoder().encode(source)),
-      { presentationPolicy: 'retained' }
-    );
-    const document = result.document;
-    if (
-      !result.ok ||
-      !document ||
-      document.kind !== 'standalone' ||
-      document.assets.some((asset) => asset.kind === 'audio') ||
-      document.layers.some((layer) => layer.type.toLowerCase() === 'audio')
-    )
-      return null;
-    return document;
-  } catch {
-    return null;
-  }
+/** Each animation snapshot owns its complete checked local package. */
+export function readReviewAnnotationEffectDocument(source: string): AnimationTemplate | null {
+  const result = parseAnimationTemplateSource(source);
+  return result.ok ? result.template : null;
 }
 
 function parseSnapshot(raw: unknown): ReviewAnnotationEffectSnapshot | null {
   if (
     !isRecord(raw) ||
-    raw['schemaVersion'] !== 'sniptale.effect.v1' ||
+    raw['schemaVersion'] !== 'sniptale.animation.v1' ||
     raw['kind'] !== 'standalone' ||
     !digest(raw['sha256']) ||
     raw['id'] !== `effect:${raw['sha256']}` ||
@@ -205,46 +163,22 @@ function parseSnapshot(raw: unknown): ReviewAnnotationEffectSnapshot | null {
     !finite(raw['retainedByteLength'], 1, MAX_RETAINED_BYTES) ||
     !Number.isSafeInteger(raw['retainedByteLength']) ||
     !Array.isArray(raw['assets']) ||
-    raw['assets'].length > EFFECT_BUNDLE_LIMITS.maxAssets
+    raw['assets'].length !== 0
   )
     return null;
-  const assets: ReviewAnnotationEffectAsset[] = [];
-  const ids = new Set<string>();
-  for (const value of raw['assets']) {
-    const asset = parseAsset(value);
-    if (!asset || ids.has(asset.id)) return null;
-    ids.add(asset.id);
-    assets.push(asset);
-  }
   const sourceBytes = new TextEncoder().encode(raw['source']).byteLength;
-  if (
-    sourceBytes + assets.reduce((sum, asset) => sum + asset.byteLength, 0) !==
-    raw['retainedByteLength']
-  )
-    return null;
+  if (sourceBytes !== raw['retainedByteLength']) return null;
   const document = readReviewAnnotationEffectDocument(raw['source']);
-  if (!document || document.id !== raw['documentId'] || document.assets.length !== assets.length)
-    return null;
-  for (const declared of document.assets) {
-    const retained = assets.find((asset) => asset.id === declared.id);
-    if (
-      !retained ||
-      retained.kind !== declared.kind ||
-      retained.mimeType !== declared.mimeType ||
-      (declared.byteLength !== undefined && declared.byteLength !== retained.byteLength) ||
-      (declared.sha256 !== undefined && declared.sha256 !== retained.sha256)
-    )
-      return null;
-  }
+  if (!document || document.id !== raw['documentId']) return null;
   return {
     id: raw['id'],
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
     documentId: raw['documentId'],
     sha256: raw['sha256'],
     source: raw['source'],
     retainedByteLength: raw['retainedByteLength'],
-    assets: assets.sort((a, b) => a.id.localeCompare(b.id)),
+    assets: [],
   };
 }
 
@@ -287,7 +221,7 @@ export function mergeReviewAnnotationEffectSnapshots(
 /** Checks every retained instance against its own immutable source, including handle and option bindings. */
 export function reviewAnnotationEffectMatchesDocument(
   instance: ReviewAnnotationEffect,
-  document: EffectV1Document
+  document: AnimationTemplate
 ): boolean {
   const controls = new Map(document.controls.map((control) => [control.id, control]));
   const handles = document.objectLayout?.handles ?? [];
@@ -332,74 +266,29 @@ export class ReviewAnnotationEffectUnavailableError extends Error {
 /** Verifies immutable bytes outside storage transactions through an injected existing asset reader. */
 export async function verifyReviewAnnotationEffectSnapshot(
   raw: unknown,
-  readAsset: (reference: string, signal: AbortSignal) => Promise<Blob | undefined>,
+  _readAsset: (reference: string, signal: AbortSignal) => Promise<Blob | undefined>,
   signal: AbortSignal
 ) {
   signal.throwIfAborted();
   const snapshot = parseReviewAnnotationEffectSnapshots([raw])?.[0];
   if (!snapshot) throw new ReviewAnnotationEffectUnavailableError('invalid');
-  const sourceHash = await sha256EffectV1Bytes(new TextEncoder().encode(snapshot.source));
+  const sourceHash = bytesToHex(sha256(new TextEncoder().encode(snapshot.source)));
   signal.throwIfAborted();
   if (sourceHash !== snapshot.sha256)
     throw new ReviewAnnotationEffectUnavailableError('source-integrity');
   const document = readReviewAnnotationEffectDocument(snapshot.source);
   if (!document) throw new ReviewAnnotationEffectUnavailableError('invalid');
-  const assets: (ReviewAnnotationEffectAsset & { blob: Blob })[] = [];
-  const svgSources = new Map<string, string>();
-  for (const asset of snapshot.assets) {
+  for (const resource of document.resources) {
     signal.throwIfAborted();
-    let blob: Blob | undefined;
-    try {
-      blob = await readAsset(asset.assetId, signal);
-    } catch {
-      signal.throwIfAborted();
-      throw new ReviewAnnotationEffectUnavailableError('resource-unavailable');
-    }
-    signal.throwIfAborted();
-    if (!blob) throw new ReviewAnnotationEffectUnavailableError('resource-unavailable');
-    if (blob.size !== asset.byteLength || blob.type !== asset.mimeType)
+    if (!(await verifyAnimationResource(resource)))
       throw new ReviewAnnotationEffectUnavailableError('resource-integrity');
-    try {
-      const bytes = new Uint8Array(await blob.arrayBuffer());
-      signal.throwIfAborted();
-      if (
-        bytes.byteLength !== asset.byteLength ||
-        (await sha256EffectV1Bytes(bytes)) !== asset.sha256
-      )
-        throw new ReviewAnnotationEffectUnavailableError('resource-integrity');
-      signal.throwIfAborted();
-      assertEffectV1AssetSignature(bytes, asset.mimeType, 'annotation-resource');
-      if (asset.kind === 'svg')
-        svgSources.set(asset.id, new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-    } catch {
-      signal.throwIfAborted();
-      throw new ReviewAnnotationEffectUnavailableError('resource-integrity');
-    }
-    assets.push({ ...asset, blob });
   }
-  // External SVG bytes receive the same script/URL admission as embedded Effect V1 SVG.
-  if (
-    svgSources.size &&
-    !validateEffectV1Document(
-      {
-        ...document,
-        assets: document.assets.map((asset) => {
-          const svgText = svgSources.get(asset.id);
-          const retained = snapshot.assets.find((value) => value.id === asset.id);
-          return svgText !== undefined && retained
-            ? { ...asset, svgText, byteLength: retained.byteLength, sha256: retained.sha256 }
-            : asset;
-        }),
-      },
-      { presentationPolicy: 'retained' }
-    ).ok
-  )
-    throw new ReviewAnnotationEffectUnavailableError('resource-integrity');
+  const assets: (ReviewAnnotationEffectAsset & { blob: Blob })[] = [];
   signal.throwIfAborted();
   return {
     snapshot,
     document,
-    mode: document.objectLayout ? ('object' as const) : ('scene' as const),
+    mode: 'object' as const,
     assets,
   };
 }

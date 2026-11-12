@@ -10,7 +10,8 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     exclusive: true,
     owner: 'effect-v1-backup-v6-inventory',
     productionFile: 'apps/extension/src/workflows/media-hub-backup/v6/inventory/effect-bundles.ts',
-    reason: 'EffectV1 bundle archive inventory has direct metadata and object-file proof.',
+    reason:
+      'Source-only visual archive inventory has exact source, preference and atomic snapshot proof.',
     testFiles: [
       'apps/extension/src/workflows/media-hub-backup/v6/inventory/effect-bundles.test.ts',
     ],
@@ -29,7 +30,8 @@ export const EFFECT_V1_INTEGRATION_OWNER_MAPPINGS = [
     owner: 'effect-v1-backup-v6-publication',
     productionFile:
       'apps/extension/src/workflows/media-hub-backup/v6/root-publication/effect-bundle.ts',
-    reason: 'EffectV1 restore publication and session checkpoint share one transaction.',
+    reason:
+      'Source-only resources, separate preferences and publication receipt share one native transaction.',
     testFiles: [
       'apps/extension/src/workflows/media-hub-backup/v6/root-publication/effect-bundle.test.ts',
     ],

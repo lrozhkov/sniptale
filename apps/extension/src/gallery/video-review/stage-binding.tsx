@@ -55,6 +55,7 @@ type ReviewStageBindingProps = {
   url: string;
   source: ReviewSource;
   canvas?: { width: number; height: number } | undefined;
+  sourceFilters?: import('../../features/video/review/advanced/types').QuickEditAdvancedState['sourceFilters'];
   windowHeader?:
     | import('../../features/video/review/advanced/types').QuickEditWindowHeader
     | undefined;
@@ -304,6 +305,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         drawing={props.drawing}
         region={props.region}
         scene={{
+          sourceFilters: props.sourceFilters,
           background: sceneInput.background,
           camera,
           canvas: sceneInput.canvas,

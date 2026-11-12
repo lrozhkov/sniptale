@@ -11,6 +11,7 @@ import { createVideoClip } from '../project/timeline/project-meta.test.helpers';
 import { resolveVideoCompositionFrame } from './timeline/frame';
 import {
   resolveOrderedVisualPassLayers,
+  resolveVisualStateSourceSpotlights,
   splitVisualLayersForSourceSpotlights,
 } from './visual-pass-layers';
 it('preserves actions-only projections through ordered export passes without drawing the original video twice', () => {
@@ -265,3 +266,23 @@ it.each([false, true])(
     expect(layers).toEqual(before);
   }
 );
+
+it('retargets chain masks only to members present in a GL state without changing the canonical frame', () => {
+  const states = ['A', 'B', 'C'].map((clipId) => ({
+    id: `mask-${clipId}`,
+    clipId,
+    afterClipId: 'C',
+    sourceTransition: { id: 'chain', leadingClipId: 'B', trailingClipId: 'C' },
+    spotlight: createQuickEditSpotlight(),
+    phase: 'hold' as const,
+    progress: 1,
+  }));
+  const original = structuredClone(states);
+  const a = resolveVisualStateSourceSpotlights([{ clipId: 'A' }, { clipId: 'X' }], states);
+  const b = resolveVisualStateSourceSpotlights([{ clipId: 'X' }, { clipId: 'B' }], states);
+  const c = resolveVisualStateSourceSpotlights([{ clipId: 'X' }, { clipId: 'C' }], states);
+  expect(a.map((state) => [state.id, state.afterClipId])).toEqual([['mask-A', 'A']]);
+  expect(b.map((state) => [state.id, state.afterClipId])).toEqual([['mask-B', 'B']]);
+  expect(c.map((state) => [state.id, state.afterClipId])).toEqual([['mask-C', 'C']]);
+  expect(states).toEqual(original);
+});

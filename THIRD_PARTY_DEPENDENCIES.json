@@ -288,6 +288,19 @@
       "version": "2.0.0"
     },
     {
+      "archivePath": "LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt",
+      "licenseExpression": "MIT",
+      "licenseSource": "node_modules/@lottiefiles/dotlottie-web/LICENSE",
+      "licenseSourceKind": "installed-file",
+      "licenseStorageKind": "generated-copy",
+      "packageName": "@lottiefiles/dotlottie-web",
+      "packagePath": "node_modules/@lottiefiles/dotlottie-web",
+      "selectedLicense": "MIT",
+      "sha256": "779cec663b3c6590082566f2a000170d7a4d1a4bfc6f954e61efa4adddc652a8",
+      "sourceUrl": "https://github.com/LottieFiles/dotlottie-web.git",
+      "version": "0.82.1"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@noble__hashes-2.4.0.txt",
       "licenseExpression": "MIT",
       "licenseSource": "node_modules/@noble/hashes/LICENSE",

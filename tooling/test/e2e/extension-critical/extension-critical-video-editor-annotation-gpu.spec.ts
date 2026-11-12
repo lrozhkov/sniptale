@@ -1,9 +1,8 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import {
-  parseEffectV1Source,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
+import { animationRuntimeDuration } from '../../../../apps/extension/src/contracts/effect-runtime/animation';
 import {
   createVideoProjectFromRecording,
   resolveVideoOverlayTrack,
@@ -28,14 +27,13 @@ async function openAnnotationProject(page: import('@playwright/test').Page, orig
   const bytes = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
   const source = await readFile(
     new URL(
-      '../../../../apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+      '../../../../apps/extension/public/video-effects/animations/title.sniptale-animation.json',
       import.meta.url
     ),
     'utf8'
   );
-  const document = parseEffectV1Source(source).document;
-  if (!document || document.kind !== 'standalone' || !document.objectLayout)
-    throw new Error('Invalid standalone annotation fixture.');
+  const document = parseAnimationTemplateSource(source).template;
+  if (!document) throw new Error('Invalid standalone annotation fixture.');
   const project = createVideoProjectFromRecording({
     recordingId: 'beta-v1-recording',
     filename: 'beta-v1.webm',
@@ -58,7 +56,7 @@ async function openAnnotationProject(page: import('@playwright/test').Page, orig
   const track = resolveVideoOverlayTrack(project, 0, 12);
   if (!project.tracks.includes(track)) project.tracks.push(track);
   const host = createEffectHostClip({
-    objectLayout: document.objectLayout,
+    dimensions: { width: document.animation.w, height: document.animation.h },
     duration: 12,
     effectInstanceId: 'parent-gpu-title',
     name: 'GPU annotation',
@@ -77,7 +75,7 @@ async function openAnnotationProject(page: import('@playwright/test').Page, orig
       source,
       assets: [],
       retainedByteLength: Buffer.byteLength(source),
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       documentId: document.id,
       kind: 'standalone',
     },
@@ -89,15 +87,12 @@ async function openAnnotationProject(page: import('@playwright/test').Page, orig
       target: { kind: 'scene' },
       snapshotId,
       controls: Object.fromEntries(
-        document.controls.map((control) => [
-          control.id,
-          resolveEffectV1ControlDefault(control, 'ru'),
-        ])
+        document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'ru')])
       ),
       enabled: true,
       startTime: 0,
       duration: 12,
-      playbackRate: document.duration / 12,
+      playbackRate: animationRuntimeDuration(document) / 12,
     },
   ];
   Object.assign(project, hydrateVideoProject(project));

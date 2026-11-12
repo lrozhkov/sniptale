@@ -1,10 +1,12 @@
 import { expect, it, vi } from 'vitest';
 
-import {
-  EFFECT_V1_SCHEMA,
-  type EffectV1Command,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+const source = readFileSync(
+  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+  'utf8'
+);
+const hash = createHash('sha256').update(source).digest('hex');
 import { createEffectRuntimeRenderMessage } from '../runtime/request';
 import { parseEffectRuntimeSnapshotDocument } from '../runtime/snapshot-document';
 import { disposeEffectRuntimeComposition, getEffectRuntimeVisualPassFrames } from './rendered';
@@ -18,58 +20,71 @@ class FakeBitmap implements ImageBitmap {
   ) {}
 }
 
-it('serializes exact visual asset bytes while excluding audio payloads', async () => {
-  const plan = createPlan();
-  plan.assets = [
-    createAsset('image', new Blob(['image']), 'image/png'),
-    createAsset('audio', new Blob(['audio']), 'audio/wav'),
-  ];
-  const source = new FakeBitmap(10, 10);
-
+it('serializes the exact self-contained source without detached raster or audio payloads', async () => {
   const command = await createEffectRuntimeRenderMessage({
-    inputFrames: { source: { bitmap: source, height: 10, width: 10 } },
-    plan,
+    inputFrames: {},
+    plan: createPlan(),
     requestId: 'request',
     sequenceId: 2,
   });
-
   expect(command).toMatchObject({
+    documentRef: { id: hash },
     assetSelectionRef: { id: expect.stringMatching(/^[a-f0-9]{64}$/u) },
-    inputFrames: { source: { bitmap: source } },
+    inputFrames: {},
     requestId: 'request',
     sequenceId: 2,
   });
-  await expect(command.materializeImmutablePayloads()).resolves.toMatchObject({
-    assets: [{ id: 'image', kind: 'image' }],
+  await expect(command.materializeImmutablePayloads()).resolves.toEqual({
+    assets: [],
+    documentSource: source,
   });
 });
-
-it('fails when retained asset metadata and readable blob bytes diverge', async () => {
+it.each(['image', 'audio'])(
+  'refuses detached %s resources before constructing the sandbox request',
+  async (kind) => {
+    const plan = createPlan();
+    plan.assets = [
+      createAsset(kind, new Blob(['resource']), kind === 'audio' ? 'audio/wav' : 'image/png'),
+    ];
+    await expect(
+      createEffectRuntimeRenderMessage({
+        inputFrames: {},
+        plan,
+        requestId: 'request',
+        sequenceId: 0,
+      })
+    ).rejects.toThrow('EFFECT_RUNTIME_ANIMATION_INPUT_REJECTED');
+  }
+);
+it('refuses source-video frame inputs before constructing the sandbox request', async () => {
+  await expect(
+    createEffectRuntimeRenderMessage({
+      inputFrames: { source: { bitmap: new FakeBitmap(10, 10), height: 10, width: 10 } },
+      plan: createPlan(),
+      requestId: 'request',
+      sequenceId: 0,
+    })
+  ).rejects.toThrow('EFFECT_RUNTIME_ANIMATION_INPUT_REJECTED');
+});
+it('retains the integrity check when immutable source bytes are materialized', async () => {
   const plan = createPlan();
-  plan.assets = [{ ...createAsset('image', new Blob(['x']), 'image/png'), byteLength: 2 }];
-
+  plan.documentSha256 = 'f'.repeat(64);
   const command = await createEffectRuntimeRenderMessage({
     inputFrames: {},
     plan,
     requestId: 'request',
-    sequenceId: 1,
+    sequenceId: 0,
   });
-
   await expect(command.materializeImmutablePayloads()).rejects.toThrow(
-    'EFFECT_RUNTIME_ASSET_READ_FAILED'
+    'EFFECT_RUNTIME_ANIMATION_INTEGRITY_FAILED'
   );
 });
-
-it('parses only validated bounded snapshot documents', () => {
-  const source = JSON.stringify(createDocument([{ op: 'clear' }]));
-
-  expect(parseEffectRuntimeSnapshotDocument({ source })).toMatchObject({ id: 'safe-graph' });
-  expect(() => parseEffectRuntimeSnapshotDocument({ source: '{' })).toThrow(
-    'Effect runtime snapshot document is invalid'
-  );
-  expect(() => parseEffectRuntimeSnapshotDocument({ source: '{}' })).toThrow(
-    'Effect runtime snapshot document is invalid'
-  );
+it('parses only validated bounded self-contained animation source', () => {
+  expect(parseEffectRuntimeSnapshotDocument({ source })).toMatchObject({ id: 'sniptale-callout' });
+  for (const invalid of ['{', '{}'])
+    expect(() => parseEffectRuntimeSnapshotDocument({ source: invalid })).toThrow(
+      'Effect runtime snapshot document is invalid'
+    );
 });
 
 it('reads and disposes unique rendered frame authorities exactly once', () => {
@@ -116,21 +131,16 @@ function createPlan(): EffectRuntimeFramePlan {
     controls: {},
     dimensions: { height: 10, width: 10 },
     renderDimensions: { height: 10, width: 10 },
-    documentSha256: 'a'.repeat(64),
-    documentSource: '{}',
+    documentSha256: hash,
+    documentSource: source,
     duration: 2,
     effectInstanceId: 'effect',
     fps: 30,
     frameIndex: 0,
-    kind: 'targetEffect',
+    kind: 'standalone',
     progress: 0,
     snapshotId: 'snapshot',
-    target: {
-      chainIndex: 0,
-      clipId: 'clip',
-      kind: 'clip',
-      placement: { height: 10, opacity: 1, rotation: 0, width: 10, x: 0, y: 0 },
-    },
+    target: { kind: 'scene', clipId: 'host' },
     time: 0,
   };
 }
@@ -157,22 +167,5 @@ function createFrame(bitmap: ImageBitmap) {
     snapshotId: 'snapshot',
     target: { clipId: 'host', kind: 'scene' as const },
     width: 10,
-  };
-}
-
-function createDocument(commands: EffectV1Command[]): EffectV1Document {
-  return {
-    assets: [],
-    clips: [],
-    controls: [],
-    duration: 2,
-    id: 'safe-graph',
-    kind: 'standalone',
-    label: { en: 'Safe graph', ru: 'Безопасный граф' },
-    layers: [],
-    program: { commands, kind: 'graph', version: 1 },
-    scenes: [{ duration: 2, id: 'main', start: 0 }],
-    schemaVersion: EFFECT_V1_SCHEMA,
-    timeline: { phases: [], tracks: [] },
   };
 }

@@ -154,6 +154,9 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    ['video_animation_packages', { keyPath: 'packId' }],
+    ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+    ['video_gl_transition_presets', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -219,6 +222,9 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    ['video_animation_packages', { keyPath: 'packId' }],
+    ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+    ['video_gl_transition_presets', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual(
@@ -304,6 +310,18 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('recording_events', {
         keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'],
       });
+    else if (migration.toDatabaseVersion === 54)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['video_animation_packages', { keyPath: 'packId' }],
+      ]);
+    else if (migration.toDatabaseVersion === 55)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+      ]);
+    else if (migration.toDatabaseVersion === 56)
+      expect(db.createObjectStore.mock.calls).toEqual([
+        ['video_gl_transition_presets', { keyPath: 'id' }],
+      ]);
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -340,6 +358,9 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    ['video_animation_packages', { keyPath: 'packId' }],
+    ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+    ['video_gl_transition_presets', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -382,6 +403,9 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    ['video_animation_packages', { keyPath: 'packId' }],
+    ['video_visual_preferences', { keyPath: ['kind', 'packId'] }],
+    ['video_gl_transition_presets', { keyPath: 'id' }],
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual(
@@ -582,7 +606,7 @@ it('creates the complete fresh schema with empty unindexed connection authority'
   const tx = { abort: vi.fn(), objectStore: vi.fn() };
   handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
   expect([...names].sort()).toEqual([...EXPECTED_STORES].sort());
-  expect(names).toHaveLength(46);
+  expect(names).toHaveLength(49);
   expect(db.createObjectStore).toHaveBeenCalledWith('sync_connection', { keyPath: 'key' });
   expect(db.createObjectStore).toHaveBeenCalledWith('secret_protection', { keyPath: 'key' });
   expect(connectionIndex).not.toHaveBeenCalled();

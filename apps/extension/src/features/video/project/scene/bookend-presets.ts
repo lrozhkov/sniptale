@@ -82,7 +82,8 @@ export function parseVideoProjectBookendPresets(value: unknown): VideoProjectBoo
     const setting = value[key];
     if (
       setting !== undefined &&
-      (!isRecord(setting) || !hasFields(setting, ['type', 'before', 'after', 'color']))
+      (!isRecord(setting) ||
+        (setting['type'] !== 'gl' && !hasFields(setting, ['type', 'before', 'after', 'color'])))
     )
       return null;
   }

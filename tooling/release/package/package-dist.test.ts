@@ -1,4 +1,7 @@
-import { EXPECTED_EFFECT_SANDBOX_CSP } from '../artifact-security/sandbox-policy.mjs';
+import {
+  EXPECTED_EFFECT_SANDBOX_CSP,
+  EXPECTED_TOUR_SANDBOX_CSP,
+} from '../artifact-security/sandbox-policy.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -57,7 +60,7 @@ async function createReleaseRoot() {
   });
   await fs.writeFile(
     path.join(root, 'dist', 'apps/extension/src/tour-preview-sandbox/index.html'),
-    '<!doctype html>'
+    `<meta http-equiv="Content-Security-Policy" content="${EXPECTED_TOUR_SANDBOX_CSP}">`
   );
   await fs.writeFile(path.join(root, 'dist', 'assets', 'popup.js'), 'console.log("popup");');
   return root;

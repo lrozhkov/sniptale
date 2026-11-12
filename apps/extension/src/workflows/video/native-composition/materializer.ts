@@ -1,3 +1,5 @@
+import { createNativeGlTrackCanvas } from './gl-track-canvas';
+import { createGlTransitionCanvas } from '../../../features/video/composition/canvas/gl-transition';
 import { createPreviewSourceProvider, type PreviewSourceProvider } from '../preview-source';
 import { prepareNativePreviewSceneFrame } from './frame-plan';
 import { collectPreviewImageResourceDemand } from './image-resources';
@@ -99,6 +101,7 @@ interface VideoPreviewMaterializerState {
   playbackSamplerConversion: 'canvas' | 'native';
   gpuPreview: ReturnType<typeof createNativeGpuPreviewRenderer> | null;
   spatialRenderer: ReviewSpatialRenderer | null;
+  transitionRenderer: ReturnType<typeof createNativeGlTrackCanvas> | null;
   stagingCanvas: HTMLCanvasElement | null;
   captionRenderer: ReturnType<typeof createVideoProjectCaptionRenderer>;
   cursorTrajectoryRenderer: ReturnType<typeof createRecordingCursorTrajectoryRenderer>;
@@ -382,10 +385,11 @@ function createMaterializedJoinPresentation(
 } {
   const resources = createPreviewRenderResources({
     maximumCanvases: 2,
-    maximumManagedBytes: params.rasterSize.width * params.rasterSize.height * 8,
+    maximumManagedBytes: params.rasterSize.width * params.rasterSize.height * 20 + 32768,
     createCanvas: () => params.ownerDocument.createElement('canvas'),
   });
   let cutSampler: ReturnType<typeof createCompositionCutSampleSource> | undefined;
+  let glJoin: ReturnType<typeof createGlTransitionCanvas> | undefined;
   let cutSamplerConversion: 'canvas' | 'native' = 'canvas';
   let cutPlan: ReturnType<typeof resolveVideoProjectCompositionJoinPlans>[number] | undefined;
   let cutPlans = plans.filter(({ boundary }) => boundary.sampling === 'cut');
@@ -548,7 +552,8 @@ function createMaterializedJoinPresentation(
     let output: GpuPreviewOutput | undefined;
     let handedOff = false;
     try {
-      if (plan.boundary.transition?.type === 'dissolve') {
+      const gl = plan.boundary.transition?.type === 'gl' ? plan.boundary.transition : undefined;
+      if (gl || plan.boundary.transition?.type === 'dissolve') {
         const samples = resolveVideoProjectCompositionJoinEndpoints(
           plan,
           params.sampleFps ?? params.project.fps,
@@ -569,20 +574,29 @@ function createMaterializedJoinPresentation(
               kind: 'group',
               output: params.rasterSize,
               logical: params.rasterSize,
+              ...(gl
+                ? {
+                    composition: {
+                      kind: 'gl-transition' as const,
+                      selection: gl.selection,
+                      progress: blend.incoming,
+                    },
+                  }
+                : {}),
               layers: [
                 {
                   source: outgoing,
                   rect,
                   inverse,
-                  opacity: sampling === 'cut' ? 1 : 1 - incomingWeight,
+                  opacity: gl || sampling === 'cut' ? 1 : 1 - incomingWeight,
                   clampSourceEdges: ['left', 'top', 'right', 'bottom'],
                 },
                 {
                   source: incoming,
                   rect,
                   inverse,
-                  opacity: incomingWeight,
-                  blend: sampling === 'cut' ? 'over' : 'add',
+                  opacity: gl ? 1 : incomingWeight,
+                  blend: gl || sampling === 'cut' ? 'over' : 'add',
                   clampSourceEdges: ['left', 'top', 'right', 'bottom'],
                 },
               ],
@@ -624,6 +638,8 @@ function createMaterializedJoinPresentation(
       releaseNestedCuts();
       cutSampler?.dispose();
       gpuComposer.dispose();
+      glJoin?.dispose();
+      glJoin = undefined;
       if (!busy) {
         resources.dispose();
         colors.dispose();
@@ -683,7 +699,13 @@ function createMaterializedJoinPresentation(
             ).camera,
           time,
         };
-        const blend = evaluateCompositionJoin(time, plan.seam, plan.before, plan.after)!;
+        const blend = evaluateCompositionJoin(
+          time,
+          plan.seam,
+          plan.before,
+          plan.after,
+          plan.boundary.transition?.type === 'gl' ? plan.boundary.transition.easing : 'LINEAR'
+        )!;
         if (directSamples && acquireGpuOutput) {
           completedOutput = await renderGpuJoinFrame(plan, time, blend, signal, acquireGpuOutput);
           throwIfAborted(signal);
@@ -702,7 +724,39 @@ function createMaterializedJoinPresentation(
         }
         const context = canvas.getContext('2d');
         if (!context) throw new Error('Preview frame context is unavailable.');
-        if (plan.boundary.transition?.type === 'dissolve') {
+        if (plan.boundary.transition?.type === 'gl') {
+          const selection = plan.boundary.transition.selection;
+          const samples = resolveVideoProjectCompositionJoinEndpoints(
+            plan,
+            params.sampleFps ?? params.project.fps,
+            time
+          );
+          await endpoints.withEndpoints(
+            {
+              key: plan,
+              ...samples,
+              incomingWeight: blend.incoming,
+              ...(cutPlan ? { sampling: 'cut' as const } : {}),
+            },
+            signal,
+            async ({ outgoing, incoming }) => {
+              glJoin ??= createGlTransitionCanvas({
+                ownerDocument: params.ownerDocument,
+                reserve: (bytes) => resources.bytes('native-gl-transition', bytes),
+              });
+              await glJoin.render({
+                context,
+                from: outgoing,
+                to: incoming,
+                ...params.rasterSize,
+                selection,
+                progress: blend.incoming,
+                ratio: params.rasterSize.width / params.rasterSize.height,
+                signal,
+              });
+            }
+          );
+        } else if (plan.boundary.transition?.type === 'dissolve') {
           const samples = resolveVideoProjectCompositionJoinEndpoints(
             plan,
             params.sampleFps ?? params.project.fps,
@@ -731,7 +785,7 @@ function createMaterializedJoinPresentation(
         try {
           const overlay = artwork.getContext('2d');
           if (!overlay) throw new Error('Composition edge artwork is unavailable.');
-          if (plan.boundary.transition?.type !== 'dissolve')
+          if (plan.boundary.transition?.type === 'fade-black')
             drawCompositionColorOverlay(
               overlay,
               blend.black,
@@ -841,6 +895,7 @@ function createMaterializerMediaState(
               }),
           }),
     spatialRenderer: null,
+    transitionRenderer: null,
     stagingCanvas: null,
     captionRenderer: createVideoProjectCaptionRenderer(),
     cursorTrajectoryRenderer: createRecordingCursorTrajectoryRenderer(),
@@ -872,6 +927,8 @@ function disposeMaterializer(state: VideoPreviewMaterializerState, stage: HTMLDi
   const spatial = state.spatialRenderer;
   state.spatialRenderer = null;
   spatial?.dispose();
+  state.transitionRenderer?.dispose();
+  state.transitionRenderer = null;
   if (state.stagingCanvas) {
     state.stagingCanvas.width = 0;
     state.stagingCanvas.height = 0;
@@ -1006,6 +1063,11 @@ async function renderMaterializedFrame(
         assertActive();
         state.stagingCanvas ??= params.ownerDocument.createElement('canvas');
         return state.stagingCanvas;
+      },
+      transitionRenderer: () => {
+        assertActive();
+        state.transitionRenderer ??= createNativeGlTrackCanvas(params.ownerDocument);
+        return state.transitionRenderer;
       },
       spatialRenderer: () => {
         assertActive();

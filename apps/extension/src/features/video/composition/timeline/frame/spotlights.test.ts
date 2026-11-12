@@ -1,4 +1,5 @@
-import { VideoMotionFocusMode, VideoTransitionKind } from '../../../project/types';
+import { createGlTransitionSelection } from '../../../project/transition/gl-catalog';
+import { VideoMotionFocusMode } from '../../../project/types';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../../project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../../project/motion';
@@ -202,12 +203,12 @@ it('schedules source-scene coverage after its bound video while global scene rem
 });
 
 it.each(
-  Object.values(VideoTransitionKind).flatMap((kind) =>
-    [true, false].map((sameOrigin) => ({ kind, sameOrigin }))
+  (['Fade', 'Directional', 'CrossZoom'] as const).flatMap((shader) =>
+    [true, false].map((sameOrigin) => ({ shader, sameOrigin }))
   )
 )(
-  'joins one authored source focus across $kind; same origin=$sameOrigin',
-  ({ kind, sameOrigin }) => {
+  'joins one authored source focus across $shader; same origin=$sameOrigin',
+  ({ shader, sameOrigin }) => {
     const leading = createVideoClip({
       id: 'leading',
       duration: 4,
@@ -219,7 +220,8 @@ it.each(
     project.transitions = [
       {
         id: 'transition',
-        kind,
+        kind: 'gl',
+        selection: createGlTransitionSelection(shader)!,
         easing: 'LINEAR',
         duration: 1,
         leadingClipId: leading.id,

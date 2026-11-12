@@ -19,5 +19,3 @@ export const EFFECT_RUNTIME_WORKER_REQUEST_KEYS = [
   'type',
   'width',
 ] as const;
-
-export const EFFECT_RUNTIME_WORKER_FRAME_KEYS = ['bitmap', 'height', 'width'] as const;

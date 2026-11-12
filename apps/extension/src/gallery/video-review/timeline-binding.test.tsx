@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -13,29 +14,39 @@ import { ReviewTimelineBinding } from './timeline-binding';
 import { translate, getCurrentLocale } from '../../platform/i18n';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
 
-const catalogFixture = vi.hoisted((): EffectBundleCatalogEntry => ({
-  packId: 'catalog',
-  source: 'builtin',
-  enabled: true,
-  createdAt: 0,
-  updatedAt: 0,
-  version: '1',
-  retainedByteLength: 0,
-  sourceSha256: 'hash',
-  label: { en: 'Catalog title', ru: 'Заголовок каталога' },
-  description: { en: '', ru: '' },
-  assets: [],
-  documents: [
-    {
-      id: 'title',
-      kind: 'standalone',
-      schemaVersion: 'sniptale.effect.v1',
-      sha256: 'hash',
-      assets: [],
-      presentation: { label: { en: 'Catalog title', ru: 'Заголовок каталога' }, duration: 4 },
-    },
-  ],
-}));
+const catalogFixture = await vi.hoisted(async (): Promise<EffectBundleCatalogEntry> => {
+  const { readFileSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const source = readFileSync(
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
+    'utf8'
+  );
+  const hash = createHash('sha256').update(source).digest('hex');
+  return {
+    packId: 'catalog',
+    source: 'builtin',
+    enabled: true,
+    createdAt: 0,
+    updatedAt: 0,
+    version: '1',
+    retainedByteLength: Buffer.byteLength(source),
+    sourceSha256: hash,
+    label: { en: 'Catalog title', ru: 'Заголовок каталога' },
+    description: { en: '', ru: '' },
+    assets: [],
+    documents: [
+      {
+        id: 'sniptale-title',
+        kind: 'standalone',
+        schemaVersion: 'sniptale.animation.v1',
+        sha256: hash,
+        source,
+        assets: [],
+        presentation: { label: { en: 'Catalog title', ru: 'Заголовок каталога' }, duration: 3 },
+      },
+    ],
+  };
+});
 vi.mock('./use-annotation-effects-catalog', () => ({
   useReviewAnnotationCatalog: () => ({
     items: [{ status: 'ready', entry: catalogFixture }],
@@ -66,10 +77,11 @@ vi.mock('../../workflows/video-review/media-index', async (original) => ({
 
 function resource(id: string, zoom = false): LoadedReview {
   const source = readFileSync(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-title/effect.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
     'utf8'
   );
-  const snapshotId = `effect:${'a'.repeat(64)}`;
+  const hash = createHash('sha256').update(source).digest('hex');
+  const snapshotId = `effect:${hash}`;
   const instance: ReviewAnnotationEffect = {
     id: 'first',
     snapshotId,
@@ -99,9 +111,9 @@ function resource(id: string, zoom = false): LoadedReview {
       effectSnapshots: [
         {
           id: snapshotId,
-          sha256: 'a'.repeat(64),
+          sha256: hash,
           source,
-          schemaVersion: 'sniptale.effect.v1',
+          schemaVersion: 'sniptale.animation.v1',
           kind: 'standalone',
           documentId: 'sniptale-title',
           retainedByteLength: new TextEncoder().encode(source).byteLength,
@@ -307,7 +319,7 @@ it('retains a refused choice, completes one placement and ignores an old activat
     expect(add).toHaveBeenLastCalledWith(
       expect.objectContaining({
         catalog: catalogFixture,
-        documentId: 'title',
+        documentId: 'sniptale-title',
         start: 1,
         end: 3,
         plane: { width: 640, height: 360 },

@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -10,6 +11,7 @@ import { VideoExportFormat, VideoExportQualityPreset } from '../../features/vide
 import { renderProjectCompositionFrame } from './composition-joins';
 import type { ProjectCompositionSceneInput } from './types';
 const owners = vi.hoisted(() => ({
+  gl: vi.fn(),
   cutSample: vi.fn(),
   cutRelease: vi.fn(),
   cutDispose: vi.fn(),
@@ -23,6 +25,10 @@ vi.mock('../../workflows/video-review/decoded-video-sample', () => ({
     sample: owners.cutSample,
     dispose: owners.cutDispose,
   }),
+}));
+vi.mock('../../features/video/composition/canvas/gl-transition', async (original) => ({
+  ...(await original<typeof import('../../features/video/composition/canvas/gl-transition')>()),
+  createGlTransitionCanvas: (...args: unknown[]) => owners.gl(...args),
 }));
 vi.mock('./composition-scene', () => ({ renderProjectCompositionScene: owners.scene }));
 vi.mock('./media-playback/frame', () => ({ syncVideoClipFrame: owners.sync }));
@@ -347,4 +353,48 @@ it('uses bounded decoded frames for a windowed video outside a join', async () =
   expect(owners.cutRelease).toHaveBeenCalledOnce();
   args.job.compositionJoinRenderer?.dispose();
   expect(owners.cutDispose).toHaveBeenCalledOnce();
+});
+
+it('exports a pinned GL join from complete endpoints with eased progress and no dissolve substitution', async () => {
+  const args = input();
+  const selection = createGlTransitionSelection('BowTie')!;
+  args.project.compositionJoins![0]!.transition = {
+    type: 'gl',
+    selection,
+    easing: 'EASE_IN_OUT',
+    before: 0.2,
+    after: 0.2,
+  };
+  const render = vi.fn(
+    async (request: {
+      context: CanvasRenderingContext2D;
+      from: HTMLCanvasElement;
+      to: HTMLCanvasElement;
+      selection: unknown;
+      progress: number;
+    }) => {
+      expect(Array.from(request.from.getContext('2d')!.getImageData(4, 2, 1, 1).data)).toEqual([
+        255, 0, 0, 255,
+      ]);
+      expect(Array.from(request.to.getContext('2d')!.getImageData(4, 2, 1, 1).data)).toEqual([
+        0, 0, 255, 255,
+      ]);
+      request.context.fillStyle = '#123456';
+      request.context.fillRect(0, 0, 8, 4);
+    }
+  );
+  const dispose = vi.fn();
+  owners.gl.mockReturnValue({ render, dispose });
+  await renderProjectCompositionFrame(args);
+  expect(render).toHaveBeenCalledOnce();
+  expect(render.mock.calls[0]![0]).toMatchObject({ selection, width: 8, height: 4 });
+  expect(render.mock.calls[0]![0].progress).toBeCloseTo(0.0625, 12);
+  expect(pixel(args)).toEqual([18, 52, 86, 255]);
+  expect(owners.scene.mock.calls.map(([sample]) => sample.currentTime)).toEqual([0.875, 1]);
+  await renderProjectCompositionFrame({ ...args, currentTime: 1.1 });
+  expect(owners.gl).toHaveBeenCalledOnce();
+  expect(render).toHaveBeenCalledTimes(2);
+  expect(owners.scene).toHaveBeenCalledTimes(2);
+  args.job.compositionJoinRenderer!.dispose();
+  expect(dispose).toHaveBeenCalledOnce();
 });

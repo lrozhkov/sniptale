@@ -1,7 +1,7 @@
 import {
-  mapEffectV1ObjectPoint,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+  mapAnimationObjectPoint,
+  type AnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,
@@ -116,7 +116,7 @@ export function reviewAnnotationPlanePoint(
 /** Shared visible body corners and fixed scene handles for canvas hit/contour interaction. */
 export function reviewAnnotationBodyGeometry(
   instance: ReviewAnnotationEffect,
-  document: EffectV1Document,
+  document: AnimationTemplate,
   geometry: ReviewAnnotationGeometry
 ) {
   const plane = geometry[instance.attachment];
@@ -189,7 +189,7 @@ export function convertReviewAnnotationAttachment(
 /** A bound numeric handle field changes its fixed scene anchor, not an instance control override. */
 export function changeReviewAnnotationBoundControl(
   instance: ReviewAnnotationEffect,
-  document: EffectV1Document,
+  document: AnimationTemplate,
   geometry: ReviewAnnotationGeometry,
   controlId: string,
   value: number
@@ -204,8 +204,8 @@ export function changeReviewAnnotationBoundControl(
   const x = controlId === handle.xControl ? value : controls[handle.xControl];
   const y = controlId === handle.yControl ? value : controls[handle.yControl];
   if (typeof x !== 'number' || typeof y !== 'number') return null;
-  const point = mapEffectV1ObjectPoint(
-    layout,
+  const point = mapAnimationObjectPoint(
+    document,
     resolveReviewAnnotationEffectBox(instance.transform, plane),
     { x, y }
   );
@@ -218,7 +218,7 @@ export function changeReviewAnnotationBoundControl(
 /** Computes an admitted drag on its canonical plane; the overlay owns capture and transaction lifetime. */
 export function previewReviewAnnotationDrag(args: {
   instance: ReviewAnnotationEffect;
-  document: EffectV1Document;
+  document: AnimationTemplate;
   geometry: ReviewAnnotationGeometry;
   start: Point;
   point: Point;
@@ -274,15 +274,12 @@ export function previewReviewAnnotationDrag(args: {
       dy = w * sin + h * cos + point.y - start.y;
     let width = Math.max(1, dx * cos + dy * sin),
       height = Math.max(1, -dx * sin + dy * cos);
-    const layout = document.objectLayout;
-    if (layout?.resize === 'scale') {
-      const scale =
-        Math.abs(width - w) / w >= Math.abs(height - h) / h
-          ? width / layout.width
-          : height / layout.height;
-      width = scale * layout.width;
-      height = scale * layout.height;
-    }
+    const scale =
+      Math.abs(width - w) / w >= Math.abs(height - h) / h
+        ? width / document.animation.w
+        : height / document.animation.h;
+    width = scale * document.animation.w;
+    height = scale * document.animation.h;
     const cx = corner.x + (width / 2) * cos - (height / 2) * sin,
       cy = corner.y + (width / 2) * sin + (height / 2) * cos;
     return {

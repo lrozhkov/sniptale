@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type {
   VideoProjectEffectInstance,
@@ -14,7 +15,6 @@ import {
 import {
   VideoTrackKind,
   VideoTransitionEasing,
-  VideoTransitionKind,
   type VideoProject,
 } from '../../../features/video/project/types';
 import { createVideoEditorProjectTestStore } from './test-store.test-support';
@@ -41,29 +41,15 @@ export function createProjectWithEffects(): VideoProject {
   return {
     ...project,
     clips: [leading, trailing, ...createSceneEffectHosts(project, overlayTrackId, sceneA, sceneB)],
-    effectInstances: [
-      sceneA,
-      createInstance('clip', 'snapshot-b', 'targetEffect', { clipId: 'clip-a', kind: 'clip' }, 2),
-      sceneB,
-      createInstance(
-        'transition',
-        'snapshot-c',
-        'transition',
-        { kind: 'transition', transitionId: 'transition-a' },
-        4
-      ),
-    ],
-    effectSnapshots: [
-      createSnapshot('snapshot-a', 'standalone'),
-      createSnapshot('snapshot-b', 'targetEffect'),
-      createSnapshot('snapshot-c', 'transition'),
-    ],
+    effectInstances: [sceneA, sceneB],
+    effectSnapshots: [createSnapshot('snapshot-a', 'standalone')],
     transitions: [
       {
         duration: 1,
         easing: VideoTransitionEasing.LINEAR,
         id: 'transition-a',
-        kind: VideoTransitionKind.CROSSFADE,
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         leadingClipId: leading.id,
         trailingClipId: trailing.id,
       },
@@ -143,7 +129,7 @@ function createSnapshot(
     id,
     kind,
     retainedByteLength: 1,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     sha256: 'a'.repeat(64),
     source: '{}',
   };

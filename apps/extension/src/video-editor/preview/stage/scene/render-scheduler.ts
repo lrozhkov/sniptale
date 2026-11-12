@@ -362,6 +362,8 @@ function canStart(
 ) {
   const job = state.pendingJob;
   if (state.disposed || state.failure || !job || state.preparingJob === job) return false;
+  // A replacement seek must wait for its own decoded sources while canceled preparation drains.
+  if (job.sourceRuntime?.selected && args.prepare && state.prepared?.job !== job) return false;
   if (!state.active.length) return true;
   const preparation = state.prepared;
   return (

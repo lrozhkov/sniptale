@@ -1,20 +1,24 @@
-import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import type { EffectControlContext } from '@sniptale/runtime-contracts/effect-controls';
 import { getEffectControlSections, getEffectSequenceOptions } from './presentation';
-function document() {
-  const source = readFileSync(
-    new URL(
-      '../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout.sniptale-effect.json',
-      import.meta.url
-    ),
-    'utf8'
-  );
-  const parsed = parseEffectV1Source(source).document;
-  if (!parsed) throw new Error('Invalid fixture');
-  return parsed;
+function document(): EffectControlContext & { id: string } {
+  return {
+    id: 'metadata-example',
+    controls: [
+      {
+        id: 'sequence',
+        kind: 'number',
+        defaultValue: 0,
+        min: 0,
+        max: 2,
+        step: 1,
+        group: 'animation',
+      },
+    ],
+    objectLayout: { handles: [{ xControl: 'anchorX', yControl: 'anchorY' }] },
+  };
 }
+
 it('groups explicit metadata independently of template names, preserving source order for ties', () => {
   const doc = document();
   doc.id = 'external-effect';

@@ -1,5 +1,11 @@
+import { createSourceImageFilter } from '../../../image-filters/contract';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { omitLeadingGroupCopies, gpuPreviewTextureBytes } from './gpu-preview-plan';
+import {
+  omitLeadingGroupCopies,
+  gpuPreviewTextureBytes,
+  validateGpuPreviewFrame,
+  requiresRasterSource,
+} from './gpu-preview-plan';
 import type { GpuPreviewGroup, GpuPreviewLayer } from './gpu-preview-types';
 
 beforeEach(() => {
@@ -180,4 +186,20 @@ it('retains conflicting raster cache refusal before bounded scene staging', () =
   expect(() =>
     gpuPreviewTextureBytes([layer, { ...layer, cache: { key: 'same', revision: 2 } }])
   ).toThrow('cache key has conflicting sources');
+});
+
+it('keeps active source filters on wrapper groups while neutral stacks preserve direct sampling', () => {
+  const f = fixture();
+  const color = createSourceImageFilter('color', 'a');
+  f.wrapper.imageFilters = { stack: { version: 1, filters: [color] }, logical: f.request.logical };
+  expect(requiresRasterSource(f.wrapper)).toBe(false);
+  expect(omitLeadingGroupCopies(f.request).layers).toEqual([f.background, f.video]);
+  if (color.kind !== 'color') throw new Error('Expected color.');
+  color.parameters.exposure = 1;
+  expect(requiresRasterSource(f.wrapper)).toBe(true);
+  expect(omitLeadingGroupCopies(f.request)).toBe(f.request);
+  const compiled = validateGpuPreviewFrame(f.request, 8192).imageFilters.get(f.wrapper);
+  expect(compiled?.steps[0]?.values[0]).toBe(2);
+  color.parameters.exposure = 0;
+  expect(compiled?.steps[0]?.values[0]).toBe(2);
 });

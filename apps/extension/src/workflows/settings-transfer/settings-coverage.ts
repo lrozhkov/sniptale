@@ -100,6 +100,12 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
     'action/status'
   ),
   excluded('styles/video-effects/controller.ts', ['deleteEffectBundle'], 'action/status'),
+  excluded('styles/video-effects/gl-catalog.tsx', ['deleteGlPresetCatalogEntry'], 'action/status'),
+  transferable(
+    'styles/video-effects/gl-catalog.tsx',
+    ['setBuiltinGlTransitionEnabled', 'setGlPresetCatalogEnabled'],
+    ['styles.video-effects']
+  ),
   transferable(
     'styles/video-effects/controller.ts',
     ['setEffectDocumentEnabled'],

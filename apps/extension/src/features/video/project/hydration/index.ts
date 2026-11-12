@@ -5,7 +5,7 @@ import { normalizeClip } from './clip';
 import { normalizeHydratedTracks } from './tracks';
 import { getProjectSceneBackground, syncProjectSceneBackground } from '../scene/background';
 import { normalizeVideoProjectMotionRegion } from '../motion/index';
-import { normalizeVideoProjectTransition } from '../transition/template';
+import { parseVideoProjectTransition } from '../transition/contract';
 import { getVideoProjectUtilityLanes } from '../utility-lanes';
 import { normalizeVideoObjectTrack } from '../object-tracks';
 import type { VideoProject } from '../types/index';
@@ -133,16 +133,12 @@ function normalizeHydratedAssets(project: VideoProject): VideoProject['assets'] 
 function normalizeHydratedTransitions(
   project: VideoProject
 ): NonNullable<VideoProject['transitions']> {
-  return Array.isArray(project.transitions)
-    ? project.transitions
-        .filter(
-          (transition) =>
-            typeof transition.id === 'string' &&
-            typeof transition.leadingClipId === 'string' &&
-            typeof transition.trailingClipId === 'string'
-        )
-        .map((transition) => normalizeVideoProjectTransition(transition))
-    : [];
+  if (!Array.isArray(project.transitions)) return [];
+  return project.transitions.map((transition) => {
+    const accepted = parseVideoProjectTransition(transition);
+    if (!accepted) throw new Error('Unsupported explicit project transition.');
+    return accepted;
+  });
 }
 
 function normalizeObjectTracks(project: VideoProject): NonNullable<VideoProject['objectTracks']> {
@@ -190,7 +186,8 @@ export function hydrateVideoProject(
     hydrateRecordingInteractionAnchors({
       ...hydratedProject,
       cursorTrack: materializeVideoProjectCursorSourceObservations(hydratedProject),
-    })
+    }),
+    { createMissingTransitions: false }
   );
   return {
     ...synchronizedProject,

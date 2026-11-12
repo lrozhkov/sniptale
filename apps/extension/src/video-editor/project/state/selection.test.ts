@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../features/video/project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import {
@@ -53,7 +54,8 @@ function createSelectionTransition() {
     duration: 0.5,
     easing: 'LINEAR',
     id: 'transition-1',
-    kind: 'CROSSFADE',
+    kind: 'gl' as const,
+    selection: createGlTransitionSelection('Fade')!,
     leadingClipId: 'clip-1',
     trailingClipId: 'clip-1',
   } as never;
@@ -229,8 +231,8 @@ it('clears orphaned FX targets and reconciles groups after removing their clips'
   project.effectInstances = [
     {
       id: 'fx',
-      kind: 'targetEffect',
-      target: { kind: 'clip', clipId: 'missing' },
+      kind: 'standalone',
+      target: { kind: 'scene' },
       controls: {},
       enabled: true,
       duration: 1,

@@ -1,3 +1,7 @@
+import {
+  sourceImageFilterPlaneSize,
+  type SourceImageFilterStack,
+} from '../../features/image-filters/contract';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
 import { createZoomPreviewGpuArtwork } from './zoom-preview-gpu-artwork';
 import {
@@ -40,6 +44,8 @@ const identity: QuickEditHomography = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
 /** Inspector scene inputs retain the existing authored gesture and history authorities. */
 export interface ZoomPreviewGpuInput {
+  sourceFilters?: SourceImageFilterStack | undefined;
+  sourceSize?: { width: number; height: number } | undefined;
   currentTime?: number | undefined;
   /** Physical source clock and navigation intent frozen with this scene. */
   liveSource?:
@@ -247,6 +253,18 @@ export function createZoomPreviewGpuRenderer(): MiniRenderer {
             : []),
           {
             source,
+            ...(input.sourceFilters
+              ? {
+                  imageFilters: {
+                    stack: input.sourceFilters,
+                    projectTime: input.currentTime,
+                    logical: sourceImageFilterPlaneSize(
+                      input.sourceSize ?? input.frame ?? input.layout.videoRect,
+                      borrowed?.orientation?.rotation
+                    ),
+                  },
+                }
+              : {}),
             ...(borrowed?.orientation ? { orientation: borrowed.orientation } : {}),
             rect: input.layout.videoRect,
             inverse: identity,

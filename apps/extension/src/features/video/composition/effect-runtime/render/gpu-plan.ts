@@ -15,7 +15,7 @@ import {
 import { buildEffectRuntimeGpuOperationLayers } from './gpu-plan-layers';
 
 /** Materialize valid complex plans on a borrowed device; never close caller-owned wire resources. */
-export async function materializeEffectRuntimeGpuPlan(
+async function materializeEffectRuntimeGpuPlan(
   plan: EffectRuntimeGpuPlanResult,
   gpu: GpuPreviewRenderer,
   signal: AbortSignal

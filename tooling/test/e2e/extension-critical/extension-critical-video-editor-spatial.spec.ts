@@ -1,13 +1,15 @@
+import { VideoMotionOverlayZoomMode } from '../../../../apps/extension/src/features/video/project/types';
+import { applyEffectCatalogDocument } from '../../../../apps/extension/src/features/video/project/effect-instance/apply';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { initializeEffectSceneAnchors } from '../../../../apps/extension/src/features/video/project/effect-instance/layout';
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
-import { enableGpuPreviewProof, observeEffectGpuPlans } from '../support/gpu-preview-proof';
+import { enableGpuPreviewProof } from '../support/gpu-preview-proof';
 import { normalizeVideoProjectCursorSkin } from '../../../../apps/extension/src/features/video/project/cursor';
 import { resolveProjectCursorCameraPlan } from '../../../../apps/extension/src/features/video/composition/motion/project-follow';
 import { resolveVideoCompositionCamera } from '../../../../apps/extension/src/features/video/composition/motion';
 import { createHash } from 'node:crypto';
-import {
-  parseEffectV1Source,
-  resolveEffectV1ControlDefault,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import {
   chooseInspectorValue,
@@ -51,7 +53,7 @@ async function openFixture(
   theme = 'dark',
   options: {
     overlays?: boolean;
-    effectRegion?: boolean;
+    effectAnchors?: boolean;
     cursorFollow?: boolean;
     sourceActionFocus?: boolean;
     sourceWindowFollow?: boolean;
@@ -223,7 +225,8 @@ async function openFixture(
         id: 'ordinary-spatial-crossfade',
         leadingClipId: image.id,
         trailingClipId: trailing.id,
-        kind: 'CROSSFADE',
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         duration: 0.4,
         easing: 'LINEAR',
       },
@@ -258,87 +261,104 @@ async function openFixture(
       },
     });
   }
-  if (options.effectRegion || options.sourceFx || options.effectTransition) {
-    if (options.effectRegion) image.transform.rotation = 25;
+  if (options.effectAnchors) {
     const source = await readFile(
       new URL(
-        `../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/` +
-          `${
-            options.effectTransition
-              ? 'sniptale-transition-dissolve'
-              : options.sourceFx
-                ? 'sniptale-video-warm'
-                : 'sniptale-spotlight'
-          }.sniptale-effect.json`,
+        '../../../../apps/extension/public/video-effects/animations/arrow.sniptale-animation.json',
         import.meta.url
       ),
       'utf8'
     );
-    const document = parseEffectV1Source(source).document;
-    if (!document) throw new Error('Invalid EffectV1 region fixture');
-    const sha256 = createHash('sha256').update(source).digest('hex');
-    const snapshotId = `effect:${sha256}`;
-    project.effectSnapshots = [
-      {
-        id: snapshotId,
-        sha256,
-        source,
-        assets: [],
-        retainedByteLength: Buffer.byteLength(source),
-        schemaVersion: 'sniptale.effect.v1',
+    const accepted = parseAnimationTemplateSource(source);
+    if (!accepted.ok) throw new Error(JSON.stringify(accepted.diagnostics));
+    const document = accepted.template,
+      sha256 = createHash('sha256').update(source).digest('hex');
+    const arrowTrack = createVideoProjectTrack('Arrow', -1, 'PRIMARY');
+    project.version = 52;
+    project.motionRegions[0]!.overlayZoomMode = VideoMotionOverlayZoomMode.FOLLOW_CAMERA;
+    project.tracks.push(arrowTrack);
+    Object.assign(
+      project,
+      await applyEffectCatalogDocument({
+        project,
         documentId: document.id,
-        kind: options.effectTransition ? 'transition' : 'targetEffect',
-      },
-    ];
-    project.effectInstances = [
-      {
-        id: 'projected-region',
-        kind: options.effectTransition ? 'transition' : 'targetEffect',
-        target: options.effectTransition
-          ? { kind: 'transition', transitionId: 'ordinary-spatial-crossfade' }
+        instanceId: 'lottie-arrow',
+        startTime: 0,
+        standaloneDuration: 1.2,
+        target: { kind: 'scene' },
+        trackId: arrowTrack.id,
+        catalog: {
+          packId: 'builtin:arrow-proof',
+          source: 'builtin',
+          sourceSha256: sha256,
+          createdAt: 0,
+          updatedAt: 0,
+          version: '1',
+          enabled: true,
+          label: { en: document.label.en, ru: document.label.ru ?? document.label.en },
+          description: { en: '', ru: '' },
+          assets: [],
+          retainedByteLength: Buffer.byteLength(source),
+          documents: [
+            {
+              id: document.id,
+              source,
+              sha256,
+              assets: [],
+              kind: 'standalone',
+              schemaVersion: 'sniptale.animation.v1',
+            },
+          ],
+        },
+      })
+    );
+    const host = project.clips.find(
+      (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === 'lottie-arrow'
+    );
+    if (!host) throw new Error('Missing applied arrow host');
+    host.id = 'lottie-arrow-host';
+    host.transform = { ...host.transform, x: 0, y: 0, width: 320, height: 180, rotation: 25 };
+    const instance = project.effectInstances!.find((item) => item.id === 'lottie-arrow')!;
+    const sceneAnchors = initializeEffectSceneAnchors(document, host.transform);
+    if (!sceneAnchors) throw new Error('Missing built-in arrow handles');
+    instance.sceneAnchors = sceneAnchors;
+  }
+  if (options.sourceFx) {
+    // Contrast zero gives an independent constant source oracle: R=B=.18, G=.36.
+    // Actions, cursor, header and camera remain owned by the following composition stages.
+    const green = createSourceImageFilter('color', 'spatial-source-green');
+    if (green.kind !== 'color') throw new Error('Expected color filter.');
+    green.parameters.contrast = 0;
+    green.parameters.brightness = 0.36;
+    green.parameters.saturation = 0;
+    green.parameters.tint = 1;
+    project.clips = project.clips.map((clip) => {
+      if (
+        clip.type !== 'VIDEO' ||
+        project.tracks.find((track) => track.id === clip.trackId)?.role === 'CAMERA'
+      )
+        return clip;
+      const eligible =
+        options.sourceFx === 'clip'
+          ? clip.id === video.id
           : options.sourceFx === 'track'
-            ? { kind: 'track', trackId: video.trackId }
-            : options.sourceFx === 'video-group'
-              ? { kind: 'video-group' }
-              : { kind: 'clip', clipId: options.sourceFx ? video.id : image.id },
-        snapshotId,
-        controls: Object.fromEntries(
-          document.controls.map((control) => [
-            control.id,
-            resolveEffectV1ControlDefault(control, locale),
-          ])
-        ),
-        ...(options.sourceFx
-          ? {
-              controls: {
-                ...Object.fromEntries(
-                  document.controls.map((control) => [
-                    control.id,
-                    resolveEffectV1ControlDefault(control, locale),
-                  ])
-                ),
-                strength: 100,
-                edge: 0,
-                saturation: 0,
-                tint: '#00ff00',
-              },
-            }
-          : {}),
-        ...(options.effectTransition ? {} : { rangeMode: 'owner' as const }),
-        enabled: true,
-        startTime: options.effectTransition ? 0.4 : 0,
-        duration: options.effectTransition ? 0.4 : 1.2,
-        playbackRate: document.duration / (options.effectTransition ? 0.4 : image.duration),
-      },
-    ];
-    if (options.sourceFxChain) {
-      const first = project.effectInstances[0]!;
-      project.effectInstances.push({
-        ...first,
-        id: 'second-source-effect',
-        controls: { ...first.controls },
-      });
-    }
+            ? clip.trackId === video.trackId
+            : true;
+      return eligible
+        ? {
+            ...clip,
+            sourceFilters: {
+              version: 1,
+              filters: [
+                structuredClone(green),
+                ...(options.sourceFxChain
+                  ? [{ ...structuredClone(green), id: 'spatial-source-green-second' }]
+                  : []),
+              ],
+            },
+          }
+        : clip;
+    });
   }
   if (options.sourceActionFocus) {
     if (!video.sourceInstanceId) throw new Error('Missing source action identity');
@@ -425,16 +445,16 @@ async function openFixture(
         id: 'moving-source-transition',
         leadingClipId: video.id,
         trailingClipId: 'moving-next-video',
-        kind: 'PUSH',
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         duration: 0.6,
         easing: 'EASE_IN_OUT',
-        direction: 'RIGHT',
-        intensity: 'BOLD',
       },
     ];
   }
   Object.assign(project, hydrateVideoProject(project));
   expect(isHydratableVideoProject(project)).toBe(true);
+  if (options.sourceFx) project.version = 52;
   await applyHarnessBootstrap(page, {
     preserveMediaLibrary: true,
     videoProjects: [project],
@@ -509,7 +529,6 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
   }, info) => {
     test.setTimeout(180000);
     await page.setViewportSize({ ...viewport.size });
-    const completedEffectPlans = await observeEffectGpuPlans(page);
     const locale = index === 0 ? 'en' : 'ru',
       theme = index === 0 ? 'dark' : 'light';
     await page.emulateMedia({ colorScheme: theme });
@@ -663,7 +682,6 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
           () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
         )
       ).toBe(true);
-      expect(completedEffectPlans()).toBeGreaterThan(0);
       expect(errors).toEqual([]);
     } finally {
       host.server.closeAllConnections();
@@ -1627,7 +1645,7 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
 }
 
 for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
-  test(`EffectV1 region has round projected handles and native resize ${viewport.size.width}`, async ({
+  test(`Lottie object handles preserve projected editing and Undo ${viewport.size.width}`, async ({
     page,
   }, info) => {
     test.setTimeout(180000);
@@ -1638,99 +1656,101 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
     await page.addInitScript((value) => {
       if (window === window.top) localStorage.setItem('sniptale-theme-preference', value);
     }, theme);
-    const host = await startHostServer();
-    const errors: string[] = [];
+    const host = await startHostServer(),
+      errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     try {
-      await openFixture(page, host.origin, locale, theme, { effectRegion: true });
+      await openFixture(page, host.origin, locale, theme, { effectAnchors: true });
       const stage = page.locator('[data-ui="video.preview.stage.root"]');
       const select = async () => {
-        await page.locator('[data-clip-fx="projected-region"]').getByRole('button').first().click();
+        const clip = page.locator('[data-project-timeline-clip="lottie-arrow-host"]');
+        await clip.scrollIntoViewIfNeeded();
+        await clip.click();
         await stage.focus();
         await expect(stage).toHaveAttribute('data-canvas-interaction-active', 'true');
       };
+      const readAnchors = async () =>
+        (await readNativeVideoProject(page))!.effectInstances!.find(
+          (item) => item.id === 'lottie-arrow'
+        )!.sceneAnchors!;
       await select();
-      const frame = page.locator('[data-effect-editor-region="projected-region"]');
-      const handles = page.locator('[data-effect-region-handle]');
-      await expect(frame).toBeVisible();
-      await expect(handles).toHaveCount(4);
-      const geometry = await frame.evaluate((node: HTMLElement) => {
-        const parent = node.offsetParent;
-        if (!(parent instanceof HTMLElement)) throw new Error('Missing frame placement owner');
-        const bounds = parent.getBoundingClientRect(),
-          style = getComputedStyle(node);
-        const matrix = new DOMMatrixReadOnly(style.transform);
-        const width = parseFloat(style.width),
-          height = parseFloat(style.height);
-        return [...parent.querySelectorAll<HTMLElement>('[data-effect-region-handle]')].map(
-          (handle) => {
-            const key = handle.dataset['effectRegionHandle']!;
-            const point = matrix.transformPoint(
-              new DOMPoint(key.includes('e') ? width : 0, key.includes('s') ? height : 0)
-            );
-            const rect = handle.getBoundingClientRect();
-            const x = rect.x + rect.width / 2,
-              y = rect.y + rect.height / 2;
-            return {
-              key,
-              width: rect.width,
-              height: rect.height,
-              projectedParent: node.contains(handle),
-              hit: document.elementFromPoint(x, y) === handle,
-              error: Math.hypot(
-                x - (bounds.x + parseFloat(style.left) + point.x / point.w),
-                y - (bounds.y + parseFloat(style.top) + point.y / point.w)
-              ),
-            };
-          }
+      const handles = page.locator('[data-effect-handle]');
+      await expect(handles).toHaveCount(2);
+      const before = await readAnchors(),
+        bounds = (await stage.boundingBox())!;
+      const angle = (35 * Math.PI) / 180,
+        gamma = (0.7 * Math.sin(angle)) / Math.hypot(256, 144);
+      const geometry = [];
+      for (const id of ['start', 'end']) {
+        const handle = page.locator(`[data-effect-handle="${id}"]`),
+          box = (await handle.boundingBox())!,
+          point = before[id]!;
+        const denominator = 1 + gamma * (point.x - 160);
+        const expected = {
+          x:
+            bounds.x +
+            ((160 + (Math.cos(angle) * (point.x - 160)) / denominator) * bounds.width) / 320,
+          y: bounds.y + ((90 + (point.y - 90) / denominator) * bounds.height) / 180,
+        };
+        const error = Math.hypot(
+          box.x + box.width / 2 - expected.x,
+          box.y + box.height / 2 - expected.y
         );
-      });
-      expect(geometry).toHaveLength(4);
-      for (const handle of geometry) {
-        expect(handle.projectedParent).toBe(false);
-        expect(handle.width).toBeCloseTo(14, 2);
-        expect(handle.height).toBeCloseTo(14, 2);
-        expect(handle.error, JSON.stringify(handle)).toBeLessThan(0.25);
-        expect(handle.hit, JSON.stringify(handle)).toBe(true);
+        expect(box.width).toBeCloseTo(16, 2);
+        expect(box.height).toBeCloseTo(16, 2);
+        expect(error).toBeLessThan(0.25);
+        expect(
+          await handle.evaluate((node) => {
+            const r = node.getBoundingClientRect();
+            return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === node;
+          })
+        ).toBe(true);
+        geometry.push({ id, expected, box, error });
       }
       await writeFile(
-        info.outputPath('projected-region-geometry.json'),
+        info.outputPath('lottie-handle-geometry.json'),
         JSON.stringify(geometry, null, 2)
       );
       await page.screenshot({
-        path: info.outputPath('projected-effect-region.png'),
+        path: info.outputPath('lottie-object-handles.png'),
         fullPage: false,
       });
-      const readControls = async () =>
-        (await readNativeVideoProject(page))!.effectInstances!.find(
-          (item) => item.id === 'projected-region'
-        )!.controls;
-      const before = await readControls();
-      const southeast = page.locator('[data-effect-region-handle="se"]');
-      const start = (await southeast.boundingBox())!;
+      const end = page.locator('[data-effect-handle="end"]');
+      if (index === 0) {
+        await end.focus();
+        await page.keyboard.press('Shift+ArrowRight');
+        await expect
+          .poll(readAnchors)
+          .toEqual({ ...before, end: { x: before['end']!.x + 10, y: before['end']!.y } });
+        await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
+        await expect.poll(readAnchors).toEqual(before);
+        expect(errors).toEqual([]);
+        return;
+      }
+      const start = (await end.boundingBox())!;
       await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
       await page.mouse.down();
       await page.mouse.move(start.x + start.width / 2 + 12, start.y + start.height / 2 + 10);
-      expect(await readControls()).toEqual(before);
+      expect(await readAnchors()).toEqual(before);
       await page.mouse.up();
-      await expect.poll(readControls).not.toEqual(before);
-      const edited = await readControls();
+      await expect.poll(readAnchors).not.toEqual(before);
+      const edited = await readAnchors();
       await page.locator('[data-ui="video-editor.timeline.toolbar.undo"]').click();
-      await expect.poll(readControls).toEqual(before);
+      await expect.poll(readAnchors).toEqual(before);
       await page.locator('[data-ui="video-editor.timeline.toolbar.redo"]').click();
-      await expect.poll(readControls).toEqual(edited);
+      await expect.poll(readAnchors).toEqual(edited);
       await stage.focus();
-      const again = (await southeast.boundingBox())!;
+      const again = (await end.boundingBox())!;
       await page.mouse.move(again.x + again.width / 2, again.y + again.height / 2);
       await page.mouse.down();
       await page.mouse.move(again.x + again.width / 2 - 10, again.y + again.height / 2 - 8);
       await page.keyboard.press('Escape');
       await page.mouse.up();
-      expect(await readControls()).toEqual(edited);
+      expect(await readAnchors()).toEqual(edited);
       await page.reload();
       await select();
-      await expect(frame).toBeVisible();
-      expect(await readControls()).toEqual(edited);
+      await expect(handles).toHaveCount(2);
+      expect(await readAnchors()).toEqual(edited);
       expect(errors).toEqual([]);
     } finally {
       host.server.closeAllConnections();
@@ -1819,7 +1839,6 @@ for (const scope of ['clip', 'track', 'video-group', 'chain'] as const) {
     }, info) => {
       test.setTimeout(180000);
       await page.setViewportSize({ ...viewport.size });
-      const completedEffectPlans = await observeEffectGpuPlans(page);
       const host = await startHostServer();
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
@@ -1869,7 +1888,7 @@ for (const scope of ['clip', 'track', 'video-group', 'chain'] as const) {
           if (reopened) await page.reload();
           await expect(canvas).toBeVisible();
           // CLICK_PRESS uses half of its temporal envelope for the center fill.
-          // Outside grayscale/green FX, red minus blue depends only on the marker alpha.
+          // Outside the constant grayscale/green source filter, red minus blue depends only on the marker alpha.
           const alpha = 0.5 * (1 - 0.2 / 1.4);
           await expect
             .poll(
@@ -1892,7 +1911,6 @@ for (const scope of ['clip', 'track', 'video-group', 'chain'] as const) {
         );
         await page.screenshot({ path: info.outputPath('source-action-fx.png'), fullPage: false });
         expect(errors).toEqual([]);
-        expect(completedEffectPlans()).toBeGreaterThan(0);
       } finally {
         host.server.closeAllConnections();
         await new Promise<void>((resolve) => host.server.close(() => resolve()));
@@ -1904,12 +1922,11 @@ for (const scope of ['clip', 'track', 'video-group', 'chain'] as const) {
 for (const effectTransition of [false, true])
   for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     test(
-      `${effectTransition ? 'EffectV1 dissolve' : 'ordinary crossfade'} keeps two clip ` +
+      `GL Fade with ${effectTransition ? 'narrow' : 'full'} trailing window keeps two clip ` +
         `opacity contributions on the projected plane ${viewport.size.width}`,
       async ({ page }, info) => {
         test.setTimeout(180000);
         await page.setViewportSize({ ...viewport.size });
-        const completedEffectPlans = effectTransition ? await observeEffectGpuPlans(page) : null;
         const host = await startHostServer();
         const errors: string[] = [];
         page.on('pageerror', (error) => errors.push(error.message));
@@ -1945,7 +1962,7 @@ for (const effectTransition of [false, true])
           let frame = 0;
           for (const [time, alpha] of [
             [0.2, effectTransition ? 1 : 0.2],
-            [0.6, effectTransition ? 0.5 : 0.55],
+            [0.6, effectTransition ? 0.5 : 0.6],
             [1, effectTransition ? 0 : 1],
           ] as const) {
             const target = Math.round(time * before.fps);
@@ -1956,11 +1973,8 @@ for (const effectTransition of [false, true])
             await expect
               .poll(async () => Number(await slider.getAttribute('aria-valuenow')))
               .toBeCloseTo(time, 7);
-            // The narrow trailing window excludes this point. Its midpoint requires a completed effect frame.
-            if (effectTransition && time === 0.6 && completedEffectPlans)
-              await expect.poll(completedEffectPlans).toBeGreaterThan(0);
-            // Independent source-over: midpoint alpha=.1+.5*(1-.1)=.55.
-            // EffectV1 sees only the leading window here: midpoint alpha=.5*1+.5*0=.5.
+            // GL Fade interpolates premultiplied physical-track states.
+            // Full midpoint alpha=.5*.2+.5*1=.6; outside the narrow tail it is .5*1=.5.
             const expected = [18, 52, 86].map(
               (channel, i) => channel + alpha * ([34, 211, 238][i]! - channel)
             );
@@ -1981,7 +1995,6 @@ for (const effectTransition of [false, true])
             path: info.outputPath('ordinary-transition.png'),
             fullPage: false,
           });
-          if (completedEffectPlans) expect(completedEffectPlans()).toBeGreaterThan(0);
           expect(errors).toEqual([]);
         } finally {
           host.server.closeAllConnections();

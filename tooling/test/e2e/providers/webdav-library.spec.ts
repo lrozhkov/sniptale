@@ -5,10 +5,7 @@ import { expect, type Page, type TestInfo } from '@playwright/test';
 import { test, openProvider, saveProof } from './webdav-fixtures';
 import { DB_NAME } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores';
 import { parseSyncProductResponse } from '../../../../apps/extension/src/contracts/messaging/contracts/runtime/sync-product';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../support/effect-v1-corpus.test-support';
+import { readFileSync } from 'node:fs';
 
 type Provider = Awaited<ReturnType<typeof openProvider>>;
 const build = '.tmp/e2e-builds/security';
@@ -336,10 +333,9 @@ for (const viewport of [
   }, info) => {
     test.setTimeout(300_000);
     const source = await openProvider(lab, info, 'library-source', false, build, { viewport });
-    const specimen = EFFECT_BUNDLE_CORPUS.find(
-      (item) => item.accepted && item.artifact.includes('asset-bearing-conformance')
+    const animationBytes = readFileSync(
+      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json'
     );
-    if (!specimen) throw new Error('Asset-bearing corpus is unavailable.');
     let target: Provider | null = null;
     try {
       await connectionPage(source, viewport);
@@ -386,7 +382,7 @@ for (const viewport of [
           };
         },
         {
-          effectBundleBytes: Array.from(readEffectBundleCorpusArchive(specimen)),
+          effectBundleBytes: Array.from(animationBytes),
           rootUrl: enrolledRootUrl,
         }
       );

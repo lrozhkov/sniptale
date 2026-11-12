@@ -1,3 +1,7 @@
+import {
+  GL_TRANSITIONS,
+  createGlTransitionSelection,
+} from '../features/video/project/transition/gl-catalog';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -79,25 +83,96 @@ it('cancels a numeric edit without committing or changing the accepted value', (
     )!.value
   ).toBe('0.2');
 });
-it('offers three direct choices and retains timings and color across active kinds', () => {
+it('offers every bundled GL choice and preserves authored timing when explicitly replacing a legacy kind', async () => {
   const callbacks = render({ type: 'dissolve', before: 0, after: 0.4, color: '#123456' });
-  const choices = host.querySelector('[role="group"][aria-label="Join"]')!;
-  expect(choices.querySelectorAll('button')).toHaveLength(3);
-  act(() =>
-    [...choices.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent === 'gallery.videoReview.cutFadeColor')!
-      .click()
+  const open = () =>
+    act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Join"]')!.click());
+  const select = (name: string) =>
+    act(async () =>
+      [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+        .find((option) => option.textContent === name)!
+        .click()
+    );
+  await open();
+  expect(document.querySelectorAll('[role="option"]')).toHaveLength(GL_TRANSITIONS.length + 3);
+  const labels = new Set(
+    [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent)
   );
+  for (const entry of GL_TRANSITIONS) expect(labels.has(entry.name), entry.name).toBe(true);
+  await select('CrossZoom');
+  expect(callbacks.onChange).toHaveBeenLastCalledWith({
+    type: 'gl',
+    before: 0,
+    after: 0.4,
+    selection: createGlTransitionSelection('CrossZoom'),
+    easing: 'LINEAR',
+  });
+  await open();
+  await select('gallery.videoReview.cutFadeColor');
   expect(callbacks.onChange).toHaveBeenLastCalledWith({
     type: 'fade-black',
     before: 0,
     after: 0.4,
     color: '#123456',
   });
-  act(() =>
-    [...choices.querySelectorAll<HTMLButtonElement>('button')]
-      .find((button) => button.textContent === 'gallery.videoReview.transitionNone')!
-      .click()
-  );
+  await open();
+  await select('gallery.videoReview.transitionNone');
   expect(callbacks.onChange).toHaveBeenLastCalledWith(null);
+});
+
+it('keeps the pinned GL selection and easing when editing loaded join timing', () => {
+  const selection = createGlTransitionSelection('BowTie')!;
+  const settings = {
+    type: 'gl' as const,
+    selection,
+    easing: 'EASE_IN_OUT' as const,
+    before: 0.2,
+    after: 0.2,
+  };
+  const callbacks = render(settings);
+  expect(host.textContent).toContain('BowTie');
+  accept('gallery.videoReview.presentationDuration', '0.8');
+  expect(callbacks.onChange).toHaveBeenCalledExactlyOnceWith({
+    ...settings,
+    before: 0.4,
+    after: 0.4,
+  });
+});
+
+it('forwards an opaque preset slot only into a GL join without changing timing or easing', () => {
+  const value = {
+      type: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
+      before: 0.3,
+      after: 0.7,
+      easing: 'EASE_IN_OUT' as const,
+    },
+    change = vi.fn(),
+    action = vi.fn();
+  const mount = (current: CompositionJoinSettings | undefined) =>
+    root.render(
+      <PresentationJoinFields
+        label="Join"
+        value={current}
+        Details={Details}
+        preferenceId="preset-slot"
+        onChange={change}
+        onPreview={vi.fn()}
+        glPresetActions={
+          <button data-testid="preset-slot" onClick={action}>
+            Preset action
+          </button>
+        }
+      />
+    );
+  act(() => mount(value));
+  const button = host.querySelector<HTMLButtonElement>('[data-testid=preset-slot]')!;
+  expect(button).not.toBeNull();
+  act(() => button.click());
+  expect(action).toHaveBeenCalledOnce();
+  expect(change).not.toHaveBeenCalled();
+  accept('gallery.videoReview.presentationJoinBefore', '0.5');
+  expect(change).toHaveBeenLastCalledWith({ ...value, before: 0.5 });
+  act(() => mount(undefined));
+  expect(host.querySelector('[data-testid=preset-slot]')).toBeNull();
 });

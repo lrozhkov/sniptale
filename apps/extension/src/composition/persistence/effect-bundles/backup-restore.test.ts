@@ -1,223 +1,182 @@
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../../../../../tooling/test/support/effect-v1-corpus.test-support';
-import { importEffectBundleZip } from '../../../features/video/project/effect-bundle/import/zip';
-import { createEffectCatalogEntry } from './catalog-builder';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-const mocks = vi.hoisted(() => ({ integrity: vi.fn() }));
-vi.mock('./integrity', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./integrity')>()),
-  assertEffectBundleCatalogIntegrity: mocks.integrity,
-}));
-
+import '../infrastructure/indexed-db/fake-indexed-db.test-support';
+import { openDB, deleteDB, type IDBPDatabase } from 'idb';
+import { beforeEach, afterEach, expect, it } from 'vitest';
 import { prepareEffectBundleBackupRestore } from './backup-restore';
-import { parseEffectBundleCatalogEntry } from './entry';
-import { readRetainedTitleCatalogEntry } from './fixture.test-support';
-
-const metadata = {
-  createdAt: 1,
-  description: { en: '', ru: '' },
-  documents: [
-    {
-      assets: [],
-      id: 'effect',
-      kind: 'standalone' as const,
-      schemaVersion: 'sniptale.effect.v1' as const,
-      sha256: 'b'.repeat(64),
-      source: '{}',
+import {
+  readValidAnimationSourceEntry,
+  createValidGlPresetSourceEntry,
+} from './fixture.test-support';
+let db: IDBPDatabase,
+  name = '',
+  serial = 0;
+beforeEach(async () => {
+  name = `visual-prepared-restore-${++serial}`;
+  db = await openDB(name, 1, {
+    upgrade(db) {
+      db.createObjectStore('animation', { keyPath: 'packId' });
+      db.createObjectStore('transition', { keyPath: 'id' });
+      db.createObjectStore('preferences', { keyPath: ['kind', 'packId'] });
     },
-  ],
-  enabled: true,
-  label: { en: 'Bundle', ru: 'Набор' },
-  packId: 'bundle-one',
-  retainedByteLength: 5,
-  source: 'bundle-zip' as const,
-  sourceSha256: 'c'.repeat(64),
-  updatedAt: 2,
-  version: '1',
-};
-const assets = [
-  {
-    blob: new Blob(['image'], { type: 'image/png' }),
-    byteLength: 5,
-    kind: 'image' as const,
-    mimeType: 'image/png',
-    sha256: 'a'.repeat(64),
-  },
-];
-
-function store(existing?: unknown) {
-  return {
-    get: vi.fn().mockResolvedValue(existing),
-    put: vi.fn(async (_entry: unknown) => {}),
-  };
+  });
+});
+afterEach(async () => {
+  db.close();
+  await deleteDB(name);
+});
+async function publish(
+  kind: 'animation' | 'transition',
+  prepared: Awaited<ReturnType<typeof prepareEffectBundleBackupRestore>>,
+  strategy: 'skip' | 'replace' | 'duplicate',
+  extra: Partial<Parameters<typeof prepared>[0]> = {}
+) {
+  const tx = db.transaction([kind, 'preferences'], 'readwrite');
+  try {
+    const result = await prepared({
+      store: tx.objectStore(kind),
+      preferences: tx.objectStore('preferences'),
+      strategy,
+      ...extra,
+    });
+    await tx.done;
+    return result;
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      // The transaction can already be aborted.
+    }
+    await tx.done.catch(() => undefined);
+    throw error;
+  }
 }
-
-beforeEach(() => vi.resetAllMocks());
-
-describe('effect bundle prepared backup restore', () => {
-  it('puts a canonical restored entry without opening or completing a transaction', async () => {
-    const target = store();
-    const publish = await prepareEffectBundleBackupRestore({ assets, entry: metadata });
-    await expect(publish({ store: target, strategy: 'replace' })).resolves.toEqual({
-      conflicted: false,
-      imported: true,
-      packId: 'bundle-one',
-    });
-    expect(target.put).toHaveBeenCalledWith(
-      expect.objectContaining({ assets, packId: 'bundle-one' })
-    );
+it('restores exact verified Lottie source and preferences, remaps a duplicate and retains skip state', async () => {
+  const entry = await readValidAnimationSourceEntry(),
+    doc = entry.documents[0]!;
+  const preference = {
+    format: 'sniptale-visual-preferences',
+    version: 1,
+    kind: 'animation',
+    packId: entry.packId,
+    documents: { [doc.id]: { sourceSha256: doc.sha256, enabled: false } },
+  };
+  const prepared = await prepareEffectBundleBackupRestore({ kind: 'animation', entry, preference });
+  await expect(publish('animation', prepared, 'replace')).resolves.toMatchObject({
+    imported: true,
+    conflicted: false,
+    packId: entry.packId,
   });
-
-  it('supports skip and duplicate without overwriting the conflict', async () => {
-    const existing = { ...metadata, assets };
-    const skipped = store(existing);
-    const publish = await prepareEffectBundleBackupRestore({ assets, entry: metadata });
-    await expect(publish({ store: skipped, strategy: 'skip' })).resolves.toEqual({
-      conflicted: true,
+  expect(await db.get('animation', entry.packId)).toEqual(entry);
+  expect(await db.get('preferences', ['animation', entry.packId])).toEqual(preference);
+  const skipped = await publish('animation', prepared, 'skip');
+  expect(skipped.imported).toBe(false);
+  expect(await db.count('animation')).toBe(1);
+  const duplicate = await publish('animation', prepared, 'duplicate', { createId: () => 'copy' });
+  expect(duplicate.packId).not.toBe(entry.packId);
+  expect(await db.get('animation', duplicate.packId)).toEqual({
+    ...entry,
+    packId: duplicate.packId,
+  });
+  expect(await db.get('preferences', ['animation', duplicate.packId])).toEqual({
+    ...preference,
+    packId: duplicate.packId,
+  });
+});
+it(
+  'retains unsupported closed GL sources and deduplicates immutable ' +
+    'duplicate identities without replacing preferences',
+  async () => {
+    const entry = createValidGlPresetSourceEntry('Future', '99.0.0'),
+      prepared = await prepareEffectBundleBackupRestore({ kind: 'transition', entry });
+    await publish('transition', prepared, 'replace');
+    const preference = {
+      format: 'sniptale-visual-preferences',
+      version: 1,
+      kind: 'transition',
+      packId: entry.id,
+      documents: { Fade: { sourceSha256: entry.sourceSha256, enabled: false } },
+    };
+    await db.put('preferences', preference);
+    expect(await publish('transition', prepared, 'duplicate')).toMatchObject({
       imported: false,
-      packId: 'bundle-one',
-    });
-    expect(skipped.put).not.toHaveBeenCalled();
-
-    const duplicated = store(existing);
-    await expect(
-      publish({
-        createId: () => 'duplicate-id',
-        store: duplicated,
-        strategy: 'duplicate',
-      })
-    ).resolves.toEqual({
       conflicted: true,
-      imported: true,
-      packId: 'bundle-one-duplicate-id',
+      packId: entry.id,
     });
-    expect(duplicated.put).toHaveBeenCalledWith(
-      expect.objectContaining({ packId: 'bundle-one-duplicate-id' })
-    );
-  });
-});
-
-it.each(['insert', 'delete', 'recreate'] as const)(
-  'reads the current conflict after delayed integrity preparation: %s',
-  async (change) => {
-    let release: () => void = () => {
-      throw new Error('Missing integrity release');
-    };
-    mocks.integrity.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolve) => {
-          release = resolve;
-        })
-    );
-    const source = {
-      ...metadata,
-      documents: metadata.documents.map((document) => ({ ...document })),
-    };
-    const pending = prepareEffectBundleBackupRestore({ assets, entry: source });
-    const existing = { ...metadata, assets };
-    let head: unknown = change === 'insert' ? undefined : existing;
-    const target = {
-      get: vi.fn(async () => head),
-      put: vi.fn(async (_entry: unknown) => {}),
-    };
-    await vi.waitFor(() => expect(mocks.integrity).toHaveBeenCalledOnce());
-    expect(target.get).not.toHaveBeenCalled();
-    source.documents[0]!.source = 'Changed after capture';
-    head = change === 'delete' ? undefined : { ...existing, version: 'fresh-identity' };
-    release();
-    const publish = await pending;
-    expect(target.put).not.toHaveBeenCalled();
-    await expect(
-      publish({ store: target, strategy: 'duplicate', createId: () => 'copy' })
-    ).resolves.toMatchObject({
-      conflicted: change !== 'delete',
-      imported: true,
-      packId: change === 'delete' ? metadata.packId : `${metadata.packId}-copy`,
-    });
-    expect(target.put.mock.calls[0]?.[0]).toMatchObject({ documents: [{ source: '{}' }] });
-    expect(head).toEqual(
-      change === 'delete' ? undefined : { ...existing, version: 'fresh-identity' }
-    );
+    expect(await db.get('preferences', ['transition', entry.id])).toEqual(preference);
+    await publish('transition', prepared, 'replace');
+    expect(await db.get('preferences', ['transition', entry.id])).toBeUndefined();
+    expect((await db.get('transition', entry.id)).source).toBe(entry.source);
   }
 );
-
-it('retries a refused publication through a fresh store without repeating preparation', async () => {
-  const publish = await prepareEffectBundleBackupRestore({ assets, entry: metadata });
-  const refused = store();
-  refused.put.mockRejectedValueOnce(new Error('Storage refused'));
-  await expect(publish({ store: refused, strategy: 'replace' })).rejects.toThrow('Storage refused');
-  const fresh = store({ ...metadata, assets });
-  await expect(publish({ store: fresh, strategy: 'skip' })).resolves.toMatchObject({
-    conflicted: true,
-    imported: false,
-  });
-  expect(fresh.put).not.toHaveBeenCalled();
-  expect(mocks.integrity).toHaveBeenCalledOnce();
+it('refuses malformed sources and foreign preference identity before opening publication', async () => {
+  const animation = await readValidAnimationSourceEntry(),
+    gl = createValidGlPresetSourceEntry();
+  await expect(
+    prepareEffectBundleBackupRestore({
+      kind: 'animation',
+      entry: {
+        ...animation,
+        documents: animation.documents.map((doc) => ({ ...doc, sha256: '0'.repeat(64) })),
+      },
+    })
+  ).rejects.toThrow();
+  await expect(
+    prepareEffectBundleBackupRestore({
+      kind: 'transition',
+      entry: { ...gl, source: gl.source + ' ' },
+    })
+  ).rejects.toThrow();
+  await expect(
+    prepareEffectBundleBackupRestore({
+      kind: 'transition',
+      entry: gl,
+      preference: {
+        format: 'sniptale-visual-preferences',
+        version: 1,
+        kind: 'animation',
+        packId: gl.id,
+        documents: {},
+      },
+    })
+  ).rejects.toThrow();
+  expect(await db.count('animation')).toBe(0);
+  expect(await db.count('transition')).toBe(0);
 });
-
-it.each(['valid', 'resource', 'source', 'closure'] as const)(
-  'prepares actual resource catalog integrity before publication: %s',
-  async (mode) => {
-    const specimen = EFFECT_BUNDLE_CORPUS.find(
-      (item) => item.accepted && item.artifact.includes('asset-bearing-conformance')
-    )!;
-    const imported = await importEffectBundleZip(readEffectBundleCorpusArchive(specimen));
-    if (!imported.ok) throw new Error('Invalid actual catalog corpus');
-    const catalog = await createEffectCatalogEntry(
-      { kind: 'bundle-zip', bundle: imported.bundle },
-      1
-    );
-    const original = structuredClone(catalog);
-    const { assertEffectBundleCatalogIntegrity } =
-      await vi.importActual<typeof import('./integrity')>('./integrity');
-    mocks.integrity.mockImplementation(assertEffectBundleCatalogIntegrity);
-    if (mode === 'source') catalog.documents[0]!.source += ' ';
-    if (mode === 'closure') catalog.documents[0]!.assets[0]!.id = 'missing-resource';
-    if (mode === 'resource') {
-      const asset = catalog.assets[0]!;
-      const bytes = new Uint8Array(await asset.blob.arrayBuffer());
-      bytes[bytes.length - 1] = bytes[bytes.length - 1] === 0 ? 1 : 0;
-      asset.blob = new Blob([bytes], { type: asset.mimeType });
-    }
-    const { assets: resources, ...entry } = catalog;
-    const target = store(original);
-    const pending = prepareEffectBundleBackupRestore({ assets: resources, entry });
-    if (mode === 'valid') {
-      const publish = await pending;
-      expect(target.get).not.toHaveBeenCalled();
-      await publish({ store: target, strategy: 'replace' });
-      expect(target.put).toHaveBeenCalledOnce();
-      const published = parseEffectBundleCatalogEntry(target.put.mock.calls[0]?.[0]);
-      if (!published) throw new Error('Missing published catalog');
-      await expect(assertEffectBundleCatalogIntegrity(published)).resolves.toBeUndefined();
-    } else {
-      await expect(pending).rejects.toMatchObject({ code: 'catalogIntegrityFailure' });
-      expect(target.get).not.toHaveBeenCalled();
-      expect(target.put).not.toHaveBeenCalled();
-      await expect(assertEffectBundleCatalogIntegrity(original)).resolves.toBeUndefined();
-    }
-  }
-);
-
-it('restores a retained title through actual integrity checks without changing source bytes', async () => {
-  const catalog = await readRetainedTitleCatalogEntry();
-  const original = structuredClone(catalog);
-  const { assertEffectBundleCatalogIntegrity } =
-    await vi.importActual<typeof import('./integrity')>('./integrity');
-  mocks.integrity.mockImplementation(assertEffectBundleCatalogIntegrity);
-  const { assets: resources, ...entry } = catalog;
-  const target = store();
-
-  const publish = await prepareEffectBundleBackupRestore({ assets: resources, entry });
-  expect(target.put).not.toHaveBeenCalled();
-  await publish({ store: target, strategy: 'replace' });
-  expect(target.put).toHaveBeenCalledWith(original);
-  const restored = parseEffectBundleCatalogEntry(target.put.mock.calls[0]?.[0]);
-  if (!restored) throw new Error('Missing retained catalog');
-  await expect(assertEffectBundleCatalogIntegrity(restored)).resolves.toBeUndefined();
-  expect(restored.documents[0]!.source).toBe(original.documents[0]!.source);
-  expect(catalog).toEqual(original);
+it('does not overwrite another identity on repeated duplicate collisions and preserves completed sources', async () => {
+  const entry = await readValidAnimationSourceEntry(),
+    prepared = await prepareEffectBundleBackupRestore({ kind: 'animation', entry });
+  await publish('animation', prepared, 'replace');
+  await publish('animation', prepared, 'duplicate', { createId: () => 'same' });
+  await expect(
+    publish('animation', prepared, 'duplicate', { createId: () => 'same' })
+  ).rejects.toThrow('unique');
+  expect(await db.count('animation')).toBe(2);
+  expect(await db.get('animation', entry.packId)).toEqual(entry);
+});
+it('refuses insufficient physical storage and rolls back preference changes with a source-write failure', async () => {
+  const entry = createValidGlPresetSourceEntry(),
+    prepared = await prepareEffectBundleBackupRestore({ kind: 'transition', entry });
+  await expect(
+    publish('transition', prepared, 'replace', { estimate: { quota: 1, usage: 0 } })
+  ).rejects.toThrow('catalogQuotaExceeded');
+  expect(await db.count('transition')).toBe(0);
+  const tx = db.transaction(['transition', 'preferences'], 'readwrite');
+  await expect(
+    prepared({
+      store: {
+        get: (id) => tx.objectStore('transition').get(id),
+        getAll: () => tx.objectStore('transition').getAll(),
+        put: async () => {
+          throw Error('Source write failed');
+        },
+      },
+      preferences: tx.objectStore('preferences'),
+      strategy: 'replace',
+    })
+  ).rejects.toThrow('Source write failed');
+  tx.abort();
+  await tx.done.catch(() => undefined);
+  expect(await db.count('preferences')).toBe(0);
+  await expect(publish('transition', prepared, 'replace')).resolves.toMatchObject({
+    imported: true,
+  });
 });

@@ -76,6 +76,7 @@ function stagePresentationScene(
     ...(props.annotationEffects ? { annotationEffects: props.annotationEffects } : {}),
     outerFadePlan: props.outerFadePlan,
     source: { width: props.source.width, height: props.source.height },
+    ...(props.scene?.sourceFilters ? { sourceFilters: props.scene.sourceFilters } : {}),
     ...(props.scene?.canvas ? { canvas: props.scene.canvas } : {}),
     background: props.scene?.background ?? { enabled: false },
     ...(props.scene?.windowHeader ? { windowHeader: props.scene.windowHeader } : {}),

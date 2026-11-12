@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { validateEffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import { createHash } from 'node:crypto';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
@@ -48,24 +48,23 @@ const operation: ReviewOperation = {
 let rows: Map<string, Map<string, unknown>>;
 beforeEach(() => {
   harness.failure = false;
-  vi.mocked(completePhysicalDeleteOperation).mockClear();
+  vi.mocked(completePhysicalDeleteOperation).mockReset().mockResolvedValue(undefined);
   const fixture = createReviewWorkspaceStoreFixture(() => harness.failure);
   rows = fixture.rows;
   harness.database.mockResolvedValue(fixture.database);
 });
 
-async function installAdoptedAnnotation() {
+async function installSourceOnlyAnnotation() {
   const opened = await openVideoWorkspace(id, source);
   const text = readFileSync(
-    resolve(
-      'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json'
-    ),
+    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
     'utf8'
   );
-  const result = validateEffectV1Document(JSON.parse(text));
-  if (!result.ok || !result.document) throw new Error('Invalid adopted source fixture');
-  const asset = result.document.assets[0]!;
-  const hash = 'a'.repeat(64);
+  const result = parseAnimationTemplateSource(text);
+  if (!result.ok || !result.template) throw new Error('Invalid self-contained source fixture');
+  const hash = createHash('sha256').update(text).digest('hex');
+  // Independent existing asset ownership must never be inferred from annotation bytes.
+  const asset = { mimeType: 'image/png', byteLength: 1, sha256: 'b'.repeat(64) };
   const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
   const after = {
     ...before,
@@ -81,6 +80,7 @@ async function installAdoptedAnnotation() {
           attachment: 'viewport',
           transform: { x: 0, y: 0, width: 1, height: 1, rotation: 0 },
           controls: { accent: '#123456' },
+          anchors: { tip: { x: 0.5, y: 0.5 } },
           order: 0,
         },
       ],
@@ -93,22 +93,13 @@ async function installAdoptedAnnotation() {
     effectSnapshots: [
       {
         id: `effect:${hash}`,
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         kind: 'standalone',
-        documentId: result.document.id,
+        documentId: result.template.id,
         sha256: hash,
         source: text,
-        retainedByteLength: new TextEncoder().encode(text).byteLength + asset.byteLength!,
-        assets: [
-          {
-            id: asset.id,
-            kind: 'svg',
-            mimeType: asset.mimeType,
-            byteLength: asset.byteLength!,
-            sha256: asset.sha256!,
-            assetId: 'project-asset:adopted',
-          },
-        ],
+        retainedByteLength: new TextEncoder().encode(text).byteLength,
+        assets: [],
       },
     ],
   });
@@ -140,15 +131,30 @@ async function installAdoptedAnnotation() {
   return workspace;
 }
 
-it('journals causal private annotation retirement atomically when Undo is followed by branching', async () => {
-  const adopted = await installAdoptedAnnotation();
-  const undone = await moveVideoWorkspaceHistory({
+it('retires source-only annotation bytes after branching without claiming an unrelated asset', async () => {
+  const adopted = await installSourceOnlyAnnotation();
+  let undone = await moveVideoWorkspaceHistory({
     aggregateId: id,
     expectedRevision: adopted.revision,
     expectedSourceAssetId: adopted.sourceAssetId,
     direction: 'undo',
   });
   expect(undone.workspace.effectSnapshots).toHaveLength(1);
+  expect(undone.workspace.effectSnapshots?.[0]?.source).toBe(adopted.effectSnapshots?.[0]?.source);
+  expect(undone.workspace.effectSnapshots?.[0]?.sha256).toBe(adopted.effectSnapshots?.[0]?.sha256);
+  const redone = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedRevision: undone.workspace.revision,
+    expectedSourceAssetId: adopted.sourceAssetId,
+    direction: 'redo',
+  });
+  expect(redone.workspace.effectSnapshots).toEqual(adopted.effectSnapshots);
+  undone = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedRevision: redone.workspace.revision,
+    expectedSourceAssetId: adopted.sourceAssetId,
+    direction: 'undo',
+  });
   expect(rows.get('project_assets')!.has('adopted')).toBe(true);
   expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
   const branch = await commitVideoWorkspace({
@@ -163,20 +169,13 @@ it('journals causal private annotation retirement atomically when Undo is follow
   expect(rows.get('asset_owners')!.has(JSON.stringify(['project-asset', 'adopted', 'body']))).toBe(
     true
   );
-  const intents = [...rows.get('asset_operations')!.values()];
-  expect(intents).toHaveLength(1);
-  expect(intents[0]).toMatchObject({
-    kind: 'physical-delete',
-    assetIds: [],
-    privateSources: [{ projectAssetId: 'adopted', expectedAssetId: 'adopted-bytes' }],
-  });
-  expect(completePhysicalDeleteOperation).toHaveBeenCalledWith(intents[0], undefined);
+  expect([...rows.get('asset_operations')!.values()]).toEqual([]);
 });
 
 it.each(['redo-consumer', 'published', 'ambiguous'])(
-  'keeps adopted resources with %s evidence after branching',
+  'keeps unrelated asset ownership with %s evidence after source-only branching',
   async (kind) => {
-    const adopted = await installAdoptedAnnotation();
+    const adopted = await installSourceOnlyAnnotation();
     if (kind === 'redo-consumer') {
       const other = { ...adopted, aggregateId: 'other-review', cursor: 0 };
       rows.get('video_workspaces')!.set('other-review', other);
@@ -198,15 +197,12 @@ it.each(['redo-consumer', 'published', 'ambiguous'])(
     expect(rows.get('project_assets')!.has('adopted')).toBe(true);
     expect(rows.get('asset_refs')!.has('adopted-bytes')).toBe(true);
     expect(rows.get('asset_owners')!.size).toBe(1);
-    expect(completePhysicalDeleteOperation).toHaveBeenCalledOnce();
+    expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
   }
 );
 
-it('preserves the prior graph and adopted ownership when delete-intent publication fails', async () => {
-  const fixture = createReviewWorkspaceStoreFixture((name) => name === 'asset_operations');
-  rows = fixture.rows;
-  harness.database.mockResolvedValue(fixture.database);
-  const adopted = await installAdoptedAnnotation();
+it('preserves the prior graph and unrelated ownership when workspace publication fails', async () => {
+  const adopted = await installSourceOnlyAnnotation();
   const undone = await moveVideoWorkspaceHistory({
     aggregateId: id,
     expectedRevision: adopted.revision,
@@ -214,6 +210,7 @@ it('preserves the prior graph and adopted ownership when delete-intent publicati
     direction: 'undo',
   });
   const before = structuredClone(rows);
+  harness.failure = true;
   await expect(
     commitVideoWorkspace({
       aggregateId: id,
@@ -222,12 +219,22 @@ it('preserves the prior graph and adopted ownership when delete-intent publicati
       operation,
     })
   ).rejects.toThrow('No space');
+  harness.failure = false;
   expect(rows).toEqual(before);
+  expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
+  const retried = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedRevision: undone.workspace.revision,
+    expectedSourceAssetId: adopted.sourceAssetId,
+    operation,
+  });
+  expect(retried.workspace.history).toEqual([operation]);
+  expect(rows.get('project_assets')!.has('adopted')).toBe(true);
   expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
 });
 
-it('journals private annotation release when the paused buffer replaces all retained history', async () => {
-  const adopted = await installAdoptedAnnotation();
+it('releases source-only snapshots when the paused buffer replaces all retained history', async () => {
+  const adopted = await installSourceOnlyAnnotation();
   const saved = await saveVideoWorkspaceSnapshot({
     aggregateId: id,
     expectedRevision: adopted.revision,
@@ -238,11 +245,11 @@ it('journals private annotation release when the paused buffer replaces all reta
   });
   expect(saved.workspace.effectSnapshots).toEqual([]);
   expect(rows.get('project_assets')!.has('adopted')).toBe(true);
-  expect(completePhysicalDeleteOperation).toHaveBeenCalledOnce();
+  expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
 });
 
-it('keeps committed authored changes and a replay intent when physical deletion fails', async () => {
-  const adopted = await installAdoptedAnnotation();
+it('commits source-only edits without consulting an unavailable unrelated physical deleter', async () => {
+  const adopted = await installSourceOnlyAnnotation();
   const undone = await moveVideoWorkspaceHistory({
     aggregateId: id,
     expectedRevision: adopted.revision,
@@ -260,19 +267,14 @@ it('keeps committed authored changes and a replay intent when physical deletion 
   });
   expect(saved.workspace.history).toEqual([operation]);
   expect(rows.get('project_assets')!.has('adopted')).toBe(true);
-  expect([...rows.get('asset_operations')!.values()]).toEqual([
-    expect.objectContaining({
-      kind: 'physical-delete',
-      assetIds: [],
-      privateSources: [{ projectAssetId: 'adopted', expectedAssetId: 'adopted-bytes' }],
-    }),
-  ]);
+  expect([...rows.get('asset_operations')!.values()]).toEqual([]);
+  expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
 });
 
 it.each(['append', 'paused-save'])(
   'retains expired effect bytes after automatic history rollover via %s',
   async (mode) => {
-    const adopted = await installAdoptedAnnotation();
+    const adopted = await installSourceOnlyAnnotation();
     const applied = adopted.history[0]!;
     if (applied.target !== 'advancedContent') throw new Error('Unexpected adopted operation');
     const history: ReviewOperation[] = [
@@ -334,6 +336,6 @@ it.each(['append', 'paused-save'])(
     expect(
       rows.get('asset_owners')!.has(JSON.stringify(['project-asset', 'adopted', 'body']))
     ).toBe(true);
-    expect(completePhysicalDeleteOperation).toHaveBeenCalledOnce();
+    expect(completePhysicalDeleteOperation).not.toHaveBeenCalled();
   }
 );

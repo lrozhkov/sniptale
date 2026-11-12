@@ -1,3 +1,4 @@
+import { hasSourceImageFilters } from '../../../image-filters/contract';
 import { withCursorMotionPath } from '../../project/cursor-motion';
 import { reviewTrackEnabled } from './track-controls';
 import { resolveCameraFollowPolicy } from '../../project/camera/cursor-policy';
@@ -100,6 +101,7 @@ export function resolveQuickEditEffectiveFeatures(
  * consumes this instead of interpreting stored settings independently.
  */
 interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
+  sourceFilters?: QuickEditAdvancedState['sourceFilters'];
   zoomRegions: readonly QuickEditZoomRegion[];
   background: QuickEditBackgroundSettings;
   canvas: QuickEditCanvasSize | undefined;
@@ -140,6 +142,7 @@ export function resolveQuickEditEffectiveState(
   const features = resolveQuickEditEffectiveFeatures(state);
   return {
     ...features,
+    ...(state.sourceFilters ? { sourceFilters: state.sourceFilters } : {}),
     cursorMotions:
       advanced && state.cursorMotionEnabled !== false && state.ui.tracks.cursorMotion !== false
         ? state.cursorMotions
@@ -352,6 +355,7 @@ function createCursorRegionProjection(
 }
 
 export type QuickEditExportReason =
+  | 'source-filters'
   | 'canvas'
   | 'window-header'
   | 'webcam'
@@ -452,6 +456,8 @@ export function resolveQuickEditExportPlan(args: {
     visual.push('click-animations');
   if (features.actionsApplied && args.advanced.keyAnimations?.some((item) => item.enabled))
     visual.push('key-animations');
+  if (effective.sourceFilters && hasSourceImageFilters(effective.sourceFilters))
+    visual.push('source-filters');
   if (effective.canvas) visual.push('canvas');
   if (effective.windowHeader) visual.push('window-header');
   if (effective.webcam) visual.push('webcam');

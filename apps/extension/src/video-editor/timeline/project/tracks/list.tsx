@@ -4,7 +4,7 @@ import { readVideoEditorEffectDocumentDragPayload } from '../../../contracts/eff
 import { resolveEffectOwner } from '../../../../features/video/project/effect-instance/owner';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import { getTimelineHistoryLayout } from '../effect-lanes/history-layout';
-import { Activity, ChevronDown, ChevronRight, Rows3, Text } from 'lucide-react';
+import { Activity, Rows3, Text } from 'lucide-react';
 import { TimelineIconButton } from '../controls/icon-button';
 import { ProjectTimelineAddTrackControl } from '../toolbar/sections/add-controls';
 import type { ProjectTimelineInsertionActions } from '../types';
@@ -351,43 +351,7 @@ function ProjectTimelineRailRows(props: {
           onToggleTrackVisibility={props.onToggleTrackVisibility}
         />
       ))}
-      {props.trackLayoutModel.videoFx && (
-        <div
-          style={{ height: props.trackLayoutModel.videoFx.fxHeight }}
-          className="border-b border-[var(--sniptale-color-border-soft)] px-3"
-        >
-          <button
-            type="button"
-            data-ui="video-editor.timeline.video-fx"
-            className={[
-              'flex h-5 w-full items-center gap-1 rounded-[var(--sniptale-radius-sm)]',
-              'text-[11px] text-[var(--sniptale-color-text-muted)]',
-              'hover:bg-[var(--sniptale-color-surface-hover)]',
-              'focus-visible:outline focus-visible:outline-2',
-              'focus-visible:outline-[var(--sniptale-color-accent)]',
-            ].join(' ')}
-            aria-expanded={!props.trackLayoutModel.videoFx.fxCollapsed}
-            aria-label={translate(
-              props.trackLayoutModel.videoFx.fxCollapsed
-                ? 'videoEditor.effectsLibrary.showTimelineEffects'
-                : 'videoEditor.effectsLibrary.collapseTimelineEffects'
-            )}
-            onClick={() =>
-              props.trackPanelPrefs.setFxCollapsed(
-                'video-group',
-                !props.trackLayoutModel.videoFx?.fxCollapsed
-              )
-            }
-          >
-            {props.trackLayoutModel.videoFx.fxCollapsed ? (
-              <ChevronRight size={12} aria-hidden="true" />
-            ) : (
-              <ChevronDown size={12} aria-hidden="true" />
-            )}
-            {`FX · ${translate('videoEditor.effectsLibrary.wholeVideo')}`}
-          </button>
-        </div>
-      )}
+
       <ProjectTimelineEffectLaneLabelRows
         onSelectMotionLane={props.onSelectMotionLane}
         motionLaneSelected={props.motionLaneSelected}

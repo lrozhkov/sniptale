@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { createQuickEditSpotlight } from '../../features/video/project/scene/focus-appearance';
 import { DEFAULT_WINDOW_HEADER } from '@sniptale/runtime-contracts/window-header';
 import { drawReviewSceneFrame } from './scene-frame';
@@ -14,6 +17,24 @@ import { drainSegmentAudio, writeReviewFrames } from './render-export';
 import { renderRenderWindowFrames } from './render-export-composition.test-support';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
+
+const FRAME_SOURCE = readFileSync(
+  'apps/extension/public/video-effects/animations/frame.sniptale-animation.json',
+  'utf8'
+);
+const FRAME_DOCUMENT = parseAnimationTemplateSource(FRAME_SOURCE);
+if (!FRAME_DOCUMENT.ok) throw new Error('Expected valid shipped frame animation.');
+const FRAME_HASH = createHash('sha256').update(FRAME_SOURCE).digest('hex');
+const FRAME_SNAPSHOT = {
+  id: `effect:${FRAME_HASH}`,
+  schemaVersion: 'sniptale.animation.v1' as const,
+  kind: 'standalone' as const,
+  documentId: FRAME_DOCUMENT.template.id,
+  sha256: FRAME_HASH,
+  source: FRAME_SOURCE,
+  retainedByteLength: Buffer.byteLength(FRAME_SOURCE),
+  assets: [],
+};
 const presentationExport = vi.hoisted(() => vi.fn());
 const annotationMain = vi.hoisted(() => ({ open: vi.fn() }));
 vi.mock('./presentation-main', async (importOriginal) => {
@@ -61,7 +82,7 @@ function annotationExportArgs() {
     instances: [
       {
         id: 'frame',
-        snapshotId: 'effect:frame',
+        snapshotId: FRAME_SNAPSHOT.id,
         enabled: true,
         start: 0,
         end: 2,
@@ -113,18 +134,7 @@ it('composes annotations without extra decoding and preserves fractional cadence
     dispose: vi.fn(),
   };
   annotationMain.open.mockReset().mockResolvedValue(main);
-  const effectSnapshots = [
-    {
-      id: 'effect:frame',
-      schemaVersion: 'sniptale.effect.v1' as const,
-      kind: 'standalone' as const,
-      documentId: 'frame',
-      sha256: '0'.repeat(64),
-      source: '{}',
-      retainedByteLength: 2,
-      assets: [],
-    },
-  ];
+  const effectSnapshots = [{ ...FRAME_SNAPSHOT }];
   const fullMap = buildReviewTimeMap(10, []);
   const receipt = await writeReviewFrames({
     ...args,

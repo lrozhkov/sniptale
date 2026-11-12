@@ -1,3 +1,4 @@
+import { SourceImageFilterFields } from '../../ui/source-image-filter-fields';
 import { resolveQuickEditActiveFocusRegions } from '../../features/video/review/advanced/focus-layout';
 import type { CursorFocusPath } from '../../features/video/project/cursor-focus-path/types';
 import { ReviewButton, ReviewDetails } from './controls';
@@ -129,6 +130,8 @@ export function ReviewSceneProperties(props: {
   onCaptions?(settings: NonNullable<QuickEditAdvancedState['captions']>): void;
   presentation?: ComponentProps<typeof ReviewPresentationBinding>;
   watermark?: Omit<ComponentProps<typeof WatermarkInspector>, 'Disclosure' | 'dataUi'>;
+  sourceFilters?: QuickEditAdvancedState['sourceFilters'];
+  onSourceFilters?(value: QuickEditAdvancedState['sourceFilters']): void;
   windowHeader?: QuickEditAdvancedState['windowHeader'];
   headerIdentity?: string | undefined;
   onWindowHeader?(header: QuickEditAdvancedState['windowHeader']): void;
@@ -161,6 +164,22 @@ export function ReviewSceneProperties(props: {
         ) : null}
         <ReviewInspectorSections
           sections={[
+            ...(props.onSourceFilters
+              ? [
+                  {
+                    id: 'source-filters',
+                    label: translate('videoEditor.sidebar.sourceFiltersTitle'),
+                    icon: Scan,
+                    content: (
+                      <SourceImageFilterFields
+                        value={props.sourceFilters}
+                        disabled={props.busy}
+                        onChange={props.onSourceFilters}
+                      />
+                    ),
+                  },
+                ]
+              : []),
             {
               id: 'canvas',
               label: translate('gallery.videoReview.canvas'),

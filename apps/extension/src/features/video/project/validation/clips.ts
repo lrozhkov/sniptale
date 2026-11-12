@@ -1,3 +1,4 @@
+import { parseSourceImageFilterStack } from '../../../image-filters/contract';
 import { isCameraShadowDirection } from '../camera/shadow-direction';
 import { parseReviewSpeechTranscript } from '../../review/speech-validation';
 import { parseMediaSourceCrop } from '../media-crop';
@@ -192,6 +193,9 @@ function isPlaybackWindow(value: unknown, duration: number): boolean {
 
 function hasBaseClipFields(value: Record<string, unknown>): boolean {
   return (
+    (value['sourceFilters'] === undefined ||
+      (value['type'] === VideoProjectClipType.VIDEO &&
+        parseSourceImageFilterStack(value['sourceFilters']) !== null)) &&
     (value['sourceRange'] === undefined ||
       (value['type'] === VideoProjectClipType.EFFECT &&
         value['attachment'] !== undefined &&

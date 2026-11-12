@@ -1,3 +1,9 @@
+import { hasSourceImageFilters } from '../../../image-filters/contract';
+import {
+  compileSourceImageFilters,
+  type SourceImageFilterProgram,
+} from '../../../image-filters/plan';
+import { glTransitionUniforms } from '../../project/transition/gl-catalog';
 import {
   EFFECT_RUNTIME_GPU_PAINT_LIMITS,
   parseEffectRuntimeGpuPaint,
@@ -279,7 +285,11 @@ export function previewPipelineKey(variant: PreviewPipelineVariant) {
 /** One device shares only requested pipeline variants across all frame slots. */
 export type GpuPreviewRequest = Parameters<GpuPreviewRenderer['render']>[0];
 export function requiresRasterSource(layer: GpuPreviewLayer) {
-  return requiresGpuPreviewFilter(layer) || !!layer.cssFilter;
+  return (
+    requiresGpuPreviewFilter(layer) ||
+    !!layer.cssFilter ||
+    !!(layer.imageFilters && hasSourceImageFilters(layer.imageFilters.stack))
+  );
 }
 
 /** Preserve the packed path's native-size RGB sampling without reading decoded planes on CPU. */
@@ -320,6 +330,8 @@ export function validateGpuPreviewFrame(
   let layerCount = 0;
   const pipelines = new Map<string, PreviewPipelineVariant>();
   const nativeFrames = new Set<VideoFrame>();
+  const imageFilters = new Map<GpuPreviewLayer, SourceImageFilterProgram>();
+  const glTransitions = new Map<GpuPreviewGroup, NonNullable<GpuPreviewGroup['composition']>>();
   const retainRaster = (
     raster: { source: Raster; cache?: GpuPreviewLayer['cache'] },
     path: string
@@ -360,6 +372,14 @@ export function validateGpuPreviewFrame(
     validLogicalSize(logical);
     layers.forEach((layer, index) => {
       const path = `${prefix}/${index}`;
+      if (layer.imageFilters) {
+        const program = compileSourceImageFilters(
+          layer.imageFilters.stack,
+          layer.imageFilters.logical,
+          layer.imageFilters.projectTime
+        );
+        if (program.steps.length) imageFilters.set(layer, program);
+      }
       layerValues(layer, output, logical);
       hasCssFilter ||= !!layer.cssFilter;
       const native = layer.source instanceof VideoFrame;
@@ -395,6 +415,21 @@ export function validateGpuPreviewFrame(
         if (validatedGroups.has(group)) return;
         visiting.add(group);
         targetKeys.add(path);
+        if (group.composition) {
+          if (
+            group.composition.kind !== 'gl-transition' ||
+            group.layers.length !== 2 ||
+            !glTransitionUniforms(
+              group.composition.selection,
+              group.composition.progress,
+              group.logical.width / group.logical.height
+            )
+          )
+            throw new Error('GPU transition composition is invalid.');
+          glTransitions.set(group, structuredClone(group.composition));
+          targetKeys.add(`${path}/gl-from`);
+          targetKeys.add(`${path}/gl-to`);
+        }
         validateLayers(group.layers, group.output, group.logical, path, depth + 1);
         visiting.delete(group);
         validatedGroups.add(group);
@@ -415,8 +450,10 @@ export function validateGpuPreviewFrame(
     retainedKeys,
     targetKeys,
     hasCssFilter,
+    imageFilters,
     pipelines,
     nativeFrames,
+    glTransitions,
   };
 }
 
@@ -443,7 +480,8 @@ function isNeutralFullLayer(layer: GpuPreviewLayer, logical: Size, origin = { x:
     ) &&
     (layer.opacity ?? 1) === 1 &&
     (layer.blend ?? 'over') === 'over' &&
-    effects.every((key) => layer[key] === undefined)
+    effects.every((key) => layer[key] === undefined) &&
+    !(layer.imageFilters && hasSourceImageFilters(layer.imageFilters.stack))
   );
 }
 
@@ -453,6 +491,7 @@ function canOmitLeadingGroupCopy(
 ) {
   if (!isGroup(layer.source)) return false;
   const group = layer.source;
+  if (group.composition) return false;
   // A bounded integer offset cancels exactly on a native-density pixel grid.
   const origin =
     parent.output.width === parent.logical.width &&
@@ -567,7 +606,10 @@ function aliasCopiedGroups(request: GpuPreviewRequest): GpuPreviewRequest {
         const children = normalize(source.layers);
         const copy = children.length === 1 ? children[0] : undefined;
         group =
-          copy && isGroup(copy.source) && canOmitLeadingGroupCopy(copy, source)
+          !source.composition &&
+          copy &&
+          isGroup(copy.source) &&
+          canOmitLeadingGroupCopy(copy, source)
             ? copy.source
             : children === source.layers
               ? source
@@ -602,7 +644,9 @@ export function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRe
   const groups = new Map<GpuPreviewGroup, GpuPreviewGroup>();
   const normalize = (
     layers: readonly GpuPreviewLayer[],
-    parent: Pick<GpuPreviewRequest, 'output' | 'logical'>
+    parent: Pick<GpuPreviewRequest, 'output' | 'logical'> & {
+      composition?: GpuPreviewGroup['composition'];
+    }
   ): readonly GpuPreviewLayer[] => {
     const mapped = layers.map((layer) => {
       if (!isGroup(layer.source)) return layer;
@@ -617,6 +661,7 @@ export function omitLeadingGroupCopies(request: GpuPreviewRequest): GpuPreviewRe
       return group === source ? layer : { ...layer, source: group };
     });
     let result = mapped.every((layer, index) => layer === layers[index]) ? layers : mapped;
+    if (parent.composition) return result;
     for (let index = result.length - 1; index >= 0; index--) {
       if (!coversOpaqueDestination(result[index]!, parent)) continue;
       if (index > 0) result = result.slice(index);
@@ -777,9 +822,11 @@ export function resolveGpuPreviewGroupRasters({
       }
       const orientation = layer.orientation;
       const unsafe =
+        group.composition ||
         layer.depth ||
         layer.blur ||
         layer.cssFilter ||
+        (layer.imageFilters && hasSourceImageFilters(layer.imageFilters.stack)) ||
         (orientation && (orientation.rotation || orientation.flip)) ||
         group.layers.some((child) => child.operationClip || child.depth);
       // Filter support and destination-UV masks retain their original target coordinate system.
@@ -970,6 +1017,10 @@ export function gpuPreviewTextureBytes(
         if (groups.has(layer.source)) continue;
         groups.add(layer.source);
         add(layer.source.output);
+        if (layer.source.composition) {
+          add(layer.source.output);
+          add(layer.source.output);
+        }
         visit(layer.source.layers);
       } else if (
         typeof VideoFrame === 'undefined' ||

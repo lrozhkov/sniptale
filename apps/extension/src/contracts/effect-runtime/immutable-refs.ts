@@ -1,4 +1,5 @@
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 
@@ -16,5 +17,5 @@ export async function createEffectRuntimeAssetSelectionId(
     })
     .map(({ id, sha256 }) => `${id}\u0000${sha256}`)
     .join('\n');
-  return sha256EffectV1Bytes(new TextEncoder().encode(canonical));
+  return bytesToHex(sha256(new TextEncoder().encode(canonical)));
 }

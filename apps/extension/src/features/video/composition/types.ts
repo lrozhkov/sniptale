@@ -1,3 +1,4 @@
+import type { GlTrackNode } from '../project/transition/gl-track-plan';
 import type { CameraShadowVector } from '../project/camera/shadow-direction';
 import type { QuickEditHomography } from './motion/spatial-geometry';
 import type { VisualLayerSourcePointMapping } from './draw/fitted-media';
@@ -108,6 +109,8 @@ export interface VideoCompositionSpotlightState {
 
 export type VideoCompositionVisualLayer =
   | (VideoCompositionLayerBase<VideoProjectVideoClip, 'video'> & {
+      /** Derived project clock for source filters; independent of decoded source PTS. */
+      compositionTime?: number;
       /** Role of the source track, retained for independent camera composition. */
       trackRole?: VideoProjectTrackRole;
       /** Evaluated scene-space shadow direction; never serialized into the clip. */
@@ -189,6 +192,10 @@ export interface VideoCompositionCameraState {
 }
 
 export interface VideoCompositionFrame {
+  /** Canonical physical-track states; both backends consume the same accepted plan. */
+  glTrackPlans?: ReadonlyMap<string, GlTrackNode>;
+  /** Source cursors inside a GL state are suppressed from the global cursor stage. */
+  sourceCursors?: ReadonlyMap<string, VideoCompositionCursorState>;
   sceneSpotlights?: readonly VideoCompositionSpotlightState[];
   /** Viewport-normalized borders stay independent of the project camera. */
   viewportBorders?: readonly VideoCompositionBorderState[];

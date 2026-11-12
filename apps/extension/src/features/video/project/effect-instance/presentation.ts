@@ -1,7 +1,5 @@
-import {
-  parseEffectV1Source,
-  resolveEffectLocaleText,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { readEffectPresentationDocument } from '../effect-bundle/presentation-document';
+import { resolveEffectLocaleText } from '@sniptale/runtime-contracts/effect-controls';
 import { getCurrentLocale, translate } from '../../../../platform/i18n';
 import type { VideoProject, VideoProjectEffectClip } from '../types';
 import type { VideoProjectEffectSnapshot } from './types';
@@ -20,9 +18,7 @@ export function getEffectInstanceLabel(project: VideoProject, instanceId: string
   if (!snapshot) return translate('videoEditor.effectsLibrary.unavailableEffect');
   let label = labels.get(snapshot);
   if (!label) {
-    label =
-      parseEffectV1Source(snapshot.source, { presentationPolicy: 'retained' }).document?.label ??
-      {};
+    label = readEffectPresentationDocument(snapshot.source).document?.label ?? {};
     labels.set(snapshot, label);
   }
   return (

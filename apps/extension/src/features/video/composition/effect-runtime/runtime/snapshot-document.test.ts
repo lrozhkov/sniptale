@@ -1,16 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
-import * as jsonBoundary from '../../../project/effect-bundle/json-structure';
+import * as animationTemplate from '@sniptale/runtime-contracts/animation-template';
 import { parseEffectRuntimeSnapshotDocument } from './snapshot-document';
 
 const source = readFileSync(
-  'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
   'utf8'
 );
 
 it('reuses a validated snapshot across frames without repeating the JSON boundary', () => {
   const snapshot = { source };
-  const parse = vi.spyOn(jsonBoundary, 'parseBoundedEffectJson');
+  const parse = vi.spyOn(animationTemplate, 'parseAnimationTemplateSource');
   const first = parseEffectRuntimeSnapshotDocument(snapshot);
   for (let frame = 0; frame < 60; frame++) {
     expect(parseEffectRuntimeSnapshotDocument(snapshot)).toBe(first);
@@ -18,9 +18,9 @@ it('reuses a validated snapshot across frames without repeating the JSON boundar
   expect(parse).toHaveBeenCalledTimes(1);
   parse.mockRestore();
   expect(Object.isFrozen(first)).toBe(true);
-  expect(Object.isFrozen(first.program.commands)).toBe(true);
+  expect(Object.isFrozen(first.animation.layers)).toBe(true);
   expect(() => {
-    first.program.commands.length = 0;
+    first.animation.layers.length = 0;
   }).toThrow();
 });
 

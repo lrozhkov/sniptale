@@ -37,6 +37,7 @@ import {
 import type { ReviewClickCue } from '../../features/video/review/click-animation';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 export interface ReviewExportSourceScene {
+  sourceFilters?: QuickEditAdvancedState['sourceFilters'];
   sourceSize: { width: number; height: number };
   baseCanvas?: { width: number; height: number };
   windowHeader?: QuickEditAdvancedState['windowHeader'];

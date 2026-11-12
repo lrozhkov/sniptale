@@ -249,15 +249,12 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     owner: 'pointer-session-final-release',
     productionFile: 'apps/extension/src/video-editor/interaction/pointer-session.ts',
     allowCrossOwner: true,
-    reason: `Final pointer coordinates must reach the EffectV1 inverse without changing existing timeline,
+    reason: `Final pointer coordinates must reach the shared inverse without changing existing timeline,
       canvas, and workspace session consumers.`,
     testFiles: [
       'apps/extension/src/video-editor/interaction/pointer-session.test.ts',
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
       'apps/extension/src/video-editor/preview/stage/canvas/navigator.test.tsx',
       'apps/extension/src/video-editor/preview/stage/annotation-target-overlay/index.test.tsx',
-      'apps/extension/src/video-editor/timeline/project/canvas/parts/clip-fx.test.tsx',
       'apps/extension/src/video-editor/timeline/project/interaction-state/drag.test.tsx',
       'apps/extension/src/video-editor/timeline/project/interaction-state/drag-lanes.test.tsx',
       'apps/extension/src/video-editor/timeline/project/interaction-state/drag-magnet.test.tsx',
@@ -277,19 +274,18 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   },
   {
     owner: 'projected-effect-region-native-gestures',
-    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.tsx',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/effect-handles.tsx',
     allowCrossOwner: true,
-    reason: `Projected EffectV1 controls use shared point geometry and must remain selectable through the
+    reason: `Supported Lottie handles use shared point geometry and must remain selectable through the
       native FX timeline scroll owner.`,
     testFiles: [
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
+      'apps/extension/src/video-editor/preview/stage/canvas/index.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/canvas/root.test.tsx',
       'apps/extension/src/video-editor/preview/stage/canvas/geometry.camera.test.ts',
       'apps/extension/src/video-editor/preview/stage/canvas/selection-overlay.test.tsx',
       'apps/extension/src/video-editor/timeline/project/interaction-state/selected-track-scroll.test.tsx',
       'apps/extension/src/video-editor/timeline/project/interaction-state/index.test.tsx',
       'apps/extension/src/video-editor/timeline/project/interaction-state/scroll-sync.test.ts',
-      'apps/extension/src/video-editor/timeline/project/canvas/parts/clip-fx.test.tsx',
     ],
   },
   {
@@ -440,7 +436,6 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/preview/stage/runtime/interactions.test.ts',
       'apps/extension/src/video-editor/preview/stage/canvas/transform/gesture.test.ts',
       'apps/extension/src/video-editor/preview/stage/canvas/selection-overlay.test.tsx',
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
       'apps/extension/src/workflows/video/native-composition/canvas.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/geometry.test.tsx',
       'apps/extension/src/video-editor/preview/stage/scene/index.test.tsx',

@@ -92,13 +92,11 @@ export const EDITOR_OWNER_MAPPINGS = [
   },
   {
     owner: 'video-preview-canvas-region-gestures',
-    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/editor-region/gesture.ts',
+    productionFile: 'apps/extension/src/video-editor/preview/stage/canvas/effect-handles.tsx',
     reason:
-      'Region and anchor consumers retain shared arrow decoding, pointer preview, single commit \
-and cancellation behavior.',
+      'Lottie object anchors retain arrow decoding, pointer preview, single commit and cancellation behavior.',
     testFiles: [
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/model.test.ts',
-      'apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.test.tsx',
+      'apps/extension/src/video-editor/preview/stage/canvas/root.test.tsx',
       'apps/extension/src/video-editor/preview/stage/canvas/index.test.tsx',
     ],
   },
@@ -172,6 +170,7 @@ and cancellation behavior.',
     allowCrossOwner: true,
     reason: 'Video isolation owns source fit, decorations, sharp feedback and failure cleanup.',
     testFiles: [
+      'apps/extension/src/workflows/video-review/source-filters-render.test.ts',
       'apps/extension/src/features/video/composition/draw/video.test.ts',
       'apps/extension/src/features/video/composition/draw/visual.test.ts',
       'apps/extension/src/features/video/composition/draw/visual.media-source.test.ts',

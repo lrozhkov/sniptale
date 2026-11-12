@@ -19,6 +19,7 @@ export async function resolveCatalogDocument(
     enabled: catalog.enabled,
     documents: resolved.documents.map((document) => ({
       ...document,
+      ...(requested.enabled !== undefined ? { enabled: requested.enabled } : {}),
       ...(requested.presetPreferences ? { presetPreferences: requested.presetPreferences } : {}),
       ...(requested.previewPresetId ? { previewPresetId: requested.previewPresetId } : {}),
     })),

@@ -2,11 +2,9 @@ import { readFileSync } from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
-
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
 import { createEmptyVideoProject } from '../factories/creation';
-import { importRawEffectDocument } from '../effect-bundle/import/zip';
+import { importAnimationArtifactBytes } from '../effect-bundle/lottie-profile';
 import { applyEffectCatalogDocument } from './apply';
 import { resolveEffectInstanceTime } from './timing';
 import { buildClipLabel } from '../timeline/meta';
@@ -70,7 +68,7 @@ it('does not mutate an applied snapshot when a catalog document is reimported', 
     startTime: 0,
     target: { kind: 'scene' },
   });
-  const changedSource = readFixture().replace('Neutral Standalone', 'Changed Standalone');
+  const changedSource = readFixture().replace('Callout', 'Changed Callout');
   const changedCatalog = await createRawCatalog(changedSource);
   const second = await applyEffectCatalogDocument({
     catalog: changedCatalog,
@@ -83,7 +81,7 @@ it('does not mutate an applied snapshot when a catalog document is reimported', 
 
   expect(second.effectSnapshots).toHaveLength(2);
   expect(second.effectSnapshots?.[0]?.source).toBe(first.effectSnapshots?.[0]?.source);
-  expect(second.effectSnapshots?.[0]?.source).not.toContain('Changed Standalone');
+  expect(second.effectSnapshots?.[0]?.source).not.toContain('Changed Callout');
 });
 
 it('fails closed when effect kind and target semantics disagree', async () => {
@@ -113,45 +111,37 @@ it('uses one shared timing equation for preview, export and audio', () => {
 });
 
 async function createRawCatalog(source: string): Promise<EffectBundleCatalogEntry> {
-  const bytes = new TextEncoder().encode(source);
-  const imported = await importRawEffectDocument(bytes);
-  if (!imported.ok) throw new Error('Expected EffectV1 fixture to import');
-  const document = imported.artifact.document;
+  const imported = await importAnimationArtifactBytes(new TextEncoder().encode(source));
+  if (!imported.ok) throw new Error('Expected valid animation fixture.');
+  const entry = imported.documents[0]!,
+    document = entry.template;
   return {
     assets: [],
     createdAt: 1,
-    description: {
-      en: document.document.description?.en ?? '',
-      ru: document.document.description?.ru ?? '',
-    },
+    updatedAt: 1,
+    enabled: true,
+    description: { en: '', ru: '' },
+    label: { en: document.label.en, ru: document.label.ru ?? document.label.en },
     documents: [
       {
         assets: [],
-        id: document.document.id,
-        kind: document.document.kind,
-        schemaVersion: 'sniptale.effect.v1',
-        sha256: await sha256EffectV1Bytes(bytes),
-        source,
+        id: document.id,
+        kind: 'standalone',
+        schemaVersion: 'sniptale.animation.v1',
+        sha256: entry.sha256,
+        source: entry.source,
       },
     ],
-    enabled: true,
-    label: { en: document.document.label.en ?? '', ru: document.document.label.ru ?? '' },
-    packId: `raw.${document.document.id}`,
-    retainedByteLength: bytes.byteLength,
+    packId: `animation.${document.id}`,
+    retainedByteLength: new TextEncoder().encode(entry.source).byteLength,
     source: 'raw-json',
-    sourceSha256: await sha256EffectV1Bytes(bytes),
-    updatedAt: 1,
-    version: '0.0.0',
+    sourceSha256: imported.archiveSha256,
+    version: '1',
   };
 }
-
 function readFixture(): string {
   return readFileSync(
-    new URL(
-      '../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/' +
-        'neutral-standalone.sniptale-effect.json',
-      import.meta.url
-    ),
+    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
     'utf8'
   );
 }

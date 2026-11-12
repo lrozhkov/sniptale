@@ -1,4 +1,3 @@
-import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
 import { buildProjectTransitionSegments } from '../../../project/transition/project';
 import { getClipCompositeVisualOpacity } from '../../../project/timeline/presentation';
 import { projectMotionSourcePhases } from '../../../project/motion/source-binding';
@@ -126,10 +125,6 @@ function joinSourceTransitionMasks(
           project.tracks.some((track) => track.id === clip.trackId && track.visible)
       )
       .toSorted((a, b) => b.startTime - a.startTime)[0];
-    const alpha = clips.reduce(
-      (sum, clip) => sum + resolveClipTransitionVisualState(project, clip, time).opacityMultiplier,
-      0
-    );
     if (!last) continue;
     for (const [groupId, group] of groups) {
       if (!pair.every((id) => group.clipIds.has(id))) continue;
@@ -140,8 +135,6 @@ function joinSourceTransitionMasks(
           id: JSON.stringify([segment.transition.id, groupId]),
           leadingClipId: segment.leadingClipId,
           trailingClipId: segment.trailingClipId,
-          // Complementary Native fades blend coverage. Full overlapping exposures retain union coverage.
-          ...(alpha <= 1 + 4 * Number.EPSILON ? { blend: true as const } : {}),
         };
       }
     }

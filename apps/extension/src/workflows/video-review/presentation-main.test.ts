@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createReviewPresentationMain,
@@ -12,6 +15,23 @@ import { createReviewCaptionSettings } from '../../features/video/review/text-do
 import { calculatePreviewRenderAllocation } from './preview-render-allocation';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
+const FRAME_SOURCE = readFileSync(
+  'apps/extension/public/video-effects/animations/frame.sniptale-animation.json',
+  'utf8'
+);
+const FRAME_DOCUMENT = parseAnimationTemplateSource(FRAME_SOURCE);
+if (!FRAME_DOCUMENT.ok) throw new Error('Expected valid shipped frame animation.');
+const FRAME_HASH = createHash('sha256').update(FRAME_SOURCE).digest('hex');
+const FRAME_SNAPSHOT = {
+  id: `effect:${FRAME_HASH}`,
+  schemaVersion: 'sniptale.animation.v1' as const,
+  kind: 'standalone' as const,
+  documentId: FRAME_DOCUMENT.template.id,
+  sha256: FRAME_HASH,
+  source: FRAME_SOURCE,
+  retainedByteLength: Buffer.byteLength(FRAME_SOURCE),
+  assets: [],
+};
 const io = vi.hoisted(() => ({
   samples: [] as {
     timestamp: number;
@@ -319,7 +339,7 @@ it('composes immutable annotations with full clocks and export fps', async () =>
     instances: [
       {
         id: 'frame',
-        snapshotId: 'effect:frame',
+        snapshotId: FRAME_SNAPSHOT.id,
         enabled: true,
         start: 0,
         end: 10,
@@ -330,18 +350,7 @@ it('composes immutable annotations with full clocks and export fps', async () =>
       },
     ],
   };
-  args.effectSnapshots = [
-    {
-      id: 'effect:frame',
-      schemaVersion: 'sniptale.effect.v1',
-      kind: 'standalone',
-      documentId: 'frame',
-      sha256: '0'.repeat(64),
-      source: '{}',
-      retainedByteLength: 2,
-      assets: [],
-    },
-  ];
+  args.effectSnapshots = [{ ...FRAME_SNAPSHOT }];
   const owner = await open(args);
   const frame = await owner.renderAtTime(0.3001);
   expect(io.times).toEqual([0.5]);

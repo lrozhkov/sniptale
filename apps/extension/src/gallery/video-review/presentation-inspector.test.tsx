@@ -1,3 +1,9 @@
+import { useGlTransitionCatalog } from '../../composition/gl-transition-presets/catalog';
+import {
+  createGlCatalogFixture,
+  createImportedGlCatalogFixture,
+} from '../../composition/gl-transition-presets/catalog.test-support';
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 // @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -407,8 +413,14 @@ it('configures and removes a join independently of the opposite edge and media',
   props.settings.outroTransition = { type: 'dissolve', before: 0.1, after: 0.3 };
   await render();
   async function choose(option: string) {
-    const group = section().querySelector('[role="group"][aria-label="Transition to video"]')!;
-    const node = [...group.querySelectorAll<HTMLButtonElement>('button')].find(
+    const trigger = section().querySelector<HTMLButtonElement>(
+      'button[aria-label="Transition to video"]'
+    )!;
+    await act(async () => {
+      trigger.click();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+    const node = [...document.querySelectorAll<HTMLButtonElement>('[role=option]')].find(
       (item) => item.textContent === option
     )!;
     await act(async () => node.click());
@@ -444,4 +456,88 @@ it('configures and removes a join independently of the opposite edge and media',
   expect(last).not.toHaveProperty('introTransition');
   expect(last.outroTransition).toEqual(props.settings.outroTransition);
   expect(last.intro).toEqual(props.settings.intro);
+});
+
+async function importPresetFile(
+  parent: ParentNode,
+  selection: ReturnType<typeof createGlTransitionSelection>,
+  name = 'Imported'
+) {
+  if (!selection) throw new Error('Missing preset selection');
+  const source = JSON.stringify({
+    format: 'sniptale-gl-preset',
+    version: 1,
+    name,
+    transition: selection,
+  });
+  const file = new File([source], 'imported.sniptale-gl-preset.json');
+  Object.defineProperty(file, 'arrayBuffer', {
+    value: async () => new TextEncoder().encode(source).buffer,
+  });
+  const input = parent.querySelector<HTMLInputElement>('input[type=file]');
+  if (!input) throw new Error('Missing preset file input');
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+}
+
+it('imports a GL preset only into the selected presentation side and retains timing/easing', async () => {
+  retained();
+  const initial = {
+    type: 'gl' as const,
+    selection: createGlTransitionSelection('Fade')!,
+    easing: 'EASE_IN_OUT' as const,
+    before: 0.3,
+    after: 0.7,
+  };
+  props.settings.introTransition = initial;
+  const before = structuredClone(props.settings);
+  await render();
+  expect(host.querySelector('[data-gl-preset-owner]')?.getAttribute('data-gl-preset-owner')).toBe(
+    'presentation:intro'
+  );
+  const selection = createGlTransitionSelection('CrossZoom')!;
+  await importPresetFile(host, selection);
+  expect(props.onChange).toHaveBeenCalledExactlyOnceWith({
+    ...before,
+    introTransition: { ...initial, selection },
+  });
+  expect(props.settings).toEqual(before);
+  expect(props.onPreview).not.toHaveBeenCalled();
+});
+
+vi.mock('../../composition/gl-transition-presets/catalog', async () => {
+  const { createGlCatalogFixture } =
+    await import('../../composition/gl-transition-presets/catalog.test-support');
+  return { useGlTransitionCatalog: vi.fn(createGlCatalogFixture) };
+});
+
+it('applies a saved catalogue selection to only the chosen Gallery bookend', async () => {
+  const { catalog, selection } = createImportedGlCatalogFixture();
+  vi.mocked(useGlTransitionCatalog).mockReturnValue(catalog);
+  try {
+    retained();
+    props.settings.introTransition = { type: 'dissolve', before: 0.3, after: 0.7 };
+    props.settings.outroTransition = { type: 'dissolve', before: 0.1, after: 0.2 };
+    await render();
+    const trigger = section().querySelector<HTMLButtonElement>(
+      'button[aria-label="Transition to video"]'
+    )!;
+    await act(async () => {
+      trigger.click();
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
+    const option = [...document.querySelectorAll<HTMLButtonElement>('[role=option]')].find(
+      (node) => node.textContent === 'Saved zoom'
+    );
+    expect(option).toBeDefined();
+    await act(async () => option!.click());
+    expect(props.onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        introTransition: { type: 'gl', selection, easing: 'LINEAR', before: 0.3, after: 0.7 },
+        outroTransition: props.settings.outroTransition,
+      })
+    );
+  } finally {
+    vi.mocked(useGlTransitionCatalog).mockImplementation(createGlCatalogFixture);
+  }
 });

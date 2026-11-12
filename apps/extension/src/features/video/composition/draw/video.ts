@@ -1,3 +1,5 @@
+import { hasSourceImageFilters, SourceImageFilterError } from '../../../image-filters/contract';
+import { withSourceImageFilterCanvas } from '../canvas/source-image-filter';
 import { cameraShadowLocalOffset } from '../../project/camera/shadow-direction';
 import { drawCompositionBorders } from './border';
 import { roundedWindowRadius } from '../../project/window-geometry';
@@ -78,6 +80,48 @@ export function drawVideoLayer(
           samplingDemand !== 'original' && isVideoCompositionFrameSource(source)
             ? source.preparedSampling
             : undefined;
+        const filters = layer.clip.sourceFilters;
+        if (filters && hasSourceImageFilters(filters)) {
+          const logical = { width: media.sourceWidth, height: media.sourceHeight };
+          let density = 1;
+          const prepared = sampling?.visitPreparedTiles(samplingDemand, (tile) => {
+            density = Math.max(
+              density,
+              tile.physicalSourceRect.width / tile.originalPixelROI.width,
+              tile.physicalSourceRect.height / tile.originalPixelROI.height
+            );
+          });
+          withSourceImageFilterCanvas(
+            {
+              stack: filters,
+              projectTime: layer.compositionTime,
+              logical,
+              raster: {
+                width: Math.ceil(logical.width * density),
+                height: Math.ceil(logical.height * density),
+              },
+              resources: isVideoCompositionFrameSource(source) ? source.renderResources : undefined,
+              ownerDocument: target.canvas.ownerDocument,
+              paint(context, size) {
+                if (prepared && sampling) {
+                  if (
+                    !sampling.drawPrepared(
+                      samplingDemand,
+                      context,
+                      { x: 0, y: 0, ...logical },
+                      { x: 0, y: 0, ...size }
+                    )
+                  )
+                    throw new SourceImageFilterError();
+                } else if (source instanceof HTMLVideoElement)
+                  context.drawImage(source, 0, 0, size.width, size.height);
+                else source.draw(context, 0, 0, size.width, size.height);
+              },
+            },
+            (canvas) => target.drawImage(canvas, x, y, width, height)
+          );
+          return;
+        }
         const prepared = sampling?.visitPreparedTiles(samplingDemand, (tile) => {
           const roi = tile.originalPixelROI,
             physical = tile.physicalSourceRect;

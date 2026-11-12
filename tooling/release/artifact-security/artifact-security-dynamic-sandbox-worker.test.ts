@@ -1,4 +1,4 @@
-import { EXPECTED_EFFECT_SANDBOX_CSP } from './sandbox-policy.mjs';
+import { EXPECTED_EFFECT_SANDBOX_CSP, EXPECTED_TOUR_SANDBOX_CSP } from './sandbox-policy.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -94,7 +94,9 @@ function createFiles(args: {
   return [
     ...createTestLegalArtifactFiles(),
     {
-      contents: Buffer.from('<!doctype html>'),
+      contents: Buffer.from(
+        `<meta http-equiv="Content-Security-Policy" content="${EXPECTED_TOUR_SANDBOX_CSP}">`
+      ),
       relativePath: 'apps/extension/src/tour-preview-sandbox/index.html',
     },
     { contents: Buffer.from(JSON.stringify(baseManifest)), relativePath: 'manifest.json' },

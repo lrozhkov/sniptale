@@ -140,34 +140,6 @@ export const VideoOverlayAnimationKind = {
 export type VideoOverlayAnimationKind =
   (typeof VideoOverlayAnimationKind)[keyof typeof VideoOverlayAnimationKind];
 
-export const VideoTransitionTemplateKind = {
-  CROSSFADE: 'CROSSFADE',
-  FADE_THROUGH_LIGHT: 'FADE_THROUGH_LIGHT',
-  DIP_TO_COLOR: 'DIP_TO_COLOR',
-  PUSH: 'PUSH',
-  SLIDE: 'SLIDE',
-  ZOOM_DISSOLVE: 'ZOOM_DISSOLVE',
-  BLUR_REVEAL: 'BLUR_REVEAL',
-  LIGHT_SWEEP: 'LIGHT_SWEEP',
-  CARD_FLIP_REVEAL: 'CARD_FLIP_REVEAL',
-  LINEAR_WIPE: 'LINEAR_WIPE',
-  RADIAL_REVEAL: 'RADIAL_REVEAL',
-  DISPLACEMENT_WARP: 'DISPLACEMENT_WARP',
-  GLARE_SWEEP: 'GLARE_SWEEP',
-} as const;
-
-export type VideoTransitionTemplateKind =
-  (typeof VideoTransitionTemplateKind)[keyof typeof VideoTransitionTemplateKind];
-
-export const VideoTransitionRenderKind = {
-  COMPOSITE: 'COMPOSITE',
-  CSS_LIKE: 'CSS_LIKE',
-  SHADER: 'SHADER',
-} as const;
-
-export type VideoTransitionRenderKind =
-  (typeof VideoTransitionRenderKind)[keyof typeof VideoTransitionRenderKind];
-
 export const VideoTemplateIntensity = {
   SOFT: 'SOFT',
   BALANCED: 'BALANCED',

@@ -99,3 +99,22 @@ export function splitVisualLayersForSourceSpotlights(
   if (pending.length) result.push({ layers: pending });
   return result;
 }
+
+/** A track state contains only its present source owners; absent chain members cannot own a boundary. */
+export function resolveVisualStateSourceSpotlights(
+  layers: readonly { clipId: string }[],
+  spotlights: readonly VideoCompositionSpotlightState[] = []
+): VideoCompositionSpotlightState[] {
+  const members = new Set(layers.map((layer) => layer.clipId));
+  return spotlights.flatMap((state) => {
+    const owner = state.clipId ?? state.afterClipId;
+    if (!owner || !members.has(owner)) return [];
+    const owners = new Set(
+      state.sourceTransition
+        ? [state.sourceTransition.leadingClipId, state.sourceTransition.trailingClipId, owner]
+        : [owner]
+    );
+    const last = layers.findLast((layer) => owners.has(layer.clipId));
+    return [{ ...state, afterClipId: last?.clipId ?? owner }];
+  });
+}

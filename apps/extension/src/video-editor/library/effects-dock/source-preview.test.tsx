@@ -18,7 +18,7 @@ vi.mock('../../../ui/effect-catalog-preview', async (original) => ({
   ),
 }));
 const source = readFileSync(
-  'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+  'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
   'utf8'
 );
 const catalog: EffectBundleCatalogEntry = {
@@ -29,16 +29,16 @@ const catalog: EffectBundleCatalogEntry = {
       kind: 'standalone',
       source,
       sha256: 'a'.repeat(64),
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       assets: [],
-      previewPresetId: 'sniptale-orange-light',
+      previewPresetId: 'midnight-blue',
     },
   ],
   assets: [],
   enabled: true,
   label: { en: 'Callout', ru: 'Выноска' },
   description: { en: '', ru: '' },
-  source: 'raw-json',
+  source: 'sniptale-animation',
   sourceSha256: 'a'.repeat(64),
   retainedByteLength: source.length,
   createdAt: 0,
@@ -100,7 +100,7 @@ it('previews without editing the project and applies the chosen time, track and 
     });
   const duration = host.querySelector<HTMLInputElement>('input[type=number]')!;
   change(duration, '0');
-  expect(duration.value).toBe('4');
+  expect(duration.value).toBe('3');
   change(duration, '1');
   expect(duration.value).toBe('1');
   act(() => button('videoEditor.effectsLibrary.previewPlay').click());
@@ -127,7 +127,7 @@ it('previews without editing the project and applies the chosen time, track and 
       startTime: 3,
       standaloneDuration: 1,
       trackId: 'track',
-      controlPresetId: 'sniptale-orange-light',
+      controlPresetId: 'midnight-blue',
     }),
     expect.objectContaining({ startTime: 8, standaloneDuration: 1 }),
   ]);

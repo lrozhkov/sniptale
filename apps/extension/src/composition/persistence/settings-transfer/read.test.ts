@@ -1,8 +1,16 @@
+vi.mock('../effect-bundles/gl-presets', async (original) => ({
+  ...(await original<typeof import('../effect-bundles/gl-presets')>()),
+  listGlPresetCatalogEntries: async () => [],
+}));
+vi.mock('../effect-bundles/preferences', async (original) => ({
+  ...(await original<typeof import('../effect-bundles/preferences')>()),
+  readVisualCatalogPreferences: async () => [],
+}));
 import { createQuickActionAppearance } from '../../../contracts/quick-action-appearance';
 import { parseSettingsTransferPackageText } from '../../../contracts/settings-transfer';
 vi.mock('../effect-bundles', async (original) => ({
   ...(await original<typeof import('../effect-bundles')>()),
-  listImportedEffectBundles: vi.fn(async () => []),
+  listAnimationCatalogEntries: vi.fn(async () => []),
 }));
 import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';

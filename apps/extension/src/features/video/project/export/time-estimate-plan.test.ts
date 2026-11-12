@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../transition/gl-catalog';
 import { createProject, createVideoClip } from '../timeline/project-meta.test.helpers';
 import { createSubtitleClip } from '../factories/overlay-clip';
 import { VideoTrackKind } from '../types';
@@ -47,10 +48,9 @@ it('uses exact transition and effect boundaries while excluded subtitles add no 
       leadingClipId: first.id,
       trailingClipId: second.id,
       duration: 1,
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       easing: 'LINEAR',
-      renderKind: 'CSS_LIKE',
-      templateKind: 'CROSSFADE',
     },
   ];
   project.effectInstances = [

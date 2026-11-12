@@ -1,15 +1,10 @@
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
-import {
-  assertEffectV1AssetSignature,
-  parseEffectV1Source,
-  sha256EffectV1Bytes,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { verifyRuntimeAnimationSource } from '../../../contracts/effect-runtime/animation';
 import { parseBoundedEffectJson } from '../../../features/video/project/effect-bundle/json-structure';
 import { parseBuiltinEffectIndex } from '../../../features/video/project/effect-bundle/catalog/builtin-index';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
-import { materializeDocumentAssets } from '../../../features/video/project/effect-bundle/import/assets';
 
-/** The identity prefix is outside the imported manifest identifier grammar. */
+/** The identity prefix is outside the imported package identifier grammar. */
 export const BUILTIN_EFFECT_PREFIX = 'builtin:';
 export function createBuiltinEffectResources(read: (path: string) => Promise<Uint8Array>) {
   let pending: Promise<EffectBundleCatalogEntry> | undefined;
@@ -17,9 +12,9 @@ export function createBuiltinEffectResources(read: (path: string) => Promise<Uin
     const index = parseBuiltinEffectIndex(parseBoundedEffectJson(await read('index.json')));
     const manifest = index.manifest;
     const base = {
-      packId: `${BUILTIN_EFFECT_PREFIX}${manifest.packId}`,
+      packId: `${BUILTIN_EFFECT_PREFIX}${manifest.id}`,
       source: 'builtin' as const,
-      version: manifest.version,
+      version: '1',
       sourceSha256: index.sourceSha256,
       label: manifest.label,
       description: manifest.description ?? { en: '', ru: '' },
@@ -31,8 +26,8 @@ export function createBuiltinEffectResources(read: (path: string) => Promise<Uin
     };
     const documents = index.documents.map((item, i) => ({
       ...item,
-      sha256: manifest.effectDocuments[i]!.sha256,
-      schemaVersion: 'sniptale.effect.v1' as const,
+      sha256: manifest.documents[i]!.sha256,
+      schemaVersion: 'sniptale.animation.v1' as const,
       assets: [],
     }));
     const cache = new Map<string, Promise<EffectBundleCatalogEntry>>();
@@ -40,56 +35,25 @@ export function createBuiltinEffectResources(read: (path: string) => Promise<Uin
       const previous = cache.get(id);
       if (previous) return previous;
       const work = (async () => {
-        const declaration = manifest.effectDocuments.find((item) => item.id === id);
-        if (!declaration) throw new Error('Unknown builtin effect');
+        const declaration = manifest.documents.find((item) => item.id === id);
+        if (!declaration) throw new Error('Unknown builtin animation');
         const bytes = await read(declaration.path);
-        if (
-          bytes.length !== declaration.byteLength ||
-          (await sha256EffectV1Bytes(bytes)) !== declaration.sha256
-        )
-          throw new Error('Builtin effect integrity failure');
+        if (bytes.byteLength !== declaration.byteLength)
+          throw new Error('Builtin animation integrity failure');
         const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-        const parsed = parseEffectV1Source(source);
-        if (!parsed.document || parsed.document.id !== id)
-          throw new Error('Invalid builtin effect');
-        const paths = new Map<string, Uint8Array>();
-        for (const asset of parsed.document.assets) {
-          if (!asset.path || paths.has(asset.path)) continue;
-          const declaration = manifest.assets.find((item) => item.path === asset.path);
-          if (!declaration) throw new Error('Missing builtin asset');
-          const bytes = await read(declaration.path);
-          if (
-            bytes.length !== declaration.byteLength ||
-            (await sha256EffectV1Bytes(bytes)) !== declaration.sha256
-          )
-            throw new Error('Builtin asset integrity failure');
-          assertEffectV1AssetSignature(bytes, declaration.mimeType, 'builtin-resource');
-          paths.set(declaration.path, bytes);
-        }
-        const resolved = await materializeDocumentAssets(
-          parsed.document,
-          manifest.assets,
-          paths,
-          new Map()
-        );
-        if (!resolved.ok) throw new Error('Invalid builtin assets');
-        const uniqueAssets = new Map(resolved.assets.map((asset) => [asset.sha256, asset]));
-        const assets = [...uniqueAssets.values()].map(({ bytes, ...asset }) => ({
-          ...asset,
-          blob: new Blob([bytes.slice().buffer], { type: asset.mimeType }),
-        }));
+        const document = await verifyRuntimeAnimationSource(source, declaration.sha256);
+        if (!document || document.id !== id) throw new Error('Builtin animation integrity failure');
         return {
           ...base,
-          assets,
-          retainedByteLength: bytes.length + assets.reduce((n, a) => n + a.byteLength, 0),
+          retainedByteLength: bytes.byteLength,
           documents: [
             {
               id,
-              kind: parsed.document.kind,
-              schemaVersion: 'sniptale.effect.v1' as const,
+              kind: 'standalone' as const,
+              schemaVersion: 'sniptale.animation.v1' as const,
               source,
               sha256: declaration.sha256,
-              assets: resolved.assets.map(({ id, sha256 }) => ({ id, sha256 })),
+              assets: [],
             },
           ],
         };

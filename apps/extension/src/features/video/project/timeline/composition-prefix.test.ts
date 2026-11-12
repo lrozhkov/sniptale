@@ -138,25 +138,14 @@ it('retains source phase camera timing and voice snapshots', () => {
   expect(acceptedAudio.type === 'AUDIO' && acceptedAudio.textSnapshot).toBe(audio.textSnapshot);
 });
 
-it('translates every effect target and preserves document phase', () => {
+it('translates annotation scene time and preserves document phase', () => {
   const project = fixture();
-  const targets: VideoProjectEffectTarget[] = [
-    { kind: 'scene' },
-    { kind: 'track', trackId: 'track-video' },
-    { kind: 'video-group' },
-    { kind: 'clip', clipId: 'clip-video' },
-    { kind: 'transition', transitionId: 'join' },
-  ];
+  const targets: VideoProjectEffectTarget[] = [{ kind: 'scene' }];
   project.effectInstances = targets.map((target, index) => ({
     id: String(index),
     target,
     snapshotId: 'snapshot',
-    kind:
-      target.kind === 'scene'
-        ? 'standalone'
-        : target.kind === 'transition'
-          ? 'transition'
-          : 'targetEffect',
+    kind: 'standalone',
     controls: { amount: 0.5 },
     enabled: true,
     startTime: 2,

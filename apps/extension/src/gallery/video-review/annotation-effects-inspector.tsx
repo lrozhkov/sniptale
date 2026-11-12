@@ -12,15 +12,15 @@ import {
 import { InspectorParameterRow } from '../../ui/compact-inspector-controls/layout';
 import { useMemo, useRef, type KeyboardEvent } from 'react';
 import { Clock3, Copy, Move, LayoutTemplate, Trash2 } from 'lucide-react';
+import { type AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
-  applyEffectV1ControlPreset,
+  applyEffectControlPreset,
   resolveEffectLocaleText,
-  resolveEffectV1ControlDefault,
+  resolveEffectControlDefault,
   type ControlDefinition,
-  type EffectV1Document,
-  resolveEffectV1ControlGroup,
-  EFFECT_V1_CONTROL_GROUPS,
-} from '@sniptale/runtime-contracts/effect-v1';
+  resolveEffectControlGroup,
+  EFFECT_CONTROL_GROUPS,
+} from '@sniptale/runtime-contracts/effect-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
 import {
   ColorField,
@@ -79,7 +79,7 @@ export function ReviewAnnotationInspector(props: Props) {
 }
 
 function AnnotationParameters(
-  props: Props & { document: EffectV1Document; instance: ReviewAnnotationEffect; locale: string }
+  props: Props & { document: AnimationTemplate; instance: ReviewAnnotationEffect; locale: string }
 ) {
   const { editor, document, instance, locale } = props;
   const disabled = props.busy || editor.pending;
@@ -90,7 +90,7 @@ function AnnotationParameters(
         ...Object.fromEntries(
           document.controls.map((control) => [
             control.id,
-            resolveEffectV1ControlDefault(control, locale),
+            resolveEffectControlDefault(control, locale),
           ])
         ),
         ...instance.controls,
@@ -118,12 +118,7 @@ function AnnotationParameters(
       key={key}
       label={label}
       value={value}
-      disabled={
-        disabled ||
-        ((key === 'width' || key === 'height') &&
-          document.objectLayout?.resize === 'scale' &&
-          !geometry)
-      }
+      disabled={disabled || ((key === 'width' || key === 'height') && !geometry)}
       min={min}
       max={max}
       step={unit === 's' ? 0.1 : 1}
@@ -139,19 +134,15 @@ function AnnotationParameters(
   const dimension = (axis: 'width' | 'height', value: number): Patch => {
     const next = value / 100;
     const plane = geometry?.[instance.attachment];
-    const layout = document.objectLayout;
-    if (layout?.resize === 'scale' && plane) {
+    const layout = document.animation;
+    if (plane) {
       return {
         transform: {
           ...transform,
           width:
-            axis === 'width'
-              ? next
-              : (next * plane.height * layout.width) / (plane.width * layout.height),
+            axis === 'width' ? next : (next * plane.height * layout.w) / (plane.width * layout.h),
           height:
-            axis === 'height'
-              ? next
-              : (next * plane.width * layout.height) / (plane.height * layout.width),
+            axis === 'height' ? next : (next * plane.width * layout.h) / (plane.height * layout.w),
         },
       };
     }
@@ -229,16 +220,6 @@ function AnnotationParameters(
           {!converted && (
             <div role="status">
               {translate('gallery.videoReview.annotationAttachmentUnavailable')}
-            </div>
-          )}
-          {!document.objectLayout && (
-            <div className="flex min-h-8 min-w-0 items-center justify-between gap-2 text-xs">
-              <span className="shrink-0 text-[var(--sniptale-color-text-secondary)]">
-                {translate('gallery.videoReview.annotationLayout')}
-              </span>
-              <span className="min-w-0 truncate text-[var(--sniptale-color-text-primary)]">
-                {translate('gallery.videoReview.annotationFullScene')}
-              </span>
             </div>
           )}
           {number(
@@ -373,7 +354,7 @@ function AnnotationParameters(
 }
 
 function annotationSdkSections(props: {
-  document: EffectV1Document;
+  document: AnimationTemplate;
   instance: ReviewAnnotationEffect;
   values: Record<string, string | number>;
   locale: string;
@@ -385,7 +366,7 @@ function annotationSdkSections(props: {
   const { document, instance, values, locale, editor, disabled, preview, commit } = props;
   const groups = new Map<string, ControlDefinition[]>();
   for (const control of [...document.controls].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))) {
-    const group = resolveEffectV1ControlGroup(control.group, document.controlGroups) ?? 'advanced';
+    const group = resolveEffectControlGroup(control.group, document.controlGroups) ?? 'advanced';
     const members = groups.get(group) ?? [];
     members.push(control);
     groups.set(group, members);
@@ -408,7 +389,7 @@ function annotationSdkSections(props: {
         return translate('videoEditor.effectsLibrary.objectAdvanced');
     }
   };
-  return EFFECT_V1_CONTROL_GROUPS.filter((group) => groups.has(group)).map((group) => ({
+  return EFFECT_CONTROL_GROUPS.filter((group) => groups.has(group)).map((group) => ({
     id: `sdk:${group}`,
     label: label(group),
     icon: effectControlRootIcon(group),
@@ -438,7 +419,7 @@ function annotationSdkSections(props: {
                 document={document}
                 control={control}
                 instance={instance}
-                value={values[control.id] ?? resolveEffectV1ControlDefault(control, locale)}
+                value={values[control.id] ?? resolveEffectControlDefault(control, locale)}
                 locale={locale}
                 editor={editor}
                 disabled={disabled}
@@ -454,7 +435,7 @@ function annotationSdkSections(props: {
 }
 
 function AnnotationPreset(props: {
-  document: EffectV1Document;
+  document: AnimationTemplate;
   instance: ReviewAnnotationEffect;
   editor: Editor;
   locale: string;
@@ -485,7 +466,7 @@ function AnnotationPreset(props: {
       onChange={(id) =>
         id &&
         editor.change(instance.id, {
-          controls: applyEffectV1ControlPreset(document, instance.controls, id),
+          controls: applyEffectControlPreset(document, instance.controls, id),
         })
       }
     />
@@ -493,7 +474,7 @@ function AnnotationPreset(props: {
 }
 
 type AnnotationControlProps = {
-  document: EffectV1Document;
+  document: AnimationTemplate;
   control: ControlDefinition;
   instance: ReviewAnnotationEffect;
   value: string | number;
@@ -555,8 +536,8 @@ function AnnotationControl(props: AnnotationControlProps) {
     const length =
       handle && layout
         ? handle.xControl === control.id
-          ? layout.width
-          : layout.height
+          ? props.document.animation.w
+          : props.document.animation.h
         : undefined;
     return (
       <AnnotationNumeric

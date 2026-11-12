@@ -1,4 +1,5 @@
-import { readFile } from 'node:fs/promises';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { readNativeVideoProject } from '../support/native-video-project';
 import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import { parseHydratableVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { expect, type Page, type TestInfo } from '@playwright/test';
@@ -8,13 +9,13 @@ import {
   countPersistedEffectInstances,
   countResponsiveAnimationFrames,
   createTransitionE2eProject,
-  EFFECT_V1_STANDALONE_FIXTURE,
-  EFFECT_V1_TARGET_FIXTURE,
-  EFFECT_V1_TRANSITION_FIXTURE,
+  LOTTIE_ANNOTATION_FIXTURE,
   importAndApplyEffect,
+  applyBuiltinSourceFilter,
+  chooseGlTransition,
+  readAnimationFixtureSource,
   importEffectFile,
   importVideoInput,
-  importVisualInput,
   openEffectVideoEditorHarness,
   readPreviewCanvasSignature,
 } from './extension-critical-video-effects.helpers';
@@ -27,7 +28,7 @@ const VIDEO_EDITOR_PREVIEW_CACHE_READY_LABEL = translate(
   'ru'
 );
 
-test('EffectV1 catalog enable toggle stays live in Chromium IndexedDB', async ({
+test('Lottie catalog enable toggle stays live in Chromium IndexedDB', async ({
   page,
   extensionId,
 }) => {
@@ -40,8 +41,8 @@ test('EffectV1 catalog enable toggle stays live in Chromium IndexedDB', async ({
     .getByRole('button', { name: translate('videoEditor.app.newProjectAction', 'en'), exact: true })
     .click();
   await importEffectFile(page, {
-    documentId: 'neutral-standalone',
-    fixturePath: EFFECT_V1_STANDALONE_FIXTURE,
+    documentId: 'e2e-title',
+    fixturePath: LOTTIE_ANNOTATION_FIXTURE,
     locale: 'en',
   });
 
@@ -52,7 +53,7 @@ test('EffectV1 catalog enable toggle stays live in Chromium IndexedDB', async ({
     );
     const row = settings
       .locator('[data-settings-collection-item]')
-      .filter({ hasText: 'Neutral Standalone' });
+      .filter({ hasText: 'E2E e2e-title' });
     const toggle = row.getByRole('switch');
     await expect(toggle).toBeChecked();
     await toggle.click();
@@ -60,28 +61,28 @@ test('EffectV1 catalog enable toggle stays live in Chromium IndexedDB', async ({
     await page.bringToFront();
     // Headless Chromium keeps both pages focused; deliver the real return-to-editor event.
     await page.evaluate(() => window.dispatchEvent(new FocusEvent('focus')));
-    await expect(page.locator('[data-effect-document="neutral-standalone"]')).toHaveCount(0);
+    await expect(page.locator('[data-effect-document="e2e-title"]')).toHaveCount(0);
     await settings.bringToFront();
     await toggle.click();
     await expect(toggle).toBeChecked();
     await page.bringToFront();
     // Headless Chromium keeps both pages focused; deliver the real return-to-editor event.
     await page.evaluate(() => window.dispatchEvent(new FocusEvent('focus')));
-    await expect(page.locator('[data-effect-document="neutral-standalone"]')).toBeVisible();
+    await expect(page.locator('[data-effect-document="e2e-title"]')).toBeVisible();
   } finally {
     await settings.close();
   }
   expect(pageErrors).toEqual([]);
 });
 
-test('EffectV1 playback keeps the video editor responsive', async ({ page, hostOrigin }, info) => {
+test('Lottie playback keeps the video editor responsive', async ({ page, hostOrigin }, info) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
   await openEffectVideoEditorHarness(page, hostOrigin);
   await importAndApplyEffect(page, {
-    documentId: 'neutral-standalone',
-    fixturePath: EFFECT_V1_STANDALONE_FIXTURE,
+    documentId: 'e2e-title',
+    fixturePath: LOTTIE_ANNOTATION_FIXTURE,
   });
   await verifyEffectInspector(page, info, 'annotation');
   await expect(page.locator('[data-playback-counter="true"]')).toContainText('0:03.0');
@@ -100,15 +101,15 @@ test('EffectV1 playback keeps the video editor responsive', async ({ page, hostO
   expect(pageErrors.filter((message) => /EffectV1|effect runtime/iu.test(message))).toEqual([]);
 });
 
-test('cached EffectV1 preview prepares beyond the first frame and starts playback', async ({
+test('cached Lottie preview prepares beyond the first frame and starts playback', async ({
   page,
   hostOrigin,
 }) => {
   await openEffectVideoEditorHarness(page, hostOrigin);
   await importVideoInput(page);
   await importAndApplyEffect(page, {
-    documentId: 'neutral-standalone',
-    fixturePath: EFFECT_V1_STANDALONE_FIXTURE,
+    documentId: 'e2e-title',
+    fixturePath: LOTTIE_ANNOTATION_FIXTURE,
   });
   await page.locator('[data-ui="video.preview.display-settings"]').click();
   await page.getByRole('radio', { name: '720p', exact: true }).check();
@@ -126,7 +127,7 @@ test('cached EffectV1 preview prepares beyond the first frame and starts playbac
   ).toBeVisible();
 });
 
-test('target EffectV1 playback keeps visual input rendering responsive', async ({
+test('source-filter playback keeps video input rendering responsive', async ({
   page,
   hostOrigin,
 }) => {
@@ -141,37 +142,34 @@ test('target EffectV1 playback keeps visual input rendering responsive', async (
 
   await page.setViewportSize({ height: 2160, width: 3840 });
   await openEffectVideoEditorHarness(page, hostOrigin);
-  await importVisualInput(page);
+  await importVideoInput(page);
   const visualInputSignature = await readPreviewCanvasSignature(page);
-  await importAndApplyEffect(page, {
-    documentId: 'demo-target-overlay',
-    fixturePath: EFFECT_V1_TARGET_FIXTURE,
-  });
-
-  await expect.poll(() => countPersistedEffectInstances(page)).toBe(1);
+  const sandboxCount = await page.locator('iframe[src*="effect-runtime-sandbox"]').count();
+  await applyBuiltinSourceFilter(page);
+  await expect
+    .poll(
+      async () =>
+        (await readNativeVideoProject(page))?.clips.flatMap((clip) =>
+          clip.type === 'VIDEO' ? (clip.sourceFilters?.filters ?? []) : []
+        ).length
+    )
+    .toBe(1);
+  await expect.poll(() => countPersistedEffectInstances(page)).toBe(0);
   await expect
     .poll(() => readPreviewCanvasSignature(page), {
-      message: `EffectV1 preview did not change. Console errors: ${consoleErrors.join(' | ')}`,
+      message: `Source-filter preview did not change. Console errors: ${consoleErrors.join(' | ')}`,
     })
     .not.toBe(visualInputSignature);
   await page.getByRole('button', { name: VIDEO_EDITOR_PLAY_LABEL, exact: true }).click();
-  const runtimeSandbox = page.locator('iframe[src*="effect-runtime-sandbox"]');
-  await expect(runtimeSandbox).toHaveCount(1);
-  await runtimeSandbox.evaluate((iframe) =>
-    iframe.setAttribute('data-e2e-runtime-owner', 'initial')
-  );
+  await expect(page.locator('iframe[src*="effect-runtime-sandbox"]')).toHaveCount(sandboxCount);
   expect(await countResponsiveAnimationFrames(page, 2_000)).toBeGreaterThan(1);
-  await expect(page.locator('iframe[data-e2e-runtime-owner="initial"]')).toHaveCount(1);
 
   await page.getByRole('button', { name: VIDEO_EDITOR_PAUSE_LABEL, exact: true }).click();
   expect(consoleErrors).toEqual([]);
   expect(pageErrors.filter((message) => /EffectV1|effect runtime/iu.test(message))).toEqual([]);
 });
 
-test('transition EffectV1 playback keeps the junction runtime responsive', async ({
-  page,
-  hostOrigin,
-}, info) => {
+test('GL transition playback keeps the junction responsive', async ({ page, hostOrigin }) => {
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -180,15 +178,17 @@ test('transition EffectV1 playback keeps the junction runtime responsive', async
   const project = createTransitionE2eProject();
   await page.setViewportSize({ height: 2160, width: 3840 });
   await openEffectVideoEditorHarness(page, hostOrigin, project);
-  await importAndApplyEffect(page, {
-    documentId: 'neutral-transition',
-    fixturePath: EFFECT_V1_TRANSITION_FIXTURE,
-  });
-  await expect.poll(() => countPersistedEffectInstances(page)).toBe(1);
-  await verifyEffectInspector(page, info, 'transition');
+  const sandboxCount = await page.locator('iframe[src*="effect-runtime-sandbox"]').count();
+  const initial = (await readNativeVideoProject(page))?.transitions?.[0];
+  if (!initial) throw new Error('Expected a canonical visual join');
+  await chooseGlTransition(page);
+  await expect
+    .poll(async () => (await readNativeVideoProject(page))?.transitions?.[0])
+    .toMatchObject({ ...initial, kind: 'gl', selection: { name: 'CrossZoom' } });
+  await expect.poll(() => countPersistedEffectInstances(page)).toBe(0);
 
   await page.getByRole('button', { name: VIDEO_EDITOR_PLAY_LABEL, exact: true }).click();
-  await expect(page.locator('iframe[src*="effect-runtime-sandbox"]')).toHaveCount(1);
+  await expect(page.locator('iframe[src*="effect-runtime-sandbox"]')).toHaveCount(sandboxCount);
   expect(await countResponsiveAnimationFrames(page, 1_500)).toBeGreaterThan(1);
 
   const pauseButton = page.getByRole('button', { name: VIDEO_EDITOR_PAUSE_LABEL, exact: true });
@@ -226,7 +226,7 @@ async function verifyEffectInspector(page: Page, info: TestInfo, kind: string) {
 }
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
-  test(`applied EffectV1 survives catalog replacement ${viewport.name}`, async ({
+  test(`applied Lottie survives catalog replacement ${viewport.name}`, async ({
     page,
     extensionId,
   }, info) => {
@@ -250,11 +250,11 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
         .click();
       await openNativeCatalog(page);
       await importEffectFile(page, {
-        documentId: 'neutral-standalone',
-        fixturePath: EFFECT_V1_STANDALONE_FIXTURE,
+        documentId: 'e2e-title',
+        fixturePath: LOTTIE_ANNOTATION_FIXTURE,
         locale: 'en',
       });
-      const document = page.locator('[data-effect-document="neutral-standalone"]');
+      const document = page.locator('[data-effect-document="e2e-title"]');
       const apply = document.getByRole('button', {
         name: label('videoEditor.effectsLibrary.applyToScene'),
         exact: true,
@@ -274,16 +274,19 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       expect(host.transform.rotation).toBe(0);
       expect(host.transform.opacity).toBe(1);
       expect(host.transform.height).toBeGreaterThan(320);
-      // Sample the fixture clear color inside its host, away from the title layer.
+      // Sample the opaque panel interior, away from text and animated foreground.
       const pixel = () =>
         page.locator('[data-preview-stage-canvas]').evaluate(
           (node: HTMLCanvasElement, point) => {
             const scale = Math.min(node.width / point.width, node.height / point.height);
             const x = (node.width - point.width * scale) / 2 + point.x * scale;
             const y = (node.height - point.height * scale) / 2 + point.y * scale;
-            return Array.from(
-              node.getContext('2d')!.getImageData(Math.round(x), Math.round(y), 1, 1).data
-            );
+            const sample = globalThis.document.createElement('canvas');
+            sample.width = node.width;
+            sample.height = node.height;
+            const context = sample.getContext('2d')!;
+            context.drawImage(node, 0, 0);
+            return Array.from(context.getImageData(Math.round(x), Math.round(y), 1, 1).data);
           },
           {
             width: before.width,
@@ -299,7 +302,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await settings.goto(`${origin}/apps/extension/src/settings/index.html?section=video-effects`);
       const row = settings
         .locator('[data-settings-collection-item]')
-        .filter({ hasText: 'Neutral Standalone' });
+        .filter({ hasText: 'E2E e2e-title' });
       await expect(row).toHaveCount(1);
       await row
         .getByRole('button', { name: label('settings.collection.actions.delete'), exact: true })
@@ -324,10 +327,19 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await expect.poll(pixel).toEqual(baselinePixel);
       await openNativeCatalog(page);
       const dock = page.locator('[data-ui="video-editor.effects-library.dock"]');
-      const original = await readFile(EFFECT_V1_STANDALONE_FIXTURE, 'utf8');
-      const replacement = original
-        .replace('"#5f7cff"', '"#00ff00"')
-        .replace('"#10131d"', '"#ec4899"');
+      const original = await readAnimationFixtureSource(LOTTIE_ANNOTATION_FIXTURE, 'e2e-title');
+      const parsedReplacement = parseAnimationTemplateSource(original);
+      if (!parsedReplacement.template) throw new Error('Invalid replacement animation');
+      const changed = parsedReplacement.template;
+      const accent = changed.controls.find((control) => control.id === 'accent');
+      if (accent?.kind !== 'color') throw new Error('Replacement colour control unavailable');
+      accent.defaultValue = '#00ff00';
+      const panelColor = changed.controls.find((control) => control.id === 'panel');
+      if (panelColor?.kind !== 'color') throw new Error('Replacement panel control unavailable');
+      panelColor.defaultValue = '#ec4899';
+      for (const preset of changed.controlPresets ?? [])
+        if ('accent' in preset.values) preset.values.accent = '#00ff00';
+      const replacement = JSON.stringify(changed);
       expect(replacement).not.toBe(original);
       const chooser = page.waitForEvent('filechooser');
       await dock
@@ -336,7 +348,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       await (
         await chooser
       ).setFiles({
-        name: 'neutral-standalone.sniptale-effect.json',
+        name: 'e2e-title.sniptale-animation.json',
         mimeType: 'application/json',
         buffer: Buffer.from(replacement),
       });
@@ -380,6 +392,7 @@ async function openNativeCatalog(page: Page) {
     .first()
     .click();
   await expect(page.locator('[data-ui="video-editor.effects-library.dock"]')).toBeVisible();
+  await page.locator('[data-ui="video-editor.library-tab.annotations"]').click();
 }
 
 async function readCurrentCatalogProject(page: Page) {

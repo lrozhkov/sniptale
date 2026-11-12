@@ -3864,17 +3864,6 @@
     },
     {
       "rule": "structural-function-risk",
-      "file": "apps/extension/src/video-editor/preview/stage/canvas/editor-region/index.tsx",
-      "symbol": "EditorRegionFrame",
-      "owner": "extension:video-editor:preview",
-      "reason": "tool-noise: One React frame owns four EffectV1 region handles and their shared gesture. Its span includes JSX and nested pointer and keyboard callbacks. Parent metrics show 12 statements, cyclomatic 8, and no state authority. Separate fragments would retain the same model, gesture, and cleanup receiver. Exact geometry, native drag, cancellation, and reopening tests cover this component. Fresh architecture review must check this classification before closeout.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent UI state, commands, resource ownership, or gesture lifetimes. Remove when the analyzer separates JSX and nested callbacks from parent span.",
-      "reviewDate": "2026-10-20",
-      "astHash": "a3f4b3d516fac8aff0f77682f5c2ac7622b64071e504955a6b77dcc2f2dbf590",
-      "signatureHash": "a11ab1391dfe7ae96a8a24102d264fe5c331be4fe1af613111e8191e23fda9a7"
-    },
-    {
-      "rule": "structural-function-risk",
       "file": "apps/extension/src/video-editor/project/operations/workspace.ts",
       "symbol": "prepareReviewResources",
       "owner": "extension:video-editor:project",
@@ -5170,28 +5159,6 @@
       "reviewDate": "2026-11-04",
       "astHash": "5679859d4de46106ae4ef921717bb58302f493e4bd535d16e283746b5bfe13fe",
       "signatureHash": "d8ff8b3cbd8dd08194707a84b336ae8181e3648ec31debcc6a7309795cb6645f"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/effect-runtime-sandbox/worker/interpreter/path-drawing.ts",
-      "symbol": "drawCanvasPathSegments",
-      "owner": "extension:effect-runtime-sandbox:worker",
-      "reason": "tool-noise: One native path operation evaluates each operand once and uses that value for drawing and the conservative hull. Splitting evaluation from hull collection risks expression order or repeated evaluation. The separate primitive bounds owner computes the hull.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes operand evaluation or native path order. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "47a1f468e9afb0d568094bc510bac81e692e26cac6192e24402ad669d33a8ac7",
-      "signatureHash": "993fa10609b3fecca99f8de177c97acce4b5070bb29f0b0000099cd9f85abca7"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/effect-runtime-sandbox/worker/svg/path-bounds.ts",
-      "symbol": "deriveSvgPathBounds",
-      "owner": "extension:effect-runtime-sandbox:worker",
-      "reason": "tool-noise: One numeric SVG scan tracks command position, relative coordinates and reflected controls to derive a conservative hull. Arc geometry already has a separate helper. Unknown grammar returns unknown bounds. Native Path2D retains validity and rendering authority.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes SVG grammar or bounds derivation. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "0026e1f98f50972c74268fcdc92ba39c4b45baf218383d4f3bb3c1a40746df95",
-      "signatureHash": "c79139ce317d35175b9c26b6bc96b8445a1428cfb69bd7f0afd14a2abbe825d5"
     },
     {
       "rule": "structural-file-risk",
@@ -6523,17 +6490,6 @@
       "reviewDate": "2026-11-10",
       "astHash": "af8963bf4110aefabbaf712072384486cda745ef19eaec501959ca8c616c90d7",
       "signatureHash": "9c0dc7928a0b02e29aea3b14229fdc03ce9956a8db5901ae3cdac013a3866b5f"
-    },
-    {
-      "rule": "structural-function-risk",
-      "file": "apps/extension/src/effect-runtime-sandbox/worker/interpreter/gpu-target.ts",
-      "symbol": "createEffectRuntimeGpuTarget",
-      "owner": "extension:effect-runtime-sandbox:worker",
-      "reason": "tool-noise: One plan owns resource IDs, admission budget, pass snapshots, scratch, adoption and disposal. Paint uses the same ledger without a bitmap lifetime. Independent read-only structural diagnosis assessed Keep. Fresh final review must check this exact binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess independent state, fixtures, resource lifetimes, allocation and release. Reassess pass ordering, shader layout, barriers, cancellation, publication and recovery. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-10",
-      "astHash": "c618785964823fb929a12dc41373975a2ff9524326e56431be4a1e60927ffa20",
-      "signatureHash": "6544c8726ff81d38e9ba53300b65915abc917890f5d00be7787beb7c1ed5a407"
     },
     {
       "rule": "structural-function-risk",

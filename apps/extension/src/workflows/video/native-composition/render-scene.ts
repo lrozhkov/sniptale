@@ -520,6 +520,10 @@ async function drawResolvedPreviewSceneContent(
     canvas: args.params.canvas,
     ...(args.params.sceneOutput ? { sceneOutput: args.params.sceneOutput } : {}),
     ...(args.params.spatialRenderer ? { spatialRenderer: args.params.spatialRenderer } : {}),
+    ...(args.params.transitionRenderer
+      ? { transitionRenderer: args.params.transitionRenderer }
+      : {}),
+    ...(args.params.signal ? { signal: args.params.signal } : {}),
     ...(viewportCanvas ? { viewportCanvas } : {}),
     clipMediaElements: args.clipMediaElements,
     ...(args.params.preparedFrame?.sourceFrames

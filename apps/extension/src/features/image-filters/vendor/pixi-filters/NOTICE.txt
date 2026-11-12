@@ -1,0 +1,7 @@
+PixiJS Filters v6.1.5
+Copyright (c) 2013-2025 Mathew Groves, Chad Engler
+License: MIT. See LICENSE in this directory.
+Source commit: e9d1ca987864f121680bb0d7e9612c05b37748de
+Sniptale adapts adjustment, clamped Kawase blur, and advanced bloom kernels.
+The adaptations use explicit logical coordinates and the compositor's existing device and resource lifetime.
+The bloom adaptation retains valid premultiplied alpha on transparent pixels.

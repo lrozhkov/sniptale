@@ -1,10 +1,11 @@
+import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
 import type { GpuPreviewLayer } from '../../features/video/composition/canvas/gpu-preview';
 import { prepareEffectRuntimeGpuFramePlans } from '../../features/video/composition/effect-runtime/runtime/gpu-driver';
 import { createEffectRuntimeGpuFrameLedger } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import {
-  resolveEffectV1ObjectRenderBounds,
-  type EffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+  resolveAnimationObjectRenderBounds,
+  type AnimationTemplate,
+} from '@sniptale/runtime-contracts/animation-template';
 import type { EffectRuntimeSandboxExecutor } from '../../contracts/effect-runtime/types';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { renderEffectRuntimeFramePlans } from '../../features/video/composition/effect-runtime/runtime/driver';
@@ -52,7 +53,7 @@ type Definition = Awaited<ReturnType<typeof verifyReviewAnnotationEffectSnapshot
 /** Uses the complete main clock and SDK geometry before any sandbox or bitmap acquisition. */
 export function planReviewAnnotationFrame(args: {
   snapshot: ReviewAnnotationEffectSnapshot;
-  document: EffectV1Document;
+  document: AnimationTemplate;
   instance: ReviewAnnotationEffect;
   segments: readonly ReviewTimeSegment[];
   time: number;
@@ -73,32 +74,20 @@ export function planReviewAnnotationFrame(args: {
     throw new Error('Annotation controls are unavailable.');
   const clock = sampleReviewAnnotationEffect(
     projectReviewAnnotationEffect(instance, args.segments),
-    document.duration,
+    animationRuntimeDuration(document),
     args.time
   );
   if (!clock) return null;
   const box = resolveReviewAnnotationEffectBox(instance.transform, plane);
   const controls = resolveReviewAnnotationEffectControls(document, instance, plane);
-  const layout = document.objectLayout;
-  const local =
-    layout?.resize === 'reflow' ? { ...layout, width: box.width, height: box.height } : layout;
-  const bounds = local
-    ? resolveEffectV1ObjectRenderBounds(local, controls)
-    : { x: 0, y: 0, ...plane };
-  const body = local ?? plane;
+  const bounds = resolveAnimationObjectRenderBounds(document, controls);
   const bitmapBounds = {
-    x: bounds.x / body.width,
-    y: bounds.y / body.height,
-    width: bounds.width / body.width,
-    height: bounds.height / body.height,
+    x: bounds.x / document.animation.w,
+    y: bounds.y / document.animation.h,
+    width: bounds.width / document.animation.w,
+    height: bounds.height / document.animation.h,
   };
-  // Scale graphs keep native bounds in logical space. The worker's existing raster
-  // transform supplies independent physical density; authored aspect must not be
-  // fitted a second time by its uniform object-layout transform.
-  const dimensions =
-    layout?.resize === 'scale'
-      ? { width: bounds.width, height: bounds.height }
-      : { width: box.width * bitmapBounds.width, height: box.height * bitmapBounds.height };
+  const dimensions = { width: bounds.width, height: bounds.height };
   const renderDimensions = {
     width: Math.max(1, Math.ceil(box.width * bitmapBounds.width * args.density.width)),
     height: Math.max(1, Math.ceil(box.height * bitmapBounds.height * args.density.height)),
@@ -111,7 +100,7 @@ export function planReviewAnnotationFrame(args: {
     renderDimensions,
     documentSha256: args.snapshot.sha256,
     documentSource: args.snapshot.source,
-    duration: document.duration,
+    duration: animationRuntimeDuration(document),
     effectInstanceId: instance.id,
     fps: args.fps,
     frameIndex: Math.max(0, Math.floor(clock.time * args.fps)),

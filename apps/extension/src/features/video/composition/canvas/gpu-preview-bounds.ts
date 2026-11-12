@@ -44,13 +44,16 @@ export function createGpuPreviewDrawBounds() {
       let content = groups.get(group);
       if (!content) {
         // These operations can remove or recolor destination pixels but cannot create alpha.
-        content = union(
-          group.layers
-            .filter(
-              (child) => child.blend !== 'mask' && child.blend !== 'erase' && child.blend !== 'atop'
-            )
-            .map((child) => bounds(child, group.logical, group.output))
-        );
+        content = group.composition
+          ? full(group.logical)
+          : union(
+              group.layers
+                .filter(
+                  (child) =>
+                    child.blend !== 'mask' && child.blend !== 'erase' && child.blend !== 'atop'
+                )
+                .map((child) => bounds(child, group.logical, group.output))
+            );
         groups.set(group, content);
       }
       if (content.width === 0 || content.height === 0) return { x: 0, y: 0, width: 0, height: 0 };

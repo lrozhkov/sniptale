@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { ControlDefinition } from '@sniptale/runtime-contracts/effect-v1';
+import type { ControlDefinition } from '@sniptale/runtime-contracts/effect-controls';
 import { InspectorLayout } from '../../../../../ui/compact-inspector-controls/layout';
 import { EffectControl } from './control-field';
 

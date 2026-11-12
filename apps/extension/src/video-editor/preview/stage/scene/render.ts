@@ -1,3 +1,4 @@
+import { createNativeGlTrackCanvas } from '../../../../workflows/video/native-composition/gl-track-canvas';
 import type { GpuPreviewFramePresenter } from '../../../../features/video/composition/canvas/preview-presentation';
 import { createVideoPreviewCompositionJoinRenderer } from './joins';
 import { createVideoProjectWatermarkRenderer } from '../../../../features/video/composition/canvas/project-watermark';
@@ -285,6 +286,7 @@ function usePreviewRenderSchedulerRef(
   );
   const stagingRef = useRef<HTMLCanvasElement | null>(null);
   const spatialRef = useRef<ReviewSpatialRenderer | null>(null);
+  const transitionRef = useRef<ReturnType<typeof createNativeGlTrackCanvas> | null>(null);
   const gpuRef = useRef<ReturnType<typeof createNativeGpuPreviewRenderer> | null>(null);
   const cacheRendererRef = useRef<ReturnType<typeof createVideoPreviewExactFrameRenderer> | null>(
     null
@@ -317,6 +319,8 @@ function usePreviewRenderSchedulerRef(
         const spatial = spatialRef.current;
         spatialRef.current = null;
         spatial?.dispose();
+        transitionRef.current?.dispose();
+        transitionRef.current = null;
         gpuRef.current?.dispose();
         gpuRef.current = null;
         feedbackRef.current.onFailure('visual', error);
@@ -381,6 +385,11 @@ function usePreviewRenderSchedulerRef(
               gpuRef.current?.acceptsNativeFrames === true,
             captionRenderer,
             watermarkRenderer,
+            transitionRenderer: () => {
+              input.signal?.throwIfAborted();
+              transitionRef.current ??= createNativeGlTrackCanvas(input.canvas.ownerDocument);
+              return transitionRef.current;
+            },
             spatialRenderer: () => {
               input.signal?.throwIfAborted();
               if (spatialRef.current) return spatialRef.current;
@@ -427,6 +436,8 @@ function usePreviewRenderSchedulerRef(
     const spatial = spatialRef.current;
     spatialRef.current = null;
     spatial?.dispose();
+    transitionRef.current?.dispose();
+    transitionRef.current = null;
     gpuRef.current?.dispose();
     gpuRef.current = null;
   }, [retryVersion, renderer]);
@@ -443,6 +454,8 @@ function usePreviewRenderSchedulerRef(
       const spatial = spatialRef.current;
       spatialRef.current = null;
       spatial?.dispose();
+      transitionRef.current?.dispose();
+      transitionRef.current = null;
       gpuRef.current?.dispose();
       gpuRef.current = null;
       if (stagingRef.current) {

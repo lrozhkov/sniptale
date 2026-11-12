@@ -2,7 +2,7 @@ import type { EffectRuntimeGpuRasterResource } from '../../../../../contracts/ef
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { EffectRuntimeGpuPass } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { EFFECT_SVG_VECTOR_LIMITS } from '../../../../../contracts/effect-runtime/svg-vector';
-import { EFFECT_V1_GRAPH_LIMITS } from '@sniptale/runtime-contracts/effect-v1';
+import { EFFECT_RUNTIME_GPU_PLAN_LIMITS } from '../../../../../contracts/effect-runtime/gpu-plan';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS } from './resource-limits';
 import {
   EFFECT_RUNTIME_PROTOCOL_VERSION,
@@ -25,7 +25,7 @@ class Bitmap implements ImageBitmap {
 }
 beforeEach(() => vi.stubGlobal('ImageBitmap', Bitmap));
 afterEach(() => vi.unstubAllGlobals());
-function request(): EffectRuntimeWorkerMessage {
+function request(): EffectRuntimeWorkerMessage & { renderTarget?: 'gpu-plan' } {
   return {
     renderTarget: 'gpu-plan',
     assetSelectionRef: { id: 'a'.repeat(64) },
@@ -194,13 +194,13 @@ it('accepts earlier immutable passes, fractional logical sizes and finite normal
 it('bounds graph operations, depth, resource entries and aggregate raster allocation', () => {
   const p = plan();
   const nativePaints =
-    EFFECT_V1_GRAPH_LIMITS.expandedCommands * 2 * EFFECT_SVG_VECTOR_LIMITS.maxParts;
+    EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations * 2 * EFFECT_SVG_VECTOR_LIMITS.maxParts;
   p.passes[0]!.operations = Array(nativePaints + 1);
   expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
   p.passes[0]!.operations = [];
   p.resources = Array(
     nativePaints +
-      EFFECT_V1_GRAPH_LIMITS.expandedCommands +
+      EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations +
       EFFECT_RUNTIME_RESOURCE_LIMITS.maxDecodedRasterEntries +
       EFFECT_RUNTIME_RESOURCE_LIMITS.maxInputFrames +
       2
@@ -221,7 +221,7 @@ it('rejects forward references, duplicate pass IDs, excessive depth and noncover
   const draw = initial.operations[0]!;
   if (draw.op !== 'draw') throw Error();
   const passes: EffectRuntimeGpuPass[] = Array.from(
-    { length: EFFECT_V1_GRAPH_LIMITS.graphDepth + 1 },
+    { length: EFFECT_RUNTIME_GPU_PLAN_LIMITS.depth + 1 },
     (_, index) => ({
       ...initial,
       id: index,
@@ -303,12 +303,12 @@ it('rejects repeated primitive operands and bounds shared scalar operations at c
   const initial = p.passes[0]!.operations[0]!;
   if (initial.op !== 'draw') throw Error();
   p.passes[0]!.operations = Array.from(
-    { length: EFFECT_V1_GRAPH_LIMITS.expandedCommands + 1 },
+    { length: EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations + 1 },
     () => initial
   );
   expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
   p.passes[0]!.operations = Array.from(
-    { length: EFFECT_V1_GRAPH_LIMITS.expandedCommands },
+    { length: EFFECT_RUNTIME_GPU_PLAN_LIMITS.scalarOperations },
     () => initial
   );
   expect(parseEffectRuntimeGpuPlan(p, request())).not.toBeNull();
@@ -456,4 +456,9 @@ it.each([
       { op: 'ellipse', args: [0, 0, 1, -1, 0, 0, 1, false], transform: [1, 0, 0, 1, 0, 0] },
     ];
   expect(parseEffectRuntimeGpuPlan(p, request())).toBeNull();
+});
+
+it('retains the established evaluated-plan operation and dependency-depth budgets', () => {
+  expect(EFFECT_RUNTIME_GPU_PLAN_LIMITS).toEqual({ scalarOperations: 50_000, depth: 32 });
+  expect(Object.isFrozen(EFFECT_RUNTIME_GPU_PLAN_LIMITS)).toBe(true);
 });

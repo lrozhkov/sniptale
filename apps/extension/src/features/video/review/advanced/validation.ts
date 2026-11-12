@@ -1,3 +1,4 @@
+import { parseSourceImageFilterStack } from '../../../image-filters/contract';
 import { parseCursorMotions } from '../../project/cursor-motion';
 import { parseReviewAudioClip } from '../audio-clip-validation';
 import { parseSceneBackgroundMotion } from '../../project/scene/background-motion';
@@ -507,6 +508,15 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
 }
 
 function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdvancedContent | null {
+  const sourceFilters =
+    raw['sourceFilters'] === undefined
+      ? undefined
+      : parseSourceImageFilterStack(raw['sourceFilters']);
+  if (
+    sourceFilters === null ||
+    (sourceFilters && !supportsAdvancedSchema(raw['schemaVersion'], 30))
+  )
+    return null;
   const cameraFollowDefaults =
     raw['cameraFollowDefaults'] === undefined
       ? undefined
@@ -640,6 +650,7 @@ function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdva
     zoom,
     background,
     audio,
+    ...(sourceFilters ? { sourceFilters } : {}),
     ...(text ? { text } : {}),
     ...(captions ? { captions } : {}),
     ...(annotationEffects ? { annotationEffects } : {}),
@@ -713,7 +724,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 28,
+      27, 28, 29,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

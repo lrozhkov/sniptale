@@ -1,3 +1,5 @@
+import { createSourceImageFilter } from '../../../image-filters/contract';
+import { planEnhancedRegion } from './region-plan';
 // @vitest-environment jsdom
 import {
   EFFECT_RUNTIME_RESOURCE_LIMITS,
@@ -517,4 +519,203 @@ it('preserves a physical tile crop and declines an unchanged source without allo
   expect(() =>
     preparedSourceGpuLayers(sampling, 'crop', { x: 0, y: 0, width: 0, height: 1 })
   ).toThrow(RangeError);
+});
+
+it('expands opted-in source support at the original demand density without changing its identity', async () => {
+  const { source, identity, demand } = fixture();
+  const requested = {
+    ...demand,
+    originalPixelROI: { x: 480, y: 0, width: 960, height: 8 },
+    targetRasterSize: { width: 1920, height: 16 },
+  };
+  const before = structuredClone(requested);
+  const enhancer = tileDriver();
+  const prepared = await prepareSourceSampling({
+    source,
+    identity,
+    demands: [requested],
+    enhancer,
+    budget: createPreparedSourceBudget(),
+    fullSourceSupport: true,
+  });
+  const request = enhancer.withEnhancedRegion.mock.calls[0]![0];
+  expect(request.roi).toEqual({ x: 0, y: 0, width: 1920, height: 8 });
+  expect(request.targetSize).toEqual({ width: 3840, height: 16 });
+  expect(prepared.sampling.sourceKey).toBe(identity.sourceKey);
+  expect(prepared.sampling.sourceTime).toBe(2);
+  expect(prepared.sampling.passTime).toBe(1);
+  expect(requested).toEqual(before);
+  const filters = { version: 1 as const, filters: [createSourceImageFilter('blur', 'blur')] };
+  const filtered = preparedSourceGpuLayers(
+    prepared.sampling,
+    'body',
+    { x: 10, y: 5, width: 960, height: 4 },
+    filters
+  )!;
+  expect(filtered.layers).toHaveLength(1);
+  expect(filtered.layers[0]!.imageFilters).toEqual({
+    stack: filters,
+    logical: identity.sourceSize,
+    projectTime: 0,
+  });
+  const group = filtered.layers[0]!.source;
+  if (!('kind' in group) || group.kind !== 'group')
+    throw new Error('Expected contiguous source plane');
+  expect(group.logical).toEqual(identity.sourceSize);
+  expect(group.output).toEqual({ width: 3840, height: 16 });
+  expect(group.layers).toHaveLength(2);
+  expect(filtered.density).toBe(4);
+  prepared.dispose();
+});
+it('retains the inactive source path when full support is requested without magnification', async () => {
+  const { source, identity, demand } = fixture();
+  const enhancer = tileDriver();
+  const prepared = await prepareSourceSampling({
+    source,
+    identity,
+    demands: [
+      {
+        ...demand,
+        sourceToOutputHomography: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+        targetRasterSize: { ...identity.sourceSize },
+      },
+    ],
+    enhancer,
+    budget: createPreparedSourceBudget(),
+    fullSourceSupport: true,
+  });
+  expect(enhancer.withEnhancedRegion).not.toHaveBeenCalled();
+  expect(
+    preparedSourceGpuLayers(
+      prepared.sampling,
+      'body',
+      { x: 0, y: 0, ...identity.sourceSize },
+      { version: 1, filters: [createSourceImageFilter('blur', 'blur')] }
+    )
+  ).toBeNull();
+  prepared.dispose();
+});
+it('keeps a visible demand density when an invisible part of the source crosses a projective horizon', async () => {
+  const { source, identity, demand } = fixture();
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const enhancer = {
+    withEnhancedRegion: vi.fn<ExportEnhancer['withEnhancedRegion']>(async (request, consume) => {
+      const plan = planEnhancedRegion({
+        mode: 'clark-x2',
+        sourceSize: request.sourceSize,
+        roi: request.roi,
+        targetSize: request.targetSize,
+        zoomActive: true,
+      });
+      for (const tile of plan.tiles)
+        await consume({
+          image: canvas,
+          sourceRect: { x: 0, y: 0, width: 1, height: 1 },
+          destination: tile.destination,
+        });
+      return { applied: true, tileCount: plan.tiles.length };
+    }),
+  };
+  const requested = {
+    ...demand,
+    originalPixelROI: { x: 0, y: 0, width: 320, height: 8 },
+    sourceToOutputHomography: [2, 0, 0, 0, 2, 0, -1 / 1600, 0, 1] as const,
+    targetRasterSize: { width: 1280, height: 32 },
+  };
+  const prepared = await prepareSourceSampling({
+    source,
+    identity,
+    demands: [requested],
+    enhancer,
+    budget: createPreparedSourceBudget(),
+    fullSourceSupport: true,
+  });
+  expect(enhancer.withEnhancedRegion.mock.calls[0]![0].targetSize).toEqual({
+    width: 7680,
+    height: 32,
+  });
+  expect(
+    preparedSourceGpuLayers(
+      prepared.sampling,
+      'body',
+      { x: 0, y: 0, ...identity.sourceSize },
+      { version: 1, filters: [createSourceImageFilter('bloom', 'bloom')] }
+    )
+  ).not.toBeNull();
+  prepared.dispose();
+});
+it('refuses partial or overlapping prepared support while neutral stacks retain the original tiles', () => {
+  const { identity } = fixture();
+  const image = document.createElement('canvas');
+  image.width = 960;
+  image.height = 8;
+  const partial = {
+    ...identity,
+    drawPrepared: () => true,
+    visitPreparedTiles(
+      _id: string,
+      consume: (tile: import('../draw/media-source').PreparedSourceTile) => void
+    ) {
+      consume({
+        image,
+        physicalSourceRect: { x: 0, y: 0, width: 960, height: 8 },
+        originalPixelROI: { x: 0, y: 0, width: 960, height: 8 },
+      });
+      return true;
+    },
+  };
+  const destination = { x: 0, y: 0, ...identity.sourceSize };
+  expect(
+    preparedSourceGpuLayers(partial, 'body', destination, {
+      version: 1,
+      filters: [createSourceImageFilter('color', 'neutral')],
+    })
+  ).not.toBeNull();
+  const filters = { version: 1 as const, filters: [createSourceImageFilter('blur', 'blur')] };
+  expect(() => preparedSourceGpuLayers(partial, 'body', destination, filters)).toThrow();
+  const overlapping = {
+    ...partial,
+    visitPreparedTiles(
+      id: string,
+      consume: (tile: import('../draw/media-source').PreparedSourceTile) => void
+    ) {
+      partial.visitPreparedTiles(id, consume);
+      partial.visitPreparedTiles(id, consume);
+      return true;
+    },
+  };
+  expect(() => preparedSourceGpuLayers(overlapping, 'body', destination, filters)).toThrow();
+});
+
+it('releases expanded source reservations before a refused backend allocation can start', async () => {
+  const { source, identity, demand } = fixture();
+  const enhancer = tileDriver();
+  const release = vi.fn();
+  const reserve = vi
+    .fn()
+    .mockReturnValueOnce(release)
+    .mockImplementationOnce(() => {
+      throw new Error('Support budget refused.');
+    });
+  await expect(
+    prepareSourceSampling({
+      source,
+      identity,
+      fullSourceSupport: true,
+      demands: [
+        {
+          ...demand,
+          originalPixelROI: { x: 480, y: 0, width: 960, height: 8 },
+          targetRasterSize: { width: 1920, height: 16 },
+        },
+      ],
+      enhancer,
+      budget: { reserve, reserveBytes: vi.fn() },
+    })
+  ).rejects.toThrow('Support budget refused');
+  expect(enhancer.withEnhancedRegion).not.toHaveBeenCalled();
+  expect(release).toHaveBeenCalledOnce();
+  expect(source.width).toBe(1920);
+  expect(demand.originalPixelROI).toEqual({ x: 0, y: 0, width: 1920, height: 8 });
 });

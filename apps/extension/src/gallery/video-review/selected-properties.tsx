@@ -1,3 +1,12 @@
+import { useGlTransitionCatalog } from '../../composition/gl-transition-presets/catalog';
+import {
+  glTransitionChoices,
+  glTransitionChoiceValue,
+  resolveGlTransitionChoice,
+} from '../../ui/gl-transition-choices';
+import { GlTransitionPresetActions } from '../../composition/gl-transition-presets/actions';
+
+import { GlTransitionFields } from '../../ui/gl-transition-fields';
 import { withCursorMotionPath } from '../../features/video/project/cursor-motion';
 import { createRecordingCursorAvailabilityReader } from '../../workflows/video-review/cursor-trajectory';
 import {
@@ -306,6 +315,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                     : (region.start + region.end) / 2,
                 }}
                 background={advanced.background}
+                sourceFilters={advanced.sourceFilters}
                 source={resource.source}
                 canvas={advanced.canvas}
                 windowHeader={advanced.windowHeader}
@@ -467,6 +477,7 @@ function CutTransitionFields(props: {
   onChange(value: CompositionJoinSettings | null): Promise<boolean> | undefined;
 }) {
   const locale = useAppLocale();
+  const glCatalog = useGlTransitionCatalog();
   const [draft, setDraft] = useState(props.edit.transition ?? null);
   const [saving, setSaving] = useState(false);
   const pending = useRef(false);
@@ -512,21 +523,60 @@ function CutTransitionFields(props: {
         className="min-w-0 sniptale-parameter-stack"
         data-ui="gallery.videoReview.cutTransition"
       >
-        <SelectField<CompositionJoinSettings['type'] | 'none'>
+        <SelectField<string>
           className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.zoomTransitionType')}
-          value={draft?.type ?? 'none'}
+          value={
+            draft?.type === 'gl'
+              ? glTransitionChoiceValue(glCatalog, draft.selection)
+              : (draft?.type ?? 'none')
+          }
           options={[
             { value: 'none', label: translate('gallery.videoReview.transitionNone') },
             { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
             { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
+            ...glTransitionChoices(glCatalog, draft?.type === 'gl' ? draft.selection : undefined),
           ]}
-          onChange={(type) =>
-            void commit(type === 'none' ? null : { before: 0.25, after: 0.25, ...draft, type })
-          }
+          onChange={(type) => {
+            if (type === 'none') {
+              void commit(null);
+              return;
+            }
+            const timing = { before: draft?.before ?? 0.25, after: draft?.after ?? 0.25 };
+            if (type === 'dissolve' || type === 'fade-black') {
+              void commit({ ...timing, type, ...(draft?.color ? { color: draft.color } : {}) });
+              return;
+            }
+            const selection = resolveGlTransitionChoice(glCatalog, type);
+            if (selection)
+              void commit({
+                ...timing,
+                type: 'gl',
+                selection,
+                easing: draft?.type === 'gl' ? draft.easing : 'LINEAR',
+              });
+          }}
         />
         {draft ? (
           <>
+            {draft.type === 'gl' && (
+              <GlTransitionFields
+                presetActions={
+                  <GlTransitionPresetActions
+                    ownerKey={props.edit.id}
+                    ownerRevision={props.edit}
+                    selection={draft.selection}
+                    disabled={saving}
+                    onApply={(selection) => commit({ ...draft, selection })}
+                  />
+                }
+                selection={draft.selection}
+                easing={draft.easing}
+                disabled={saving}
+                onChangeSelection={(selection) => void commit({ ...draft, selection })}
+                onChangeEasing={(easing) => void commit({ ...draft, easing })}
+              />
+            )}
             {draft.type === 'fade-black' ? (
               <ColorField
                 className={reviewSelectFieldClassName}

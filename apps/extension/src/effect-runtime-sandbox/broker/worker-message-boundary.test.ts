@@ -21,7 +21,6 @@ beforeEach(() => vi.stubGlobal('ImageBitmap', Bitmap));
 afterEach(() => vi.unstubAllGlobals());
 function request(): EffectRuntimeWorkerMessage {
   return {
-    renderTarget: 'gpu-plan',
     assetSelectionRef: { id: 'a'.repeat(64) },
     documentRef: { id: 'b'.repeat(64) },
     controls: {},
@@ -32,7 +31,7 @@ function request(): EffectRuntimeWorkerMessage {
     width: 10,
     renderHeight: 10,
     renderWidth: 10,
-    inputFrames: { source: { bitmap: new Bitmap(0, 0), width: 10, height: 10 } },
+    inputFrames: {},
     progress: 0,
     time: 0,
     effectInstanceId: 'effect',
@@ -83,11 +82,11 @@ function plan(): EffectRuntimeGpuPlanResult {
     ],
   };
 }
-it('requires expected request metadata before admitting worker plans', () => {
+it('refuses retired worker plans even when request metadata matches', () => {
   const p = plan();
   expect(
     parseEffectRuntimeWorkerResponse({ type: EFFECT_RUNTIME_WORKER_RESPONSE, result: p }, request())
-  ).toEqual(p);
+  ).toBeNull();
   expect(
     parseEffectRuntimeWorkerResponse({ type: EFFECT_RUNTIME_WORKER_RESPONSE, result: p })
   ).toBeNull();

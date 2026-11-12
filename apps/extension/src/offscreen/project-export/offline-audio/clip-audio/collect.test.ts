@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../../../features/video/project/transition/gl-catalog';
 import { parseHydratableVideoProject } from '../../../../features/video/project/validation/root';
 import {
   createEmptyVideoProject,
@@ -193,7 +194,8 @@ it('retains crossfade phase when exporting a range inside the audio overlap', ()
         leadingClipId: 'clip-1',
         trailingClipId: 'clip-2',
         duration: 1,
-        kind: 'CROSSFADE',
+        kind: 'gl' as const,
+        selection: createGlTransitionSelection('Fade')!,
         easing: 'LINEAR',
       },
     ],

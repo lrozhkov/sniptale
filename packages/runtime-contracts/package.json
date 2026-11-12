@@ -13,7 +13,6 @@
     "./capture/action": "./src/capture/action.ts",
     "./dom-tree": "./src/dom-tree/index.ts",
     "./editor/session": "./src/editor/session/index.ts",
-    "./effect-v1": "./src/effect-v1/index.ts",
     "./export": "./src/export/index.ts",
     "./highlighter/annotation-template-tags": "./src/highlighter/annotation-template-tags.ts",
     "./highlighter/callout": "./src/highlighter/callout.ts",
@@ -71,9 +70,12 @@
     "./scenario/guide-parser": "./src/scenario/guide-parser.ts",
     "./scenario/types/tour": "./src/scenario/types/tour.ts",
     "./scenario/tour-parser": "./src/scenario/tour-parser.ts",
-    "./window-header": "./src/window-header.ts"
+    "./window-header": "./src/window-header.ts",
+    "./effect-controls": "./src/effect-controls/index.ts",
+    "./animation-template": "./src/animation-template/index.ts"
   },
   "dependencies": {
+    "@noble/hashes": "2.4.0",
     "@sniptale/foundation": "0.5.2",
     "zod": "^4.6.7"
   },

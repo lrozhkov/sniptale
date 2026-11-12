@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import {
   planReviewCutTransitions,
@@ -228,4 +229,42 @@ it('retains the exact selected seam and its frame bounds when windows share an e
   expect(reviewCutTransitionAt(sharedBoundary, plans)?.plan).toBe(plans[1]);
   expect(reviewCutTransitionAt(sharedBoundary, plans)?.plan.left).toBe(plans[1]!.left);
   expect(reviewCutTransitionAt(NaN, plans)).toBeNull();
+});
+
+it('retains GL identity and evaluates easing on the speed-adjusted result clock', () => {
+  const selection = createGlTransitionSelection('BowTie')!;
+  const transition = {
+    type: 'gl' as const,
+    selection,
+    easing: 'EASE_IN_OUT' as const,
+    before: 0.5,
+    after: 0.5,
+  };
+  const plans = planReviewCutTransitions(10, [
+    {
+      id: 'speed',
+      kind: 'speed',
+      requestedStart: 0,
+      requestedEnd: 2,
+      start: 0,
+      end: 2,
+      rate: 2,
+      audio: 'speed',
+    },
+    { id: 'cut', kind: 'cut', requestedStart: 2, requestedEnd: 4, start: 2, end: 4, transition },
+  ]);
+  expect(plans).toHaveLength(1);
+  expect(plans[0]).toMatchObject({
+    type: 'gl',
+    selection,
+    easing: 'EASE_IN_OUT',
+    seam: 1,
+    left: { start: 0, end: 2 },
+    right: { start: 4, end: 10 },
+  });
+  expect(reviewCutTransitionAt(0.5, plans)?.incoming).toBe(0);
+  expect(reviewCutTransitionAt(0.75, plans)?.incoming).toBe(0.0625);
+  expect(reviewCutTransitionAt(1, plans)?.incoming).toBe(0.5);
+  expect(reviewCutTransitionAt(1.25, plans)?.incoming).toBe(0.9375);
+  expect(reviewCutTransitionAt(1.5, plans)).toBeNull();
 });

@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../../features/video/project/transition/gl-catalog';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import { createVideoEditorTimelineState } from './root-state';
@@ -68,7 +69,8 @@ it('covers selection fallbacks for scene and transition branches', () => {
       duration: 1,
       easing: 'LINEAR',
       id: 'transition-1',
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       leadingClipId: 'missing-clip-a',
       trailingClipId: 'missing-clip-b',
     } as never,

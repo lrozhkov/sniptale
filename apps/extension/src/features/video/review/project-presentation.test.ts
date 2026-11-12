@@ -1,3 +1,4 @@
+import { createGlTransitionSelection } from '../project/transition/gl-catalog';
 import {
   planReviewProjectPresentation,
   type ReviewProjectBookendResource,
@@ -673,3 +674,28 @@ it.each(['intro', 'outro', 'both'] as const)(
     expect(input.document.advancedContent.text!.fragments).toEqual(before);
   }
 );
+
+it('preserves pinned GL identity and easing when promoting bookends to Native composition joins', () => {
+  const input = bookendFixture();
+  const settings = input.document.advancedContent.presentation!;
+  const selection = createGlTransitionSelection('BowTie')!;
+  settings.introTransition = {
+    type: 'gl',
+    selection,
+    easing: 'EASE_IN_OUT',
+    before: 0.2,
+    after: 0.3,
+  };
+  const before = structuredClone(input);
+  const result = planReviewProjectConversion(input);
+  if (result.status !== 'prepared') throw new Error(JSON.stringify(result));
+  expect(
+    result.project.compositionJoins?.find(
+      ({ id }) => id === `${result.project.id}:bookend:intro:join`
+    )?.transition
+  ).toEqual(settings.introTransition);
+  expect(hydrateVideoProject(structuredClone(result.project)).compositionJoins).toEqual(
+    result.project.compositionJoins
+  );
+  expect(input).toEqual(before);
+});

@@ -697,7 +697,8 @@ test('background camera modes match Gallery pixels and keep a second video indep
       import { createEffectHostClip } from './apps/extension/src/features/video/project/factories/overlay-clip';
       import { drawEffectRuntimeVisualLayer } from './apps/extension/src/features/video/composition/draw/effect-runtime';
       import { getFittedMediaContentFrame } from './apps/extension/src/features/video/composition/draw/fitted-media';
-      import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+      import { sha256 } from '@noble/hashes/sha2.js';
+      import { bytesToHex } from '@noble/hashes/utils.js';
       import { shouldLockVisualLayerToViewport } from './apps/extension/src/features/video/composition/motion/layer-camera';
       import { createReviewSpatialSession as createReviewSpatialRenderer } from './apps/extension/src/workflows/video-review/spatial-render-session';
       import { drawSpatialCompositionGroup } from './apps/extension/src/features/video/composition/draw/spatial';
@@ -722,13 +723,10 @@ test('background camera modes match Gallery pixels and keep a second video indep
           `headerPaint.fillRect(0, 0, 640, 40);
         const headerImage = new Image(); headerImage.src = headerCanvas.toDataURL(); await headerImage.decode();
         const annotationSource = ${JSON.stringify(
-          await readFile(
-            'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-standalone.sniptale-effect.json',
-            'utf8'
-          )
+          await readFile('tooling/test/e2e/fixtures/lottie/neutral.sniptale-animation.json', 'utf8')
         )};
         const annotationDocument = JSON.parse(annotationSource);
-        const annotationHash = await sha256EffectV1Bytes(new TextEncoder().encode(annotationSource));
+        const annotationHash = bytesToHex(sha256(new TextEncoder().encode(annotationSource)));
         const annotationCanvas = document.createElement('canvas'); annotationCanvas.width = 160; ` +
           `annotationCanvas.height = 80;
         const annotationPaint = annotationCanvas.getContext('2d'); annotationPaint.fillStyle = '#ff00ff';
@@ -827,7 +825,7 @@ test('background camera modes match Gallery pixels and keep a second video indep
               rotation: annotation.transform.rotation * 180 / Math.PI, opacity: 1 };
             project.clips.push(annotationHost);
             project.effectSnapshots = [{ id: annotation.snapshotId, sha256: annotationHash, source: annotationSource,
-              documentId: annotationDocument.id, kind: 'standalone', schemaVersion: 'sniptale.effect.v1',
+              documentId: annotationDocument.id, kind: 'standalone', schemaVersion: 'sniptale.animation.v1',
               retainedByteLength: new TextEncoder().encode(annotationSource).byteLength, assets: [] }];
             project.effectInstances = [{ id: annotation.id, snapshotId: annotation.snapshotId, enabled: true,
               controls: {}, kind: 'standalone', target: { kind: 'scene' }, startTime: 0, duration: 2, ` +

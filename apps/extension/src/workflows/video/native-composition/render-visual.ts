@@ -1,3 +1,6 @@
+import type { PreviewSceneRenderInput } from './types';
+import { mapCompositionPointThroughCamera } from '../../../features/video/composition/motion';
+import { drawSpatialSceneOverlays } from '../../../features/video/composition/draw/spatial';
 import type { PreparedPreviewSceneCanvas } from './types';
 import type { CameraOutputViewport } from '../../../features/video/project/export/output-dimensions';
 import type { PreviewSceneSourceFrames } from './source-frames';
@@ -7,12 +10,14 @@ import { drawSpatialCompositionGroup } from '../../../features/video/composition
 import type { ReviewSpatialRenderer } from '../../../features/video/composition/canvas/spatial-renderer';
 import {
   resolveOrderedVisualPassLayers,
+  resolveVisualStateSourceSpotlights,
   splitVisualLayersForSourceSpotlights,
 } from '../../../features/video/composition/visual-pass-layers';
 import { resolveEffectRuntimeVisualLayers } from '../../../features/video/composition/draw/effect-runtime';
 import {
   createEffectRuntimeDrawState,
   drawCompositionVisualLayer,
+  drawCursorCompositionState,
   drawEffectRuntimeVisualLayer,
   type EffectRuntimeDrawState,
 } from '../../../features/video/composition/draw';
@@ -23,6 +28,7 @@ import {
 } from '../../../features/video/composition/effect-runtime';
 import {
   mapVisualLayerToViewportSpace,
+  shouldLockVisualLayerToViewport,
   segmentVisualLayersByViewportLock,
 } from '../../../features/video/composition/motion/layer-camera';
 import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
@@ -155,6 +161,8 @@ export async function drawPreviewVisualPasses(params: {
   canvas: HTMLCanvasElement;
   viewportCanvas?: HTMLCanvasElement;
   spatialRenderer?: () => ReviewSpatialRenderer;
+  transitionRenderer?: PreviewSceneRenderInput['transitionRenderer'];
+  signal?: AbortSignal;
   clipMediaElements: Map<string, VideoCompositionMediaSource>;
   currentTime?: number;
   imageBank: Record<string, HTMLImageElement>;
@@ -196,6 +204,8 @@ export async function drawPreviewVisualPasses(params: {
     prepared,
     effectRuntimeFrames: params.effectRuntimeFrames,
     spatialRenderer: params.spatialRenderer,
+    transitionRenderer: params.transitionRenderer,
+    signal: params.signal,
   });
   await drawPreviewTransitionOverlays({
     canvas: params.canvas,
@@ -219,7 +229,14 @@ async function drawPreviewOrderedVisualLayers(params: {
   passes: ReturnType<typeof resolveVideoCompositionRenderPasses>['visualPasses'];
   prepared: PreparedPreviewSceneCanvas;
   spatialRenderer: (() => ReviewSpatialRenderer) | undefined;
+  transitionRenderer: PreviewSceneRenderInput['transitionRenderer'];
+  signal: AbortSignal | undefined;
+  withSceneBackdrop?: (paint: (source: HTMLCanvasElement) => void) => void;
 }) {
+  if (params.frame.glTrackPlans?.size) {
+    await drawPreviewGlTrackLayers(params);
+    return;
+  }
   const splitClipId = resolveActiveCameraSplit(
     params.project,
     params.time,
@@ -266,25 +283,44 @@ async function drawPreviewOrderedVisualLayers(params: {
           prepared: params.prepared,
           spatialRenderer: params.spatialRenderer,
         });
-      if (part.afterClipId)
-        drawCompositionSceneSpotlights({
-          context: params.prepared.context,
-          afterClipId: part.afterClipId,
-          frame: params.frame,
-          project: params.project,
-          images: params.imageBank,
-          viewport: {
-            x: params.prepared.viewport.offsetX,
-            y: params.prepared.viewport.offsetY,
-            width: params.prepared.viewport.width,
-            height: params.prepared.viewport.height,
-          },
-          composition: {
-            x: params.prepared.viewport.offsetX,
-            y: params.prepared.viewport.offsetY,
-            scale: params.prepared.viewport.scale,
-          },
-        });
+      if (part.afterClipId) {
+        const afterClipId = part.afterClipId;
+        const drawMask = (source?: HTMLCanvasElement) =>
+          drawCompositionSceneSpotlights({
+            ...(source ? { blurSource: () => source } : {}),
+            context: params.prepared.context,
+            afterClipId,
+            frame: params.frame,
+            project: params.project,
+            images: params.imageBank,
+            viewport: {
+              x: params.prepared.viewport.offsetX,
+              y: params.prepared.viewport.offsetY,
+              width: params.prepared.viewport.width,
+              height: params.prepared.viewport.height,
+            },
+            composition: {
+              x: params.prepared.viewport.offsetX,
+              y: params.prepared.viewport.offsetY,
+              scale: params.prepared.viewport.scale,
+            },
+          });
+        const samples = params.frame.sceneSpotlights?.filter(
+          (state) => state.afterClipId === part.afterClipId
+        );
+        if (
+          params.withSceneBackdrop &&
+          samples?.some(
+            (state) =>
+              state.spotlight.blur > 0 ||
+              state.spotlight.effect === 'magnify' ||
+              (state.from?.blur ?? 0) > 0 ||
+              state.from?.effect === 'magnify'
+          )
+        )
+          params.withSceneBackdrop(drawMask);
+        else drawMask();
+      }
     }
   }
 }
@@ -343,5 +379,136 @@ async function drawPreviewUnlockedLayerGroup(params: {
     passTarget.flush();
   } finally {
     passTarget.dispose();
+  }
+}
+
+async function drawPreviewGlTrackLayers(
+  params: Parameters<typeof drawPreviewOrderedVisualLayers>[0]
+) {
+  if (!params.transitionRenderer)
+    throw new Error('Native transition fallback owner is unavailable.');
+  const renderer = params.transitionRenderer();
+  const { glTrackPlans, ...baseFrame } = params.frame;
+  const viewport = params.prepared.viewport;
+  const dpr = params.prepared.dpr;
+  const width = Math.max(1, Math.ceil(viewport.width * dpr));
+  const height = Math.max(1, Math.ceil(viewport.height * dpr));
+  const splitClipId = resolveActiveCameraSplit(
+    params.project,
+    params.time,
+    params.frame.visualLayers
+  )?.clipId;
+  const ordered = resolveEffectRuntimeVisualLayers(
+    params.frame.visualLayers.filter((layer) => layer.clipId !== splitClipId),
+    params.effectRuntimeFrames?.overlayFrames
+  );
+  const tracks = new Map<string, typeof ordered>();
+  for (const layer of ordered) {
+    const members = tracks.get(layer.clip.trackId) ?? [];
+    members.push(layer);
+    tracks.set(layer.clip.trackId, members);
+  }
+  for (const [trackId, layers] of tracks) {
+    params.signal?.throwIfAborted();
+    const root = glTrackPlans?.get(trackId);
+    if (!root) {
+      await drawPreviewOrderedVisualLayers({
+        ...params,
+        frame: { ...baseFrame, visualLayers: layers },
+      });
+      continue;
+    }
+    const result = await renderer.render({
+      root,
+      width,
+      height,
+      ratio: params.project.width / params.project.height,
+      signal: params.signal ?? new AbortController().signal,
+      async paintState(target, clipIds) {
+        const members = new Set(clipIds);
+        const selected = layers.filter((layer) => members.has(layer.clipId));
+        const stateFrame = {
+          ...baseFrame,
+          visualLayers: selected,
+          sceneSpotlights: resolveVisualStateSourceSpotlights(
+            selected,
+            params.frame.sceneSpotlights
+          ),
+        };
+        const prepared = {
+          ...params.prepared,
+          context: target.context,
+          bounds: { width: viewport.width, height: viewport.height },
+          viewport: { ...viewport, offsetX: 0, offsetY: 0 },
+        };
+        target.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+        await drawPreviewOrderedVisualLayers({
+          ...params,
+          canvas: target.canvas,
+          prepared,
+          frame: stateFrame,
+          withSceneBackdrop(paint) {
+            target.withScratch((scratch) => {
+              scratch.context.drawImage(
+                params.canvas,
+                viewport.offsetX * dpr,
+                viewport.offsetY * dpr,
+                width,
+                height,
+                0,
+                0,
+                width,
+                height
+              );
+              scratch.context.drawImage(target.canvas, 0, 0);
+              paint(scratch.canvas);
+            });
+          },
+        });
+        for (const id of clipIds) {
+          const cursor = params.frame.sourceCursors?.get(id);
+          if (!cursor?.visible) continue;
+          const owner = selected.find((layer) => layer.clipId === id);
+          const locked = owner && shouldLockVisualLayerToViewport(owner, params.frame.camera);
+          if (
+            !locked &&
+            drawSpatialSceneOverlays({
+              actions: [],
+              cursor,
+              camera: params.frame.camera,
+              context: target.context,
+              destination: { x: 0, y: 0, width: viewport.width, height: viewport.height },
+              logicalSize: { width: params.project.width, height: params.project.height },
+              output: { width, height },
+              rasterScale: viewport.scale * dpr,
+              spatialRenderer: params.spatialRenderer,
+            })
+          )
+            continue;
+          const point = locked
+            ? cursor
+            : mapCompositionPointThroughCamera(cursor, params.frame.camera);
+          if (point)
+            drawCursorCompositionState(target.context, {
+              ...cursor,
+              x: point.x * viewport.scale,
+              y: point.y * viewport.scale,
+              scale: cursor.scale * viewport.scale * (locked ? 1 : params.frame.camera.scale),
+            });
+        }
+      },
+    });
+    try {
+      params.signal?.throwIfAborted();
+      params.prepared.context.drawImage(
+        result.canvas,
+        viewport.offsetX,
+        viewport.offsetY,
+        viewport.width,
+        viewport.height
+      );
+    } finally {
+      result.release();
+    }
   }
 }

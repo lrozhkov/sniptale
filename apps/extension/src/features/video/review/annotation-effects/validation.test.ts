@@ -1,11 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  resolveEffectV1ControlDefault,
-  sha256EffectV1Bytes,
-  validateEffectV1Document,
-} from '@sniptale/runtime-contracts/effect-v1';
+import { validateAnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
+import { sha256 as hashSha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import { initializeReviewAnnotationEffectAnchors } from './layout';
 import {
   parseReviewAnnotationEffects,
@@ -20,20 +19,17 @@ import type { ReviewAnnotationEffect } from './types';
 const hash = 'a'.repeat(64);
 function source(name: string) {
   return readFileSync(
-    resolve(
-      'apps/extension/public/video-effects/effects/annotations',
-      `sniptale-${name}/effect.sniptale-effect.json`
-    ),
+    resolve('apps/extension/public/video-effects/animations', `${name}.sniptale-animation.json`),
     'utf8'
   );
 }
 function snapshot(text: string) {
   const document = readReviewAnnotationEffectDocument(text);
   if (!document)
-    throw new Error(JSON.stringify(validateEffectV1Document(JSON.parse(text)).diagnostics));
+    throw new Error(JSON.stringify(validateAnimationTemplate(JSON.parse(text)).diagnostics));
   return {
     id: `effect:${hash}`,
-    schemaVersion: 'sniptale.effect.v1',
+    schemaVersion: 'sniptale.animation.v1',
     kind: 'standalone',
     documentId: document.id,
     sha256: hash,
@@ -70,13 +66,13 @@ describe('annotation JSON admission', () => {
       )
     ).toBeNull();
   });
-  it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
+  it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arrow'])(
     'retains every declared control and geometry of %s independently from the catalog',
     (name) => {
       const text = source(name);
       const document = readReviewAnnotationEffectDocument(text)!;
       const controls = Object.fromEntries(
-        document.controls.map((c) => [c.id, resolveEffectV1ControlDefault(c, 'ru')])
+        document.controls.map((c) => [c.id, resolveEffectControlDefault(c, 'ru')])
       );
       const current = instance();
       const anchors = initializeReviewAnnotationEffectAnchors(
@@ -175,135 +171,60 @@ describe('annotation JSON admission', () => {
 
 async function byteSnapshot(text: string) {
   const retained = snapshot(text);
-  const sha256 = await sha256EffectV1Bytes(new TextEncoder().encode(text));
+  const sha256 = bytesToHex(hashSha256(new TextEncoder().encode(text)));
   return { ...retained, id: `effect:${sha256}`, sha256 };
 }
 
-async function svgSnapshot(bytes: Uint8Array) {
-  const original = readReviewAnnotationEffectDocument(
-    readFileSync(
-      resolve(
-        'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json'
-      ),
-      'utf8'
-    )
-  )!;
-  const asset = original.assets[0]!;
-  const sha256 = await sha256EffectV1Bytes(bytes);
-  const text = JSON.stringify({
+function imageSource(bytes: Uint8Array, overrides: Record<string, unknown> = {}) {
+  const original = readReviewAnnotationEffectDocument(source('frame'))!;
+  return JSON.stringify({
     ...original,
-    assets: [{ ...asset, sha256, byteLength: bytes.byteLength }],
-  });
-  const retained = await byteSnapshot(text);
-  return {
-    ...retained,
-    retainedByteLength: retained.retainedByteLength + bytes.byteLength,
-    assets: [
+    resources: [
+      ...original.resources,
       {
-        id: asset.id,
-        kind: 'svg' as const,
-        mimeType: 'image/svg+xml',
-        assetId: 'project-asset:imported',
-        sha256,
+        path: 'images/mark.png',
+        mimeType: 'image/png',
         byteLength: bytes.byteLength,
+        sha256: bytesToHex(hashSha256(bytes)),
+        base64: Buffer.from(bytes).toString('base64'),
+        ...overrides,
       },
     ],
-  };
+    animation: {
+      ...original.animation,
+      assets: [{ id: 'mark', w: 16, h: 16, p: 'images/mark.png', u: '', e: 0 }],
+    },
+  });
+}
+
+function png() {
+  return Uint8Array.from(readFileSync(resolve('apps/extension/public/icons/icon-16.png')));
 }
 
 describe('immutable byte verification', () => {
-  it('verifies a real imported PNG with matching metadata and refuses a forged matching-hash signature', async () => {
-    const bytes = Uint8Array.from(readFileSync(resolve('apps/extension/public/icons/icon-16.png')));
-    const original = readReviewAnnotationEffectDocument(
-      readFileSync(
-        resolve(
-          'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json'
-        ),
-        'utf8'
-      )
-    )!;
-    const sha256 = await sha256EffectV1Bytes(bytes);
-    const asset = original.assets[0]!;
-    const retained = await byteSnapshot(
-      JSON.stringify({
-        ...original,
-        controls: [],
-        timeline: { phases: [], tracks: [] },
-        assets: [
-          {
-            ...asset,
-            kind: 'image',
-            mimeType: 'image/png',
-            path: 'assets/mark.png',
-            byteLength: bytes.byteLength,
-            sha256,
-          },
-        ],
-        layers: original.layers.map((layer) =>
-          layer.type === 'svgAsset' ? { ...layer, type: 'imageAsset' } : layer
-        ),
-        program: {
-          kind: 'graph',
-          version: 1,
-          commands: [
-            {
-              op: 'image',
-              assetId: asset.id,
-              layerId: 'mark',
-              x: 0,
-              y: 0,
-              width: 240,
-              height: 240,
-              fit: 'contain',
-            },
-          ],
-        },
-      })
-    );
-    const value = {
-      ...retained,
-      retainedByteLength: retained.retainedByteLength + bytes.byteLength,
-      assets: [
-        {
-          id: asset.id,
-          kind: 'image' as const,
-          mimeType: 'image/png',
-          assetId: 'project-asset:image',
-          byteLength: bytes.byteLength,
-          sha256,
-        },
-      ],
-    };
+  it('verifies an embedded PNG and refuses a changed resource digest without changing the snapshot', async () => {
+    const bytes = png();
+    const retained = await byteSnapshot(imageSource(bytes));
+    const before = structuredClone(retained);
+    const read = vi.fn();
     const verified = await verifyReviewAnnotationEffectSnapshot(
-      value,
-      async () => new Blob([bytes], { type: 'image/png' }),
+      retained,
+      read,
       new AbortController().signal
     );
-    expect(verified.mode).toBe('scene');
-    expect(verified.assets[0]?.blob.size).toBe(bytes.byteLength);
-    const forged = new Uint8Array(bytes.byteLength);
-    const forgedSha = await sha256EffectV1Bytes(forged);
-    const document = verified.document;
-    const changed = await byteSnapshot(
-      JSON.stringify({
-        ...document,
-        assets: document.assets.map((entry) => ({ ...entry, sha256: forgedSha })),
-      })
-    );
+    expect(verified.mode).toBe('object');
+    expect(verified.assets).toEqual([]);
+    expect(verified.document.resources.at(-1)?.base64).toBe(Buffer.from(bytes).toString('base64'));
+    expect(verified.document.resources.at(-1)?.byteLength).toBe(bytes.byteLength);
+    expect(read).not.toHaveBeenCalled();
+    const changed = await byteSnapshot(imageSource(bytes, { sha256: '0'.repeat(64) }));
     await expect(
-      verifyReviewAnnotationEffectSnapshot(
-        {
-          ...changed,
-          retainedByteLength: changed.retainedByteLength + forged.byteLength,
-          assets: value.assets.map((entry) => ({ ...entry, sha256: forgedSha })),
-        },
-        async () => new Blob([forged], { type: 'image/png' }),
-        new AbortController().signal
-      )
+      verifyReviewAnnotationEffectSnapshot(changed, read, new AbortController().signal)
     ).rejects.toMatchObject({ code: 'resource-integrity' });
+    expect(retained).toEqual(before);
   });
 
-  it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners'])(
+  it.each(['lower-third', 'title', 'chapters', 'callout', 'frame', 'corners', 'arrow'])(
     'verifies %s source without a catalog or resource acquisition',
     async (name) => {
       const retained = await byteSnapshot(source(name));
@@ -319,21 +240,6 @@ describe('immutable byte verification', () => {
       expect(read).not.toHaveBeenCalled();
     }
   );
-
-  it('verifies external SVG and explicitly retains full-scene geometry', async () => {
-    const bytes = Uint8Array.from(
-      readFileSync(resolve('tooling/test/e2e/fixtures/effect-v1/assets/neutral-mark.svg'))
-    );
-    const retained = await svgSnapshot(bytes);
-    const blob = new Blob([bytes], { type: 'image/svg+xml' });
-    const read = vi.fn(async () => blob);
-    const signal = new AbortController().signal;
-    const verified = await verifyReviewAnnotationEffectSnapshot(retained, read, signal);
-    expect(verified.mode).toBe('scene');
-    expect(verified.document.objectLayout).toBeUndefined();
-    expect(verified.assets[0]?.blob).toBe(blob);
-    expect(read).toHaveBeenCalledExactlyOnceWith('project-asset:imported', signal);
-  });
 
   it('refuses changed source despite structurally valid JSON and recomputed retained size', async () => {
     const retained = await byteSnapshot(source('frame'));
@@ -352,80 +258,86 @@ describe('immutable byte verification', () => {
     expect(read).not.toHaveBeenCalled();
   });
 
-  it('refuses missing resources and suppresses raw reader failures', async () => {
-    const bytes = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
-    const retained = await svgSnapshot(bytes);
-    const signal = new AbortController().signal;
+  it.each([
+    { mimeType: 'image/jpeg' },
+    { byteLength: 1 },
+    { path: 'https://private.example/mark.png' },
+    { path: '../mark.png' },
+  ])('refuses inconsistent embedded metadata without external acquisition %j', async (change) => {
+    const text = imageSource(png(), change);
+    const bytes = new TextEncoder().encode(text),
+      digest = bytesToHex(hashSha256(bytes));
+    const retained = {
+      ...snapshot(source('frame')),
+      source: text,
+      id: `effect:${digest}`,
+      sha256: digest,
+      retainedByteLength: bytes.byteLength,
+    };
+    const before = structuredClone(retained),
+      read = vi.fn();
     await expect(
-      verifyReviewAnnotationEffectSnapshot(retained, async () => undefined, signal)
-    ).rejects.toMatchObject({ code: 'resource-unavailable' });
-    await expect(
-      verifyReviewAnnotationEffectSnapshot(
-        retained,
-        async () => {
-          throw new Error('PRIVATE_CONTENT');
-        },
-        signal
-      )
-    ).rejects.toMatchObject({ message: 'Annotation effect is unavailable: resource-unavailable.' });
-  });
-
-  it('refuses mismatched MIME, size and bytes without rewriting retained metadata', async () => {
-    const bytes = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
-    const retained = await svgSnapshot(bytes);
-    const original = structuredClone(retained);
-    for (const blob of [
-      new Blob([bytes], { type: 'image/png' }),
-      new Blob(['short'], { type: 'image/svg+xml' }),
-      new Blob([bytes.map((byte) => byte ^ 1)], { type: 'image/svg+xml' }),
-    ]) {
-      await expect(
-        verifyReviewAnnotationEffectSnapshot(
-          retained,
-          async () => blob,
-          new AbortController().signal
-        )
-      ).rejects.toMatchObject({ code: 'resource-integrity' });
-    }
-    expect(retained).toEqual(original);
+      verifyReviewAnnotationEffectSnapshot(retained, read, new AbortController().signal)
+    ).rejects.toMatchObject({ name: 'ReviewAnnotationEffectUnavailableError' });
+    expect(read).not.toHaveBeenCalled();
+    expect(retained).toEqual(before);
   });
 
   it.each([
     'INVALID_SIGNATURE',
     '<svg onload="alert(1)"><script>alert(2)</script></svg>',
     '<svg><image href="https://private.example/image.png"/></svg>',
-  ])('refuses forged matching digests for unsafe resource %s', async (text) => {
-    const bytes = new TextEncoder().encode(text);
-    const retained = await svgSnapshot(bytes);
+  ])('refuses forged matching digests and unsupported SVG before acquisition %s', async (text) => {
+    const bytes = new TextEncoder().encode(text),
+      value = imageSource(bytes);
+    const digest = bytesToHex(hashSha256(new TextEncoder().encode(value))),
+      read = vi.fn();
+    const retained = {
+      ...snapshot(source('frame')),
+      id: `effect:${digest}`,
+      sha256: digest,
+      source: value,
+      retainedByteLength: new TextEncoder().encode(value).byteLength,
+    };
     await expect(
-      verifyReviewAnnotationEffectSnapshot(
-        retained,
-        async () => new Blob([bytes], { type: 'image/svg+xml' }),
-        new AbortController().signal
-      )
-    ).rejects.toMatchObject({ code: 'resource-integrity' });
+      verifyReviewAnnotationEffectSnapshot(retained, read, new AbortController().signal)
+    ).rejects.toMatchObject({ code: 'invalid' });
+    expect(read).not.toHaveBeenCalled();
   });
 
-  it('keeps early and late cancellation distinct from unavailable reads', async () => {
-    const bytes = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"></svg>');
-    const retained = await svgSnapshot(bytes);
-    const controller = new AbortController();
-    controller.abort();
-    const read = vi.fn();
+  it('refuses a missing embedded resource instead of invoking the legacy asset reader', async () => {
+    const original = readReviewAnnotationEffectDocument(source('title'))!;
+    const text = JSON.stringify({ ...original, resources: [] });
+    const digest = bytesToHex(hashSha256(new TextEncoder().encode(text))),
+      read = vi.fn(async () => {
+        throw new Error('PRIVATE_CONTENT');
+      });
+    const retained = {
+      ...snapshot(source('title')),
+      id: `effect:${digest}`,
+      sha256: digest,
+      source: text,
+      retainedByteLength: new TextEncoder().encode(text).byteLength,
+    };
     await expect(
-      verifyReviewAnnotationEffectSnapshot(retained, read, controller.signal)
-    ).rejects.toMatchObject({ name: 'AbortError' });
+      verifyReviewAnnotationEffectSnapshot(retained, read, new AbortController().signal)
+    ).rejects.toMatchObject({ message: 'Annotation effect is unavailable: invalid.' });
     expect(read).not.toHaveBeenCalled();
-    const late = new AbortController();
+  });
+
+  it('keeps early and late cancellation distinct without reading external resources', async () => {
+    const retained = await byteSnapshot(source('title')),
+      read = vi.fn();
+    const early = new AbortController();
+    early.abort();
     await expect(
-      verifyReviewAnnotationEffectSnapshot(
-        retained,
-        async () => {
-          late.abort();
-          return new Blob([bytes], { type: 'image/svg+xml' });
-        },
-        late.signal
-      )
+      verifyReviewAnnotationEffectSnapshot(retained, read, early.signal)
     ).rejects.toMatchObject({ name: 'AbortError' });
+    const late = new AbortController();
+    const pending = verifyReviewAnnotationEffectSnapshot(retained, read, late.signal);
+    // Verification yields after the first embedded resource. Abort before its continuation.
+    late.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(read).not.toHaveBeenCalled();
   });
 });

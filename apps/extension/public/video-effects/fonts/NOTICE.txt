@@ -1,0 +1,6 @@
+Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text)
+
+Golos Text version 2.004.
+The font bytes are embedded in Lottie templates as base64. The font bytes do not change.
+The SIL Open Font License 1.1 applies to the font bytes. See OFL.txt.
+Font SHA-256: 17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063

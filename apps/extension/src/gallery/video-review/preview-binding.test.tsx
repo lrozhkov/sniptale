@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
 import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
 import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { act, type ComponentProps } from 'react';
@@ -16,6 +19,23 @@ import { createReviewCaptionSettings } from '../../features/video/review/text-do
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { LoadedReview } from './use-session';
 
+const FRAME_SOURCE = readFileSync(
+  'apps/extension/public/video-effects/animations/frame.sniptale-animation.json',
+  'utf8'
+);
+const FRAME_DOCUMENT = parseAnimationTemplateSource(FRAME_SOURCE);
+if (!FRAME_DOCUMENT.ok) throw new Error('Expected valid shipped frame animation.');
+const FRAME_HASH = createHash('sha256').update(FRAME_SOURCE).digest('hex');
+const FRAME_SNAPSHOT = {
+  id: `effect:${FRAME_HASH}`,
+  schemaVersion: 'sniptale.animation.v1' as const,
+  kind: 'standalone' as const,
+  documentId: FRAME_DOCUMENT.template.id,
+  sha256: FRAME_HASH,
+  source: FRAME_SOURCE,
+  retainedByteLength: Buffer.byteLength(FRAME_SOURCE),
+  assets: [],
+};
 const io = vi.hoisted(() => ({
   stage: vi.fn(),
   frame: vi.fn(),
@@ -79,7 +99,7 @@ it('forwards immutable session annotation sources and full clocks, reading local
     instances: [
       {
         id: 'frame',
-        snapshotId: 'effect:frame',
+        snapshotId: FRAME_SNAPSHOT.id,
         enabled: true,
         start: 0,
         end: 14,
@@ -91,18 +111,7 @@ it('forwards immutable session annotation sources and full clocks, reading local
     ],
   };
   const captured = session.getSnapshot();
-  const effectSnapshots = [
-    {
-      id: 'effect:frame',
-      schemaVersion: 'sniptale.effect.v1' as const,
-      kind: 'standalone' as const,
-      documentId: 'frame',
-      sha256: '0'.repeat(64),
-      source: '{}',
-      retainedByteLength: 2,
-      assets: [],
-    },
-  ];
+  const effectSnapshots = [{ ...FRAME_SNAPSHOT }];
   vi.spyOn(session, 'getSnapshot').mockReturnValue({
     ...captured,
     snapshot: {

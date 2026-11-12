@@ -77,6 +77,12 @@ export interface EffectRuntimeGpuPass {
   operations: readonly EffectRuntimeGpuOperation[];
 }
 
+/** Evaluated-plan operation and dependency-depth ceilings are independent of source format. */
+export const EFFECT_RUNTIME_GPU_PLAN_LIMITS = Object.freeze({
+  scalarOperations: 50_000,
+  depth: 32,
+});
+
 export const EFFECT_RUNTIME_GPU_PAINT_LIMITS = {
   pathCommands: 128,
   gradientStops: 128,

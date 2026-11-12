@@ -1,5 +1,4 @@
 import { resolveRecordingSignalObservation } from '../../operations/recording-events-selection';
-import { mapScopedEffectIntervals } from '../../../../features/video/project/effect-instance/time-map';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type {
   VideoEditorTypingCompressionRequest,
@@ -171,27 +170,7 @@ function planSourceRangeEdit(
   const removedDuration = previousDuration - nextDuration;
   const shifted = shiftProjectTrackTailBy(nextProject, clip.trackId, endTime, -removedDuration);
   if ('reason' in shifted) return { status: 'blocked', reason: shifted.reason };
-  const scoped = mapScopedEffectIntervals(
-    (project.effectInstances ?? []).filter(
-      (instance) => instance.target.kind === 'track' || instance.target.kind === 'video-group'
-    ),
-    new Set(middle.affectedClips.map((item) => item.trackId)),
-    { start: startTime, end: endTime, duration: nextDuration }
-  );
-  nextProject = reconcileProjectMutation(nextProject, {
-    ...shifted.project,
-    ...(project.effectInstances
-      ? {
-          effectInstances: [
-            ...(shifted.project.effectInstances ?? []).filter(
-              (instance) =>
-                instance.target.kind !== 'track' && instance.target.kind !== 'video-group'
-            ),
-            ...scoped,
-          ],
-        }
-      : {}),
-  });
+  nextProject = reconcileProjectMutation(nextProject, shifted.project);
   return {
     status: 'ready',
     project: nextProject,

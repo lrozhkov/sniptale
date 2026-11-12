@@ -1,3 +1,4 @@
+import { hasSourceImageFilters } from '../../features/image-filters/contract';
 import {
   useCallback,
   useEffect,
@@ -56,6 +57,7 @@ export function useReviewPreviewPresentation(input: ReviewPreviewPresentationInp
   const interacting = input.interacting || placement !== null || Object.keys(comments).length > 0;
   // A raw-source dissolve cannot represent two independently decorated camera poses.
   const manual =
+    !!(input.scene.sourceFilters && hasSourceImageFilters(input.scene.sourceFilters)) ||
     (typeof navigator !== 'undefined' && !!navigator.gpu) ||
     isReviewPreviewManual(input.preferences, input.playing) ||
     !!(

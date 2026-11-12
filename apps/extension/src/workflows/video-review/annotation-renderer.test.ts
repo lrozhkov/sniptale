@@ -1,12 +1,13 @@
 import * as sandboxRuntime from '../video/effect-runtime-sandbox';
 import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
-  mapEffectV1ObjectPoint,
-  resolveEffectV1ObjectRenderBounds,
-  resolveEffectV1ControlDefault,
-  sha256EffectV1Bytes,
-} from '@sniptale/runtime-contracts/effect-v1';
+  mapAnimationObjectPoint,
+  resolveAnimationObjectRenderBounds,
+} from '@sniptale/runtime-contracts/animation-template';
+import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
+import { resolveEffectControlDefault } from '@sniptale/runtime-contracts/effect-controls';
 import type {
   EffectRuntimeFrameResult,
   EffectRuntimeGpuPlanResult,
@@ -36,35 +37,35 @@ async function fixture(names = ['title']) {
   const instances: ReviewAnnotationScene['lane']['instances'] = [];
   for (const name of names) {
     const source = readFileSync(
-      `apps/extension/public/video-effects/effects/annotations/sniptale-${name}/effect.sniptale-effect.json`,
+      `apps/extension/public/video-effects/animations/${name}.sniptale-animation.json`,
       'utf8'
     );
     const document = readReviewAnnotationEffectDocument(source)!;
-    const hash = await sha256EffectV1Bytes(new TextEncoder().encode(source));
+    const hash = createHash('sha256').update(source).digest('hex');
     const snapshot: ReviewAnnotationEffectSnapshot = {
       id: `effect:${hash}`,
       sha256: hash,
       source,
       documentId: document.id,
-      schemaVersion: 'sniptale.effect.v1',
+      schemaVersion: 'sniptale.animation.v1',
       kind: 'standalone',
       retainedByteLength: new TextEncoder().encode(source).byteLength,
       assets: [],
     };
     snapshots.push(snapshot);
-    const layout = document.objectLayout!;
+    const layout = document.objectLayout;
     const transform = {
       x: 0.2,
       y: 0.3,
-      width: layout.width / plane.width,
-      height: layout.height / plane.height,
+      width: document.animation.w / plane.width,
+      height: document.animation.h / plane.height,
       rotation: 0.2,
     };
     const controls = Object.fromEntries(
-      document.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'en')])
+      document.controls.map((control) => [control.id, resolveEffectControlDefault(control, 'en')])
     );
     const anchors = initializeReviewAnnotationEffectAnchors(document, transform, controls, plane);
-    for (const handle of layout.handles ?? []) {
+    for (const handle of layout?.handles ?? []) {
       delete controls[handle.xControl];
       delete controls[handle.yControl];
     }
@@ -169,14 +170,14 @@ it('renders six real definitions in order through the standalone driver and clos
   ]);
   for (const [request] of f.executor.renderFrame.mock.calls) {
     expect(request).toMatchObject({
-      duration: 4,
+      duration: 3,
       progress: 0.5,
-      time: 2,
-      frameIndex: 60,
+      time: 1.5,
+      frameIndex: 45,
       inputFrames: {},
     });
     expect((await request.materializeImmutablePayloads()).documentSource).toContain(
-      'sniptale.effect.v1'
+      'sniptale-animation'
     );
   }
   expect(renderer.counters().liveRasterResources).toBe(6);
@@ -209,13 +210,13 @@ it('keeps the full main animation clock after cuts/speed and does not restart at
   ]);
   const renderer = await createReviewAnnotationRenderer(f.scene, f.deps);
   const frame = await renderer.render(5.5, density, 30, f.deps.signal);
-  expect(f.executor.renderFrame.mock.calls[0]![0].time).toBeCloseTo(28 / 9);
+  expect(f.executor.renderFrame.mock.calls[0]![0].time).toBeCloseTo(7 / 3);
   expect(f.executor.renderFrame.mock.calls[0]![0].progress).toBeCloseTo(7 / 9);
   frame.release();
   renderer.dispose();
 });
 
-it('grows callout raster bounds past the body, and reflow dimensions use the authored body', async () => {
+it('grows external callout bounds and separates source coordinates from physical body dimensions', async () => {
   const f = await fixture(['callout', 'frame']);
   const callout = f.scene.lane.instances[0]!;
   const document = readReviewAnnotationEffectDocument(f.scene.snapshots[0]!.source)!;
@@ -227,12 +228,12 @@ it('grows callout raster bounds past the body, and reflow dimensions use the aut
   const plans = renderer.describe(6, density, 30);
   expect(plans[0]!.bitmapBounds.x).toBeLessThan(0);
   expect(plans[0]!.bitmapBounds.width).toBeGreaterThan(1);
-  expect(plans[1]!.plan.dimensions).toEqual({ width: 1152, height: 324 });
+  expect(plans[1]!.plan.dimensions).toEqual({ width: 640, height: 360 });
   expect(plans[1]!.plan.renderDimensions).toEqual({ width: 576, height: 162 });
   renderer.dispose();
 });
 
-it('scale-body aspect and fixed handles agree with public SDK raster bounds', async () => {
+it('scale-body aspect and fixed handles agree with shared animation source bounds', async () => {
   const f = await fixture(['callout']);
   const instance = f.scene.lane.instances[0]!;
   instance.transform = { x: 0.1, y: 0.2, width: 0.5, height: 0.1, rotation: 0 };
@@ -249,18 +250,18 @@ it('scale-body aspect and fixed handles agree with public SDK raster bounds', as
     time: 6,
     fps: 30,
   })!;
-  const bounds = resolveEffectV1ObjectRenderBounds(layout, planned.plan.controls);
+  const bounds = resolveAnimationObjectRenderBounds(document, planned.plan.controls);
   expect(planned.plan.dimensions).toEqual({ width: bounds.width, height: bounds.height });
   const { box, bitmapBounds, plan } = planned;
   for (const point of [
     { x: 0, y: 0 },
-    { x: layout.width, y: layout.height },
+    { x: document.animation.w, y: document.animation.h },
     ...layout.handles!.map((handle) => ({
       x: Number(plan.controls[handle.xControl]),
       y: Number(plan.controls[handle.yControl]),
     })),
   ]) {
-    const mapped = mapEffectV1ObjectPoint(layout, box, point);
+    const mapped = mapAnimationObjectPoint(document, box, point);
     const painted = {
       x:
         box.x +
@@ -458,7 +459,7 @@ it('keeps Gallery annotation phase and anchors in ordinary Native cut and rate i
     project.effectSnapshots = [{ ...snapshot, assets: [] }];
     project.effectInstances = [];
     project.clips = [];
-    const playbackRate = document.duration / projection.duration;
+    const playbackRate = animationRuntimeDuration(document) / projection.duration;
     for (const [index, slice] of projection.slices.entries()) {
       const id = `${instance.id}:${index}`;
       const duration = slice.end - slice.start;

@@ -1,40 +1,38 @@
 import { Fragment, useMemo, type ReactNode } from 'react';
+import type { EffectControlSet } from '@sniptale/runtime-contracts/effect-controls';
 import {
-  resolveEffectV1ControlGroup,
-  resolveEffectV1ControlGroupIcons,
-  type EffectV1ControlIcon,
+  resolveEffectControlGroup,
+  resolveEffectControlGroupIcons,
+  type EffectControlIcon,
   type ControlDefinition,
-  type EffectV1Document,
-  type EffectV1ControlGroup,
-} from '@sniptale/runtime-contracts/effect-v1';
+  type EffectControlGroup,
+} from '@sniptale/runtime-contracts/effect-controls';
 
 /** Render admitted metadata; editor adapters own disclosure preferences and all mutations. */
 type TreeProps = {
-  document: EffectV1Document;
+  document: EffectControlSet;
   parentId: string;
   controls: readonly ControlDefinition[];
   renderControl(control: ControlDefinition): ReactNode;
-  renderGroup(group: EffectV1ControlGroup, children: ReactNode): ReactNode;
+  renderGroup(group: EffectControlGroup, children: ReactNode): ReactNode;
 };
 
 /** Resolve retained display icons without changing the saved document. */
 export function EffectControlTree(props: TreeProps) {
   const icons = useMemo(
-    () => resolveEffectV1ControlGroupIcons(props.document.controlGroups, props.document.controls),
+    () => resolveEffectControlGroupIcons(props.document.controlGroups, props.document.controls),
     [props.document]
   );
   return <EffectControlBranch {...props} icons={icons} />;
 }
 
-function EffectControlBranch(
-  props: TreeProps & { icons: ReadonlyMap<number, EffectV1ControlIcon> }
-) {
+function EffectControlBranch(props: TreeProps & { icons: ReadonlyMap<number, EffectControlIcon> }) {
   const groups = props.document.controlGroups ?? [];
   const parents = new Map(groups.map((group) => [group.id, group.parentId]));
   const parent = (control: ControlDefinition) =>
     control.group && parents.has(control.group)
       ? control.group
-      : (resolveEffectV1ControlGroup(control.group, groups) ?? 'advanced');
+      : (resolveEffectControlGroup(control.group, groups) ?? 'advanced');
   const contains = (groupId: string) =>
     props.controls.some((control) => {
       let id: string | undefined = parent(control);

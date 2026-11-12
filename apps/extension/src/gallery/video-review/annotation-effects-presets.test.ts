@@ -5,7 +5,7 @@ import { reviewAnnotationPresetId } from './annotation-effects-presets';
 
 const document = readReviewAnnotationEffectDocument(
   readFileSync(
-    'apps/extension/public/video-effects/effects/annotations/sniptale-callout/effect.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
     'utf8'
   )
 );
@@ -39,9 +39,9 @@ it('compares parsed RGBA including alpha, with exact fallback for unsupported co
 });
 
 it('uses exact numeric values and refuses ambiguous partial presets without choosing an identity', () => {
-  const numeric = { ...document, controlPresets: [{ ...preset, values: { font: 24 } }] };
-  expect(reviewAnnotationPresetId(numeric, { font: 24 }, 'en')).toBe(preset.id);
-  expect(reviewAnnotationPresetId(numeric, { font: 24.000001 }, 'en')).toBe('');
+  const numeric = { ...document, controlPresets: [{ ...preset, values: { fontSize: 24 } }] };
+  expect(reviewAnnotationPresetId(numeric, { fontSize: 24 }, 'en')).toBe(preset.id);
+  expect(reviewAnnotationPresetId(numeric, { fontSize: 24.000001 }, 'en')).toBe('');
   const duplicate = {
     ...document,
     controlPresets: [

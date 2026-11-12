@@ -1,3 +1,4 @@
+import { SourceImageFilterFields } from '../../../../../ui/source-image-filter-fields';
 import { RotateCcw } from 'lucide-react';
 import { getFittedMediaWindowFrame } from '../../../../../features/video/composition/draw/fitted-media';
 import { mediaWindowPadding } from '../../../../../features/video/project/window-geometry';
@@ -172,6 +173,23 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
         disabled={props.locked || !props.onUpdateMediaClipWindowHeader}
         onChange={(header) => props.onUpdateMediaClipWindowHeader?.(props.clip.id, header)}
       />
+      {props.clip.type === VideoProjectClipType.VIDEO ? (
+        <InspectorDetails
+          preferenceId="media-frame:source-filters"
+          label={translate('videoEditor.sidebar.sourceFiltersTitle')}
+        >
+          <SourceImageFilterFields
+            value={props.clip.sourceFilters}
+            disabled={props.locked || !props.onEditMediaClip}
+            onChange={(stack) =>
+              props.onEditMediaClip?.(props.clip.id, {
+                kind: 'source-filters',
+                stack: stack ?? null,
+              })
+            }
+          />
+        </InspectorDetails>
+      ) : null}
       <MediaApplyVisualsButton
         clip={props.clip}
         disabled={props.locked}

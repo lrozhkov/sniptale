@@ -4,10 +4,7 @@ import { promisify } from 'node:util';
 import { expect, type Page } from '@playwright/test';
 import { test, openProvider, saveProof } from './webdav-fixtures';
 import { applyHarnessBootstrap } from '../extension-critical.helpers';
-import {
-  EFFECT_BUNDLE_CORPUS,
-  readEffectBundleCorpusArchive,
-} from '../../support/effect-v1-corpus.test-support';
+import { readFileSync } from 'node:fs';
 
 async function upload(page: Page, key: string) {
   return page.evaluate((key) => window.webdavTransferHarness.uploadSource(key), key);
@@ -253,33 +250,27 @@ for (const viewport of [
   }, info) => {
     test.setTimeout(180_000);
     const sender = await openProvider(lab, info, 'portable-source');
-    const specimen = EFFECT_BUNDLE_CORPUS.find(
-      (item) => item.accepted && item.artifact.includes('asset-bearing-conformance')
+    const animationBytes = readFileSync(
+      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json'
     );
-    if (!specimen) throw new Error('Asset-bearing corpus is missing.');
-    const sent = await sender.page.evaluate(
-      async (effectBundleBytes) => {
-        const seed = await window.webdavTransferHarness.portable.source({ effectBundleBytes });
-        const media = await window.webdavTransferHarness.portable.outgoing.sendHistory(
-          seed.mediaId
-        );
-        const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
-          seed.projectId,
-          true
-        );
-        return {
-          ...seed,
-          spaceId: projects.at(-1)!.spaceId,
-          metadataAttempts: media.length + projects.length,
-          logicalOperations: media.length + projects.length - 1,
-          objects: [
-            ...media.flatMap((item) => item.files),
-            ...projects.flatMap((item) => item.files),
-          ],
-        };
-      },
-      Array.from(readEffectBundleCorpusArchive(specimen))
-    );
+    const sent = await sender.page.evaluate(async (effectBundleBytes) => {
+      const seed = await window.webdavTransferHarness.portable.source({ effectBundleBytes });
+      const media = await window.webdavTransferHarness.portable.outgoing.sendHistory(seed.mediaId);
+      const projects = await window.webdavTransferHarness.portable.outgoing.sendHistory(
+        seed.projectId,
+        true
+      );
+      return {
+        ...seed,
+        spaceId: projects.at(-1)!.spaceId,
+        metadataAttempts: media.length + projects.length,
+        logicalOperations: media.length + projects.length - 1,
+        objects: [
+          ...media.flatMap((item) => item.files),
+          ...projects.flatMap((item) => item.files),
+        ],
+      };
+    }, Array.from(animationBytes));
     try {
       for (const object of sent.objects)
         expect(await lab.externalProof(object.key)).toEqual({

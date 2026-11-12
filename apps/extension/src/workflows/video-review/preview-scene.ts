@@ -26,6 +26,7 @@ export type PreviewScene = {
   source: Size;
   canvas?: Size;
   background: QuickEditAdvancedState['background'];
+  sourceFilters?: QuickEditAdvancedState['sourceFilters'];
   windowHeader?: QuickEditAdvancedState['windowHeader'];
   watermark?: QuickEditAdvancedState['watermark'];
   webcam?: QuickEditAdvancedState['webcam'];

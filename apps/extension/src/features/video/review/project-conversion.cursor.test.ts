@@ -339,8 +339,8 @@ function denseCursorInput(count: number) {
   return { input, cursorTrack };
 }
 
-it('retains a complete 64688-sample recording through conversion and canonical reopen', () => {
-  const { input, cursorTrack } = denseCursorInput(64688);
+it('retains source cursor samples beyond the 5000-key authoring limit through conversion and reopen', () => {
+  const { input, cursorTrack } = denseCursorInput(5001);
   const before = structuredClone(input.seed.cursorTrack);
   const plan = planReviewProjectConversion(input);
   expect(plan.status).toBe('prepared');

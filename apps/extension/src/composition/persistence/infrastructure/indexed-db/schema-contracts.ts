@@ -45,6 +45,9 @@ import {
   STORE_NAME,
   THUMBNAILS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
   VIDEO_PROJECTS_STORE,
   VIDEO_PROJECT_REVISIONS_STORE,
   WEB_SNAPSHOTS_STORE,
@@ -165,8 +168,13 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'effects',
-    schemaVersion: 1,
-    stores: [{ storeName: VIDEO_EFFECT_BUNDLES_STORE, dataClass: 'durable-authority' }],
+    schemaVersion: 4,
+    stores: [
+      { storeName: VIDEO_EFFECT_BUNDLES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_ANIMATION_PACKAGES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_VISUAL_PREFERENCES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_GL_TRANSITION_PRESETS_STORE, dataClass: 'durable-authority' },
+    ],
   },
   {
     domainId: 'editorAssets',

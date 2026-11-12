@@ -1,6 +1,5 @@
+import { createHash } from 'node:crypto';
 import { afterEach, expect, it, vi } from 'vitest';
-
-import { sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
 import { createEffectRuntimeAssetSelectionId } from '../../contracts/effect-runtime/immutable-refs';
 
 import {
@@ -9,7 +8,7 @@ import {
   EFFECT_RUNTIME_SANDBOX_READY_MESSAGE,
   EFFECT_RUNTIME_SANDBOX_RENDER_MESSAGE,
 } from '../../contracts/effect-runtime/types';
-import { createDocument } from '../worker/interpreter/support.test-support';
+import { createAnimationDocument } from './request-boundary.test-support';
 
 vi.mock('../worker/index?worker&inline', () => ({
   default: class FakeWorker {
@@ -108,8 +107,10 @@ async function connectAndExecute(listener: SandboxListener, parent: MessageChann
 }
 
 async function createMessage() {
-  const documentSource = JSON.stringify(createDocument([{ op: 'clear' }]));
-  const documentSha256 = await sha256EffectV1Bytes(new TextEncoder().encode(documentSource));
+  const documentSource = JSON.stringify(createAnimationDocument(10, 10));
+  const documentSha256 = await createHash('sha256')
+    .update(new TextEncoder().encode(documentSource))
+    .digest('hex');
   const assetSelectionId = await createEffectRuntimeAssetSelectionId([]);
   return {
     assetSelectionRef: { assets: [], id: assetSelectionId },

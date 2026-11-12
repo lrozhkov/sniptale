@@ -42,7 +42,8 @@ import { parseProjectAssetPayload } from './asset-publication-payload';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import { readFileSync } from 'node:fs';
-import { validateEffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
+import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
+import { createHash } from 'node:crypto';
 import type { VideoWorkspace } from '../review-workspaces/contracts';
 
 const ref = {
@@ -70,13 +71,19 @@ const exportEntry = {
 
 function annotationRecoveryFixture(cursor: number) {
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-runtime-conformance.sniptale-effect.json',
+    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
     'utf8'
   );
-  const validated = validateEffectV1Document(JSON.parse(source));
-  if (!validated.ok || !validated.document) throw new Error('Invalid fixture');
-  const descriptor = validated.document.assets[0]!;
-  const snapshotId = `effect:${'a'.repeat(64)}`;
+  const validated = parseAnimationTemplateSource(source);
+  if (!validated.template) throw Error('Invalid fixture');
+  const descriptor = {
+    id: 'legacy-mark',
+    mimeType: 'image/svg+xml',
+    byteLength: 358,
+    sha256: 'b'.repeat(64),
+  };
+  const sourceHash = createHash('sha256').update(source).digest('hex');
+  const snapshotId = `effect:${sourceHash}`;
   const entry = {
     id: 'mark',
     assetId: ref.assetId,
@@ -106,22 +113,13 @@ function annotationRecoveryFixture(cursor: number) {
     effectSnapshots: [
       {
         id: snapshotId,
-        schemaVersion: 'sniptale.effect.v1',
+        schemaVersion: 'sniptale.animation.v1',
         kind: 'standalone',
-        documentId: validated.document.id,
-        sha256: 'a'.repeat(64),
+        documentId: validated.template.id,
+        sha256: sourceHash,
         source,
-        retainedByteLength: new TextEncoder().encode(source).byteLength + entry.size,
-        assets: [
-          {
-            id: descriptor.id,
-            assetId: 'project-asset:mark',
-            kind: 'svg',
-            mimeType: entry.mimeType,
-            sha256: claim.sha256,
-            byteLength: entry.size,
-          },
-        ],
+        retainedByteLength: new TextEncoder().encode(source).byteLength,
+        assets: [],
       },
     ],
     history: [
@@ -169,7 +167,7 @@ function annotationRecoveryFixture(cursor: number) {
 }
 
 it.each([0, 1])(
-  'recovers private bytes retained by disabled Undo/Redo at cursor %i',
+  'refuses a detached recovery claim for source-only Undo/Redo at cursor %i',
   async (cursor) => {
     const fixture = annotationRecoveryFixture(cursor);
     mocks.readReview.mockResolvedValue({ workspace: fixture.workspace });
@@ -180,9 +178,11 @@ it.each([0, 1])(
           createTransaction(writes, Promise.resolve(), undefined, undefined, fixture.workspace),
       })
     );
-    await projectAssetPublicationAdapter.publish(fixture.journal);
-    expect(writes).toContainEqual(['project_assets', 'put', fixture.entry]);
-    expect(writes.some(([store]) => store === 'media_library')).toBe(false);
+    await expect(projectAssetPublicationAdapter.publish(fixture.journal)).rejects.toMatchObject({
+      name: 'SupersededAssetPublicationError',
+    });
+    expect(writes).toEqual([]);
+    expect(mocks.discardPrepared).not.toHaveBeenCalled();
   }
 );
 
@@ -1109,7 +1109,7 @@ it.each(['purged', 'changed-source', 'unreferenced', 'changed-resource'] as cons
 );
 
 it.each([0, 1])(
-  'directly publishes an exact disabled retained claim at history cursor %i',
+  'refuses direct detached ownership for source-only history at cursor %i',
   async (cursor) => {
     const fixture = annotationRecoveryFixture(cursor);
     const writes: Array<[string, 'delete' | 'put', unknown]> = [];
@@ -1119,9 +1119,11 @@ it.each([0, 1])(
           createTransaction(writes, Promise.resolve(), undefined, undefined, fixture.workspace),
       })
     );
-    await publishProjectAssetJournal(fixture.journal);
-    expect(writes).toContainEqual(['project_assets', 'put', fixture.entry]);
-    expect(writes.some(([store]) => store === 'media_library')).toBe(false);
+    await expect(publishProjectAssetJournal(fixture.journal)).rejects.toMatchObject({
+      name: 'SupersededAssetPublicationError',
+    });
+    expect(writes).toEqual([]);
+    expect(mocks.discardPrepared).not.toHaveBeenCalled();
     expect(mocks.readReview).not.toHaveBeenCalled();
   }
 );

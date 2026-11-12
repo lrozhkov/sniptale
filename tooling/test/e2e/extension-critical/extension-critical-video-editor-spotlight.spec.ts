@@ -1,6 +1,6 @@
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import type { VideoProject } from '../../../../apps/extension/src/features/video/project/types';
-import { createHash } from 'node:crypto';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
 import { createQuickEditSpotlight } from '../../../../apps/extension/src/features/video/project/scene/focus-appearance';
 import { isValidVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { encodedNativeVideoSamples } from '../support/native-video-export-proof';
@@ -842,7 +842,8 @@ async function configureSpotlightComposition(project: VideoProject) {
       leadingClipId: main.id,
       trailingClipId: trailing.id,
       duration: 0.2,
-      kind: 'CROSSFADE',
+      kind: 'gl' as const,
+      selection: createGlTransitionSelection('Fade')!,
       easing: 'LINEAR',
     },
   ];
@@ -864,42 +865,11 @@ async function configureSpotlightComposition(project: VideoProject) {
     phaseTransitions: { enter: 'none', exit: 'none' },
     perspective: { enabled: true, rotateX: 10, rotateY: -18, rotateZ: 5, strength: 0.7 },
   });
-  const source = await readFile(
-    new URL(
-      '../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-video-warm.sniptale-effect.json',
-      import.meta.url
-    ),
-    'utf8'
-  );
-  const document = parseEffectV1Source(source).document;
-  if (!document) throw new Error('Invalid composition effect');
-  const sha256 = createHash('sha256').update(source).digest('hex');
-  const snapshotId = `effect:${sha256}`;
-  project.effectSnapshots = [
-    {
-      id: snapshotId,
-      sha256,
-      source,
-      assets: [],
-      retainedByteLength: Buffer.byteLength(source),
-      schemaVersion: 'sniptale.effect.v1',
-      documentId: document.id,
-      kind: document.kind,
-    },
-  ];
-  project.effectInstances = [
-    {
-      id: 'spotlight-window-effect',
-      kind: document.kind,
-      snapshotId,
-      target: { kind: 'clip', clipId: 'encoded-second-window' },
-      rangeMode: 'owner',
-      enabled: true,
-      startTime: 0,
-      duration: 1.2,
-      playbackRate: document.duration / 1.2,
-      controls: { strength: 100, edge: 0, tint: '#ffffff', saturation: 100 },
-    },
-  ];
+  const independent = project.clips.find((clip) => clip.id === 'encoded-second-window');
+  if (!independent || independent.type !== 'VIDEO') throw new Error('Missing independent video.');
+  const blur = createSourceImageFilter('blur', 'spotlight-window-filter');
+  if (blur.kind !== 'blur') throw new Error('Expected blur filter.');
+  blur.parameters.radius = 2;
+  independent.sourceFilters = { version: 1, filters: [blur] };
+  project.version = 52;
 }

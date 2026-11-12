@@ -4,12 +4,18 @@ import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap
 import { createEffectRuntimeFailure } from '../../contracts/effect-runtime/identity';
 import { installEffectRuntimeSandboxGuards } from '../policy/guards';
 import { createEffectRuntimeWorkerExecutionState } from './execute';
+import { initializeLottieRuntime } from './lottie';
 
-installEffectRuntimeSandboxGuards(self);
+// Only trusted bundled initialization runs before guards. No message is executed during preload.
+const ready = initializeLottieRuntime()
+  .then(
+    () => true,
+    () => false
+  )
+  .finally(() => installEffectRuntimeSandboxGuards(self));
 const executionState = createEffectRuntimeWorkerExecutionState();
 self.onmessage = (event: MessageEvent<unknown>) => {
-  if (event.origin !== '' || event.ports.length > 0) {
-    for (const port of event.ports) port.close();
+  const sendFailure = () => {
     closeEffectRuntimeBitmaps(event.data);
     self.postMessage(
       {
@@ -18,18 +24,24 @@ self.onmessage = (event: MessageEvent<unknown>) => {
       },
       { transfer: [] }
     );
+  };
+  if (event.origin !== '' || event.ports.length > 0) {
+    for (const port of event.ports) port.close();
+    sendFailure();
     return;
   }
-  void executionState.execute(event.data).then((result) => {
-    const transfer =
-      result.kind === 'gpu-plan'
-        ? [...new Set(collectEffectRuntimeResultBitmaps(result))]
-        : collectEffectRuntimeResultBitmaps(result);
-    try {
-      self.postMessage({ result, type: EFFECT_RUNTIME_WORKER_RESPONSE }, { transfer });
-    } catch {
-      if (result.kind === 'gpu-plan') for (const bitmap of transfer) bitmap.close();
-      else closeEffectRuntimeBitmaps(result);
-    }
-  });
+  void ready
+    .then((initialized) =>
+      initialized
+        ? executionState.execute(event.data)
+        : createEffectRuntimeFailure(event.data, 'crashed')
+    )
+    .then((result) => {
+      const transfer = collectEffectRuntimeResultBitmaps(result);
+      try {
+        self.postMessage({ result, type: EFFECT_RUNTIME_WORKER_RESPONSE }, { transfer });
+      } catch {
+        closeEffectRuntimeBitmaps(result);
+      }
+    }, sendFailure);
 };

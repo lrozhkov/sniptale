@@ -1,3 +1,4 @@
+import { isPlainRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   installSyncQueueSummaryIndexes,
   estimateSyncQueueSummaryIndexBytes,
@@ -7,11 +8,14 @@ import {
   estimateDeletionReferenceIndexBytes,
 } from './deletion-index-migration';
 import { REFERENCE_INDEX_STORES } from './row-index-contract';
-import type { UpgradeDatabase, UpgradeTransaction } from './upgrade/types';
+import type { DatabaseMigrationSource, UpgradeDatabase, UpgradeTransaction } from './upgrade/types';
 import { ROW_REFERENCE_INDEX } from './row-index-contract';
 import { estimateUsageIndexBytes } from './usage-index-migration';
 import type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
+  VIDEO_ANIMATION_PACKAGES_STORE,
+  VIDEO_VISUAL_PREFERENCES_STORE,
+  VIDEO_GL_TRANSITION_PRESETS_STORE,
   VOICE_INPUT_HISTORY_STORE,
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
@@ -904,7 +908,164 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       );
     },
   },
+
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'effects', from: 1, to: 2 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 53,
+    toDatabaseVersion: 54,
+    risk: 'additive',
+    stores: [VIDEO_ANIMATION_PACKAGES_STORE],
+    migrate(db) {
+      const store = db.createObjectStore(VIDEO_ANIMATION_PACKAGES_STORE, { keyPath: 'packId' });
+      store.createIndex('enabled', 'enabled');
+      store.createIndex('updatedAt', 'updatedAt');
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_ANIMATION_PACKAGES_STORE],
+        'Animation package store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'effects', from: 2, to: 3 }],
+    estimateAdditionalBytes: estimateVisualPreferenceCopyBytes,
+    fromDatabaseVersion: 54,
+    toDatabaseVersion: 55,
+    risk: 'additive',
+    stores: [VIDEO_ANIMATION_PACKAGES_STORE, VIDEO_VISUAL_PREFERENCES_STORE],
+    migrate(db, transaction) {
+      db.createObjectStore(VIDEO_VISUAL_PREFERENCES_STORE, { keyPath: ['kind', 'packId'] });
+      // Enqueue the source cursor synchronously. Its requests keep the native upgrade transaction alive.
+      void copyAnimationPreferences(transaction).catch(() => {
+        try {
+          transaction.abort();
+        } catch {
+          /* A failed native request can already have aborted it. */
+        }
+      });
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_ANIMATION_PACKAGES_STORE, VIDEO_VISUAL_PREFERENCES_STORE],
+        'Visual preference store is unavailable.'
+      );
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'effects', from: 3, to: 4 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 55,
+    toDatabaseVersion: 56,
+    risk: 'additive',
+    stores: [VIDEO_GL_TRANSITION_PRESETS_STORE],
+    migrate(db) {
+      db.createObjectStore(VIDEO_GL_TRANSITION_PRESETS_STORE, { keyPath: 'id' }).createIndex(
+        'updatedAt',
+        'updatedAt'
+      );
+      return undefined;
+    },
+    validate(db) {
+      return requireMigrationStores(
+        db,
+        [VIDEO_GL_TRANSITION_PRESETS_STORE],
+        'GL preset store is unavailable.'
+      );
+    },
+  },
 ];
+
+function projectPrototypeAnimationPreferences(value: unknown) {
+  if (
+    !isPlainRecord(value) ||
+    value['format'] !== 'sniptale-animation-catalog' ||
+    value['version'] !== 1 ||
+    typeof value['packId'] !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$/.test(value['packId']) ||
+    typeof value['enabled'] !== 'boolean' ||
+    !Array.isArray(value['documents']) ||
+    !value['documents'].length ||
+    value['documents'].length > 100
+  )
+    throw new Error('Invalid prototype animation package metadata.');
+  const documents: Record<
+    string,
+    { sourceSha256: string; enabled: boolean; presetPreferences?: unknown }
+  > = {};
+  for (const document of value['documents']) {
+    if (
+      !isPlainRecord(document) ||
+      typeof document['id'] !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(document['id']) ||
+      typeof document['sha256'] !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(document['sha256']) ||
+      typeof document['enabled'] !== 'boolean' ||
+      Object.hasOwn(documents, document['id'])
+    )
+      throw new Error('Invalid prototype animation preference reference.');
+    Object.defineProperty(documents, document['id'], {
+      value: {
+        sourceSha256: document['sha256'],
+        enabled: document['enabled'],
+        ...(document['presetPreferences'] === undefined
+          ? {}
+          : { presetPreferences: document['presetPreferences'] }),
+      },
+      enumerable: true,
+    });
+  }
+  return {
+    format: 'sniptale-visual-preferences',
+    version: 1,
+    kind: 'animation',
+    packId: value['packId'],
+    enabled: value['enabled'],
+    documents,
+  };
+}
+
+async function copyAnimationPreferences(transaction: UpgradeTransaction): Promise<void> {
+  const source = transaction.objectStore(VIDEO_ANIMATION_PACKAGES_STORE);
+  if (!source.openCursor) throw new Error('Animation preference copy is unavailable.');
+  const target = transaction.objectStore(VIDEO_VISUAL_PREFERENCES_STORE);
+  let cursor = await source.openCursor();
+  while (cursor) {
+    await target.put(projectPrototypeAnimationPreferences(cursor.value));
+    cursor = await cursor.continue();
+  }
+}
+
+async function estimateVisualPreferenceCopyBytes(
+  source?: DatabaseMigrationSource
+): Promise<number> {
+  if (!source) return 64 * 1024;
+  let bytes = 64 * 1024;
+  let store;
+  try {
+    store = source.transaction(VIDEO_ANIMATION_PACKAGES_STORE, 'readonly').store;
+  } catch (error) {
+    // Earlier sources do not have the package store that migration54 creates.
+    if (error instanceof DOMException && error.name === 'NotFoundError') return bytes;
+    throw error;
+  }
+  let cursor = await store.openCursor();
+  while (cursor) {
+    bytes += new TextEncoder().encode(
+      JSON.stringify(projectPrototypeAnimationPreferences(cursor.value))
+    ).byteLength;
+    cursor = await cursor.continue();
+  }
+  return bytes;
+}
 
 function ensureSnapshotAssetIndex(transaction: UpgradeTransaction, name: string): void {
   const store = transaction.objectStore(name);

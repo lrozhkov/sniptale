@@ -1,3 +1,4 @@
+import type { GlTrackNode } from '../../../features/video/project/transition/gl-track-plan';
 import { resolveGpuPreviewGroupRasters } from '../../../features/video/composition/canvas/gpu-preview-plan';
 import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import type {
@@ -44,9 +45,13 @@ import {
   resolveEffectRuntimeVisualLayerFrame,
   resolveEffectRuntimeVisualLayers,
 } from '../../../features/video/composition/draw/effect-runtime';
-import { segmentVisualLayersByViewportLock } from '../../../features/video/composition/motion/layer-camera';
+import {
+  shouldLockVisualLayerToViewport,
+  segmentVisualLayersByViewportLock,
+} from '../../../features/video/composition/motion/layer-camera';
 import {
   resolveOrderedVisualPassLayers,
+  resolveVisualStateSourceSpotlights,
   splitVisualLayersForSourceSpotlights,
 } from '../../../features/video/composition/visual-pass-layers';
 import {
@@ -412,8 +417,10 @@ export async function buildNativeGpuPreviewLayers(args: {
       });
       const lens: GpuPreviewLayer = {
         ...(frame.sourceDemand
-          ? groupLayer(video.forDemand(layers, frame.sourceDemand))
-          : snapshot),
+          ? groupLayer(video.forDemand(blurBackdrop ?? layers, frame.sourceDemand))
+          : blurBackdrop
+            ? groupLayer(blurBackdrop)
+            : snapshot),
         ...(sourceDensity > 1
           ? {
               clip: {
@@ -602,8 +609,17 @@ export async function buildNativeGpuPreviewLayers(args: {
           transform: { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 },
         }).map((resolved) => ({ ...resolved, sourceDemand: `sceneLens:${state.id}` }))
       );
-  const sceneMasks = (layers: readonly GpuPreviewLayer[], afterClipId?: string) =>
-    spotlight(layers, sceneSpotlights(input.project, passes.overlayFrame, afterClipId));
+  const sceneMasks = (
+    layers: readonly GpuPreviewLayer[],
+    afterClipId?: string,
+    frame = passes.overlayFrame,
+    backdrop?: readonly GpuPreviewLayer[]
+  ) =>
+    spotlight(
+      layers,
+      sceneSpotlights(input.project, frame, afterClipId),
+      backdrop ? [...backdrop, ...layers] : undefined
+    );
   try {
     if (args.inputComposition) {
       const request = args.inputComposition;
@@ -666,87 +682,167 @@ export async function buildNativeGpuPreviewLayers(args: {
       passes.overlayFrame.visualLayers.filter((layer) => layer.clipId !== split?.clipId),
       args.effects?.overlayFrames
     );
-    // Explicit source feedback can follow a viewport-locked group in another camera segment.
-    const frameActionOwners = new Set(
-      orderedLayers.filter((layer) => layer.effectActionsOnly).map((layer) => layer.clipId)
-    );
-    const segments = segmentVisualLayersByViewportLock(orderedLayers, passes.overlayFrame.camera);
-    for (const segment of segments)
-      for (const part of splitVisualLayersForSourceSpotlights(
-        segment.layers,
-        passes.overlayFrame.sceneSpotlights
-      )) {
-        if (segment.isLocked)
-          layers.push(
-            ...mergeSharp(paintLayers(part.layers, args.effects?.overlayFrames, frameActionOwners))
-          );
-        else {
-          const exposure: GpuPreviewLayer[] = [];
-          for (const pass of passes.visualPasses) {
-            await args.effects?.prepareVisualPass?.(pass.time);
-            const frameLayers = paintLayers(
-              resolveOrderedVisualPassLayers(part.layers, pass.frame.visualLayers),
-              args.effects?.framesByTime.get(pass.time),
-              frameActionOwners,
-              pass.frame,
-              pass.time
+    const renderOrdered = async (
+      stateLayers: Layer[],
+      initial: GpuPreviewLayer[],
+      sceneFrame = passes.overlayFrame,
+      backdrop?: readonly GpuPreviewLayer[]
+    ): Promise<GpuPreviewLayer[]> => {
+      let composed = initial;
+      // Explicit source feedback can follow a viewport-locked group in another camera segment.
+      const frameActionOwners = new Set(
+        stateLayers.filter((layer) => layer.effectActionsOnly).map((layer) => layer.clipId)
+      );
+      const segments = segmentVisualLayersByViewportLock(stateLayers, passes.overlayFrame.camera);
+      for (const segment of segments)
+        for (const part of splitVisualLayersForSourceSpotlights(
+          segment.layers,
+          sceneFrame.sceneSpotlights
+        )) {
+          if (segment.isLocked)
+            composed.push(
+              ...mergeSharp(
+                paintLayers(part.layers, args.effects?.overlayFrames, frameActionOwners)
+              )
             );
-            const projected = cameraLayers(frameLayers.content, pass.frame.camera);
-            if (frameLayers.sharp.length)
-              projected.push(...cameraLayers(frameLayers.sharp, pass.frame.camera, true));
-            if (passes.visualPasses.length === 1 && pass.alpha === 1) exposure.push(...projected);
-            else {
-              const exposureLayer: GpuPreviewLayer = {
-                ...groupLayer(projected),
-                opacity: pass.alpha,
-                blend: passes.visualPasses.length > 1 ? 'add' : 'over',
-              };
-              if (
-                args.effects?.prepareVisualPass &&
-                !('kind' in args.effects) &&
-                passes.visualPasses.length > 1 &&
-                pass.time !== input.currentTime
-              ) {
-                if (!('kind' in exposureLayer.source) || exposureLayer.source.kind !== 'group')
-                  throw new Error('GPU exposure group is unavailable.');
-                const group = exposureLayer.source;
-                exposureLayer.source = await snapshot(group);
-                if (input.preparedFrame?.sourceFrames?.sampling) {
-                  const variants = new Map<string, GpuPreviewLayer>();
-                  for (const state of passes.overlayFrame.sceneSpotlights ?? []) {
-                    const id = `sceneLens:${state.id}`;
-                    if (
-                      !sceneSpotlights(input.project, passes.overlayFrame, state.afterClipId).some(
-                        (frame) => frame.sourceDemand === id && frame.lens && frame.lens.scale > 1
+          else {
+            const exposure: GpuPreviewLayer[] = [];
+            for (const pass of passes.visualPasses) {
+              await args.effects?.prepareVisualPass?.(pass.time);
+              const frameLayers = paintLayers(
+                resolveOrderedVisualPassLayers(part.layers, pass.frame.visualLayers),
+                args.effects?.framesByTime.get(pass.time),
+                frameActionOwners,
+                pass.frame,
+                pass.time
+              );
+              const projected = cameraLayers(frameLayers.content, pass.frame.camera);
+              if (frameLayers.sharp.length)
+                projected.push(...cameraLayers(frameLayers.sharp, pass.frame.camera, true));
+              if (passes.visualPasses.length === 1 && pass.alpha === 1) exposure.push(...projected);
+              else {
+                const exposureLayer: GpuPreviewLayer = {
+                  ...groupLayer(projected),
+                  opacity: pass.alpha,
+                  blend: passes.visualPasses.length > 1 ? 'add' : 'over',
+                };
+                if (
+                  args.effects?.prepareVisualPass &&
+                  !('kind' in args.effects) &&
+                  passes.visualPasses.length > 1 &&
+                  pass.time !== input.currentTime
+                ) {
+                  if (!('kind' in exposureLayer.source) || exposureLayer.source.kind !== 'group')
+                    throw new Error('GPU exposure group is unavailable.');
+                  const group = exposureLayer.source;
+                  exposureLayer.source = await snapshot(group);
+                  if (input.preparedFrame?.sourceFrames?.sampling) {
+                    const variants = new Map<string, GpuPreviewLayer>();
+                    for (const state of sceneFrame.sceneSpotlights ?? []) {
+                      const id = `sceneLens:${state.id}`;
+                      if (
+                        !sceneSpotlights(input.project, sceneFrame, state.afterClipId).some(
+                          (frame) => frame.sourceDemand === id && frame.lens && frame.lens.scale > 1
+                        )
                       )
-                    )
-                      continue;
-                    const futureLens = sceneSpotlights(
-                      input.project,
-                      passes.overlayFrame,
-                      state.afterClipId
-                    ).find((frame) => frame.sourceDemand === id)?.lens;
-                    const source = await snapshot(
-                      {
-                        ...group,
-                        layers: video.forDemand(group.layers, id),
-                      },
-                      futureLens?.scale ?? 1
-                    );
-                    variants.set(id, { ...exposureLayer, source });
+                        continue;
+                      const futureLens = sceneSpotlights(
+                        input.project,
+                        sceneFrame,
+                        state.afterClipId
+                      ).find((frame) => frame.sourceDemand === id)?.lens;
+                      const source = await snapshot(
+                        {
+                          ...group,
+                          layers: video.forDemand(group.layers, id),
+                        },
+                        futureLens?.scale ?? 1
+                      );
+                      variants.set(id, { ...exposureLayer, source });
+                    }
+                    if (variants.size) video.retainDemandSnapshots(exposureLayer, variants);
                   }
-                  if (variants.size) video.retainDemandSnapshots(exposureLayer, variants);
                 }
+                exposure.push(exposureLayer);
               }
-              exposure.push(exposureLayer);
             }
+            if (passes.visualPasses.length === 1 && passes.visualPasses[0]?.alpha === 1)
+              composed.push(...exposure);
+            else composed.push(groupLayer(exposure));
           }
-          if (passes.visualPasses.length === 1 && passes.visualPasses[0]?.alpha === 1)
-            layers.push(...exposure);
-          else layers.push(groupLayer(exposure));
+          if (part.afterClipId)
+            composed = sceneMasks(composed, part.afterClipId, sceneFrame, backdrop);
         }
-        if (part.afterClipId) layers = sceneMasks(layers, part.afterClipId);
+      return composed;
+    };
+    const trackPlans = passes.overlayFrame.glTrackPlans;
+    if (!trackPlans?.size) layers = await renderOrdered(orderedLayers, layers);
+    else {
+      const tracks = new Map<string, Layer[]>();
+      for (const layer of orderedLayers) {
+        const members = tracks.get(layer.clip.trackId) ?? [];
+        members.push(layer);
+        tracks.set(layer.clip.trackId, members);
       }
+      for (const [trackId, trackLayers] of tracks) {
+        const plan = trackPlans.get(trackId);
+        if (!plan) {
+          layers = await renderOrdered(trackLayers, layers);
+          continue;
+        }
+        const backdrop = [...layers];
+        const cache = new Map<GlTrackNode, GpuPreviewLayer>();
+        const build = async (node: GlTrackNode): Promise<GpuPreviewLayer> => {
+          const previous = cache.get(node);
+          if (previous) return previous;
+          let result: GpuPreviewLayer;
+          if (node.kind === 'gl') {
+            const before = await build(node.before);
+            const after = await build(node.after);
+            result = groupLayer([before, after]);
+            if (!('kind' in result.source) || result.source.kind !== 'group')
+              throw new Error('GL track output group is unavailable.');
+            result.source.composition = {
+              kind: 'gl-transition',
+              selection: node.junction.selection,
+              progress: node.junction.progress,
+            };
+          } else {
+            const members = new Set(node.clipIds);
+            const selected = trackLayers.filter((layer) => members.has(layer.clipId));
+            const states = resolveVisualStateSourceSpotlights(
+              selected,
+              passes.overlayFrame.sceneSpotlights
+            );
+            const frame = {
+              ...passes.overlayFrame,
+              visualLayers: selected,
+              sceneSpotlights: states,
+            };
+            const stateLayers = await renderOrdered(selected, [], frame, backdrop);
+            for (const id of node.clipIds) {
+              const cursor = passes.overlayFrame.sourceCursors?.get(id);
+              if (!cursor?.visible) continue;
+              const artwork = raster(
+                (context) => drawCursorCompositionState(context, cursor),
+                true,
+                integerArtworkBounds(resolveCursorCompositionPaintBounds(cursor))
+              );
+              const owner = selected.find((layer) => layer.clipId === id);
+              stateLayers.push(
+                ...(owner && shouldLockVisualLayerToViewport(owner, passes.overlayFrame.camera)
+                  ? [artwork]
+                  : cameraLayers([artwork], passes.overlayFrame.camera, true))
+              );
+            }
+            result = groupLayer(stateLayers);
+          }
+          cache.set(node, result);
+          return result;
+        };
+        layers.push(await build(plan));
+      }
+    }
     const overlays: GpuPreviewLayer[] = [];
     for (const pass of passes.visualPasses) {
       if (!pass.transitionOverlays.length) continue;

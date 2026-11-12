@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createNativeEffectPreparation } from './effect-preparation';
 import type { PreviewSceneRenderInput } from './types';
@@ -64,18 +65,29 @@ function fixture() {
     effectRuntimeExecutor: vi.fn(() => primary),
   };
   input.effectPreparation!.project = input.project;
+  const documentSource = JSON.stringify({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'native-preparation',
+    label: { en: 'Native preparation' },
+    controls: [],
+    bindings: [],
+    resources: [],
+    animation: { v: '5.12.2', w: 8, h: 4, fr: 30, ip: 0, op: 30, assets: [], layers: [] },
+  });
+  const documentSha256 = createHash('sha256').update(documentSource).digest('hex');
   const plan = {
     effectInstanceId: 'annotation',
-    snapshotId: 'effect:' + 'a'.repeat(64),
-    documentSha256: 'a'.repeat(64),
-    documentSource: '{}',
+    snapshotId: 'effect:' + documentSha256,
+    documentSha256,
+    documentSource,
     assets: [],
     controls: {},
     dimensions: { width: 8, height: 4 },
     renderDimensions: { width: 8, height: 4 },
     duration: 1,
     fps: 30,
-    frameIndex: 1,
+    frameIndex: 3,
     progress: 0.1,
     time: 0.1,
     kind: 'standalone' as const,

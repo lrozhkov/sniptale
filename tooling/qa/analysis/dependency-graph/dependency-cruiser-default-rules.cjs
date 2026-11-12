@@ -117,7 +117,10 @@ module.exports = [
     from: {},
     to: {
       couldNotResolve: true,
-      pathNot: '[?](?:inline|raw|url)$',
+      // Vite embeds this exact declared package asset before sandbox startup.
+      pathNot:
+        '[?](?:inline|raw|url)$' +
+        '|^@lottiefiles/dotlottie-web/dotlottie-player[.]wasm[?]url&inline$',
     },
   },
   {

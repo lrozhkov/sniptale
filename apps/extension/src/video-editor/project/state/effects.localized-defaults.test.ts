@@ -1,7 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { expect, it, vi } from 'vitest';
-import { createEffectCatalogEntry } from '../../../composition/persistence/effect-bundles/catalog-builder';
-import { importRawEffectDocument } from '../../../features/video/project/effect-bundle/import/zip';
+import { readValidAnimationCatalog } from '../../../composition/persistence/effect-bundles/fixture.test-support';
 import { applyEffectCatalogDocument } from '../../../features/video/project/effect-instance/apply';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { parseHydratableVideoProject } from '../../../features/video/project/validation';
@@ -16,15 +14,8 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 
 it('localizes only new instances; edits, empty strings, history and restored copies retain text', async () => {
   locale.value = 'ru';
-  const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json'
-  );
-  const imported = await importRawEffectDocument(new Uint8Array(source));
-  if (!imported.ok) throw new Error('Expected valid collection document');
-  const catalog = await createEffectCatalogEntry(
-    { document: imported.artifact, kind: 'raw-json' },
-    1
-  );
+  const catalog = await readValidAnimationCatalog();
+  const source = catalog.documents[0]!.source!;
   const args = {
     catalog,
     documentId: catalog.documents[0]!.id,
@@ -45,9 +36,7 @@ it('localizes only new instances; edits, empty strings, history and restored cop
 
   const store = createVideoEditorProjectTestStore();
   store.getState().setProject(applied);
-  store
-    .getState()
-    .updateEffectInstance('ru-instance', { controls: { title: '', subtitle: 'My text' } });
+  store.getState().updateEffectInstance('ru-instance', { controls: { title: '' } });
   const state = store.getState();
   const undone = undoVideoEditorProjectHistory(state.projectHistory, state.project!);
   if (undone?.status !== 'applied') throw new Error('Expected undo');
@@ -62,7 +51,7 @@ it('localizes only new instances; edits, empty strings, history and restored cop
   const copyId = store.getState().duplicateEffectInstance('ru-instance');
   expect(copyId).not.toBeNull();
   for (const instance of store.getState().project!.effectInstances!) {
-    expect(instance.controls).toMatchObject({ title: '', subtitle: 'My text' });
+    expect(instance.controls).toMatchObject({ title: '' });
   }
   expect(store.getState().project!.effectSnapshots![0]!.source).toBe(source.toString());
 });

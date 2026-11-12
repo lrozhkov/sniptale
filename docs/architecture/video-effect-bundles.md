@@ -1,57 +1,65 @@
-# EffectV1 bundles
+# Animation packages and GL transitions
 
-Sniptale accepts `sniptale.effect.v1` JSON and `sniptale.bundle.engine2` ZIP archives. `@sniptale/runtime-contracts/effect-v1` owns the schema and producer fixtures. Extension import, persistence, project, preview, export, and backup adapters stay under their named video and persistence owners.
+Sniptale accepts checked Lottie JSON, `.lottie` archives, animation JSON, and portable animation packs. The `animation-template` runtime contract owns source validation. The `effect-controls` contract owns editable metadata. Video, import, persistence, preview, export, and backup adapters retain their existing owners.
 
-Reject executable effects, imported source, dynamic modules, remote dependencies, unknown schema versions, and engine1 or legacy template-pack compatibility. Present stored projects with `templateInstances` as unsupported items.
+Reject executable imports, expressions, dynamic modules, remote dependencies, and unknown versions. Reject EffectV1 command documents and engine2 bundles. Preserve opaque historical catalogue rows without applying or rewriting them. Present projects with unsupported template data as unavailable items.
 
 ## Import
 
-Parse raw JSON with the bounded structural parser and EffectV1 validator. Before ZIP inflation, check the central directory, normalized paths, entry count, entry and total sizes, compression ratios, collisions, and manifest. Reject encryption, symlinks, traversal, absolute paths, ambiguous separators, undeclared files, and executable MIME types.
+Parse JSON with the bounded structural parser before animation validation. Check archive paths, entry counts, sizes, compression ratios, collisions, and manifests before inflation. Reject encryption, symlinks, traversal, absolute paths, ambiguous separators, undeclared files, and executable MIME types.
 
-Check allowed keys, graph closure, kinds, inputs, references, observability, bounds, and target compatibility. Accept only SDK-approved image, SVG, and audio assets. Check declared sizes, SHA-256 digests, and MIME signatures.
+Check local resource references, dimensions, frame intervals, controls, bindings, and object handles. Accept only the supported PNG, JPEG, WebP, TTF, and OTF resources. Check declared sizes, SHA-256 digests, and MIME signatures. Reject detached SVG and audio resources.
 
-Lock the SDK corpus version and contract commit in extension tests. Replace the complete fixture set, expectations, evidence, lock, and digests together.
+The portable exporter includes complete checked sources and their embedded resources. Catalogue preferences remain separate from package bytes. Recheck the resulting archive through the supported importer.
 
-## Catalog and projects
+## Catalogue and projects
 
-Store one materialized record per catalog pack. Commit metadata, checked source, and assets atomically. Recheck source and asset hashes on read without fixes. Keep invalid rows visible as typed invalid summaries. Prevent their application.
+The `video_animation_packages` store contains source-only packages. Separate preferences reference immutable package and document identities. The `video_visual_preferences` store contains those preferences. The `video_gl_transition_presets` store contains checked GL selections. Commit related resources and preferences atomically.
 
-An effect application creates or reuses an immutable content-addressed project snapshot. The snapshot contains the checked source and referenced assets. A catalog pack reimport or removal must not change existing projects. Check source, assets, retained-byte accounting, references, and target compatibility on project save and read.
+Recheck source and resource hashes without changing stored bytes. Keep invalid stored rows visible through typed summaries. Prevent their application. A catalogue reimport or removal must not change applied project snapshots.
 
-`MEDIA_HUB_BACKUP_VERSION` in `apps/extension/src/workflows/media-hub-backup/v6/contracts.ts` owns the media-hub backup version. The current format stores snapshot blobs as bounded archive entries. Restore checks paths, sizes, hashes, signatures, closure, and the reconstructed project before one IndexedDB write. Privacy erasure removes the catalog with other authoritative stores.
+An annotation application creates or reuses a content-addressed snapshot. Its source contains every required resource. Annotation snapshots do not adopt detached project assets. Check retained bytes, references, controls, intrinsic dimensions, and host timing on project save and read.
+
+The media-hub backup contract owns the archive version. Its owner is `apps/extension/src/workflows/media-hub-backup/v6/contracts.ts`. Restore checks paths, sizes, hashes, signatures, references, and the reconstructed project before publication. Privacy erasure includes authoritative catalogue and preference stores.
+
+## Image filters and transitions
+
+Source filters belong to VIDEO clips. Their checked stacks contain supported operations and parameters, without imported drawing code. Both composition backends use the same operation order and logical source dimensions.
+
+Explicit visual joins contain checked GL selections. The bundled catalogue pins 214 shaders and their parameters. New visual joins use Fade. Audio joins retain their separate audio behavior. Presets contain selections and preferences, without executable shader imports.
 
 ## Runtime
 
-Preview and export share frame and audio plans. Before sandbox evaluation, resolve instance time, target visibility, transitions, and target-effect ordering.
+The manifest sandbox and inline Worker render checked Lottie packages. Imported bytes never become scripts. The retired SDK is not a runtime dependency.
 
-The manifest sandbox and inline Worker interpret only the EffectV1 vocabulary. Never convert imported bytes to script. Bind protocol version, request and sequence, snapshot and document identity, dimensions, time, controls, assets, and input frames. Enforce queue, timeout, canvas, raster, SVG, decoded-media, and failure budgets in both broker and Worker. Evaluation, validation, and resource failures must not select another renderer.
+The parent resolves visibility, local time, controls, placement, and immutable package identity. Protocol version 7 binds source digest, resources, request identity, dimensions, and clock. The broker checks package hashes and resources before Worker execution. It refuses detached assets and source-frame inputs.
 
-Gallery and Native live preview can select `gpu-scene` through the sandbox connection configuration. Protocol version 6 supports the explicit `prepareGpuFrame` request. The Worker evaluates EffectV1 and transfers drawing operations, paint operands or bitmap resources. The broker checks the plan. The parent checks the plan again before the main preview GPU executes it. A parent plan can contain at most 512 resources, 64 passes and 512 operations. Reject unknown operations, executable content, invalid references, identity mismatches and resource failures.
+The Worker retains Lottie players and serializes their mutation. Successful requests return independently owned bitmaps. Worker replies cannot select the retired command or GPU-plan interpreter.
 
-Paint resources contain evaluated paths, text, gradients and rectangular clips. Paint operands cannot request external media or execute code. Each paint permits 128 path commands, 128 gradient stops and 64 KiB of metadata. A plan permits 1 MiB of paint metadata. Unsupported native overloads or excess paint metadata use the existing bounded bitmap representation. Each GPU slot rasterizes changed paint contents once and retains its texture. A later frame reuses that texture when the complete normalized operands and dimensions match. Placement, alpha and filters remain separate GPU draw parameters. Coverage resources remain separate from drawable sources. Temporary paint rasters remain alive until GPU completion, including cancellation.
+Both receiving boundaries check controls, intrinsic geometry, and animation duration. Physical raster dimensions remain separate from logical dimensions. Queue, deadline, package, raster, cache, and consecutive-failure limits remain active. Malformed, stale, late, and failed-transfer results release their resources. A timeout retires the Worker before queued execution resumes.
 
-The default `renderFrame` request remains bitmap-only. Export retains this default. During the first migration stage, a valid plan above the parent transport limits uses the existing sandbox GPU bitmap result. Dependent effects also retain their existing path. These routes are intermediate migration work, not a completed GPU-scene transition.
+The parent compositor owns final placement, camera, masks, and composition. Transferred bitmaps remain alive until their GPU borrows finish. Preview can discard obsolete requests. Export must process each required frame. These execution policies do not change source interpretation.
 
-Gallery and Native can select `gpu-scene-plan` for advisory preparation. This mode accepts only `prepareGpuFrame` requests and returns checked plans within the parent transport limits. It rejects bitmap results and oversized plans instead of using the bitmap fallback. This mode does not create a sandbox GPU renderer. Advisory sessions have separate queues and failure budgets. Their failures do not change the foreground session.
+The parent backend owns WebGPU availability and device failure. Its Canvas fallback does not admit unsupported animation packages. Validation and resource failures remain explicit.
 
-Authored scene data and transient edits define the advisory context. Cursor and recording event hydration can replace render data without retiring this context. Foreground jobs retain their existing invalidation rules.
-
-The shared composition owner schedules overlay and sampled poses. Each prepared GPU frame owns its transferred resources. A retired pose closes those resources only after all GPU borrows end. The final graph includes the editor wrappers when it checks layer and depth limits. If generated effect groups exceed those limits, use the same parent GPU provider to prepare bounded chunks. Do not mutate a submitted graph or acquire a second device for this operation.
-
-If WebGPU is unavailable, preview uses the existing Canvas renderer. A typed GPU device failure permits one Canvas retry with the returned original input bitmaps. Keep those inputs alive until GPU work finishes. The original request deadline also applies to this retry. A timeout prevents late publication. Resource cleanup waits for GPU completion. Do not retry an unsupported operation, invalid plan, or resource failure through Canvas.
-
-Use the shared audio plan for preview, MP4, and WebM. Apply ordinary host-clip visibility and interval rules to standalone effect audio. Preview owns a disposable Web Audio graph with stale-decode protection and cleanup. Check decoded PCM limits after browser decode.
-
-Keep sandbox CSP free of `unsafe-eval`. Reject `Function`, `eval`, external Worker scripts, and dynamic code in source and artifacts.
+Sandbox CSP permits local packaged WASM and data resources. It prohibits `unsafe-eval`, remote connections, and extension API authority. The tour sandbox retains its separate restrictions. Reject external Worker scripts and executable imported content.
 
 ## Change proof
 
-For contract changes, update the schema, validator, importer, and locked corpus. Prove admitted JSON and ZIP imports plus each changed rejection boundary. Include catalog atomicity, quota, rollback, project integrity, and backup restore when the changed behavior reaches those paths. Include effect kinds, chaining, timing, audio, preview/export parity, and cleanup when the changed behavior reaches those paths.
+For contract changes, update the source validator, importer, and affected fixtures. Prove supported JSON and archive imports with each changed refusal boundary. Include atomicity, quota, rollback, integrity, and backup restore when the change reaches those paths.
 
-For sandbox entry changes, update manifest and build topology, CSP, and artifact-security proof. Do not add compatibility, executable assets, dynamic-code exceptions, or a second preview or export runtime.
+Check both editors, inspector previews, attachment planes, clocks, controls, Undo/Redo, cancellation, cleanup, and export for affected consumers. Check actual GPU completion and pixels when the scenario requires GPU composition. A bitmap receipt alone does not prove final composition.
+
+For sandbox entry changes, check manifest, build topology, CSP, and artifact security. Do not add compatibility interpreters, executable assets, dynamic-code exceptions, or a second runtime for preview and export.
 
 ## Annotation attachment conversion
 
-Attachment changes first preserve an exactly representable rotated rectangle. Perspective or shear uses a local flatten. For that flatten, project the body center. Retain the Jacobian's local X direction and axis lengths. Project each fixed anchor independently.
+Attachment conversion first preserves an exactly representable rotated rectangle. Perspective or shear requires a local flatten. Project the body center. Retain the Jacobian's local X direction and axis lengths. Project each fixed anchor independently.
 
-The target body loses projective deformation. The conversion does not promise four-corner equality or two-switch reversibility. Existing bounds and rejection of singular, behind-camera or reflected geometry still apply. One existing history transaction stores attachment, transform and anchors. Undo/Redo restores the full accepted state exactly without changes to timing, controls or immutable effect identity.
+The target body loses projective deformation. The conversion does not promise four-corner equality or reversibility after two switches. Existing bounds still apply. Reject singular, behind-camera, and reflected geometry. One history transaction stores attachment, transform, and anchors. Undo/Redo restores the accepted state exactly, including timing, controls, and immutable identity.
+
+## Generated validator tool-noise
+
+`apps/extension/build/lottie-schema.ts` owns the pinned schema and compiled validator bytes. Formatting must preserve both artifacts. Two successful generator runs must produce the same validator bytes.
+
+Three style rules have an exact `tool-noise` scope: `packages/runtime-contracts/src/animation-template/lottie-schema.generated.js`. Ajv reuses variable declarations and temporary values. The generator emits readable code. The production bundler owns minification. The rules are `no-redeclare`, `no-unused-vars`, and `no-useless-assignment`. Security and dynamic-code checks remain active. Remove this scope when the generator no longer emits these constructs or you remove the validator.

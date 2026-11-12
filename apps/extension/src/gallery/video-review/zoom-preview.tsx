@@ -218,12 +218,15 @@ function PreparedZoomPreview(
     region.spotlight,
     region.border,
     props.spatialEdit?.revision,
+    props.sourceFilters,
   ]);
   const authoredCenter = (patch: { centerX: number; centerY: number; scale?: number }) => {
     const mapped = quickEditCropCamera({ ...camera, ...patch }, props, true);
     return { ...patch, centerX: mapped.centerX, centerY: mapped.centerY };
   };
   const surface = {
+    sourceFilters: props.sourceFilters,
+    sourceSize: props.source,
     currentTime: props.focus?.time ?? (props.region.start + props.region.end) / 2,
     background,
     headerImage: header.image,
@@ -388,6 +391,8 @@ function ZoomPreviewResultLayers(props: {
     <>
       {!overlay && (view === 'result' || playback) ? (
         <ReviewMotionBlurPreview
+          sourceFilters={accepted ? accepted.sourceFilters : scene.sourceFilters}
+          sourceSize={accepted?.sourceSize ?? scene.source}
           scene={auxiliary?.scene ?? scene}
           hasSpatialBase={view === 'result'}
           focus={playback ? auxiliary?.focus : scene.focus}

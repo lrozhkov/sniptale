@@ -1,11 +1,11 @@
+import { createGlTransitionSelection } from '../../../../apps/extension/src/features/video/project/transition/gl-catalog';
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
 import { normalizeVideoProjectCursorSkin } from '../../../../apps/extension/src/features/video/project/cursor';
-import { createHash } from 'node:crypto';
 import {
   DEFAULT_WINDOW_HEADER,
   windowHeaderGeometry,
 } from '../../../../packages/runtime-contracts/src/window-header';
-import { parseEffectV1Source } from '../../../../packages/runtime-contracts/src/effect-v1/validation/index';
+import { createSourceImageFilter } from '../../../../apps/extension/src/features/image-filters/contract';
 import { isValidVideoProject } from '../../../../apps/extension/src/features/video/project/validation/root';
 import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
@@ -326,22 +326,14 @@ for (const [index, viewport] of PRIMARY_BROWSER_VIEWPORTS.entries()) {
 }
 
 for (const format of ['WEBM', 'MP4'] as const) {
-  test(`encoded ${format} source crop composes with headers, camera, transitions and EffectV1`, async ({
+  test(`encoded ${format} source crop composes with headers, camera, transitions and source filters`, async ({
     page,
   }, info) => {
     test.setTimeout(180000);
-    await page.setViewportSize({ width: 1280, height: 560 });
+    await page.setViewportSize({ width: 1920, height: 900 });
     const host = await startHostServer();
     try {
       const bytes = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
-      const source = await readFile(
-        new URL('../fixtures/effect-v1/demo-target-overlay.sniptale-effect.json', import.meta.url),
-        'utf8'
-      );
-      const parsed = parseEffectV1Source(source);
-      if (!parsed.ok || !parsed.document) throw new Error('Invalid effect fixture');
-      const document = parsed.document,
-        sha256 = createHash('sha256').update(source).digest('hex');
       const project = createVideoProjectFromMultiSourceRecording({
         name: 'Encoded crop matrix',
         videos: [
@@ -420,50 +412,20 @@ for (const format of ['WEBM', 'MP4'] as const) {
           leadingClipId: first.id,
           trailingClipId: secondClip.id,
           duration: 0.2,
-          kind: 'CROSSFADE',
+          kind: 'gl' as const,
+          selection: createGlTransitionSelection('Fade')!,
           easing: 'LINEAR',
         },
       ];
-      const snapshotId = `effect:${sha256}`;
-      project.effectSnapshots = [
-        {
-          assets: [],
-          documentId: document.id,
-          id: snapshotId,
-          kind: document.kind,
-          retainedByteLength: new TextEncoder().encode(source).byteLength,
-          schemaVersion: 'sniptale.effect.v1',
-          sha256,
-          source,
-        },
-      ];
-      const controls = Object.fromEntries(
-        document.controls.map(({ defaultValue, id }) => [id, defaultValue])
+      const brightness = createSourceImageFilter('color', 'crop-source-color');
+      if (brightness.kind !== 'color') throw new Error('Expected color filter.');
+      brightness.parameters.brightness = 1.1;
+      project.clips = project.clips.map((clip) =>
+        clip.type === 'VIDEO' && [first.id, secondClip.id].includes(clip.id)
+          ? { ...clip, sourceFilters: { version: 1, filters: [structuredClone(brightness)] } }
+          : clip
       );
-      project.effectInstances = [
-        {
-          id: 'crop-clip-fx',
-          controls,
-          duration: 0.8,
-          enabled: true,
-          kind: document.kind,
-          playbackRate: document.duration / 0.8,
-          snapshotId,
-          startTime: 0,
-          target: { kind: 'clip', clipId: first.id },
-        },
-        {
-          id: 'crop-track-fx',
-          controls,
-          duration: 0.6,
-          enabled: true,
-          kind: document.kind,
-          playbackRate: document.duration / 0.6,
-          snapshotId,
-          startTime: 0.8,
-          target: { kind: 'track', trackId: main.trackId },
-        },
-      ];
+      project.version = 52;
       const cameraClip = project.clips.find((clip) => clip.id === camera.id);
       if (cameraClip?.type !== 'VIDEO') throw new Error('Missing export camera');
       cameraClip.cameraPositions = [
@@ -649,6 +611,15 @@ for (const format of ['WEBM', 'MP4'] as const) {
                 320,
                 180 - frame.join
               );
+              // Independent straight-RGBA oracle for the authored 1.1 brightness multiplier.
+              const referencePixels = expected.getImageData(0, 0, 320, 180);
+              for (let index = 0; index < referencePixels.data.length; index += 4)
+                for (let channel = 0; channel < 3; channel++)
+                  referencePixels.data[index + channel] = Math.min(
+                    255,
+                    Math.round(referencePixels.data[index + channel]! * 1.1)
+                  );
+              expected.putImageData(referencePixels, 0, 0);
               let error = 0,
                 count = 0;
               for (const u of [0.15, 0.3, 0.45, 0.6])

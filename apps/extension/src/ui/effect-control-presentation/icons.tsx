@@ -59,10 +59,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import {
-  EFFECT_V1_CONTROL_ROOT_ICONS,
-  type EffectV1ControlIcon,
-  type EffectV1SemanticControlGroup,
-} from '@sniptale/runtime-contracts/effect-v1';
+  EFFECT_CONTROL_ROOT_ICONS,
+  type EffectControlIcon,
+  type EffectSemanticControlGroup,
+} from '@sniptale/runtime-contracts/effect-controls';
 
 /** Imported packages select semantic icons, never component names or executable artwork. */
 export const effectControlIcons = {
@@ -123,9 +123,9 @@ export const effectControlIcons = {
   baseline: Baseline,
   decoration: Underline,
   texture: Wallpaper,
-} satisfies Record<EffectV1ControlIcon, LucideIcon>;
+} satisfies Record<EffectControlIcon, LucideIcon>;
 
 /** Both editor adapters display the same icons reserved by contract validation. */
-export function effectControlRootIcon(root: EffectV1SemanticControlGroup): LucideIcon {
-  return effectControlIcons[EFFECT_V1_CONTROL_ROOT_ICONS[root]];
+export function effectControlRootIcon(root: EffectSemanticControlGroup): LucideIcon {
+  return effectControlIcons[EFFECT_CONTROL_ROOT_ICONS[root]];
 }

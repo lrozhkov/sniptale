@@ -132,6 +132,11 @@
       "source": "LICENSES/dependencies/@iconify__types-2.0.0.txt"
     },
     {
+      "archivePath": "LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt",
+      "sha256": "779cec663b3c6590082566f2a000170d7a4d1a4bfc6f954e61efa4adddc652a8",
+      "source": "LICENSES/dependencies/@lottiefiles__dotlottie-web-0.82.1.txt"
+    },
+    {
       "archivePath": "LICENSES/dependencies/@noble__hashes-2.4.0.txt",
       "sha256": "4f221aee6e072336700c408c68ab3b96a3fc09f6aebe6f48f1bd99e5ef13faec",
       "source": "LICENSES/dependencies/@noble__hashes-2.4.0.txt"
@@ -421,13 +426,43 @@
     },
     {
       "archivePath": "THIRD_PARTY_DEPENDENCIES.json",
-      "sha256": "d8b1296f47adcea86dd33eefbca4b01d04b453828d99335164d9094d25f96625",
+      "sha256": "eb1fbb080ce1e7df6f43d03eae2a4847328c3de24640bb858535fb758d7860dd",
       "source": "THIRD_PARTY_DEPENDENCIES.json"
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "eaf8908f6e322dafe9dc8b54facc4c9c2bff124d8ecb516bd169be9a71b50747",
+      "sha256": "9a368ce743027ed61fe714451a9958fbe1cc0e142ead985801037f58b184cd89",
       "source": "THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/fonts/NOTICE.txt",
+      "sha256": "7fc56df9fae16e89186f10c2104828777864f552e187319bcfd17b56b212379f",
+      "source": "apps/extension/public/video-effects/fonts/NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/fonts/OFL.txt",
+      "sha256": "ff532f9e8789f09a9fdffc3c0954eedfb0a48be77b2e2eb90f5f82e4f347f50c",
+      "source": "apps/extension/public/video-effects/fonts/OFL.txt"
+    },
+    {
+      "archivePath": "apps/extension/public/video-effects/fonts/identity.json",
+      "sha256": "a70b698451327b25a6c7c9ae52cb9b059a098b7c80e3a94998e39b3fcbe4e01f",
+      "source": "apps/extension/public/video-effects/fonts/identity.json"
+    },
+    {
+      "archivePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE",
+      "sha256": "d554721b2cd409d9bc075d743bb34f960e05ba55de1818a62fa60caf21ca6188",
+      "source": "apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE"
+    },
+    {
+      "archivePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt",
+      "sha256": "7035cbca1a28d7ce44138d9e672106d35854bb8ef7a6b566f34ea434eead220c",
+      "source": "apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt"
+    },
+    {
+      "archivePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json",
+      "sha256": "0978ccc5143e059d0b17b93bcaeede34f5c881ecae0113c9301e598f598bd25d",
+      "source": "apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json"
     },
     {
       "archivePath": "apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/LICENSE",
@@ -681,6 +716,80 @@
             "sourceSha256": "f307941ba096017f0b6a62b7bfcff94d1f3171e5376415aed934ee29d0ff2237"
           }
         ]
+      },
+      {
+        "id": "golos-text-lottie-2-004",
+        "name": "Golos Text 2.004 in Lottie templates",
+        "attribution": "Copyright 2019 The Golos Text Project Authors (https://github.com/googlefonts/golos-text)",
+        "license": "OFL-1.1",
+        "sourceUrl": "https://github.com/googlefonts/golos-text",
+        "licensePath": "apps/extension/public/video-effects/fonts/OFL.txt",
+        "licenseSha256": "ff532f9e8789f09a9fdffc3c0954eedfb0a48be77b2e2eb90f5f82e4f347f50c",
+        "noticePath": "apps/extension/public/video-effects/fonts/NOTICE.txt",
+        "noticeSha256": "7fc56df9fae16e89186f10c2104828777864f552e187319bcfd17b56b212379f",
+        "provenancePath": "apps/extension/public/video-effects/fonts/identity.json",
+        "provenanceSha256": "a70b698451327b25a6c7c9ae52cb9b059a098b7c80e3a94998e39b3fcbe4e01f",
+        "modifications": "The font bytes do not change. Sniptale animation files embed the bytes as base64. The OFL license applies to the font bytes.",
+        "artifacts": [
+          {
+            "path": "apps/extension/public/video-effects/animations/lower-third.sniptale-animation.json",
+            "sha256": "9021a55d065bd9f0be93387ac2f1f8a58cbf18a9b670bd1e72d6cb5b77c7f845",
+            "sourceUrl": "https://github.com/googlefonts/golos-text",
+            "sourceSha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/callout.sniptale-animation.json",
+            "sha256": "7638aac7a193c14792950668081a780685c2995a12206e4b446c5c600ef17cce",
+            "sourceUrl": "https://github.com/googlefonts/golos-text",
+            "sourceSha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/chapters.sniptale-animation.json",
+            "sha256": "e2147d13b77e5e5d67ef738d8a7518e3b72d07bd4c1d573011b14817e9705d01",
+            "sourceUrl": "https://github.com/googlefonts/golos-text",
+            "sourceSha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/title.sniptale-animation.json",
+            "sha256": "547f8ef191b5c52fc780c993f773cefbfd52028c26d29f01e1590e392de20abc",
+            "sourceUrl": "https://github.com/googlefonts/golos-text",
+            "sourceSha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063"
+          },
+          {
+            "path": "apps/extension/public/video-effects/animations/frame.sniptale-animation.json",
+            "sha256": "d4a52d535d3fc657ca5387b8ec97bcfdde6e8dae2b8e0e8f29871477c18a42a3",
+            "sourceUrl": "https://github.com/googlefonts/golos-text",
+            "sourceSha256": "17bb58fb69aec2dfb047a2ebf52534023e9b688c97a6b7ac795b0a72912c2063"
+          }
+        ]
+      },
+      {
+        "id": "pixi-filters-source-kernels-6-1-5",
+        "name": "Pixi Filters source image kernels v6.1.5",
+        "attribution": "Copyright (c) 2013-2025 Mathew Groves, Chad Engler",
+        "license": "MIT",
+        "sourceUrl": "https://github.com/pixijs/filters/tree/e9d1ca987864f121680bb0d7e9612c05b37748de",
+        "licensePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/LICENSE",
+        "noticePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/NOTICE.txt",
+        "provenancePath": "apps/extension/src/features/image-filters/vendor/pixi-filters/identity.json",
+        "modifications": "Adapt adjustment, clamped Kawase blur and bloom for the existing compositor device. Add Sniptale monochrome, sepia, sharpen, pixelate, vignette and deterministic grain. Reconstruct canonical source texels before interpolation. Use explicit logical coordinates, project time and valid premultiplied alpha. Provide an independent CPU image reference.",
+        "artifacts": [
+          {
+            "path": "apps/extension/src/features/image-filters/shader.ts",
+            "sha256": "10284e4e4823c336cbf1279fcb93016f16363e5d1d3bd2ad6b7eea5b39a739d5",
+            "sourceUrl": "https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de",
+            "sourceSha256": "35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9"
+          },
+          {
+            "path": "apps/extension/src/features/image-filters/reference.ts",
+            "sha256": "450a1a4383b8472e4be3fca49ad42c266f0694647d236ce316640a16a7597186",
+            "sourceUrl": "https://codeload.github.com/pixijs/filters/tar.gz/e9d1ca987864f121680bb0d7e9612c05b37748de",
+            "sourceSha256": "35a9c08c1a245f97181f62ed89e7ebe06b8559f4973f34abe47dd910a9fcc0b9"
+          }
+        ],
+        "licenseSha256": "d554721b2cd409d9bc075d743bb34f960e05ba55de1818a62fa60caf21ca6188",
+        "noticeSha256": "7035cbca1a28d7ce44138d9e672106d35854bb8ef7a6b566f34ea434eead220c",
+        "provenanceSha256": "0978ccc5143e059d0b17b93bcaeede34f5c881ecae0113c9301e598f598bd25d"
       }
     ]
   },

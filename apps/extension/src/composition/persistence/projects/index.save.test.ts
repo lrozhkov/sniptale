@@ -1084,3 +1084,74 @@ it('retains passive source speech and replacement-only resources through save re
   ).toBe(false);
   expect(project).toEqual(before);
 });
+
+it('saves and reopens a real admitted animation with maximum document and catalogue provenance', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { importAnimationArtifactBytes } =
+    await import('../../../features/video/project/effect-bundle/lottie-profile');
+  const { createAnimationCatalogEntry } = await import('../effect-bundles/catalog-builder');
+  const { applyEffectCatalogDocument } =
+    await import('../../../features/video/project/effect-instance/apply');
+  const { createEmptyVideoProject } =
+    await import('../../../features/video/project/factories/creation');
+  const { parseVideoProjectEntry } = await import('./read-guards');
+  const { getVideoProject } = await import('./index');
+  const document = JSON.parse(
+    readFileSync(
+      'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+      'utf8'
+    )
+  );
+  document.id = 'a'.repeat(128);
+  const imported = await importAnimationArtifactBytes(
+    new TextEncoder().encode(JSON.stringify(document))
+  );
+  if (!imported.ok) throw new Error(JSON.stringify(imported));
+  const source = await createAnimationCatalogEntry(imported, 1);
+  expect(source.packId.length).toBe(138);
+  for (const packId of [source.packId, 'p'.repeat(192)]) {
+    const catalog = {
+      ...source,
+      packId,
+      assets: [],
+      enabled: true,
+      label: { en: source.label.en, ru: source.label.ru ?? source.label.en },
+      description: { en: '', ru: '' },
+      version: String(source.version),
+      documents: source.documents.map((entry) => ({
+        ...entry,
+        kind: 'standalone' as const,
+        schemaVersion: 'sniptale.animation.v1' as const,
+        assets: [],
+      })),
+    };
+    const applied = await applyEffectCatalogDocument({
+      catalog,
+      documentId: document.id,
+      instanceId: 'boundary-instance',
+      project: createEmptyVideoProject('Boundary'),
+      startTime: 0,
+      target: { kind: 'scene' },
+    });
+    let head: ReturnType<typeof parseVideoProjectEntry> = null;
+    projectsDbMocks.txGetMock.mockImplementation(async (id: string) =>
+      id === applied.id ? (head ?? undefined) : undefined
+    );
+    projectsDbMocks.dbGetMock.mockImplementation(async (_store: string, id: string) =>
+      id === applied.id ? (head ?? undefined) : undefined
+    );
+    projectsDbMocks.txPutMock.mockImplementation(async (entry: unknown) => {
+      const parsed = parseVideoProjectEntry(entry);
+      if (parsed) head = parsed;
+    });
+    await saveVideoProject(applied);
+    expect(head).not.toBeNull();
+    const reopened = await getVideoProject(applied.id);
+    expect(reopened.status).toBe('ready');
+    if (reopened.status !== 'ready') throw new Error('Saved project did not reopen');
+    expect(reopened.project.effectInstances?.[0]?.catalogPackId).toBe(packId);
+    expect(reopened.project.effectSnapshots?.[0]?.source).toBe(
+      applied.effectSnapshots?.[0]?.source
+    );
+  }
+});
