@@ -241,6 +241,16 @@ function acceptsFaintCompletion(image, box, overlaps, glyphMetrics) {
     return false;
   return true;
 }
+function sourceSupportsOverlap(a, b) {
+  if (!a.atoms?.length || !b.atoms?.length) return true;
+  const [p, q] = [a, b].map(({ atoms }) => ({
+    left: Math.min(...atoms.map((atom) => atom.x)),
+    top: Math.min(...atoms.map((atom) => atom.y)),
+    right: Math.max(...atoms.map((atom) => atom.x + atom.w)),
+    bottom: Math.max(...atoms.map((atom) => atom.y + atom.h)),
+  }));
+  return p.left < q.right && q.left < p.right && p.top < q.bottom && q.top < p.bottom;
+}
 function completeFaintCatalog(image, analysisImage, catalog, faintProposals, glyphMetrics) {
   for (const candidate of faintProposals) {
     // A faint pass can complete a label already represented by fragments.
@@ -250,7 +260,9 @@ function completeFaintCatalog(image, analysisImage, catalog, faintProposals, gly
       const overlaps = catalog.filter(
         (existing) =>
           Math.min(existing.x + existing.w, box.x + box.w) > Math.max(existing.x, box.x) &&
-          Math.min(existing.y + existing.h, box.y + box.h) > Math.max(existing.y, box.y)
+          Math.min(existing.y + existing.h, box.y + box.h) > Math.max(existing.y, box.y) &&
+          // Padding can overlap an accent or neighboring row without sharing source ink.
+          sourceSupportsOverlap(existing, box)
       );
       if (!overlaps.length) {
         catalog.push(box);
