@@ -6,7 +6,10 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 const admit = () => vi.advanceTimersByTimeAsync(20);
 import { createPreviewSceneRenderScheduler, type PreviewSceneRenderJob } from './render-scheduler';
-import { createProject } from '../../../../features/video/project/timeline/project-meta.test.helpers';
+import {
+  createProject,
+  createShapeClip,
+} from '../../../../features/video/project/timeline/project-meta.test.helpers';
 import { resolveVideoCompositionRenderPasses } from '../../../../features/video/composition/timeline/render';
 
 it('prepares one reserved frame before the active GPU render completes and releases it afterward', async () => {
@@ -1109,5 +1112,163 @@ it('waits for the newest paused decoded-source preparation while the canceled pr
   expect(onSuccess).toHaveBeenCalledExactlyOnceWith(second, expect.objectContaining({ time: 2 }));
   expect(newRelease).toHaveBeenCalledOnce();
   expect(onError).not.toHaveBeenCalled();
+  scheduler.dispose();
+});
+
+it('publishes intermediate gesture poses while retaining only the latest pending pose', async () => {
+  const completion = Promise.withResolvers<void>();
+  const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValue(undefined);
+  const onSuccess = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({ render, onSuccess, onError: vi.fn() });
+  const first = {
+    ...createJob(2.5),
+    transformInteraction: { clipId: 'clip' },
+    previewRenderer: 'gpu' as const,
+    previewCacheBypass: true,
+  };
+  const cleanup = scheduler.enqueue(first);
+  await admit();
+  const second = { ...first, controller: new AbortController() };
+  const third = { ...first, controller: new AbortController() };
+  scheduler.enqueue(second);
+  cleanup(); // The committed replacement decides whether this active pose remains valid.
+  scheduler.enqueue(third);
+  expect(first.controller.signal.aborted).toBe(false);
+  expect(second.controller.signal.aborted).toBe(true);
+  completion.resolve();
+  await admit();
+  expect(onSuccess.mock.calls.map(([job]) => job)).toEqual([first, third]);
+  expect(render).toHaveBeenCalledTimes(2);
+  scheduler.dispose();
+});
+
+it.each(['time', 'generation', 'gesture', 'end', 'layout', 'renderer'] as const)(
+  'cancels an active gesture frame after a hard %s change',
+  async (change) => {
+    const completion = Promise.withResolvers<void>();
+    const onSuccess = vi.fn();
+    const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValue(undefined);
+    const scheduler = createPreviewSceneRenderScheduler({ render, onSuccess, onError: vi.fn() });
+    const first = {
+      ...createJob(2.5),
+      transformInteraction: { clipId: 'clip' },
+      previewRenderer: 'gpu' as const,
+      previewCacheBypass: true,
+    };
+    scheduler.enqueue(first);
+    await admit();
+    const next = {
+      ...first,
+      controller: new AbortController(),
+      ...(change === 'time' ? { currentTime: 3 } : {}),
+      ...(change === 'generation' ? { renderGeneration: 1 } : {}),
+      ...(change === 'gesture' ? { transformInteraction: { clipId: 'clip' } } : {}),
+      ...(change === 'end' ? { transformInteraction: undefined } : {}),
+      ...(change === 'layout' ? { layoutVersion: 1 } : {}),
+      ...(change === 'renderer' ? { previewRenderer: 'legacy' as const } : {}),
+    };
+    scheduler.enqueue(next);
+    expect(first.controller.signal.aborted).toBe(true);
+    completion.resolve();
+    await admit();
+    expect(onSuccess.mock.calls.some(([job]) => job === first)).toBe(false);
+    scheduler.dispose();
+  }
+);
+
+it.each(['pose', 'content', 'source', 'camera', 'raster', 'dispose'] as const)(
+  'retains only transform changes within a gesture: %s',
+  async (change) => {
+    const completion = Promise.withResolvers<void>();
+    const onSuccess = vi.fn();
+    const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValue(undefined);
+    const scheduler = createPreviewSceneRenderScheduler({ render, onSuccess, onError: vi.fn() });
+    const clip = createShapeClip();
+    const first = {
+      ...createJob(1),
+      project: createProject([clip]),
+      transformInteraction: { clipId: clip.id },
+      previewRenderer: 'gpu' as const,
+      previewCacheBypass: true,
+      previewRasterSize: { width: 1904, height: 1072 },
+    };
+    scheduler.enqueue(first);
+    await admit();
+    const next = {
+      ...first,
+      controller: new AbortController(),
+      project: {
+        ...first.project,
+        clips: [
+          {
+            ...clip,
+            transform: { ...clip.transform, x: 50 },
+            ...(change === 'content' ? { name: 'different content' } : {}),
+          },
+        ],
+      },
+      previewRasterSize: { width: change === 'raster' ? 960 : 1904, height: 1072 },
+      renderRevision: Promise.resolve('new-pose'),
+      ...(change === 'source' ? { assetUrls: { changed: 'blob:replacement' } } : {}),
+    };
+    if (change === 'camera')
+      Object.defineProperty(next.project, Symbol('prepared-camera'), { value: {} });
+    scheduler.enqueue(next);
+    if (change === 'dispose') scheduler.dispose();
+    expect(first.controller.signal.aborted).toBe(change !== 'pose');
+    completion.resolve();
+    await admit();
+    expect(onSuccess.mock.calls.some(([job]) => job === first)).toBe(change === 'pose');
+    scheduler.dispose();
+  }
+);
+
+it('cancels gesture cleanup when no committed replacement was admitted', async () => {
+  const completion = Promise.withResolvers<void>();
+  const onSuccess = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({
+    render: () => completion.promise,
+    onSuccess,
+    onError: vi.fn(),
+  });
+  const first = {
+    ...createJob(2.5),
+    transformInteraction: { clipId: 'clip' },
+    previewRenderer: 'gpu' as const,
+    previewCacheBypass: true,
+  };
+  const cleanup = scheduler.enqueue(first);
+  await admit();
+  cleanup();
+  expect(first.controller.signal.aborted).toBe(true);
+  completion.resolve();
+  await admit();
+  expect(onSuccess).not.toHaveBeenCalled();
+  scheduler.dispose();
+});
+
+it('withdraws a retained active cohort when its latest pending replacement is cleaned up', async () => {
+  const completion = Promise.withResolvers<void>();
+  const render = vi.fn().mockReturnValueOnce(completion.promise).mockResolvedValue(undefined);
+  const onSuccess = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({ render, onSuccess, onError: vi.fn() });
+  const first = {
+    ...createJob(2.5),
+    transformInteraction: { clipId: 'clip' },
+    previewRenderer: 'gpu' as const,
+    previewCacheBypass: true,
+  };
+  scheduler.enqueue(first);
+  await admit();
+  const second = { ...first, controller: new AbortController() };
+  const cleanup = scheduler.enqueue(second);
+  expect(first.controller.signal.aborted).toBe(false);
+  cleanup();
+  expect(first.controller.signal.aborted).toBe(true);
+  expect(second.controller.signal.aborted).toBe(true);
+  completion.resolve();
+  await admit();
+  expect(onSuccess).not.toHaveBeenCalled();
+  expect(render).toHaveBeenCalledOnce();
   scheduler.dispose();
 });

@@ -146,6 +146,7 @@ export interface PreviewStageCanvasProps {
   renderGenerationRef?: React.MutableRefObject<number>;
   project: VideoProject;
   effectPreparationProject?: VideoProject | undefined;
+  transformInteraction?: { readonly clipId: string } | undefined;
   selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedClip: VideoProjectClip | null;
   selectedClipId: string | null;

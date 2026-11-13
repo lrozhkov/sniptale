@@ -50,6 +50,8 @@ export interface PreviewStageCanvasSceneParams {
   project: VideoProject;
   /** Stable authored snapshot, before runtime hydration. */
   effectPreparationProject?: VideoProject | undefined;
+  /** One canvas transform gesture; ending it restores strict latest-request cancellation. */
+  transformInteraction?: { readonly clipId: string } | undefined;
   renderGeneration?: number;
   renderGenerationRef?: React.MutableRefObject<number> | undefined;
   stageRef: React.RefObject<HTMLDivElement | null>;

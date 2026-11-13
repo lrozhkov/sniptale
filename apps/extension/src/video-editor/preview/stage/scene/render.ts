@@ -67,6 +67,14 @@ function usePreviewStageRenderEffect(
   const committed = useRef({ params, renderRevision });
   const lastRequest = useRef<{ projectId: string; generation: number; time: number } | null>(null);
   const cancelDirect = useRef<(() => void) | null>(null);
+  const cancelRender = useRef<(() => void) | null>(null);
+  useLayoutEffect(
+    () => () => {
+      cancelRender.current?.();
+      cancelRender.current = null;
+    },
+    []
+  );
   useLayoutEffect(() => {
     committed.current = { params, renderRevision };
   });
@@ -109,6 +117,7 @@ function usePreviewStageRenderEffect(
         previewRenderer: current.previewRenderer ?? 'gpu',
         project: current.project,
         effectPreparationProject: current.effectPreparationProject,
+        transformInteraction: current.transformInteraction,
         renderGeneration: current.renderGenerationRef?.current ?? current.renderGeneration ?? 0,
         runtimeVersion: current.effectRuntimeFeedback.retryVersion,
         layoutVersion: current.resizeVersion,
@@ -154,7 +163,16 @@ function usePreviewStageRenderEffect(
       direct && last?.projectId === current.project.id && last.generation === generation
         ? last.time
         : current.currentTime;
-    return enqueueRef.current(time, direct);
+    const previous = cancelRender.current;
+    const transform =
+      !!current.transformInteraction &&
+      current.isPlaying !== true &&
+      current.previewRenderer === 'gpu' &&
+      current.previewCacheBypass === true;
+    // A committed gesture replacement can retain its predecessor; other requests cancel first.
+    if (!transform) previous?.();
+    cancelRender.current = enqueueRef.current(time, direct) ?? null;
+    if (transform) previous?.();
   }, [
     direct,
     effectTime,
@@ -170,6 +188,7 @@ function usePreviewStageRenderEffect(
     params.isPlaying,
     params.project,
     params.effectPreparationProject,
+    params.transformInteraction,
     activeClipKey,
     params.previewMode,
     params.previewRenderer,
@@ -216,6 +235,7 @@ function createPreviewStageCanvasRenderJob(args: {
   previewRenderer: PreviewStageCanvasSceneParams['previewRenderer'];
   project: PreviewStageCanvasSceneParams['project'];
   effectPreparationProject?: PreviewStageCanvasSceneParams['effectPreparationProject'];
+  transformInteraction?: PreviewStageCanvasSceneParams['transformInteraction'];
   renderGeneration: number;
   runtimeVersion: number;
   layoutVersion: number;
@@ -256,6 +276,7 @@ function createPreviewStageCanvasRenderJob(args: {
     ...(args.previewMode ? { previewMode: args.previewMode } : {}),
     project: args.project,
     effectPreparationProject: args.effectPreparationProject,
+    transformInteraction: args.transformInteraction,
     renderGeneration: args.renderGeneration,
     runtimeVersion: args.runtimeVersion,
     layoutVersion: args.layoutVersion,

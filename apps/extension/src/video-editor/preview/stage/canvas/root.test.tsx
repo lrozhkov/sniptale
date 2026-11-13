@@ -124,17 +124,27 @@ it('forwards authored provenance separately from the hydrated scene into the mou
   const props = rootProps({ activeInsertKind: null, mode: 'player' });
   const authored = props.project;
   const hydrated = { ...authored };
+  const transformInteraction = { clipId: 'dragged-clip' };
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
   try {
     await act(async () =>
       root.render(
-        <PreviewStageRoot {...props} project={hydrated} effectPreparationProject={authored} />
+        <PreviewStageRoot
+          {...props}
+          project={hydrated}
+          effectPreparationProject={authored}
+          transformInteraction={transformInteraction}
+        />
       )
     );
     expect(vi.mocked(usePreviewStageCanvasScene).mock.lastCall![0]).toEqual(
-      expect.objectContaining({ project: hydrated, effectPreparationProject: authored })
+      expect.objectContaining({
+        project: hydrated,
+        effectPreparationProject: authored,
+        transformInteraction,
+      })
     );
     expect(vi.mocked(usePreviewStageCanvasScene).mock.lastCall![0].project).toBe(hydrated);
     expect(vi.mocked(usePreviewStageCanvasScene).mock.lastCall![0].effectPreparationProject).toBe(
