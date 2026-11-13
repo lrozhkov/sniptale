@@ -156,7 +156,7 @@ function AutosavePopover({
   const { open, anchor, layer, id, portalStyle, menuPosition, close } = popover;
   const { label, tone } = statusPresentation(props, spinning);
   const failed = tone === 'danger';
-  const rect = anchor.current?.getBoundingClientRect();
+  const rect = open ? anchor.current?.getBoundingClientRect() : undefined;
   const arrow = Math.max(
     12,
     Math.min(320, (rect?.left ?? 0) + (rect?.width ?? 0) / 2 - Number(portalStyle.left ?? 0))
