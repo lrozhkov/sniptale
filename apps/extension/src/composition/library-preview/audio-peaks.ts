@@ -1,6 +1,7 @@
 import { MAX_VIDEO_PROJECT_AUDIO_PEAKS } from '../../features/video/project/types';
 
 const AUDIO_PEAKS_PER_SECOND = 100;
+const AUDIO_PEAK_WORK_BUDGET_MS = 4;
 export const AUDIO_PEAK_MAX_DECODE_BLOB_SIZE = 24 * 1024 * 1024;
 export const AUDIO_PEAK_MAX_DECODE_DURATION_SECONDS = 5 * 60;
 
@@ -28,7 +29,10 @@ function getBucketPeak(channelData: Float32Array[], start: number, end: number):
   return Math.min(1, peak);
 }
 
-function buildAudioPeaks(audioBuffer: AudioBuffer, durationSeconds: number): number[] | null {
+async function buildAudioPeaks(
+  audioBuffer: AudioBuffer,
+  durationSeconds: number
+): Promise<number[] | null> {
   if (audioBuffer.length <= 0 || audioBuffer.numberOfChannels <= 0) {
     return null;
   }
@@ -42,11 +46,22 @@ function buildAudioPeaks(audioBuffer: AudioBuffer, durationSeconds: number): num
     audioBuffer.getChannelData(index)
   );
 
-  return Array.from({ length: bucketCount }, (_, bucketIndex) => {
+  const peaks = new Array<number>(bucketCount);
+  let sliceStarted = performance.now();
+  for (let bucketIndex = 0; bucketIndex < bucketCount; bucketIndex++) {
     const start = Math.floor((bucketIndex * audioBuffer.length) / bucketCount);
     const end = Math.floor(((bucketIndex + 1) * audioBuffer.length) / bucketCount);
-    return end <= start ? 0 : getBucketPeak(channelData, start, end);
-  });
+    peaks[bucketIndex] = end <= start ? 0 : getBucketPeak(channelData, start, end);
+    if (
+      bucketIndex + 1 < bucketCount &&
+      performance.now() - sliceStarted >= AUDIO_PEAK_WORK_BUDGET_MS
+    ) {
+      // A resolved Promise keeps draining microtasks; a task lets input and rendering proceed.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      sliceStarted = performance.now();
+    }
+  }
+  return peaks;
 }
 
 function canDecodeAudioPeaks(blob: Blob, durationSeconds: number): boolean {
@@ -83,7 +98,7 @@ export async function loadAudioPeaks(
     audioContext = new AudioContextConstructor();
     const arrayBuffer = await blob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    return buildAudioPeaks(audioBuffer, durationSeconds);
+    return await buildAudioPeaks(audioBuffer, durationSeconds);
   } catch {
     return null;
   } finally {
