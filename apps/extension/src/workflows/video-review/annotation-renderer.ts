@@ -1,3 +1,4 @@
+import { createEffectRuntimeGpuFrameReuse } from '../../features/video/composition/effect-runtime/runtime/gpu-frame-reuse';
 import { animationRuntimeDuration } from '../../contracts/effect-runtime/animation';
 import type { GpuPreviewLayer } from '../../features/video/composition/canvas/gpu-preview';
 import { prepareEffectRuntimeGpuFramePlans } from '../../features/video/composition/effect-runtime/runtime/gpu-driver';
@@ -160,6 +161,7 @@ export async function createReviewAnnotationRenderer(
   const definitions = new Map<string, Definition>();
   const reservations: { release(): void }[] = [];
   const ledger = createEffectRuntimeCompositionResourceLedger();
+  const gpuFrameReuse = createEffectRuntimeGpuFrameReuse();
   let executor: EffectRuntimeSandboxExecutor | undefined;
   let disposed = false;
   let active = false;
@@ -200,6 +202,7 @@ export async function createReviewAnnotationRenderer(
   const dispose = () => {
     if (disposed) return;
     disposed = true;
+    gpuFrameReuse.dispose();
     cancelWarm();
     attempted = undefined;
     executor?.dispose();
@@ -458,7 +461,7 @@ export async function createReviewAnnotationRenderer(
         (bytes) => deps.resources.bytes('annotation-gpu-plan-resources', bytes),
         owner.maximumInFlight
       );
-      const frames = await prepareEffectRuntimeGpuFramePlans({
+      const frames = await gpuFrameReuse.prepare({
         executor,
         plans: planned.map((entry) => entry.plan),
         ledger: gpuLedger,
@@ -480,7 +483,11 @@ export async function createReviewAnnotationRenderer(
           entries: planned.map((entry) => {
             const frame = frames.get(entry.instance.id);
             if (!frame) throw new Error('Annotation GPU frame is unavailable.');
-            return { ...entry, source: frame.source };
+            return {
+              ...entry,
+              source: frame.source,
+              ...(frame.rasterCache ? { rasterCache: frame.rasterCache } : {}),
+            };
           }),
           release,
           retain() {

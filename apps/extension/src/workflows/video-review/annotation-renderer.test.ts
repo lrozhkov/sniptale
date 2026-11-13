@@ -944,3 +944,46 @@ it('prepares four startup bitmap frames and releases outputs before async compil
   finish();
   renderer.dispose();
 });
+
+it('reuses owned unchanged GPU contents across clock ticks and retires them after the last batch borrow', async () => {
+  const f = await fixture();
+  class Bitmap {
+    static [Symbol.hasInstance](value: unknown) {
+      return f.bitmaps.some((bitmap) => bitmap === value);
+    }
+  }
+  vi.stubGlobal('ImageBitmap', Bitmap);
+  const executor = {
+    ...f.executor,
+    gpuFrameReuseContext: {},
+    maximumGpuFramesInFlight: 2 as const,
+    prepareGpuFrame: vi.fn(async (request: EffectRuntimeRenderCommand) => f.success(request)),
+  };
+  const renderer = await createReviewAnnotationRenderer(f.scene, {
+    ...f.deps,
+    createExecutor: () => executor,
+  });
+  try {
+    const first = await renderer.prepareGpu(6, density, 30, f.deps.signal);
+    const next = await renderer.prepareGpu(6.001, density, 30, f.deps.signal);
+    expect(executor.prepareGpuFrame).toHaveBeenCalledOnce();
+    const a = first.entries[0],
+      b = next.entries[0];
+    if (!a || !b || !('rasterCache' in a) || !('rasterCache' in b))
+      throw new Error('Expected owned GPU metadata.');
+    expect(b.source).toBe(a.source);
+    expect(b.rasterCache).toEqual(a.rasterCache);
+    const borrowed = next.retain();
+    first.release();
+    next.release();
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    renderer.dispose();
+    expect(f.bitmaps[0]!.close).not.toHaveBeenCalled();
+    borrowed.release();
+    expect(f.bitmaps[0]!.close).toHaveBeenCalledOnce();
+    expect(f.managed()).toBe(0);
+  } finally {
+    renderer.dispose();
+    vi.unstubAllGlobals();
+  }
+});

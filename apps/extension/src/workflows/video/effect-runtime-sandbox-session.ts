@@ -32,6 +32,7 @@ export class EffectRuntimeSandboxSessionManager {
   private requestCount = 0;
   private readonly waitingRequests: { start(): void; refuse(): void }[] = [];
   private disposed = false;
+  private frameReuseContext = {};
   private session: EffectRuntimeSandboxSession | null = null;
 
   constructor(
@@ -42,6 +43,11 @@ export class EffectRuntimeSandboxSessionManager {
       compositionBackend?: 'gpu-preview' | 'gpu-scene' | 'gpu-scene-plan';
     }
   ) {}
+
+  /** Local completed-content generation; client cancellation does not retire valid pixels. */
+  get gpuFrameReuseContext(): object | undefined {
+    return this.disposed ? undefined : this.frameReuseContext;
+  }
 
   /** Start transport readiness without admitting a frame; actual requests can retry a failed load. */
   preload(): void {
@@ -91,6 +97,7 @@ export class EffectRuntimeSandboxSessionManager {
       signal
     );
     if (this.configuration.compositionBackend === 'gpu-scene-plan' && result.kind === 'frame') {
+      this.frameReuseContext = {};
       result.bitmap.close();
       return createEffectRuntimeFailure(command, 'outputRejected');
     }
@@ -122,8 +129,16 @@ export class EffectRuntimeSandboxSessionManager {
           }
           this.requestCount++;
           try {
-            resolve(await operation());
+            const result = await operation();
+            if (
+              result.kind === 'error' &&
+              result.code !== 'stale' &&
+              result.code !== 'queueDepthExceeded'
+            )
+              this.frameReuseContext = {};
+            resolve(result);
           } catch (error) {
+            this.frameReuseContext = {};
             reject(error);
           } finally {
             this.requestCount--;
@@ -207,6 +222,7 @@ export class EffectRuntimeSandboxSessionManager {
   private clearSession(expected: EffectRuntimeSandboxSession | null = this.session): void {
     if (!expected || this.session !== expected) return;
     this.session = null;
+    this.frameReuseContext = {};
     this.refuseWaitingRequests();
     this.clearAcknowledgements();
     expected.cancelLoad();

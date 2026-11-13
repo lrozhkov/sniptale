@@ -35,6 +35,8 @@ export function createEffectRuntimeSandboxExecutor(
       ...(args.compositionBackend ? { compositionBackend: args.compositionBackend } : {}),
     });
   let manager = createManager();
+  let observedFrameContext = manager.gpuFrameReuseContext;
+  let frameReuseContext = {};
   let disposed = false;
   let foregroundUsed = false;
   type WarmSession = {
@@ -61,6 +63,8 @@ export function createEffectRuntimeSandboxExecutor(
         warm.adopted = true;
         manager.dispose();
         manager = warm.manager;
+        // Before the first foreground request, the owned standby is the same admitted content session.
+        observedFrameContext = manager.gpuFrameReuseContext;
       } else retire(warm);
     }
     return manager;
@@ -120,6 +124,15 @@ export function createEffectRuntimeSandboxExecutor(
     args.compositionBackend === 'gpu-scene' || args.compositionBackend === 'gpu-scene-plan';
   if (scene) manager.preload();
   return {
+    get gpuFrameReuseContext() {
+      if (!scene || disposed) return undefined;
+      const current = manager.gpuFrameReuseContext;
+      if (current !== observedFrameContext) {
+        observedFrameContext = current;
+        frameReuseContext = {};
+      }
+      return current ? frameReuseContext : undefined;
+    },
     dispose: () => {
       if (disposed) return;
       disposed = true;

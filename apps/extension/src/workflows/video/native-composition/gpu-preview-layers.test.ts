@@ -2252,3 +2252,43 @@ it('uses the unrotated source filter extent for a quarter-turn Native frame', as
   expect(source?.orientation).toEqual({ rotation: 90, flip: false });
   expect(source?.imageFilters?.logical).toEqual({ width: 32, height: 16 });
 });
+
+it('retains the same immutable SDK texture token while source-attached placement changes', async () => {
+  const { effect, bitmap, frames } = await attachedFixture();
+  const original = frames.get('attached');
+  if (!original) throw new Error('Expected effect frame.');
+  const rasterCache = { key: 'owned-contents', revision: {} };
+  const prepared = {
+    ...original,
+    source: bitmap,
+    rasterCache,
+    retain: () => ({ release() {} }),
+    dispose() {},
+  };
+  const mask = vi.fn(() => ({
+    source: bitmap,
+    rect: { x: 0, y: 0, width: 32, height: 16 },
+    inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1] as const,
+  }));
+  const first = buildNativeGpuEffectLayer({
+    layer: effect,
+    frame: prepared,
+    fullFrame: false,
+    plane: { x: -128, y: -128, width: 288, height: 272 },
+    mask,
+  });
+  const next = buildNativeGpuEffectLayer({
+    layer: { ...effect, x: effect.x + 20 },
+    frame: prepared,
+    fullFrame: false,
+    plane: { x: -128, y: -128, width: 288, height: 272 },
+    mask,
+  });
+  const before = flatten([first]).find(
+    (layer) => layer.source === bitmap && layer.blend !== 'mask'
+  );
+  const after = flatten([next]).find((layer) => layer.source === bitmap && layer.blend !== 'mask');
+  expect(before?.cache).toBe(rasterCache);
+  expect(after?.cache).toBe(rasterCache);
+  expect(after?.rect.x).toBe(before!.rect.x + 20);
+});

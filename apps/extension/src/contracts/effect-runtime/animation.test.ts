@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   animationRuntimeDuration,
+  animationRuntimeFrameIndex,
   parseRuntimeAnimationDocument,
   parseRuntimeAnimationFrame,
   verifyRuntimeAnimationSource,
@@ -80,3 +81,17 @@ it('rejects resource digest poisoning even when the complete package digest matc
   const source = JSON.stringify(document);
   expect(await verifyRuntimeAnimationSource(source, await digest(source))).toBeNull();
 });
+
+it.each([
+  { fr: 30, ip: 30, op: 90, time: 0, expected: 0 },
+  { fr: 30, ip: 30, op: 90, time: 1 / 30 - Number.EPSILON, expected: 0 },
+  { fr: 30, ip: 30, op: 90, time: 1 / 30, expected: 1 },
+  { fr: 30, ip: 30, op: 90, time: 2, expected: 59 },
+  { fr: 29.97, ip: 120, op: 240, time: 120 / 29.97, expected: 119 },
+  { fr: 30, ip: 0.5, op: 60, time: 59.5 / 30, expected: 59 },
+])(
+  'uses the same relative integer frame at source clock boundaries %j',
+  ({ time, expected, ...animation }) => {
+    expect(animationRuntimeFrameIndex(animation, time)).toBe(expected);
+  }
+);

@@ -1,3 +1,4 @@
+import { createEffectRuntimeGpuFrameReuse } from '../../../features/video/composition/effect-runtime/runtime/gpu-frame-reuse';
 import {
   createSceneSpotlightMaterialOwner,
   type SceneSpotlightMaterialSource,
@@ -156,6 +157,7 @@ export function createNativeGpuPreviewRenderer(
   let materialsReleased = false;
   const lifetime = new AbortController();
   const effectPreparation = createNativeEffectPreparation(options.createPreparationExecutor);
+  const effectFrameReuse = createEffectRuntimeGpuFrameReuse();
   const spotlightMaterials = createSceneSpotlightMaterialOwner();
   const maximumInFlight = options.maximumInFlight ?? 1;
   const slots = Array.from({ length: maximumInFlight }, () => ({
@@ -169,6 +171,7 @@ export function createNativeGpuPreviewRenderer(
     if ((disposed || unavailable) && !materialsReleased) {
       materialsReleased = true;
       spotlightMaterials.dispose();
+      effectFrameReuse.dispose();
       for (const slot of slots) slot.materials.dispose();
     }
     if (disposed && !publicationHolds) {
@@ -178,6 +181,9 @@ export function createNativeGpuPreviewRenderer(
     }
   };
   return {
+    get prepareEffectFrames() {
+      return unavailable ? undefined : effectFrameReuse.prepare;
+    },
     get fallbackReason() {
       return fallbackReason;
     },
@@ -187,6 +193,7 @@ export function createNativeGpuPreviewRenderer(
     dispose() {
       disposed = true;
       effectPreparation.dispose();
+      effectFrameReuse.dispose();
       lifetime.abort();
       settleRetirement();
     },

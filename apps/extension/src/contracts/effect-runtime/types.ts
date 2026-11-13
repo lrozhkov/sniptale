@@ -187,6 +187,9 @@ export type EffectRuntimeFrameResult =
   | EffectRuntimeFrameSuccess;
 
 export interface EffectRuntimeSandboxExecutor {
+  /** Opt in to canonical Lottie-frame reuse. Retire this token on failure/reset; omit after disposal. */
+  readonly gpuFrameReuseContext?: object | undefined;
+
   /** The session owner bounds aggregate active requests; omission retains serial preparation. */
   readonly maximumConcurrentPreparationRequests?: 1 | 2;
   /** Concurrent GPU preparations return independently owned resources, including bitmap fallback. */

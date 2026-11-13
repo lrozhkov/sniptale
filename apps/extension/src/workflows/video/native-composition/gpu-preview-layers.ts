@@ -1038,6 +1038,7 @@ export function buildNativeGpuEffectLayer(args: {
   if (!inverse) throw new Error('Effect bitmap projection is unavailable.');
   const local: GpuPreviewLayer = {
     source,
+    ...('rasterCache' in frame && frame.rasterCache ? { cache: frame.rasterCache } : {}),
     rect: {
       x: layer.x + bounds.x * layer.width,
       y: layer.y + bounds.y * layer.height,

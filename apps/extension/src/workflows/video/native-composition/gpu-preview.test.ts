@@ -226,16 +226,19 @@ it.each(['abort', 'seek'] as const)(
 
 it('falls back as a complete frame when the adapter is absent or fails without retaining frames', async () => {
   const f = fixture();
+  expect(f.owner.prepareEffectFrames).toBeTypeOf('function');
   f.render.mockRejectedValueOnce(new GpuPreviewDeviceError('Device lost'));
   expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBeUndefined();
   expect(f.finish).toHaveBeenCalledOnce();
   expect(f.captured[0]!.close).toHaveBeenCalledOnce();
   expect(f.dispose).toHaveBeenCalledOnce();
+  expect(f.owner.prepareEffectFrames).toBeUndefined();
   expect(await f.owner.render(f.input, f.passes, f.finish, () => false)).toBeUndefined();
   expect(f.render).toHaveBeenCalledOnce();
   const absent = createNativeGpuPreviewRenderer(async () => null);
   owners.push(absent);
   expect(await absent.render(f.input, f.passes, f.finish, () => false)).toBeUndefined();
+  expect(absent.prepareEffectFrames).toBeUndefined();
 });
 
 it('reuses immutable raster texture revisions and applies authored rotation to video and decoration', async () => {

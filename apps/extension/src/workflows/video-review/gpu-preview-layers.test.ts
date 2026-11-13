@@ -1,3 +1,4 @@
+import { reviewGpuAnnotationLayer } from './gpu-preview-annotations';
 import { expect, it, vi } from 'vitest';
 import {
   createReviewGpuPrimitives,
@@ -629,5 +630,26 @@ it('retains a magnifier outside the canonical source plane for later camera proj
   );
   for (const item of vi.mocked(f.resources.canvas).mock.results)
     for (const call of item.value.context.clip.mock.calls) expect(call).toEqual(['evenodd']);
+  f.primitives.dispose();
+});
+
+it('keeps immutable annotation contents while moving the Gallery placement', () => {
+  const f = fixture();
+  const rasterCache = { key: 'owned-contents', revision: {} };
+  const entry = {
+    instance: { transform: { x: 0.2, y: 0.3, width: 0.2, height: 0.2, rotation: 0 } },
+    bitmapBounds: { x: 0, y: 0, width: 1, height: 1 },
+    rasterCache,
+  };
+  const first = reviewGpuAnnotationLayer(entry, { x: 0, y: 0, ...size }, f.caption.source);
+  const next = reviewGpuAnnotationLayer(
+    { ...entry, instance: { transform: { ...entry.instance.transform, x: 0.5 } } },
+    { x: 0, y: 0, ...size },
+    f.caption.source
+  );
+  expect(next.source).toBe(first.source);
+  expect(first.cache).toBe(rasterCache);
+  expect(next.cache).toBe(rasterCache);
+  expect(next.inverse).not.toEqual(first.inverse);
   f.primitives.dispose();
 });

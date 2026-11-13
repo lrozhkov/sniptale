@@ -18,6 +18,17 @@ export function animationRuntimeDuration(document: AnimationTemplate): number {
   return (document.animation.op - document.animation.ip) / document.animation.fr;
 }
 
+/** dotLottie takes a frame relative to ip; its core applies the source in-point. */
+export function animationRuntimeFrameIndex(
+  animation: Pick<AnimationTemplate['animation'], 'fr' | 'ip' | 'op'>,
+  time: number
+): number {
+  return Math.min(
+    Math.max(0, Math.ceil(animation.op - animation.ip) - 1),
+    Math.max(0, Math.floor(time * animation.fr))
+  );
+}
+
 export function parseRuntimeAnimationDocument(value: unknown): AnimationTemplate | null {
   const result = validateAnimationTemplate(value);
   return result.ok ? result.template : null;

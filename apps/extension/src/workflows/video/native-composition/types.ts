@@ -1,3 +1,4 @@
+import type { prepareEffectRuntimeGpuFramePlans } from '../../../features/video/composition/effect-runtime/runtime/gpu-driver';
 import type { createNativeGlTrackCanvas } from './gl-track-canvas';
 import type { CameraOutputViewport } from '../../../features/video/project/export/output-dimensions';
 import type { PreviewSourceDemand, PreviewSourceAcquireOptions } from '../preview-source';
@@ -188,6 +189,8 @@ export interface PreviewScenePreparedFrame {
 
 /** GPU output is optional: undefined delegates the complete frame to the existing renderer. */
 export interface NativeGpuPreviewRenderer {
+  /** Prepare immutable effect contents within this GPU session's lifetime. */
+  readonly prepareEffectFrames?: typeof prepareEffectRuntimeGpuFramePlans | undefined;
   readonly fallbackReason?: PreviewRendererStatus['fallback'];
   readonly acceptsNativeFrames?: boolean;
   render(

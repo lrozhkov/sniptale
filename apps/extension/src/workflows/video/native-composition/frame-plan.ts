@@ -190,6 +190,9 @@ export function prepareNativePreviewGpuComposition(
     overlayTime: input.currentTime,
     visualPasses: passes.visualPasses,
     rasterScale,
+    ...(input.gpuPreview?.prepareEffectFrames
+      ? { prepareFrames: input.gpuPreview.prepareEffectFrames }
+      : {}),
     ...(input.signal ? { signal: input.signal } : {}),
   });
 }

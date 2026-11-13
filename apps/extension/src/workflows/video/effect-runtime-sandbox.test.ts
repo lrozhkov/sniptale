@@ -306,7 +306,11 @@ it.each([undefined, 'gpu-preview', 'gpu-scene', 'gpu-scene-plan'] as const)(
         ? 'function'
         : 'undefined'
     );
+    expect(executor.gpuFrameReuseContext !== undefined).toBe(
+      compositionBackend === 'gpu-scene' || compositionBackend === 'gpu-scene-plan'
+    );
     executor.dispose();
+    expect(executor.gpuFrameReuseContext).toBeUndefined();
   }
 );
 
@@ -626,3 +630,77 @@ it.each(['timeout', 'malformed'] as const)(
     }
   }
 );
+
+it('retires reusable contents on runtime failure while client cancellation preserves the generation', async () => {
+  const request = createRequest();
+  const rendered = vi
+    .spyOn(sandboxRender, 'renderEffectRuntimeSandboxFrame')
+    .mockResolvedValueOnce(createEffectRuntimeFailure(request, 'resourceLimit'));
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+    compositionBackend: 'gpu-scene',
+  });
+  try {
+    const initial = manager.gpuFrameReuseContext;
+    await expect(manager.prepareGpuFrame(request)).resolves.toMatchObject({
+      code: 'resourceLimit',
+    });
+    const recovered = manager.gpuFrameReuseContext;
+    expect(recovered).not.toBe(initial);
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      manager.prepareGpuFrame(createRequest(), controller.signal)
+    ).resolves.toMatchObject({ code: 'stale' });
+    expect(manager.gpuFrameReuseContext).toBe(recovered);
+    manager.dispose();
+    expect(manager.gpuFrameReuseContext).toBeUndefined();
+  } finally {
+    manager.dispose();
+    rendered.mockRestore();
+  }
+});
+
+it('keeps a pure foreground reuse token through the actual completed standby handoff', async () => {
+  const rendered = vi
+    .spyOn(sandboxRender, 'renderEffectRuntimeSandboxFrame')
+    .mockImplementation(async (_authority, request) => {
+      const bitmap = createInputBitmap();
+      return {
+        kind: 'frame',
+        bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        effectInstanceId: request.effectInstanceId,
+        requestId: request.requestId,
+        snapshotId: request.snapshotId,
+        sequenceId: request.sequenceId,
+        acknowledged: {
+          documentId: request.documentRef.id,
+          assetSelectionId: request.assetSelectionRef.id,
+        },
+      };
+    });
+  const primary = createEffectRuntimeSandboxExecutor({
+    compositionBackend: 'gpu-scene',
+    timeoutMs: 100,
+  });
+  try {
+    const before = primary.gpuFrameReuseContext;
+    const warm = primary.createWarmExecutor!();
+    if (!warm) throw new Error('Reading the context must not consume foreground admission.');
+    const first = await warm.prepareGpuFrame!(createRequest());
+    if (first.kind === 'frame') first.bitmap.close();
+    warm.dispose();
+    const next = await primary.prepareGpuFrame!(createRequest());
+    if (next.kind === 'frame') next.bitmap.close();
+    expect(next.kind).toBe('frame');
+    expect(primary.gpuFrameReuseContext).toBe(before);
+    primary.dispose();
+    expect(primary.gpuFrameReuseContext).toBeUndefined();
+  } finally {
+    primary.dispose();
+    rendered.mockRestore();
+  }
+});

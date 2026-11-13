@@ -1,4 +1,5 @@
 import { DotLottie, type TextDocument } from '@lottiefiles/dotlottie-web';
+import { animationRuntimeFrameIndex } from '../../contracts/effect-runtime/animation';
 import wasmUrl from '@lottiefiles/dotlottie-web/dotlottie-player.wasm?url&inline';
 import { parseColor } from '@sniptale/foundation/color';
 import { parseEffectControlValues } from '@sniptale/runtime-contracts/effect-controls';
@@ -500,9 +501,7 @@ export async function createLottieFrameRenderer(template: AnimationTemplate) {
       )
         throw new Error('Lottie viewport geometry is unavailable.');
       // dotLottie uses a frame index relative to ip; the core applies the source in-point.
-      player.setFrame(
-        Math.min(Math.max(0, Math.ceil(op - ip) - 1), Math.max(0, Math.floor(request.time * fr)))
-      );
+      player.setFrame(animationRuntimeFrameIndex({ fr, ip, op }, request.time));
       signal.throwIfAborted();
       // The incremental player can skip unchanged frames. Transfer would clear its retained image.
       const bitmap = await createImageBitmap(canvas);
