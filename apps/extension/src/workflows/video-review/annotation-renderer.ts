@@ -134,7 +134,9 @@ export async function createReviewAnnotationRenderer(
     readAsset(reference: string, signal: AbortSignal): Promise<Blob | null>;
     signal: AbortSignal;
     createExecutor?: () => EffectRuntimeSandboxExecutor;
-    createWarmExecutor?: () => EffectRuntimeSandboxExecutor | undefined;
+    createWarmExecutor?: (
+      primary?: EffectRuntimeSandboxExecutor
+    ) => EffectRuntimeSandboxExecutor | undefined;
   }
 ) {
   const ids = scene.lane.enabled
@@ -296,18 +298,38 @@ export async function createReviewAnnotationRenderer(
       deps.resources.bytes('annotation-warm-plan-resources', bytes)
     );
     try {
+      const cohort = [entry];
+      if (flight.executor.maximumWarmFrames === 4 && captured) {
+        const segments = captured.segments;
+        const instances = (args.instances ?? captured.lane.instances).filter((instance) =>
+          projectReviewAnnotationEffect(instance, segments).slices.some(
+            (slice) => slice.start >= flight.start && slice.start <= time
+          )
+        );
+        cohort.push(
+          ...describe(time, args.densityAt(time), args.fps, instances)
+            .filter((candidate) => candidate.instance.id !== entry.instance.id)
+            .slice(0, 3)
+        );
+      }
       const frames = await prepareEffectRuntimeGpuFramePlans({
         executor: flight.executor,
-        plans: [entry.plan],
+        plans: cohort.map((candidate) => candidate.plan),
         ledger,
         signal: flight.controller.signal,
       });
       flight.frames = frames;
       flight.controller.signal.throwIfAborted();
       if (warm !== flight) return;
-      const frame = frames.get(entry.instance.id);
-      if (!frame || !('kind' in frame.source) || frame.source.kind !== 'group') return;
-      const compilation = args.prepare({ ...entry, source: frame.source }, time);
+      const compilation = Promise.all(
+        cohort.map((candidate) => {
+          const frame = frames.get(candidate.instance.id);
+          if (!frame) throw new Error('Annotation warm frame is unavailable.');
+          return Promise.resolve(args.prepare({ ...candidate, source: frame.source }, time)).catch(
+            () => undefined
+          );
+        })
+      );
       // preparePipelines captures descriptors synchronously; no bitmap stays borrowed while it compiles.
       for (const prepared of frames.values()) prepared.dispose();
       flight.frames = undefined;
@@ -387,7 +409,7 @@ export async function createReviewAnnotationRenderer(
           fps: args.fps,
           start: next.start,
         };
-        const isolated = deps.createWarmExecutor();
+        const isolated = deps.createWarmExecutor(executor);
         if (!isolated?.prepareGpuFrame) {
           if (!isolated) attempted = undefined;
           isolated?.dispose();

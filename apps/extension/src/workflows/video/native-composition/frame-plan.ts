@@ -384,13 +384,7 @@ export function resolveUpcomingNativeEffectOnset(
     : null;
 }
 
-/** Resolve one future standalone request from project data without capturing or seeking media. */
-export function resolveUpcomingNativeEffect(
-  input: Pick<
-    PreviewSceneRenderInput,
-    'project' | 'currentTime' | 'canvas' | 'stage' | 'previewRasterSize'
-  >
-): {
+type UpcomingNativeEffectFrame = {
   onset: number;
   time: number;
   plan: EffectRuntimeFramePlan;
@@ -398,7 +392,15 @@ export function resolveUpcomingNativeEffect(
   fullFrame: false;
   logical: { width: number; height: number };
   output: { width: number; height: number };
-} | null {
+};
+
+/** Resolve a bounded future onset cohort from one composition sample without reading media. */
+export function resolveUpcomingNativeEffect(
+  input: Pick<
+    PreviewSceneRenderInput,
+    'project' | 'currentTime' | 'canvas' | 'stage' | 'previewRasterSize'
+  >
+): (UpcomingNativeEffectFrame & { startupBatch: readonly UpcomingNativeEffectFrame[] }) | null {
   const { project, currentTime } = input;
   const next = resolveUpcomingNativeEffectOnset(project, currentTime);
   if (!next) return null;
@@ -415,7 +417,7 @@ export function resolveUpcomingNativeEffect(
   );
   if (!plan || !layer) return null;
   const logical = { width: project.width, height: project.height };
-  return {
+  const first: UpcomingNativeEffectFrame = {
     onset: next.onset,
     time: next.time,
     fullFrame: false,
@@ -424,4 +426,31 @@ export function resolveUpcomingNativeEffect(
     output: resolvePreviewCompositionFrameSize(input) ?? logical,
     plan: scaleEffectRuntimeFramePlan(plan, resolvePreviewEffectRuntimeRasterScale(input)),
   };
+  const startupBatch = [first];
+  const seen = new Set([first.plan.effectInstanceId]);
+  const scale = resolvePreviewEffectRuntimeRasterScale(input);
+  for (const companion of passes.overlayFrame.effectRuntimePlans ?? []) {
+    if (startupBatch.length === 4) break;
+    if (
+      seen.has(companion.effectInstanceId) ||
+      companion.kind !== 'standalone' ||
+      companion.target.kind !== 'scene'
+    )
+      continue;
+    const clipId = companion.target.clipId;
+    const host = project.clips.find((clip) => clip.id === clipId && clip.type === 'EFFECT');
+    if (!host || host.startTime < next.onset || host.startTime > next.time) continue;
+    const companionLayer = passes.overlayFrame.visualLayers.find(
+      (candidate) => candidate.clipId === clipId && candidate.kind === 'effect'
+    );
+    if (!companionLayer) continue;
+    seen.add(companion.effectInstanceId);
+    startupBatch.push({
+      ...first,
+      onset: host.startTime,
+      layer: companionLayer,
+      plan: scaleEffectRuntimeFramePlan(companion, scale),
+    });
+  }
+  return { ...first, startupBatch };
 }

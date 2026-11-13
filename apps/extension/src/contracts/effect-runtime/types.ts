@@ -189,7 +189,11 @@ export type EffectRuntimeFrameResult =
 export interface EffectRuntimeSandboxExecutor {
   /** Concurrent GPU preparations return independently owned resources, including bitmap fallback. */
   readonly maximumGpuFramesInFlight?: 2;
+  /** Independent frames in one startup advisory cohort; this does not increase queue concurrency. */
+  readonly maximumWarmFrames?: 4;
   dispose(): void;
+  /** Borrow isolated startup work. A completed healthy session can transfer to the parent before its first foreground request. */
+  createWarmExecutor?(): EffectRuntimeSandboxExecutor | undefined;
   /** Prepare transport readiness without a frame request; an unavailable session can retry. */
   preload?(): void;
   prepareGpuFrame?(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult>;

@@ -25,7 +25,7 @@ const identity = [1, 0, 0, 0, 1, 0, 0, 0, 1] as const;
 /** Own the nondrawing marker while the backend captures requirements from borrowed sources. */
 function prepareNativeEffectPipelines(
   gpu: GpuPreviewRenderer,
-  candidate: Candidate,
+  candidate: Pick<Candidate, 'layer' | 'logical' | 'output' | 'fullFrame'>,
   frame: EffectRuntimeGpuPreparedFrame,
   signal: AbortSignal
 ): Promise<void> {
@@ -63,19 +63,20 @@ function prepareNativeEffectPipelines(
 
 function preloadNativeEffectTransport(
   input: Pick<PreviewSceneRenderInput, 'effectRuntimeExecutor'>
-): void {
+): EffectRuntimeSandboxExecutor | undefined {
   try {
     const primary =
       typeof input.effectRuntimeExecutor === 'function'
         ? input.effectRuntimeExecutor()
         : input.effectRuntimeExecutor;
     primary?.preload?.();
+    return primary;
   } catch {
     // Primary readiness failure must not prevent the isolated pipeline preparation.
   }
 }
 
-/** One actual Native provider owns one isolated advisory transaction, independently of frame leases. */
+/** One provider prepares an advisory cohort; its executor owns startup-session handoff. */
 export function createNativeEffectPreparation(
   createExecutor?: (ownerDocument: Document) => EffectRuntimeSandboxExecutor
 ) {
@@ -116,22 +117,26 @@ export function createNativeEffectPreparation(
     };
     signal.addEventListener('abort', abort, { once: true });
     try {
-      current.frames = await prepareEffectRuntimeGpuFramePlans({
+      const candidates =
+        current.executor.maximumWarmFrames === 4 ? candidate.startupBatch : [candidate];
+      const frames = await prepareEffectRuntimeGpuFramePlans({
         executor: current.executor,
-        plans: [candidate.plan],
+        plans: candidates.map((entry) => entry.plan),
         ledger: createEffectRuntimeGpuFrameLedger(),
         signal: current.controller.signal,
       });
+      current.frames = frames;
       current.controller.signal.throwIfAborted();
       signal.throwIfAborted();
       if (flight !== current) return;
-      const frame = current.frames.get(candidate.plan.effectInstanceId);
-      if (!frame || !('kind' in frame.source) || frame.source.kind !== 'group') return;
-      const compilation = prepareNativeEffectPipelines(
-        gpu,
-        candidate,
-        frame,
-        current.controller.signal
+      const compilation = Promise.all(
+        candidates.map((entry) => {
+          const frame = frames.get(entry.plan.effectInstanceId);
+          if (!frame) throw new Error('Native effect warm frame is unavailable.');
+          return prepareNativeEffectPipelines(gpu, entry, frame, current.controller.signal).catch(
+            () => undefined
+          );
+        })
       );
       releaseFrames(current);
       await compilation;
@@ -192,9 +197,10 @@ export function createNativeEffectPreparation(
           currentTime: preparation.time,
         });
         if (!candidate) return;
-        preloadNativeEffectTransport(input);
+        const primary = preloadNativeEffectTransport(input);
         cancel();
-        const executor = createExecutor(input.canvas.ownerDocument);
+        const executor =
+          primary?.createWarmExecutor?.() ?? createExecutor(input.canvas.ownerDocument);
         const current: Flight = {
           controller: new AbortController(),
           executor,

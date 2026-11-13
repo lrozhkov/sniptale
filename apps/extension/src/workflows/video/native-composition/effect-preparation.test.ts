@@ -5,6 +5,7 @@ import { createNativeEffectPreparation } from './effect-preparation';
 import type { PreviewSceneRenderInput } from './types';
 import type {
   EffectRuntimeGpuPlanResult,
+  EffectRuntimeSceneResult,
   EffectRuntimeRenderCommand,
   EffectRuntimeSandboxExecutor,
 } from '../../../contracts/effect-runtime/types';
@@ -385,4 +386,51 @@ it('preloads only accepted candidates and permits a new context to retry readine
   f.owner.dispose();
   f.owner.update(f.input, f.provider);
   expect(f.primary.preload).toHaveBeenCalledOnce();
+});
+
+it('prepares four startup bitmap frames through the primary capability', async () => {
+  const f = fixture();
+  const entries = Array.from({ length: 4 }, (_, index) => ({
+    ...f.candidate,
+    plan: { ...f.candidate.plan, effectInstanceId: index ? 'startup-' + index : 'annotation' },
+  }));
+  io.resolve.mockReturnValue({ ...f.candidate, startupBatch: entries });
+  const bitmaps: Bitmap[] = [];
+  const warm: EffectRuntimeSandboxExecutor = {
+    maximumWarmFrames: 4,
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn(
+      async (request: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult> => {
+        const bitmap = new Bitmap();
+        bitmaps.push(bitmap);
+        return {
+          kind: 'frame',
+          bitmap,
+          width: 8,
+          height: 4,
+          effectInstanceId: request.effectInstanceId,
+          requestId: request.requestId,
+          snapshotId: request.snapshotId,
+          sequenceId: request.sequenceId,
+          acknowledged: {
+            documentId: request.documentRef.id,
+            assetSelectionId: request.assetSelectionRef.id,
+          },
+        };
+      }
+    ),
+  };
+  Object.assign(f.primary, { createWarmExecutor: vi.fn(() => warm) });
+  const compilation = Promise.withResolvers<void>();
+  f.preparePipelines.mockImplementation(() => compilation.promise);
+  f.owner.update(f.input, f.provider);
+  await vi.waitFor(() => expect(f.preparePipelines).toHaveBeenCalledTimes(4));
+  expect(f.create).not.toHaveBeenCalled();
+  expect(warm.prepareGpuFrame).toHaveBeenCalledTimes(4);
+  expect(bitmaps).toHaveLength(4);
+  for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  compilation.resolve();
+  f.owner.dispose();
+  expect(warm.dispose).toHaveBeenCalledOnce();
 });

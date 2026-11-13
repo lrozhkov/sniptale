@@ -182,9 +182,10 @@ class ManualPresentationSession {
         ),
       ...(this.rendererPreference === 'gpu'
         ? {
-            annotationWarmExecutor: () =>
+            annotationWarmExecutor: (primary) =>
               this.playing
-                ? createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene-plan' })
+                ? (primary?.createWarmExecutor?.() ??
+                  createEffectRuntimeSandboxExecutor({ compositionBackend: 'gpu-scene-plan' }))
                 : undefined,
           }
         : {}),

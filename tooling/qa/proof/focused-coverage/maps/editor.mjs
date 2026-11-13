@@ -659,6 +659,10 @@ action-feedback-click-fields.test.tsx',
     reason: `Mounted preview hooks exercise the session acquisition, source callbacks, stale
       results, publication, cancellation, failure diagnostics and retry lifecycle.`,
     testFiles: [
+      'apps/extension/src/gallery/video-review/preview-presentation-session.test.ts',
+      'apps/extension/src/gallery/video-review/preview-presentation-session.sources.test.ts',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-camera.test.tsx',
+      'apps/extension/src/gallery/video-review/use-preview-presentation-performance.test.tsx',
       'apps/extension/src/gallery/video-review/use-preview-presentation.test.tsx',
       'apps/extension/src/gallery/video-review/use-preview-presentation-captions.test.tsx',
     ],

@@ -5,6 +5,8 @@ import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewTimeline } from './timeline';
+import { FakeEngine } from './review-audio-runtime.test-support';
+import * as audioPlayback from '../../workflows/video-review/audio-playback-engine';
 import { parseReviewOperation } from '../../features/video/review/validation';
 import type { ReviewAnchor } from '../../features/video/review/types';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
@@ -348,6 +350,7 @@ it('selects a range with an explicit source tool and clears it outside', async (
 });
 
 it('commits safe cuts, skips excluded playback and preserves exact comment navigation', async () => {
+  vi.spyOn(audioPlayback, 'createReviewAudioEngine').mockReturnValue(new FakeEngine());
   const fixture = createEditorFixture(integration);
   const { root, host, back, click } = fixture;
   integration.index.mockResolvedValue({
@@ -365,6 +368,14 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     const video = host.querySelector('video')!;
+    let paused = true;
+    Object.defineProperty(video, 'paused', { configurable: true, get: () => paused });
+    video.addEventListener('play', () => {
+      paused = false;
+    });
+    video.addEventListener('pause', () => {
+      paused = true;
+    });
     await dragTimePlane(host, 140);
     expect(video.currentTime).toBe(1.4);
     await click('cutMode');
@@ -413,9 +424,10 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     });
     await click('play');
     expect(video.currentTime).toBe(1);
+    expect(video.paused).toBe(false);
     await act(async () => {
       video.currentTime = 0.5;
-      video.dispatchEvent(new Event('timeupdate'));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     });
     expect(video.currentTime).toBe(1);
     await act(async () => video.dispatchEvent(new Event('pause')));

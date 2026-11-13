@@ -897,3 +897,50 @@ it('contains advisory factory failure and attempts that event only once', async 
   expect(createWarmExecutor).toHaveBeenCalledTimes(2);
   renderer.dispose();
 });
+
+it('prepares four startup bitmap frames and releases outputs before async compilation', async () => {
+  const f = await fixture(['title', 'callout', 'lower-third', 'frame', 'corners', 'chapters']);
+  f.scene.lane.instances[5]!.start = 1;
+  f.scene.lane.instances.push(
+    { ...f.scene.lane.instances[0]!, id: 'later', start: 3, order: 6 },
+    { ...f.scene.lane.instances[0]!, id: 'disabled', enabled: false, order: 7 }
+  );
+  let finish!: () => void;
+  const compilation = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  const warm: EffectRuntimeSandboxExecutor = {
+    maximumWarmFrames: 4,
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn(async (request) => f.success(request)),
+  };
+  const renderer = await createReviewAnnotationRenderer(f.scene, {
+    ...f.deps,
+    createWarmExecutor: () => warm,
+  });
+  const held = f.managed();
+  const prepare = vi.fn(
+    (_entry: { instance: ReviewAnnotationScene['lane']['instances'][number] }) => compilation
+  );
+  renderer.warmUpcomingGpu({
+    time: 1.5,
+    fps: 30,
+    context: {},
+    signal: f.deps.signal,
+    densityAt: () => density,
+    prepare,
+  });
+  await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(4));
+  expect(prepare.mock.calls.map(([entry]) => entry.instance.id)).toEqual([
+    'instance-title',
+    'instance-callout',
+    'instance-lower-third',
+    'instance-frame',
+  ]);
+  expect(f.bitmaps).toHaveLength(4);
+  for (const bitmap of f.bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(f.managed()).toBe(held);
+  finish();
+  renderer.dispose();
+});

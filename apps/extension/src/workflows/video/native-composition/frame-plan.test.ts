@@ -335,3 +335,29 @@ it('reports the prepared resource snapshot before its SDK request completes and 
   await rejected;
   expect(f.frames[0]!.close).toHaveBeenCalledOnce();
 });
+
+it('describes at most four simultaneous startup annotations with one future composition sample', () => {
+  const f = futureFixture(),
+    project = f.input.project;
+  const template = project.effectInstances![0]!,
+    track = project.tracks[0]!;
+  for (let index = 1; index <= 7; index++) {
+    const id = 'cohort-' + index,
+      trackId = 'cohort-track-' + index;
+    const startTime = index === 5 ? 1 : index === 6 ? 3 : 2;
+    project.tracks.push({ ...track, id: trackId, order: index, isRoot: false });
+    project.clips.push({ ...f.host, id: id + '-host', trackId, effectInstanceId: id, startTime });
+    project.effectInstances!.push({ ...template, id, startTime, enabled: index !== 7 });
+  }
+  const before = f.video.currentTime;
+  const candidate = resolveUpcomingNativeEffect(f.input);
+  expect(candidate?.startupBatch).toHaveLength(4);
+  const ids = candidate!.startupBatch.map((entry) => entry.plan.effectInstanceId);
+  expect(ids[0]).toBe('future');
+  expect(ids).not.toContain('cohort-5');
+  expect(ids).not.toContain('cohort-6');
+  expect(ids).not.toContain('cohort-7');
+  expect(new Set(ids).size).toBe(4);
+  expect(f.frames).toEqual([]);
+  expect(f.video.currentTime).toBe(before);
+});
