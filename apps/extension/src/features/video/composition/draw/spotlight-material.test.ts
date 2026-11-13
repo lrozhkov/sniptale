@@ -115,7 +115,9 @@ it('invalidates the output, frame order and allocator identity without crossing 
 it('does not retain a mask pair larger than the64MiB output budget', () => {
   const owner = fixture();
   const large = { width: 4096, height: 2160 };
-  owner.acquire(large, [frame]).dispose();
+  const first = owner.acquire(large, [frame]);
+  expect(first.cache).toBeUndefined();
+  first.dispose();
   owner.acquire(large, [frame]).dispose();
   expect(createSceneSpotlightMasks).toHaveBeenCalledTimes(2);
   for (const result of vi.mocked(createSceneSpotlightMasks).mock.results)
@@ -147,4 +149,33 @@ it('refuses new allocations after disposal and does not destroy pending readers'
   expect(
     vi.mocked(createSceneSpotlightMasks).mock.results[0]!.value!.dispose
   ).toHaveBeenCalledOnce();
+});
+
+it('publishes stable immutable texture revisions without sharing owner keys', () => {
+  const owner = fixture();
+  const first = owner.acquire(output, [frame]);
+  const next = owner.acquire(output, [structuredClone(frame)]);
+  expect(first.cache).toBeDefined();
+  expect(next.cache).toEqual(first.cache);
+  expect(first.cache!.dim.key).not.toBe(first.cache!.blur.key);
+  first.dispose();
+  next.dispose();
+  const changed = owner.acquire(output, [{ ...frame, radius: 20 }]);
+  expect(changed.cache!.dim.key).not.toBe(first.cache!.dim.key);
+  expect(changed.cache!.dim.revision).not.toBe(first.cache!.dim.revision);
+  const other = fixture().acquire(output, [frame]);
+  expect(other.cache!.dim.key).not.toBe(first.cache!.dim.key);
+  changed.dispose();
+  other.dispose();
+});
+
+it('keeps concurrently borrowed mask versions distinct inside one GPU request', () => {
+  const owner = fixture();
+  const first = owner.acquire(output, [frame]);
+  const second = owner.acquire(output, [{ ...frame, radius: 12 }]);
+  expect(second.cache!.dim.key).not.toBe(first.cache!.dim.key);
+  expect(second.cache!.blur.key).not.toBe(first.cache!.blur.key);
+  expect(second.cache!.dim.revision).not.toBe(first.cache!.dim.revision);
+  first.dispose();
+  second.dispose();
 });

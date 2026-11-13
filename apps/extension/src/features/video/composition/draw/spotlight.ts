@@ -122,12 +122,24 @@ function maskCanvas(
   };
 }
 
+type SceneSpotlightMasks = {
+  dim: HTMLCanvasElement;
+  blur: HTMLCanvasElement;
+  radius: number;
+  dispose(): void;
+  /** Owned immutable contents; omitted for direct, unretained mask producers. */
+  cache?: {
+    dim: { key: string; revision: object };
+    blur: { key: string; revision: object };
+  };
+};
+
 /** Rasterizes union coverage in bounded tiles; callers dispose both returned masks. */
 export function createSceneSpotlightMasks(
   output: { width: number; height: number },
   frames: readonly SceneSpotlightLayer[],
   resources?: RenderResources
-) {
+): SceneSpotlightMasks {
   const leases: RenderCanvasLease[] = [];
   let disposed = false;
   const dispose = () => {

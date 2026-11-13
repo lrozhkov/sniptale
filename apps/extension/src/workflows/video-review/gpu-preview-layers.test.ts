@@ -2,6 +2,7 @@ import { reviewGpuAnnotationLayer } from './gpu-preview-annotations';
 import { expect, it, vi } from 'vitest';
 import {
   createReviewGpuPrimitives,
+  applyReviewGpuSpotlightFrames,
   reviewGpuContentLayers,
   reviewGpuFinishLayers,
 } from './gpu-preview-layers';
@@ -653,3 +654,42 @@ it('keeps immutable annotation contents while moving the Gallery placement', () 
   expect(next.inverse).not.toEqual(first.inverse);
   f.primitives.dispose();
 });
+
+it.each([
+  ['blur', 0, 12],
+  ['dim', 0.5, 0],
+  ['both', 0.5, 12],
+] as const)(
+  'publishes only active Gallery spotlight channels with immutable cache metadata: %s',
+  (_name, dim, blur) => {
+    const f = fixture();
+    const dimSource = f.resources.canvas('dim', size).canvas;
+    const blurSource = f.resources.canvas('blur', size).canvas;
+    const cache = {
+      dim: { key: 'mask-dim', revision: {} },
+      blur: { key: 'mask-blur', revision: {} },
+    };
+    const dispose = vi.fn();
+    const acquire = vi.fn(() => ({
+      dim: dimSource,
+      blur: blurSource,
+      radius: blur,
+      cache,
+      dispose,
+    }));
+    const primitives = createReviewGpuPrimitives(f.resources, undefined, acquire);
+    const result = applyReviewGpuSpotlightFrames({
+      dimensions,
+      frames: [{ opening: { x: 20, y: 10, width: 100, height: 60 }, radius: 4, dim, blur }],
+      source: f.main,
+      primitives,
+    });
+    const nodes = visit(result.layers);
+    expect(nodes.some((node) => node.source === dimSource)).toBe(dim > 0);
+    expect(nodes.some((node) => node.source === blurSource)).toBe(blur > 0);
+    if (dim > 0) expect(nodes.find((node) => node.source === dimSource)!.cache).toBe(cache.dim);
+    if (blur > 0) expect(nodes.find((node) => node.source === blurSource)!.cache).toBe(cache.blur);
+    primitives.dispose();
+    expect(dispose).toHaveBeenCalledOnce();
+  }
+);

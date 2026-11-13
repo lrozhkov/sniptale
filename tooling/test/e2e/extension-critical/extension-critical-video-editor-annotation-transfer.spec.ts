@@ -1805,7 +1805,13 @@ for (const {
             );
             await page.mouse.click(box.x + (box.width * start) / duration + 0.1, box.y + 10);
             await addReviewFocus(page);
-            await button('gallery.videoReview.focusSpotlight').click();
+            await dialog
+              .getByRole('complementary')
+              .getByRole('button', {
+                name: label('gallery.videoReview.focusSpotlight'),
+                exact: true,
+              })
+              .click();
             await chooseInspectorValue(
               page,
               dialog,

@@ -44,8 +44,19 @@ export function createSceneSpotlightMaterialOwner() {
       if (!Number.isSafeInteger(bytes) || bytes > MAXIMUM_RETAINED_BYTES)
         return createSceneSpotlightMasks(output, frames, resources);
       const lease = retained.borrow(resources ?? unmanaged, contentKey(output, frames), () => {
+        const identity = crypto.randomUUID();
+        const revision = {};
         const masks = createSceneSpotlightMasks(output, frames, resources);
-        return { value: masks, release: masks.dispose };
+        return {
+          value: {
+            ...masks,
+            cache: {
+              dim: { key: `spotlight:${identity}:dim`, revision },
+              blur: { key: `spotlight:${identity}:blur`, revision },
+            },
+          },
+          release: masks.dispose,
+        };
       });
       return { ...lease.value, dispose: lease.release };
     },

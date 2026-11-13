@@ -2292,3 +2292,62 @@ it('retains the same immutable SDK texture token while source-attached placement
   expect(after?.cache).toBe(rasterCache);
   expect(after?.rect.x).toBe(before!.rect.x + 20);
 });
+
+it.each(['blur', 'dim'] as const)(
+  'publishes only active Native spotlight channels with immutable cache metadata: %s',
+  async (effect) => {
+    const f = fixture();
+    f.passes.overlayFrame.sceneSpotlights = [
+      {
+        id: 'channel',
+        phase: 'hold',
+        progress: 1,
+        spotlight: { ...createQuickEditSpotlight(), effect, blur: 12, strength: 0.5 },
+      },
+    ];
+    const dim = document.createElement('canvas'),
+      blur = document.createElement('canvas');
+    dim.width = blur.width = 32;
+    dim.height = blur.height = 16;
+    const cache = {
+      dim: { key: 'native-mask-dim', revision: {} },
+      blur: { key: 'native-mask-blur', revision: {} },
+    };
+    const dispose = vi.fn();
+    const spotlightMaterial = vi.fn(() => ({
+      dim,
+      blur,
+      radius: effect === 'blur' ? 12 : 0,
+      cache,
+      dispose,
+    }));
+    const plan = await buildNativeGpuPreviewLayers({ ...f, spotlightMaterial });
+    plans.push(plan);
+    const nodes = flatten(plan.layers);
+    expect(nodes.some((node) => node.source === dim)).toBe(effect === 'dim');
+    expect(nodes.some((node) => node.source === blur)).toBe(effect === 'blur');
+    const active = nodes.find((node) => node.source === (effect === 'dim' ? dim : blur));
+    expect(active!.cache).toBe(cache[effect]);
+    plan.release();
+    expect(dispose).toHaveBeenCalledOnce();
+  }
+);
+
+it('does not prepare dim/blur masks for a Native lens-only composition', async () => {
+  const f = fixture();
+  f.passes.overlayFrame.sceneSpotlights = [
+    {
+      id: 'only-lens',
+      phase: 'hold',
+      progress: 1,
+      spotlight: { ...createQuickEditSpotlight(), effect: 'magnify', magnification: 2 },
+    },
+  ];
+  const spotlightMaterial = vi.fn(() => {
+    throw new Error('Inactive mask preparation');
+  });
+  const plan = await buildNativeGpuPreviewLayers({ ...f, spotlightMaterial });
+  plans.push(plan);
+  expect(spotlightMaterial).not.toHaveBeenCalled();
+  expect(flatten(plan.layers).some((layer) => layer.lens?.scale === 2)).toBe(true);
+});

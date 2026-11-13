@@ -713,13 +713,21 @@ export function applyReviewGpuSpotlightFrames(args: {
       const blur = group(
         [
           { source, rect: full, inverse: identity, blur: masks.radius },
-          { ...texture(masks.blur, full), blend: 'mask' },
+          {
+            ...texture(masks.blur, full),
+            ...(masks.cache ? { cache: masks.cache.blur } : {}),
+            blend: 'mask',
+          },
         ],
         dimensions
       );
       layers.push({ source: blur, rect: full, inverse: identity });
     }
-    layers.push(texture(masks.dim, full));
+    if (masked.some((frame) => frame.dim > 0))
+      layers.push({
+        ...texture(masks.dim, full),
+        ...(masks.cache ? { cache: masks.cache.dim } : {}),
+      });
   }
   return group(layers, dimensions);
 }

@@ -453,10 +453,9 @@ export async function buildNativeGpuPreviewLayers(args: {
       };
       result.push(groupLayer([lens, { ...openingMask, blend: 'mask' }]));
     }
-    const masks = (args.spotlightMaterial ?? createSceneSpotlightMasks)(
-      logical,
-      frames.filter((frame) => frame.dim > 0 || frame.blur > 0)
-    );
+    const masked = frames.filter((frame) => frame.dim > 0 || frame.blur > 0);
+    if (!masked.length) return result;
+    const masks = (args.spotlightMaterial ?? createSceneSpotlightMasks)(logical, masked);
     retained.push({ release: masks.dispose });
     if (masks.radius > 0)
       result.push(
@@ -464,13 +463,20 @@ export async function buildNativeGpuPreviewLayers(args: {
           { ...(blurBackdrop ? groupLayer(blurBackdrop) : snapshot), blur: masks.radius },
           {
             source: masks.blur,
+            ...(masks.cache ? { cache: masks.cache.blur } : {}),
             rect: { x: 0, y: 0, ...logical },
             inverse: IDENTITY,
             blend: 'mask',
           },
         ])
       );
-    result.push({ source: masks.dim, rect: { x: 0, y: 0, ...logical }, inverse: IDENTITY });
+    if (frames.some((frame) => frame.dim > 0))
+      result.push({
+        source: masks.dim,
+        ...(masks.cache ? { cache: masks.cache.dim } : {}),
+        rect: { x: 0, y: 0, ...logical },
+        inverse: IDENTITY,
+      });
     return result;
   };
 
