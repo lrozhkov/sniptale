@@ -1804,7 +1804,7 @@ for (const {
                 .getAttribute('aria-valuemax')
             );
             await page.mouse.click(box.x + (box.width * start) / duration + 0.1, box.y + 10);
-            await addReviewFocus(page);
+            await addReviewFocus(page, locale);
             await dialog
               .getByRole('complementary')
               .getByRole('button', {
@@ -1851,7 +1851,7 @@ for (const {
           await ruler.scrollIntoViewIfNeeded();
           const box = (await ruler.boundingBox())!;
           await page.mouse.click(box.x + 0.1, box.y + 10);
-          await addReviewFocus(page);
+          await addReviewFocus(page, locale);
           await dialog
             .locator('[data-ui="gallery.videoReview.spatialTools"]')
             .getByRole('button', {

@@ -1,4 +1,7 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { parseEffectControlValues } from '@sniptale/runtime-contracts/effect-controls';
+import { resolveAnimationObjectRenderBounds } from '@sniptale/runtime-contracts/animation-template';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   parseRuntimeAnimationDocument,
@@ -380,4 +383,62 @@ it('does not share cancellation between simultaneous requests for the same canon
   f.owner.dispose();
   expect(survivingBitmap.close).toHaveBeenCalledTimes(1);
   expect(f.ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+});
+
+it('keeps identical Lottie hold pixels while rendering the authored entrance and exit', async () => {
+  const f = fixture();
+  const animationSource = readFileSync(
+    'apps/extension/public/video-effects/animations/callout.sniptale-animation.json',
+    'utf8'
+  );
+  const document = parseRuntimeAnimationDocument(JSON.parse(animationSource));
+  if (!document) throw new Error('Invalid animation fixture.');
+  const controls = parseEffectControlValues(
+    document,
+    Object.fromEntries(document.controls.map((control) => [control.id, control.defaultValue]))
+  );
+  if (!controls) throw new Error('Invalid control fixture.');
+  const bounds = resolveAnimationObjectRenderBounds(document, controls);
+  const input = (time: number): EffectRuntimeFramePlan => ({
+    ...plan(time),
+    documentSource: animationSource,
+    documentSha256: digest(animationSource),
+    controls,
+    dimensions: { width: bounds.width, height: bounds.height },
+    renderDimensions: { width: Math.ceil(bounds.width), height: Math.ceil(bounds.height) },
+    duration: 3,
+    progress: time / 3,
+  });
+  const views: ReturnType<typeof frame>[] = [];
+  try {
+    const first = frame(await f.prepare(input(0.3)));
+    views.push(first);
+    const held = frame(await f.prepare(input(0.6)));
+    views.push(held);
+    expect(held.source).toBe(first.source);
+    expect(f.executor.prepareGpuFrame).toHaveBeenCalledTimes(1);
+    const edited = frame(
+      await f.prepare({ ...input(0.7), controls: { ...controls, opacity: 50 } })
+    );
+    views.push(edited);
+    expect(edited.source).not.toBe(first.source);
+    const undone = frame(await f.prepare(input(0.8)));
+    views.push(undone);
+    expect(undone.source).not.toBe(edited.source);
+    const retained = frame(await f.prepare(input(1.2)));
+    views.push(retained);
+    expect(retained.source).toBe(undone.source);
+    const exit = frame(await f.prepare(input(2.8)));
+    views.push(exit);
+    expect(exit.source).not.toBe(first.source);
+    const entrance = frame(await f.prepare(input(0.05)));
+    views.push(entrance);
+    expect(entrance.source).not.toBe(first.source);
+    expect(f.executor.prepareGpuFrame).toHaveBeenCalledTimes(5);
+  } finally {
+    for (const view of views) view.dispose();
+    f.owner.dispose();
+  }
+  expect(f.ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+  expect(f.bitmaps.every((bitmap) => bitmap.close.mock.calls.length === 1)).toBe(true);
 });

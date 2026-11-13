@@ -1,9 +1,11 @@
+import type { AnimationTemplate } from '@sniptale/runtime-contracts/animation-template';
 import {
   animationRuntimeFrameIndex,
   parseRuntimeAnimationFrame,
   verifyRuntimeAnimationSource,
 } from '../../../../../contracts/effect-runtime/animation';
 import { readEffectPresentationDocument } from '../../../project/effect-bundle/presentation-document';
+import { createEffectRuntimeGpuContentKey } from './gpu-frame-content';
 import { prepareEffectRuntimeGpuFramePlans } from './gpu-driver';
 import { EFFECT_RUNTIME_RESOURCE_LIMITS, assertEffectRasterDimensions } from './resource-limits';
 import type { EffectRuntimeFramePlan, EffectRuntimeGpuPreparedFrame } from './types';
@@ -24,6 +26,10 @@ type Entry = {
 /** Own completed Lottie pixels independently of frame placement, requests and GPU readers. */
 export function createEffectRuntimeGpuFrameReuse() {
   const entries = new Map<string, Entry>();
+  const contentKeys = new WeakMap<
+    AnimationTemplate,
+    ReturnType<typeof createEffectRuntimeGpuContentKey>
+  >();
   const lifetime = new AbortController();
   let executor: Preparation['executor'] | undefined;
   let context: object | undefined;
@@ -120,13 +126,18 @@ export function createEffectRuntimeGpuFrameReuse() {
     )
       return null;
     assertEffectRasterDimensions(plan.renderDimensions.width, plan.renderDimensions.height);
+    let contentKey = contentKeys.get(document);
+    if (!contentKey) {
+      contentKey = createEffectRuntimeGpuContentKey(document);
+      contentKeys.set(document, contentKey);
+    }
     return JSON.stringify([
       plan.documentSha256,
       plan.controls,
       plan.dimensions,
       plan.renderDimensions,
       plan.bitmapBounds,
-      animationRuntimeFrameIndex(document.animation, plan.time),
+      contentKey(animationRuntimeFrameIndex(document.animation, plan.time)),
     ]);
   };
   return {
