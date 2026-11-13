@@ -188,6 +188,7 @@ it('marks a window held at its retained source end explicitly without changing t
     expect.any(AbortSignal),
     { discontinuity: true }
   );
+  expect(f.sourceRuntime.acquire.mock.calls[0]![0][0]).not.toHaveProperty('holdEnd');
   expect(prepared?.input.preparedFrame?.compositionTime).toBe(1.5);
   prepared?.release();
 });
@@ -238,5 +239,30 @@ it.each(['gpu', 'legacy'] as const)(
     prepared?.release();
     expect(release).toHaveBeenCalledOnce();
     lease.release();
+  }
+);
+
+it.each(['gpu', 'legacy'] as const)(
+  'declares physical source-end hold for ordinary %s Native frames',
+  async (previewRenderer) => {
+    const f = fixture();
+    const prepared = await prepareNativePreviewSceneFrame({ ...f.input, previewRenderer });
+    expect(f.sourceRuntime.acquire).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          time: f.clip.sourceStart + f.projectTime,
+          rangeStart: f.clip.sourceStart,
+          rangeEnd: f.clip.sourceStart + f.clip.sourceDuration,
+          holdEnd: true,
+        }),
+      ],
+      expect.any(AbortSignal),
+      { discontinuity: true }
+    );
+    expect(prepared?.input.preparedFrame?.sourcePresentation.get('source')?.timestampUs).toBe(
+      39283333
+    );
+    prepared?.release();
+    expect(f.release).toHaveBeenCalledOnce();
   }
 );

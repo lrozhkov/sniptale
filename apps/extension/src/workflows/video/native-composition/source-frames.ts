@@ -62,7 +62,7 @@ export async function preparePreviewSourceFrames(
         time: sourceTime,
         rangeStart: layer.clip.sourceStart - offset,
         rangeEnd,
-        ...(retainedEnd ? { endpoint: 'retained-end' as const } : {}),
+        ...(retainedEnd ? { endpoint: 'retained-end' as const } : { holdEnd: true }),
       });
     }
   }
