@@ -6985,6 +6985,105 @@
       "reviewDate": "2026-11-13",
       "astHash": "aa978430d4b39ba691cc636bcd397e3e95f760c07143bb02477db17cab157898",
       "signatureHash": "67521e28cac61dd319f1630cf496adb13bbdb8968a8a89fefadc89dea069e8e2"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/simplify-lab/bench.mjs",
+      "symbol": "<file>",
+      "owner": "tooling:simplify-lab:bench.mjs",
+      "reason": "tool-noise: Independent read-only final-body inspection confirmed this exact scope. One benchmark input-selection, execution and report lifecycle. Frozen replay delegates immutable artifact admission to the corpus owner; browser effects remain in the substantive runner adapter. Fresh complete-candidate architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent workflow, effect owner, shared fixture lifetime, state authority, publication policy or separately configured decision policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "23568dc69e2b9cc749cab986c3a9a2417d572f0cf5efb94bd1deb9b40b4aa9ab",
+      "signatureHash": "8207e42f40a644e420ad61a69117d4fc5411b7317de6672a6481ff1022d306ee"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/simplify-lab/bench.mjs",
+      "symbol": "runBench",
+      "owner": "tooling:simplify-lab:bench.mjs",
+      "reason": "tool-noise: Independent read-only final-body inspection confirmed this exact scope. One output reservation and run transaction. Generated and frozen admission converge before selection and computation. Cancellation, partial records, cleanup, comparison and final status share one summary. Fresh complete-candidate architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent workflow, effect owner, shared fixture lifetime, state authority, publication policy or separately configured decision policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "04af0724c2ee012cf3c8679656431c19f0b64b230b8ad1e2a655a2a58ef6de2a",
+      "signatureHash": "1b99ad1c8af8a6bef42fc2377f7cfda1547ccb49fb6a907fd54bf568d110a6e3"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/simplify-lab/bench.test.mjs",
+      "symbol": "<file>",
+      "owner": "tooling:simplify-lab:bench.test.mjs",
+      "reason": "tool-noise: Independent read-only final-body inspection confirmed this exact scope. One benchmark consumer suite using the existing fixture and runner. Frozen admission, baseline immutability, option conflicts and controlled output contention prove the same run contract. Fresh complete-candidate architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent workflow, effect owner, shared fixture lifetime, state authority, publication policy or separately configured decision policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "e8d9cf24a6d9d75caf6aca3d94c2cc85513425fa973e4963b71840a7fc83e701",
+      "signatureHash": "9fe09accf7bd9712e03824b9171450b849891acdd5c08fb2cb5698dc81865424"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/simplify-lab/corpus.mjs",
+      "symbol": "generateCorpus",
+      "owner": "tooling:simplify-lab:corpus.mjs",
+      "reason": "tool-noise: Independent read-only final-body inspection confirmed this exact scope. One corpus fingerprint, verified reuse and exclusive publication transaction. Versioned family selection contributes to identity. Current-identity admission and incomplete-output preservation share the existing corpus authority. Fresh complete-candidate architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent workflow, effect owner, shared fixture lifetime, state authority, publication policy or separately configured decision policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "4d447f2aa52520c147c2d46225c4b61a3a20f9c72b9ee04869e54fdbcbd7bcc7",
+      "signatureHash": "66ef16fa9f4c89eaa3a3dc0fbc8f953484fc2cfd7b798b8d4f6d6c2a89d672ef"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/simplify-lab/evaluate.mjs",
+      "symbol": "evaluateRaster",
+      "owner": "tooling:simplify-lab:evaluate.mjs",
+      "reason": "tool-noise: Independent read-only owner planning review confirmed this exact body. Pure coupled pixel accounting. ROI, noise, ink attribution, protected/background damage and fragment outcomes use one oracle interpretation without effects or service state. Fresh final architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent workflow, policy, effect, output authority, resource lifetime or test subject. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "1fa6e964beecdad227348785f7b54ef328e8b3e3bf038401f9ab5c5497ebc92d",
+      "signatureHash": "e724f1c2f44e58c3680b3e97ea9defd068c3b0148a4ada682ab5f56045847dd3"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/simplify-lab/report-contract.mjs",
+      "symbol": "compareRunSummaries",
+      "owner": "tooling:simplify-lab:report-contract.mjs",
+      "reason": "tool-noise: Independent read-only owner planning review confirmed this exact body. One admitted-cohort regression decision. Case and fragment comparisons jointly prevent aggregate improvement from hiding local damage; no effect or state authority. Fresh final architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent workflow, policy, effect, output authority, resource lifetime or test subject. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "706332d81393d6d66274cb42309ccaaadb99c90232f9a76a2c23183320aa0848",
+      "signatureHash": "5b5bd038182686bb0a931eec143da0dfb5fe8adc2a4b3d8832012158622e6c62"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/features/simplify/engine/detector-catalog.mjs",
+      "symbol": "buildCatalog",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. One ordered catalog construction operation coordinates source evidence, control claims, catalog refinement and final publication. Existing strong-row source evidence joins control-mark admission without another lifecycle, effect or authority. Fresh final architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent operation, subject, effect, lifecycle, state authority, fixture lifetime or publication contract. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "f1033f574766e756a381522c67aee39b6f71ec8cbf2357c88e524992dd583d9f",
+      "signatureHash": "9a32ee8b110a3371aae730a249faa6560b51c9b65f76e18665ce7ee7aa6c2e26"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/features/simplify/engine/recognition-completeness.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:features",
+      "reason": "tool-noise: Independent read-only final-body inspection confirmed this exact scope. One text-cleanup and graphic/background-preservation consumer suite. Flat-plane, gradient and alpha cases prove the existing erase-support contract with isolated test-local canvas receivers. Fresh complete-candidate architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent workflow, effect owner, shared fixture lifetime, state authority, publication policy or separately configured decision policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "b3c0a34db5e0f76eedbb8ae6e7ed5a7dfdba5588940d6f6d50c3aca76afb88ff",
+      "signatureHash": "12736fdbd46fe622d9da04320ddd14b5353a02cd68af8c4f16d3f52c7c3de8b0"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/simplify-lab/corpus-recipes.mjs",
+      "symbol": "recipesFor",
+      "owner": "tooling:simplify-lab:corpus-recipes.mjs",
+      "reason": "tool-noise: Independent read-only final-body inspection confirmed this exact scope. One pure deterministic corpus-design operation. Versioned family selection, pairwise parameters, negative controls and smoke selection form one recipe design without effects or mutable service authority. Fresh complete-candidate architecture review must validate the binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess an independent workflow, effect owner, shared fixture lifetime, state authority, publication policy or separately configured decision policy. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "a33b7ac0e40037d42dc4a3f0c8e1a7278d4852cefeafe7e613e1d1968b32b3da",
+      "signatureHash": "37dc54d545e7b6c169376ec329fe13c1c32ebd3458a4c17ded3fb79b041b503d"
     }
   ]
 }

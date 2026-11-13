@@ -122,14 +122,13 @@ export async function drawNativeAutomaticSimplify(
     'backdrop-filter',
     'blur(2px)'
   );
-  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toHaveCSS(
-    'border-style',
-    'dashed'
-  );
-  await expect(page.locator('[data-ui="content.drawing.simplify-private"]')).toHaveCSS(
-    'border-color',
-    'rgb(37, 99, 235)'
-  );
+  const privateRaster = page.locator('[data-ui="content.drawing.simplify-private"]');
+  if (mode === 'video-recording') {
+    await expect(privateRaster).toHaveCSS('border-style', 'none');
+  } else {
+    await expect(privateRaster).toHaveCSS('border-style', 'dashed');
+    await expect(privateRaster).toHaveCSS('border-color', 'rgb(37, 99, 235)');
+  }
   await page.locator('[data-ui="content.drawing.simplify-private"]').evaluate((node) => {
     const root = node.getRootNode() as ShadowRoot | Document;
     const state = {
@@ -155,7 +154,7 @@ export async function drawNativeAutomaticSimplify(
           style.display !== 'none' &&
           mask.getBoundingClientRect().width > 0
         ),
-        pending: Boolean(root.querySelector('[data-ui="content.drawing.simplify-pending"]')),
+        pending: mask?.getAttribute('data-simplify-pending') === 'true',
       });
       requestAnimationFrame(sample);
     };
@@ -170,6 +169,8 @@ export async function drawNativeAutomaticSimplify(
   expect(releasePixels.equals(beforeProbe)).toBe(false);
   await page.screenshot({ path: info.outputPath(`${mode}-release.png`), fullPage: false });
   await waitForSimplify(page);
+  await expect(privateRaster).not.toHaveAttribute('data-simplify-pending', 'true');
+  await expect(privateRaster).toHaveCSS('backdrop-filter', 'none');
   const frames = await page.evaluate(() => {
     const state = (
       window as typeof window & {

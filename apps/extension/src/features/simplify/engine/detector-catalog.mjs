@@ -1,3 +1,4 @@
+import { sameSourceInk } from './ownership-ink.mjs';
 import { preserveUncertainRows } from './row-integrity.mjs';
 import { attachTextDecorations } from './text-decoration.mjs';
 import { claimRadialIcons } from './radial-icons.mjs';
@@ -46,8 +47,39 @@ import {
 } from './detector-roles.mjs';
 import { normalizeTypeface } from './detector-typeface.mjs';
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-function createControlMarkIcons(image, controls) {
-  const marks = rejectMarkerHoles(image, controls.marks || []);
+function createControlMarkIcons(image, controls, sourceRows) {
+  const marks = rejectMarkerHoles(image, controls.marks || []).filter((mark) => {
+    if (mark.kind !== 'compact-disc') return true;
+    const cx = mark.x + mark.w / 2,
+      cy = mark.y + mark.h / 2;
+    const ownedDot = sourceRows.some((row) => {
+      const bounds = row.glyphBounds;
+      if (
+        cx <= bounds.x ||
+        cx >= bounds.x + bounds.w ||
+        cy < bounds.y ||
+        cy >= bounds.y + bounds.h ||
+        Math.max(mark.w, mark.h) > row.xHeight * 0.4 ||
+        controls.protected.some((b) => cx >= b.x && cx < b.x + b.w && cy >= b.y && cy < b.y + b.h)
+      )
+        return false;
+      const parts = inkParts(image, { ...row.sourceBox, atoms: null });
+      const dot = parts.find((p) => p.x < cx && p.x + p.w > cx && p.y <= cy && p.y + p.h > cy);
+      if (!dot) return false;
+      // A detached glyph dot needs aligned source ink below it, not only row overlap.
+      return parts.some(
+        (part) =>
+          part !== dot &&
+          part.y >= dot.y + dot.h &&
+          part.y - dot.y - dot.h <= row.xHeight &&
+          cx >= part.x &&
+          cx < part.x + part.w &&
+          part.y + part.h <= bounds.y + bounds.h &&
+          sameSourceInk(dot.rgb, part.rgb, row.sourceBox.bg)
+      );
+    });
+    return !ownedDot;
+  });
   const markIcons = marks.map((mark) => {
     const foreground = controls.icons.filter(
       (b) =>
@@ -530,7 +562,10 @@ export function buildCatalog(image, detectRaw, glyphMetrics) {
   );
   const sourceRows = sourceRaw
     .filter((b) => b.shape === 'text')
-    .map((b) => glyphMetrics(image, b))
+    .map((b) => {
+      const metrics = glyphMetrics(image, b);
+      return metrics && { ...metrics, sourceBox: b };
+    })
     .filter(
       (m) =>
         m &&
@@ -547,7 +582,7 @@ export function buildCatalog(image, detectRaw, glyphMetrics) {
     glyphMetrics
   );
   const { media, controls } = proposals;
-  const markIcons = createControlMarkIcons(image, controls);
+  const markIcons = createControlMarkIcons(image, controls, sourceRows);
   controls.icons.push(...markIcons, ...sourceDirectionIcons(image, sourceRaw, glyphMetrics));
   const touchesMedia = (b) =>
     media.some((m) => b.x < m.x + m.w && b.x + b.w > m.x && b.y < m.y + m.h && b.y + b.h > m.y);
