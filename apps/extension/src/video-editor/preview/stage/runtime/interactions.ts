@@ -148,7 +148,13 @@ function startPreviewStageTransform(
   const onGuideChange = params.onGuideChange ?? (() => undefined);
   params.cleanupRef.current = startPreviewTransformGesture({
     ...params.gestureHooks,
-    onCommit: params.onUpdateClipTransform,
+    onCommit: (clipId, transform) =>
+      params.onUpdateClipTransform(
+        clipId,
+        state.mode === 'move' && state.clip.type === 'EFFECT'
+          ? { x: transform.x, y: transform.y }
+          : transform
+      ),
     onFinish: () => {
       if (params.interactionRef.current === state) params.interactionRef.current = null;
       params.cleanupRef.current = null;
