@@ -183,6 +183,22 @@ export function createSceneSpotlightMasks(
           sceneSpotlightNeedsClip(single, single.clip),
           single.projection
         );
+      const openingBounds = single ? maskOpeningBounds(single, width, height) : null;
+      if (single && openingBounds) {
+        const weight = single.blend?.weight ?? 1;
+        fillMaskAlpha(
+          dim.context,
+          width,
+          height,
+          Math.round(255 * Math.max(0, single.dim * weight))
+        );
+        fillMaskAlpha(
+          blur.context,
+          width,
+          height,
+          radius ? Math.round((255 * Math.max(0, single.blur * weight)) / radius) : 0
+        );
+      }
       for (let y = 0; y < height; y += tileHeight)
         for (let x = 0; x < width; x += tileWidth) {
           const tile = {
@@ -191,8 +207,11 @@ export function createSceneSpotlightMasks(
             width: Math.min(tileWidth, width - x),
             height: Math.min(tileHeight, height - y),
           };
-          if (single) paintSingleMaskTile(dim.context, blur.context, hole, single, radius, tile);
-          else if (prefix)
+          if (single) {
+            const region = openingBounds ? intersectMaskTile(tile, openingBounds) : tile;
+            if (region.width && region.height)
+              paintSingleMaskTile(dim.context, blur.context, hole, single, radius, region);
+          } else if (prefix)
             paintMaskTile(dim.context, blur.context, hole, frames, groups, prefix, radius, tile);
         }
     } finally {
@@ -203,6 +222,63 @@ export function createSceneSpotlightMasks(
   } catch (error) {
     dispose();
     throw error;
+  }
+}
+
+/** Keep Skia's full raster; only the opening can change the constant outside coverage. */
+function maskOpeningBounds(frame: SceneSpotlightLayer, width: number, height: number) {
+  const corners = rectCorners(frame.opening);
+  const projection = frame.projection;
+  if (
+    projection &&
+    corners.some(({ x, y }) => projection[6] * x + projection[7] * y + projection[8] <= 1e-6)
+  )
+    return null;
+  const points = projection
+    ? corners.map((point) => projectQuickEditPoint(projection, point))
+    : corners;
+  if (points.some((point) => !point || !Number.isFinite(point.x) || !Number.isFinite(point.y)))
+    return null;
+  const bounds = getCanvasPointsBounds(points.map((point) => point!));
+  // Skia antialias coverage can touch the pixel adjacent to the geometric opening.
+  const x = Math.max(0, Math.floor(bounds.x) - 2),
+    y = Math.max(0, Math.floor(bounds.y) - 2);
+  return {
+    x,
+    y,
+    width: Math.max(0, Math.min(width, Math.ceil(bounds.x + bounds.width) + 2) - x),
+    height: Math.max(0, Math.min(height, Math.ceil(bounds.y + bounds.height) + 2) - y),
+  };
+}
+
+function intersectMaskTile(tile: SceneSpotlightRect, opening: SceneSpotlightRect) {
+  const x = Math.max(tile.x, opening.x),
+    y = Math.max(tile.y, opening.y);
+  return {
+    x,
+    y,
+    width: Math.max(0, Math.min(tile.x + tile.width, opening.x + opening.width) - x),
+    height: Math.max(0, Math.min(tile.y + tile.height, opening.y + opening.height) - y),
+  };
+}
+
+function fillMaskAlpha(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  value: number
+) {
+  // ImageData clamps the already rounded alpha; use that same byte for the solid region.
+  const alpha = Math.max(0, Math.min(255, value)) || 0;
+  context.save();
+  try {
+    context.resetTransform();
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = 'copy';
+    context.fillStyle = `#000000${alpha.toString(16).padStart(2, '0')}`;
+    context.fillRect(0, 0, width, height);
+  } finally {
+    context.restore();
   }
 }
 
