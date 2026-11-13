@@ -311,7 +311,7 @@ async function renderPreparedPreviewScene(
         async (composeInput) => {
           const supplied = params.preparedFrame;
           const prepared =
-            supplied &&
+            supplied?.effects &&
             supplied.rasterScale ===
               resolvePreviewEffectRuntimeRasterScale({
                 canvas: params.canvas,
@@ -714,7 +714,12 @@ async function resolvePreviewEffectRuntimeFrames(
       ...renderPasses.visualPasses.map((pass) => pass.frame),
     ])
   ) {
-    return prepareNativePreviewGpuComposition(params, renderPasses, executor);
+    return prepareNativePreviewGpuComposition(
+      params,
+      renderPasses,
+      executor,
+      params.preparedFrame?.effects ? undefined : params.preparedFrame?.rasterScale
+    );
   }
   return renderEffectRuntimeComposition({
     project: params.project,

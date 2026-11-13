@@ -25,7 +25,9 @@ import {
   resolveUpcomingNativeEffect,
   resolveUpcomingNativeEffectOnset,
 } from './frame-plan';
-import type { PreviewSceneRenderInput } from './types';
+import type { PreviewSceneRenderInput, NativeGpuPreviewRenderer } from './types';
+import { renderNativeCompositionScene as renderPreviewScene } from './render-scene';
+import { resolvePreviewEffectRuntimeRasterScale } from './canvas';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -361,3 +363,133 @@ it('describes at most four simultaneous startup annotations with one future comp
   expect(f.frames).toEqual([]);
   expect(f.video.currentTime).toBe(before);
 });
+
+it('keeps replaceable source lookahead free of deferred effect rendering', async () => {
+  const f = futureFixture();
+  f.input.currentTime = 2.1;
+  f.video.currentTime = 2.1;
+  const prepareGpuFrame = vi.fn(async (command: EffectRuntimeRenderCommand) =>
+    createEffectRuntimeFailure(command, 'inputRejected')
+  );
+  const prepared = await prepareNativePreviewSceneFrame(
+    {
+      ...f.input,
+      effectRuntimeExecutor: { prepareGpuFrame, renderFrame: vi.fn(), dispose: vi.fn() },
+    },
+    { deferEffectRendering: true }
+  );
+  if (!prepared) throw new Error('Expected source lookahead packet');
+  expect(prepareGpuFrame).not.toHaveBeenCalled();
+  expect(prepared.input.preparedFrame?.effects).toBeUndefined();
+  expect(prepared.input.preparedFrame?.passes.overlayFrame.effectRuntimePlans).toHaveLength(1);
+  expect(prepared.input.preparedFrame?.compositionTime).toBe(2.1);
+  expect(prepared.input.preparedFrame?.sourcePresentation.get('source')?.timestampUs).toBe(2100000);
+  const scale = prepared.input.preparedFrame?.rasterScale;
+  expect(scale).toBeGreaterThan(0);
+  f.video.currentTime = 4;
+  const copy = prepared.input.decodedVideoFrames?.get('source')?.toVideoFrame?.();
+  expect(copy?.timestamp).toBe(2100000);
+  prepared.release();
+  prepared.release();
+  expect(f.frames[0]!.close).toHaveBeenCalledOnce();
+  expect(prepareGpuFrame).not.toHaveBeenCalled();
+  copy?.close();
+});
+
+it.each(['complete', 'abort', 'eager-resize'] as const)(
+  'renders deferred annotations at the captured scale and releases after GPU %s',
+  async (outcome) => {
+    const f = futureFixture();
+    f.input.currentTime = 2.1;
+    f.video.currentTime = 2.1;
+    class Bitmap implements ImageBitmap {
+      readonly width = 32;
+      readonly height = 16;
+      close = vi.fn();
+    }
+    vi.stubGlobal('ImageBitmap', Bitmap);
+    const bitmaps: Bitmap[] = [];
+    const prepareGpuFrame = vi.fn(async (request: EffectRuntimeRenderCommand) => {
+      const bitmap = new Bitmap();
+      bitmaps.push(bitmap);
+      return {
+        kind: 'frame' as const,
+        bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        effectInstanceId: request.effectInstanceId,
+        requestId: request.requestId,
+        sequenceId: request.sequenceId,
+        snapshotId: request.snapshotId,
+        acknowledged: {
+          documentId: request.documentRef.id,
+          assetSelectionId: request.assetSelectionRef.id,
+        },
+      };
+    });
+    const controller = new AbortController();
+    const prepared = await prepareNativePreviewSceneFrame(
+      {
+        ...f.input,
+        signal: controller.signal,
+        effectRuntimeExecutor: { prepareGpuFrame, renderFrame: vi.fn(), dispose: vi.fn() },
+      },
+      { deferEffectRendering: outcome !== 'eager-resize' }
+    );
+    if (!prepared) throw new Error('Expected source packet');
+    expect(prepareGpuFrame).toHaveBeenCalledTimes(outcome === 'eager-resize' ? 1 : 0);
+    const submitted = Promise.withResolvers<void>();
+    const completed = Promise.withResolvers<void>();
+    const render = vi.fn<NativeGpuPreviewRenderer['render']>(
+      async (_input, passes, _finish, _invalidated, resolveEffects) => {
+        expect(passes).toBe(prepared.input.preparedFrame?.passes);
+        if (typeof resolveEffects !== 'function') throw new Error('Expected effect resolver');
+        const effects = await resolveEffects(async () => {
+          throw new Error('Dependent input');
+        });
+        expect(effects?.overlayFrames.size).toBe(1);
+        expect(prepareGpuFrame).toHaveBeenCalledTimes(outcome === 'eager-resize' ? 2 : 1);
+        expect(bitmaps.at(-1)!.close).not.toHaveBeenCalled();
+        submitted.resolve();
+        await completed.promise;
+        expect(bitmaps.at(-1)!.close).not.toHaveBeenCalled();
+        return true;
+      }
+    );
+    const expectedPlan = prepared.input.preparedFrame?.passes.overlayFrame.effectRuntimePlans[0];
+    if (!expectedPlan) throw new Error('Expected annotation plan');
+    const rasterInput = { ...prepared.input, previewRasterSize: { width: 1280, height: 720 } };
+    const expected = scaleEffectRuntimeFramePlan(
+      expectedPlan,
+      outcome === 'eager-resize'
+        ? resolvePreviewEffectRuntimeRasterScale(rasterInput)
+        : prepared.input.preparedFrame?.rasterScale
+    );
+    const result = renderPreviewScene({
+      ...prepared.input,
+      gpuPreview: { render, dispose: vi.fn() },
+      ...(outcome !== 'complete' ? { previewRasterSize: { width: 1280, height: 720 } } : {}),
+    });
+    void result.catch(() => undefined);
+    await vi.waitFor(() =>
+      expect(prepareGpuFrame).toHaveBeenCalledTimes(outcome === 'eager-resize' ? 2 : 1)
+    );
+    await submitted.promise;
+    expect(prepareGpuFrame.mock.calls.at(-1)?.[0]).toMatchObject({
+      renderWidth: expected.renderDimensions.width,
+      renderHeight: expected.renderDimensions.height,
+    });
+    if (outcome === 'abort') controller.abort();
+    expect(bitmaps.at(-1)!.close).not.toHaveBeenCalled();
+    completed.resolve();
+    const presentation = await result;
+    if (outcome === 'abort') expect(presentation).toBe(false);
+    else expect(presentation).toMatchObject({ time: 2.1, renderer: { backend: 'gpu' } });
+    expect(bitmaps.at(-1)!.close).toHaveBeenCalledOnce();
+    expect(f.frames[0]!.close).not.toHaveBeenCalled();
+    prepared.release();
+    prepared.release();
+    expect(f.frames[0]!.close).toHaveBeenCalledOnce();
+    for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  }
+);

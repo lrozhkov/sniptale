@@ -196,7 +196,8 @@ export function prepareNativePreviewGpuComposition(
 
 /** Prepare CPU-side scene work without acquiring an output or changing GPU materials. */
 export function prepareNativePreviewSceneFrame(
-  input: PreviewSceneRenderInput
+  input: PreviewSceneRenderInput,
+  options: { deferEffectRendering?: boolean } = {}
 ): Promise<PreviewScenePreparedFrame | undefined> | undefined {
   if (
     (input.previewRenderer === 'legacy' &&
@@ -312,7 +313,7 @@ export function prepareNativePreviewSceneFrame(
         release();
         return undefined;
       }
-      if (executor?.prepareGpuFrame && gpuIsolated)
+      if (executor?.prepareGpuFrame && gpuIsolated && !options.deferEffectRendering)
         effects = await prepareNativePreviewGpuComposition(input, passes, executor, rasterScale);
       input.signal?.throwIfAborted();
       return {

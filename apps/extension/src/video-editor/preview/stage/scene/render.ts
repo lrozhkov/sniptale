@@ -389,7 +389,7 @@ function usePreviewRenderSchedulerRef(
         const render = (input: Parameters<typeof renderPreviewScene>[0]) => {
           joinsRef.current ??= createVideoPreviewCompositionJoinRenderer(
             renderPreviewScene,
-            prepareNativePreviewSceneFrame
+            prepareNativeSceneSources
           );
           if (input.previewRenderer !== 'legacy')
             gpuRef.current ??= createNativeGpuPreviewRenderer(undefined, {
@@ -533,7 +533,14 @@ function prepareNativeSceneJob(
     return undefined;
   joins.current ??= createVideoPreviewCompositionJoinRenderer(
     renderPreviewScene,
-    prepareNativePreviewSceneFrame
+    prepareNativeSceneSources
   );
   return joins.current.prepare(input);
+}
+
+/** Keep replaceable playback lookahead limited to source and geometry preparation. */
+function prepareNativeSceneSources(input: Parameters<typeof renderPreviewScene>[0]) {
+  return prepareNativePreviewSceneFrame(input, {
+    deferEffectRendering: Boolean(input.effectPreparation),
+  });
 }
