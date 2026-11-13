@@ -57,6 +57,7 @@ export type EditorSessionAutosaveState = {
   > | null;
   presentationTimer: number;
   interactionActive: boolean;
+  pendingCompletionActive: boolean;
   interactionRevision: number;
   interactionWaiters: Array<() => void>;
   presentationPending: boolean;
@@ -83,6 +84,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     coordinator: null,
     presentationTimer: 0,
     interactionActive: false,
+    pendingCompletionActive: false,
     interactionRevision: 0,
     interactionWaiters: [],
     presentationPending: false,
@@ -112,6 +114,7 @@ export function interruptImagePresentation(state: EditorSessionAutosaveState): v
 
 export function releaseAutosaveInteraction(state: EditorSessionAutosaveState): void {
   state.interactionActive = false;
+  state.pendingCompletionActive = false;
   for (const resolve of state.interactionWaiters.splice(0)) resolve();
 }
 

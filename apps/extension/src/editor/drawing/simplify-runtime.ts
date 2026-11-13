@@ -27,6 +27,7 @@ interface EditorSimplifyRuntimeOptions {
   createCompute: () => EditorSimplifyCompute;
   prepareObject: (object: FabricObject) => void;
   commitHistory: () => void;
+  beforeCommit?: () => void;
   syncRuntimeState: () => void;
   reportFailure?: (error: unknown) => void;
   publishDerived?: () => boolean;
@@ -269,7 +270,11 @@ export function requestEditorSimplify(
       });
       if (!isCurrent()) return;
       const decoded = await FabricImage.fromURL(result.dataUrl);
-      if (!isCurrent()) return;
+      if (!preview) runtime.options.beforeCommit?.();
+      if (!isCurrent()) {
+        decoded.dispose();
+        return;
+      }
       if (preview) {
         retainedPreview = true;
         presentation.show(result.dataUrl, source);

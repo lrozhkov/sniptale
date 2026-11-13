@@ -1,3 +1,4 @@
+import { flushEditorFreehandCompletion } from '../../../draw-workflow/released';
 import { mountEditorRasterRuntime } from '../../../../raster-editing/runtime';
 import { createRasterTargetAdapter } from '../../../../raster-editing/adapters';
 import { syncSourceStateFromObject } from '../../../document/source';
@@ -80,6 +81,7 @@ export function mountEditorController(
     if (controller.createSimplifyCompute)
       mountEditorSimplifyRuntime({
         canvas,
+        beforeCommit: () => flushEditorFreehandCompletion(canvas),
         createCompute: controller.createSimplifyCompute,
         prepareObject: (object) => controller.prepareObject(object),
         commitHistory: () => controller.commitHistory(),
@@ -102,6 +104,7 @@ export function mountEditorController(
         reportFailure: () => showToast(translate('content.toolbar.drawingSimplifyFailed'), 'error'),
       });
     const rasterAdapter = createRasterTargetAdapter({
+      beforeCommit: () => flushEditorFreehandCompletion(canvas),
       canvas: () => controller.canvas,
       frame: () => useEditorStore.getState().frame,
       documentBounds: () => ({ x: 0, y: 0, ...controller.canvasDocumentSize }),

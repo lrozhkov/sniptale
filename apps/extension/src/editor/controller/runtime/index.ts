@@ -1,3 +1,4 @@
+import { hasPendingEditorFreehandCompletion } from '../draw-workflow/released';
 import { readEditorHistoryState } from '../history';
 import type { Canvas, FabricObject } from 'fabric';
 import type { EditorViewportState } from '../../../features/editor/document/types';
@@ -45,7 +46,10 @@ export function syncEditorRuntimeState(
     syncSelectionToolSettingsFromObject(selectedObject, singleType);
   }
 
-  const historyState = readEditorHistoryState(history);
+  const historyState = readEditorHistoryState(
+    history,
+    hasPendingEditorFreehandCompletion(canvas) ? 1 : 0
+  );
 
   store.syncRuntime({
     layers,
@@ -78,5 +82,18 @@ export function syncEditorRuntimeState(
 export function scheduleEditorZoomToFit(callback: () => void): void {
   requestAnimationFrame(() => {
     requestAnimationFrame(callback);
+  });
+}
+
+/** Publishes only Undo availability while the released stroke awaits its scene capture. */
+export function syncEditorHistoryRuntimeState(
+  canvas: Canvas | null,
+  history: SnapshotHistory<string> | null
+): void {
+  const store = useEditorStore.getState();
+  store.syncRuntime({
+    cropReady: store.cropReady,
+    cropSelection: store.cropSelection,
+    history: readEditorHistoryState(history, hasPendingEditorFreehandCompletion(canvas) ? 1 : 0),
   });
 }

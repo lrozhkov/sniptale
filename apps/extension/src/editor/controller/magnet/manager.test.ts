@@ -39,6 +39,7 @@ function createTopContext() {
 type MagnetTestTopContext = ReturnType<typeof createTopContext>;
 type MagnetTestCanvas = {
   clearContext: ReturnType<typeof vi.fn>;
+  requestRenderAll: ReturnType<typeof vi.fn>;
   contextTop: MagnetTestTopContext | undefined;
 };
 
@@ -68,12 +69,14 @@ function createCanvas(
   objects: FabricObject[],
   options: {
     throwOnMissingTopContext?: boolean;
+    upperCanvasEl?: HTMLCanvasElement;
     topContext?: MagnetTestTopContext | null;
   } = {}
 ) {
   const listeners = new Map<string, Set<unknown>>();
   const topContext = options.topContext === undefined ? createTopContext() : options.topContext;
   const canvas = {
+    ...(options.upperCanvasEl ? { upperCanvasEl: options.upperCanvasEl } : {}),
     uniScaleKey: 'shiftKey',
     uniformScaling: true,
     viewportTransform: [1, 0, 0, 1, 0, 0] as [number, number, number, number, number, number],
@@ -760,4 +763,48 @@ it('keeps native text width resize alignment on its established fallback path', 
   expect(manager.getVisualFeedback().relations).toEqual([]);
   expect(manager.getVisualFeedback().guides).toMatchObject([{ axis: 'x', coordinate: 122 }]);
   manager.dispose();
+});
+
+it('does not request scene redraws for empty freehand mouseup and lost capture cleanup', () => {
+  const element = document.createElement('canvas');
+  const { canvas, manager } = createManagerHarness({
+    objects: [],
+    activeTool: 'pencil',
+    canvasOptions: { upperCanvasEl: element },
+  });
+  try {
+    canvas.requestRenderAll.mockClear();
+    manager.mouseUp();
+    element.dispatchEvent(new Event('lostpointercapture'));
+    expect(canvas.requestRenderAll).not.toHaveBeenCalled();
+  } finally {
+    manager.dispose();
+  }
+});
+
+it('redraws once when releasing visible guides and skips the subsequent empty capture cleanup', () => {
+  const element = document.createElement('canvas');
+  const target = createRect({ left: 160, top: 140, width: 40, height: 40 });
+  const { canvas, manager } = createManagerHarness({
+    objects: [target],
+    size: { width: 1000, height: 1000 },
+    canvasOptions: { upperCanvasEl: element },
+  });
+  try {
+    manager.snapPoint({
+      point: { x: 156, y: 139 },
+      origin: { x: 100, y: 100 },
+      preserveAngle: false,
+      bypass: false,
+    });
+    expect(manager.hasActiveGuides()).toBe(true);
+    canvas.requestRenderAll.mockClear();
+    manager.mouseUp();
+    expect(manager.hasActiveGuides()).toBe(false);
+    expect(canvas.requestRenderAll).toHaveBeenCalledOnce();
+    element.dispatchEvent(new Event('lostpointercapture'));
+    expect(canvas.requestRenderAll).toHaveBeenCalledOnce();
+  } finally {
+    manager.dispose();
+  }
 });

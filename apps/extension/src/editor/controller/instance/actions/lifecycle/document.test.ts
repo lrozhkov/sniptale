@@ -71,6 +71,7 @@ function createAutosaveService(
     restoreDraft: vi.fn(async () => undefined),
     scheduleAutosave: vi.fn(),
     setInteractionActive: vi.fn(),
+    setPendingCompletionActive: vi.fn(),
     saveNow: vi.fn(async () => undefined),
     setEnabled: vi.fn(),
     updateContext: vi.fn(),

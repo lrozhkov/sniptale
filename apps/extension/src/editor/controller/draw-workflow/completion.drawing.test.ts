@@ -256,6 +256,10 @@ describe('drawing completion history', () => {
         session = completion?.drawSession ?? null;
         expect(commitHistory).toHaveBeenCalledOnce();
         expect(completion?.drawSession).toBeNull();
+        // Fabric performs this cleanup after its mouse:up listeners return.
+        surface.renderTop();
+        expect(alpha(surface.contextTop, 165)).toBeGreaterThan(0);
+        expect(alpha(surface.getContext(), 165)).toBe(0);
         flush();
         expect(alpha(surface.getContext(), 165)).toBeGreaterThan(0);
         expect(alpha(surface.contextTop, 45)).toBe(0);

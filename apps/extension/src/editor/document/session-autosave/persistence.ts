@@ -71,7 +71,8 @@ async function persistEditorSessionDocument(args: {
 
     if (
       args.state.activeContext?.aggregateId === args.context.aggregateId &&
-      args.revision === args.state.autosaveRevision
+      args.revision === args.state.autosaveRevision &&
+      !args.state.pendingCompletionActive
     ) {
       args.state.lastCheckpointReceipt = result.checkpointReceipt
         ? { ...result.checkpointReceipt }

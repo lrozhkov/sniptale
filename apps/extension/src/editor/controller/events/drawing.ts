@@ -9,7 +9,7 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import { cropDown } from '../crop-workflow/pointer';
 import { activateTextTarget, isTextTarget } from './text-target';
-import { completeDrawWorkflowFromBindings } from './draw-completion';
+import { releaseFreehandDrawWorkflowFromBindings } from './draw-completion';
 import type { EditorControllerEventBindings, EditorControllerEventHandlers } from './types';
 import { handleStepMouseDown } from '../tools/step-drawing/pointer';
 import { isEditorDrawingSelection } from '../../drawing/object/metadata';
@@ -209,7 +209,7 @@ export function createEditorDrawingEventHandlers(
     ) {
       // Chorded mouse input can release the primary button without a pointerup.
       lastHandledMoveEvent = null;
-      completeDrawWorkflowFromBindings(bindings);
+      releaseFreehandDrawWorkflowFromBindings(bindings);
       return true;
     }
     if (lastHandledMoveEvent === event) return true;
@@ -287,7 +287,7 @@ export function createEditorDrawingEventHandlers(
         lastHandledMoveEvent = null;
         textTargetCandidate = null;
         selectionModifierGesture = null;
-        completeDrawWorkflowFromBindings(bindings);
+        releaseFreehandDrawWorkflowFromBindings(bindings);
         return;
       }
       const canvas = bindings.getCanvas();
@@ -304,7 +304,7 @@ export function createEditorDrawingEventHandlers(
         textTargetCandidate = null;
         return;
       }
-      completeDrawWorkflowFromBindings(bindings);
+      releaseFreehandDrawWorkflowFromBindings(bindings);
     },
     handleWindowPointerMove: (event) => {
       const canvas = bindings.getCanvas();
@@ -317,7 +317,7 @@ export function createEditorDrawingEventHandlers(
       const drawSession = bindings.getDrawSession();
       if (!drawSession || !isEditorDrawingSessionPointer(drawSession, event)) return;
       lastHandledMoveEvent = null;
-      completeDrawWorkflowFromBindings(bindings);
+      releaseFreehandDrawWorkflowFromBindings(bindings);
     },
     handlePointerCancel: (event) => {
       if (event && 'isPrimary' in event && event.isPrimary === false) return;

@@ -710,3 +710,47 @@ it('recovers a restored preview without marking its saved document failed', asyn
   expect(commitWorkspaceMock).not.toHaveBeenCalled();
   autosave.dispose();
 });
+
+it('retains deferred completion protection independently of physical input activity', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  autosave.setPendingCompletionActive(true);
+  autosave.setInteractionActive(false);
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  autosave.setInteractionActive(true);
+  autosave.setPendingCompletionActive(false);
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  autosave.setInteractionActive(false);
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  await autosave.saveNow(() => createDocument('completed'));
+  expect(autosave.hasUnsavedChanges()).toBe(false);
+  autosave.dispose();
+});
+
+it('does not mark an accepted deferred completion clean when an older save acknowledges', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const { useEditorStore } = await import('../../state/useEditorStore');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  let release: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(
+    (input) =>
+      new Promise((resolve) => {
+        release = () =>
+          resolve({ revision: input.expectedRevision + 1, documentAssetsByRuntimeUrl: new Map() });
+      })
+  );
+  const saving = autosave.saveNow(() => createDocument('older'));
+  await vi.advanceTimersByTimeAsync(0);
+  autosave.setPendingCompletionActive(true);
+  release();
+  await saving;
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  expect(useEditorStore.getState().saveState).not.toBe('saved');
+  autosave.scheduleAutosave(createDocument('completed'));
+  autosave.setPendingCompletionActive(false);
+  await autosave.flushAutosave(() => createDocument('completed'));
+  expect(autosave.hasUnsavedChanges()).toBe(false);
+  autosave.dispose();
+});

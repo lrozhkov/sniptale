@@ -265,10 +265,13 @@ export function cancelDeferredEditorHistory(history: SnapshotHistory<string> | n
 }
 
 /** Projects captured steps immediately, including before the first encoded Undo entry. */
-export function readEditorHistoryState(history: SnapshotHistory<string> | null) {
+export function readEditorHistoryState(
+  history: SnapshotHistory<string> | null,
+  pendingActions = 0
+) {
   if (!history) return { canUndo: false, canRedo: false, index: 0, size: 1 };
   const current = history.getState();
-  const pending = historyAssets.get(history)?.deferred?.getCount() ?? 0;
+  const pending = (historyAssets.get(history)?.deferred?.getCount() ?? 0) + pendingActions;
   if (!pending)
     return {
       canUndo: current.canUndo,

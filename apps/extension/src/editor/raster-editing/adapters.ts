@@ -45,6 +45,7 @@ export type RasterTargetAdapterOptions = {
   documentBounds: () => PixelBounds;
   prepareObject: (object: FabricObject) => void;
   commitNative: (object: FabricObject) => void;
+  beforeCommit?: () => void;
   publishBackground: (
     candidate: BackgroundRasterCandidate,
     options: FrameSceneMutationOptions
@@ -465,6 +466,7 @@ export function createRasterTargetAdapter(options: RasterTargetAdapterOptions) {
           candidate.visibleFullDataUrl,
           signal ? { signal } : {}
         );
+        options.beforeCommit?.();
         if (!isCurrent(target) || signal?.aborted) {
           element.dispose();
           return false;
@@ -532,6 +534,7 @@ export function createRasterTargetAdapter(options: RasterTargetAdapterOptions) {
         signal
       );
       const copy = await FabricImage.fromURL(source, signal ? { signal } : {});
+      options.beforeCommit?.();
       if (!isCurrent(target) || signal?.aborted) {
         copy.dispose();
         return false;
@@ -549,6 +552,7 @@ export function createRasterTargetAdapter(options: RasterTargetAdapterOptions) {
       return true;
     },
     allowContentEditing(target: RasterTarget): boolean {
+      options.beforeCommit?.();
       const object = target.identity;
       if (
         findTarget(options.canvas()?.getObjects() ?? [], target.id) !== object ||

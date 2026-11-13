@@ -63,7 +63,10 @@ vi.mock('./text-target', () => ({
   activateTextTarget: mocks.activateTextTarget,
   isTextTarget: mocks.isTextTarget,
 }));
-vi.mock('./draw-completion', () => ({ completeDrawWorkflowFromBindings: mocks.complete }));
+vi.mock('./draw-completion', () => ({
+  completeDrawWorkflowFromBindings: mocks.complete,
+  releaseFreehandDrawWorkflowFromBindings: mocks.complete,
+}));
 vi.mock('../tools/step-drawing/pointer', () => ({ handleStepMouseDown: mocks.stepDown }));
 vi.mock('../../drawing/object/metadata', () => ({
   isEditorDrawingSelection: mocks.isDrawingSelection,

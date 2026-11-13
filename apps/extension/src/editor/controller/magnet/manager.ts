@@ -68,10 +68,7 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
     this.unbindArrowSnap = bindEditorDrawingArrowSnapping(managerOptions.canvas, (input) =>
       this.snapPoint(input)
     );
-    const clear = () => {
-      this.clearGuides();
-      this.canvas.requestRenderAll?.();
-    };
+    const clear = () => this.clearFeedbackAfterInput();
     const modifier = (event: KeyboardEvent) => {
       if (event.key === 'Alt' || event.key === 'Escape') clear();
     };
@@ -225,8 +222,18 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
   }
 
   mouseUp(): void {
+    this.clearFeedbackAfterInput();
+  }
+
+  private clearFeedbackAfterInput(): void {
+    const hadFeedback =
+      this.verticalLines.size > 0 ||
+      this.horizontalLines.size > 0 ||
+      this.onlyDrawPoint ||
+      this.visualFeedback.guides.length > 0 ||
+      this.visualFeedback.relations.length > 0;
     this.clearGuides();
-    this.canvas.requestRenderAll();
+    if (hadFeedback) this.canvas.requestRenderAll?.();
   }
 
   private describeTarget(object: FabricObject): EditorSnapTarget {

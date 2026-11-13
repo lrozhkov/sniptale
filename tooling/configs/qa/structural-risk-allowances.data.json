@@ -6914,10 +6914,10 @@
       "file": "apps/extension/src/editor/raster-editing/adapters.ts",
       "symbol": "createRasterTargetAdapter",
       "owner": "extension:editor:raster-editing",
-      "reason": "tool-noise: Independent read-only inspection confirmed this exact corrected body. This factory binds one hydration cache and injected native publication callbacks. Target resolution and detached-resource admission share this adapter lifetime. The replacement observer is forwarded to the existing background owner. Fresh final architecture review must validate this binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent authority, effect, recovery path or resource lifetime. Reassess if the observer expands beyond this exact synchronous replacement. Remove when the analyzer models this cohesive owner.",
+      "reason": "tool-noise: This factory binds one hydration cache and the same native publication callbacks. The added injected beforeCommit callback settles an accepted stroke before existing publication readmission checks. It adds no new cache, transport, state receiver, target authority or independently owned lifetime. Resolution, resource preparation and publication remain in the existing adapter. Score remains one and cohesion one; factory registration length triggers this finding. Fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, publication authority, effect owner, recovery contract, fixture or resource lifetime. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-13",
-      "astHash": "a62318b12008f98ed214100b1425b7c828db96817ad169511e911c8c37a80a62",
+      "astHash": "4c98518c69e15dd06d38f83f258940a310100a88928cecd5674541b54cd28b62",
       "signatureHash": "c900ac34b10787bef38fcb7b0317cdc972389e47bacd4c2d6f4221f414ef67ec"
     },
     {
@@ -7090,10 +7090,10 @@
       "file": "apps/extension/src/editor/controller/draw-workflow/completion.drawing.test.ts",
       "symbol": "describe callback",
       "owner": "extension:editor:controller",
-      "reason": "tool-noise: This describe callback registers completion tests using the same stroke fixture and controlled frame delivery. New assertions compare the final top-plane preview with the scheduled committed render. It owns no production state or independent fixture lifetime. Score remains one and cohesion remains one; extracting a registration callback would add navigation without separating an owner. Fresh complete-candidate architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
+      "reason": "tool-noise: This registration callback owns one completion consumer suite. The change adds an assertion at native renderTop cleanup after the input session ends. All cases retain their existing isolated Canvas and controlled frame fixtures. There is no new subject, service or fixture lifetime. Score remains one and cohesion one; registration length triggers the finding. Fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, publication authority, effect owner, recovery contract, fixture or resource lifetime. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-13",
-      "astHash": "8e87310382d66707ab017b04489869fe1421a07291ab0897cdf880218deba215",
+      "astHash": "437e8300f1749b5e0c6ac843c5035f9a560abf02b6aa186b335405a0d1961219",
       "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
     },
     {
@@ -7106,6 +7106,17 @@
       "reviewDate": "2026-11-13",
       "astHash": "f27f8102db3d51273ef7a36b629986dca7d904a393f2101c266a635dd0e50c63",
       "signatureHash": "315fc35e7e67743337620059df01494b2b0a0aa130724de67a2017702d1709ce"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/controller/magnet/manager.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:controller",
+      "reason": "tool-noise: This suite tests the existing magnet manager lifecycle. Two added cases reuse the same manager/canvas fixture to distinguish empty cleanup from visible-guide cleanup and dispatch real lostpointercapture events on an isolated canvas element. Each new manager is disposed in finally. No independent fixture service, production authority or resource owner is introduced. Score remains two and cohesion one; the hard file-length limit triggers this finding. Fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, publication authority, effect owner, recovery contract, fixture or resource lifetime. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "cf03d6f5d7e0e5496bd30aba9987f91bac54e6ff0566d28c5af0c0aa6439b724",
+      "signatureHash": "cc733bf225495f29752598ec970964435042cbf31f74bf4820b6b589d9f8a07d"
     }
   ]
 }
