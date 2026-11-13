@@ -99,12 +99,14 @@ export function createEffectRuntimeSandboxExecutor(
       }
     };
     return {
+      maximumConcurrentPreparationRequests: EFFECT_RUNTIME_RESOURCE_LIMITS.maxQueueDepth,
       maximumGpuFramesInFlight: 2,
       maximumWarmFrames: 4,
       preload: () => {
         if (!warm.closed && !warm.retired && !warm.adopted) warm.manager.preload();
       },
-      prepareGpuFrame: (request) => run(request, () => warm.manager.prepareGpuFrame(request)),
+      prepareGpuFrame: (request, signal) =>
+        run(request, () => warm.manager.prepareGpuFrame(request, signal)),
       renderFrame: (request) => run(request, () => warm.manager.renderFrame(request)),
       dispose: () => {
         if (warm.closed) return;
@@ -126,13 +128,14 @@ export function createEffectRuntimeSandboxExecutor(
     },
     ...(scene
       ? {
+          maximumConcurrentPreparationRequests: EFFECT_RUNTIME_RESOURCE_LIMITS.maxQueueDepth,
           maximumGpuFramesInFlight: 2 as const,
           createWarmExecutor,
           preload: () => {
             if (!disposed) manager.preload();
           },
-          prepareGpuFrame: (request: EffectRuntimeRenderCommand) =>
-            foreground().prepareGpuFrame(request),
+          prepareGpuFrame: (request: EffectRuntimeRenderCommand, signal?: AbortSignal) =>
+            foreground().prepareGpuFrame(request, signal),
         }
       : {}),
     renderFrame: (request) => foreground().renderFrame(request),

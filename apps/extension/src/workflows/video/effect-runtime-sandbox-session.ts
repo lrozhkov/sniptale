@@ -1,3 +1,4 @@
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../../features/video/composition/effect-runtime/runtime/resource-limits';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
@@ -9,6 +10,7 @@ import {
 } from '../../contracts/effect-runtime/sandbox-connection';
 import {
   EFFECT_RUNTIME_SANDBOX_CONNECT_MESSAGE,
+  type EffectRuntimeFrameFailure,
   type EffectRuntimeFrameResult,
   type EffectRuntimeSceneResult,
   type EffectRuntimeRenderCommand,
@@ -27,6 +29,8 @@ export class EffectRuntimeSandboxSessionManager {
   private readonly active = new Set<PendingEffectRuntimeRequest>();
   private readonly acknowledgedAssetSelections = new Set<string>();
   private readonly acknowledgedDocuments = new Set<string>();
+  private requestCount = 0;
+  private readonly waitingRequests: { start(): void; refuse(): void }[] = [];
   private disposed = false;
   private session: EffectRuntimeSandboxSession | null = null;
 
@@ -52,6 +56,7 @@ export class EffectRuntimeSandboxSessionManager {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.refuseWaitingRequests();
     this.clearSession();
     for (const pending of this.active) {
       pending.finish(createEffectRuntimeFailure(pending.request, 'crashed'));
@@ -63,10 +68,15 @@ export class EffectRuntimeSandboxSessionManager {
       closeEffectRuntimeBitmaps(command.inputFrames);
       return createEffectRuntimeFailure(command, 'inputRejected');
     }
-    return renderEffectRuntimeSandboxFrame(this.createRenderAuthority(), command);
+    return this.withAdmission(command, () =>
+      renderEffectRuntimeSandboxFrame(this.createRenderAuthority(), command)
+    );
   }
 
-  async prepareGpuFrame(command: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult> {
+  async prepareGpuFrame(
+    command: EffectRuntimeRenderCommand,
+    signal?: AbortSignal
+  ): Promise<EffectRuntimeSceneResult> {
     if (
       this.configuration.compositionBackend !== 'gpu-scene' &&
       this.configuration.compositionBackend !== 'gpu-scene-plan'
@@ -74,16 +84,80 @@ export class EffectRuntimeSandboxSessionManager {
       closeEffectRuntimeBitmaps(command.inputFrames);
       return createEffectRuntimeFailure(command, 'inputRejected');
     }
-    const result = await renderEffectRuntimeSandboxFrame(
-      this.createRenderAuthority(),
+    const result = await this.withAdmission(
       command,
-      'prepareGpuFrame'
+      () =>
+        renderEffectRuntimeSandboxFrame(this.createRenderAuthority(), command, 'prepareGpuFrame'),
+      signal
     );
     if (this.configuration.compositionBackend === 'gpu-scene-plan' && result.kind === 'frame') {
       result.bitmap.close();
       return createEffectRuntimeFailure(command, 'outputRejected');
     }
     return result;
+  }
+
+  private withAdmission<T extends EffectRuntimeSceneResult>(
+    command: EffectRuntimeRenderCommand,
+    operation: () => Promise<T>,
+    signal?: AbortSignal
+  ): Promise<T | EffectRuntimeFrameFailure> {
+    const fail = (code: 'crashed' | 'stale' | 'queueDepthExceeded') => {
+      closeEffectRuntimeBitmaps(command.inputFrames);
+      return createEffectRuntimeFailure(command, code);
+    };
+    if (this.disposed || signal?.aborted)
+      return Promise.resolve(fail(this.disposed ? 'crashed' : 'stale'));
+    return new Promise((resolve, reject) => {
+      const refuse = (code: 'crashed' | 'stale' | 'queueDepthExceeded') => {
+        signal?.removeEventListener('abort', abort);
+        resolve(fail(code));
+      };
+      const waiter = {
+        start: async () => {
+          signal?.removeEventListener('abort', abort);
+          if (signal?.aborted) {
+            refuse('stale');
+            return;
+          }
+          this.requestCount++;
+          try {
+            resolve(await operation());
+          } catch (error) {
+            reject(error);
+          } finally {
+            this.requestCount--;
+            this.drainRequests();
+          }
+        },
+        refuse: () => refuse('crashed'),
+      };
+      const abort = () => {
+        const index = this.waitingRequests.indexOf(waiter);
+        if (index < 0) return;
+        this.waitingRequests.splice(index, 1);
+        refuse('stale');
+        this.drainRequests();
+      };
+      if (this.requestCount < EFFECT_RUNTIME_RESOURCE_LIMITS.maxQueueDepth) void waiter.start();
+      else if (this.waitingRequests.length < EFFECT_RUNTIME_RESOURCE_LIMITS.maxQueueDepth) {
+        this.waitingRequests.push(waiter);
+        signal?.addEventListener('abort', abort, { once: true });
+      } else refuse('queueDepthExceeded');
+    });
+  }
+
+  private drainRequests(): void {
+    while (
+      !this.disposed &&
+      this.requestCount < EFFECT_RUNTIME_RESOURCE_LIMITS.maxQueueDepth &&
+      this.waitingRequests.length
+    )
+      this.waitingRequests.shift()!.start();
+  }
+
+  private refuseWaitingRequests(): void {
+    for (const waiter of this.waitingRequests.splice(0)) waiter.refuse();
   }
 
   private createRenderAuthority(): EffectRuntimeSandboxRenderAuthority {
@@ -133,11 +207,13 @@ export class EffectRuntimeSandboxSessionManager {
   private clearSession(expected: EffectRuntimeSandboxSession | null = this.session): void {
     if (!expected || this.session !== expected) return;
     this.session = null;
+    this.refuseWaitingRequests();
     this.clearAcknowledgements();
     expected.cancelLoad();
     expected.controlPort?.close();
     expected.controlPort = null;
     expected.iframe.remove();
+    for (const pending of this.active) pending.retire();
   }
 }
 

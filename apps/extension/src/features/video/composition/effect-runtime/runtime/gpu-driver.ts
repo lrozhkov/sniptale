@@ -20,7 +20,11 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
   try {
     if (!args.executor.prepareGpuFrame)
       throw new Error('EFFECT_RUNTIME_GPU_PREPARATION_UNAVAILABLE');
-    for (const [sequenceId, plan] of args.plans.entries()) {
+    const prepare = args.executor.prepareGpuFrame;
+    const prepareFrame = async (
+      plan: EffectRuntimeFramePlan,
+      sequenceId: number
+    ): Promise<EffectRuntimeGpuPreparedFrame> => {
       args.signal?.throwIfAborted();
       if (
         plan.kind !== 'standalone' ||
@@ -34,7 +38,7 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
         sequenceId,
       });
       args.signal?.throwIfAborted();
-      const result = await args.executor.prepareGpuFrame(command);
+      const result = await prepare.call(args.executor, command, args.signal);
       let accepted = false;
       try {
         args.signal?.throwIfAborted();
@@ -51,7 +55,7 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
           closeEffectRuntimeGpuSceneResources(result);
           reservation.release();
         };
-        frames.set(plan.effectInstanceId, {
+        const frame: EffectRuntimeGpuPreparedFrame = {
           source,
           width: result.width,
           height: result.height,
@@ -79,11 +83,25 @@ export async function prepareEffectRuntimeGpuFramePlans(args: {
             retired = true;
             release();
           },
-        });
+        };
         accepted = true;
+        return frame;
       } finally {
         if (!accepted) closeEffectRuntimeGpuSceneResources(result);
       }
+    };
+    const capacity = args.executor.maximumConcurrentPreparationRequests === 2 ? 2 : 1;
+    for (let offset = 0; offset < args.plans.length; offset += capacity) {
+      args.signal?.throwIfAborted();
+      const results = await Promise.allSettled(
+        args.plans
+          .slice(offset, offset + capacity)
+          .map((plan, index) => prepareFrame(plan, offset + index))
+      );
+      for (const result of results)
+        if (result.status === 'fulfilled') frames.set(result.value.effectInstanceId, result.value);
+      const failure = results.find((result) => result.status === 'rejected');
+      if (failure) throw failure.reason;
     }
     return frames;
   } catch (error) {

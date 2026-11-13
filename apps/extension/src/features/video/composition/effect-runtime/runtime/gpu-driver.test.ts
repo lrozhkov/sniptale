@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createEffectRuntimeFailure } from '../../../../../contracts/effect-runtime/identity';
+import type {
+  EffectRuntimeRenderCommand,
+  EffectRuntimeSceneResult,
+} from '../../../../../contracts/effect-runtime/types';
 import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effect-runtime/types';
 import type { EffectRuntimeFramePlan } from './types';
 import { createEffectRuntimeGpuFrameLedger } from './resource-limits';
@@ -190,6 +195,134 @@ it('rejects an oversized packet in two-frame mode and closes its partial results
     })
   ).rejects.toThrow();
   expect(bitmaps).toHaveLength(17);
+  for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+});
+
+function controlledPreparations(capacity?: 2) {
+  const requests: {
+    command: EffectRuntimeRenderCommand;
+    response: ReturnType<typeof Promise.withResolvers<EffectRuntimeSceneResult>>;
+    bitmap: Bitmap;
+  }[] = [];
+  const owner: EffectRuntimeSandboxExecutor = {
+    ...(capacity ? { maximumConcurrentPreparationRequests: capacity } : {}),
+    dispose: vi.fn(),
+    renderFrame: vi.fn(),
+    prepareGpuFrame: vi.fn((command) => {
+      const response = Promise.withResolvers<EffectRuntimeSceneResult>();
+      requests.push({ command, response, bitmap: new Bitmap() });
+      return response.promise;
+    }),
+  };
+  const complete = async (sequenceId: number, fail = false) => {
+    const entry = requests.find((r) => r.command.sequenceId === sequenceId);
+    if (!entry) throw new Error('Missing controlled request');
+    if (fail) {
+      entry.bitmap.close();
+      entry.response.resolve(createEffectRuntimeFailure(entry.command, 'inputRejected'));
+    } else entry.response.resolve(await executor(entry.bitmap).prepareGpuFrame!(entry.command));
+  };
+  return { owner, requests, complete };
+}
+
+it('overlaps two supported annotation preparations and preserves authored order', async () => {
+  const f = controlledPreparations(2);
+  const ledger = createEffectRuntimeGpuFrameLedger();
+  const pending = prepareEffectRuntimeGpuFramePlans({
+    executor: f.owner,
+    plans: Array.from({ length: 4 }, (_, i) => plan('pair-' + i)),
+    ledger,
+  });
+  await vi.waitFor(() => expect(f.requests).toHaveLength(2));
+  await f.complete(1);
+  expect(f.requests).toHaveLength(2);
+  await f.complete(0);
+  await vi.waitFor(() => expect(f.requests).toHaveLength(4));
+  await f.complete(3);
+  await f.complete(2);
+  const frames = await pending;
+  expect([...frames.keys()]).toEqual(['pair-0', 'pair-1', 'pair-2', 'pair-3']);
+  expect(f.requests.map((r) => r.command.sequenceId).sort()).toEqual([0, 1, 2, 3]);
+  for (const frame of frames.values()) frame.dispose();
+  for (const request of f.requests) expect(request.bitmap.close).toHaveBeenCalledOnce();
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+});
+
+it.each(['failure', 'abort', 'reject'] as const)(
+  'drains both submitted results after %s without starting the next annotation',
+  async (outcome) => {
+    const f = controlledPreparations(2);
+    const ledger = createEffectRuntimeGpuFrameLedger();
+    const controller = new AbortController();
+    let settled = false;
+    const pending = prepareEffectRuntimeGpuFramePlans({
+      executor: f.owner,
+      plans: [plan('first'), plan('second'), plan('third')],
+      ledger,
+      signal: controller.signal,
+    });
+    void pending.then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      }
+    );
+    await vi.waitFor(() => expect(f.requests).toHaveLength(2));
+    if (outcome === 'abort') controller.abort();
+    if (outcome === 'reject') {
+      const first = f.requests.find((r) => r.command.sequenceId === 0)!;
+      first.bitmap.close();
+      first.response.reject(new Error('Controlled transport rejection'));
+    } else await f.complete(0, outcome === 'failure');
+    expect(settled).toBe(false);
+    expect(f.requests).toHaveLength(2);
+    await f.complete(1);
+    await expect(pending).rejects.toThrow();
+    expect(f.requests).toHaveLength(2);
+    for (const request of f.requests) expect(request.bitmap.close).toHaveBeenCalledOnce();
+    expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+  }
+);
+
+it('keeps unknown executors serial until the first annotation response', async () => {
+  const f = controlledPreparations();
+  const ledger = createEffectRuntimeGpuFrameLedger();
+  const pending = prepareEffectRuntimeGpuFramePlans({
+    executor: f.owner,
+    plans: [plan('one'), plan('two')],
+    ledger,
+  });
+  await vi.waitFor(() => expect(f.requests).toHaveLength(1));
+  await f.complete(0);
+  await vi.waitFor(() => expect(f.requests).toHaveLength(2));
+  await f.complete(1);
+  for (const frame of (await pending).values()) frame.dispose();
+  expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
+});
+
+it('drains paired over-budget replies without retaining any partial raster', async () => {
+  const bitmaps: Bitmap[] = [];
+  const owner = { ...executor(new Bitmap()), maximumConcurrentPreparationRequests: 2 as const };
+  owner.prepareGpuFrame = async (request) => {
+    const bitmap = new Bitmap(1904, 1072);
+    bitmaps.push(bitmap);
+    return executor(bitmap).prepareGpuFrame!(request);
+  };
+  const ledger = createEffectRuntimeGpuFrameLedger(undefined, 2);
+  await expect(
+    prepareEffectRuntimeGpuFramePlans({
+      executor: owner,
+      ledger,
+      plans: Array.from({ length: 18 }, (_, index) => ({
+        ...plan('paired-mask-' + index),
+        renderDimensions: { width: 1904, height: 1072 },
+      })),
+    })
+  ).rejects.toThrow();
+  expect(bitmaps).toHaveLength(18);
   for (const bitmap of bitmaps) expect(bitmap.close).toHaveBeenCalledOnce();
   expect(ledger.snapshot().liveDecodedRasterBytes).toBe(0);
 });

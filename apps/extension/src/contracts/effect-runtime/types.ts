@@ -187,6 +187,8 @@ export type EffectRuntimeFrameResult =
   | EffectRuntimeFrameSuccess;
 
 export interface EffectRuntimeSandboxExecutor {
+  /** The session owner bounds aggregate active requests; omission retains serial preparation. */
+  readonly maximumConcurrentPreparationRequests?: 1 | 2;
   /** Concurrent GPU preparations return independently owned resources, including bitmap fallback. */
   readonly maximumGpuFramesInFlight?: 2;
   /** Independent frames in one startup advisory cohort; this does not increase queue concurrency. */
@@ -196,7 +198,11 @@ export interface EffectRuntimeSandboxExecutor {
   createWarmExecutor?(): EffectRuntimeSandboxExecutor | undefined;
   /** Prepare transport readiness without a frame request; an unavailable session can retry. */
   preload?(): void;
-  prepareGpuFrame?(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeSceneResult>;
+  /** A local signal can refuse queued work before transfer; submitted results must still drain. */
+  prepareGpuFrame?(
+    request: EffectRuntimeRenderCommand,
+    signal?: AbortSignal
+  ): Promise<EffectRuntimeSceneResult>;
   renderFrame(request: EffectRuntimeRenderCommand): Promise<EffectRuntimeFrameResult>;
 }
 

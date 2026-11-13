@@ -44,12 +44,12 @@ export class PendingEffectRuntimeRequest {
     });
     this.args.active.add(this);
     this.timer = setTimeout(() => {
-      this.args.clearSession();
       this.finish(createEffectRuntimeFailure(this.request, 'timeout'));
+      this.args.clearSession();
     }, this.args.timeoutMs);
     this.channel.port1.onmessageerror = () => {
-      this.args.clearSession();
       this.finish(createEffectRuntimeFailure(this.request, 'malformed'));
+      this.args.clearSession();
     };
     this.channel.port1.onmessage = (event) => this.handleMessage(event);
     this.channel.port1.start();
@@ -57,18 +57,31 @@ export class PendingEffectRuntimeRequest {
     return promise;
   }
 
+  /** Settle a retired session now; drain late transferred resources until reply or deadline. */
+  retire(): void {
+    if (this.settled) return;
+    this.settled = true;
+    this.resolve(createEffectRuntimeFailure(this.request, 'crashed'));
+  }
+
   finish(result: EffectRuntimeSceneResult): void {
     if (this.settled) {
       closeEffectRuntimeGpuSceneResources(result);
+      this.closeReply();
       return;
     }
     this.settled = true;
+    this.closeReply();
+    this.resolve(result);
+  }
+
+  private closeReply(): void {
     if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
     this.args.active.delete(this);
     this.channel.port1.onmessage = null;
     this.channel.port1.onmessageerror = null;
     this.channel.port1.close();
-    this.resolve(result);
   }
 
   private handleMessage(event: MessageEvent<unknown>): void {
@@ -110,8 +123,8 @@ export class PendingEffectRuntimeRequest {
       );
     } catch {
       closeEffectRuntimeBitmaps(this.request.inputFrames);
-      this.args.clearSession();
       this.finish(createEffectRuntimeFailure(this.request, 'crashed'));
+      this.args.clearSession();
     }
   }
 }

@@ -6,7 +6,7 @@ import {
   type AudioProcessing,
   type AudioProcessorIdentity,
 } from '@sniptale/runtime-contracts/audio-effects';
-import generated from './catalog.generated.json';
+import generated from './catalog.generated.json' with { type: 'json' };
 
 const identity = z.strictObject({
   engine: z.enum(['faust', 'rnnoise', 'signalsmith']),
