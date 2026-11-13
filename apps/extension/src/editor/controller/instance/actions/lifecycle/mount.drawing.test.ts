@@ -7,7 +7,7 @@ import { expect, it, vi } from 'vitest';
 import { createImageEditorController } from '../../../core/root';
 import type { EditorControllerInstance } from '../../types';
 import { executeRasterCompute } from '../../../../raster-editing/compute';
-import { createEditorSnapshotHistory } from '../../../history';
+import { createEditorSnapshotHistory, readEditorHistoryState } from '../../../history';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
   DEFAULT_EDITOR_FRAME_SETTINGS,
@@ -275,7 +275,7 @@ it('publishes selected source pixels, fragment preparation and both flips throug
       displayHeight: 4,
       locked: true,
     });
-    expect(controller.history?.getState().index).toBe(1);
+    expect(readEditorHistoryState(controller.history).index).toBe(1);
     runtime.selectAll();
     await runtime.copySelected();
     const copy = canvas.getActiveObject();
@@ -283,14 +283,14 @@ it('publishes selected source pixels, fragment preparation and both flips throug
     expect(copy).not.toBe(source);
     expect(copy?.sniptaleType).toBe('image');
     expect(copy?.objectCaching).toBe(false);
-    expect(controller.history?.getState().index).toBe(2);
+    expect(readEditorHistoryState(controller.history).index).toBe(2);
     canvas.setActiveObject(source);
     runtime.refresh();
     await runtime.flipHorizontal();
     await runtime.flipVertical();
     expect(source.flipX).toBe(true);
     expect(source.flipY).toBe(true);
-    expect(controller.history?.getState().index).toBe(4);
+    expect(readEditorHistoryState(controller.history).index).toBe(4);
   } finally {
     mounted.dispose();
   }

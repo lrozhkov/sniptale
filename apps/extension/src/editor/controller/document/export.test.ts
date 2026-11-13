@@ -7,7 +7,64 @@ import {
   buildEditorCanvasDocument,
   copyEditorRenderedImage,
   renderEditorCanvasToDataUrl,
+  renderEditorCanvasToBlob,
 } from './export';
+
+it('encodes async output without synchronous data URLs and releases the detached render', async () => {
+  const canvas = createExportCanvas();
+  let finish: BlobCallback = () => undefined;
+  const encode = vi.spyOn(canvas.renderedCanvas, 'toBlob').mockImplementation((callback) => {
+    finish = callback;
+  });
+  const promise = renderEditorCanvasToBlob(canvas as never, { format: 'png', quality: 1 });
+  expect(encode).toHaveBeenCalledOnce();
+  expect(canvas.toDataUrlMock).not.toHaveBeenCalled();
+  const output = new Blob(['pixels'], { type: 'image/png' });
+  finish(output);
+  await expect(promise).resolves.toBe(output);
+  expect(canvas.renderedCanvas.width).toBe(0);
+  expect(canvas.renderedCanvas.height).toBe(0);
+});
+
+it('defers canvas JSON encoding while detaching nested data from later canvas mutations', () => {
+  const { canvas, options } = createEditorCanvasDocumentOptions();
+  const serialized = {
+    type: 'Rect',
+    left: 12,
+    custom: { value: 3 },
+    sniptaleRasterState: undefined,
+  };
+  canvas.getObjects.mockReturnValue([{ toObject: () => serialized }] as never);
+  const stringify = vi.spyOn(JSON, 'stringify');
+  const document = buildEditorCanvasDocument(options);
+  expect(stringify).not.toHaveBeenCalled();
+  serialized.left = 90;
+  serialized.custom.value = 99;
+  const snapshot = JSON.parse(document.canvasJson);
+  expect(snapshot.objects[0]).toMatchObject({ left: 12, custom: { value: 3 } });
+  expect(snapshot.objects[0]).not.toHaveProperty('sniptaleRasterState');
+  const calls = stringify.mock.calls.length;
+  expect(document.canvasJson).toBe(document.canvasJson);
+  expect(stringify.mock.calls).toHaveLength(calls);
+});
+
+it('rejects an aborted async render and ignores a late encoder completion', async () => {
+  const canvas = createExportCanvas();
+  const abort = new AbortController();
+  let finish: BlobCallback = () => undefined;
+  vi.spyOn(canvas.renderedCanvas, 'toBlob').mockImplementation((callback) => {
+    finish = callback;
+  });
+  const promise = renderEditorCanvasToBlob(canvas as never, {
+    format: 'png',
+    quality: 1,
+    signal: abort.signal,
+  });
+  abort.abort();
+  await expect(promise).rejects.toBe(abort.signal.reason);
+  finish(new Blob(['obsolete'], { type: 'image/png' }));
+  expect(canvas.renderedCanvas.width).toBe(0);
+});
 import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
 import { Canvas } from 'fabric';
 import { EditorCanvas } from '../../document/canvas-surface/render-region';

@@ -6683,10 +6683,10 @@
       "file": "apps/extension/src/content/drawing/pointer-runtime.ts",
       "symbol": "useDrawingPointerRuntime",
       "owner": "extension:content:drawing",
-      "reason": "tool-noise: Part3 replaces the guide-only ref with one DrawingSnapFeedback ref for the same captured pointer gesture. Guides, relations and primary axis keys are replaced together on update and cleared together on down, finalization and cancellation. The ref is disposable presentation/tie-retention data; controller.session remains the accepted document authority. The hook passes eligible relation objects and the previous envelope into the existing pointer-update owner; it does not calculate a competing correction or retain another session. The opacity input and owner-local eligibility read filter existing document/anchor objects for the same active gesture, without acquiring a resource, installing a new listener or introducing persistence/transport.",
-      "removalCondition": "Remove this exact allowance when this hook AST/signature changes. Reassess any added session/document writer, independent async result publisher, resource/listener lifetime, or second feedback store. Do not extend it to eligibleRelationObjects or another function. Remove it when the analyzer models the single captured gesture without this false positive.",
-      "reviewDate": "2026-11-12",
-      "astHash": "577dd591f9634a6bec4a191a820de2740509443a95becfb189c63dd705c9b119",
+      "reason": "tool-noise: This hook still owns one captured drawing gesture. The change moves its existing finalizer before the move callback and invokes that same finalizer on a primary-button release without pointerup. Draft, pointer identity, preview and cancellation keep one lifetime and one controller.session writer. No new subscription, transport, persistence or resource owner is added. Score remains one; the hard line limit does not distinguish this cohesive hook from mixed authority. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "e667c382e30eae35162d077d6f835acff7bb85a321b055bd6fda33f84e651f78",
       "signatureHash": "6e2189699c966df1adc0ae7ba245ed41a86d003ce3ac2f3e471b6f4ed837b1ca"
     },
     {
@@ -6727,10 +6727,10 @@
       "file": "apps/extension/src/editor/controller/events/drawing.test.ts",
       "symbol": "<file>",
       "owner": "extension:editor:controller",
-      "reason": "tool-noise: Independent read-only inspection confirmed this exact drawing-event consumer suite. Coalesced projection and duplicate-delivery cases reuse the existing drawing-event fixture. Reported receivers are test-local canvas/session instances, mock controls and assertion chains; they introduce no independent runtime authority or fixture lifetime. Fresh complete-candidate architecture review must validate this binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent subject, fixture lifetime, effect owner, state authority, recovery contract or publication policy. Remove when the analyzer models this cohesive scope.",
+      "reason": "tool-noise: The parameterized released-primary tests use the existing event fixture and mocks for pencil and marker. Held-button fixture corrections retain duplicate-delivery and fallback assertions. Each test owns one local drawing session; no independent effect, shared fixture lifetime or production authority is added. Score remains two and cohesion one; file length causes this finding. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-13",
-      "astHash": "13455ea9317227d6a2b583a1f09a0abc977c08502148e5df8cc545760cc3802d",
+      "astHash": "66ed5489738fa112957b3d8b9a7ea4b524fa1f146ea75af4797dbaecf9134995",
       "signatureHash": "c55a421f8f28fa853fdf44912d64ca204d1f549426e142ade54977705cd225cd"
     },
     {
@@ -6738,10 +6738,10 @@
       "file": "apps/extension/src/editor/controller/instance/actions/lifecycle/selection-chrome.test.ts",
       "symbol": "<file>",
       "owner": "extension:editor:controller",
-      "reason": "tool-noise: The added parameterized test observes native authored-point priority and corresponding selection chrome at three zoom levels. Each case uses one local EditorCanvas, one authored arrow and the existing chrome mount/dispose lifecycle. Drawing imports construct the real hit surface required by the proof. No independent service, shared mutable fixture, capture lifetime or production authority is introduced. Score remains four and cohesion remains one.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent fixture setup/cleanup, service, capture lifetime, export replacement or unrelated contract. Remove when the analyzer models this cohesive chrome proof scope. Final fresh architecture review must validate this binding.",
-      "reviewDate": "2026-11-12",
-      "astHash": "6f08f0e7355383be164d5752c2aa9c4ba2a38437ee13fc20e32542287ae23689",
+      "reason": "tool-noise: The added test uses the existing canvas/chrome lifecycle to prove repeated empty renders perform no geometry reads or SVG mutations. Updated hover assertions allow an absent empty preview group while retaining visible-border, zoom, selection, leave, blur and disposal proof. Each test owns an isolated canvas and cleanup; no independent fixture lifetime or production state authority is added. Score remains four and cohesion one. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "a72409c4f9398db6a3708458f622c15980ea732d6bf39b1630fe37b6a066df8b",
       "signatureHash": "7a45cea346373b8a69cf26c486cfd76f66e9d0ce4a5efe33d10616241d040330"
     },
     {
@@ -6749,10 +6749,10 @@
       "file": "apps/extension/src/editor/controller/instance/actions/lifecycle/selection-chrome.ts",
       "symbol": "mountEditorSelectionChrome",
       "owner": "extension:editor:controller",
-      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. One mount/dispose lifetime owns the SVG, subscriptions, transient hover sources and restoration of patched Canvas controls. It has no persistence or transport effect. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-12",
-      "astHash": "6c6d170ed6f324528ca9a62e54ad7bdb142cd1d52dda132c43027d65fa2f75a4",
+      "reason": "tool-noise: This owner still mounts and disposes one SVG selection chrome for one canvas. The fast path reads existing selection/hover/magnet feedback before DOM writes and retains only the existing empty selection node when no visuals are needed. It adds no state receiver, event subscription, capture lifetime or document writer. Existing chrome listeners and cleanup remain together. Score remains four; moving empty rendering into a forwarding owner would distribute the same SVG lifetime. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "ab51e550e1c0efc8b5320982a64638e07c6ca61c3f05a4e709a3d5aac2dc63ef",
       "signatureHash": "f9f9651e46acf9d2cef24f917002ef400eb9764e0138f677ee5b36e0262bfd65"
     },
     {
@@ -6957,11 +6957,11 @@
       "rule": "structural-file-risk",
       "file": "tooling/qa/proof/focused-coverage/maps/editor.mjs",
       "symbol": "<file>",
-      "owner": "qa:focused-coverage:editor",
-      "reason": "tool-noise: Independent read-only inspection confirmed this passive test-owner registry. Two exact vendor mappings select existing region, pixel, Worker and brush tests. They add no threshold, budget, exemption or execution lifetime. Fresh final architecture review must validate this binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent registry authority, test execution policy, threshold, budget or owner boundary. Remove when the analyzer models this passive registry.",
+      "owner": "tooling:qa:proof",
+      "reason": "tool-noise: This passive owner map adds one exact production-file to existing frame-export test binding. It changes discovery to execute the real consumer suite and adds no runtime code, effect, state receiver or competing test-selection authority. Score remains two, effects and state zero, cohesion one; splitting this exact mapping into a forwarding registry would distribute the same owner map. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-13",
-      "astHash": "2ba4014ed74c81f877ca2dd918d99c8a391e81ba06cdefe2e0e4773c0458e681",
+      "astHash": "ad01319266ce2959b2bb00b11ea2103024731b7598436654e5bb8d42aa337168",
       "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
     },
     {
@@ -7090,11 +7090,22 @@
       "file": "apps/extension/src/editor/controller/draw-workflow/completion.drawing.test.ts",
       "symbol": "describe callback",
       "owner": "extension:editor:controller",
-      "reason": "tool-noise: Independent read-only inspection confirmed this exact completion consumer suite. The terminal-paint cases keep preview setup, controlled frame delivery, synchronous history assertions and canvas cleanup within one stroke-completion lifecycle. The describe callback registers tests and owns no runtime state. Fresh complete-candidate architecture review must validate this binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent subject, fixture lifetime, effect owner, state authority, recovery contract or publication policy. Remove when the analyzer models this cohesive scope.",
+      "reason": "tool-noise: This describe callback registers completion tests using the same stroke fixture and controlled frame delivery. New assertions compare the final top-plane preview with the scheduled committed render. It owns no production state or independent fixture lifetime. Score remains one and cohesion remains one; extracting a registration callback would add navigation without separating an owner. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
       "reviewDate": "2026-11-13",
-      "astHash": "b7f0656ca112c021152c47030f8e7fea976a36a9cd689249469a28e6ffffef3f",
+      "astHash": "8e87310382d66707ab017b04489869fe1421a07291ab0897cdf880218deba215",
       "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/controller/events/drawing.ts",
+      "symbol": "createEditorDrawingEventHandlers",
+      "owner": "extension:editor:controller",
+      "reason": "tool-noise: This factory binds handlers for one Fabric drawing gesture. Text target, modifier gesture and duplicate delivery identity settle through the existing completion/cancellation adapters. The change adds primary-release completion to the existing move receiver. It adds no effect, state authority, recovery owner or public contract. Its own score is one, cyclomatic one, effects zero and cohesion one; callback registration length causes this finding. Fresh complete-candidate architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
+      "reviewDate": "2026-11-13",
+      "astHash": "f27f8102db3d51273ef7a36b629986dca7d904a393f2101c266a635dd0e50c63",
+      "signatureHash": "315fc35e7e67743337620059df01494b2b0a0aa130724de67a2017702d1709ce"
     }
   ]
 }

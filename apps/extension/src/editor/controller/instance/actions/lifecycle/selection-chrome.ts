@@ -305,8 +305,11 @@ function appendSelection(
   }
 }
 
-function appendGuides(svg: SVGElement, magnet: EditorMagnetManager, zoom: number): void {
-  const accepted = magnet.getVisualFeedback();
+function appendGuides(
+  svg: SVGElement,
+  accepted: ReturnType<EditorMagnetManager['getVisualFeedback']>,
+  zoom: number
+): void {
   const feedback = resolveDrawingAlignmentFeedback(accepted.guides, zoom, accepted.relations);
   const color = 'var(--sniptale-color-canvas-magnet, #9854d8)';
   for (const line of feedback.lines)
@@ -425,27 +428,42 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     const width = canvas.getWidth();
     const height = canvas.getHeight();
     if (width <= 0 || height <= 0) return;
-    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-    const zoom = screenScale(canvas);
-    selection.replaceChildren();
     const activeObject = canvas.getActiveObject();
+    const activeObjects = canvas.getActiveObjects?.() ?? [];
+    const candidates =
+      canvas instanceof EditorCanvas && !previewSuspended
+        ? layerHoverTarget && layerHoverTarget.visible && !activeObjects.includes(layerHoverTarget)
+          ? [layerHoverTarget]
+          : canvas.getSelectionPreviewObjects(hoverTarget)
+        : [];
+    const accepted = magnet.getVisualFeedback();
+    if (
+      !activeObject &&
+      !activeObjects.length &&
+      !candidates.length &&
+      !accepted.guides.length &&
+      !accepted.relations.length
+    ) {
+      if (selection.childNodes.length) selection.replaceChildren();
+      if (svg.childNodes.length !== 1 || svg.firstChild !== selection)
+        svg.replaceChildren(selection);
+      return;
+    }
+    // Read layout before SVG writes; empty freehand chrome must not invalidate layout.
+    const zoom = screenScale(canvas);
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    selection.replaceChildren();
     if (activeObject) appendSelection(selection, activeObject, zoom, touchedControls);
-    for (const object of canvas.getActiveObjects?.() ?? []) {
+    for (const object of activeObjects) {
       const bounds = projected?.resolve(object);
       if (bounds) appendSelectionBorder(selection, object, zoom, false, bounds);
     }
     const guides = svgElement('g', {
       transform: `matrix(${(canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]).join(' ')})`,
     });
-    appendGuides(guides, magnet, zoom * (canvas.viewportTransform?.[0] ?? 1));
+    appendGuides(guides, accepted, zoom * (canvas.viewportTransform?.[0] ?? 1));
     const previews = svgElement('g', { 'data-ui': 'editor.canvas.selection-preview' });
     if (canvas instanceof EditorCanvas && !previewSuspended) {
-      const candidates =
-        layerHoverTarget &&
-        layerHoverTarget.visible &&
-        !canvas.getActiveObjects().includes(layerHoverTarget)
-          ? [layerHoverTarget]
-          : canvas.getSelectionPreviewObjects(hoverTarget);
       for (const object of candidates) {
         const bounds = projected?.resolve(object);
         if (bounds !== null)

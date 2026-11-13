@@ -1,36 +1,15 @@
-import type { Canvas } from 'fabric';
 import type { EditorControllerEventStateBindings } from './types';
 import { readEditorDrawingObject } from '../../drawing/object/metadata';
 import { renderEditorFreehandPreview } from '../../drawing/preview';
 
 type PreviewBindings = Pick<EditorControllerEventStateBindings, 'getCanvas' | 'getDrawSession'>;
-const pendingPreviews = new WeakMap<Canvas, number>();
-
-export function cancelEditorFreehandPreview(canvas: Canvas): void {
-  const frame = pendingPreviews.get(canvas);
-  if (frame === undefined) return;
-  window.cancelAnimationFrame(frame);
-  pendingPreviews.delete(canvas);
-}
-
-export function requestEditorFreehandPreview(bindings: PreviewBindings): void {
+export function renderEditorFreehandDraft(bindings: PreviewBindings): void {
   const canvas = bindings.getCanvas();
-  if (!canvas || pendingPreviews.has(canvas)) return;
   const session = bindings.getDrawSession();
-  const frame = window.requestAnimationFrame(() => {
-    pendingPreviews.delete(canvas);
-    if (
-      canvas.disposed ||
-      canvas.destroyed ||
-      bindings.getCanvas() !== canvas ||
-      !session ||
-      bindings.getDrawSession() !== session ||
-      session.object?.visible
-    )
-      return;
-    canvas.renderTop();
-  });
-  pendingPreviews.set(canvas, frame);
+  if (!canvas || canvas.disposed || canvas.destroyed || !session?.object || session.object.visible)
+    return;
+  // Native pointermove already batches samples; another rAF delays the accepted tail.
+  canvas.renderTop();
 }
 
 function renderActiveDrawingPreview(
@@ -57,7 +36,6 @@ export function createAfterRenderHandler(
       return;
     }
 
-    cancelEditorFreehandPreview(canvas);
     const ctx = canvas.getSelectionContext();
     if (!ctx || !canvas.viewportTransform) {
       return;

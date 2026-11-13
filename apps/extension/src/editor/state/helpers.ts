@@ -111,16 +111,43 @@ export function createRuntimePatch(
   state: EditorState,
   patch: EditorRuntimePatch
 ): RuntimeStatePatch {
-  return {
+  const selection = patch.selection
+    ? {
+        ...patch.selection,
+        selectedObjectIds:
+          patch.selection.selectedObjectIds.length === state.selection.selectedObjectIds.length &&
+          patch.selection.selectedObjectIds.every(
+            (id, index) => id === state.selection.selectedObjectIds[index]
+          )
+            ? state.selection.selectedObjectIds
+            : patch.selection.selectedObjectIds,
+      }
+    : state.selection;
+  const next: RuntimeStatePatch = {
     layers: patch.layers ? retainLayerProjections(state.layers, patch.layers) : state.layers,
-    selection: patch.selection ?? state.selection,
+    selection: retainFlatProjection(state.selection, selection),
     cropReady: patch.cropReady,
-    cropSelection: patch.cropSelection,
-    history: patch.history ?? state.history,
-    viewport: patch.viewport ?? state.viewport,
-    frame: patch.frame ? normalizeEditorFrameSettings(patch.frame) : state.frame,
-    browserFrame: patch.browserFrame ?? state.browserFrame,
+    cropSelection:
+      state.cropSelection && patch.cropSelection
+        ? retainFlatProjection(state.cropSelection, patch.cropSelection)
+        : patch.cropSelection,
+    history: retainFlatProjection(state.history, patch.history ?? state.history),
+    viewport: retainFlatProjection(state.viewport, patch.viewport ?? state.viewport),
+    frame:
+      patch.frame && patch.frame !== state.frame
+        ? normalizeEditorFrameSettings(patch.frame)
+        : state.frame,
+    browserFrame: retainFlatProjection(
+      state.browserFrame,
+      patch.browserFrame ?? state.browserFrame
+    ),
   };
+  const keys = Object.keys(next) as Array<keyof RuntimeStatePatch>;
+  return keys.every((key) => Object.is(next[key], state[key])) ? state : next;
+}
+
+function retainFlatProjection<T extends object>(previous: T, next: T): T {
+  return previous === next || sameProjectionFields(previous, next) ? previous : next;
 }
 
 function sameProjectionFields<T extends object>(previous: T, next: T): boolean {

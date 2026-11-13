@@ -23,6 +23,19 @@ import {
 } from '../../document/import-boundary';
 
 const transientDrawingObjects = new WeakMap<FabricObject, DrawingObject>();
+const parsedDrawingObjects = new WeakMap<
+  FabricObject,
+  { serialized: string | undefined; drawing: DrawingObject | null }
+>();
+
+function readCommittedDrawingObject(target: FabricObject): DrawingObject | null {
+  const serialized = target.sniptaleDrawingJson;
+  const cached = parsedDrawingObjects.get(target);
+  if (cached && cached.serialized === serialized) return cached.drawing;
+  const drawing = parseEditorDrawingMetadata(serialized);
+  parsedDrawingObjects.set(target, { serialized, drawing });
+  return drawing;
+}
 
 export function writeEditorDrawingObject(target: FabricObject, object: DrawingObject): void {
   transientDrawingObjects.delete(target);
@@ -44,8 +57,7 @@ export function stageEditorDrawingObject(target: FabricObject, object: DrawingOb
 }
 
 export function readEditorDrawingObject(target: FabricObject): DrawingObject | null {
-  const drawing =
-    transientDrawingObjects.get(target) ?? parseEditorDrawingMetadata(target.sniptaleDrawingJson);
+  const drawing = transientDrawingObjects.get(target) ?? readCommittedDrawingObject(target);
   if (drawing?.kind !== 'simplify') return drawing;
   const result =
     target instanceof FabricImage

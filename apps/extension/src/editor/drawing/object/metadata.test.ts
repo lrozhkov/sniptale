@@ -519,6 +519,28 @@ it('replaces staged preview metadata when committing through the document serial
   expect(JSON.parse(object.sniptaleDrawingJson!)).toEqual({ version: 1, object: committed });
 });
 
+it('reuses validated metadata until the serialized value changes and keeps staged edits authoritative', () => {
+  const object = createEditorDrawingFabricObject(shape, 1);
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    const committed = readEditorDrawingObject(object);
+    const calls = parse.mock.calls.length;
+    expect(readEditorDrawingObject(object)).toBe(committed);
+    expect(parse.mock.calls).toHaveLength(calls);
+    const replacement = { ...shape, color: '#123456' };
+    object.sniptaleDrawingJson = JSON.stringify({ version: 1, object: replacement });
+    expect(readEditorDrawingObject(object)).toEqual(replacement);
+    object.sniptaleDrawingJson = '{invalid';
+    expect(readEditorDrawingObject(object)).toBeNull();
+    stageEditorDrawingObject(object, shape);
+    expect(readEditorDrawingObject(object)).toBe(shape);
+    writeEditorDrawingObject(object, replacement);
+    expect(readEditorDrawingObject(object)).toEqual(replacement);
+  } finally {
+    parse.mockRestore();
+  }
+});
+
 it('scales text font metadata only for coordinated scene layout', () => {
   const object = createEditorDrawingFabricObject(
     {

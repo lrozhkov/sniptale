@@ -458,7 +458,7 @@ describe('drawing beyond the image and canvas', () => {
     mocks.updatePath.mockReturnValue(true);
 
     const outside = document.createElement('div');
-    const move = new MouseEvent('mousemove', { bubbles: true });
+    const move = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
     Object.defineProperty(move, 'target', { value: outside });
     path.handlers.handleMouseMove({ e: move });
 
@@ -488,7 +488,7 @@ describe('drawing pointer continuity', () => {
     mocks.readDrawing.mockReturnValue({ id: 'pencil-1', kind: 'pencil' });
     mocks.updateDrawing.mockReturnValue({ id: 'pencil-1', kind: 'pencil' });
     mocks.updatePath.mockReturnValue(true);
-    const move = new MouseEvent('mousemove', { bubbles: true });
+    const move = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
     path.canvas.upperCanvasEl.dispatchEvent(move);
 
     path.handlers.handleMouseMove({ e: move });
@@ -508,7 +508,7 @@ describe('drawing pointer continuity', () => {
     mocks.readDrawing.mockReturnValue({ id: 'marker-1', kind: 'marker' });
     mocks.updateDrawing.mockReturnValue({ id: 'marker-1', kind: 'marker' });
     mocks.updatePath.mockReturnValue(true);
-    const move = new MouseEvent('mousemove', { bubbles: true });
+    const move = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
 
     path.handlers.handleMouseMove({ e: move });
     path.handlers.handleMouseMove({ e: move });
@@ -516,6 +516,23 @@ describe('drawing pointer continuity', () => {
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
     expect(mocks.stageDrawing).toHaveBeenCalledOnce();
   });
+
+  it.each(['pencil', 'marker'] as const)(
+    'finishes %s before ingesting a move with primary released',
+    (tool) => {
+      const path = createBindings(tool);
+      path.bindings.getDrawSession.mockReturnValue({
+        object: { id: 'path-object' },
+        start: { x: 1, y: 2 },
+        tool,
+      });
+      const move = new MouseEvent('mousemove', { buttons: 2 });
+      path.handlers.handleMouseMove({ e: move });
+      expect(mocks.complete).toHaveBeenCalledWith(path.bindings);
+      expect(mocks.appendSamples).not.toHaveBeenCalled();
+      expect(mocks.stageDrawing).not.toHaveBeenCalled();
+    }
+  );
 
   it('starts resizing a geometric draft on the first window move without a hold delay', () => {
     const shape = createBindings('shape');
@@ -527,7 +544,7 @@ describe('drawing pointer continuity', () => {
     });
     mocks.readDrawing.mockReturnValue({ id: 'shape-1', kind: 'rectangle' });
     mocks.updateDrawing.mockReturnValue({ id: 'shape-1', kind: 'rectangle' });
-    const move = new MouseEvent('mousemove', { bubbles: true });
+    const move = new MouseEvent('mousemove', { bubbles: true, buttons: 1 });
 
     shape.handlers.handleMouseMove({ e: move });
 
@@ -563,7 +580,7 @@ describe('drawing pointer continuity', () => {
 
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
     expect(mocks.stageDrawing).toHaveBeenCalledOnce();
-    expect(requestFrame).toHaveBeenCalledOnce();
+    expect(requestFrame).not.toHaveBeenCalled();
   });
 
   it('cancels queued drawing work and the Fabric transform on pointer cancellation', () => {

@@ -392,6 +392,21 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     ]
   );
 
+  const finalizeDraft = useCallback(
+    (event?: Event) => {
+      const draft = draftRef.current;
+      commitPointerDraft(controller, draft, event, simplifyDraft.getSource());
+      draftRef.current = null;
+      simplifyDraft.clear();
+      alignmentFeedbackRef.current = { guides: [], relations: [], acceptedByAxis: {} };
+      clearHover();
+      activePointerRef.current = null;
+      lastPointerEventRef.current = null;
+      changed();
+    },
+    [changed, controller, simplifyDraft, clearHover]
+  );
+
   const onPointerMove = useCallback(
     (
       event: ReactPointerEvent<HTMLCanvasElement>,
@@ -406,6 +421,15 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
         return;
       }
       if (draft.kind === 'bend' && event.pointerId !== activePointerRef.current) return;
+      if (
+        draft.kind === 'create' &&
+        (draft.object.kind === 'pencil' || draft.object.kind === 'marker') &&
+        event.pointerId === activePointerRef.current &&
+        (event.buttons & 1) === 0
+      ) {
+        finalizeDraft(event.nativeEvent);
+        return;
+      }
       const isTextTransform =
         (draft.kind === 'move' || draft.kind === 'resize') && draft.original.kind === 'text';
       if (isTextTransform) {
@@ -433,7 +457,16 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
       if (update.selection) controller.session.setSelection(update.selection);
       changed();
     },
-    [args.alignMoves, args.getObjectOpacity, changed, controller, root, simplifyDraft, updateHover]
+    [
+      args.alignMoves,
+      args.getObjectOpacity,
+      changed,
+      controller,
+      finalizeDraft,
+      root,
+      simplifyDraft,
+      updateHover,
+    ]
   );
 
   useDrawingAlignmentModifiers({
@@ -443,21 +476,6 @@ export function useDrawingPointerRuntime(args: DrawingPointerRuntimeOptions) {
     lastPointerEventRef,
     onPointerMove,
   });
-
-  const finalizeDraft = useCallback(
-    (event?: Event) => {
-      const draft = draftRef.current;
-      commitPointerDraft(controller, draft, event, simplifyDraft.getSource());
-      draftRef.current = null;
-      simplifyDraft.clear();
-      alignmentFeedbackRef.current = { guides: [], relations: [], acceptedByAxis: {} };
-      clearHover();
-      activePointerRef.current = null;
-      lastPointerEventRef.current = null;
-      changed();
-    },
-    [changed, controller, simplifyDraft, clearHover]
-  );
 
   const { finishPointer, cancelPointer } = useDrawingPointerCompletion(
     draftRef,

@@ -24,11 +24,7 @@ vi.mock('../../drawing/preview', () => ({
   renderEditorFreehandPreview: mocks.renderPreview,
 }));
 
-import {
-  cancelEditorFreehandPreview,
-  createAfterRenderHandler,
-  requestEditorFreehandPreview,
-} from './runtime.render';
+import { createAfterRenderHandler, renderEditorFreehandDraft } from './runtime.render';
 import { createBeforeRenderHandler } from './runtime.canvas';
 import type { DrawSession } from '../core/types';
 
@@ -234,9 +230,6 @@ function createPreviewLifecycle() {
     end: () => {
       session = null;
     },
-    replace: () => {
-      session = session ? { ...session } : null;
-    },
     detachCanvas: () => {
       currentCanvas = null;
     },
@@ -245,22 +238,20 @@ function createPreviewLifecycle() {
 
 afterEach(() => vi.restoreAllMocks());
 
-it('coalesces top frames without rendering committed objects and clears each translucent preview', () => {
+it('paints each accepted batch immediately on the top plane without redrawing committed objects', () => {
   const fixture = createPreviewLifecycle();
-  const { canvas, bindings, flush } = fixture;
+  const { canvas, bindings } = fixture;
   const committed = new Rect();
   canvas.add(committed);
   const render = vi.spyOn(committed, 'render');
   const clear = vi.spyOn(canvas, 'clearContext');
-  for (let i = 0; i < 8; i++) requestEditorFreehandPreview(bindings);
-  expect(fixture.frames.size).toBe(1);
-  flush();
+  renderEditorFreehandDraft(bindings);
+  expect(fixture.frames.size).toBe(0);
   expect(render).not.toHaveBeenCalled();
   expect(mocks.renderPreview).toHaveBeenCalledOnce();
   expect(clear).toHaveBeenCalledExactlyOnceWith(canvas.contextTop);
   expect(canvas.contextTopDirty).toBe(true);
-  requestEditorFreehandPreview(bindings);
-  flush();
+  renderEditorFreehandDraft(bindings);
   expect(clear).toHaveBeenCalledTimes(2);
   expect(mocks.renderPreview).toHaveBeenCalledTimes(2);
   fixture.end();
@@ -271,34 +262,26 @@ it('coalesces top frames without rendering committed objects and clears each tra
   canvas.destroy();
 });
 
-it.each(['before', 'after'])(
-  'refreshes a live preview with the scene %s a queued top frame',
-  (order) => {
-    const { canvas, bindings, frames, flush } = createPreviewLifecycle();
-    const transform = vi.spyOn(canvas.contextTop, 'transform');
-    requestEditorFreehandPreview(bindings);
-    if (order === 'after') flush();
-    const previous = mocks.renderPreview.mock.calls.length;
-    canvas.viewportTransform = [2, 0, 0, 2, 13, 27];
-    canvas.renderAll();
-    expect(transform).toHaveBeenLastCalledWith(2, 0, 0, 2, 13, 27);
-    expect(mocks.renderPreview).toHaveBeenCalledTimes(previous + 1);
-    expect(frames.size).toBe(0);
-    flush();
-    expect(mocks.renderPreview).toHaveBeenCalledTimes(previous + 1);
-    canvas.destroy();
-  }
-);
+it('refreshes an immediate preview with a changed scene viewport', () => {
+  const { canvas, bindings, frames } = createPreviewLifecycle();
+  const transform = vi.spyOn(canvas.contextTop, 'transform');
+  renderEditorFreehandDraft(bindings);
+  canvas.viewportTransform = [2, 0, 0, 2, 13, 27];
+  canvas.renderAll();
+  expect(transform).toHaveBeenLastCalledWith(2, 0, 0, 2, 13, 27);
+  expect(frames.size).toBe(0);
+  expect(mocks.renderPreview).toHaveBeenCalledTimes(2);
+  canvas.destroy();
+});
 
-it.each(['end', 'replace', 'detachCanvas', 'cancel', 'dispose', 'visible'] as const)(
-  'does not paint queued previews after %s',
+it.each(['end', 'detachCanvas', 'dispose', 'visible'] as const)(
+  'does not paint drafts after %s',
   (transition) => {
     const fixture = createPreviewLifecycle();
-    requestEditorFreehandPreview(fixture.bindings);
-    if (transition === 'cancel') cancelEditorFreehandPreview(fixture.canvas);
-    else if (transition === 'dispose') fixture.canvas.disposed = true;
+    if (transition === 'dispose') fixture.canvas.disposed = true;
     else if (transition === 'visible') fixture.object.visible = true;
     else fixture[transition]();
+    renderEditorFreehandDraft(fixture.bindings);
     fixture.flush();
     expect(mocks.renderPreview).not.toHaveBeenCalled();
     fixture.canvas.destroy();

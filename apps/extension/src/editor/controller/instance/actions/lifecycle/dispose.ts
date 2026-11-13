@@ -1,3 +1,4 @@
+import { cancelDeferredEditorHistory } from '../../../history';
 import { unmountEditorRasterRuntime } from '../../../../raster-editing/runtime';
 import { unmountEditorSimplifyRuntime } from '../../../../drawing/simplify-runtime';
 import { detachEditorControllerEventHandlers } from '../../../events';
@@ -7,6 +8,7 @@ import { detachEditorCanvasPointerCapture } from './pointer-capture';
 import { disposeEditorSelectionChrome } from './selection-chrome';
 
 export function disposeEditorController(controller: EditorControllerInstance): void {
+  cancelDeferredEditorHistory(controller.history);
   ensureEditorCanvasReadyHandoff(controller).tearDown();
 
   if (!controller.canvas) {

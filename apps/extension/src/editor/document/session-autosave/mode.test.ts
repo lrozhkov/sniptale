@@ -8,6 +8,39 @@ import {
   commitWorkspaceMock,
 } from './autosave.test-support';
 
+it('keeps an Undo result dirty while an older save acknowledges, then saves the newer revision', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const { useEditorStore } = await import('../../state/useEditorStore');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  let release: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(
+    (input) =>
+      new Promise((resolve) => {
+        release = () =>
+          resolve({ revision: input.expectedRevision + 1, documentAssetsByRuntimeUrl: new Map() });
+      })
+  );
+  const saving = autosave.saveNow(() => createDocument('before-undo'));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  autosave.scheduleAutosave(createDocument('after-undo'));
+  release();
+  await saving;
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  expect(useEditorStore.getState().saveState).not.toBe('saved');
+  await autosave.flushAutosave(() => createDocument('after-undo'));
+  expect(commitWorkspaceMock.mock.calls.map(([input]) => input.document.sourceImageData)).toEqual([
+    'before-undo',
+    'after-undo',
+  ]);
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ expectedRevision: 1 })
+  );
+  expect(autosave.hasUnsavedChanges()).toBe(false);
+  autosave.dispose();
+});
+
 describe('image autosave ordered snapshot barriers', () => {
   it.each(['saveNow', 'persistSnapshot'] as const)(
     'joins an accepted %s that supersedes its pending autosave barrier',

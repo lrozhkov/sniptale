@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { Canvas, Group, Point, Rect, Textbox } from 'fabric';
+import { Canvas, Group, Path, Point, Rect, Textbox } from 'fabric';
 import { EditorCanvas } from '../../document/canvas-surface/render-region';
 import { serializeCanvasObjects } from '../../controller/document/serialization';
 import { createEditorDrawingFabricObject } from './vector';
@@ -9,6 +9,82 @@ import {
   restoreCanonicalEditorDrawingObjects,
 } from './canonicalize';
 import { readEditorDrawingObject, writeEditorDrawingObject } from './metadata';
+
+it.each(['pencil', 'marker'] as const)(
+  'restores compact %s snapshots from every source sample with identical pixels',
+  async (kind) => {
+    const canvas = new Canvas(document.createElement('canvas'), {
+      width: 400,
+      height: 240,
+      renderOnAddRemove: false,
+      enableRetinaScaling: false,
+    });
+    try {
+      const drawing = {
+        id: 'compact-stroke',
+        kind,
+        color: '#cc4411',
+        width: 8,
+        opacity: 0.4,
+        samples: Array.from({ length: 120 }, (_, index) => ({
+          x: 30 + index * 2,
+          y: 90 + Math.sin(index / 8) * 30,
+          t: index,
+        })),
+      };
+      const object = createEditorDrawingFabricObject(drawing, 1);
+      object.objectCaching = false;
+      canvas.add(object);
+      canvas.setViewportTransform([0.73, 0, 0, 0.73, 12, 23]);
+      canvas.renderAll();
+      const before = canvas.getContext().getImageData(0, 0, 400, 240).data;
+      const json = serializeCanvasObjects(canvas);
+      expect(JSON.parse(json).objects[0].path).toEqual([['M', 0, 0]]);
+      await canvas.loadFromJSON(json);
+      restoreCanonicalEditorDrawingObjects({
+        canvas,
+        source: null,
+        prepareObject: (restored) => {
+          restored.objectCaching = false;
+        },
+      });
+      const restored = canvas.getObjects()[0]!;
+      expect(restored.sniptaleId).toBe(drawing.id);
+      expect(readEditorDrawingObject(restored)).toEqual(drawing);
+      canvas.renderAll();
+      expect(canvas.getContext().getImageData(0, 0, 400, 240).data).toEqual(before);
+    } finally {
+      canvas.destroy();
+    }
+  }
+);
+
+it('retains native paths for ordinary paths and grouped freehand children', () => {
+  const native = new Path('M 10 20 L 60 80');
+  native.sniptaleRole = 'annotation';
+  native.sniptaleType = 'shape';
+  const child = createEditorDrawingFabricObject(
+    {
+      id: 'nested-stroke',
+      kind: 'pencil',
+      color: '#000',
+      width: 4,
+      samples: [
+        { x: 20, y: 20, t: 0 },
+        { x: 80, y: 40, t: 1 },
+      ],
+    },
+    1
+  );
+  const group = new Group([child]);
+  group.sniptaleType = 'group';
+  group.sniptaleRole = 'annotation';
+  const serialized = JSON.parse(
+    serializeCanvasObjects({ getObjects: () => [native, group] } as never)
+  );
+  expect(serialized.objects[0].path).toEqual(native.path);
+  expect(serialized.objects[1].objects[0].path).toEqual((child as Path).path);
+});
 
 it('restores a scene-scaled text layer below the insertion minimum without changing its width or identity', () => {
   const canvas = new Canvas(document.createElement('canvas'), { renderOnAddRemove: false });

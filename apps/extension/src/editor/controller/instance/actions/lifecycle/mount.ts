@@ -1,7 +1,7 @@
 import { mountEditorRasterRuntime } from '../../../../raster-editing/runtime';
 import { createRasterTargetAdapter } from '../../../../raster-editing/adapters';
 import { syncSourceStateFromObject } from '../../../document/source';
-import { replaceCurrentEditorSnapshotHistory } from '../../../history';
+import { flushDeferredEditorHistory, replaceCurrentEditorSnapshotHistory } from '../../../history';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../../../platform/i18n';
 import { mountEditorSimplifyRuntime } from '../../../../drawing/simplify-runtime';
@@ -87,6 +87,7 @@ export function mountEditorController(
         publishDerived: () => {
           const history = controller.history;
           if (!history) return false;
+          flushDeferredEditorHistory(history);
           const changed = replaceCurrentEditorSnapshotHistory({
             history,
             expectedRevision: history.getRevision(),

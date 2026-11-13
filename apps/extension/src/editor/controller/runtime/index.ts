@@ -1,3 +1,4 @@
+import { readEditorHistoryState } from '../history';
 import type { Canvas, FabricObject } from 'fabric';
 import type { EditorViewportState } from '../../../features/editor/document/types';
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
@@ -14,17 +15,6 @@ function getSelectedObjectLabel(object: FabricObject | null): string | null {
   }
 
   return object.sniptaleRichShape.source?.name ?? object.sniptaleRichShape.shapeKind;
-}
-
-function getEditorHistoryState(history: SnapshotHistory<string> | null) {
-  return history
-    ? {
-        canUndo: history.getState().canUndo,
-        canRedo: history.getState().canRedo,
-        index: history.getState().index,
-        size: history.getState().size,
-      }
-    : { canUndo: false, canRedo: false, index: 0, size: 1 };
 }
 
 function getSelectedObject(activeObjects: FabricObject[]) {
@@ -55,7 +45,7 @@ export function syncEditorRuntimeState(
     syncSelectionToolSettingsFromObject(selectedObject, singleType);
   }
 
-  const historyState = getEditorHistoryState(history);
+  const historyState = readEditorHistoryState(history);
 
   store.syncRuntime({
     layers,

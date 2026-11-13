@@ -9,13 +9,13 @@ const mocks = vi.hoisted(() => ({
   blobToDataUrl: vi.fn(async () => 'data:image/png;base64,final'),
   dataUrlToBlob: vi.fn(async () => new Blob(['base'], { type: 'image/png' })),
   rasterize: vi.fn(),
-  renderCanvas: vi.fn(() => 'data:image/png;base64,base'),
+  renderCanvas: vi.fn(async () => new Blob(['base'], { type: 'image/png' })),
   showToast: vi.fn(),
 }));
 
 vi.mock('../controller/document/export', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../controller/document/export')>()),
-  renderEditorCanvasToDataUrl: mocks.renderCanvas,
+  renderEditorCanvasToBlob: mocks.renderCanvas,
 }));
 vi.mock('../../composition/frame-annotation-raster-client', () => ({
   rasterizeFrameAnnotations: mocks.rasterize,
@@ -65,7 +65,7 @@ it('delegates directly when the Fabric canvas is unavailable', async () => {
       canvasDocumentSize: { width: 200, height: 100 },
       renderOptions: { format: 'png', quality: 100 },
     })
-  ).resolves.toBe('data:image/png;base64,base');
+  ).resolves.toBe('data:image/png;base64,final');
   expect(mocks.renderCanvas).toHaveBeenCalledWith(null, { format: 'png', quality: 100 });
 });
 
@@ -302,7 +302,7 @@ it('omits a hidden frame annotation from the DOM raster export', async () => {
       canvasDocumentSize: { width: 200, height: 100 },
       renderOptions: { format: 'png', quality: 100 },
     })
-  ).resolves.toBe('data:image/png;base64,base');
+  ).resolves.toBe('data:image/png;base64,final');
   expect(mocks.rasterize).not.toHaveBeenCalled();
   expect(proxy.visible).toBe(false);
 });
@@ -346,8 +346,11 @@ it.each([
 ])('converts the raster PNG to $format with normalized quality', async (fixture) => {
   const { canvas } = createCanvas();
   const drawImage = vi.fn();
-  const toDataURL = vi.fn(() => `data:${fixture.mime};base64,converted`);
-  const outputCanvas = { getContext: vi.fn(() => ({ drawImage })), height: 0, toDataURL, width: 0 };
+  const toBlob = vi.fn((callback: BlobCallback) =>
+    callback(new Blob(['converted'], { type: fixture.mime }))
+  );
+  const outputCanvas = { getContext: vi.fn(() => ({ drawImage })), height: 0, toBlob, width: 0 };
+  mocks.blobToDataUrl.mockResolvedValueOnce(`data:${fixture.mime};base64,converted`);
   const revokeObjectURL = vi.fn();
   vi.stubGlobal(
     'Image',
@@ -370,7 +373,7 @@ it.each([
   ).resolves.toBe(`data:${fixture.mime};base64,converted`);
   expect(outputCanvas).toMatchObject({ height: 100, width: 200 });
   expect(drawImage).toHaveBeenCalledOnce();
-  expect(toDataURL).toHaveBeenCalledWith(fixture.mime, fixture.encodedQuality);
+  expect(toBlob).toHaveBeenCalledWith(expect.any(Function), fixture.mime, fixture.encodedQuality);
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:raster');
 });
 

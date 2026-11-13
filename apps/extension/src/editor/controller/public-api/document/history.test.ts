@@ -310,10 +310,14 @@ it('does not decode the current snapshot on a successful undo or redo', async ()
   const parse = vi.spyOn(JSON, 'parse');
   try {
     await undoEditorControllerSnapshot(controller);
-    expect(parse).toHaveBeenCalledTimes(1);
+    expect(parse.mock.calls.filter(([value]) => value === JSON.stringify(original))).toHaveLength(
+      1
+    );
+    expect(parse.mock.calls.some(([value]) => value === JSON.stringify(edited))).toBe(false);
     parse.mockClear();
     await redoEditorControllerSnapshot(controller);
-    expect(parse).toHaveBeenCalledTimes(1);
+    expect(parse.mock.calls.filter(([value]) => value === JSON.stringify(edited))).toHaveLength(1);
+    expect(parse.mock.calls.some(([value]) => value === JSON.stringify(original))).toBe(false);
   } finally {
     parse.mockRestore();
   }

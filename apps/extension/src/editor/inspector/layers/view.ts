@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useEditorController } from '../../application/controller-context';
 import { createLayerDropHandler } from './drop';
 import { useLayerPanelHeight } from './height';
@@ -28,13 +28,16 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
   const { initialScrollOffset, onScrollOffsetChange } = args;
   useLayoutEffect(() => {
     const list = height.listRef.current;
-    if (!list || !state.expanded) return;
-    if (initialScrollOffset === undefined && !onScrollOffsetChange) return;
-    if (initialScrollOffset !== undefined) list.scrollTop = initialScrollOffset;
-    const remember = () => onScrollOffsetChange?.(list.scrollTop);
+    if (list && state.expanded && initialScrollOffset !== undefined)
+      list.scrollTop = initialScrollOffset;
+  }, [height.listRef, state.expanded, initialScrollOffset]);
+  useEffect(() => {
+    const list = height.listRef.current;
+    if (!list || !state.expanded || !onScrollOffsetChange) return;
+    const remember = () => onScrollOffsetChange(list.scrollTop);
     list.addEventListener('scroll', remember, { passive: true });
     return () => list.removeEventListener('scroll', remember);
-  }, [height.listRef, state.expanded, initialScrollOffset, onScrollOffsetChange]);
+  }, [height.listRef, state.expanded, onScrollOffsetChange]);
   const handleLayerDrop = useMemo(
     () =>
       createLayerDropHandler({

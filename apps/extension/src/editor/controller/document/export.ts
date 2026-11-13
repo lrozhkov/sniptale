@@ -13,7 +13,8 @@ import {
 import { translate } from '../../../platform/i18n';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { normalizeEditorFrameSettings } from '../../../features/editor/document/constants';
-import { collectRichShapeDocumentObjects, serializeCanvasObjects } from './';
+import { collectRichShapeDocumentObjects } from './';
+import { captureCanvasObjects } from './serialization';
 import type {
   EditorRenderedImageSize,
   EditorRenderToDataUrlOptions,
@@ -39,9 +40,12 @@ export function buildEditorCanvasDocument(options: {
   }
 
   const { enabled: _runtimePresence, ...browserFrame } = options.browserFrame;
-  const canvasJson = serializeCanvasObjects(options.canvas);
+  let capturedCanvas: ReturnType<typeof captureCanvasObjects> | null = captureCanvasObjects(
+    options.canvas
+  );
+  let canvasJson: string | undefined;
   const raster = inspectEditorRasterCanvas(
-    JSON.parse(canvasJson) as unknown,
+    capturedCanvas,
     (value, kind): value is string =>
       isImageDataUrl(value) && (kind === 'image' || value.startsWith('data:image/png;'))
   );
@@ -64,7 +68,17 @@ export function buildEditorCanvasDocument(options: {
     ...(options.source.compositionBase
       ? { compositionBase: { ...options.source.compositionBase } }
       : {}),
-    canvasJson,
+    get canvasJson() {
+      if (canvasJson === undefined) {
+        canvasJson = JSON.stringify(capturedCanvas);
+        capturedCanvas = null;
+      }
+      return canvasJson;
+    },
+    set canvasJson(value: string) {
+      canvasJson = value;
+      capturedCanvas = null;
+    },
     richShapes: collectRichShapeDocumentObjects(options.canvas),
   };
 }
@@ -145,6 +159,40 @@ export function renderEditorCanvasToDataUrl(
   const renderedCanvas = resolveRenderedCanvasElement(canvas, options.outputSize);
   const mimeType = resolveBrowserClipboardImageMimeType(options.format);
   return renderedCanvas.toDataURL(mimeType, normalizeQuality(options.quality));
+}
+
+/** Encodes a detached render asynchronously so preview saves do not stall editor input. */
+export async function renderEditorCanvasToBlob(
+  canvas: Canvas | null,
+  options: EditorRenderToDataUrlOptions
+): Promise<Blob> {
+  options.signal?.throwIfAborted();
+  if (!canvas) throw new Error(translate('editor.runtime.canvasUnavailable'));
+  const renderedCanvas = resolveRenderedCanvasElement(canvas, options.outputSize);
+  const mimeType = resolveBrowserClipboardImageMimeType(options.format);
+  return new Promise<Blob>((resolve, reject) => {
+    const onAbort = () => reject(options.signal?.reason);
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+    const release = () => {
+      options.signal?.removeEventListener('abort', onAbort);
+      renderedCanvas.width = renderedCanvas.height = 0;
+    };
+    try {
+      renderedCanvas.toBlob(
+        (blob) => {
+          release();
+          if (options.signal?.aborted) reject(options.signal.reason);
+          else if (!blob) reject(new Error('Editor image encoding failed'));
+          else resolve(blob);
+        },
+        mimeType,
+        normalizeQuality(options.quality)
+      );
+    } catch (error) {
+      release();
+      reject(error);
+    }
+  });
 }
 
 async function createClipboardBlob(dataUrl: string): Promise<Blob> {

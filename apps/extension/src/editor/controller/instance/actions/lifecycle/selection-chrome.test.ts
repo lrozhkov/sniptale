@@ -28,6 +28,38 @@ it('keeps selection controls bounded in screen pixels across editor zoom', () =>
   });
 });
 
+it('leaves empty selection chrome unchanged without reading layout on repeated renders', () => {
+  const container = document.createElement('div');
+  const upperCanvasEl = document.createElement('canvas');
+  container.appendChild(upperCanvasEl);
+  const readBounds = vi.spyOn(upperCanvasEl, 'getBoundingClientRect');
+  const listeners = new Map<string, (event?: any) => void>();
+  const canvas = {
+    upperCanvasEl,
+    getWidth: () => 100,
+    getHeight: () => 100,
+    getActiveObject: () => undefined,
+    getActiveObjects: () => [],
+    on: (name: string, handler: (event?: any) => void) => {
+      listeners.set(name, handler);
+      return () => listeners.delete(name);
+    },
+  };
+  mountEditorSelectionChrome(
+    canvas as never,
+    { getVisualFeedback: () => ({ guides: [], relations: [], acceptedByAxis: {} }) } as never
+  );
+  const svg = container.querySelector('[data-ui="editor.canvas.selection-chrome"]')!;
+  const replace = vi.spyOn(svg, 'replaceChildren');
+  const attributes = vi.spyOn(svg, 'setAttribute');
+  for (let i = 0; i < 10; i++) listeners.get('after:render')?.();
+  expect(readBounds).not.toHaveBeenCalled();
+  expect(replace).not.toHaveBeenCalled();
+  expect(attributes).not.toHaveBeenCalled();
+  expect(svg.querySelector('[data-ui="editor.canvas.selection-controls"]')).not.toBeNull();
+  disposeEditorSelectionChrome(canvas as never);
+});
+
 it('fades controls for a selected shape during a pointer gesture and restores them on release', () => {
   useEditorStore.getState().updateWorkspace({ hideSelectionWhileDragging: true });
   const container = document.createElement('div');
@@ -510,7 +542,7 @@ it('renders hover as a border only and clears it on selection, leave, blur and d
   };
   mountEditorSelectionChrome(canvas, magnet);
   const root = canvas.upperCanvasEl.parentElement!;
-  const preview = () => root.querySelector('[data-ui="editor.canvas.selection-preview"]')!;
+  const preview = () => root.querySelector('[data-ui="editor.canvas.selection-preview"]');
   const hover = () =>
     canvas.fire('mouse:move', {
       e: new MouseEvent('mousemove'),
@@ -519,22 +551,22 @@ it('renders hover as a border only and clears it on selection, leave, blur and d
       viewportPoint: new Point(25, 25),
     });
   hover();
-  expect(preview().querySelector('polygon')?.getAttribute('data-layer-id')).toBe('hover-layer');
-  expect(preview().querySelectorAll('circle')).toHaveLength(0);
+  expect(preview()?.querySelector('polygon')?.getAttribute('data-layer-id')).toBe('hover-layer');
+  expect(preview()?.querySelectorAll('circle')).toHaveLength(0);
   expect(canvas.getActiveObjects()).toEqual([]);
   canvas.setZoom(2);
   canvas.renderAll();
-  expect(preview().querySelector('polygon')?.getAttribute('points')).toMatch(/^40,40 /);
+  expect(preview()?.querySelector('polygon')?.getAttribute('points')).toMatch(/^40,40 /);
   canvas.setActiveObject(object);
   canvas.renderAll();
-  expect(preview().children).toHaveLength(0);
+  expect(preview()?.children.length ?? 0).toBe(0);
   canvas.discardActiveObject();
   canvas.upperCanvasEl.dispatchEvent(new MouseEvent('mouseout'));
-  expect(preview().children).toHaveLength(0);
+  expect(preview()?.children.length ?? 0).toBe(0);
   hover();
-  expect(preview().children).toHaveLength(1);
+  expect(preview()?.children.length).toBe(1);
   window.dispatchEvent(new Event('blur'));
-  expect(preview().children).toHaveLength(0);
+  expect(preview()?.children.length ?? 0).toBe(0);
   disposeEditorSelectionChrome(canvas);
   hover();
   expect(root.querySelector('[data-ui="editor.canvas.selection-chrome"]')).toBeNull();
@@ -759,14 +791,14 @@ it('shows a solid rectangle hover outline without handles or a second selected o
     viewportPoint: new Point(60, 60),
   });
   const root = canvas.upperCanvasEl.parentElement!;
-  const preview = () => root.querySelector('[data-ui="editor.canvas.selection-preview"]')!;
-  expect(preview().querySelectorAll('polygon')).toHaveLength(1);
-  expect(preview().querySelector('polygon')!.getAttribute('stroke-dasharray')).toBe('');
-  expect(preview().querySelectorAll('[data-control]')).toHaveLength(0);
+  const preview = () => root.querySelector('[data-ui="editor.canvas.selection-preview"]');
+  expect(preview()?.querySelectorAll('polygon')).toHaveLength(1);
+  expect(preview()?.querySelector('polygon')!.getAttribute('stroke-dasharray')).toBe('');
+  expect(preview()?.querySelectorAll('[data-control]')).toHaveLength(0);
   expect(canvas.getActiveObjects()).toEqual([]);
   canvas.setActiveObject(object);
   canvas.renderAll();
-  expect(preview().children).toHaveLength(0);
+  expect(preview()?.children.length ?? 0).toBe(0);
   expect(
     root.querySelector('[data-ui="editor.canvas.selection-controls"]')!.querySelectorAll('polygon')
   ).toHaveLength(0);

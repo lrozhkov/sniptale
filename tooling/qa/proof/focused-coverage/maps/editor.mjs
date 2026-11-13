@@ -1,5 +1,11 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
+    owner: 'editor-frame-annotation-export',
+    productionFile: 'apps/extension/src/editor/controller/public-api/document/frame-annotation-export.ts',
+    reason: 'Frame export tests prove ordered rendering, proxy restoration, format conversion, cancellation and stale results.',
+    testFiles: ['apps/extension/src/editor/frame-annotation/export.test.ts'],
+  },
+  {
     owner: 'editor-frame-annotation-projection',
     productionFile: 'apps/extension/src/editor/frame-annotation/projection-read-only.tsx',
     reason:

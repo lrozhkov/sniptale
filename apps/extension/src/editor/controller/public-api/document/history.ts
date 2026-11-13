@@ -3,6 +3,7 @@ import type { EditorDocument } from '../../../../features/editor/document/types'
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import type { ApplyDocumentOptions } from '../../core/types';
 import {
+  flushDeferredEditorHistory,
   readCurrentEditorSnapshot,
   redoEditorSnapshot,
   resetEditorSnapshotHistory,
@@ -144,6 +145,7 @@ export async function resetEditorControllerToOriginal(
   return runEditorDocumentTransition(controller.canvas ?? controller.history, async () => {
     flushActiveFrameAnnotationDraft();
     const history = controller.history;
+    flushDeferredEditorHistory(history);
     const previousIndex = history?.getState().index ?? 0;
     if (!history || previousIndex === 0) return;
     const previousDocument = readCurrentEditorSnapshot(history);
@@ -185,6 +187,7 @@ export async function restoreEditorControllerOriginalDocument(
 ): Promise<void> {
   return runEditorDocumentTransition(controller.canvas ?? controller.history, async () => {
     if (!isCurrent()) throw new Error('Editor document changed during restoration.');
+    flushDeferredEditorHistory(controller.history);
     flushActiveFrameAnnotationDraft();
     const previousDocument = readCurrentEditorSnapshot(controller.history);
     try {

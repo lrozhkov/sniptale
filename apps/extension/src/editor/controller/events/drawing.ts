@@ -202,6 +202,16 @@ export function createEditorDrawingEventHandlers(
   const updateDraftOnce = (event: TPointerEvent) => {
     const session = bindings.getDrawSession();
     if (!session || !isEditorDrawingSessionPointer(session, event)) return false;
+    if (
+      (session.tool === 'pencil' || session.tool === 'marker') &&
+      'buttons' in event &&
+      (event.buttons & 1) === 0
+    ) {
+      // Chorded mouse input can release the primary button without a pointerup.
+      lastHandledMoveEvent = null;
+      completeDrawWorkflowFromBindings(bindings);
+      return true;
+    }
     if (lastHandledMoveEvent === event) return true;
     lastHandledMoveEvent = event;
     updateEditorDrawingDraft(bindings, [event]);

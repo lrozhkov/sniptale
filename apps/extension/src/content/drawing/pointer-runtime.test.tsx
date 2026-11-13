@@ -92,7 +92,7 @@ it('edits multiple shaft bends with one commit per drag, no empty click, and can
   event('pointermove', 100, 0);
   expect(canvas.style.cursor).toBe('grab');
   event('pointerdown', 100, 0);
-  expect(canvas.style.cursor).toBe('none');
+  expect(canvas.style.cursor).toBe('grabbing');
   event('pointerup', 100, 0);
   expect(commit).not.toHaveBeenCalled();
   expect(arrow()).not.toHaveProperty('bendPoints');

@@ -12,7 +12,7 @@ import { parseEditorDrawingMetadata } from '../../document/import-boundary';
 import { stageEditorDrawingObject } from '../../drawing/object/metadata';
 import { completeEditorDrawWorkflow } from './completion';
 import type { DrawSession } from '../core/types';
-import { createAfterRenderHandler, requestEditorFreehandPreview } from '../events/runtime.render';
+import { createAfterRenderHandler, renderEditorFreehandDraft } from '../events/runtime.render';
 import { createBeforeRenderHandler } from '../events/runtime.canvas';
 
 function canvas() {
@@ -177,7 +177,7 @@ describe('drawing completion history', () => {
   });
 
   it.each(['pencil', 'marker'] as const)(
-    'paints the accepted %s tail before history without a later segment',
+    'retains the accepted %s preview until the scheduled scene render without growing its tail',
     (kind) => {
       const frames = new Map<number, FrameRequestCallback>();
       let frameId = 0;
@@ -207,6 +207,7 @@ describe('drawing completion history', () => {
         };
         const object = createEditorDrawingFabricObject(initial, 1);
         object.visible = false;
+        object.objectCaching = false;
         surface.add(object);
         let session: DrawSession | null = {
           tool: kind,
@@ -230,17 +231,19 @@ describe('drawing completion history', () => {
           frames.clear();
           callbacks.forEach((callback) => callback(0));
         };
-        requestEditorFreehandPreview(bindings);
+        renderEditorFreehandDraft(bindings);
         flush();
         expect(alpha(surface.contextTop, 45)).toBeGreaterThan(0);
         expect(alpha(surface.contextTop, 165)).toBe(0);
         const final = { ...initial, samples: [...initial.samples, { x: 180, y: 40, t: 20 }] };
         stageEditorDrawingObject(object, final);
-        requestEditorFreehandPreview(bindings);
+        renderEditorFreehandDraft(bindings);
+        // The accepted tail must be visible before pointerup starts history work.
+        expect(alpha(surface.contextTop, 165)).toBeGreaterThan(0);
         const commitHistory = vi.fn(() => {
           expect(parseEditorDrawingMetadata(object.sniptaleDrawingJson)).toEqual(final);
-          expect(alpha(surface.getContext(), 165)).toBeGreaterThan(0);
-          expect(alpha(surface.contextTop, 45)).toBe(0);
+          expect(alpha(surface.getContext(), 165)).toBe(0);
+          expect(alpha(surface.contextTop, 165)).toBeGreaterThan(0);
         });
         const completion = completeEditorDrawWorkflow({
           canvas: surface,
@@ -253,6 +256,9 @@ describe('drawing completion history', () => {
         session = completion?.drawSession ?? null;
         expect(commitHistory).toHaveBeenCalledOnce();
         expect(completion?.drawSession).toBeNull();
+        flush();
+        expect(alpha(surface.getContext(), 165)).toBeGreaterThan(0);
+        expect(alpha(surface.contextTop, 45)).toBe(0);
         const pixels = surface.getContext().getImageData(0, 0, 240, 100).data;
         flush();
         expect(surface.getContext().getImageData(0, 0, 240, 100).data).toEqual(pixels);
