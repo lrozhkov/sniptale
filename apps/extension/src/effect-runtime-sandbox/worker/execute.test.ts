@@ -289,7 +289,7 @@ it('applies the existing raster byte budget across instances of one document', a
   expect(deps.dispose).toHaveBeenCalledTimes(5);
 });
 
-it('retires every instance on a full document replacement and recovers reference-only requests', async () => {
+it('retires every instance on a changed full document replacement and recovers reference-only requests', async () => {
   const deps = dependencies(),
     state = createEffectRuntimeWorkerExecutionState(deps),
     input = request();
@@ -302,7 +302,9 @@ it('retires every instance on a full document replacement and recovers reference
   };
   expect(await state.execute(second)).toMatchObject({ kind: 'frame' });
   expect(deps.createRenderer).toHaveBeenCalledTimes(2);
-  expect(await state.execute({ ...input, requestId: 'replacement' })).toMatchObject({
+  const replacement = structuredClone(input);
+  replacement.documentRef.document.label = { en: 'Replacement' };
+  expect(await state.execute({ ...replacement, requestId: 'replacement' })).toMatchObject({
     kind: 'frame',
   });
   expect(deps.dispose).toHaveBeenCalledTimes(2);
@@ -312,3 +314,92 @@ it('retires every instance on a full document replacement and recovers reference
   state.dispose();
   expect(deps.dispose).toHaveBeenCalledTimes(4);
 });
+
+it('keeps healthy instance players across concurrent identical full-document delivery', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  try {
+    const results = await Promise.all([
+      state.execute(input),
+      state.execute({ ...structuredClone(input), requestId: 'concurrent-full' }),
+    ]);
+    expect(results.map((result) => result.kind)).toEqual(['frame', 'frame']);
+    expect(deps.createRenderer).toHaveBeenCalledOnce();
+    expect(
+      await state.execute({
+        ...structuredClone(input),
+        effectInstanceId: 'instance-2',
+        requestId: 'second-instance',
+      })
+    ).toMatchObject({ kind: 'frame' });
+    expect(
+      await state.execute({
+        ...input,
+        requestId: 'first-reference',
+        documentRef: { id: input.documentRef.id },
+      })
+    ).toMatchObject({ kind: 'frame' });
+    expect(deps.createRenderer).toHaveBeenCalledTimes(2);
+    expect(deps.dispose).not.toHaveBeenCalled();
+    expect(state.snapshot().models.entries).toBe(2);
+  } finally {
+    state.dispose();
+  }
+  expect(deps.dispose).toHaveBeenCalledTimes(2);
+});
+
+it('recovers every instance after a failed render using an identical full document', async () => {
+  const deps = dependencies(),
+    state = createEffectRuntimeWorkerExecutionState(deps),
+    input = request();
+  const reference = { ...input, documentRef: { id: input.documentRef.id } };
+  try {
+    expect(await state.execute(input)).toMatchObject({ kind: 'frame' });
+    expect(
+      await state.execute({ ...reference, effectInstanceId: 'instance-2', requestId: 'second' })
+    ).toMatchObject({ kind: 'frame' });
+    deps.render.mockRejectedValueOnce(new Error('render failed'));
+    expect(await state.execute({ ...reference, requestId: 'failed' })).toMatchObject({
+      kind: 'error',
+      code: 'outputRejected',
+    });
+    expect(
+      await state.execute({ ...structuredClone(input), requestId: 'recover-full' })
+    ).toMatchObject({ kind: 'frame' });
+    expect(deps.dispose).toHaveBeenCalledTimes(2);
+    expect(
+      await state.execute({
+        ...reference,
+        effectInstanceId: 'instance-2',
+        requestId: 'recover-reference',
+      })
+    ).toMatchObject({ kind: 'frame' });
+    expect(deps.createRenderer).toHaveBeenCalledTimes(4);
+  } finally {
+    state.dispose();
+  }
+  expect(deps.dispose).toHaveBeenCalledTimes(4);
+});
+
+it.each(['load', 'dimensions'] as const)(
+  'retries an identical full document after %s failure',
+  async (failure) => {
+    const deps = dependencies(),
+      state = createEffectRuntimeWorkerExecutionState(deps),
+      input = request();
+    const rejected = new Bitmap(1, 1);
+    if (failure === 'load') deps.createRenderer.mockRejectedValueOnce(new Error('load failed'));
+    else deps.render.mockResolvedValueOnce(rejected);
+    try {
+      expect(await state.execute(input)).toMatchObject({ kind: 'error', code: 'outputRejected' });
+      if (failure === 'dimensions') expect(rejected.close).toHaveBeenCalledOnce();
+      expect(
+        await state.execute({ ...structuredClone(input), requestId: 'recover' })
+      ).toMatchObject({ kind: 'frame' });
+      expect(deps.createRenderer).toHaveBeenCalledTimes(2);
+    } finally {
+      state.dispose();
+    }
+  }
+);

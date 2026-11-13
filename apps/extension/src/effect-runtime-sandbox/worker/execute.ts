@@ -22,6 +22,7 @@ interface PreparedModel {
   renderer: Renderer | null;
   loading: Promise<Renderer> | null;
   retired: boolean;
+  lastRenderSucceeded: boolean;
 }
 interface ExecutionDependencies {
   createRenderer: typeof createLottieFrameRenderer;
@@ -64,8 +65,16 @@ export function createEffectRuntimeWorkerExecutionState(
           assets.set(id, {});
           return true;
         },
-        setDocument(id) {
-          // A full immutable replacement retires every mutable instance of that document.
+        setDocument(id, supplied) {
+          const retained = models.find((model) => model.documentId === id);
+          // Concurrent first frames can repeat a full payload before its acknowledgement returns.
+          // Failed instances still require the existing full-replacement recovery.
+          if (
+            retained &&
+            !models.find((model) => model.documentId === id && !model.lastRenderSucceeded) &&
+            JSON.stringify(retained.document) === JSON.stringify(supplied)
+          )
+            return;
           models.deleteWhere((model) => model.documentId === id);
         },
       });
@@ -87,7 +96,9 @@ export function createEffectRuntimeWorkerExecutionState(
         renderer: null,
         loading: null,
         retired: false,
+        lastRenderSucceeded: false,
       };
+      model.lastRenderSucceeded = false;
       const previousBytes = model.retainedBytes;
       model.retainedBytes = request.renderWidth * request.renderHeight * 4;
       if (!models.set(modelKey, model)) {
@@ -119,6 +130,7 @@ export function createEffectRuntimeWorkerExecutionState(
         bitmap.close();
         return createEffectRuntimeFailure(request, 'outputRejected');
       }
+      model.lastRenderSucceeded = true;
       return {
         ...getEffectRuntimeIdentity(request),
         kind: 'frame',
