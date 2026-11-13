@@ -6727,11 +6727,11 @@
       "file": "apps/extension/src/editor/controller/events/drawing.test.ts",
       "symbol": "<file>",
       "owner": "extension:editor:controller",
-      "reason": "tool-noise: Independent read-only topology diagnosis inspected this exact operation and change reason. The added pointer cancellation assertions use the existing drawing-event fixture. Ten added lines cross the file cap without another fixture lifetime or production authority. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, effect owner, resource lifetime, recovery contract or fixture lifecycle. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-12",
-      "astHash": "47a661d80f276ac0806386275cffd0c1c0429a330e673da5cdbb98067c4db6b6",
-      "signatureHash": "717d64b8206edc1a0f52eb6f425a90468c389b2e7557270967d9e005e43dc58f"
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact drawing-event consumer suite. Coalesced projection and duplicate-delivery cases reuse the existing drawing-event fixture. Reported receivers are test-local canvas/session instances, mock controls and assertion chains; they introduce no independent runtime authority or fixture lifetime. Fresh complete-candidate architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent subject, fixture lifetime, effect owner, state authority, recovery contract or publication policy. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-13",
+      "astHash": "13455ea9317227d6a2b583a1f09a0abc977c08502148e5df8cc545760cc3802d",
+      "signatureHash": "c55a421f8f28fa853fdf44912d64ca204d1f549426e142ade54977705cd225cd"
     },
     {
       "rule": "structural-file-risk",
@@ -7084,6 +7084,17 @@
       "reviewDate": "2026-11-13",
       "astHash": "a33b7ac0e40037d42dc4a3f0c8e1a7278d4852cefeafe7e613e1d1968b32b3da",
       "signatureHash": "37dc54d545e7b6c169376ec329fe13c1c32ebd3458a4c17ded3fb79b041b503d"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/controller/draw-workflow/completion.drawing.test.ts",
+      "symbol": "describe callback",
+      "owner": "extension:editor:controller",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact completion consumer suite. The terminal-paint cases keep preview setup, controlled frame delivery, synchronous history assertions and canvas cleanup within one stroke-completion lifecycle. The describe callback registers tests and owns no runtime state. Fresh complete-candidate architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent subject, fixture lifetime, effect owner, state authority, recovery contract or publication policy. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-13",
+      "astHash": "b7f0656ca112c021152c47030f8e7fea976a36a9cd689249469a28e6ffffef3f",
+      "signatureHash": "a726e8cdb6c0e5dabaacbf0fb22a5554deae6d52648133e9c4a8e7231932c938"
     }
   ]
 }

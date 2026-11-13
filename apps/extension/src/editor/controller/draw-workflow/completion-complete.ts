@@ -42,7 +42,12 @@ export function createCompletedDrawWorkflowState(
     beginEditorTextboxEditing(completion.object);
     completion.object.enterEditing();
   }
-  canvas.requestRenderAll();
+  if (completion.completedTool === 'pencil' || completion.completedTool === 'marker') {
+    // Materialize the accepted tail before history and state synchronization can delay a frame.
+    canvas.renderAll();
+  } else {
+    canvas.requestRenderAll();
+  }
   if (drawing?.kind === 'simplify') {
     requestEditorSimplify(canvas, completion.object);
   } else if (completion.completedTool !== 'text') {

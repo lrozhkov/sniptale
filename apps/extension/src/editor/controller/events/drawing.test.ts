@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { FabricObject } from 'fabric';
+import { createTypedTestFixture } from '../../testing/fabric-canvas.test-support';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -801,3 +802,70 @@ it('restores a native transform on pointercancel without clearing its accepted s
   expect(instance.bindings.cancelTransientInteraction).not.toHaveBeenCalled();
   expect(instance.canvas.discardActiveObject).not.toHaveBeenCalled();
 });
+
+it.each(
+  ['pencil', 'marker'].flatMap((kind) => [
+    { kind, zoom: 0.2, cssX: 0.5, cssY: 1.5, backing: 2 },
+    { kind, zoom: 1, cssX: 1, cssY: 1, backing: 3 },
+    { kind, zoom: 4, cssX: 2, cssY: 0.75, backing: 2.5 },
+  ])
+)(
+  'projects every coalesced $kind sample independently at zoom$zoom',
+  ({ kind, zoom, cssX, cssY, backing }) => {
+    resetDrawingMocks();
+    const path = createBindings(kind);
+    const object = new FabricObject({ visible: false });
+    const seed = [{ x: 10, y: 30, t: 50 }];
+    path.bindings.setDrawSession({ object, pointerId: 7, start: { x: 10, y: 30 }, tool: kind });
+    mocks.readDrawing.mockReturnValue({ id: 'coalesced-stroke', kind, samples: seed });
+    const pan = { x: 35, y: 45 };
+    const expected = [
+      { x: 40, y: 70, t: 101 },
+      { x: 80, y: 100, t: 107 },
+      { x: 120, y: 130, t: 115 },
+    ];
+    Object.assign(path.canvas, {
+      viewportTransform: [zoom, 0, 0, zoom, pan.x, pan.y],
+      getWidth: () => 800,
+      getHeight: () => 600,
+    });
+    path.canvas.upperCanvasEl.width = 800 * backing;
+    path.canvas.upperCanvasEl.height = 600 * backing;
+    vi.spyOn(path.canvas.upperCanvasEl, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(120, 80, 800 * cssX, 600 * cssY)
+    );
+    // Fabric caches the dispatch event's scene point while its mouse:move handler runs.
+    path.canvas.getScenePoint.mockReturnValue({ x: 120, y: 130 });
+    const samples = expected.map(({ x, y, t }) =>
+      createTypedTestFixture<PointerEvent>({
+        clientX: 120 + (x * zoom + pan.x) * cssX,
+        clientY: 80 + (y * zoom + pan.y) * cssY,
+        timeStamp: t,
+      })
+    );
+    const event = createTypedTestFixture<PointerEvent>({
+      clientX: samples[2]!.clientX,
+      clientY: samples[2]!.clientY,
+      pointerId: 7,
+      ctrlKey: false,
+      shiftKey: false,
+      timeStamp: 115,
+      getCoalescedEvents: () => samples,
+      composedPath: () => [path.canvas.upperCanvasEl, window],
+    });
+    path.handlers.handleMouseMove({ e: event });
+    path.handlers.handleWindowPointerMove(event);
+    path.handlers.handleMouseMove({ e: event });
+    expect(mocks.appendSamples).toHaveBeenCalledTimes(1);
+    expect(mocks.stageDrawing).toHaveBeenCalledTimes(1);
+    const additions = mocks.appendSamples.mock.calls[0]![1];
+    expect(additions).toHaveLength(3);
+    for (const [index, point] of expected.entries())
+      expect(additions![index]).toMatchObject({
+        x: expect.closeTo(point.x, 6),
+        y: expect.closeTo(point.y, 6),
+        t: point.t,
+      });
+    expect(mocks.appendSamples).toHaveBeenCalledWith(seed, expect.any(Array), kind === 'pencil');
+  }
+);
