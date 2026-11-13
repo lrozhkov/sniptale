@@ -1,3 +1,4 @@
+import { createSourceImageFilter } from '../../../image-filters/contract';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import {
@@ -2713,3 +2714,84 @@ it('keeps materialized paint alive through aborted GPU completion', async () => 
   await rejected;
   expect([uploaded.width, uploaded.height]).toEqual([0, 0]);
 });
+
+it('reuses completed static-group mips while preserving group drawing and invalidating edits', async () => {
+  const g = graphics(),
+    renderer = await owner();
+  const child = { ...layer(), cache: { key: 'static', revision: {} } };
+  const input = { ...layer(group([child])), blur: 1 };
+  (await renderer.render(request([input]))).close();
+  expect(g.pass.draw).toHaveBeenCalledTimes(9);
+  (await renderer.render(request([input]))).close();
+  expect(g.pass.draw).toHaveBeenCalledTimes(11);
+  child.opacity = 0.5;
+  (await renderer.render(request([input]))).close();
+  expect(g.pass.draw).toHaveBeenCalledTimes(20);
+  (await renderer.render(request([input]))).close();
+  expect(g.pass.draw).toHaveBeenCalledTimes(22);
+});
+
+it.each(['encode', 'validation', 'cancel'] as const)(
+  'does not accept changed mip contents after %s failure',
+  async (failure) => {
+    const g = graphics(),
+      renderer = await owner();
+    const child = { ...layer(), cache: { key: 'static', revision: {} } };
+    const input = { ...layer(group([child])), blur: 1 };
+    (await renderer.render(request([input]))).close();
+    child.opacity = 0.5;
+    const controller = new AbortController();
+    const fence = deferred<void>();
+    if (failure === 'encode') {
+      let draws = 0;
+      g.pass.draw.mockImplementation(() => {
+        if (++draws === 2) throw new Error('partial mip encode');
+      });
+    } else if (failure === 'validation')
+      g.device.popErrorScope.mockResolvedValueOnce({ message: 'invalid mip output' });
+    else g.queue.onSubmittedWorkDone.mockReturnValueOnce(fence.promise);
+    const pending = renderer.render(request([input], controller.signal));
+    const rejected = expect(pending).rejects.toThrow(
+      failure === 'cancel'
+        ? /abort/i
+        : failure === 'encode'
+          ? 'partial mip encode'
+          : 'invalid mip output'
+    );
+    if (failure === 'cancel') {
+      await vi.waitFor(() => expect(g.queue.submit).toHaveBeenCalledTimes(2));
+      controller.abort();
+      fence.resolve();
+    }
+    await rejected;
+    g.pass.draw.mockImplementation(() => {});
+    const before = g.pass.draw.mock.calls.length;
+    (await renderer.render(request([input]))).close();
+    expect(g.pass.draw.mock.calls.length - before).toBe(9);
+  }
+);
+
+it.each(['css', 'image'] as const)(
+  'regenerates mips after changing an outer %s filter on a static group',
+  async (kind) => {
+    const g = graphics(),
+      renderer = await owner();
+    const child = { ...layer(), cache: { key: 'static', revision: {} } };
+    const input: GpuPreviewLayer = { ...layer(group([child])), blur: 1 };
+    const color = createSourceImageFilter('color', 'outer');
+    if (color.kind !== 'color') throw new Error('Expected color filter.');
+    color.parameters.brightness = 0.75;
+    if (kind === 'css') input.cssFilter = { brightness: 0.75 };
+    else
+      input.imageFilters = {
+        stack: { version: 1, filters: [color] },
+        logical: { width: 64, height: 36 },
+      };
+    (await renderer.render(request([input]))).close();
+    const first = g.pass.draw.mock.calls.length;
+    if (kind === 'css') input.cssFilter = { brightness: 0.5 };
+    else color.parameters.brightness = 0.5;
+    (await renderer.render(request([input]))).close();
+    expect(g.pass.draw.mock.calls.length - first).toBe(first);
+  }
+);

@@ -1,3 +1,4 @@
+import { createGpuPreviewGroupContents } from './gpu-preview-content';
 import { createSourceImageFilterGpu } from '../../../image-filters/gpu';
 import type { SourceImageFilterProgram } from '../../../image-filters/plan';
 import type { createGlTransitionGpu } from './gl-transition';
@@ -65,6 +66,7 @@ export async function createGpuPreviewSlot({
     bytes: number;
   };
   const textures = new Map<string, TextureEntry>();
+  const groupContents = createGpuPreviewGroupContents();
   const transitionResources: { release(): void }[] = [];
   const pendingPaintRasters: { canvas: OffscreenCanvas; reservation: Reservation }[] = [];
   const targets = new Map<
@@ -201,6 +203,7 @@ export async function createGpuPreviewSlot({
     const encoder = device.createCommandEncoder();
     let uniformIndex = 0;
     const renderedGroups = new Map<GpuPreviewGroup, GPUTexture>();
+    const contentKey = groupContents();
     const preparedFrames = new Map<VideoFrame, GPUTexture>();
     const frameRasters = new Map<GpuPreviewLayer['source'], GPUTexture>();
     const rasterFor = (layer: Pick<GpuPreviewLayer, 'source' | 'cache'>, path: string) => {
@@ -321,7 +324,15 @@ export async function createGpuPreviewSlot({
           if (!cssFilter) throw new Error('GPU preview CSS filter is unavailable.');
           source = cssFilter.prepare(encoder, source, path, layer.cssFilter);
         }
-        if (requiresGpuPreviewFilter(layer)) source = filter.prepare(encoder, source, path);
+        if (requiresGpuPreviewFilter(layer))
+          source = filter.prepare(
+            encoder,
+            source,
+            path,
+            isGroup(layer.source) && !layer.cssFilter && !imageFilterPlan
+              ? contentKey(layer.source)
+              : undefined
+          );
         return source.createView();
       });
       const masks = layers.map((layer, index) =>
@@ -462,6 +473,7 @@ export async function createGpuPreviewSlot({
       }
       device.pushErrorScope('validation');
       let scopeOpen = true;
+      let completed = false;
       try {
         const pipelines = await preparePipelines(plan.pipelines);
         const transitionPlans = new Map(
@@ -555,7 +567,9 @@ export async function createGpuPreviewSlot({
         const error = validation.value;
         if (error) throw new Error(error.message);
         check(request.signal);
-        return outputTexture ? undefined : surface.transferToImageBitmap();
+        const result = outputTexture ? undefined : surface.transferToImageBitmap();
+        completed = true;
+        return result;
       } finally {
         // A failed encode can still contain texture uploads; drain before borrowed frames or resources leave scope.
         try {
@@ -577,7 +591,7 @@ export async function createGpuPreviewSlot({
               retained.canvas.width = retained.canvas.height = 0;
               retained.reservation.release();
             }
-            filter.endFrame();
+            filter.endFrame(completed);
             cssFilter?.endFrame();
             imageFilter?.endFrame();
           }

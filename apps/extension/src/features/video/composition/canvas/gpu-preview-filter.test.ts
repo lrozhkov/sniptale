@@ -217,3 +217,45 @@ it('bounds the actual reduction and cubic tap ancestry for odd and small mip dim
     }
   }
 });
+
+it('reuses only confirmed mip contents and invalidates partial or unversioned writes', async () => {
+  const mock = graphics();
+  const { filter, device } = await filterOwner(mock.reserve);
+  const source = device.createTexture({ size: [128, 64], format: 'rgba8unorm', usage: 4 });
+  const render = (content: string | undefined, completed: boolean) => {
+    filter.beginFrame();
+    const result = filter.prepare(device.createCommandEncoder(), source, 'scene', content);
+    filter.endFrame(completed);
+    return result;
+  };
+  const target = render('a', true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(8);
+  expect(render('a', true)).toBe(target);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(8);
+  render('b', false);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(16);
+  render('b', true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(24);
+  render('b', true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(24);
+  render(undefined, true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(32);
+  render('b', true);
+  expect(mock.pass.draw).toHaveBeenCalledTimes(40);
+});
+
+it('rejects conflicting content on the same source within a frame and defaults to unconfirmed completion', async () => {
+  const mock = graphics(),
+    { filter, device } = await filterOwner(mock.reserve);
+  const source = device.createTexture({ size: [128, 64], format: 'rgba8unorm', usage: 4 });
+  filter.beginFrame();
+  filter.prepare(device.createCommandEncoder(), source, 'scene', 'a');
+  expect(() => filter.prepare(device.createCommandEncoder(), source, 'scene', 'b')).toThrow(
+    'conflicting'
+  );
+  filter.endFrame();
+  filter.beginFrame();
+  filter.prepare(device.createCommandEncoder(), source, 'scene', 'a');
+  expect(mock.pass.draw).toHaveBeenCalledTimes(16);
+  filter.endFrame(true);
+});

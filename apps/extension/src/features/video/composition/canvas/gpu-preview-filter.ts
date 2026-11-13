@@ -46,6 +46,8 @@ type Entry = {
   textureBytes: number;
   reservation: Reservation;
   uniforms: Uniform[];
+  completedContent?: string | undefined;
+  pendingContent?: string | undefined;
 };
 
 const MAX_TEXTURE_BYTES = 256 * 1024 * 1024;
@@ -111,7 +113,7 @@ export async function createGpuPreviewFilter(
   const sampler = device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
   const entries = new Map<string, Entry>();
   const used = new Set<string>();
-  const prepared = new Map<string, GPUTexture>();
+  const prepared = new Map<string, { source: GPUTexture; content: string | undefined }>();
   let active = false;
   let disposed = false;
   let allocatedBytes = 0;
@@ -199,14 +201,19 @@ export async function createGpuPreviewFilter(
       used.clear();
       prepared.clear();
     },
-    prepare(encoder: GPUCommandEncoder, source: GPUTexture, key: string): GPUTexture {
+    prepare(
+      encoder: GPUCommandEncoder,
+      source: GPUTexture,
+      key: string,
+      content?: string
+    ): GPUTexture {
       if (disposed) throw new Error('GPU preview filter is disposed.');
       if (!active) throw new Error('GPU preview filter frame is not active.');
       const previousSource = prepared.get(key);
       const existing = entries.get(key);
       if (previousSource) {
-        if (previousSource !== source || !existing)
-          throw new Error('GPU preview filter key has conflicting sources.');
+        if (previousSource.source !== source || previousSource.content !== content || !existing)
+          throw new Error('GPU preview filter key has conflicting sources or contents.');
         return existing.texture;
       }
       let entry = existing;
@@ -223,6 +230,12 @@ export async function createGpuPreviewFilter(
       }
       used.add(key);
       const retained = entry;
+      if (content !== undefined && retained.completedContent === content) {
+        prepared.set(key, { source, content });
+        return retained.texture;
+      }
+      retained.completedContent = undefined;
+      retained.pendingContent = content;
       retained.uniforms.forEach((uniform, level) => {
         const input = level === 0 ? source : retained.texture;
         const inputView = input.createView({
@@ -250,17 +263,24 @@ export async function createGpuPreviewFilter(
         pass.draw(3);
         pass.end();
       });
-      prepared.set(key, source);
+      prepared.set(key, { source, content });
       return entry.texture;
     },
-    endFrame() {
+    endFrame(completed = false) {
       if (!active) return;
       active = false;
       if (disposed) {
         clear();
         return;
       }
-      for (const [key, entry] of entries) if (!used.has(key)) release(key, entry);
+      for (const [key, entry] of entries) {
+        if (!used.has(key)) release(key, entry);
+        else {
+          if (completed && entry.pendingContent !== undefined)
+            entry.completedContent = entry.pendingContent;
+          entry.pendingContent = undefined;
+        }
+      }
       prepared.clear();
     },
     dispose() {
