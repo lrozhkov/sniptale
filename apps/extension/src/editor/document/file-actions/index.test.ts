@@ -165,6 +165,46 @@ describe('insertEditorImageFromFile', () => {
 });
 
 describe('exportEditorSession', () => {
+  it('refuses exact UTF-8 Blob bytes above the import profile before allocating a URL', async () => {
+    const session = { ...createEditorDocument(), sourceName: 'я'.repeat(21 * 1024 * 1024) };
+    controller.exportDocument.mockReturnValue(session);
+    const serialized = JSON.stringify(session, null, 2);
+    expect(serialized.length).toBeLessThan(40 * 1024 * 1024);
+    expect(new Blob([serialized]).size).toBeGreaterThan(40 * 1024 * 1024);
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:refused');
+    const createElement = vi.spyOn(document, 'createElement');
+
+    await expect(editorFileActions.exportEditorSession(controller)).rejects.toThrow();
+
+    expect(createObjectUrl).not.toHaveBeenCalled();
+    expect(createElement).not.toHaveBeenCalled();
+    expect(controller.exportDocument()).toBe(session);
+    expect(controller.loadDocument).not.toHaveBeenCalled();
+    expect(controller.openImage).not.toHaveBeenCalled();
+  });
+
+  it('admits an exact 40 MiB JSON Blob at the inclusive import byte boundary', async () => {
+    const session = createEditorDocument();
+    const padding = 40 * 1024 * 1024 - new Blob([JSON.stringify(session, null, 2)]).size;
+    session.sourceImageData += 'A'.repeat(padding);
+    controller.exportDocument.mockReturnValue(session);
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:boundary');
+    const link = document.createElement('a');
+    vi.spyOn(link, 'click').mockImplementation(() => {});
+    vi.spyOn(document, 'createElement').mockReturnValue(link);
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    vi.useFakeTimers();
+
+    await editorFileActions.exportEditorSession(controller);
+
+    expect(createObjectUrl.mock.calls[0]?.[0]).toMatchObject({
+      size: 40 * 1024 * 1024,
+      type: 'application/json',
+    });
+    expect(link.click).toHaveBeenCalledOnce();
+    vi.runAllTimers();
+  });
+
   it('downloads the exported session document as JSON and revokes the URL asynchronously', async () => {
     const originalCreateElement = document.createElement.bind(document);
     const clickMock = vi.fn();
@@ -271,14 +311,19 @@ it('reimports the generated session filename without changing the document contr
   const link = document.createElement('a');
   vi.spyOn(link, 'click').mockImplementation(() => {});
   vi.spyOn(document, 'createElement').mockReturnValue(link);
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:session-roundtrip');
+  const createObjectUrl = vi
+    .spyOn(URL, 'createObjectURL')
+    .mockReturnValue('blob:session-roundtrip');
   vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
   await editorFileActions.exportEditorSession(controller);
   expect(link.download).toBe('Session_editor-session.json');
+  const exportedBlob = createObjectUrl.mock.calls[0]?.[0];
+  if (!(exportedBlob instanceof Blob)) throw new Error('The session export Blob is missing.');
+  expect(exportedBlob.size).toBe(new Blob([JSON.stringify(session, null, 2)]).size);
   const setImageData = vi.fn();
   await editorFileActions.importEditorSessionFromFile(
     controller,
-    new File([JSON.stringify(session)], link.download, { type: 'application/json' }),
+    new File([exportedBlob], link.download, { type: 'application/json' }),
     setImageData
   );
   expect(controller.loadDocument).toHaveBeenCalledWith(
@@ -316,5 +361,83 @@ it.each(['read', 'canvas', 'load'] as const)(
       setImageData
     );
     expect(setImageData).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['image', 'session'] as const)(
+  'saves accepted work before %s replacement and persists the loaded document',
+  async (kind) => {
+    const finish = vi.fn();
+    const autosaveService = {
+      flushAutosave: vi.fn(async () => undefined),
+      beginHydration: vi.fn((isCurrent: () => boolean) => {
+        expect(isCurrent()).toBe(true);
+        return { saveNow: vi.fn(async () => undefined), finish };
+      }),
+      persistSnapshot: vi.fn(async () => undefined),
+    };
+    const localController = { ...controller, autosaveService };
+    const publish = vi.fn();
+    if (kind === 'image') {
+      await editorFileActions.openEditorImageFromFile(
+        localController,
+        new File(['pixels'], 'new.png', { type: 'image/png' }),
+        publish
+      );
+      expect(controller.openImage).toHaveBeenCalledOnce();
+    } else {
+      const session = { ...createEditorDocument(), version: 2 as const };
+      await editorFileActions.importEditorSessionFromFile(
+        localController,
+        new File([JSON.stringify(session)], 'new.json'),
+        publish
+      );
+      expect(controller.loadDocument).toHaveBeenCalledWith(session);
+    }
+    expect(autosaveService.flushAutosave).toHaveBeenCalledOnce();
+    expect(autosaveService.beginHydration).toHaveBeenCalledOnce();
+    expect(finish).toHaveBeenCalledWith(true);
+    expect(autosaveService.persistSnapshot).toHaveBeenCalledOnce();
+    expect(publish).toHaveBeenCalledOnce();
+  }
+);
+
+it.each(['image', 'session'] as const)(
+  'preserves accepted work when %s replacement fails after hydration begins',
+  async (kind) => {
+    const failure = new Error('Decode failed');
+    const finish = vi.fn();
+    const autosaveService = {
+      flushAutosave: vi.fn(async () => undefined),
+      beginHydration: vi.fn(() => ({ saveNow: vi.fn(async () => undefined), finish })),
+      persistSnapshot: vi.fn(async () => undefined),
+    };
+    const localController = {
+      ...controller,
+      autosaveService,
+      openImage: vi.fn(async () => {
+        throw failure;
+      }),
+      loadDocument: vi.fn(async () => {
+        throw failure;
+      }),
+    };
+    const publish = vi.fn();
+    const replacing =
+      kind === 'image'
+        ? editorFileActions.openEditorImageFromFile(
+            localController,
+            new File(['pixels'], 'new.png', { type: 'image/png' }),
+            publish
+          )
+        : editorFileActions.importEditorSessionFromFile(
+            localController,
+            new File([JSON.stringify({ ...createEditorDocument(), version: 2 })], 'new.json'),
+            publish
+          );
+    await expect(replacing).rejects.toBe(failure);
+    expect(finish).toHaveBeenCalledWith(false);
+    expect(publish).not.toHaveBeenCalled();
+    expect(autosaveService.persistSnapshot).not.toHaveBeenCalled();
   }
 );

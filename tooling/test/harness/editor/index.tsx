@@ -1,4 +1,6 @@
-import type { FabricObject } from 'fabric';
+import { FabricImage, Group, type FabricObject } from 'fabric';
+import type { RasterSessionSnapshot } from '../../../../apps/extension/src/editor/raster-editing/session';
+import type { EditorDocument } from '../../../../apps/extension/src/features/editor/document/types';
 import { useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CommandPressScope } from '@sniptale/ui/control-language/press';
@@ -32,6 +34,14 @@ declare global {
       clearSelection: () => void;
       getCanvasObjects: () => Array<Record<string, unknown>>;
       renderImage: () => Promise<string>;
+      exportDocument: () => EditorDocument;
+      getRasterSnapshot: () => RasterSessionSnapshot | null;
+      getSceneProjection: () => {
+        viewport: number[];
+        width: number;
+        height: number;
+        rect: { left: number; top: number; width: number; height: number };
+      } | null;
       getInteractionState: () => {
         historyIndex: number;
         historyReady: boolean;
@@ -50,23 +60,17 @@ type HarnessCanvasLike = {
   getObjects?: () => FabricObject[];
 };
 
-function getObjectElement(object: FabricObject): HTMLImageElement | SVGImageElement | null {
-  const imageObject = object as FabricObject & {
-    getElement?: () => Element | null;
-  };
-  const element = imageObject.getElement?.() ?? null;
-
-  return element instanceof HTMLImageElement || element instanceof SVGImageElement ? element : null;
-}
-
 function snapshotCanvasObject(object: FabricObject): HarnessCanvasObjectSnapshot {
-  const element = getObjectElement(object);
+  const original = object instanceof FabricImage ? object.getOriginalSize() : null;
 
   return {
     type: object.type ?? null,
     sniptaleType: object.sniptaleType ?? null,
     sniptaleId: object.sniptaleId ?? null,
     visible: object.visible,
+    active: object.canvas?.getActiveObjects().includes(object) ?? false,
+    contentLocked: object.sniptaleContentLocked ?? null,
+    positionLocked: object.sniptaleLocked ?? false,
     left: object.left ?? null,
     top: object.top ?? null,
     width: object.width ?? null,
@@ -75,7 +79,13 @@ function snapshotCanvasObject(object: FabricObject): HarnessCanvasObjectSnapshot
     scaledHeight: typeof object.getScaledHeight === 'function' ? object.getScaledHeight() : null,
     scaleX: object.scaleX ?? null,
     scaleY: object.scaleY ?? null,
-    src: element ? (element.getAttribute('src') ?? element.getAttribute('href')) : null,
+    matrix: [...object.calcTransformMatrix()],
+    cropX: object instanceof FabricImage ? object.cropX : null,
+    cropY: object instanceof FabricImage ? object.cropY : null,
+    sourceWidth: original?.width ?? null,
+    sourceHeight: original?.height ?? null,
+    src: object instanceof FabricImage ? object.getSrc() : null,
+    children: object instanceof Group ? object.getObjects().map(snapshotCanvasObject) : [],
   };
 }
 
@@ -155,6 +165,22 @@ function HarnessEditorDebugBridge() {
         return getCanvasObjects(controller).map(snapshotCanvasObject);
       },
       renderImage: () => controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
+      exportDocument: () => structuredClone(controller.exportDocument()),
+      getRasterSnapshot: () => {
+        const snapshot = controller.getRasterRuntime()?.getSnapshot();
+        return snapshot ? structuredClone(snapshot) : null;
+      },
+      getSceneProjection: () => {
+        const canvas = controller.canvas;
+        if (!canvas) return null;
+        const rect = canvas.upperCanvasEl.getBoundingClientRect();
+        return {
+          viewport: [...canvas.viewportTransform],
+          width: canvas.width,
+          height: canvas.height,
+          rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        };
+      },
       getInteractionState: () => {
         const transform = controller.canvas?._currentTransform;
         return {

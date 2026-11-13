@@ -142,13 +142,16 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
       backgroundImageInputRef: args.backgroundImageInputRef,
       importSessionInputRef: args.importSessionInputRef,
       onApplyFrame: async () => {
-        await args.controller.applyFrameSettings({
-          ...args.frameDraft,
-          sourceImage: {
-            ...normalizeEditorImageSettings(args.frameDraft.sourceImage),
-            opacity: 1,
+        await args.controller.applyFrameSettings(
+          {
+            ...args.frameDraft,
+            sourceImage: {
+              ...normalizeEditorImageSettings(args.frameDraft.sourceImage),
+              opacity: 1,
+            },
           },
-        });
+          { allowBackgroundContentEditing: true }
+        );
         useEditorStore.getState().setFreshImageBackgroundPending(false);
       },
       onExportSession: () => actionRailHandlers.exportSession(),

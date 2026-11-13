@@ -13,6 +13,8 @@ import { estimateUsageIndexBytes } from './usage-index-migration';
 import type { DatabaseMigrationDescriptor } from './schema-contract-types';
 import {
   VOICE_INPUT_HISTORY_STORE,
+  IMAGE_WORKSPACES_STORE,
+  SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
   SYNC_CAPTURE_STORE,
   SYNC_OUTBOX_STORE,
   SYNC_CATALOG_CACHE_STORE,
@@ -904,6 +906,17 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       );
     },
   },
+  contractOnlyMigration({
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 34, to: 35 },
+      { domainId: 'scenarioProjects', from: 10, to: 11 },
+    ],
+    fromDatabaseVersion: 53,
+    toDatabaseVersion: 54,
+    stores: [IMAGE_WORKSPACES_STORE, SCENARIO_STEP_EDITOR_DOCUMENTS_STORE],
+    validationStores: [IMAGE_WORKSPACES_STORE, SCENARIO_STEP_EDITOR_DOCUMENTS_STORE],
+    diagnostic: 'Retained raster document stores are unavailable.',
+  }),
 ];
 
 function ensureSnapshotAssetIndex(transaction: UpgradeTransaction, name: string): void {

@@ -119,8 +119,7 @@ export interface EditorShapeSettings {
   inheritCustomCss: boolean;
 }
 
-interface EditorDocumentVersion2 {
-  version: 2;
+interface EditorDocumentBase {
   sourceImageData: string;
   sourceName: string | null;
   /** Editable document caption; legacy workspaces retain their aggregate caption. */
@@ -140,9 +139,10 @@ interface EditorDocumentVersion2 {
   richShapes?: EditorRichShapeDocumentObject[];
 }
 
-export type EditorDocument = EditorDocumentVersion2;
+export type EditorDocument = EditorDocumentBase & ({ version: 2 } | { version: 3 });
 
 export interface EditorLayerChild {
+  effects?: EditorRasterEffect[];
   id: string;
   name: string;
   type: EditorObjectType;

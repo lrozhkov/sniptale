@@ -1,3 +1,4 @@
+import { translate } from '../../../platform/i18n';
 import { createOutputFilename } from '../../../workflows/file-naming/index';
 import { flushEditorDocumentForExit } from './checkpoint-exit';
 import { waitForEditorDocumentCanvas } from './canvas-ready';
@@ -184,12 +185,17 @@ export async function exportEditorSession(
   controller: ExportEditorSessionController
 ): Promise<void> {
   const sessionDocument = controller.exportDocument();
+  const blob = new Blob([JSON.stringify(sessionDocument, null, 2)], { type: 'application/json' });
+  try {
+    assertEditorSessionFileCanBeRead(blob);
+  } catch {
+    throw new Error(translate('editor.runtime.sessionExportTooLarge'));
+  }
   const filename = await createOutputFilename({
     category: 'resources',
     type: 'editor-session',
     extension: 'json',
   });
-  const blob = new Blob([JSON.stringify(sessionDocument, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = window.document.createElement('a');
   link.href = url;

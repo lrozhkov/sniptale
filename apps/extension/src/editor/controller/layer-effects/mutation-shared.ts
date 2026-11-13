@@ -1,6 +1,6 @@
 import type { Canvas, FabricObject } from 'fabric';
 import type { EditorRasterEffect } from '../../../features/editor/document/effects';
-import { findObjectById } from '../document/layers';
+import { findObjectById, findRasterContentObject } from '../document/layers';
 
 import type { SourceState } from '../../document/model/source-state';
 import { applyEditorRasterEffects, isEditorRasterObject } from './filters';
@@ -19,7 +19,25 @@ export type LayerMutationContext = {
   syncRuntimeState: () => void;
   createLayerMutationToken: () => number;
   isLayerMutationTokenCurrent: (token: number) => boolean;
+  rasterCorrections?: {
+    apply: (
+      id: string,
+      effects: (accepted: EditorRasterEffect[]) => EditorRasterEffect[],
+      preview: boolean
+    ) => Promise<void>;
+    reset: () => void;
+  };
 };
+
+/** Admit raster content independently of the native position lock. */
+export function getRasterEffectObject(canvas: Canvas | null, id: string): FabricObject | null {
+  const content = findRasterContentObject(canvas, id);
+  if (content) return content;
+  const object = getEditableObject(canvas, id);
+  return object && !isEditorRasterObject(object) && object.sniptaleRole !== 'background'
+    ? object
+    : null;
+}
 
 export function getEditableObject(canvas: Canvas | null, id: string): FabricObject | null {
   const object = findObjectById(canvas, id);
@@ -81,6 +99,7 @@ export async function ensureRasterObject(
   object: FabricObject,
   mutationToken: number
 ): Promise<FabricObject | null> {
+  if (object.sniptaleRole === 'background') return null;
   if (isEditorRasterLayerType(object.sniptaleType)) {
     return object;
   }

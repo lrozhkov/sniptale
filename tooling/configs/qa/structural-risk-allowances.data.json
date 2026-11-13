@@ -148,23 +148,12 @@
       "rule": "structural-file-risk",
       "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/database-migrations.ts",
       "symbol": "<file>",
-      "owner": "extension:app-core:composition",
-      "reason": "tool-noise: One ordered migration registry adds syncCapture7→8, secretProtection0→1 and syncCapture8→9 descriptors. Index implementation remains delegated to sync-queue-index-migration; no second migration authority. The inspected operation or proof fixture has one cohesive authority/lifetime. Scale, branch or owner-import metrics do not establish a second authority; exact tool-noise is supported for this inspected shape. Fresh complete-candidate architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact body or signature changes. Reassess a new independent writer, state receiver, transport, recovery or resource lifetime, or independent fixture setup/cleanup. Remove when the analyzer models this cohesive owner. Final AST/signature binding and independent architecture review are required; this report does not renew an allowance.",
-      "reviewDate": "2026-11-02",
-      "astHash": "4c09a7b58dd9a597540fdbd718f4e347155e8b4c0237d43b7c0f4833cdc5ad81",
+      "owner": "extension:composition:persistence",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. One chronological migration registry owns the schema version. The added contract-only descriptor does not add another writer or migration lifetime. Released descriptors remain unchanged. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "e09fdddbdb38caaf3043c15420c0389eafe9f9883ec41725f7cfabe14a35760c",
       "signatureHash": "997b5791b002abb0ffb4285b44f735bd472980ff7b0689337e07a75a0b2bff0b"
-    },
-    {
-      "rule": "structural-file-risk",
-      "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts",
-      "symbol": "<file>",
-      "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The chronological database registry and its fresh and upgrade proof include the new recording stores. Released rows remain unchanged. Independent read-only topology diagnosis inspected this owner and change reason. Fresh complete-candidate architecture review must validate this exact binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent subject, state authority, writer, transaction, privileged effect, resource lifetime or recovery contract. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-01",
-      "astHash": "3dd579d1018ffe5fd768d7e7ac6487c0b978cdf93e44239fc5d4b9470fd100b4",
-      "signatureHash": "2f7df5c56a3f68284b51613fbf87463eb059de5185d079f2749d29b4e57c2cef"
     },
     {
       "rule": "structural-file-risk",
@@ -1342,17 +1331,6 @@
       "reviewDate": "2026-10-18",
       "reason": "tool-noise: One static exact-string dictionary/pattern map consumed by locale.js; no effects or state. Independently inspected by pr_structural_wrapper_diagnosis. Reference component bodies remain equivalent except shared ID allocation; native lifecycle and identity proof passed. Complete-candidate architecture review remains required.",
       "removalCondition": "Remove when this exact AST or signature changes. Reassess any independent state receiver, writer, resource, recovery or fixture lifecycle. Remove when the analyzer models this cohesive owner. Fresh complete-candidate architecture review must validate this classification."
-    },
-    {
-      "rule": "structural-file-risk",
-      "file": "tooling/qa/proof/focused-coverage/maps/editor.mjs",
-      "symbol": "<file>",
-      "owner": "tooling:qa:proof",
-      "reason": "tool-noise: One declarative map connects exact production files to existing consumer tests. Added entries preserve affected consumer proof. File length introduces no executable authority or threshold change.",
-      "removalCondition": "Remove when the AST or signature changes. Remove if a new authority changes test selection policy. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-04",
-      "astHash": "63cae29e14d6f6f2714fb316a6e9725b5cc97033c5f49cc1459cfb03b69d17fc",
-      "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
     },
     {
       "rule": "structural-file-risk",
@@ -6831,6 +6809,182 @@
       "astHash": "424eb526bcf3d88e95adff3471466365e36cef71dd4d562d351f2b0076b7ead4",
       "signatureHash": "54ce65c79c1adcb26df1edce625f19160d8d1f15c0dd8d807d51ab2410754611",
       "reviewDate": "2026-11-13"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/workspace/floating/tool-properties-rail.tsx",
+      "symbol": "EditorFloatingToolPropertiesRail",
+      "owner": "extension:editor:workspace",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. This rail composes current tool surfaces and selection eligibility. Raster commands and parameter portal lifetimes have separate owners. The function adds no raster state or resource authority. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "82a4959fda1c8f55a3828cb5f0395253cd676456f78fa1ff3995a7dcafd131a3",
+      "signatureHash": "3bb6dd0c1b119f33c9863f97c4c6ca2b85376adc0d6a2f1bbf1922d9a568fca0"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/platform/media-utils/png-codec.ts",
+      "symbol": "decodePngRgba",
+      "owner": "extension:platform:media-utils",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. One bounded streaming decode owns row assembly, unfiltering, output conversion and reader cleanup. These phases share the same reader and output. Splitting their lifetime would scatter failure cleanup. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "0803a254e262cc1146fb2713c7ffdb9d673a078b3d5fc6415b85ae8ee17af51e",
+      "signatureHash": "aaf3c0c94673898dad230b48945eab496a41bacbb389aa68f3ed326383cfa873"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/compute.ts",
+      "symbol": "parseCommand",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. One Worker command ingress parses the supported discriminated contract. Explicit type and range checks cause the score. Metadata, plane, mask, bounds and color validators already have named operations. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "556f93c87db6f42ab4966954d6bbce645a78292718fbbe7dd5e14369f6581fea",
+      "signatureHash": "3406c69b2248876cacbd22e5e1fd0a35698a43daafcef7294e97327148dab585"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/coordinates.ts",
+      "symbol": "createBackgroundRasterGeometry",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. One source-to-scene projection covers native and fallback background representations. Fit, blur render size, crop, flips and tile period are inputs to the same projection. No mutable document authority is introduced. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "fe985454605c6c7a96dce2bc726e109959d9780cf2c60adf319733b5d9b04f0b",
+      "signatureHash": "d615afd14f8ad5e97fca70744683ea508099147e347e3a5fde4760557091bc71"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/preview.ts",
+      "symbol": "createRasterPreview",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. One native preview lifetime owns render interception, accepted-render fallback, ancestor cache restoration, preparation, cancellation and disposal. Chrome drawing has a separate owner. Isolation, render failure and late disposal have deterministic proof. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "e09e2428b29663c21a9d120add7f10133303c62fdfb271cdea0028dc85c8912d",
+      "signatureHash": "385bc776d69241205ce32f71e136c0de16ca3290004108cb5cfb6daa664d53a3"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/vendor/bezier-line.ts",
+      "symbol": "add#2",
+      "owner": "extension:editor:raster-editing:vendor",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. This pinned Klecks interpolation advances one stroke point, direction and spacing state and emits its samples. Provenance records the extraction and local changes. The counted writes share one stroke lifetime. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "890ff5a4da866650b1a6cd2c9b099e8e44ff66102f100eb5e26b7331d51d54ca",
+      "signatureHash": "64e98b58fbe03332b7b4a0ab48857c0e1f102c28db4dc77122ed27867d718c20"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/vendor/flood-fill.ts",
+      "symbol": "floodFill",
+      "owner": "extension:editor:raster-editing:vendor",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. This pinned Klecks function computes one region and its growth over one output mask. Contiguous search, whole-image matching and the growth marker are phases of that algorithm. The public wrapper validates inputs and clips output. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "38ecdbec9b3e8e4d59dc1d11f0ba3ada4df9f1af8368751e7484761a80877902",
+      "signatureHash": "b630400fad4c2a18370b2fd5b9b0c96d5c0c4123c08ced039d095b7b2d6eec29"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-raster-background.spec.ts",
+      "symbol": "fixture",
+      "owner": "test:e2e:raster-background",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. One bootstrap fixture declares the same source, target, crop and vector scene across supported raster representations. Real browser navigation and UI perform all mutations. Serialized data does not add another browser or persistence lifetime. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "dd550cf5e8e4b3732cd5d66efd0e5f341334371c55a8f26e3b14d05eeea29da1",
+      "signatureHash": "90baa4ff363e64228297ce5ab8b439739b63de5431f4f0bef11421c1085a6a31"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/raster-editing/adapters.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact corrected body. One native boundary adapts admitted targets, prepares detached resources and invokes existing publication owners. Private copy rendering and placement operations are named separately. The optional replacement observer adds no persistent state or publication authority. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent authority, effect, recovery path or resource lifetime. Reassess if the observer expands beyond this exact synchronous replacement. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "ed2ab14ebb68383b05fbe1d1ffb7a0d1ff118a3cc58b7a65357f99a931cb8490",
+      "signatureHash": "44d84a090282ee901d4d653de35bfcc0318933fbe2d5194c83db0ad19d4ac8c6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/adapters.ts",
+      "symbol": "createRasterTargetAdapter",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact corrected body. This factory binds one hydration cache and injected native publication callbacks. Target resolution and detached-resource admission share this adapter lifetime. The replacement observer is forwarded to the existing background owner. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent authority, effect, recovery path or resource lifetime. Reassess if the observer expands beyond this exact synchronous replacement. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "a62318b12008f98ed214100b1425b7c828db96817ad169511e911c8c37a80a62",
+      "signatureHash": "c900ac34b10787bef38fcb7b0317cdc972389e47bacd4c2d6f4221f414ef67ec"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/adapters.ts",
+      "symbol": "createRasterTargetAdapter.publish",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact corrected body. One native publication prepares and admits render data, mutates the accepted native object synchronously and disposes prepared resources in finally. The background branch forwards its optional observer after preparation and current-target checks. The parameter causes the metric threshold without another responsibility. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent authority, effect, recovery path or resource lifetime. Reassess if the observer expands beyond this exact synchronous replacement. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "01b061909acabb86d100cbc84afa3be907f6c822d4aa8283fac3176e723ad102",
+      "signatureHash": "c7810e4fafd344f84dc3fbc65c78cf58dfe1f425fe4962e7a34bdeba90acafba"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/session.ts",
+      "symbol": "createRasterSession",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Independent read-only inspection confirmed this corrected session body. One editing generation owns target, selection, drafts, cancellation and publication. Invalid native revisions reuse the existing refresh owner only after disposal, generation and target admission. Late work cannot clear a newer job. Pure geometry and native preview have separate owners. The exact own-background receipt remains separate from stale cleanup. Fresh correction architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent authority, effect, recovery path or resource lifetime. Reassess if the observer expands beyond this exact synchronous replacement. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "2c728ab52035cfca9321f4c9f73a4e6979c11da6111efb1c07268676d52935b9",
+      "signatureHash": "75a4dd75f00eab356f4fdf4706650b5371d2dbdebf09112f5d4ec0938c0c6317"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/infrastructure/indexed-db/schema-contracts.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:composition:persistence:proof",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. The existing native-upgrade fixture proves raster contract publication and missing-store refusal. The added assertions use the same database setup and cleanup. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "d78080aec40b6af9e170f986fd4dd4d8b5df7e46446c128e12ee1ea8215bff3d",
+      "signatureHash": "2f7df5c56a3f68284b51613fbf87463eb059de5185d079f2749d29b4e57c2cef"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/qa/proof/focused-coverage/maps/editor.mjs",
+      "symbol": "<file>",
+      "owner": "qa:focused-coverage:editor",
+      "reason": "tool-noise: Independent read-only inspection confirmed this passive test-owner registry. Two exact vendor mappings select existing region, pixel, Worker and brush tests. They add no threshold, budget, exemption or execution lifetime. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess a new independent registry authority, test execution policy, threshold, budget or owner boundary. Remove when the analyzer models this passive registry.",
+      "reviewDate": "2026-11-13",
+      "astHash": "2ba4014ed74c81f877ca2dd918d99c8a391e81ba06cdefe2e0e4773c0458e681",
+      "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/raster-editing/session.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Independent read-only inspection confirmed this corrected session body. One editing generation owns target, selection, drafts, cancellation and publication. Invalid native revisions reuse the existing refresh owner only after disposal, generation and target admission. Late work cannot clear a newer job. Pure geometry and native preview have separate owners. The exact own-background receipt remains separate from stale cleanup. Fresh correction architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent authority, effect, recovery path or resource lifetime. Reassess if the observer expands beyond this exact synchronous replacement. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "cf189410d0debba2ab42e9c5b44f5f070949089cdef73078f384c44659ebf8bd",
+      "signatureHash": "d4b484584b54a446446e9a3dd1169f4701e82b5b113aa3d521c1a9522fff048f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/workspace/floating/raster-tools.tsx",
+      "symbol": "RasterParameters",
+      "owner": "extension:editor:workspace",
+      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. This function renders one active-tool parameter surface and dispatches runtime commands. Its complete portal lifecycle has a separate owner. Explicit JSX branches add no mutable raster state, computation or persistence authority. Fresh final architecture review must validate this binding.",
+      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
+      "reviewDate": "2026-11-13",
+      "astHash": "aa978430d4b39ba691cc636bcd397e3e95f760c07143bb02477db17cab157898",
+      "signatureHash": "67521e28cac61dd319f1630cf496adb13bbdb8968a8a89fefadc89dea069e8e2"
     }
   ]
 }

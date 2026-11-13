@@ -73,3 +73,98 @@ it('retains signed canvas extents without accepting signed legacy bitmap dimensi
     )
   ).toThrow();
 });
+
+it('imports retained raster PNG resources and rejects unsafe or partial state before loading', () => {
+  const image = 'data:image/png;base64,QUJDRA==';
+  const object = {
+    type: 'image',
+    src: image,
+    sniptaleRasterState: {
+      version: 1,
+      width: 12,
+      height: 8,
+      crop: { x: 2, y: 1, width: 8, height: 6 },
+    },
+    sniptaleRasterOriginalData: image,
+    sniptaleRasterColorData: image,
+    sniptaleRasterVisibilityData: image,
+    sniptaleRasterKeyData: image,
+  };
+  const encode = (value: unknown) =>
+    JSON.stringify({
+      ...createEditorDocumentFixture(),
+      version: 3,
+      canvasJson: JSON.stringify({ objects: [value] }),
+    });
+  expect(parseImportedEditorDocument(encode(object)).version).toBe(3);
+  for (const patch of [
+    { sniptaleRasterOriginalData: 'https://example.com/source.png' },
+    { sniptaleRasterColorData: 'javascript:alert(1)' },
+    { sniptaleRasterVisibilityData: 'data:image/jpeg;base64,QUJDRA==' },
+    { sniptaleRasterState: undefined },
+  ]) {
+    expect(() => parseImportedEditorDocument(encode({ ...object, ...patch }))).toThrow();
+  }
+});
+
+it('imports rich shapes with a zero line width without changing their source data', async () => {
+  const { createDefaultRichShapeObject } =
+    await import('../../../features/editor/document/rich-shape');
+  const shape = createDefaultRichShapeObject();
+  const richShapes = [
+    { ...shape, style: { ...shape.style, line: { ...shape.style.line, width: 0 } } },
+  ];
+  const document = { ...createEditorDocumentFixture(), richShapes };
+  expect(parseImportedEditorDocument(JSON.stringify(document))).toEqual(document);
+});
+
+it.each([
+  { name: 'coordinate', properties: { left: 131073 } },
+  { name: 'dimension', properties: { width: 32769 } },
+  { name: 'zero scale', properties: { scaleX: 0 } },
+  { name: 'excessive scale', properties: { scaleY: 101 } },
+  { name: 'negative opacity', properties: { opacity: -1 } },
+  { name: 'excessive opacity', properties: { opacity: 101 } },
+  { name: 'negative line width', properties: { strokeWidth: -1 } },
+  { name: 'excessive line width', properties: { strokeWidth: 32769 } },
+  { name: 'remote source', properties: { src: 'https://example.test/source.png' } },
+  { name: 'excessive text', properties: { text: 'x'.repeat(200001) } },
+])('rejects unsafe imported canvas $name before it can enter the editor', ({ properties }) => {
+  const document = {
+    ...createEditorDocumentFixture(),
+    canvasJson: JSON.stringify({ objects: [{ type: 'rect', ...properties }] }),
+  };
+  expect(() => parseImportedEditorDocument(JSON.stringify(document))).toThrow();
+});
+
+it('refuses oversized session text and invalid document JSON with their existing errors', () => {
+  expect(() => parseImportedEditorDocument(' '.repeat(50 * 1024 * 1024 + 1))).toThrow();
+  expect(() => parseImportedEditorDocument('{broken')).toThrow();
+});
+
+it('refuses source positions and background URLs outside the session admission contract', () => {
+  const fixture = createEditorDocumentFixture();
+  for (const document of [
+    { ...fixture, sourceLeft: 131073 },
+    { ...fixture, sourceTop: -131073 },
+    {
+      ...fixture,
+      frame: { ...fixture.frame, backgroundImageData: 'https://example.test/background.png' },
+    },
+  ])
+    expect(() => parseImportedEditorDocument(JSON.stringify(document))).toThrow();
+});
+
+it('refuses an imported canvas that exceeds the traversal or object budget', () => {
+  const fixture = createEditorDocumentFixture();
+  const wide = { objects: Array.from({ length: 5001 }, () => ({ type: 'rect' })) };
+  let nested: unknown = 'leaf';
+  for (let index = 0; index < 42; index++) nested = { child: nested };
+  for (const canvas of [wide, { objects: [{ type: 'rect', custom: nested }] }]) {
+    expect(() =>
+      parseImportedEditorDocument(
+        JSON.stringify({ ...fixture, canvasJson: JSON.stringify(canvas) })
+      )
+    ).toThrow();
+  }
+});

@@ -781,3 +781,44 @@ it('creates the same exact nonunique due index for a fresh database', () => {
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('admits raster metadata and refuses publication when a required store is absent', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 53
+  )!;
+  const plan = buildDatabaseMigrationPlan(53, 54);
+  expect(plan).toHaveLength(1);
+  expect(plan?.[0]).toMatchObject({
+    fromDatabaseVersion: 53,
+    toDatabaseVersion: 54,
+    risk: 'additive',
+    backupCoverage: 'none',
+    stores: ['image_workspaces', 'scenario_step_editor_documents'],
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 34, to: 35 },
+      { domainId: 'scenarioProjects', from: 10, to: 11 },
+    ],
+  });
+  const { names, put, createIndex, db, transaction } = createNativeUpgradeFixture(source.stores);
+  handleDatabaseUpgrade(db, 53, 54, transaction);
+  expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(put.mock.calls.map(([row]) => row)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(db.createObjectStore).not.toHaveBeenCalled();
+  expect(db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(createIndex).not.toHaveBeenCalled();
+  expect(
+    parseStoredSchemaContracts(
+      Object.entries(source.domainVersions).map(([domainId, schemaVersion]) => ({
+        domainId,
+        schemaVersion,
+      }))
+    )
+  ).toBeNull();
+  put.mockClear();
+  names.delete('scenario_step_editor_documents');
+  expect(() => handleDatabaseUpgrade(db, 53, 54, transaction)).toThrow(
+    'Retained raster document stores are unavailable.'
+  );
+  expect(transaction.abort).toHaveBeenCalledOnce();
+  expect(put).not.toHaveBeenCalled();
+});

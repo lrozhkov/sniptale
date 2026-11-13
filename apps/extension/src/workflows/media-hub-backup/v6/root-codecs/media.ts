@@ -14,7 +14,7 @@ import type {
 import type { StoredWebSnapshotRecord } from '../../../../composition/persistence/web-snapshots/contracts';
 import type { StoredImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
-import type { PortableEditorDocumentV3 } from './editor-document';
+import { assertPortableEditorDocument, type PortableEditorDocument } from './editor-document';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   parseProjectAssetEntry,
@@ -84,7 +84,7 @@ export interface PortableMediaMetadata {
     screenshotObjectId: string;
   };
   workspace?: Omit<StoredImageWorkspaceEntry, 'document'> & {
-    document: PortableEditorDocumentV3;
+    document: PortableEditorDocument;
   };
   presentation?: PortableAggregatePresentation;
 }
@@ -210,6 +210,10 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
   const reviewAssets = parseReviewAssets(metadata.reviewAssets, metadata.videoReview);
   if (reviewAssets) metadata.reviewAssets = reviewAssets;
   else delete metadata.reviewAssets;
+  if (metadata.workspace !== undefined) {
+    if (!isRecord(metadata.workspace)) throw new Error('Portable image workspace is invalid.');
+    assertPortableEditorDocument(metadata.workspace.document);
+  }
   return metadata as PortableMediaMetadata;
 }
 

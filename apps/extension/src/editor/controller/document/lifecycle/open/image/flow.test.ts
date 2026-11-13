@@ -116,6 +116,7 @@ async function expectAppliedOpenDocumentSync(): Promise<void> {
     { version: 1 },
     {
       resetHistory: true,
+      freshSourceContent: true,
       updateOriginal: true,
     }
   );

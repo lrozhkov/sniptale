@@ -64,6 +64,10 @@ import { runWithDurableAssetOperationRecovery } from '../../../composition/persi
 import { restoreMediaHubBackupV6 } from './restore';
 import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from './export';
 import { inspectMediaHubBackupV6 } from './inspect';
+import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
+import { createPersistedEditorDocumentFixture } from '../../../composition/persistence/document-assets/test-support';
+import { encodePortableEditorDocument } from './root-codecs/editor-document';
+import { createInternalObjectSegments } from './layout';
 
 const descriptor = {
   mediaSubtype: 'library-item' as const,
@@ -97,23 +101,44 @@ let currentSession: {
   updatedAt: number;
 };
 
-async function archive(): Promise<Blob> {
+async function archive(workspace?: unknown, transport = false): Promise<Blob> {
   const output = createArchiveMemorySink();
   const writer = createArchiveWriter(output.sink);
+  const metadata = {
+    entry: {
+      id: descriptor.rootId,
+      source: { kind: 'screenshot' },
+      tags: [],
+      ...(workspace === undefined ? {} : { mimeType: object.mimeType, size: object.size }),
+    },
+    originalObjectId: object.objectId,
+    ...(workspace === undefined ? {} : { workspace }),
+  };
+  const rootJson = new Blob([JSON.stringify(metadata)], { type: 'application/json' });
+  const rootObject = {
+    objectId: 'root-metadata',
+    filename: 'root.json',
+    mimeType: rootJson.type,
+    size: rootJson.size,
+    path: createInternalObjectSegments('root-metadata', 'root.json').join('/'),
+  };
+  const archiveDescriptor = transport
+    ? { ...descriptor, objectCount: 2, totalBytes: descriptor.totalBytes + rootJson.size }
+    : descriptor;
   await writer.addText('_sniptale/manifest.json', '{}');
-  await writer.addText(catalogPath, `${JSON.stringify(descriptor)}\n`);
+  await writer.addText(catalogPath, `${JSON.stringify(archiveDescriptor)}\n`);
   await writer.addText(
     descriptor.metadataPath,
     JSON.stringify({
-      descriptor,
-      metadata: {
-        entry: { id: descriptor.rootId, source: { kind: 'screenshot' }, tags: [] },
-        originalObjectId: object.objectId,
-      },
-      objects: [object],
+      descriptor: archiveDescriptor,
+      metadata: transport
+        ? { payloadObjectId: rootObject.objectId, faviconObjectIds: [] }
+        : metadata,
+      objects: transport ? [object, rootObject] : [object],
     })
   );
   await writer.addBlob(object.path, new Blob(['media']));
+  if (transport) await writer.addBlob(rootObject.path, rootJson);
   await writer.close();
   return output.blob();
 }
@@ -518,3 +543,99 @@ it.each(['cursor', 'events'] as const)(
     });
   }
 );
+
+it.each(
+  [
+    'library-folders-v1',
+    'library-folders-v2',
+    'library-folders-v3',
+    'library-folders-v4',
+    'library-folders-v5',
+  ].flatMap((layout) =>
+    ['legacy', 'current', 'future', 'partial'].map((kind) => ({ layout, kind }))
+  )
+)('admits $kind retained documents in $layout before archive staging', async ({ layout, kind }) => {
+  const version = kind === 'legacy' ? 3 : kind === 'future' ? 5 : 4;
+  const document = {
+    ...createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'source'),
+    version: 4 as const,
+  };
+  document.canvasJson = JSON.stringify({
+    objects: [
+      {
+        sniptaleRasterOriginalData: 'sniptale-asset:source',
+        sniptaleRasterColorData: 'sniptale-asset:source',
+        sniptaleRasterVisibilityData: 'sniptale-asset:source',
+        sniptaleRasterKeyData: 'sniptale-asset:source',
+        sniptaleRasterState: {
+          version: 1,
+          width: 8,
+          height: 6,
+          crop: { x: 2, y: 1, width: 4, height: 3 },
+        },
+      },
+    ],
+  });
+  const portable = encodePortableEditorDocument({
+    document,
+    objectsByAssetId: new Map([['source', object.objectId]]),
+  });
+  const candidate = {
+    ...portable,
+    version,
+    ...(kind === 'partial'
+      ? {
+          canvasJson: JSON.stringify({
+            objects: [{ sniptaleRasterOriginalData: `sniptale-object:${object.objectId}` }],
+          }),
+        }
+      : {}),
+  };
+  const file = await archive(
+    {
+      aggregateId: 'one',
+      createdAt: 1,
+      updatedAt: 1,
+      document: candidate,
+    },
+    layout !== 'library-folders-v1'
+  );
+  mocks.verify.mockResolvedValue({
+    inspection: { manifest: { layout, sharedObjects: [], catalogs: [{ path: catalogPath }] } },
+    session: currentSession,
+  });
+  const publisher = {
+    profile: 'media:library-item',
+    publish: vi.fn(async () => {
+      currentSession = {
+        ...currentSession,
+        committedRoots: ['media:library-item:one'],
+        currentRoot: null,
+      };
+      return { conflicted: false, imported: true, retainedAssetIds: ['local-asset'] };
+    }),
+  };
+  const operation = restoreMediaHubBackupV6({
+    file,
+    operationId: 'restore-1',
+    publishers: [publisher],
+  });
+  if (kind === 'current') {
+    await expect(operation).resolves.toMatchObject({ status: 'completed' });
+    expect(mocks.stage).toHaveBeenCalledOnce();
+    expect(publisher.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        envelope: expect.objectContaining({
+          metadata: expect.objectContaining({
+            workspace: expect.objectContaining({ document: portable }),
+          }),
+        }),
+      })
+    );
+  } else {
+    await expect(operation).rejects.toThrow(/invalid|validation/);
+    expect(mocks.stage).not.toHaveBeenCalled();
+    expect(mocks.createJournal).not.toHaveBeenCalled();
+    expect(publisher.publish).not.toHaveBeenCalled();
+  }
+});

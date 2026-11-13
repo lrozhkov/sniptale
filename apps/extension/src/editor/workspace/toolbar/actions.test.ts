@@ -4,6 +4,7 @@ import { closeLayerEffectsBeforeToolbarAction, createEditorToolbarActions } from
 function args(inspector: 'tool' | 'file' | 'canvas-size' | 'image-size' | 'frame' = 'tool') {
   return {
     controller: {
+      getRasterRuntime: vi.fn(() => null),
       cancelCropMode: vi.fn(),
       clearSelection: vi.fn(),
       setActiveTool: vi.fn(),
@@ -95,4 +96,15 @@ it('toggles ordinary inspectors while keeping select mode active', () => {
   createEditorToolbarActions(leaveCropForLayers).activateTool('select');
   expect(leaveCropForLayers.controller.cancelCropMode).toHaveBeenCalledOnce();
   expect(leaveCropForLayers.setInspector).toHaveBeenCalledWith('tool');
+});
+
+it('settles raster editing before ordinary tools clear the selected target', () => {
+  const options = args();
+  const stop = vi.fn();
+  options.controller.getRasterRuntime.mockReturnValue({ setTool: stop } as never);
+  createEditorToolbarActions(options).activateTool('select');
+  expect(stop).toHaveBeenCalledWith(null);
+  expect(stop.mock.invocationCallOrder[0]).toBeLessThan(
+    options.controller.clearSelection.mock.invocationCallOrder[0] ?? Infinity
+  );
 });

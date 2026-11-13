@@ -5,8 +5,8 @@ const mutationMocks = vi.hoisted(() => ({
   applyEditorLayerRasterEffect: vi.fn(async () => undefined),
   applyEditorLayerTransformation: vi.fn(async () => undefined),
   mergeEditorSelectedLayers: vi.fn(async () => undefined),
-  previewEditorLayerRasterEffect: vi.fn(),
-  removeEditorLayerRasterEffect: vi.fn(),
+  previewEditorLayerRasterEffect: vi.fn(async () => undefined),
+  removeEditorLayerRasterEffect: vi.fn(async () => undefined),
   resetEditorLayerRasterEffectPreview: vi.fn(),
   updateEditorLayerRasterEffect: vi.fn(async () => undefined),
 }));

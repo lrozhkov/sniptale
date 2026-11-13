@@ -1,3 +1,5 @@
+import { inspectEditorRasterCanvas } from '../../features/editor/document/raster-state';
+import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import { isValidScenarioBlurCanvasObject } from './scenario-blur-metadata';
 // policyStateIds: [] - parser sets and resource ceilings are immutable document import policy,
 // not mutable authority or capability state.
@@ -213,6 +215,12 @@ export function parseEditorDrawingMetadata(value: unknown): DrawingObject | null
 }
 
 function assertDrawingFabricObject(value: UnknownRecord): void {
+  if (
+    value['sniptaleContentLocked'] !== undefined &&
+    typeof value['sniptaleContentLocked'] !== 'boolean'
+  ) {
+    throw new Error('Invalid editor content permission');
+  }
   const objectType = value['sniptaleType'];
   if (
     REMOVED_EDITOR_OBJECT_TYPES.has(String(objectType)) ||
@@ -320,4 +328,10 @@ export function assertValidEditorDrawingCanvasJson(canvasJson: string): void {
     throw new Error('Invalid editor canvas objects');
   }
   assertDrawingFabricObjectTree(parsed['objects']);
+  const raster = inspectEditorRasterCanvas(
+    parsed,
+    (value, kind): value is string =>
+      isImageDataUrl(value) && (kind === 'image' || value.startsWith('data:image/png;'))
+  );
+  if (!raster.valid) throw new Error('Invalid editor raster metadata');
 }

@@ -1,0 +1,74 @@
+{
+  "repository": "https://github.com/bitbof/klecks",
+  "revision": "b86ba7d0edb2c48ad21ca58aae4775fccf329632",
+  "license": "MIT",
+  "files": [
+    {
+      "upstreamPath": "LICENSE",
+      "blobSha": "14ded21de0f08981ab433b84bac6dbb3d522fef7",
+      "url": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/LICENSE",
+      "bytes": 1076,
+      "sha256": "0234a0861b38c1f3c9198b0f048a1b713bf3b1b198b5cced343acc7335b90785",
+      "gitBlobVerified": true
+    },
+    {
+      "upstreamPath": "src/app/script/klecks/image-operations/flood-fill.ts",
+      "blobSha": "a3ac1a9ae2920c63e9c95bc8abb1251ccd9fab91",
+      "url": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/image-operations/flood-fill.ts",
+      "bytes": 10098,
+      "sha256": "c571c4fbc0ff4f4f1df1aedd01af02aadabc7226af187d1001fd26487875a5c0",
+      "gitBlobVerified": true
+    },
+    {
+      "upstreamPath": "src/app/script/klecks/brushes/eraser-brush.ts",
+      "blobSha": "976e7505c031c360d2c25289e4cf316850bf7214",
+      "url": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts",
+      "bytes": 9703,
+      "sha256": "9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007",
+      "gitBlobVerified": true
+    },
+    {
+      "upstreamPath": "src/app/script/bb/math/line.ts",
+      "blobSha": "bafade47fe584a7619801c338bdfc2c425644786",
+      "url": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/line.ts",
+      "bytes": 12433,
+      "sha256": "6336d91fcc70507bb67765310b7bbb3d6e77bbb316e0c0ff9fb443444c6815d0",
+      "gitBlobVerified": true
+    },
+    {
+      "upstreamPath": "src/app/script/bb/math/vec2.ts",
+      "blobSha": "bac8bc7c06246da72000104877dc28f08573af78",
+      "url": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/vec2.ts",
+      "bytes": 1102,
+      "sha256": "188bab9d9f70fc1c917b1fd7461220f421b683bb8b8627237a6aca8c30d39ba3",
+      "gitBlobVerified": true
+    },
+    {
+      "upstreamPath": "src/app/script/bb/math/math.ts",
+      "blobSha": "f62497d01188872054d938027f952b657bcc2530",
+      "url": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/math.ts",
+      "bytes": 8416,
+      "sha256": "c4951b2aa82d4b2dd5f621b26f181d4362019d5c04095b32f58d2c4f59f48565",
+      "gitBlobVerified": true
+    }
+  ],
+  "changes": [
+    "Replaced the upstream TIndexBounds import with its local structural type; no upstream dependency graph was imported.",
+    "Constructed DataView with the source view byteOffset and byteLength.",
+    "Bounded each growth-neighbor lookup by x and y so image edges cannot wrap into adjacent rows.",
+    "Added non-null assertions for source reads bounded by validated dimensions, for noUncheckedIndexedAccess.",
+    "Added this attribution comment; normalized formatting with the repository formatter.",
+    "Extracted BezierLine and PointLine with only their required Vec2 and scalar helpers into bezier-line.ts.",
+    "Replaced the upstream vector type with SourcePoint and copyObj with a point copy.",
+    "Initialized direction explicitly and added bounded-read assertions for strict TypeScript.",
+    "Adapted eraser stamp spacing and synchronous finalization into brush.ts. Added local independent hardness, selection, crop, periodic clipping, Restore, and cumulative coverage.",
+    "Kept draft planes separate from immutable accepted input planes. Removed upstream Canvas, history, pressure, and UI dependencies.",
+    "Clipped brush samples to the native render rectangle in continuous source coordinates before periodic wrapping."
+  ],
+  "wrapperPolicy": [
+    "Validate source dimensions, RGBA data, binary selection, integer seed, tolerance, grow and contiguous before computation.",
+    "Copy source RGBA and canonicalize RGB to zero when alpha is zero.",
+    "Reject seeds outside explicit selections and reclip grown output to the selection.",
+    "Clamp growth to the maximum image dimension, which already reaches every image pixel."
+  ]
+}

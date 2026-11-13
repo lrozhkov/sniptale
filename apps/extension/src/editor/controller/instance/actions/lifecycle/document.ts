@@ -1,3 +1,4 @@
+import { getEditorRasterRuntime } from '../../../../raster-editing/runtime';
 import type { EditorDocument } from '../../../../../features/editor/document/types';
 import {
   createEditorDocumentCommandService,
@@ -24,6 +25,7 @@ export async function openImageForController(
   sourceName: string | null = null,
   options: OpenImageOptions = {}
 ): Promise<void> {
+  if (controller.canvas) getEditorRasterRuntime(controller.canvas)?.cancel();
   await defaultDocumentCommands.openImage(
     asDocumentCommandController(controller),
     dataUrl,
@@ -36,10 +38,12 @@ export async function loadDocumentForController(
   controller: EditorControllerInstance,
   document: EditorDocument
 ): Promise<void> {
+  if (controller.canvas) getEditorRasterRuntime(controller.canvas)?.cancel();
   await defaultDocumentCommands.loadDocument(asDocumentCommandController(controller), document);
 }
 
 export function closeDocumentForController(controller: EditorControllerInstance): void {
+  if (controller.canvas) getEditorRasterRuntime(controller.canvas)?.cancel();
   defaultDocumentCommands.closeDocument(asDocumentCommandController(controller));
 }
 

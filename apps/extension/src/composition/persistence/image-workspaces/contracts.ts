@@ -1,5 +1,5 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
-import type { PersistedEditorDocumentV3 } from '../document-assets/contracts';
+import type { PersistedEditorDocument } from '../document-assets/contracts';
 import type { AssetRef } from '../assets/contracts';
 
 /** Authoritative editable document for an image aggregate. */
@@ -16,5 +16,5 @@ export interface ImageWorkspaceEntry {
 }
 
 export interface StoredImageWorkspaceEntry extends Omit<ImageWorkspaceEntry, 'document'> {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
 }

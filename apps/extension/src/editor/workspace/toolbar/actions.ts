@@ -17,7 +17,8 @@ type ToolbarActionArgs = {
   controller: Pick<
     ImageEditorController,
     'cancelCropMode' | 'clearSelection' | 'setActiveTool' | 'suspendToolMode'
-  >;
+  > &
+    Partial<Pick<ImageEditorController, 'getRasterRuntime'>>;
   hasImage: boolean;
   inspector: ToolbarInspector | 'tool';
   setActiveTool: (tool: EditorTool) => void;
@@ -32,6 +33,7 @@ function prepareToolAction(
     return false;
   }
 
+  args.controller.getRasterRuntime?.()?.setTool(null);
   closeLayerEffectsBeforeToolbarAction(args);
   if (args.inspector === 'canvas-size' && !options?.preserveCropMode) {
     args.controller.cancelCropMode();

@@ -1,3 +1,6 @@
+import { mountEditorRasterRuntime } from '../../../../raster-editing/runtime';
+import { createRasterTargetAdapter } from '../../../../raster-editing/adapters';
+import { syncSourceStateFromObject } from '../../../document/source';
 import { replaceCurrentEditorSnapshotHistory } from '../../../history';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../../../platform/i18n';
@@ -97,6 +100,46 @@ export function mountEditorController(
         },
         reportFailure: () => showToast(translate('content.toolbar.drawingSimplifyFailed'), 'error'),
       });
+    const rasterAdapter = createRasterTargetAdapter({
+      canvas: () => controller.canvas,
+      frame: () => useEditorStore.getState().frame,
+      documentBounds: () => ({ x: 0, y: 0, ...controller.canvasDocumentSize }),
+      prepareObject: (object) => controller.prepareObject(object),
+      commitNative: (object) => {
+        controller.source = syncSourceStateFromObject(controller.source, object);
+        controller.commitHistory();
+        controller.syncRuntimeState();
+        canvas.requestRenderAll();
+      },
+      publishBackground: (candidate, options) =>
+        controller.applyFrameSettings(
+          {
+            ...useEditorStore.getState().frame,
+            backgroundImageData: candidate.derivedImageData,
+          },
+          { ...options, backgroundCandidate: candidate }
+        ),
+      flipObject: (id, axis) =>
+        controller.applyLayerTransformation(
+          id,
+          axis === 'horizontal' ? 'flip-horizontal' : 'flip-vertical'
+        ),
+    });
+    mountEditorRasterRuntime({
+      canvas,
+      adapter: rasterAdapter,
+      ...(controller.createRasterCompute ? { createCompute: controller.createRasterCompute } : {}),
+      initialColor: useEditorStore.getState().toolSettings.pencil.color,
+      getMainTool: () => controller.activeTool,
+      isPanning: () => controller.isSpacePressed || controller.panSession !== null,
+      onModeChange: (active) => {
+        if (!active) return;
+        controller.activeTool = 'select';
+        controller.toolModeEnabled = true;
+        useEditorStore.getState().syncActiveTool('select');
+        controller.applyToolMode();
+      },
+    });
     controller.viewportElement = viewportElement;
     controller.stageElement = stageElement;
     controller.zoomLevel = 1;

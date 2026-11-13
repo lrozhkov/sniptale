@@ -1,4 +1,12 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from 'react';
 import { resolveToolbarSurfacePlacement } from '@sniptale/ui/floating-interactions/placement';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
@@ -22,7 +30,12 @@ import {
 import { createToolPropertiesGroups } from './tool-properties-groups';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { FloatingToolbarGroup } from './canvas-toolbar-model';
+import { translate } from '../../../platform/i18n';
+import { EditorRasterTools } from './raster-tools';
 import { ToolPropertiesButton } from './tool-properties-button';
+
+const subscribeWithoutRuntime = () => () => undefined;
+const snapshotWithoutRuntime = () => null;
 
 const TOOL_PROPERTIES_PAIR_CLASS_NAME = [
   'absolute z-40 flex w-max max-w-[calc(100vw-16px)] items-start gap-2 overflow-auto',
@@ -216,7 +229,22 @@ export function EditorFloatingToolPropertiesRail({
       selection.selectedObjectsAreDrawing ||
       collapsedDrawingOptionsTool !== activeDrawingTool
     );
-  const enabled = standardPropertiesEnabled || drawingPropertiesEnabled;
+  const rasterRuntime = controller.getRasterRuntime();
+  const rasterSnapshot = useSyncExternalStore(
+    rasterRuntime?.subscribe ?? subscribeWithoutRuntime,
+    rasterRuntime?.getSnapshot ?? snapshotWithoutRuntime
+  );
+  const rasterEnabled = Boolean(
+    rasterSnapshot?.available &&
+    selection.selectedObjectCount === 1 &&
+    (selection.selectedObjectType === 'image' ||
+      selection.selectedObjectType === 'source-image' ||
+      selection.selectedObjectType === 'background')
+  );
+  const multipleImages =
+    selection.selectedObjectCount > 1 && layers.some((layer) => layer.selected && layer.raster);
+  const enabled =
+    standardPropertiesEnabled || drawingPropertiesEnabled || rasterEnabled || multipleImages;
   const showSelectionActions = drawingPropertiesEnabled && selection.hasSelection;
   const selectedLayerCount = layers.filter((layer) => layer.selected).length;
   const canUngroup = canUngroupLayerSelection(layers);
@@ -240,7 +268,26 @@ export function EditorFloatingToolPropertiesRail({
         className={TOOL_PROPERTIES_PAIR_CLASS_NAME}
         style={placement.style}
       >
-        {drawingOptionsTool !== 'selection' ? (
+        {rasterEnabled && rasterRuntime ? (
+          <FloatingChromeToolbar
+            dataUi="editor.floating.raster-tools"
+            className="min-w-0 max-w-full"
+          >
+            <EditorRasterTools
+              runtime={rasterRuntime}
+              onOpenAdjustments={(targetId) =>
+                documentController.onOpenLayerEffects(targetId, 'adjustments', 'brightness')
+              }
+            />
+          </FloatingChromeToolbar>
+        ) : null}
+        {multipleImages ? (
+          <FloatingChromeToolbar>
+            <span className="px-2 text-xs">{translate('editor.raster.singleImage')}</span>
+          </FloatingChromeToolbar>
+        ) : null}
+        {(standardPropertiesEnabled || drawingPropertiesEnabled) &&
+        drawingOptionsTool !== 'selection' ? (
           <FloatingChromeToolbar
             dataUi="editor.floating.tool-properties"
             className={`min-w-0 max-w-full overflow-x-auto ${drawingOptionsTool ? 'overflow-y-hidden' : ''}`}

@@ -388,3 +388,36 @@ it('retains the shared composition baseline through export and document preparat
   expect(restored.source.compositionBase).toEqual(base);
   expect(restored.source.compositionBase).not.toBe(document.compositionBase);
 });
+
+it('exports logical 3 with full original dimensions and native source crop', () => {
+  const { canvas, options } = createEditorCanvasDocumentOptions();
+  const image = 'data:image/png;base64,QUJDRA==';
+  const serialized = {
+    type: 'Image',
+    sniptaleType: 'source-image',
+    sniptaleRole: 'source',
+    src: image,
+    width: 8,
+    height: 6,
+    cropX: 2,
+    cropY: 1,
+    sniptaleRasterState: {
+      version: 1,
+      width: 12,
+      height: 8,
+      crop: { x: 2, y: 1, width: 8, height: 6 },
+    },
+    sniptaleRasterOriginalData: image,
+    sniptaleRasterColorData: image,
+    sniptaleRasterVisibilityData: image,
+    sniptaleRasterKeyData: image,
+  };
+  canvas.getObjects.mockReturnValue([
+    { ...serialized, toObject: vi.fn(() => serialized) },
+  ] as never);
+  const exported = buildEditorCanvasDocument(options);
+  expect(exported.version).toBe(3);
+  expect(JSON.parse(exported.canvasJson).objects).toEqual([serialized]);
+  serialized.sniptaleRasterOriginalData = 'https://example.com/source.png';
+  expect(() => buildEditorCanvasDocument(options)).toThrow('Invalid editor raster metadata');
+});

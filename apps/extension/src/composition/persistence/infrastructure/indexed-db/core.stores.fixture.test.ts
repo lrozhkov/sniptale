@@ -701,3 +701,21 @@ it('adds only metadata indexes to version 50 while retaining every source row an
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+it('admits retained raster documents without changing any released row, store, index or immutable object', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 53
+  )!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 54
+  )!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({
+    ...source.domainVersions,
+    mediaLibrary: 35,
+    scenarioProjects: 11,
+  });
+});

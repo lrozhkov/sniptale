@@ -5,7 +5,7 @@ import { assertSafeScenarioAssetStorageMetadata } from '../../../../composition/
 import { parseBoundedJson } from '../codec';
 import type { MediaHubBackupRootEnvelope, MediaHubBackupSharedObject } from '../contracts';
 import { parseEffectBundleMetadata } from './effect-bundle';
-import { decodePortableEditorDocument, type PortableEditorDocumentV3 } from './editor-document';
+import { decodePortableEditorDocument, type PortableEditorDocument } from './editor-document';
 import {
   parsePortableMediaMetadata,
   type PortableAggregatePresentation,
@@ -63,7 +63,7 @@ function createRoleInventory(
     pointer(value.thumbnailObjectId);
     if (value.previewObjectId !== undefined) pointer(value.previewObjectId);
   };
-  const document = (value: PortableEditorDocumentV3) => {
+  const document = (value: PortableEditorDocument) => {
     decodePortableEditorDocument({
       document: value,
       assetsByObjectId: new Map(

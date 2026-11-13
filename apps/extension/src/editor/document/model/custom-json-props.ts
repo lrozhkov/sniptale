@@ -1,8 +1,13 @@
+import { EDITOR_RASTER_BINARY_FIELDS } from '../../../features/editor/document/raster-state';
+
 export const CUSTOM_JSON_PROPS = [
+  ...EDITOR_RASTER_BINARY_FIELDS,
+  'sniptaleRasterState',
   'sniptaleId',
   'sniptaleType',
   'sniptaleLabel',
   'sniptaleLocked',
+  'sniptaleContentLocked',
   'sniptaleRole',
   'sniptaleFrameAnnotationRevision',
   'sniptaleFrameAnnotationJson',

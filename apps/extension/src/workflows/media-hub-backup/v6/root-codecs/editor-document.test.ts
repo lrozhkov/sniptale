@@ -85,3 +85,63 @@ describe('portable editor document codec', () => {
     expect(decoded.frame).not.toHaveProperty('ignoredFrameField');
   });
 });
+
+it('archives all retained slots and restores exact stored 4 crop metadata', () => {
+  const fields = [
+    'sniptaleRasterOriginalData',
+    'sniptaleRasterColorData',
+    'sniptaleRasterVisibilityData',
+    'sniptaleRasterKeyData',
+  ];
+  const retained = {
+    ...document,
+    version: 4 as const,
+    assets: [
+      ...document.assets,
+      ...fields.map((field, index) => ({
+        assetId: `retained-${index}`,
+        role: `canvas:$.objects[0].${field}`,
+      })),
+    ],
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          src: 'sniptale-asset:canvas-local',
+          ...Object.fromEntries(
+            fields.map((field, index) => [field, `sniptale-asset:retained-${index}`])
+          ),
+          sniptaleRasterState: {
+            version: 1,
+            width: 8,
+            height: 6,
+            crop: { x: 2, y: 1, width: 4, height: 3 },
+          },
+          cropX: 2,
+          cropY: 1,
+          width: 4,
+          height: 3,
+        },
+      ],
+    }),
+  };
+  const objectsByAssetId = new Map(
+    retained.assets.map(({ assetId }, index) => [assetId, `object-${index}`])
+  );
+  const portable = encodePortableEditorDocument({ document: retained, objectsByAssetId });
+  expect(portable.version).toBe(4);
+  expect(portable.canvasJson).not.toContain('sniptale-asset:');
+  for (const field of fields)
+    expect(JSON.parse(portable.canvasJson).objects[0][field]).toMatch(/^sniptale-object:/);
+  expect(
+    decodePortableEditorDocument({
+      document: portable,
+      assetsByObjectId: new Map([...objectsByAssetId].map(([asset, object]) => [object, asset])),
+    })
+  ).toEqual(retained);
+  expect(() =>
+    decodePortableEditorDocument({
+      document: { ...portable, version: 3 },
+      assetsByObjectId: new Map([...objectsByAssetId].map(([asset, object]) => [object, asset])),
+    })
+  ).toThrow('invalid');
+});

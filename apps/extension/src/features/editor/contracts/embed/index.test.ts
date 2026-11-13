@@ -107,3 +107,37 @@ it('rejects missing, oversized, and malformed session identities and unsafe init
     })
   ).toBe(false);
 });
+
+it('admits retained logical 3 documents in embed apply and initialization', () => {
+  const image = 'data:image/png;base64,QUJDRA==';
+  const document = {
+    ...createEditorDocument(),
+    version: 3 as const,
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          sniptaleRasterState: {
+            version: 1,
+            width: 12,
+            height: 8,
+            crop: { x: 2, y: 1, width: 8, height: 6 },
+          },
+          sniptaleRasterOriginalData: image,
+        },
+      ],
+    }),
+  };
+  expect(
+    isEditorEmbedMessage(createScenarioEditorEmbedApplyMessage(image, document, 'session-test'))
+  ).toBe(true);
+  expect(
+    isEditorEmbedInitMessage(
+      createScenarioEditorEmbedInitMessage('session-test', { dataUrl: image, document })
+    )
+  ).toBe(true);
+  expect(
+    isEditorEmbedMessage(
+      createScenarioEditorEmbedApplyMessage(image, { ...document, version: 2 }, 'session-test')
+    )
+  ).toBe(false);
+});

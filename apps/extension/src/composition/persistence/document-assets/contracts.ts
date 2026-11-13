@@ -5,11 +5,10 @@ export interface PersistedEditorAssetPointer {
   assetId: string;
 }
 
-export interface PersistedEditorDocumentV3 extends Omit<
+interface PersistedEditorDocumentBase extends Omit<
   EditorDocument,
   'browserFrame' | 'frame' | 'sourceImageData' | 'version'
 > {
-  version: 3;
   sourceImage: PersistedEditorAssetPointer;
   frame: Omit<EditorDocument['frame'], 'backgroundImageData'> & {
     backgroundImage: PersistedEditorAssetPointer | null;
@@ -22,12 +21,24 @@ export interface PersistedEditorDocumentV3 extends Omit<
   assets: PersistedEditorDocumentAsset[];
 }
 
+/** Legacy persisted documents contain no retained raster metadata. */
+export interface PersistedEditorDocumentV3 extends PersistedEditorDocumentBase {
+  version: 3;
+}
+
+/** Retained raster documents use logical format 3 and persisted format 4. */
+export interface PersistedEditorDocumentV4 extends PersistedEditorDocumentBase {
+  version: 4;
+}
+
+export type PersistedEditorDocument = PersistedEditorDocumentV3 | PersistedEditorDocumentV4;
+
 export interface PersistedEditorDocumentAsset extends PersistedEditorAssetPointer {
   role: string;
 }
 
 export interface PreparedEditorDocument {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
   objects: PreparedAssetObject[];
   refs: AssetRef[];
   runtimeAssetsByUrl: ReadonlyMap<string, AssetRef>;

@@ -401,3 +401,120 @@ it('moves keyboard focus between the catalog and effect form on selection change
   act(() => root?.render(<EditorInspectorLayerEffectsPanel {...props} />));
   expect(document.activeElement).toBe(container?.querySelector('[data-section="effect"]'));
 });
+
+it('opens the selected nested image current effect and updates the exact child identity', () => {
+  const child = {
+    id: 'nested-image',
+    name: 'Nested image',
+    type: 'image' as const,
+    typeLabel: 'Image',
+    effects: [{ id: 'brightness' as const, enabled: true, amount: 0.6 }],
+  };
+  const group = createLayer({
+    id: 'parent-group',
+    name: 'Parent group',
+    type: 'group',
+    effects: [],
+    groupChildren: [
+      {
+        id: 'inner-group',
+        name: 'Inner group',
+        type: 'group',
+        typeLabel: 'Group',
+        groupChildren: [child],
+      },
+    ],
+  });
+  const props = renderPanel({
+    layers: [group],
+    selection: { ...DEFAULT_SELECTION, selectedObjectId: child.id, selectedObjectIds: [child.id] },
+    layerEffectsState: {
+      activeEffectId: 'brightness',
+      category: 'adjustments',
+      layerId: child.id,
+      query: '',
+    },
+  });
+  expect(queryNumericInput('editor.toolbar.layerEffectsAmount')?.value).toBe('0.6');
+  expect(props.previewLayerEffect).toHaveBeenCalledWith(child.id, child.effects[0]);
+  const update = [...container!.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'editor.toolbar.layerEffectsUpdate'
+  );
+  act(() => update?.click());
+  expect(props.updateLayerEffect).toHaveBeenCalledWith(child.id, child.effects[0]);
+  act(() =>
+    root?.render(
+      <EditorInspectorLayerEffectsPanel
+        {...props}
+        layers={[{ ...group, groupChildren: [{ ...child, id: 'sibling-image', name: 'Sibling' }] }]}
+        selection={{
+          ...DEFAULT_SELECTION,
+          hasSelection: false,
+          selectedObjectCount: 0,
+          selectedObjectId: null,
+          selectedObjectIds: [],
+        }}
+      />
+    )
+  );
+  expect(container?.textContent).toContain('editor.toolbar.layerEffectsSelectLayer');
+  expect(queryNumericInput('editor.toolbar.layerEffectsAmount')).toBeNull();
+  expect(props.resetLayerEffectPreview).toHaveBeenCalledWith(child.id);
+});
+
+it('keeps root vector effects supported without admitting nested vector or group targets', () => {
+  const vector = createLayer({ id: 'root-vector', type: 'shape', raster: false });
+  const nestedVector = {
+    id: 'nested-vector',
+    name: 'Nested vector',
+    type: 'shape' as const,
+    typeLabel: 'Shape',
+    effects: [ACTIVE_EFFECT],
+  };
+  const innerGroup = {
+    id: 'inner-group',
+    name: 'Inner group',
+    type: 'group' as const,
+    typeLabel: 'Group',
+    groupChildren: [nestedVector],
+  };
+  const parent = createLayer({ id: 'outer-group', type: 'group', groupChildren: [innerGroup] });
+  const selected = (id: string) => ({
+    ...DEFAULT_SELECTION,
+    selectedObjectId: id,
+    selectedObjectIds: [id],
+  });
+  expect(resolveLayerEffectsActiveLayer([vector, parent], selected(vector.id), vector.id)).toEqual({
+    id: vector.id,
+    name: vector.name,
+    effects: vector.effects,
+  });
+  expect(
+    resolveLayerEffectsActiveLayer([vector, parent], selected(nestedVector.id), nestedVector.id)
+  ).toBeNull();
+  expect(
+    resolveLayerEffectsActiveLayer([vector, parent], selected(innerGroup.id), innerGroup.id)
+  ).toBeNull();
+});
+
+it('resolves source-image descendants already admitted by the raster toolbar and backend', () => {
+  const child = {
+    id: 'nested-source',
+    name: 'Source image',
+    type: 'source-image' as const,
+    typeLabel: 'Source image',
+    effects: [ACTIVE_EFFECT],
+  };
+  const parent = createLayer({ id: 'source-parent', type: 'group', groupChildren: [child] });
+  const selection = {
+    ...DEFAULT_SELECTION,
+    selectedObjectId: child.id,
+    selectedObjectIds: [child.id],
+    selectedObjectType: 'source-image' as const,
+  };
+  expect(resolveLayerEffectsActiveLayer([parent], selection, child.id)).toEqual({
+    id: child.id,
+    name: child.name,
+    effects: child.effects,
+  });
+});

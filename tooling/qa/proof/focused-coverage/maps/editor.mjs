@@ -1350,4 +1350,22 @@ action-feedback-click-fields.test.tsx',
       'apps/extension/src/editor/inspector/tools/shape-browser/custom-shapes.test.tsx',
     ],
   },
+  {
+    owner: 'editor-raster-region',
+    productionFile: 'apps/extension/src/editor/raster-editing/vendor/flood-fill.ts',
+    reason:
+      'Region, pixel and Worker tests cover fill tolerance, selection, transparency and clipped growth.',
+    testFiles: [
+      'apps/extension/src/editor/raster-editing/region.test.ts',
+      'apps/extension/src/editor/raster-editing/pixels.test.ts',
+      'apps/extension/src/editor/raster-editing/compute.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-raster-brush',
+    productionFile: 'apps/extension/src/editor/raster-editing/vendor/bezier-line.ts',
+    reason:
+      'Brush tests execute interpolation through fast strokes, final segments, single stamps, Restore and clipping.',
+    testFiles: ['apps/extension/src/editor/raster-editing/brush.test.ts'],
+  },
 ];

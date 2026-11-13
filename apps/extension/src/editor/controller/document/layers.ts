@@ -1,5 +1,6 @@
+import { isManagedBackgroundObject } from '../background/identity';
 import type { Canvas } from 'fabric';
-import { Group, type FabricObject } from 'fabric';
+import { FabricImage, Group, type FabricObject } from 'fabric';
 import type { EditorLayerChild, EditorLayerItem } from '../../../features/editor/document/types';
 import {
   createObjectLabel,
@@ -31,6 +32,34 @@ function isTransparentPreview(object: FabricObject): boolean {
 
 export function findObjectById(canvas: Canvas | null, id: string): FabricObject | undefined {
   return canvas?.getObjects?.().find((object) => object.sniptaleId === id);
+}
+
+/** Resolve content access without changing the object's position locks. */
+export function findRasterContentObject(canvas: Canvas | null, id: string): FabricObject | null {
+  const visit = (objects: FabricObject[], blocked: boolean): FabricObject | null => {
+    for (const object of objects) {
+      const hidden = blocked || object.visible === false;
+      if (object.sniptaleId === id) {
+        const supported =
+          (object instanceof FabricImage &&
+            (object.sniptaleType === 'image' || object.sniptaleType === 'source-image')) ||
+          (isManagedBackgroundObject(object) && object.sniptaleBackgroundMode === 'image');
+        const refused =
+          object.sniptaleContentLocked === true ||
+          (object.sniptaleLocked === true && object.sniptaleContentLocked !== false);
+        return supported && !hidden && !refused ? object : null;
+      }
+      if (object instanceof Group) {
+        const found = visit(
+          object.getObjects(),
+          hidden || object.sniptaleLocked === true || object.sniptaleContentLocked === true
+        );
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return visit(canvas?.getObjects?.() ?? [], false);
 }
 
 export function getLayerObjects(canvas: Canvas | null): FabricObject[] {
@@ -67,6 +96,7 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
             ? collectChildren(child)
             : undefined;
         return {
+          effects: (child.sniptaleEffects ?? []).map((effect) => ({ ...effect })),
           id: child.sniptaleId ?? crypto.randomUUID(),
           name: child.sniptaleLabel ?? getEditorObjectTypeLabel(child.sniptaleType ?? 'image'),
           type: child.sniptaleType ?? 'image',

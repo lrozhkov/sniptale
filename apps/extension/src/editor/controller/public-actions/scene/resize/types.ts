@@ -1,5 +1,5 @@
 import type { Canvas } from 'fabric';
-import type { PreparedBackgroundLayer } from '../../../background/sync';
+import type { BackgroundRasterCandidate, PreparedBackgroundLayer } from '../../../background/sync';
 
 import type {
   BrowserFrameState,
@@ -41,6 +41,8 @@ export type SourceResizeSceneOptions = SceneResizeOptions & {
 
 /** Transient scene previews do not change accepted settings, history, or autosave. */
 export type FrameSceneMutationOptions = {
+  allowBackgroundContentEditing?: boolean;
+  backgroundCandidate?: BackgroundRasterCandidate;
   preview?: boolean;
   quality?: 'final' | 'preview';
   signal?: AbortSignal;

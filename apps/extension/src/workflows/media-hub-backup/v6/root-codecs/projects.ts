@@ -15,7 +15,7 @@ import type {
   StoredScenarioStepEditorDocumentEntry,
 } from '../../../../composition/persistence/scenario/contracts';
 import type { VideoProjectEffectSnapshot } from '../../../../features/video/project/effect-instance/types';
-import type { PortableEditorDocumentV3 } from './editor-document';
+import { assertPortableEditorDocument, type PortableEditorDocument } from './editor-document';
 import type { PortableAggregatePresentation, PortableMediaThumbnail } from './media';
 import {
   SCENARIO_HISTORY_LIMIT,
@@ -134,7 +134,7 @@ interface PortableScenarioStepDocument extends Omit<
   StoredScenarioStepEditorDocumentEntry,
   'document'
 > {
-  document: PortableEditorDocumentV3;
+  document: PortableEditorDocument;
 }
 
 interface PortableScenarioSavedVersion {
@@ -472,5 +472,6 @@ export function parsePortableScenarioProjectMetadata(
     throw new Error('Portable scenario project children are invalid.');
   }
   assertUniquePortableScenarioChildIdentities(value);
+  for (const entry of value.stepDocuments) assertPortableEditorDocument(entry.document);
   return value;
 }

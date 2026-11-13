@@ -55,23 +55,23 @@ it('keeps fabric gradient vectors aligned with css linear-gradient semantics', (
 });
 
 it('resolves image layouts for constrained background fits', () => {
-  expect(getBackgroundImageLayout('contain', SIZE, IMAGE as never)).toMatchObject({
+  expect(getBackgroundImageLayout('contain', SIZE, IMAGE)).toMatchObject({
     left: 60,
     scaleX: 2,
     scaleY: 2,
     top: 0,
   });
-  expect(getBackgroundImageLayout('fit-width', SIZE, IMAGE as never)).toMatchObject({
+  expect(getBackgroundImageLayout('fit-width', SIZE, IMAGE)).toMatchObject({
     scaleX: 3.2,
     scaleY: 3.2,
     top: -54,
   });
-  expect(getBackgroundImageLayout('fit-height', SIZE, IMAGE as never)).toMatchObject({
+  expect(getBackgroundImageLayout('fit-height', SIZE, IMAGE)).toMatchObject({
     left: 60,
     scaleX: 2,
     scaleY: 2,
   });
-  expect(getBackgroundImageLayout('cover', SIZE, IMAGE as never)).toMatchObject({
+  expect(getBackgroundImageLayout('cover', SIZE, IMAGE)).toMatchObject({
     scaleX: 3.2,
     scaleY: 3.2,
   });

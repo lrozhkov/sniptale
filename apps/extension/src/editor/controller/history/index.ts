@@ -1,3 +1,4 @@
+import { EDITOR_RASTER_BINARY_FIELDS } from '../../../features/editor/document/raster-state';
 import { isEditorDocument } from '../../../features/editor/document/guards';
 import { type EditorDocument } from '../../../features/editor/document/types';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
@@ -6,6 +7,7 @@ import { EDITOR_HISTORY_LIMITS } from '../../../features/editor-history/policy';
 const HISTORY_BINARY_INLINE_LIMIT = 4_096;
 const HISTORY_BINARY_TOKEN_PREFIX = 'sniptale-history-asset:';
 const CANVAS_BINARY_FIELDS = new Set([
+  ...EDITOR_RASTER_BINARY_FIELDS,
   'src',
   'sniptaleBackgroundImageData',
   'sniptaleSimplifySourceData',

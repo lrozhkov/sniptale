@@ -7,6 +7,7 @@ import type { EditorTool } from '../../../features/editor/document/types';
 import type { CompactCommand } from '../../inspector/compact';
 import type { EditorToolbarSelectionState } from '../toolbar/types';
 import { useEditorStore } from '../../state/useEditorStore';
+import { cancelEditorTransientInteraction } from '../../controller/input/canvas-actions/transient';
 
 const listeners = new Map<string, Set<() => void>>();
 const mocks = vi.hoisted(() => ({
@@ -14,12 +15,29 @@ const mocks = vi.hoisted(() => ({
     <div data-ui={`drawing-options.${props.tool}`}>{props.selectedType}</div>
   )),
 }));
+let activeCanvasObjects: object[] = [];
 const controller = {
+  cancelTransientInteraction: () =>
+    cancelEditorTransientInteraction({
+      canvas: controller.canvas as never,
+      activeTool: 'select',
+      drawSession: null,
+      cropGuide: null,
+      clearCropSelection: vi.fn(),
+      switchToSelectTool: vi.fn(),
+      syncRuntimeState: vi.fn(),
+    }),
+  getRasterRuntime: vi.fn(() => null),
   clearSelection: vi.fn(),
   groupSelectedLayers: vi.fn(),
   mergeSelectedLayers: vi.fn(),
   ungroupSelectedLayers: vi.fn(),
   canvas: {
+    getActiveObjects: () => activeCanvasObjects,
+    discardActiveObject: () => {
+      activeCanvasObjects = [];
+    },
+    requestRenderAll: vi.fn(),
     off: vi.fn((event: string, handler: () => void) => listeners.get(event)?.delete(handler)),
     on: vi.fn((event: string, handler: () => void) => {
       const bucket = listeners.get(event) ?? new Set();
@@ -36,6 +54,21 @@ vi.mock('../../application/controller-context', async (importOriginal) => ({
 vi.mock('../../drawing/options', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../drawing/options')>()),
   EditorDrawingOptions: mocks.drawingOptions,
+}));
+
+vi.mock('./raster-tools', () => ({
+  EditorRasterTools: (props: {
+    runtime: { setTool: (tool: string) => void };
+    onBeforeToolChange?: () => void;
+  }) => (
+    <button
+      data-ui="raster-tools"
+      onClick={() => {
+        props.onBeforeToolChange?.();
+        props.runtime.setTool('select');
+      }}
+    />
+  ),
 }));
 
 import { EditorFloatingToolPropertiesRail } from './tool-properties-rail';
@@ -345,4 +378,43 @@ it('keeps expanded commands when selected layer kind or composition changes and 
   expect(reveal()).toBeNull();
   renderRail({ activeTool: 'select', selection: single });
   expect(reveal()?.getAttribute('aria-expanded')).toBe('false');
+});
+
+it.each(['image', 'source-image', 'background'] as const)(
+  'shows raster controls for one selected %s without inspector navigation',
+  (selectedObjectType) => {
+    const snapshot = { available: true };
+    controller.getRasterRuntime.mockReturnValue({
+      subscribe: () => () => undefined,
+      getSnapshot: () => snapshot,
+    } as never);
+    renderRail({
+      activeTool: 'select',
+      documentController: { inspector: 'ai' },
+      selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType },
+    });
+    expect(container.querySelector('[data-ui="raster-tools"]')).not.toBeNull();
+    controller.getRasterRuntime.mockReturnValue(null);
+  }
+);
+
+it('keeps the selected source when the raster tool callback activates Select', () => {
+  const source = { sniptaleId: 'source', sniptaleType: 'source-image' };
+  activeCanvasObjects = [source];
+  const snapshot = { available: true };
+  const setTool = vi.fn();
+  controller.getRasterRuntime.mockReturnValue({
+    subscribe: () => () => undefined,
+    getSnapshot: () => snapshot,
+    setTool,
+  } as never);
+  renderRail({
+    activeTool: 'select',
+    selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType: 'source-image' },
+  });
+  act(() => container.querySelector<HTMLButtonElement>('[data-ui="raster-tools"]')?.click());
+  expect(setTool).toHaveBeenCalledWith('select');
+  expect(controller.canvas.getActiveObjects()).toEqual([source]);
+  activeCanvasObjects = [];
+  controller.getRasterRuntime.mockReturnValue(null);
 });

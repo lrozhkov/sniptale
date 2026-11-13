@@ -2,7 +2,7 @@ import React from 'react';
 import { Contrast, Move, Sparkles } from 'lucide-react';
 import { SegmentedSelector } from '../../chrome/ui';
 import type { EditorLayerEffectCategory } from '../../../features/editor/document/effects';
-import type { EditorLayerItem } from '../../../features/editor/document/types';
+import type { EditorLayerEffectsTarget } from './shared';
 import { translate } from '../../../platform/i18n';
 import { EmptyState, StatusRow } from '../../../ui/compact-inspector-controls';
 import { EditorInspectorGroupSection } from '../grouped';
@@ -28,7 +28,7 @@ const LAYER_EFFECT_CATEGORIES: EditorLayerEffectCategory[] = [
 const EDITOR_INSPECTOR_SECTION_CLASS_NAME = 'py-3 first:pt-0 last:pb-0 focus:outline-none';
 
 function LayerEffectsCategoryRow(props: {
-  activeLayer: EditorLayerItem;
+  activeLayer: EditorLayerEffectsTarget;
   layerEffectsState: EditorInspectorLayerEffectsProps['layerEffectsState'];
   onOpenLayerEffects: EditorInspectorLayerEffectsProps['onOpenLayerEffects'];
 }) {
@@ -58,7 +58,7 @@ function LayerEffectsCategoryRow(props: {
 
 function LayerEffectsLayerSection(
   props: Pick<EditorInspectorLayerEffectsProps, 'layerEffectsState' | 'onOpenLayerEffects'> & {
-    activeLayer: EditorLayerItem;
+    activeLayer: EditorLayerEffectsTarget;
   }
 ) {
   return (
@@ -87,7 +87,7 @@ function LayerEffectsEffectsSection(
   props: Pick<
     EditorInspectorLayerEffectsProps,
     'layerEffectsState' | 'onOpenLayerEffects' | 'setLayerEffectsState'
-  > & { activeLayer: EditorLayerItem; editor: React.ReactNode }
+  > & { activeLayer: EditorLayerEffectsTarget; editor: React.ReactNode }
 ) {
   const { category } = props.layerEffectsState;
 
@@ -135,7 +135,7 @@ function LayerEffectsEmptyState() {
 }
 
 function LayerEffectsBody(
-  props: EditorInspectorLayerEffectsProps & { activeLayer: EditorLayerItem }
+  props: EditorInspectorLayerEffectsProps & { activeLayer: EditorLayerEffectsTarget }
 ) {
   const bodyRef = React.useRef<HTMLDivElement>(null);
   const previousEffect = React.useRef(props.layerEffectsState.activeEffectId);

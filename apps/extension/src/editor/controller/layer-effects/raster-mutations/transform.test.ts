@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  findRasterContentObject: vi.fn(),
   commitLayerMutation: vi.fn(),
   ensureRasterObject: vi.fn(async (_context, object) => object),
   getEditableObject: vi.fn(),
@@ -13,6 +14,11 @@ vi.mock('../mutation-shared', async (importOriginal) => ({
   ensureRasterObject: mocks.ensureRasterObject,
   getEditableObject: mocks.getEditableObject,
   syncSourceFromObject: mocks.syncSourceFromObject,
+}));
+
+vi.mock('../../document/layers', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../document/layers')>()),
+  findRasterContentObject: mocks.findRasterContentObject,
 }));
 
 import { applyEditorLayerTransformation } from './transform';
@@ -47,6 +53,7 @@ function createObject() {
 it('applies raster layer transformation branches and commits non-resize changes', async () => {
   const object = createObject();
   mocks.getEditableObject.mockReturnValue(object);
+  mocks.findRasterContentObject.mockReturnValue(object);
 
   await applyEditorLayerTransformation(createContext('flip-horizontal') as never);
   await applyEditorLayerTransformation(createContext('flip-vertical') as never);
@@ -63,6 +70,7 @@ it('applies raster layer transformation branches and commits non-resize changes'
 
 it('skips stale or missing transformation targets', async () => {
   mocks.getEditableObject.mockReturnValue(null);
+  mocks.findRasterContentObject.mockReturnValue(null);
   await applyEditorLayerTransformation(createContext('flip-horizontal') as never);
 
   const stale = {

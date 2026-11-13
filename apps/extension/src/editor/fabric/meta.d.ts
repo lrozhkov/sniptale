@@ -1,3 +1,4 @@
+import type { EditorRasterState } from '../../features/editor/document/raster-state';
 import 'fabric';
 import type { EditorFrameSettings, EditorObjectType } from '../../features/editor/document/types';
 import type { BlurSettings } from '../../features/highlighter/contracts';
@@ -12,6 +13,11 @@ import type {
 
 declare module 'fabric' {
   interface FabricObject {
+    sniptaleRasterState?: EditorRasterState;
+    sniptaleRasterOriginalData?: string;
+    sniptaleRasterColorData?: string;
+    sniptaleRasterVisibilityData?: string;
+    sniptaleRasterKeyData?: string;
     sniptaleSimplifySourceData?: string;
     sniptaleSimplifySourceWidth?: number;
     sniptaleSimplifySourceHeight?: number;
@@ -23,6 +29,7 @@ declare module 'fabric' {
     sniptaleType?: EditorObjectType;
     sniptaleLabel?: string;
     sniptaleLocked?: boolean;
+    sniptaleContentLocked?: boolean;
     sniptaleRole?:
       | 'annotation'
       | 'background'

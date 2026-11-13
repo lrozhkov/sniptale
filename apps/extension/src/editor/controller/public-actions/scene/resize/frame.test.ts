@@ -441,3 +441,46 @@ it('restores final baseline quality without history after a baseline-equal trans
   expect(options.commitHistory).not.toHaveBeenCalled();
   expect(options.store.getFrame()).toBe(baseline);
 });
+
+it('refuses a failed background apply before geometry, frame and history publication', async () => {
+  const relayoutScene = vi.fn();
+  const updateFrame = vi.fn();
+  const commitHistory = vi.fn();
+  const dispose = vi.fn();
+  const canvas = createFabricCanvasFixture({ getObjects: () => [], requestRenderAll: vi.fn() });
+  const result = await applyEditorFrameSceneSettings({
+    canvas,
+    source: {
+      id: 'source',
+      dataUrl: '',
+      name: null,
+      intrinsicWidth: 200,
+      intrinsicHeight: 100,
+      displayWidth: 200,
+      displayHeight: 100,
+      left: 0,
+      top: 0,
+      locked: true,
+      visible: true,
+    },
+    frame: { ...DEFAULT_EDITOR_FRAME_SETTINGS, paddingLeft: 48, backgroundColor: '#123456' },
+    store: {
+      getFrame: () => DEFAULT_EDITOR_FRAME_SETTINGS,
+      getBrowserFrame: () => DEFAULT_BROWSER_FRAME_STATE,
+      updateFrame,
+    },
+    relayoutScene,
+    zoomLevel: 1,
+    getCanvasDocumentSize: () => ({ width: 200, height: 100 }),
+    ensureReachableObjects: () => false,
+    rebuildFrameDecorations: async () => undefined,
+    commitHistory,
+    syncRuntimeState: vi.fn(),
+    prepareBackground: async () => ({ apply: () => false, dispose }),
+  });
+  expect(result).toBe(false);
+  expect(dispose).toHaveBeenCalledOnce();
+  expect(relayoutScene).not.toHaveBeenCalled();
+  expect(updateFrame).not.toHaveBeenCalled();
+  expect(commitHistory).not.toHaveBeenCalled();
+});

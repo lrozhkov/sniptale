@@ -143,7 +143,20 @@ it('adopts prepared resource ownership only on commit and preserves disabled aut
   autosave.setEnabled(false);
   const hydration = autosave.beginHydration(() => true);
   expect(releaseSource).not.toHaveBeenCalled();
-  const map = new Map();
+  const original = 'data:image/png;base64,b3JpZ2luYWw=';
+  const map = new Map([
+    [
+      original,
+      {
+        assetId: 'retained-original',
+        createdAt: 1,
+        location: { kind: 'opfs' as const, objectKey: 'objects/retained-original' },
+        mimeType: 'image/png',
+        sha256: null,
+        size: 8,
+      },
+    ],
+  ]);
   autosave.adoptPreparedDocument({
     aggregateId: 'target',
     revision: 7,
@@ -157,12 +170,30 @@ it('adopts prepared resource ownership only on commit and preserves disabled aut
   expect(autosave.isEnabled()).toBe(false);
   expect(autosave.getDurableRevision()).toBe(7);
   hydration.finish(true);
-  await autosave.saveNow(() => createDocument('target edit'));
+  const retained = {
+    ...createDocument('target edit'),
+    version: 3 as const,
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          sniptaleRasterOriginalData: original,
+          sniptaleRasterState: {
+            version: 1,
+            width: 8,
+            height: 6,
+            crop: { x: 2, y: 1, width: 4, height: 3 },
+          },
+        },
+      ],
+    }),
+  };
+  await autosave.saveNow(() => retained);
   expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
     expect.objectContaining({
       aggregateId: 'target',
       expectedRevision: 7,
       reusableAssetsByRuntimeUrl: map,
+      document: retained,
     })
   );
   autosave.dispose();

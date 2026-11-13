@@ -186,7 +186,11 @@ function chooseRowFilter(row: Uint8Array, previous: Uint8Array, channels: number
 }
 
 /** Samples each row to select a reversible filter without five full-row scans. */
-export function filterPngRow(row: Uint8Array, previous: Uint8Array, channels: number): Uint8Array {
+export function filterPngRow(
+  row: Uint8Array,
+  previous: Uint8Array,
+  channels: number
+): Uint8Array<ArrayBuffer> {
   const filter = chooseRowFilter(row, previous, channels);
   const output = new Uint8Array(row.length);
   output[0] = filter;
@@ -223,4 +227,222 @@ export function assembleOptimizedPng(
     } else parts.push(Uint8Array.from(entry.encoded));
   }
   return new Blob(parts, { type: 'image/png' });
+}
+
+const MAX_RGBA_PIXELS = 100_000_000;
+const STREAM_INPUT_BYTES = 4096;
+const UNSUPPORTED_RGBA_METADATA = new Set([
+  'tRNS',
+  'iCCP',
+  'cICP',
+  'gAMA',
+  'cHRM',
+  'sBIT',
+  'mDCV',
+  'cLLI',
+]);
+
+function validateRgbaDimensions(width: number, height: number): number {
+  if (
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width < 1 ||
+    height < 1 ||
+    width > 32768 ||
+    height > 32768 ||
+    width * height > MAX_RGBA_PIXELS
+  )
+    throw new Error('Invalid PNG RGBA dimensions.');
+  return width * height * 4;
+}
+
+async function yieldPngWork(lastYield: number, signal?: AbortSignal): Promise<number> {
+  signal?.throwIfAborted();
+  if (performance.now() - lastYield < 16) return lastYield;
+  await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+  signal?.throwIfAborted();
+  return performance.now();
+}
+
+async function rgbaOutputChannels(
+  rgba: Uint8ClampedArray,
+  width: number,
+  signal?: AbortSignal
+): Promise<3 | 4> {
+  let lastYield = performance.now();
+  const stride = width * 4;
+  for (let start = 0; start < rgba.length; start += stride) {
+    lastYield = await yieldPngWork(lastYield, signal);
+    for (let index = start + 3; index < start + stride; index += 4) {
+      if (rgba[index] !== 255) return 4;
+    }
+  }
+  return 3;
+}
+
+/** Encodes exact RGBA bytes, including hidden RGB, without a Canvas conversion. */
+export async function encodePngRgba({
+  width,
+  height,
+  rgba,
+  signal,
+}: {
+  width: number;
+  height: number;
+  rgba: Uint8ClampedArray;
+  signal?: AbortSignal;
+}): Promise<Blob> {
+  signal?.throwIfAborted();
+  if (rgba.length !== validateRgbaDimensions(width, height))
+    throw new Error('PNG RGBA byte count mismatch.');
+  const channels = await rgbaOutputChannels(rgba, width, signal);
+  const stride = width * 4;
+  let previous = new Uint8Array(width * channels + 1);
+  let y = 0;
+  let lastYield = performance.now();
+  const rows = new ReadableStream<BufferSource>({
+    async pull(controller) {
+      lastYield = await yieldPngWork(lastYield, signal);
+      if (y === height) {
+        controller.close();
+        return;
+      }
+      const row = new Uint8Array(width * channels + 1);
+      if (channels === 4) row.set(rgba.subarray(y * stride, (y + 1) * stride), 1);
+      else {
+        for (let x = 0; x < width; x += 1) {
+          const source = y * stride + x * 4;
+          row.set(rgba.subarray(source, source + 3), 1 + x * 3);
+        }
+      }
+      controller.enqueue(filterPngRow(row, previous, channels));
+      previous = row;
+      y += 1;
+    },
+  });
+  const reader = rows
+    .pipeThrough(new CompressionStream('deflate'), signal ? { signal } : {})
+    .getReader();
+  const parts: BlobPart[] = [Uint8Array.from(SIGNATURE)];
+  const header = new Uint8Array(13);
+  const view = new DataView(header.buffer);
+  view.setUint32(0, width);
+  view.setUint32(4, height);
+  header.set([8, channels === 4 ? 6 : 2, 0, 0, 0], 8);
+  parts.push(makePngChunk('IHDR', header));
+  try {
+    while (true) {
+      signal?.throwIfAborted();
+      const result = await reader.read();
+      if (result.done) break;
+      parts.push(makePngChunk('IDAT', result.value));
+    }
+    signal?.throwIfAborted();
+    parts.push(makePngChunk('IEND', new Uint8Array()));
+    return new Blob(parts, { type: 'image/png' });
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+}
+
+function readRgbaPng(bytes: Uint8Array, width: number, height: number): BrowserPng {
+  const rgbaBytes = validateRgbaDimensions(width, height);
+  const png = readBrowserPng(bytes, rgbaBytes + height);
+  if (!png || png.width !== width || png.height !== height)
+    throw new Error('Invalid PNG RGBA header or dimensions.');
+  if (
+    png.chunks.some(
+      ({ type, data }) =>
+        UNSUPPORTED_RGBA_METADATA.has(type) ||
+        (type === 'sRGB' && (data.length !== 1 || data[0]! > 3))
+    )
+  )
+    throw new Error('Unsupported PNG RGBA color profile.');
+  return png;
+}
+
+/** Decodes the supported RGB/RGBA PNG profile into exact, unpremultiplied RGBA bytes. */
+export async function decodePngRgba({
+  bytes,
+  width,
+  height,
+  signal,
+}: {
+  bytes: Uint8Array;
+  width: number;
+  height: number;
+  signal?: AbortSignal;
+}): Promise<Uint8ClampedArray> {
+  signal?.throwIfAborted();
+  const png = readRgbaPng(bytes, width, height);
+  const output = new Uint8ClampedArray(width * height * 4);
+  const rowLength = width * png.channels + 1;
+  const expectedBytes = rowLength * height;
+  let row = new Uint8Array(rowLength);
+  let previous = new Uint8Array(rowLength);
+  let filled = 0;
+  let decodedBytes = 0;
+  let y = 0;
+  let chunk = 0;
+  let offset = 0;
+  let lastYield = performance.now();
+  const compressed = new ReadableStream<BufferSource>({
+    pull(controller) {
+      signal?.throwIfAborted();
+      while (chunk < png.imageData.length) {
+        const data = png.imageData[chunk]!;
+        if (offset < data.length) {
+          const end = Math.min(data.length, offset + STREAM_INPUT_BYTES);
+          controller.enqueue(data.slice(offset, end));
+          offset = end;
+          return;
+        }
+        chunk += 1;
+        offset = 0;
+      }
+      controller.close();
+    },
+  });
+  const reader = compressed
+    .pipeThrough(new DecompressionStream('deflate'), signal ? { signal } : {})
+    .getReader();
+  try {
+    while (true) {
+      lastYield = await yieldPngWork(lastYield, signal);
+      const result = await reader.read();
+      if (result.done) break;
+      const decoded = result.value;
+      if (decoded.length > expectedBytes - decodedBytes)
+        throw new Error('PNG decoded size mismatch.');
+      decodedBytes += decoded.length;
+      for (let start = 0; start < decoded.length;) {
+        const size = Math.min(rowLength - filled, decoded.length - start);
+        row.set(decoded.subarray(start, start + size), filled);
+        filled += size;
+        start += size;
+        if (filled !== rowLength) continue;
+        unfilterPngRow(row, previous, png.channels);
+        if (png.channels === 4) output.set(row.subarray(1), y * width * 4);
+        else {
+          for (let x = 0; x < width; x += 1) {
+            const target = (y * width + x) * 4;
+            output.set(row.subarray(1 + x * 3, 4 + x * 3), target);
+            output[target + 3] = 255;
+          }
+        }
+        [row, previous] = [previous, row];
+        filled = 0;
+        y += 1;
+      }
+    }
+    // Completion verifies the native zlib checksum, truncation and trailing-byte checks.
+    if (decodedBytes !== expectedBytes || filled !== 0)
+      throw new Error('PNG decoded size mismatch.');
+    signal?.throwIfAborted();
+    return output;
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
 }

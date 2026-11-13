@@ -318,3 +318,36 @@ it('admits optional text layout flags and rejects malformed values before restor
     );
   }
 });
+
+it('refuses malformed retained raster metadata before Fabric image loading', () => {
+  expect(() =>
+    assertValidEditorDrawingCanvasJson(
+      JSON.stringify({
+        objects: [
+          {
+            type: 'Image',
+            src: 'data:image/png;base64,QUJDRA==',
+            sniptaleRasterOriginalData: 'data:image/png;base64,QUJDRA==',
+          },
+        ],
+      })
+    )
+  ).toThrow('Invalid editor raster metadata');
+});
+
+it('admits optional boolean content permission and rejects malformed permission on every object', () => {
+  for (const marker of [undefined, false, true]) {
+    expect(() =>
+      assertValidEditorDrawingCanvasJson(
+        JSON.stringify({ objects: [{ sniptaleContentLocked: marker }] })
+      )
+    ).not.toThrow();
+  }
+  for (const marker of [null, 0, 'false', {}]) {
+    expect(() =>
+      assertValidEditorDrawingCanvasJson(
+        JSON.stringify({ objects: [{ objects: [{ sniptaleContentLocked: marker }] }] })
+      )
+    ).toThrow('Invalid editor content permission');
+  }
+});

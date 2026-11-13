@@ -1,7 +1,9 @@
 export type {
   HydratedEditorDocument,
   PersistedEditorDocumentAsset,
+  PersistedEditorDocument,
   PersistedEditorDocumentV3,
+  PersistedEditorDocumentV4,
   PreparedEditorDocument,
 } from './contracts';
 export {

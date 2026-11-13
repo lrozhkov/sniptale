@@ -120,14 +120,37 @@ it('retains failed final save admission through explicit retry', async () => {
   autosave.scheduleAutosave(createDocument('intermediate'));
   await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   commitWorkspaceMock.mockRejectedValueOnce(new Error('Final write failed'));
-  autosave.scheduleAutosave(createDocument('final'));
+  const retained = {
+    ...createDocument('final'),
+    version: 3 as const,
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          sniptaleRasterOriginalData: 'data:image/png;base64,b3JpZ2luYWw=',
+          sniptaleRasterColorData: 'data:image/png;base64,Y29sb3I=',
+          sniptaleRasterVisibilityData: 'data:image/png;base64,dmlzaWJpbGl0eQ==',
+          sniptaleRasterKeyData: 'data:image/png;base64,a2V5',
+          sniptaleRasterState: {
+            version: 1,
+            width: 8,
+            height: 6,
+            crop: { x: 2, y: 1, width: 4, height: 3 },
+          },
+        },
+      ],
+    }),
+  };
+  autosave.scheduleAutosave(retained);
   autosave.setInteractionActive(false);
   await vi.advanceTimersByTimeAsync(EDITOR_AUTOSAVE_POLICY.delay);
   expect(autosave.getLastWriteError()).toBeInstanceOf(Error);
   expect(autosave.hasUnsavedChanges()).toBe(true);
   expect(release).not.toHaveBeenCalled();
   expect(wakeCheckpoints).not.toHaveBeenCalled();
-  await autosave.saveNow(() => createDocument('final'));
+  await autosave.saveNow(() => retained);
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ document: retained })
+  );
   expect(autosave.getLastWriteError()).toBeNull();
   expect(release).toHaveBeenCalledOnce();
   await vi.advanceTimersByTimeAsync(0);

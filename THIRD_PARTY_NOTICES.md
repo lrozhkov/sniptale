@@ -50,6 +50,25 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/realtimeVideoUpscaler.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/realtimeVideoUpscaler.js | `58dd6544858039b4f8ba7a6cf469a4ed22aadc8588c7483ca7b4af2901ac4742` | `c096435fa3aab07a086e72b26a819312383e29f2bd807131c6c190f90f9aa86c` |
 | `apps/extension/src/features/video/composition/export-enhancement/vendor/clark-x2/runtimeCapabilities.js` | https://huggingface.co/clark-labs/clark-realtime-ui-video-upscaler-x2/resolve/main/browser/runtimeCapabilities.js | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` | `d78fe2ce0f0a4513364599854b363cddae8c1479de17d2cfca006bdd2de931c6` |
 
+## Klecks raster algorithms
+
+- Attribution: bitbof (bitbof.com)
+- Source: https://github.com/bitbof/klecks/tree/b86ba7d0edb2c48ad21ca58aae4775fccf329632
+- License: `MIT`
+- License text: [`apps/extension/src/editor/raster-editing/vendor/LICENSE`](apps/extension/src/editor/raster-editing/vendor/LICENSE)
+- License SHA-256: `0234a0861b38c1f3c9198b0f048a1b713bf3b1b198b5cced343acc7335b90785`
+- Notice text: [`apps/extension/src/editor/raster-editing/vendor/NOTICE.txt`](apps/extension/src/editor/raster-editing/vendor/NOTICE.txt)
+- Notice SHA-256: `180a6efecad16728850abc3a2c9e630eb445b16137e0e6ed8cee29673aed8a03`
+- Provenance record: [`apps/extension/src/editor/raster-editing/vendor/provenance.json`](apps/extension/src/editor/raster-editing/vendor/provenance.json)
+- Provenance SHA-256: `c0239eda3931b7b24d4be42ebeeeb24c3c38df5b5e55fafe9faed898a8f5fcba`
+- Local changes: Sniptale extracts flood-fill, Bezier, and stamp-spacing algorithms with their required helpers. It adds typed source geometry, bounded reads, and row-safe growth. It adds immutable retained planes, independent hardness, Restore mode, selection clipping, and crop clipping. It removes upstream UI, Canvas, pressure, and history dependencies.
+
+| Bundled file | Source URL | Source SHA-256 | Bundled SHA-256 |
+| --- | --- | --- | --- |
+| `apps/extension/src/editor/raster-editing/brush.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts | `9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007` | `f3b2eaeffa65134e2baeabb2108703f558d4614978dca4065649fdba0b2d16d1` |
+| `apps/extension/src/editor/raster-editing/vendor/bezier-line.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/line.ts | `6336d91fcc70507bb67765310b7bbb3d6e77bbb316e0c0ff9fb443444c6815d0` | `b463812be6a435d2b6a25a9b5dc40a393d89a348a8ea65a24354c535cdaf1d14` |
+| `apps/extension/src/editor/raster-editing/vendor/flood-fill.ts` | https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/image-operations/flood-fill.ts | `c571c4fbc0ff4f4f1df1aedd01af02aadabc7226af187d1001fd26487875a5c0` | `c6ddb53f4aaee036d8395d948db7f66ad1d0b12c614270aa2fc625dceaa8941c` |
+
 ## Production dependency licenses
 
 ### `@ai-sdk/alibaba` 2.0.69

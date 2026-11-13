@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ vi.mock('../../../document/model', async (importOriginal) => ({
   isEditableObject: mocks.isEditableObjectMock,
 }));
 
+import { Canvas, FabricImage } from 'fabric';
 import { selectLayerObject } from './selection';
 
 function createObject(id: string) {
@@ -104,3 +106,54 @@ function runSelectionStateSuite() {
 }
 
 describe('layer action selection state owner', runSelectionStateSuite);
+
+it.each([undefined, false, true])(
+  'selects a position-locked source row independently of content marker %s',
+  async (contentLocked) => {
+    mocks.isEditableObjectMock.mockReturnValue(true);
+    const source = new FabricImage(document.createElement('canvas'), {
+      width: 20,
+      height: 12,
+      selectable: false,
+      evented: false,
+      hasControls: false,
+      lockMovementX: true,
+      lockMovementY: true,
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+    });
+    source.sniptaleId = 'source';
+    source.sniptaleType = 'source-image';
+    source.sniptaleRole = 'source';
+    source.sniptaleLocked = true;
+    if (contentLocked !== undefined) source.sniptaleContentLocked = contentLocked;
+    const canvas = new Canvas(document.createElement('canvas'));
+    try {
+      canvas.add(source);
+      const result = selectLayerObject(
+        canvas,
+        'source',
+        {},
+        () => false,
+        () => undefined
+      );
+      expect(result).toBe(false);
+      expect(canvas.getActiveObjects()).toEqual([source]);
+      expect(source).toMatchObject({
+        sniptaleLocked: true,
+        selectable: false,
+        evented: false,
+        hasControls: false,
+        lockMovementX: true,
+        lockMovementY: true,
+        lockScalingX: true,
+        lockScalingY: true,
+        lockRotation: true,
+      });
+      expect(source.sniptaleContentLocked).toBe(contentLocked);
+    } finally {
+      await canvas.dispose();
+    }
+  }
+);

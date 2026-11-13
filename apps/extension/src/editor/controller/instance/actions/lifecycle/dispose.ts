@@ -1,3 +1,4 @@
+import { unmountEditorRasterRuntime } from '../../../../raster-editing/runtime';
 import { unmountEditorSimplifyRuntime } from '../../../../drawing/simplify-runtime';
 import { detachEditorControllerEventHandlers } from '../../../events';
 import type { EditorControllerInstance } from '../../types';
@@ -18,6 +19,7 @@ export function disposeEditorController(controller: EditorControllerInstance): v
     handlers: controller.eventHandlers,
     viewportResizeObserver: controller.viewportResizeObserver,
   });
+  unmountEditorRasterRuntime(controller.canvas);
   unmountEditorSimplifyRuntime(controller.canvas);
   disposeEditorSelectionChrome(controller.canvas);
   controller.magnetManager?.dispose();

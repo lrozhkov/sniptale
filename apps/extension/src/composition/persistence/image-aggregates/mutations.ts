@@ -65,7 +65,7 @@ import {
   parsePersistedEditorDocument,
   preparePersistedEditorDocument,
   replaceEditorDocumentAssetOwnership,
-  type PersistedEditorDocumentV3,
+  type PersistedEditorDocument,
 } from '../document-assets';
 import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/validation/primitives';
 
@@ -85,7 +85,7 @@ interface PreparedImageWorkspaceInput extends Omit<
   CommitImageWorkspaceInput,
   'document' | 'reusableAssetsByRuntimeUrl'
 > {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
   initialStorageClass?: 'temporary' | 'library';
   refs: AssetRef[];
   publicationId?: string;

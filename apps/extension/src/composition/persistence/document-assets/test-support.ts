@@ -1,10 +1,10 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
-import type { PersistedEditorDocumentV3 } from './contracts';
+import type { PersistedEditorDocument } from './contracts';
 
 export function createPersistedEditorDocumentFixture(
   document: EditorDocument,
   assetId = 'editor-source'
-): PersistedEditorDocumentV3 {
+): PersistedEditorDocument {
   if (document.frame.backgroundImageData || document.browserFrame?.faviconDataUrl) {
     throw new Error('Fixture helper requires explicit assets for optional editor images.');
   }
@@ -16,7 +16,7 @@ export function createPersistedEditorDocumentFixture(
       })()
     : undefined;
   return {
-    version: 3,
+    version: document.version === 3 ? 4 : 3,
     sourceImage: { assetId },
     sourceName: document.sourceName,
     sourceWidth: document.sourceWidth,

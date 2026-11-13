@@ -1,15 +1,27 @@
+import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
+import { parsePersistedEditorDocument } from './parser';
+import {
+  EDITOR_RASTER_BINARY_FIELDS,
+  inspectEditorRasterCanvas,
+} from '../../../features/editor/document/raster-state';
 // policyStateIds: [] - canvas binary field names are an immutable extraction allowlist;
 // per-document maps are operation-local byte/reference indexes and grant no authority.
 import type { EditorDocument } from '../../../features/editor/document/types';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
-import { parseAssetRef, readAssetFile, writeBlobToAsset, type AssetRef } from '../assets';
+import {
+  discardPreparedAsset,
+  parseAssetRef,
+  readAssetFile,
+  writeBlobToAsset,
+  type AssetRef,
+} from '../assets';
 
 import type {
   HydratedEditorDocument,
   PersistedEditorAssetPointer,
   PersistedEditorDocumentAsset,
-  PersistedEditorDocumentV3,
+  PersistedEditorDocument,
   PreparedEditorDocument,
 } from './contracts';
 
@@ -31,6 +43,7 @@ const CANVAS_BINARY_FIELDS = new Set([
   'sniptaleBackgroundImageData',
   'sniptaleSimplifySourceData',
   'sniptaleBlurSourceData',
+  ...EDITOR_RASTER_BINARY_FIELDS,
 ]);
 
 function pointer(assetId: string): PersistedEditorAssetPointer {
@@ -142,6 +155,15 @@ export async function preparePersistedEditorDocument(
   document: EditorDocument,
   options: { reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef> } = {}
 ): Promise<PreparedEditorDocument> {
+  const parsedCanvas: unknown = JSON.parse(document.canvasJson);
+  const raster = inspectEditorRasterCanvas(
+    parsedCanvas,
+    (resource, kind): resource is string =>
+      isImageDataUrl(resource) && (kind === 'image' || resource.startsWith('data:image/png;'))
+  );
+  if (!raster.valid || (document.version === 2 && raster.hasRaster)) {
+    throw new Error('Editor raster metadata is invalid for document preparation.');
+  }
   const assets: PersistedEditorDocumentAsset[] = [];
   const objects: PreparedEditorDocument['objects'] = [];
   const refsById = new Map<string, AssetRef>();
@@ -178,7 +200,6 @@ export async function preparePersistedEditorDocument(
           options.reusableAssetsByRuntimeUrl
         )
       : null;
-    const parsedCanvas: unknown = JSON.parse(document.canvasJson);
     const canvas = await extractCanvasValue({
       assets,
       objects,
@@ -201,7 +222,7 @@ export async function preparePersistedEditorDocument(
       : undefined;
     return {
       document: {
-        version: 3,
+        version: document.version === 3 ? 4 : 3,
         sourceImage,
         ...projectEditorImageMetadata(document),
         frame: { ...frame, backgroundImage },
@@ -216,9 +237,7 @@ export async function preparePersistedEditorDocument(
     };
   } catch (error) {
     const cleanup = await Promise.allSettled(
-      objects.map(({ ref }) =>
-        import('../assets').then(({ discardPreparedAsset }) => discardPreparedAsset(ref.assetId))
-      )
+      objects.map(({ ref }) => discardPreparedAsset(ref.assetId))
     );
     const failures = cleanup.flatMap((result) =>
       result.status === 'rejected' ? [result.reason as unknown] : []
@@ -256,9 +275,12 @@ async function hydrateCanvasValue(
 }
 
 export async function hydratePersistedEditorDocument(args: {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
   refs: readonly unknown[];
 }): Promise<HydratedEditorDocument> {
+  if (!parsePersistedEditorDocument(args.document)) {
+    throw new Error('Stored editor document is invalid.');
+  }
   const refsById = new Map<string, AssetRef>();
   for (const raw of args.refs) {
     const ref = parseAssetRef(raw);
@@ -296,7 +318,7 @@ export async function hydratePersistedEditorDocument(args: {
     : undefined;
   return {
     assetsByRuntimeUrl,
-    document: projectEditorDocumentV2(args.document, {
+    document: projectEditorDocument(args.document, {
       backgroundImageData,
       browserFrame,
       canvasJson,
@@ -342,18 +364,18 @@ function projectEditorImageMetadata(
   };
 }
 
-function projectEditorDocumentV2(
-  document: PersistedEditorDocumentV3,
+function projectEditorDocument(
+  document: PersistedEditorDocument,
   hydrated: {
     backgroundImageData: string | null;
     browserFrame: EditorDocument['browserFrame'];
     canvasJson: string;
-    frame: Omit<PersistedEditorDocumentV3['frame'], 'backgroundImage'>;
+    frame: Omit<PersistedEditorDocument['frame'], 'backgroundImage'>;
     sourceImageData: string;
   }
 ): EditorDocument {
   return {
-    version: 2,
+    version: document.version === 4 ? 3 : 2,
     sourceImageData: hydrated.sourceImageData,
     ...projectEditorImageMetadata(document),
     frame: { ...hydrated.frame, backgroundImageData: hydrated.backgroundImageData },
@@ -364,9 +386,12 @@ function projectEditorDocumentV2(
 }
 
 export async function materializePersistedEditorDocumentForLegacyTransfer(args: {
-  document: PersistedEditorDocumentV3;
+  document: PersistedEditorDocument;
   refs: readonly unknown[];
 }): Promise<EditorDocument> {
+  if (!parsePersistedEditorDocument(args.document)) {
+    throw new Error('Stored editor document is invalid.');
+  }
   const refsById = new Map<string, AssetRef>();
   for (const raw of args.refs) {
     const ref = parseAssetRef(raw);
@@ -393,7 +418,7 @@ export async function materializePersistedEditorDocumentForLegacyTransfer(args: 
         };
       })()
     : undefined;
-  return projectEditorDocumentV2(args.document, {
+  return projectEditorDocument(args.document, {
     backgroundImageData: args.document.frame.backgroundImage
       ? (dataUrls.get(args.document.frame.backgroundImage.assetId) ?? null)
       : null,

@@ -558,3 +558,30 @@ it('restores the visible document and cursor after failed Undo with a large pool
   await redoEditorControllerSnapshot(controller);
   expect(displayed).toEqual(second);
 });
+
+it('pools every retained raster slot and restores full metadata through undo and redo', () => {
+  const image = `data:image/png;base64,${'A'.repeat(8192)}`;
+  const object = {
+    sniptaleRasterState: {
+      version: 1,
+      width: 12,
+      height: 8,
+      crop: { x: 2, y: 1, width: 8, height: 6 },
+    },
+    sniptaleRasterOriginalData: image,
+    sniptaleRasterColorData: image,
+    sniptaleRasterVisibilityData: image,
+    sniptaleRasterKeyData: image,
+  };
+  const first: EditorDocument = {
+    ...createMockDocument(),
+    version: 3,
+    canvasJson: JSON.stringify({ objects: [object] }),
+  };
+  const second: EditorDocument = { ...first, sourceName: 'next.png' };
+  const history = createEditorSnapshotHistory(first);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => second });
+  expect(history.getSnapshots().every((snapshot) => !snapshot.includes(image))).toBe(true);
+  expect(undoEditorSnapshot(history)).toEqual(first);
+  expect(redoEditorSnapshot(history)).toEqual(second);
+});

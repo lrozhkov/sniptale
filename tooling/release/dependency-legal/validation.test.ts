@@ -275,58 +275,61 @@ it('generates model legal payloads through the existing owner and refuses source
   expect(await fs.readFile(policyPath, 'utf8')).toBe(policyBefore);
 });
 
-it('validates the actual vendored model, runtime and legal bytes in an isolated copy', async () => {
-  const { closure, repoRoot } = await seedValidationFixture();
-  const repositoryPolicy = JSON.parse(
-    await fs.readFile('tooling/configs/qa/oss-release.data.json', 'utf8')
-  );
-  const asset = repositoryPolicy.dependencyLegal.bundledAssets.find(
-    (entry: { id: string }) => entry.id === 'clark-x2'
-  );
-  if (!asset) throw new Error('The Clark legal metadata is missing.');
-  const paths: string[] = [
-    asset.licensePath,
-    asset.noticePath,
-    asset.provenancePath,
-    ...asset.artifacts.map((entry: { path: string }) => entry.path),
-  ];
-  const originals = new Map<string, Buffer>();
-  for (const file of paths) {
-    const bytes = await fs.readFile(file);
-    originals.set(file, bytes);
-    await fs.mkdir(path.dirname(path.join(repoRoot, file)), { recursive: true });
-    await fs.writeFile(path.join(repoRoot, file), bytes);
+it.each(['clark-x2', 'klecks-algorithms'])(
+  'validates actual bundled asset and legal bytes in an isolated copy: %s',
+  async (assetId) => {
+    const { closure, repoRoot } = await seedValidationFixture();
+    const repositoryPolicy = JSON.parse(
+      await fs.readFile('tooling/configs/qa/oss-release.data.json', 'utf8')
+    );
+    const asset = repositoryPolicy.dependencyLegal.bundledAssets.find(
+      (entry: { id: string }) => entry.id === assetId
+    );
+    if (!asset) throw new Error(`The ${assetId} legal metadata is missing.`);
+    const paths: string[] = [
+      asset.licensePath,
+      asset.noticePath,
+      asset.provenancePath,
+      ...asset.artifacts.map((entry: { path: string }) => entry.path),
+    ];
+    const originals = new Map<string, Buffer>();
+    for (const file of paths) {
+      const bytes = await fs.readFile(file);
+      originals.set(file, bytes);
+      await fs.mkdir(path.dirname(path.join(repoRoot, file)), { recursive: true });
+      await fs.writeFile(path.join(repoRoot, file), bytes);
+    }
+    const policyPath = path.join(repoRoot, 'tooling/configs/qa/oss-release.data.json');
+    const policy = JSON.parse(await fs.readFile(policyPath, 'utf8'));
+    policy.dependencyLegal.bundledAssets = [asset];
+    for (const [file, digest] of [
+      [asset.licensePath, asset.licenseSha256],
+      [asset.noticePath, asset.noticeSha256],
+      [asset.provenancePath, asset.provenanceSha256],
+    ])
+      policy.legalFiles.push({ source: file, archivePath: file, sha256: digest });
+    await fs.writeFile(policyPath, JSON.stringify(policy));
+    await writeDependencyLegalClosure({
+      closure,
+      interfaceFont: TEST_INTERFACE_FONT,
+      bundledAssets: [asset],
+      outputRoot: repoRoot,
+    });
+    expect(await validateDependencyLegalClosure(repoRoot)).toEqual([]);
+    for (const file of paths) {
+      await fs.appendFile(path.join(repoRoot, file), '\nchanged');
+      expect(
+        (await validateDependencyLegalClosure(repoRoot)).some(
+          (error: string) => error.includes('content drift') && error.includes(file)
+        )
+      ).toBe(true);
+      await fs.writeFile(path.join(repoRoot, file), originals.get(file)!);
+    }
+    expect(await fs.readFile(path.join(repoRoot, asset.licensePath))).toEqual(
+      originals.get(asset.licensePath)
+    );
+    expect(await fs.readFile(path.join(repoRoot, asset.noticePath))).toEqual(
+      originals.get(asset.noticePath)
+    );
   }
-  const policyPath = path.join(repoRoot, 'tooling/configs/qa/oss-release.data.json');
-  const policy = JSON.parse(await fs.readFile(policyPath, 'utf8'));
-  policy.dependencyLegal.bundledAssets = [asset];
-  for (const [file, digest] of [
-    [asset.licensePath, asset.licenseSha256],
-    [asset.noticePath, asset.noticeSha256],
-    [asset.provenancePath, asset.provenanceSha256],
-  ])
-    policy.legalFiles.push({ source: file, archivePath: file, sha256: digest });
-  await fs.writeFile(policyPath, JSON.stringify(policy));
-  await writeDependencyLegalClosure({
-    closure,
-    interfaceFont: TEST_INTERFACE_FONT,
-    bundledAssets: [asset],
-    outputRoot: repoRoot,
-  });
-  expect(await validateDependencyLegalClosure(repoRoot)).toEqual([]);
-  for (const file of paths) {
-    await fs.appendFile(path.join(repoRoot, file), '\nchanged');
-    expect(
-      (await validateDependencyLegalClosure(repoRoot)).some(
-        (error: string) => error.includes('content drift') && error.includes(file)
-      )
-    ).toBe(true);
-    await fs.writeFile(path.join(repoRoot, file), originals.get(file)!);
-  }
-  expect(await fs.readFile(path.join(repoRoot, asset.licensePath))).toEqual(
-    originals.get(asset.licensePath)
-  );
-  expect(await fs.readFile(path.join(repoRoot, asset.noticePath))).toEqual(
-    originals.get(asset.noticePath)
-  );
-});
+);

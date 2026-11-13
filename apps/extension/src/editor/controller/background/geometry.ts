@@ -55,7 +55,7 @@ export function createBackgroundGradient(
 export function getBackgroundImageLayout(
   fit: EditorFrameSettings['backgroundImageFit'],
   size: BackgroundCanvasSize,
-  image: FabricImage
+  image: Pick<FabricImage, 'width' | 'height'>
 ) {
   const width = Math.max(1, image.width ?? 1);
   const height = Math.max(1, image.height ?? 1);

@@ -14,6 +14,7 @@ export async function applyOpenedEditorDocument(options: {
 }): Promise<void> {
   await options.applyDocument(options.document, {
     resetHistory: true,
+    freshSourceContent: true,
     updateOriginal: true,
   });
 

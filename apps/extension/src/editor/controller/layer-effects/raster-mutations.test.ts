@@ -30,6 +30,7 @@ vi.mock('./mutation-shared', async (importOriginal) => ({
   commitLayerMutation: mocks.commitLayerMutation,
   ensureRasterObject: mocks.ensureRasterObject,
   getEditableObject: mocks.getEditableObject,
+  getRasterEffectObject: mocks.getEditableObject,
   syncSourceFromObject: mocks.syncSourceFromObject,
   upsertEditorRasterEffect: mocks.upsertEditorRasterEffect,
 }));
@@ -94,7 +95,7 @@ it('resizes rasterized layers and applies/update/removes raster effects', async 
     ...context,
     effect: { amount: 0.4, enabled: true, id: 'brightness' },
   } as never);
-  removeEditorLayerRasterEffect(context as never);
+  await removeEditorLayerRasterEffect(context as never);
 
   expect(object.scaleX).toBe(2);
   expect(object.scaleY).toBe(2);
@@ -133,7 +134,7 @@ it('skips rasterized mutation work when the layer mutation token is stale', asyn
   expect(mocks.applyRasterEffectsToObject).not.toHaveBeenCalled();
 });
 
-it('previews and resets raster effects without committing mutations', () => {
+it('previews and resets raster effects without committing mutations', async () => {
   const object = {
     ...createObject(),
     sniptaleEffects: [{ amount: 0.2, enabled: true, id: 'brightness' }],
@@ -141,7 +142,7 @@ it('previews and resets raster effects without committing mutations', () => {
   const context = createContext();
   mocks.getEditableObject.mockReturnValue(object);
 
-  previewEditorLayerRasterEffect(context as never);
+  await previewEditorLayerRasterEffect(context as never);
   resetEditorLayerRasterEffectPreview(context as never);
 
   expect(mocks.previewEditorRasterEffects).toHaveBeenNthCalledWith(1, object, [
@@ -157,12 +158,12 @@ it('previews and resets raster effects without committing mutations', () => {
   expect(mocks.applyRasterEffectsToObject).not.toHaveBeenCalled();
 });
 
-it('skips raster previews for missing canvas or non-raster objects', () => {
+it('skips raster previews for missing canvas or non-raster objects', async () => {
   const context = createContext();
   mocks.getEditableObject.mockReturnValue(createObject());
   mocks.isEditorRasterObject.mockReturnValueOnce(false);
 
-  previewEditorLayerRasterEffect(context as never);
+  await previewEditorLayerRasterEffect(context as never);
   resetEditorLayerRasterEffectPreview({ ...context, canvas: null } as never);
 
   expect(mocks.previewEditorRasterEffects).not.toHaveBeenCalled();

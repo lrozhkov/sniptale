@@ -1,10 +1,8 @@
+import type { EditorLayerEffectsTarget } from './shared';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import React from 'react';
 import { FlipHorizontal2, FlipVertical2, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
-import type {
-  EditorLayerItem,
-  EditorSelectionState,
-} from '../../../features/editor/document/types';
+import type { EditorSelectionState } from '../../../features/editor/document/types';
 import type { EditorRasterEffect } from '../../../features/editor/document/effects';
 import {
   createDefaultEditorRasterEffect,
@@ -122,7 +120,7 @@ function TransformationEditor(
 
 function RasterEffectEditor(props: {
   draftEffect: EditorRasterEffect;
-  layer: EditorLayerItem;
+  layer: EditorLayerEffectsTarget;
   applyLayerEffect: EditorInspectorLayerEffectsProps['applyLayerEffect'];
   updateLayerEffect: EditorInspectorLayerEffectsProps['updateLayerEffect'];
   previewLayerEffect: EditorInspectorLayerEffectsProps['previewLayerEffect'];
@@ -156,7 +154,7 @@ function RasterEffectEditor(props: {
 
 function useDraftRasterEffect(
   activeEffectId: EditorLayerEffectCommandId | null,
-  layer: EditorLayerItem
+  layer: EditorLayerEffectsTarget
 ) {
   const appliedEffect =
     activeEffectId && isEditorRasterEffectId(activeEffectId)
@@ -185,7 +183,7 @@ function useDraftRasterEffect(
 
 function RasterEffectActions(props: {
   draftEffect: EditorRasterEffect;
-  layer: EditorLayerItem;
+  layer: EditorLayerEffectsTarget;
   applyLayerEffect: EditorInspectorLayerEffectsProps['applyLayerEffect'];
   updateLayerEffect: EditorInspectorLayerEffectsProps['updateLayerEffect'];
   resetLayerEffectPreview: EditorInspectorLayerEffectsProps['resetLayerEffectPreview'];
@@ -244,7 +242,7 @@ type LayerEffectsEditorProps = Pick<
   | 'updateLockedDraft'
 > & {
   activeEffectId: EditorLayerEffectCommandId | null;
-  layer: EditorLayerItem;
+  layer: EditorLayerEffectsTarget;
   selection: EditorSelectionState;
 };
 

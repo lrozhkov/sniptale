@@ -1,3 +1,5 @@
+import { inspectEditorRasterCanvas } from '../../../features/editor/document/raster-state';
+import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import type { Canvas } from 'fabric';
 import type {
   BrowserFrameState,
@@ -37,8 +39,15 @@ export function buildEditorCanvasDocument(options: {
   }
 
   const { enabled: _runtimePresence, ...browserFrame } = options.browserFrame;
+  const canvasJson = serializeCanvasObjects(options.canvas);
+  const raster = inspectEditorRasterCanvas(
+    JSON.parse(canvasJson) as unknown,
+    (value, kind): value is string =>
+      isImageDataUrl(value) && (kind === 'image' || value.startsWith('data:image/png;'))
+  );
+  if (!raster.valid) throw new Error('Invalid editor raster metadata');
   return {
-    version: 2,
+    version: raster.hasRaster ? 3 : 2,
     sourceImageData: options.source.dataUrl,
     sourceName: options.source.name,
     ...(options.displayName === undefined ? {} : { displayName: options.displayName }),
@@ -55,7 +64,7 @@ export function buildEditorCanvasDocument(options: {
     ...(options.source.compositionBase
       ? { compositionBase: { ...options.source.compositionBase } }
       : {}),
-    canvasJson: serializeCanvasObjects(options.canvas),
+    canvasJson,
     richShapes: collectRichShapeDocumentObjects(options.canvas),
   };
 }
