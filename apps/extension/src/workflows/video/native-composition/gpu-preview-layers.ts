@@ -1,3 +1,4 @@
+import type { SceneSpotlightMaterialSource } from '../../../features/video/composition/draw/spotlight-material';
 import type { GlTrackNode } from '../../../features/video/project/transition/gl-track-plan';
 import { resolveGpuPreviewGroupRasters } from '../../../features/video/composition/canvas/gpu-preview-plan';
 import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
@@ -132,6 +133,7 @@ function layerProjection(layer: Layer): QuickEditHomography {
 
 /** Describes ordered GPU work; vector artwork and alpha masks never read back video pixels. */
 export async function buildNativeGpuPreviewLayers(args: {
+  spotlightMaterial?: SceneSpotlightMaterialSource;
   sourceMask?: NativeGpuSourceMaterial;
   sourceDecoration?: NativeGpuSourceMaterial;
   annotationMask?: NativeGpuSourceMaterial;
@@ -451,7 +453,7 @@ export async function buildNativeGpuPreviewLayers(args: {
       };
       result.push(groupLayer([lens, { ...openingMask, blend: 'mask' }]));
     }
-    const masks = createSceneSpotlightMasks(
+    const masks = (args.spotlightMaterial ?? createSceneSpotlightMasks)(
       logical,
       frames.filter((frame) => frame.dim > 0 || frame.blur > 0)
     );

@@ -1,3 +1,4 @@
+import { createSceneSpotlightMaterialOwner } from '../../features/video/composition/draw/spotlight-material';
 import { glTransitionUniforms } from '../../features/video/project/transition/gl-catalog';
 import { createPreparedSourceBudget } from '../../features/video/composition/export-enhancement/prepared-source';
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
@@ -141,6 +142,7 @@ export function createReviewGpuPreview(args: {
   let sceneReleased = false;
   let artworkRevision = 0;
   let coverage = createRetainedRasterMaterialOwner<HTMLCanvasElement>();
+  let spotlightMaterials = createSceneSpotlightMaterialOwner();
   const lifetime = new AbortController();
   let sceneLifetime = new AbortController();
   type Artwork = {
@@ -168,6 +170,8 @@ export function createReviewGpuPreview(args: {
     slot.artwork = null;
   };
   const clear = () => {
+    spotlightMaterials.dispose();
+    spotlightMaterials = createSceneSpotlightMaterialOwner();
     coverage.dispose();
     coverage = createRetainedRasterMaterialOwner<HTMLCanvasElement>();
     for (const slot of slots) clearSlot(slot);
@@ -294,17 +298,20 @@ export function createReviewGpuPreview(args: {
     const sceneSignal = sceneLifetime.signal;
     const signal = AbortSignal.any([input.signal, lifetime.signal, sceneSignal]);
     active++;
-    const primitives = createReviewGpuPrimitives(args.resources, (role, key, size, paint) =>
-      coverage.borrow(args.resources, JSON.stringify([role, key, size]), () => {
-        const raster = args.resources.canvas(role, size);
-        try {
-          paint(raster.context);
-          return { value: raster.canvas, release: () => raster.release() };
-        } catch (error) {
-          raster.release();
-          throw error;
-        }
-      })
+    const primitives = createReviewGpuPrimitives(
+      args.resources,
+      (role, key, size, paint) =>
+        coverage.borrow(args.resources, JSON.stringify([role, key, size]), () => {
+          const raster = args.resources.canvas(role, size);
+          try {
+            paint(raster.context);
+            return { value: raster.canvas, release: () => raster.release() };
+          } catch (error) {
+            raster.release();
+            throw error;
+          }
+        }),
+      spotlightMaterials.acquire
     );
     const ownedFrames: VideoFrame[] = [];
     const endpointOutputs: { bitmap: ImageBitmap; release(): void }[] = [];

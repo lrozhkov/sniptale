@@ -1,3 +1,4 @@
+import type { SceneSpotlightMaterialSource } from '../../features/video/composition/draw/spotlight-material';
 import { getCanvasPointsBounds } from '@sniptale/runtime-contracts/canvas-interactions';
 import { projectedOpening } from '../../features/video/composition/draw/spotlight';
 import type { VideoCompositionFrameSource } from '../../features/video/composition/draw/media-source';
@@ -78,7 +79,8 @@ export function createReviewGpuPrimitives(
     key: string,
     size: Size,
     paint: (context: CanvasRenderingContext2D) => void
-  ) => RetainedRasterMaterialLease<HTMLCanvasElement>
+  ) => RetainedRasterMaterialLease<HTMLCanvasElement>,
+  acquireSpotlight?: SceneSpotlightMaterialSource
 ) {
   const leases: { release(): void }[] = [];
   const raster = (role: string, size: Size, draw: (context: CanvasRenderingContext2D) => void) => {
@@ -92,6 +94,9 @@ export function createReviewGpuPrimitives(
   };
   return {
     raster,
+    spotlight(output: Size, frames: readonly SceneSpotlightLayer[]) {
+      return (acquireSpotlight ?? createSceneSpotlightMasks)(output, frames, resources);
+    },
     material(
       role: string,
       key: string,
@@ -701,7 +706,7 @@ export function applyReviewGpuSpotlightFrames(args: {
   }
   const masked = frames.filter((frame) => frame.dim > 0 || frame.blur > 0);
   if (masked.length) {
-    const masks = createSceneSpotlightMasks(output, masked, primitives.resources);
+    const masks = primitives.spotlight(output, masked);
     primitives.retain({ release: masks.dispose });
     if (masks.radius > 0) {
       const source = group(layers.slice(), dimensions);

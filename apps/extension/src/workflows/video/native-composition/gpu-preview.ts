@@ -1,3 +1,7 @@
+import {
+  createSceneSpotlightMaterialOwner,
+  type SceneSpotlightMaterialSource,
+} from '../../../features/video/composition/draw/spotlight-material';
 import { hasSourceImageFilters } from '../../../features/image-filters/contract';
 import { resolveProjectOutputTransform } from '../../../features/video/project/export/output-dimensions';
 import type { EffectRuntimeInputComposition } from '../../../features/video/composition/effect-runtime/frame/inputs';
@@ -152,6 +156,7 @@ export function createNativeGpuPreviewRenderer(
   let materialsReleased = false;
   const lifetime = new AbortController();
   const effectPreparation = createNativeEffectPreparation(options.createPreparationExecutor);
+  const spotlightMaterials = createSceneSpotlightMaterialOwner();
   const maximumInFlight = options.maximumInFlight ?? 1;
   const slots = Array.from({ length: maximumInFlight }, () => ({
     materials: createNativeGpuPreviewMaterials(),
@@ -163,6 +168,7 @@ export function createNativeGpuPreviewRenderer(
     if (active) return;
     if ((disposed || unavailable) && !materialsReleased) {
       materialsReleased = true;
+      spotlightMaterials.dispose();
       for (const slot of slots) slot.materials.dispose();
     }
     if (disposed && !publicationHolds) {
@@ -255,6 +261,7 @@ export function createNativeGpuPreviewRenderer(
         if (typeof effects === 'function') {
           effects = await effects((request) =>
             composeNativeGpuEffectInput({
+              spotlightMaterial: spotlightMaterials.acquire,
               input,
               passes,
               request,
@@ -353,6 +360,7 @@ export function createNativeGpuPreviewRenderer(
           layers = retained;
         } else {
           plan = await buildNativeGpuPreviewLayers({
+            spotlightMaterial: spotlightMaterials.acquire,
             sourceMask: materials.sourceMask,
             sourceDecoration: materials.sourceDecoration,
             annotationMask: materials.annotationMask,
@@ -568,6 +576,7 @@ export function createNativeGpuPreviewRenderer(
 
 /** A dependent GPU input owns its temporary graph and readback independently of scene output. */
 async function composeNativeGpuEffectInput(args: {
+  spotlightMaterial: SceneSpotlightMaterialSource;
   input: Input;
   passes: Passes;
   request: EffectRuntimeInputComposition;
@@ -614,6 +623,7 @@ async function composeNativeGpuEffectInput(args: {
       }
     );
     graph = await buildNativeGpuPreviewLayers({
+      spotlightMaterial: args.spotlightMaterial,
       sourceMask: materials.sourceMask,
       sourceDecoration: materials.sourceDecoration,
       annotationMask: materials.annotationMask,
