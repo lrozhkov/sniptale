@@ -173,3 +173,118 @@ it.each(['mask', 'erase', 'atop'] as const)(
     expect(result[2] * result[3]).toBeLessThan((size.width * size.height) / 100);
   }
 );
+
+function filteredGroup(): GpuPreviewLayer {
+  const size = { width: 1904, height: 1072 };
+  return {
+    source: { kind: 'group', output: size, logical: size, layers: [smallLayer()] },
+    rect: { x: 0, y: 0, ...size },
+    inverse: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+    depth: {
+      window: { x: 0, y: 0, ...size },
+      frame: {
+        rotation: [0, 0, 0, 1],
+        perspective: 0.5,
+        windowMotion: 0,
+        lockBackground: false,
+        focus: [
+          {
+            settings: {
+              enabled: true,
+              mode: 'area',
+              x: 0.5,
+              y: 0.5,
+              width: 0.2,
+              softness: 0.5,
+              strength: 0.5,
+            },
+            weight: 1,
+          },
+        ],
+      },
+    },
+  };
+}
+
+it.each(['depth', 'blur'] as const)(
+  'bounds a sparse %s group with conservative filter support instead of the full viewport',
+  (kind) => {
+    const size = { width: 1904, height: 1072 };
+    const layer = filteredGroup();
+    if (kind === 'blur') {
+      delete layer.depth;
+      layer.blur = 12;
+    }
+    const [x, y, width, height] = createGpuPreviewDrawBounds()(layer, size, size);
+    expect(x).toBeLessThanOrEqual(100);
+    expect(y).toBeLessThanOrEqual(80);
+    expect(x + width).toBeGreaterThanOrEqual(132);
+    expect(y + height).toBeGreaterThanOrEqual(98);
+    expect(width * height).toBeLessThan((size.width * size.height) / 4);
+  }
+);
+
+it('scales filtered content bounds across odd raster dimensions and nested masks', () => {
+  const logical = { width: 640, height: 360 };
+  const output = { width: 1919, height: 1079 };
+  const child = smallLayer();
+  const layer: GpuPreviewLayer = {
+    ...filteredGroup(),
+    source: {
+      kind: 'group',
+      logical,
+      output,
+      layers: [child, { ...child, blend: 'mask', rect: { x: 110, y: 84, width: 2, height: 2 } }],
+    },
+    rect: { x: 0, y: 0, ...logical },
+  };
+  const [x, y, width, height] = createGpuPreviewDrawBounds()(layer, output, logical);
+  expect(x).toBeLessThanOrEqual((100 * output.width) / logical.width);
+  expect(y).toBeLessThanOrEqual((80 * output.height) / logical.height);
+  expect(x + width).toBeGreaterThanOrEqual((132 * output.width) / logical.width);
+  expect(y + height).toBeGreaterThanOrEqual((98 * output.height) / logical.height);
+  expect(width * height).toBeLessThan((output.width * output.height) / 3);
+});
+
+it('retains prior full coverage for filtered projective horizons and changed orientation', () => {
+  const size = { width: 1904, height: 1072 };
+  const layer = filteredGroup();
+  for (const change of [
+    { inverse: [1, 0, 0, 0, 1, 0, 0.01, 0, -1] as const },
+    { inverse: [0, 0, 0, 0, 0, 0, 0, 0, 0] as const },
+    { orientation: { rotation: 90 as const, flip: true } },
+    { cssFilter: { blur: 10 } },
+  ])
+    expect(createGpuPreviewDrawBounds()({ ...layer, ...change }, size, size)).toEqual([
+      0, 0, 1904, 1072,
+    ]);
+});
+
+it('includes both weighted focus slots even when a persisted enabled flag is false', () => {
+  const size = { width: 1904, height: 1072 };
+  const layer = filteredGroup();
+  const depth = layer.depth!;
+  const focus = depth.frame.focus[0]!;
+  const bounds = createGpuPreviewDrawBounds();
+  const first = bounds(layer, size, size);
+  const second = bounds(
+    {
+      ...layer,
+      depth: {
+        ...depth,
+        frame: {
+          ...depth.frame,
+          focus: [
+            focus,
+            { settings: { ...focus.settings, enabled: false, strength: 1 }, weight: 1 },
+          ],
+        },
+      },
+    },
+    size,
+    size
+  );
+  expect(second[0]).toBeLessThanOrEqual(first[0]);
+  expect(second[1]).toBeLessThanOrEqual(first[1]);
+  expect(second[2] * second[3]).toBeGreaterThan(first[2] * first[3]);
+});

@@ -12,7 +12,8 @@ export function resolveBuiltAssetPath(
 
 function getContentType(pathname: string): string {
   if (pathname.endsWith('.html')) return 'text/html; charset=utf-8';
-  if (pathname.endsWith('.js')) return 'text/javascript; charset=utf-8';
+  if (pathname.endsWith('.js') || pathname.endsWith('.mjs'))
+    return 'text/javascript; charset=utf-8';
   if (pathname.endsWith('.css')) return 'text/css; charset=utf-8';
   if (pathname.endsWith('.png')) return 'image/png';
   if (pathname.endsWith('.json') || pathname.endsWith('.map')) {
