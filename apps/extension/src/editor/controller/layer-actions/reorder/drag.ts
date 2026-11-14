@@ -78,8 +78,10 @@ export function reorderLayerBlockObjects(
   const sourceIndex = next.findIndex(isSourceObject);
   const backgroundIndex = next.findIndex(isBackgroundObject);
   if (
-    (!hasWindow && sourceIndex >= 0 && sourceIndex !== next.length - 1) ||
-    (hasWindow && sourceIndex >= 0 && backgroundIndex >= 0 && sourceIndex > backgroundIndex) ||
+    (!hasWindow &&
+      sourceIndex >= 0 &&
+      next.slice(sourceIndex + 1).some((object) => !isBackgroundObject(object))) ||
+    (sourceIndex >= 0 && backgroundIndex >= 0 && sourceIndex > backgroundIndex) ||
     next.every((object, position) => object === layers[position])
   )
     return false;

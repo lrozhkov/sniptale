@@ -112,3 +112,54 @@ it('refuses invalid block moves atomically and ignores unchanged orders', async 
   expect(reorderLayerBlockObjects(canvas, ['a', 'a'], 'source')).toBe(false);
   expect(canvas.moveObjectTo).not.toHaveBeenCalled();
 });
+
+it('reorders annotations above the source when a managed background is below it', async () => {
+  const { reorderLayerBlockObjects } = await import('./drag');
+  const background = createObject('background', { sniptaleType: 'background' });
+  const source = createObject('source', { sniptaleType: 'source-image' });
+  const a = createObject('a'),
+    b = createObject('b'),
+    c = createObject('c');
+  const canvas = createCanvas();
+  mocks.getLayerObjects.mockReturnValue([background, source, a, b, c]);
+  expect(reorderLayerBlockObjects(canvas, ['c'], 'a')).toBe(true);
+  expect(canvas.moveObjectTo.mock.calls.map(([object]) => object.sniptaleId)).toEqual([
+    'background',
+    'source',
+    'a',
+    'c',
+    'b',
+  ]);
+});
+
+it('preserves a disjoint block above the source and background', async () => {
+  const { reorderLayerBlockObjects } = await import('./drag');
+  const background = createObject('background', { sniptaleRole: 'background' });
+  const source = createObject('source', { sniptaleType: 'source-image' });
+  const a = createObject('a'),
+    b = createObject('b'),
+    c = createObject('c');
+  const canvas = createCanvas();
+  mocks.getLayerObjects.mockReturnValue([background, source, a, b, c]);
+  expect(reorderLayerBlockObjects(canvas, ['a', 'c'], 'source')).toBe(true);
+  expect(canvas.moveObjectTo.mock.calls.map(([object]) => object.sniptaleId)).toEqual([
+    'background',
+    'source',
+    'a',
+    'c',
+    'b',
+  ]);
+});
+it('refuses crossing the source or raising its background without mutating the canvas', async () => {
+  const { reorderLayerBlockObjects } = await import('./drag');
+  const background = createObject('background', { sniptaleType: 'background' });
+  const source = createObject('source', { sniptaleType: 'source-image' });
+  const a = createObject('a'),
+    b = createObject('b');
+  const canvas = createCanvas();
+  mocks.getLayerObjects.mockReturnValue([background, source, a, b]);
+  expect(reorderLayerBlockObjects(canvas, ['b'], 'background')).toBe(false);
+  expect(reorderLayerBlockObjects(canvas, ['b'], null)).toBe(false);
+  expect(reorderLayerBlockObjects(canvas, ['background'], 'a')).toBe(false);
+  expect(canvas.moveObjectTo).not.toHaveBeenCalled();
+});

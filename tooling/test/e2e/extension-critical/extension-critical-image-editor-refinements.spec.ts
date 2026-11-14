@@ -977,3 +977,90 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await page.screenshot({ path: info.outputPath('layers-gutter-restored.png'), fullPage: false });
   });
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`layer grip reorders selected rows through native pointer input ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    await page.locator('[data-ui="editor.floating.layers.mode.meta"]').click();
+    await page.locator('[data-ui="editor.technical-data.field-date"]').check();
+    await page
+      .getByRole('button', {
+        name: translate('editor.compact.technicalDataInsert', 'en'),
+        exact: true,
+      })
+      .click();
+    await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
+    const list = page.locator('[data-ui="editor.layers.list-viewport"]');
+    const rows = list.locator(':scope > [data-layer-reorder-row]');
+    for (let count = await rows.count(); count < 4; count++) {
+      await rows.first().hover();
+      await rows
+        .first()
+        .getByRole('button', {
+          name: translate('editor.toolbar.duplicateLayer', 'en'),
+          exact: true,
+        })
+        .click();
+      await expect(rows).toHaveCount(count + 1);
+    }
+    await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
+    await page.locator('[data-ui="editor.frame.background-mode"] button').nth(1).click();
+    await page.locator('[data-ui="editor.floating.layers.mode.layers"]').click();
+    await expect(rows).toHaveCount(5);
+    const order = () =>
+      rows.evaluateAll((elements) =>
+        elements.map((element) => element.getAttribute('data-layer-reorder-row'))
+      );
+    await rows.first().locator('button[draggable="false"]').nth(1).click();
+    const initial = await order();
+    const grip = rows.first().locator('[data-ui="editor.layers.drag-handle"]');
+    await expect(grip).toBeVisible();
+    const start = await grip.boundingBox();
+    const target = await rows.nth(2).boundingBox();
+    expect(start).not.toBeNull();
+    expect(target).not.toBeNull();
+    await page.mouse.move(start!.x + start!.width / 2, start!.y + start!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(start!.x + start!.width / 2, target!.y + target!.height - 3, {
+      steps: 8,
+    });
+    await expect(page.locator('html')).toHaveAttribute('data-editor-layer-dragging', '');
+    await page.screenshot({ path: info.outputPath('layer-reorder-active.png'), fullPage: false });
+    await page.mouse.up();
+    await expect.poll(order).toEqual([initial[1], initial[2], initial[0], initial[3], initial[4]]);
+    await expect(page.locator('html')).not.toHaveAttribute('data-editor-layer-dragging');
+    await rows.nth(0).locator('button[draggable="false"]').nth(1).click();
+    await rows
+      .nth(1)
+      .locator('button[draggable="false"]')
+      .nth(1)
+      .click({ modifiers: ['Control'] });
+    await expect(list.locator('[data-ui="editor.layers.drag-handle"]')).toHaveCount(2);
+    const groupStart = await rows
+      .first()
+      .locator('[data-ui="editor.layers.drag-handle"]')
+      .boundingBox();
+    const groupTarget = await rows.nth(2).boundingBox();
+    await page.mouse.move(
+      groupStart!.x + groupStart!.width / 2,
+      groupStart!.y + groupStart!.height / 2
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      groupStart!.x + groupStart!.width / 2,
+      groupTarget!.y + groupTarget!.height - 3,
+      { steps: 8 }
+    );
+    await page.mouse.up();
+    await expect.poll(order).toEqual(initial);
+    await expect(list.locator('[data-ui="editor.layers.drag-handle"]')).toHaveCount(2);
+    await page.screenshot({
+      path: info.outputPath('layer-block-reorder-applied.png'),
+      fullPage: false,
+    });
+  });
+}

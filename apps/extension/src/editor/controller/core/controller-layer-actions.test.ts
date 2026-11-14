@@ -176,3 +176,29 @@ it('keeps published vectors editable through controller copy and paste after a s
   expect(publish).toHaveBeenCalledTimes(2);
   expect(commit).toHaveBeenCalledTimes(2);
 });
+
+it('commits a reorder above a managed background once and restores its order with Undo and Redo', async () => {
+  const { canvas, controller, commit } = fixture();
+  const background = new Rect({ width: 100, height: 100 });
+  background.sniptaleId = 'background';
+  background.sniptaleType = 'background';
+  const source = new Rect({ width: 100, height: 100 });
+  source.sniptaleId = 'source';
+  source.sniptaleType = 'source-image';
+  source.sniptaleLocked = true;
+  canvas.insertAt(0, background, source);
+  controller.history = new SnapshotHistory(JSON.stringify(controller.exportDocument()));
+  const order = () => canvas.getObjects().map((object) => object.sniptaleId);
+  const before = order();
+  canvas.setActiveObject(canvas.getObjects().find((object) => object.sniptaleId === 'upper')!);
+  controller.reorderLayerBlock(['upper'], 'lower');
+  const after = ['background', 'source', 'lower', 'upper', 'vector'];
+  expect(order()).toEqual(after);
+  expect(canvas.getActiveObject()?.sniptaleId).toBe('upper');
+  expect(commit).toHaveBeenCalledOnce();
+  flushDeferredEditorHistory(controller.history);
+  await controller.undo();
+  expect(order()).toEqual(before);
+  await controller.redo();
+  expect(order()).toEqual(after);
+});
