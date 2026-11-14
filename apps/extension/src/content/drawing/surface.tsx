@@ -251,6 +251,17 @@ function createDrawingPointerHandlers(args: {
     textEditor,
     textGestureRef,
   } = args;
+  const updateSelectionCursor = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    event.currentTarget.style.cursor = selectionDragHiddenRef.current
+      ? 'none'
+      : resolveDrawingCanvasHoverCursor({
+          active,
+          serviceUiSuppressed: args.serviceUiSuppressed ?? false,
+          point: toDrawingScenePoint(event, root),
+          pointer,
+          snapshot,
+        });
+  };
   return {
     onPointerDown: (event: React.PointerEvent<HTMLCanvasElement>) => {
       event.stopPropagation();
@@ -268,18 +279,12 @@ function createDrawingPointerHandlers(args: {
       textGestureRef.current =
         draft?.kind === 'rotate' || draft?.kind === 'rotate-selection' || draft?.kind === 'bend'
           ? { dragged: true, start: toDrawingScenePoint(event, root) }
-          : (draft?.kind === 'move' || draft?.kind === 'resize') && draft.original.kind === 'text'
+          : (draft?.kind === 'marquee' && snapshot.activeTool === 'text') ||
+              ((draft?.kind === 'move' || draft?.kind === 'resize') &&
+                draft.original.kind === 'text')
             ? { dragged: false, start: toDrawingScenePoint(event, root) }
             : null;
-      event.currentTarget.style.cursor = selectionDragHiddenRef.current
-        ? 'none'
-        : resolveDrawingCanvasHoverCursor({
-            active,
-            serviceUiSuppressed: args.serviceUiSuppressed ?? false,
-            point: toDrawingScenePoint(event, root),
-            pointer,
-            snapshot,
-          });
+      updateSelectionCursor(event);
     },
     onPointerMove: (event: React.PointerEvent<HTMLCanvasElement>) => {
       event.stopPropagation();
@@ -296,15 +301,7 @@ function createDrawingPointerHandlers(args: {
         if (Math.hypot(point.x - draft.start.x, point.y - draft.start.y) >= TEXT_DRAG_THRESHOLD)
           setSelectionDragHidden(true);
       }
-      event.currentTarget.style.cursor = selectionDragHiddenRef.current
-        ? 'none'
-        : resolveDrawingCanvasHoverCursor({
-            active,
-            serviceUiSuppressed: args.serviceUiSuppressed ?? false,
-            point: toDrawingScenePoint(event, root),
-            pointer,
-            snapshot,
-          });
+      updateSelectionCursor(event);
     },
     onPointerUp: (event: React.PointerEvent<HTMLCanvasElement>) => {
       event.stopPropagation();

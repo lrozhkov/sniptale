@@ -24,15 +24,15 @@ export type EditorLayerPresentationBounds = {
 type PresentationBoundsResolver = (
   object: FabricObject
 ) => EditorLayerPresentationBounds | null | undefined;
-const RASTER_SELECTION_DRAG_THRESHOLD_PX = 3;
+const SELECTION_DRAG_THRESHOLD_PX = 3;
 
 /** Owns native selection gestures, group scope, and interrupted transform recovery. */
 export class EditorSelectionCanvas extends Canvas {
   private marqueeSelection: { objects: FabricObject[]; scope: Group | null } | null = null;
   private marqueeCancelled = false;
   private transformDraft: { transform: Transform; restore: () => void } | null = null;
-  private deferRasterTarget = false;
-  private rasterSelectionGesture: {
+  private deferSelectionTarget = false;
+  private selectionGesture: {
     target: FabricObject;
     previous: FabricObject[];
     start: ReturnType<typeof util.getPointer>;
@@ -66,15 +66,10 @@ export class EditorSelectionCanvas extends Canvas {
       super.__onMouseDown(event);
       return;
     }
-    this.rasterSelectionGesture = null;
+    this.selectionGesture = null;
     const target = this.findTarget(event).target;
-    const raster =
-      target &&
-      (target.sniptaleType === 'image' ||
-        target.sniptaleType === 'source-image' ||
-        target.sniptaleType === 'background');
     if (
-      raster &&
+      target &&
       target.visible &&
       target.selectable &&
       !target.sniptaleLocked &&
@@ -82,9 +77,10 @@ export class EditorSelectionCanvas extends Canvas {
       !this.skipTargetFind &&
       !this.isDrawingMode &&
       !this._currentTransform &&
+      target !== this.getActiveObject() &&
       !this.getActiveObjects().includes(target)
     ) {
-      this.rasterSelectionGesture = {
+      this.selectionGesture = {
         target,
         previous: this.getActiveObjects().slice(),
         start: util.getPointer(event),
@@ -93,17 +89,17 @@ export class EditorSelectionCanvas extends Canvas {
         dragged: false,
       };
       // Native selection owns the marquee. Only the hit under its starting point is deferred.
-      this.deferRasterTarget = true;
+      this.deferSelectionTarget = true;
     }
     try {
       super.__onMouseDown(event);
     } finally {
-      this.deferRasterTarget = false;
+      this.deferSelectionTarget = false;
     }
   }
 
   override __onMouseMove(event: TPointerEvent): void {
-    if (this._isMainEvent(event)) this.updateRasterSelectionDistance(event);
+    if (this._isMainEvent(event)) this.updateSelectionDistance(event);
     super.__onMouseMove(event);
   }
 
@@ -112,8 +108,8 @@ export class EditorSelectionCanvas extends Canvas {
       super.__onMouseUp(event);
       return;
     }
-    this.updateRasterSelectionDistance(event);
-    const pending = this.rasterSelectionGesture;
+    this.updateSelectionDistance(event);
+    const pending = this.selectionGesture;
     const click = pending && !pending.dragged && !this.marqueeCancelled;
     if (click) this._groupSelector = null;
     try {
@@ -140,16 +136,13 @@ export class EditorSelectionCanvas extends Canvas {
         this.setActiveObject(new ActiveSelection(next, { canvas: this }), event);
       this.requestRenderAll();
     } finally {
-      this.rasterSelectionGesture = null;
+      this.selectionGesture = null;
     }
   }
 
-  private updateRasterSelectionDistance(event: TPointerEvent): void {
-    const pending = this.rasterSelectionGesture;
-    if (
-      pending &&
-      util.getPointer(event).distanceFrom(pending.start) > RASTER_SELECTION_DRAG_THRESHOLD_PX
-    )
+  private updateSelectionDistance(event: TPointerEvent): void {
+    const pending = this.selectionGesture;
+    if (pending && util.getPointer(event).distanceFrom(pending.start) > SELECTION_DRAG_THRESHOLD_PX)
       pending.dragged = true;
   }
 
@@ -261,7 +254,7 @@ export class EditorSelectionCanvas extends Canvas {
 
   /** Restores the accepted selection before leaving a group or cancelling another operation. */
   cancelSelectionMarquee(): boolean {
-    this.rasterSelectionGesture = null;
+    this.selectionGesture = null;
     if (!this._groupSelector) return false;
     const previous = this.marqueeSelection;
     this._groupSelector = null;
@@ -287,7 +280,7 @@ export class EditorSelectionCanvas extends Canvas {
   }
 
   override dispose(): ReturnType<Canvas['dispose']> {
-    this.rasterSelectionGesture = null;
+    this.selectionGesture = null;
     this.marqueeSelection = null;
     this.transformDraft = null;
     this.selectionGroupScope = null;
@@ -385,7 +378,7 @@ export class EditorSelectionCanvas extends Canvas {
   }
 
   override findTarget(e: TPointerEvent): ReturnType<Canvas['findTarget']> {
-    if (this.deferRasterTarget) return { subTargets: [], currentSubTargets: [] };
+    if (this.deferSelectionTarget) return { subTargets: [], currentSubTargets: [] };
     const priority = this.layerSelectionPriority;
     if (priority && this.getActiveObject() !== priority) this.layerSelectionPriority = null;
     const preserveObjectStacking = this.preserveObjectStacking;
@@ -500,7 +493,7 @@ export class EditorSelectionCanvas extends Canvas {
       object.selectable &&
       object.sniptaleLocked !== true &&
       isEditableObject(object);
-    const pending = this.rasterSelectionGesture;
+    const pending = this.selectionGesture;
     if (
       pending &&
       !pending.dragged &&

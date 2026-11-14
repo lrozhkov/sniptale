@@ -650,13 +650,10 @@ export function beginDrawingPointer(args: {
   if (selected && hit?.id === selected.id && snapshot.activeTool !== 'select') {
     return { draft: { kind: 'move', start: point, original: selected, object: selected } };
   }
-  if (snapshot.activeTool === 'text' && hit?.kind === 'text') {
-    return {
-      draft: { kind: 'move', start: point, original: hit, object: hit },
-      selection: [hit.id],
-    };
-  }
-  if (snapshot.activeTool === 'select') {
+  if (
+    snapshot.activeTool === 'select' ||
+    (snapshot.activeTool === 'text' && hit?.kind === 'text')
+  ) {
     return beginSelectionPointer(point, snapshot, selectedObjects, hit, modifiers);
   }
   if (snapshot.activeTool === 'text') {

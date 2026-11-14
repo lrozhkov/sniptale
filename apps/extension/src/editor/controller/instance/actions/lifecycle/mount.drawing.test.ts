@@ -410,7 +410,9 @@ it('admits mounted raster gestures only in Select without pan and cancels drafts
     expect(runtime.beginGesture({ x: 0, y: 0 })).toBe(true);
     runtime.moveGesture({ x: 2, y: 2 });
     runtime.cancelCrop();
-    expect(runtime.getSnapshot()).toMatchObject({ busy: false, cropPending: false });
+    await vi.waitFor(() =>
+      expect(runtime.getSnapshot()).toMatchObject({ busy: false, cropPending: false })
+    );
     expect(controller.history!.getState().index).toBe(before);
   } finally {
     mounted.dispose();

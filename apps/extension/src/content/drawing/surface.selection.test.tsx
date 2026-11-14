@@ -17,6 +17,7 @@ function createCanvasContextFixture(): CanvasRenderingContext2D {
     fill: vi.fn(),
     fillRect: vi.fn(),
     lineTo: vi.fn(),
+    measureText: vi.fn((text: string) => ({ width: text.length * 10 }) as TextMetrics),
     moveTo: vi.fn(),
     rect: vi.fn(),
     roundRect: vi.fn(),
@@ -308,3 +309,66 @@ it('keeps text resize controls and cursor visible during a pointer drag', () => 
   act(() => canvas.dispatchEvent(pointer('pointerup', 100, 50)));
   act(() => root.unmount());
 });
+
+it.each([false, true])(
+  'uses a Text-tool drag for marquee or selected movement, selected=%s',
+  (selected) => {
+    const onDocumentCommit = vi.fn(() => true);
+    const session = createDrawingSession({ onDocumentCommit });
+    session.commitObject({
+      backgroundColor: null,
+      bounds: { x: 20, y: 30, width: 180, height: 40 },
+      color: '#111827',
+      fontSize: 20,
+      id: 'draggable-text',
+      kind: 'text',
+      text: 'Drag me',
+    });
+    session.commitObject({
+      id: 'enclosed',
+      kind: 'blur',
+      bounds: { x: 60, y: 60, width: 10, height: 10 },
+    });
+    session.setActiveTool('text');
+    if (selected) session.select('draggable-text');
+    const before = session.getSnapshot();
+    onDocumentCommit.mockClear();
+    const controller: ContentDrawingController = {
+      session,
+      getPalette: () => ['#ef4444'],
+      applyPalette: vi.fn(),
+      getScrollRoot: () => ({ kind: 'viewport', element: null }),
+      prepareActivation: () => true,
+      registerInteractionFinalizer: vi.fn(),
+      finalizeInteraction: vi.fn(),
+    };
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+    const canvas = host.querySelector('canvas')!;
+    act(() => canvas.dispatchEvent(pointer('pointerdown', 40, 40)));
+    expect(session.getSnapshot().selectedObjectIds).toEqual(selected ? ['draggable-text'] : []);
+    act(() => {
+      canvas.dispatchEvent(pointer('pointermove', 90, 80));
+      canvas.dispatchEvent(pointer('pointerup', 90, 80));
+      canvas.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 90, clientY: 80 })
+      );
+    });
+
+    if (selected) {
+      expect(session.getSnapshot().document.objects[0]).toMatchObject({
+        bounds: { x: 70, y: 70, width: 180, height: 40 },
+      });
+      expect(session.getSnapshot().selectedObjectIds).toEqual(['draggable-text']);
+      expect(onDocumentCommit).toHaveBeenCalledOnce();
+    } else {
+      expect(session.getSnapshot().selectedObjectIds).toEqual(['enclosed']);
+      expect(session.getSnapshot().document).toEqual(before.document);
+      expect(onDocumentCommit).not.toHaveBeenCalled();
+    }
+    expect(host.querySelector('[data-ui="content.drawing.text-input"]')).toBeNull();
+    act(() => root.unmount());
+  }
+);

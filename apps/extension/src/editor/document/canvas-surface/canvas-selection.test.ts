@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 
-import { ActiveSelection, FabricImage, Group, Rect, Textbox } from 'fabric';
+import {
+  ActiveSelection,
+  Ellipse,
+  FabricImage,
+  Group,
+  Path,
+  Rect,
+  Textbox,
+  type FabricObject,
+} from 'fabric';
 import {
   beginEditorSelectionModifierGesture,
   finishEditorSelectionModifierGesture,
@@ -25,6 +34,7 @@ import {
 } from '../../controller/layer-actions/group';
 import { afterEach, expect, it, vi } from 'vitest';
 import { EditorCanvas } from './render-region';
+import type { EditorObjectType } from '../../../features/editor/document/types';
 import { selectEditorLayerById } from '../../controller/public-actions/selection/layers/select';
 
 it('targets a selected lower layer through overlapping artwork until selection clears', () => {
@@ -603,4 +613,143 @@ it('does not accept a partially covered scoped child through marquee', () => {
   expect(canvas.getSelectionPreviewObjects()).toEqual([]);
   canvas.__onMouseUp(new MouseEvent('mouseup', end));
   expect(canvas.getActiveObjects()).toEqual([]);
+});
+
+const deferredSelectionTargets: Array<{
+  name: string;
+  type: EditorObjectType;
+  make(): FabricObject;
+  point: { x: number; y: number };
+}> = [
+  {
+    name: 'shape',
+    type: 'shape',
+    make: () => new Rect({ left: 40, top: 40, width: 180, height: 120 }),
+    point: { x: 70, y: 70 },
+  },
+  {
+    name: 'ellipse',
+    type: 'shape',
+    make: () => new Ellipse({ left: 40, top: 40, rx: 100, ry: 80 }),
+    point: { x: 140, y: 120 },
+  },
+  {
+    name: 'text',
+    type: 'text',
+    make: () => new Textbox('Выбор текста', { left: 40, top: 40, width: 250, fontSize: 32 }),
+    point: { x: 60, y: 60 },
+  },
+  {
+    name: 'pencil',
+    type: 'pencil',
+    make: () => new Path('M 40 40 L 220 220', { stroke: '#000', strokeWidth: 20, fill: '' }),
+    point: { x: 100, y: 100 },
+  },
+  {
+    name: 'arrow',
+    type: 'arrow',
+    make: () =>
+      new Path('M 40 40 L 220 40 L 200 20 M 220 40 L 200 60', {
+        stroke: '#000',
+        strokeWidth: 14,
+        fill: '',
+      }),
+    point: { x: 100, y: 40 },
+  },
+  {
+    name: 'blur',
+    type: 'blur',
+    make: () => new Rect({ left: 40, top: 40, width: 180, height: 120 }),
+    point: { x: 70, y: 70 },
+  },
+  {
+    name: 'simplify',
+    type: 'simplify',
+    make: () => new Rect({ left: 40, top: 40, width: 180, height: 120 }),
+    point: { x: 70, y: 70 },
+  },
+  {
+    name: 'vector-element',
+    type: 'vector-element',
+    make: () => new Group([new Rect({ width: 180, height: 120 })], { left: 40, top: 40 }),
+    point: { x: 70, y: 70 },
+  },
+  {
+    name: 'group',
+    type: 'group',
+    make: () => new Group([new Rect({ width: 180, height: 120 })], { left: 40, top: 40 }),
+    point: { x: 70, y: 70 },
+  },
+];
+it.each(deferredSelectionTargets)(
+  'defers unselected $name to click or containment marquee before moving',
+  ({ name, type, make, point }) => {
+    const canvas = new EditorCanvas(document.createElement('canvas'), {
+      width: 600,
+      height: 400,
+      preserveObjectStacking: true,
+      selectionFullyContained: true,
+    });
+    nestedSelectionCanvases.push(canvas);
+    const target = make();
+    target.set({ originX: 'left', originY: 'top', left: 40, top: 40 });
+    target.sniptaleId = name;
+    target.sniptaleType = type;
+    const enclosed = new Rect({ left: point.x + 12, top: point.y + 12, width: 10, height: 10 });
+    enclosed.sniptaleId = 'enclosed';
+    canvas.add(target, enclosed);
+    const before = target.getCenterPoint();
+    const down = () => new MouseEvent('mousedown', { clientX: point.x, clientY: point.y });
+    expect(canvas.findTarget(down()).target).toBe(target);
+    canvas.__onMouseDown(down());
+    expect(canvas.getActiveObject()).toBeUndefined();
+    canvas.__onMouseMove(
+      new MouseEvent('mousemove', { clientX: point.x + 40, clientY: point.y + 40, buttons: 1 })
+    );
+    expect(canvas.getSelectionPreviewObjects()).toEqual([enclosed]);
+    canvas.__onMouseUp(new MouseEvent('mouseup', { clientX: point.x + 40, clientY: point.y + 40 }));
+    expect(canvas.getActiveObjects()).toEqual([enclosed]);
+    expect(target.getCenterPoint()).toEqual(before);
+    canvas.discardActiveObject();
+    canvas.__onMouseDown(down());
+    canvas.__onMouseUp(new MouseEvent('mouseup', { clientX: point.x, clientY: point.y }));
+    expect(canvas.getActiveObject()).toBe(target);
+    canvas.__onMouseDown(down());
+    canvas.__onMouseMove(
+      new MouseEvent('mousemove', { clientX: point.x + 20, clientY: point.y + 10, buttons: 1 })
+    );
+    canvas.__onMouseUp(new MouseEvent('mouseup', { clientX: point.x + 20, clientY: point.y + 10 }));
+    expect(target.getCenterPoint().x).toBeCloseTo(before.x + 20);
+    expect(target.getCenterPoint().y).toBeCloseTo(before.y + 10);
+    if (target instanceof Textbox) {
+      handleEditorDoubleClick({
+        canvas,
+        target,
+        event: new MouseEvent('dblclick'),
+        activeTool: 'select',
+        commitHistory: vi.fn(),
+        syncRuntimeState: vi.fn(),
+      });
+      expect(target.isEditing).toBe(true);
+      target.exitEditing();
+    }
+  }
+);
+it('moves an already selected aggregate without deferring it as a new target', () => {
+  const canvas = new EditorCanvas(document.createElement('canvas'), { width: 600, height: 400 });
+  nestedSelectionCanvases.push(canvas);
+  const a = new Rect({ left: 40, top: 40, width: 70, height: 70 });
+  const b = new Rect({ left: 160, top: 40, width: 70, height: 70 });
+  canvas.add(a, b);
+  const aggregate = new ActiveSelection([a, b], { canvas });
+  canvas.setActiveObject(aggregate);
+  const before = [a.getCenterPoint(), b.getCenterPoint()];
+  canvas.__onMouseDown(new MouseEvent('mousedown', { clientX: 70, clientY: 70 }));
+  canvas.__onMouseMove(new MouseEvent('mousemove', { clientX: 90, clientY: 80, buttons: 1 }));
+  canvas.__onMouseUp(new MouseEvent('mouseup', { clientX: 90, clientY: 80 }));
+  expect(canvas.getActiveObject()).toBe(aggregate);
+  [a, b].forEach((object, index) => {
+    expect(object.getCenterPoint().x).toBeCloseTo(before[index]!.x + 20);
+    expect(object.getCenterPoint().y).toBeCloseTo(before[index]!.y + 10);
+  });
 });

@@ -1,8 +1,153 @@
 import { expect, it, vi } from 'vitest';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { createDrawingSession } from '../../features/drawing/public';
+import { createDrawingSession, type DrawingObject } from '../../features/drawing/public';
 import { beginDrawingPointer, commitDrawingPointerDraft } from './interaction';
 import { updateDrawingPointerDraft } from './pointer-update';
+
+function createTypedSelectionSession(kind: DrawingObject['kind'], textTool = false) {
+  const onDocumentCommit = vi.fn(() => true);
+  const session = createDrawingSession({ onDocumentCommit });
+  const bounds = { x: 60, y: 60, width: 80, height: 80 };
+  const style = { id: 'target', color: '#000', width: 2 };
+  const target: DrawingObject =
+    kind === 'arrow'
+      ? { ...style, kind, start: { x: 60, y: 100 }, end: { x: 140, y: 100 }, dynamicWidth: false }
+      : kind === 'pencil' || kind === 'marker'
+        ? {
+            ...style,
+            kind,
+            opacity: 0.5,
+            samples: [
+              { x: 60, y: 100, t: 0 },
+              { x: 140, y: 100, t: 1 },
+            ],
+          }
+        : kind === 'text'
+          ? { ...style, kind, bounds, text: 'Target', fontSize: 20, backgroundColor: null }
+          : kind === 'simplify'
+            ? { id: 'target', kind, bounds, settings: session.getSnapshot().defaults.simplify }
+            : { ...style, kind, bounds, fillColor: '#fff' };
+  session.commitObject(target);
+  session.commitObject({
+    id: 'enclosed',
+    kind: 'blur',
+    bounds: { x: 160, y: 160, width: 20, height: 20 },
+  });
+  session.setActiveTool(textTool ? 'text' : 'select');
+  session.setSelection([]);
+  onDocumentCommit.mockClear();
+  return { session, onDocumentCommit };
+}
+
+const selectableKinds = [
+  'rectangle',
+  'ellipse',
+  'triangle',
+  'parallelogram',
+  'pencil',
+  'marker',
+  'arrow',
+  'blur',
+  'simplify',
+  'text',
+] as const;
+
+it.each([
+  ...selectableKinds.map((kind) => ({ kind, textTool: false })),
+  { kind: 'text' as const, textTool: true },
+])(
+  'defers an unselected $kind click and uses its drag for containment, textTool=$textTool',
+  ({ kind, textTool }) => {
+    const { session, onDocumentCommit } = createTypedSelectionSession(kind, textTool);
+    const before = session.getSnapshot();
+    const started = beginDrawingPointer({
+      point: { x: 100, y: 100 },
+      snapshot: before,
+      timestamp: 0,
+    });
+    expect(started.selection).toBeUndefined();
+    expect(started.draft).toMatchObject({ kind: 'marquee', clickObjectId: 'target' });
+    expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+    if (!started.draft) throw new Error('Expected pending click');
+    commitDrawingPointerDraft(session, started.draft);
+    expect(session.getSnapshot().selectedObjectIds).toEqual(['target']);
+    session.setSelection([]);
+    const moved = updateDrawingPointerDraft({
+      documentObjects: before.document.objects,
+      draft: started.draft,
+      event: {} as ReactPointerEvent<HTMLCanvasElement>,
+      point: { x: 200, y: 200 },
+      root: { kind: 'viewport', element: null },
+    });
+    expect(moved.draft.kind).toBe('marquee');
+    expect(moved.selection).toEqual(['enclosed']);
+    session.setSelection(moved.selection ?? []);
+    commitDrawingPointerDraft(session, moved.draft);
+    expect(session.getSnapshot().selectedObjectIds).toEqual(['enclosed']);
+    expect(session.getSnapshot().document).toEqual(before.document);
+    expect(onDocumentCommit).not.toHaveBeenCalled();
+  }
+);
+
+it.each(selectableKinds)('keeps selected %s movement available', (kind) => {
+  const { session, onDocumentCommit } = createTypedSelectionSession(kind);
+  session.select('target');
+  const before = session.getSnapshot();
+  const started = beginDrawingPointer({
+    point: { x: 100, y: 100 },
+    snapshot: before,
+    timestamp: 0,
+  });
+  expect(started.draft?.kind).toBe('move');
+  if (!started.draft) throw new Error('Expected selected movement');
+  const moved = updateDrawingPointerDraft({
+    documentObjects: before.document.objects,
+    draft: started.draft,
+    event: {} as ReactPointerEvent<HTMLCanvasElement>,
+    point: { x: 120, y: 130 },
+    root: { kind: 'viewport', element: null },
+  });
+  commitDrawingPointerDraft(session, moved.draft);
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['target']);
+  expect(session.getSnapshot().document.objects[0]).not.toEqual(before.document.objects[0]);
+  expect(session.getSnapshot().document.objects[1]).toEqual(before.document.objects[1]);
+  expect(onDocumentCommit).toHaveBeenCalledOnce();
+});
+
+it.each([
+  [{ ctrlKey: false, shiftKey: true }, ['enclosed', 'target'], ['enclosed']],
+  [{ ctrlKey: true, shiftKey: false }, ['enclosed', 'target'], []],
+] as const)(
+  'composes unselected Text-tool clicks and marquees with %j',
+  (modifiers, clicked, dragged) => {
+    const { session, onDocumentCommit } = createTypedSelectionSession('text', true);
+    session.select('enclosed');
+    const before = session.getSnapshot();
+    const started = beginDrawingPointer({
+      modifiers,
+      point: { x: 100, y: 100 },
+      snapshot: before,
+      timestamp: 0,
+    });
+    expect(started.selection).toBeUndefined();
+    if (!started.draft) throw new Error('Expected pending text selection');
+    commitDrawingPointerDraft(session, started.draft);
+    expect(session.getSnapshot().selectedObjectIds).toEqual(clicked);
+    session.setSelection(before.selectedObjectIds);
+    const moved = updateDrawingPointerDraft({
+      documentObjects: before.document.objects,
+      draft: started.draft,
+      event: {} as ReactPointerEvent<HTMLCanvasElement>,
+      point: { x: 200, y: 200 },
+      root: { kind: 'viewport', element: null },
+    });
+    expect(moved.selection).toEqual(dragged);
+    session.setSelection(moved.selection ?? []);
+    commitDrawingPointerDraft(session, moved.draft);
+    expect(session.getSnapshot().document).toEqual(before.document);
+    expect(onDocumentCommit).not.toHaveBeenCalled();
+  }
+);
 
 function createNestedSelectionSession() {
   const onDocumentCommit = vi.fn(() => true);

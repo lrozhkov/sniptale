@@ -588,6 +588,21 @@ it('opens an existing text with the Text tool and hides its canvas copy while ed
   vi.clearAllMocks();
   const canvas = host.querySelector('canvas')!;
 
+  const pointer = (type: string, clientX: number) => {
+    const event = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY: 40 });
+    Object.defineProperties(event, {
+      pointerId: { value: 1 },
+      pointerType: { value: 'mouse' },
+    });
+    return event;
+  };
+  act(() => canvas.dispatchEvent(pointer('pointerdown', 40)));
+  expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+  act(() => canvas.dispatchEvent(pointer('pointermove', 43.99)));
+  expect(session.getSnapshot().selectedObjectIds).toEqual([]);
+  act(() => canvas.dispatchEvent(pointer('pointerup', 43.99)));
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['existing-text']);
+
   act(() =>
     canvas.dispatchEvent(
       new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 })
@@ -662,57 +677,6 @@ it('keeps the text baseline and per-line background stable while switching to ed
   expect(editor.style.fontSize).toBe('20px');
   expect(editor.style.lineHeight).toBe('25px');
   expect(editor.style.padding).toBe('2px 6px');
-  act(() => root.unmount());
-});
-
-it('moves existing text with a Text-tool drag without opening the editor on the trailing click', () => {
-  const session = createDrawingSession({ onDocumentCommit: () => true });
-  session.commitObject({
-    backgroundColor: null,
-    bounds: { x: 20, y: 30, width: 180, height: 40 },
-    color: '#111827',
-    fontSize: 20,
-    id: 'draggable-text',
-    kind: 'text',
-    text: 'Drag me',
-  });
-  session.setActiveTool('text');
-  const controller: ContentDrawingController = {
-    session,
-    getPalette: () => ['#ef4444'],
-    applyPalette: vi.fn(),
-    getScrollRoot: () => ({ kind: 'viewport', element: null }),
-    prepareActivation: () => true,
-    registerInteractionFinalizer: vi.fn(),
-    finalizeInteraction: vi.fn(),
-  };
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
-  const canvas = host.querySelector('canvas')!;
-  const pointer = (type: string, clientX: number, clientY: number) => {
-    const event = new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY });
-    Object.defineProperties(event, {
-      pointerId: { value: 1 },
-      pointerType: { value: 'mouse' },
-    });
-    return event;
-  };
-
-  act(() => {
-    canvas.dispatchEvent(pointer('pointerdown', 40, 40));
-    canvas.dispatchEvent(pointer('pointermove', 90, 80));
-    canvas.dispatchEvent(pointer('pointerup', 90, 80));
-    canvas.dispatchEvent(
-      new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 90, clientY: 80 })
-    );
-  });
-
-  expect(session.getSnapshot().document.objects[0]).toMatchObject({
-    bounds: { x: 70, y: 70, width: 180, height: 40 },
-  });
-  expect(host.querySelector('[data-ui="content.drawing.text-input"]')).toBeNull();
   act(() => root.unmount());
 });
 

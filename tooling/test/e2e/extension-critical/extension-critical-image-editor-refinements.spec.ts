@@ -1064,3 +1064,139 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     });
   });
 }
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`unselected vector drag selects enclosed layers before selected movement ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(size);
+    await openEditor(page, hostOrigin, 'en');
+    await page.evaluate(async () => {
+      const harness = window.__sniptaleEditorHarness!;
+      const document = harness.exportDocument();
+      const canvas = JSON.parse(document.canvasJson);
+      canvas.objects.push(
+        {
+          type: 'Rect',
+          version: '7.4.0',
+          originX: 'left',
+          originY: 'top',
+          left: 99,
+          top: 99,
+          width: 500,
+          height: 250,
+          fill: '#efcccc',
+          strokeWidth: 2,
+          stroke: '#cc0000',
+          sniptaleDrawingJson: JSON.stringify({
+            version: 1,
+            object: {
+              id: 'gesture-target',
+              kind: 'rectangle',
+              color: '#cc0000',
+              fillColor: '#efcccc',
+              width: 2,
+              bounds: { x: 100, y: 100, width: 500, height: 250 },
+            },
+          }),
+          sniptaleId: 'gesture-target',
+          sniptaleType: 'shape',
+        },
+        {
+          type: 'Rect',
+          version: '7.4.0',
+          originX: 'left',
+          originY: 'top',
+          left: 219,
+          top: 179,
+          width: 30,
+          height: 30,
+          fill: '#cc0000',
+          strokeWidth: 2,
+          stroke: '#cc0000',
+          sniptaleDrawingJson: JSON.stringify({
+            version: 1,
+            object: {
+              id: 'gesture-enclosed',
+              kind: 'rectangle',
+              color: '#cc0000',
+              fillColor: '#cc0000',
+              width: 2,
+              bounds: { x: 220, y: 180, width: 30, height: 30 },
+            },
+          }),
+          sniptaleId: 'gesture-enclosed',
+          sniptaleType: 'shape',
+        }
+      );
+      await harness.loadDocument({ ...document, canvasJson: JSON.stringify(canvas) });
+      harness.clearSelection();
+    });
+    await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+    const objects = () => page.evaluate(() => window.__sniptaleEditorHarness!.getCanvasObjects());
+    const point = async (x: number, y: number) =>
+      page.evaluate(
+        ({ x, y }) => {
+          const projection = window.__sniptaleEditorHarness!.getSceneProjection()!;
+          const [a, b, c, d, e, f] = projection.viewport;
+          return {
+            x:
+              projection.rect.left +
+              ((a! * x + c! * y + e!) * projection.rect.width) / projection.width,
+            y:
+              projection.rect.top +
+              ((b! * x + d! * y + f!) * projection.rect.height) / projection.height,
+          };
+        },
+        { x, y }
+      );
+    const historyBefore = await page.evaluate(
+      () => window.__sniptaleEditorHarness!.getInteractionState().historyIndex
+    );
+    const before = (await objects()).find((object) => object['sniptaleId'] === 'gesture-target')!;
+    const from = await point(160, 140),
+      to = await point(290, 240);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await expect
+      .poll(async () => (await objects()).filter((object) => object['active']))
+      .toEqual([]);
+    await page.mouse.move(to.x, to.y, { steps: 8 });
+    await page.screenshot({
+      path: info.outputPath('unselected-vector-marquee.png'),
+      fullPage: false,
+    });
+    await page.mouse.up();
+    await expect
+      .poll(async () =>
+        (await objects()).filter((object) => object['active']).map((object) => object['sniptaleId'])
+      )
+      .toEqual(['gesture-enclosed']);
+    expect(
+      (await objects()).find((object) => object['sniptaleId'] === 'gesture-target')
+    ).toMatchObject({ left: before['left'], top: before['top'] });
+    expect(
+      await page.evaluate(() => window.__sniptaleEditorHarness!.getInteractionState().historyIndex)
+    ).toBe(historyBefore);
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    await page.mouse.click(from.x, from.y);
+    await expect
+      .poll(
+        async () =>
+          (await objects()).find((object) => object['sniptaleId'] === 'gesture-target')?.['active']
+      )
+      .toBe(true);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    const moved = await point(180, 150);
+    await page.mouse.move(moved.x, moved.y, { steps: 4 });
+    await page.mouse.up();
+    await expect
+      .poll(
+        async () =>
+          (await objects()).find((object) => object['sniptaleId'] === 'gesture-target')?.['left']
+      )
+      .toBeCloseTo(Number(before['left']) + 20, 0);
+  });
+}
