@@ -102,6 +102,7 @@ export function applySelectionToolSettingsToObjects(
     case 'transparent-base':
     case 'browser-frame':
     case 'frame-annotation':
+    case 'vector-element':
     case 'group':
       return;
     case 'source-image':

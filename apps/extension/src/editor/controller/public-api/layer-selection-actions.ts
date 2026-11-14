@@ -12,6 +12,10 @@ import {
   createLayerSelectionBindings,
 } from './layer-bindings';
 import type { EditorControllerPublicApiAdapter } from './types';
+import {
+  getEditorDocumentTransitionRevision,
+  hasPendingEditorDocumentTransition,
+} from '../history/transition-queue';
 
 export function deleteEditorControllerSelection(
   controller: EditorControllerPublicApiAdapter
@@ -25,8 +29,20 @@ export function deleteEditorControllerSelection(
 export async function duplicateEditorControllerSelection(
   controller: EditorControllerPublicApiAdapter
 ): Promise<void> {
+  const canvas = controller.canvas;
+  const source = controller.source;
+  const token = controller.layerMutationToken;
+  if (canvas && hasPendingEditorDocumentTransition(canvas)) return;
+  const revision = canvas ? getEditorDocumentTransitionRevision(canvas) : 0;
   await duplicateEditorSelection({
-    canvas: controller.canvas,
+    canvas,
+    isCurrent: () =>
+      controller.canvas === canvas &&
+      controller.source === source &&
+      controller.layerMutationToken === token &&
+      (!canvas ||
+        (!hasPendingEditorDocumentTransition(canvas) &&
+          getEditorDocumentTransitionRevision(canvas) === revision)),
     prepareObject: (object) => controller.prepareObject(object),
     nextLabelIndex: (type) =>
       controller.nextLabelIndex(type as Parameters<typeof controller.nextLabelIndex>[0]),

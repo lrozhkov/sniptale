@@ -1,3 +1,5 @@
+import { editorVectorLibraryMigration } from './vector-library-migration';
+import { requireMigrationStores } from './migration-validation';
 import {
   installSyncQueueSummaryIndexes,
   estimateSyncQueueSummaryIndexBytes,
@@ -7,7 +9,7 @@ import {
   estimateDeletionReferenceIndexBytes,
 } from './deletion-index-migration';
 import { REFERENCE_INDEX_STORES } from './row-index-contract';
-import type { UpgradeDatabase, UpgradeTransaction } from './upgrade/types';
+import type { UpgradeTransaction } from './upgrade/types';
 import { ROW_REFERENCE_INDEX } from './row-index-contract';
 import { estimateUsageIndexBytes } from './usage-index-migration';
 import type { DatabaseMigrationDescriptor } from './schema-contract-types';
@@ -41,16 +43,6 @@ import {
   RECORDING_EVENTS_STORE,
   STORE_NAME,
 } from './core.stores.ts';
-
-/** Checks this released descriptor's required stores without reading or changing source data. */
-function requireMigrationStores(
-  db: UpgradeDatabase,
-  stores: readonly string[],
-  diagnostic: string
-): undefined {
-  if (!stores.every((name) => db.objectStoreNames.contains(name))) throw new Error(diagnostic);
-  return undefined;
-}
 
 /** Released contract-only revisions keep their exact metadata and validation stores. */
 function contractOnlyMigration(
@@ -917,6 +909,7 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     validationStores: [IMAGE_WORKSPACES_STORE, SCENARIO_STEP_EDITOR_DOCUMENTS_STORE],
     diagnostic: 'Retained raster document stores are unavailable.',
   }),
+  editorVectorLibraryMigration,
 ];
 
 function ensureSnapshotAssetIndex(transaction: UpgradeTransaction, name: string): void {

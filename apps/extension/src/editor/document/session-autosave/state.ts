@@ -65,6 +65,7 @@ export type EditorSessionAutosaveState = {
   presentationAbortController: AbortController | null;
   lastWriteError: unknown | null;
   presentationRetryPromise: Promise<void> | null;
+  documentAssetsByVectorDefinitionId: ReadonlyMap<string, AssetRef>;
   documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   releaseHydratedDocument: (() => void) | null;
 };
@@ -93,6 +94,7 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     lastWriteError: null,
     presentationRetryPromise: null,
     documentAssetsByRuntimeUrl: new Map(),
+    documentAssetsByVectorDefinitionId: new Map(),
     releaseHydratedDocument: null,
   };
 }

@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
-import { Canvas, FabricImage, Rect } from 'fabric';
+import { Canvas, FabricImage, Group, Rect } from 'fabric';
+import { prepareEditorVectorDefinition } from '../../objects/vector-elements/prepare';
+import { getEditorVectorDefinition } from '../../objects/vector-elements/runtime';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
 import type { EditorDocument } from '../../../features/editor/document/types';
@@ -112,4 +114,65 @@ it('refuses locked block moves and rasterization without changing accepted work 
   expect(canvas.getActiveObject()).toBe(target);
   expect(commit).not.toHaveBeenCalled();
   expect(controller.history?.getState()).toMatchObject({ index: 0, size: 1 });
+});
+
+it('keeps published vectors editable through controller copy and paste after a style preview', async () => {
+  const canvas = new Canvas(undefined, { width: 300, height: 200, renderOnAddRemove: false });
+  canvases.push(canvas);
+  const publish = vi.fn(async () => ({
+    assetId: 'vector-asset',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'vector-object' },
+    mimeType: 'application/json',
+    sha256: null,
+    size: 100,
+  }));
+  const controller = createImageEditorController({ vectorElements: { publish } });
+  controller.canvas = canvas;
+  controller.source = {
+    id: 'source',
+    name: null,
+    dataUrl: '',
+    intrinsicWidth: 300,
+    intrinsicHeight: 200,
+    left: 0,
+    top: 0,
+    displayWidth: 300,
+    displayHeight: 200,
+    visible: true,
+    locked: false,
+  };
+  const commit = vi.spyOn(controller, 'commitHistory').mockImplementation(() => {});
+  vi.spyOn(controller, 'syncRuntimeState').mockImplementation(() => {});
+  const definition = await prepareEditorVectorDefinition(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="20" height="20" fill="red"/></svg>',
+    {
+      sourceId: 'local',
+      prefix: null,
+      name: null,
+      author: null,
+      authorUrl: null,
+      license: null,
+      licenseUrl: null,
+    }
+  );
+  expect(controller.getVectorClipboardAvailability()).toEqual({ canCopy: false, canPaste: false });
+  expect(await controller.insertVectorElement(definition, { x: 70, y: 60 })).toBe(true);
+  const original = canvas.getActiveObject()!;
+  expect(original.getCenterPoint()).toMatchObject({ x: 70, y: 60 });
+  const style = await controller.beginVectorStyleEdit();
+  expect(style?.preview({ opacity: 0.3 })).toBe(true);
+  expect(await controller.copyVectorSelection()).toBe(true);
+  expect(original.opacity).toBe(1);
+  expect(controller.getVectorClipboardAvailability()).toEqual({ canCopy: true, canPaste: true });
+  expect(await controller.pasteVectorSelection({ x: 180, y: 90 })).toBe(true);
+  const pasted = canvas.getActiveObject();
+  if (!(pasted instanceof Group)) throw new Error('Missing pasted vector group');
+  expect(canvas.getObjects()).toEqual([original, pasted]);
+  expect(pasted.sniptaleId).not.toBe(original.sniptaleId);
+  expect(pasted.getCenterPoint()).toMatchObject({ x: 180, y: 90 });
+  expect(getEditorVectorDefinition(pasted)).toEqual(definition);
+  expect(pasted.sniptaleVectorElement).toEqual(original.sniptaleVectorElement);
+  expect(publish).toHaveBeenCalledTimes(2);
+  expect(commit).toHaveBeenCalledTimes(2);
 });

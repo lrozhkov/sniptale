@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from 'vitest';
+import { translate } from '../../../platform/i18n';
 
 import { extractBrowserVersion, parseRgbColor } from '../../color/parsing';
 import {
@@ -124,6 +125,12 @@ describe('utils object helpers', () => {
     expect(getEditorObjectTypeLabel('image')).toBeTruthy();
     expect(getEditorObjectTypeLabel('browser-frame')).toBeTruthy();
     expect(getEditorObjectTypeLabel('meta-stamp')).toBeTruthy();
+    expect(getEditorObjectTypeLabel('vector-element')).toBe(
+      translate('editor.elements.nameFallback')
+    );
+    expect(createObjectLabel('vector-element', 2)).toBe(
+      `${translate('editor.elements.nameFallback')} 2`
+    );
     expect(
       getSingleSelectionType([{ sniptaleType: 'shape' }, { sniptaleType: 'shape' }] as never)
     ).toBe('shape');

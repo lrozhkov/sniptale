@@ -709,3 +709,80 @@ it('shares unchanged canonical stroke payloads across steps without restoring to
   expect(undoEditorSnapshot(history)).toEqual(first);
   expect(redoEditorSnapshot(history)).toEqual({ ...first, sourceName: 'next' });
 });
+
+it('interns immutable vector definitions separately from 100 instance versions and restores before admission', () => {
+  const id = 'a'.repeat(64);
+  const definition = {
+    version: 1 as const,
+    id,
+    viewBox: { minX: 0, minY: 0, width: 24, height: 24 },
+    svg: `<svg xmlns="http://www.w3.org/2000/svg">${' '.repeat(90_000)}</svg>`,
+    slots: [
+      {
+        id: 'c0',
+        kind: 'explicit-color' as const,
+        originalColor: '#ff0000',
+        bindings: [{ nodeId: 'v2', attribute: 'fill' as const }],
+      },
+    ],
+    capabilities: { palette: true, strokeScale: false },
+    provenance: {
+      sourceId: 'local',
+      prefix: null,
+      name: null,
+      author: null,
+      authorUrl: null,
+      license: null,
+      licenseUrl: null,
+    },
+  };
+  const document = (color: string): EditorDocument => ({
+    ...createMockDocument(),
+    version: 4,
+    vectorDefinitions: { [id]: definition },
+    canvasJson: JSON.stringify({
+      objects: [
+        {
+          type: 'Group',
+          objects: Array.from({ length: 100 }, (_, index) => ({
+            type: 'Group',
+            left: index,
+            objects: [],
+            sniptaleType: 'vector-element',
+            sniptaleVectorElement: {
+              version: 1,
+              definitionId: id,
+              overrides: { colors: { c0: color }, strokeScale: 1 },
+            },
+          })),
+        },
+      ],
+    }),
+  });
+  const first = document('#ff0000');
+  const history = createImageHistory(first, { maxActions: 100, maxBytes: 300_000 });
+  const token = JSON.parse(history.getCurrent()).vectorDefinitions[id];
+  expect(token).toMatch(/^sniptale-history-asset:/u);
+  for (let index = 1; index <= 10; index++) {
+    pushEditorSnapshotHistory({
+      history,
+      muted: false,
+      exportDocument: () => document(`#${index.toString(16).padStart(6, '0')}`),
+    });
+    expect(JSON.parse(history.getCurrent()).vectorDefinitions).toEqual({ [id]: token });
+    expect(history.getCurrent()).not.toContain('<svg');
+    expect(history.getCurrent().length).toBeLessThan(1500);
+  }
+  expect(history.getSnapshots()).toHaveLength(11);
+  expect(undoEditorSnapshot(history)).toEqual(document('#000009'));
+  expect(redoEditorSnapshot(history)).toEqual(document('#00000a'));
+  undoEditorSnapshot(history);
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => first });
+  expect(redoEditorSnapshot(history)).toBeNull();
+  expect(readCurrentEditorSnapshot(history)).toEqual(first);
+  resetEditorSnapshotHistory(history, createMockDocument());
+  pushEditorSnapshotHistory({ history, muted: false, exportDocument: () => first });
+  expect(JSON.parse(history.getCurrent()).vectorDefinitions[id]).not.toBe(token);
+  expect(undoEditorSnapshot(history)).toEqual(createMockDocument());
+  expect(redoEditorSnapshot(history)).toEqual(first);
+});

@@ -1,4 +1,14 @@
-import { Copy, Download, Expand, Redo2, Trash2, Undo2, ZoomIn, ZoomOut } from 'lucide-react';
+import {
+  ClipboardPaste,
+  Copy,
+  Download,
+  Expand,
+  Redo2,
+  Trash2,
+  Undo2,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import type {
   EditorHistoryState,
   EditorSelectionState,
@@ -21,6 +31,9 @@ interface BuildEditorCommandPaletteActionsArgs {
   controller: Pick<
     ImageEditorController,
     | 'copyRenderedImage'
+    | 'copyVectorSelection'
+    | 'pasteVectorSelection'
+    | 'getVectorClipboardAvailability'
     | 'exportDocument'
     | 'deleteSelection'
     | 'duplicateSelection'
@@ -126,7 +139,30 @@ function buildEditorDocumentActions(
 function buildEditorSelectionActions(
   args: BuildEditorCommandPaletteActionsArgs
 ): CommandPaletteAction[] {
+  const clipboard = args.controller.getVectorClipboardAvailability();
   return [
+    createCommandPaletteRunAction({
+      id: 'editor-copy-vector-layers',
+      title: translate('editor.elements.copyLayers'),
+      section: translate('shared.ui.commandPaletteActionsSection'),
+      icon: commandPaletteIcon(Copy),
+      disabled: !args.hasImage || !clipboard.canCopy,
+      onSelect: async () => {
+        if (!(await args.controller.copyVectorSelection()))
+          throw new Error(translate('editor.elements.operationFailed'));
+      },
+    }),
+    createCommandPaletteRunAction({
+      id: 'editor-paste-vector-layers',
+      title: translate('editor.elements.pasteLayers'),
+      section: translate('shared.ui.commandPaletteActionsSection'),
+      icon: commandPaletteIcon(ClipboardPaste),
+      disabled: !args.hasImage || !clipboard.canPaste,
+      onSelect: async () => {
+        if (!(await args.controller.pasteVectorSelection()))
+          throw new Error(translate('editor.elements.operationFailed'));
+      },
+    }),
     createCommandPaletteRunAction({
       id: 'editor-duplicate-selection',
       title: translate('editor.toolbar.duplicateSelection'),

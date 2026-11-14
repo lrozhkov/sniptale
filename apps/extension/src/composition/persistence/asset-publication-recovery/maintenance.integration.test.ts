@@ -1,3 +1,8 @@
+import { EDITOR_VECTOR_LIBRARY_STORE } from '../infrastructure/indexed-db/core.stores';
+import {
+  UNKNOWN_ASSET_REFERENCES,
+  rowReferenceKey,
+} from '../infrastructure/indexed-db/row-index-contract';
 import { collectReadyJournalAssetIds } from '../assets/retention-claims';
 import {
   createRetentionDatabaseFixture,
@@ -252,30 +257,41 @@ it('does no full document scan when all objects already have refs', async () => 
 });
 
 it('validates one selected native snapshot for a batch of orphan objects', async () => {
-  for (let i = 0; i < 12; i++) storage.objects.add(`orphan-${i}`);
+  const targets = Array.from({ length: 12 }, (_, index) => `orphan-${index}`);
+  for (const id of targets) storage.objects.add(id);
   await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
   expect(storage.objects.size).toBe(0);
   expect(storage.readStores.has('sync_capture')).toBe(true);
+  expect(storage.readStores.has(EDITOR_VECTOR_LIBRARY_STORE)).toBe(true);
   expect(storage.reads).toBe(storage.readStores.size);
-  expect(storage.pointRequests).toHaveBeenCalledTimes(193);
+  const snapshotStores = [...storage.readStores];
+  const historyStores = ['recording_cursor_trajectories', 'recording_events'];
+  const unknownProbeStores = snapshotStores.filter((store) => !historyStores.includes(store));
+  const unknownProbes = storage.pointRequests.mock.calls.filter(
+    (call) => call[2] === UNKNOWN_ASSET_REFERENCES
+  );
+  expect(unknownProbes.map((call) => call[0]).sort()).toEqual([...unknownProbeStores].sort());
+  for (const id of targets) {
+    const requests = storage.pointRequests.mock.calls.filter(
+      (call) => call[2] === id || call[2] === rowReferenceKey('asset', id)
+    );
+    expect(requests.map((call) => call[0]).sort()).toEqual([...snapshotStores].sort());
+  }
+  expect(storage.pointRequests).toHaveBeenCalledTimes(
+    targets.length * snapshotStores.length + unknownProbeStores.length
+  );
   const historyRequests = storage.pointRequests.mock.calls.filter(
     (call) => call[1] === 'snapshotAssetId'
   );
-  expect(historyRequests).toHaveLength(24);
+  expect(historyRequests).toHaveLength(targets.length * historyStores.length);
   expect(historyRequests).toEqual(
     expect.arrayContaining(
-      Array.from({ length: 12 }, (_, i) =>
-        ['recording_cursor_trajectories', 'recording_events'].map((store) => [
-          store,
-          'snapshotAssetId',
-          `orphan-${i}`,
-        ])
-      ).flat()
+      targets.flatMap((id) => historyStores.map((store) => [store, 'snapshotAssetId', id]))
     )
   );
   expect(
     storage.pointRequests.mock.calls.filter((call) => call[1] === 'get').map((call) => call[2])
-  ).toEqual(Array.from({ length: 12 }, (_, i) => `orphan-${i}`));
+  ).toEqual(targets);
 });
 
 it('cancels during cooperative validation without committing deletion intent', async () => {

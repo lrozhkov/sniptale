@@ -251,6 +251,7 @@
     "@fontsource/marck-script",
     "@iconify-icons/tabler",
     "@iconify/react",
+    "@iconify/utils",
     "@webav/mp4box.js",
     "@zip.js/zip.js",
     "@zumer/snapdom",

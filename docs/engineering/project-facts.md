@@ -7,7 +7,7 @@ This file projects changeable values and inventories from their existing machine
 | --- | --- | --- |
 | Product version | `0.5.2` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `54` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `55` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -99,6 +99,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/surface-style-presets`
 - `apps/extension/src/composition/persistence/sync-capture`
 - `apps/extension/src/composition/persistence/sync-catalog`
+- `apps/extension/src/composition/persistence/vector-elements`
 - `apps/extension/src/composition/persistence/video-editor-preview-preferences`
 - `apps/extension/src/composition/persistence/video-preview-cache`
 - `apps/extension/src/composition/persistence/voice-input-history`
@@ -228,6 +229,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/settings-transfer`
 - `apps/extension/src/workflows/simplify`
 - `apps/extension/src/workflows/sync-transfer`
+- `apps/extension/src/workflows/vector-catalog`
 - `apps/extension/src/workflows/video`
 - `apps/extension/src/workflows/video-review`
 - `apps/extension/src/workflows/voice-input`
@@ -322,6 +324,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `apps/extension/src/background/simplify/route.ts`
 - `apps/extension/src/background/sync-connection/product-route.ts`
 - `apps/extension/src/background/sync-connection/route.ts`
+- `apps/extension/src/background/vector-catalog/route.ts`
 - `apps/extension/src/background/voice-input/route.ts`
 
 The route registry remains the semantic authority for handler, authorization, policy-state, failure-shape, and mutation ownership. This projection is navigation aid only.

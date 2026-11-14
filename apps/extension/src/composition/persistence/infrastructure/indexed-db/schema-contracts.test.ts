@@ -1,3 +1,8 @@
+import {
+  createNativeUpgradeFixture,
+  createNativeUpgradeTransaction,
+  expectedVectorLibraryCreation,
+} from './schema-contracts.test-support';
 import { SUPPORTED_BETA_DATABASE_FIXTURES } from './fixtures';
 import { openDB } from 'idb';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -30,42 +35,6 @@ vi.mock('idb', () => ({
     close: vi.fn(),
   })),
 }));
-
-function createNativeUpgradeTransaction(put = vi.fn(), createIndex = vi.fn()) {
-  return {
-    abort: vi.fn(),
-    objectStore: vi.fn((_name: string) => ({
-      createIndex,
-      openCursor: async () => null,
-      index: () => ({ getAll: async () => [] }),
-      put,
-      clear: vi.fn(),
-      delete: vi.fn(),
-      getAll: vi.fn(),
-    })),
-  };
-}
-
-function createNativeUpgradeFixture(stores: readonly string[]) {
-  const names = new Set<string>(stores);
-  const put = vi.fn();
-  const createIndex = vi.fn();
-  const db = {
-    objectStoreNames: { contains: (name: string) => names.has(name) },
-    createObjectStore: vi.fn((name: string) => {
-      names.add(name);
-      return { createIndex, put };
-    }),
-    deleteObjectStore: vi.fn(),
-  };
-  return {
-    names,
-    put,
-    createIndex,
-    db,
-    transaction: createNativeUpgradeTransaction(put, createIndex),
-  };
-}
 
 describe('beta persistence domain registry', () => {
   it('assigns every product store to exactly one owner and keeps metadata infrastructure-owned', () => {
@@ -154,6 +123,7 @@ it('admits source mute bindings without reading or rewriting workspace rows and 
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    expectedVectorLibraryCreation,
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   const olderContracts = Object.entries(betaV14Fixture.domainVersions).map(
@@ -219,6 +189,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    expectedVectorLibraryCreation,
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.objectStore.mock.calls).toEqual(
@@ -304,6 +275,10 @@ it('upgrades each retained source contract only after all required stores valida
       expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith('recording_events', {
         keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'],
       });
+    else if (migration.fromDatabaseVersion === 54)
+      expect(db.createObjectStore).toHaveBeenCalledExactlyOnceWith(
+        ...expectedVectorLibraryCreation
+      );
     else expect(db.createObjectStore).not.toHaveBeenCalled();
     names.clear();
     expect(() => migration.validate(db, transaction)).toThrow();
@@ -340,6 +315,7 @@ it('admits compact source gain without workspace migration and refuses incompati
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    expectedVectorLibraryCreation,
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(
@@ -382,6 +358,7 @@ it('annotation admission preserves rows and aborts before publishing contracts o
     ['recording_cursor_trajectories', { keyPath: ['recordingId', 'trajectoryId'] }],
     ['recording_cursor_blocks', { keyPath: ['recordingId', 'trajectoryId', 'sequence'] }],
     ['recording_events', { keyPath: ['recordingId', 'eventStreamId', 'kind', 'entryId'] }],
+    expectedVectorLibraryCreation,
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.objectStore.mock.calls).toEqual(
@@ -582,7 +559,7 @@ it('creates the complete fresh schema with empty unindexed connection authority'
   const tx = { abort: vi.fn(), objectStore: vi.fn() };
   handleDatabaseUpgrade(db, 0, DB_VERSION, tx);
   expect([...names].sort()).toEqual([...EXPECTED_STORES].sort());
-  expect(names).toHaveLength(46);
+  expect(names).toHaveLength(47);
   expect(db.createObjectStore).toHaveBeenCalledWith('sync_connection', { keyPath: 'key' });
   expect(db.createObjectStore).toHaveBeenCalledWith('secret_protection', { keyPath: 'key' });
   expect(connectionIndex).not.toHaveBeenCalled();

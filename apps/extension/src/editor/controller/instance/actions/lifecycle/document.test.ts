@@ -55,6 +55,7 @@ function createAutosaveService(
   return {
     activate: vi.fn(),
     adoptPreparedDocument: vi.fn(),
+    adoptVectorAssets: vi.fn(),
     beginHydration: vi.fn(() => ({ finish: vi.fn(), saveNow: vi.fn(async () => undefined) })),
     discardDraft: vi.fn(async () => undefined),
     dispose: vi.fn(),

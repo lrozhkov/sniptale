@@ -1,3 +1,9 @@
+import {
+  isEditorVectorDefinition,
+  serializeEditorVectorDefinition,
+  validateEditorVectorDefinitionDigest,
+  type EditorVectorDefinition,
+} from '../../../features/editor/document/vector-element';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import { parsePersistedEditorDocument } from './parser';
 import {
@@ -153,7 +159,10 @@ async function extractCanvasValue(args: {
 
 export async function preparePersistedEditorDocument(
   document: EditorDocument,
-  options: { reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef> } = {}
+  options: {
+    reusableAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>;
+    reusableAssetsByVectorDefinitionId?: ReadonlyMap<string, AssetRef>;
+  } = {}
 ): Promise<PreparedEditorDocument> {
   const parsedCanvas: unknown = JSON.parse(document.canvasJson);
   const raster = inspectEditorRasterCanvas(
@@ -168,6 +177,7 @@ export async function preparePersistedEditorDocument(
   const objects: PreparedEditorDocument['objects'] = [];
   const refsById = new Map<string, AssetRef>();
   const runtimeAssetsByUrl = new Map<string, AssetRef>();
+  const vectorAssetsByDefinitionId = new Map<string, AssetRef>();
   try {
     const sourceImage = await stageDataUrl(
       document.sourceImageData,
@@ -211,6 +221,29 @@ export async function preparePersistedEditorDocument(
       runtimeAssetsByUrl,
       value: parsedCanvas,
     });
+    const vectorDefinitions: Record<string, PersistedEditorAssetPointer> = {};
+    for (const [id, definition] of Object.entries(
+      document.version === 4 ? (document.vectorDefinitions ?? {}) : {}
+    )) {
+      if (id !== definition.id || !(await validateEditorVectorDefinitionDigest(definition))) {
+        throw new Error('Editor vector definition identity is invalid.');
+      }
+      let ref = options.reusableAssetsByVectorDefinitionId?.get(id);
+      if (!ref) {
+        const blob = new Blob([serializeEditorVectorDefinition(definition)], {
+          type: 'application/json',
+        });
+        if (blob.size > 8 * 1024 * 1024)
+          throw new Error('Editor vector definition exceeds its resource limit.');
+        const prepared = await writeBlobToAsset(blob);
+        objects.push(prepared);
+        ref = prepared.ref;
+      }
+      refsById.set(ref.assetId, ref);
+      vectorAssetsByDefinitionId.set(id, ref);
+      vectorDefinitions[id] = pointer(ref.assetId);
+      assets.push({ assetId: ref.assetId, role: `vector:${id}` });
+    }
     assertMetadataHasNoEmbeddedBinary(canvas);
     assertMetadataHasNoEmbeddedBinary(document.richShapes);
     const { backgroundImageData: _backgroundImageData, ...frame } = document.frame;
@@ -222,7 +255,9 @@ export async function preparePersistedEditorDocument(
       : undefined;
     return {
       document: {
-        version: document.version === 3 ? 4 : 3,
+        ...(document.version === 4
+          ? { version: 5 as const, vectorDefinitions }
+          : { version: document.version === 3 ? (4 as const) : (3 as const) }),
         sourceImage,
         ...projectEditorImageMetadata(document),
         frame: { ...frame, backgroundImage },
@@ -234,6 +269,7 @@ export async function preparePersistedEditorDocument(
       objects,
       refs: [...refsById.values()],
       runtimeAssetsByUrl,
+      vectorAssetsByDefinitionId,
     };
   } catch (error) {
     const cleanup = await Promise.allSettled(
@@ -277,6 +313,7 @@ async function hydrateCanvasValue(
 export async function hydratePersistedEditorDocument(args: {
   document: PersistedEditorDocument;
   refs: readonly unknown[];
+  validateVectorDefinition?: (value: unknown) => Promise<EditorVectorDefinition>;
 }): Promise<HydratedEditorDocument> {
   if (!parsePersistedEditorDocument(args.document)) {
     throw new Error('Stored editor document is invalid.');
@@ -288,7 +325,36 @@ export async function hydratePersistedEditorDocument(args: {
   }
   const urls = new Map<string, string>();
   const assetsByRuntimeUrl = new Map<string, AssetRef>();
+  const assetsByVectorDefinitionId = new Map<string, AssetRef>();
+  const vectorDefinitions: Record<string, EditorVectorDefinition> = {};
+  if (args.document.version === 5) {
+    for (const [id, pointer] of Object.entries(args.document.vectorDefinitions)) {
+      const ref = refsById.get(pointer.assetId);
+      if (!ref) throw new MissingEditorDocumentAssetError(pointer.assetId);
+      if (ref.mimeType !== 'application/json' || ref.size > 8 * 1024 * 1024)
+        throw new Error('Editor vector definition resource is invalid.');
+      const file = await readAssetFile(ref, `vector:${id}`);
+      if (file.size > 8 * 1024 * 1024)
+        throw new Error('Editor vector definition resource exceeds its limit.');
+      const value: unknown = JSON.parse(await file.text());
+      if (
+        !isEditorVectorDefinition(value) ||
+        value.id !== id ||
+        !(await validateEditorVectorDefinitionDigest(value))
+      ) {
+        throw new Error('Editor vector definition identity is invalid.');
+      }
+      const admitted = args.validateVectorDefinition
+        ? await args.validateVectorDefinition(value)
+        : value;
+      if (serializeEditorVectorDefinition(admitted) !== serializeEditorVectorDefinition(value))
+        throw new Error('Editor vector validation changed its identity.');
+      vectorDefinitions[id] = admitted;
+      assetsByVectorDefinitionId.set(id, ref);
+    }
+  }
   for (const asset of args.document.assets) {
+    if (asset.role.startsWith('vector:')) continue;
     if (urls.has(asset.assetId)) continue;
     const ref = refsById.get(asset.assetId);
     if (!ref) throw new MissingEditorDocumentAssetError(asset.assetId);
@@ -318,16 +384,19 @@ export async function hydratePersistedEditorDocument(args: {
     : undefined;
   return {
     assetsByRuntimeUrl,
+    assetsByVectorDefinitionId,
     document: projectEditorDocument(args.document, {
       backgroundImageData,
       browserFrame,
       canvasJson,
       frame,
       sourceImageData,
+      vectorDefinitions,
     }),
     release() {
       urls.clear();
       assetsByRuntimeUrl.clear();
+      assetsByVectorDefinitionId.clear();
     },
   };
 }
@@ -372,10 +441,13 @@ function projectEditorDocument(
     canvasJson: string;
     frame: Omit<PersistedEditorDocument['frame'], 'backgroundImage'>;
     sourceImageData: string;
+    vectorDefinitions: Record<string, EditorVectorDefinition>;
   }
 ): EditorDocument {
   return {
-    version: document.version === 4 ? 3 : 2,
+    ...(document.version === 5
+      ? { version: 4 as const, vectorDefinitions: hydrated.vectorDefinitions }
+      : { version: document.version === 4 ? (3 as const) : (2 as const) }),
     sourceImageData: hydrated.sourceImageData,
     ...projectEditorImageMetadata(document),
     frame: { ...hydrated.frame, backgroundImageData: hydrated.backgroundImageData },
@@ -389,44 +461,10 @@ export async function materializePersistedEditorDocumentForLegacyTransfer(args: 
   document: PersistedEditorDocument;
   refs: readonly unknown[];
 }): Promise<EditorDocument> {
-  if (!parsePersistedEditorDocument(args.document)) {
-    throw new Error('Stored editor document is invalid.');
+  const hydrated = await hydratePersistedEditorDocument(args);
+  try {
+    return hydrated.document;
+  } finally {
+    hydrated.release();
   }
-  const refsById = new Map<string, AssetRef>();
-  for (const raw of args.refs) {
-    const ref = parseAssetRef(raw);
-    if (ref) refsById.set(ref.assetId, ref);
-  }
-  const dataUrls = new Map<string, string>();
-  for (const asset of args.document.assets) {
-    const ref = refsById.get(asset.assetId);
-    if (!ref) throw new Error(`Editor document asset ref is missing: ${asset.assetId}.`);
-    dataUrls.set(asset.assetId, await blobToDataUrl(await readAssetFile(ref, asset.role)));
-  }
-  const sourceImageData = dataUrls.get(args.document.sourceImage.assetId);
-  if (!sourceImageData) throw new Error('Editor document source image is missing.');
-  const { backgroundImage: _backgroundImage, ...frame } = args.document.frame;
-  const { browserFrame: storedBrowserFrame } = args.document;
-  const browserFrame = storedBrowserFrame
-    ? (() => {
-        const { favicon: _favicon, ...metadata } = storedBrowserFrame;
-        return {
-          ...metadata,
-          faviconDataUrl: storedBrowserFrame.favicon
-            ? (dataUrls.get(storedBrowserFrame.favicon.assetId) ?? null)
-            : null,
-        };
-      })()
-    : undefined;
-  return projectEditorDocument(args.document, {
-    backgroundImageData: args.document.frame.backgroundImage
-      ? (dataUrls.get(args.document.frame.backgroundImage.assetId) ?? null)
-      : null,
-    browserFrame,
-    canvasJson: JSON.stringify(
-      await hydrateCanvasValue(JSON.parse(args.document.canvasJson) as unknown, dataUrls)
-    ),
-    frame,
-    sourceImageData,
-  });
 }

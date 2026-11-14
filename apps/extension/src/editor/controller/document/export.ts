@@ -1,3 +1,4 @@
+import { withEditorVectorAcceptedRendering } from '../../objects/vector-elements/runtime';
 import { inspectEditorRasterCanvas } from '../../../features/editor/document/raster-state';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import type { Canvas } from 'fabric';
@@ -15,6 +16,8 @@ import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { normalizeEditorFrameSettings } from '../../../features/editor/document/constants';
 import { collectRichShapeDocumentObjects } from './';
 import { captureCanvasObjects } from './serialization';
+import { collectEditorVectorDefinitions } from './vector-elements';
+import { inspectEditorVectorCanvas } from '../../../features/editor/document/vector-document';
 import type {
   EditorRenderedImageSize,
   EditorRenderToDataUrlOptions,
@@ -49,9 +52,16 @@ export function buildEditorCanvasDocument(options: {
     (value, kind): value is string =>
       isImageDataUrl(value) && (kind === 'image' || value.startsWith('data:image/png;'))
   );
+  const vectorDefinitions = collectEditorVectorDefinitions(options.canvas);
+  const vectors = inspectEditorVectorCanvas(
+    capturedCanvas,
+    new Set(Object.keys(vectorDefinitions))
+  );
+  if (!vectors.valid) throw new Error('Invalid editor vector metadata');
   if (!raster.valid) throw new Error('Invalid editor raster metadata');
   return {
-    version: raster.hasRaster ? 3 : 2,
+    version: vectors.hasVectors ? 4 : raster.hasRaster ? 3 : 2,
+    ...(vectors.hasVectors ? { vectorDefinitions } : {}),
     sourceImageData: options.source.dataUrl,
     sourceName: options.source.name,
     ...(options.displayName === undefined ? {} : { displayName: options.displayName }),
@@ -108,7 +118,7 @@ function resolveRenderedCanvasElement(
   try {
     const documentSize = getEditorEditingDocumentSize(canvas);
     const margin = documentSize ? getEditorWorkspaceMargin(documentSize) : 0;
-    sourceCanvas =
+    sourceCanvas = withEditorVectorAcceptedRendering(canvas.getObjects(), () =>
       canvas instanceof EditorCanvas && canvas.hasVirtualViewport
         ? canvas.renderDocumentCanvas(
             documentSize && outputSize
@@ -125,7 +135,8 @@ function resolveRenderedCanvasElement(
               width: documentSize.width,
               height: documentSize.height,
             })
-          : canvas.toCanvasElement(1);
+          : canvas.toCanvasElement(1)
+    );
   } finally {
     cropGuides.forEach((object, index) => {
       object.visible = visibility[index] ?? true;

@@ -1,6 +1,15 @@
 import pencilAiIcon from '@iconify-icons/tabler/pencil-ai';
 import { Icon } from '@iconify/react';
-import { AppWindow, ChevronDown, Crop, Info, Layers3, Scaling, Wallpaper } from 'lucide-react';
+import {
+  AppWindow,
+  ChevronDown,
+  Crop,
+  Info,
+  Layers3,
+  Scaling,
+  Shapes,
+  Wallpaper,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { EditorInspector } from '../../state/types';
@@ -8,6 +17,7 @@ import { EditorIconButton, cx } from '../../chrome/ui';
 
 export type EditorLayersPanelMode =
   | 'ai'
+  | 'elements'
   | 'layers'
   | 'frame'
   | 'browser-frame'
@@ -17,6 +27,7 @@ export type EditorLayersPanelMode =
 
 const MODE_BY_INSPECTOR: Partial<Record<EditorInspector, EditorLayersPanelMode>> = {
   ai: 'ai',
+  elements: 'elements',
   frame: 'frame',
   'browser-frame': 'browser-frame',
   meta: 'meta',
@@ -37,6 +48,11 @@ const modes: ReadonlyArray<{
     id: 'layers',
     icon: <Layers3 size={16} strokeWidth={2} />,
     label: () => translate('editor.toolbar.layersTitle'),
+  },
+  {
+    id: 'elements',
+    icon: <Shapes size={16} strokeWidth={2} />,
+    label: () => translate('editor.elements.title'),
   },
   {
     id: 'frame',

@@ -56,6 +56,7 @@ async function persistEditorSessionDocument(args: {
       sourceUrl: args.context.sourceUrl,
       sourceTitle: args.document.displayName ?? args.context.sourceTitle,
       reusableAssetsByRuntimeUrl: args.state.documentAssetsByRuntimeUrl,
+      reusableAssetsByVectorDefinitionId: args.state.documentAssetsByVectorDefinitionId,
     });
 
     if (edit) edit.committed = true;
@@ -64,6 +65,11 @@ async function persistEditorSessionDocument(args: {
       args.state.activeContext.durableRevision = result.revision;
       args.state.activeContext.requireExistingRoot = true;
       args.state.documentAssetsByRuntimeUrl = result.documentAssetsByRuntimeUrl;
+      // A later insertion can publish a definition while this older document awaits its ACK.
+      args.state.documentAssetsByVectorDefinitionId = new Map([
+        ...result.documentAssetsByVectorDefinitionId,
+        ...args.state.documentAssetsByVectorDefinitionId,
+      ]);
     }
     if (!isCurrentCapture(args.state, args)) return;
     args.state.lastWriteError = null;

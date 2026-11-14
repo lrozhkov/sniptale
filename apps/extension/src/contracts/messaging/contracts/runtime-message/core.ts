@@ -1,3 +1,7 @@
+import type {
+  RuntimeVectorCatalogRequestByType,
+  RuntimeVectorCatalogResponseByType,
+} from './vector-catalog.types';
 import type { RuntimeSimplifyRequestByType, RuntimeSimplifyResponseByType } from './simplify.types';
 import type {
   RuntimePageLaunchRequestByType,
@@ -75,7 +79,8 @@ import type { SettingsTransferMessage, SettingsTransferResponse } from '../../..
 
 type RuntimeEmptyResponse = RuntimeMessageResponse<Record<string, never>>;
 
-type RuntimeCoreBaseRequestByType = RuntimeSimplifyRequestByType &
+type RuntimeCoreBaseRequestByType = RuntimeVectorCatalogRequestByType &
+  RuntimeSimplifyRequestByType &
   RuntimePageLaunchRequestByType &
   RuntimeActionSaveRequestByType &
   RuntimeAiRequestByType &
@@ -222,7 +227,8 @@ type RuntimeCoreBaseRequestByType = RuntimeSimplifyRequestByType &
     };
   };
 
-type RuntimeCoreBaseResponseByType = RuntimeSimplifyResponseByType &
+type RuntimeCoreBaseResponseByType = RuntimeVectorCatalogResponseByType &
+  RuntimeSimplifyResponseByType &
   RuntimePageLaunchResponseByType &
   RuntimeActionSaveResponseByType &
   RuntimeAiResponseByType &

@@ -15,6 +15,20 @@ it('keeps committed focused coverage owner maps valid', async () => {
   expect(module.collectFocusedCoverageOwnerMappingViolations()).toEqual([]);
 });
 
+it.each(['action-kernel/owned-route-handlers.ts', 'authorization/owned.ts'])(
+  'selects registered editor catalog and Simplify proof for %s',
+  async (owner) => {
+    const module = await importOwnerMap();
+    const root = 'apps/extension/src/background/runtime/routing';
+    expect(module.resolveMappedCoverageOwnerTests(`${root}/${owner}`)).toEqual(
+      expect.arrayContaining([
+        `${root}/action-kernel/owned-route-handlers.simplify.test.ts`,
+        `${root}/action-kernel/owned-route-handlers.vector-catalog.test.ts`,
+      ])
+    );
+  }
+);
+
 it.each(['controller.ts', 'context.tsx', 'view.tsx', 'dialog.tsx'])(
   'selects direct and participant composition proof for the common Settings protection %s owner',
   async (owner) => {
@@ -427,6 +441,21 @@ it.each([
   const module = await importOwnerMap();
   expect(module.resolveMappedCoverageOwnerTests(file)).toContain(
     'apps/extension/src/workflows/video-review/session.project-purge.test.ts'
+  );
+});
+
+it('retains existing authorization policy proof when mapping editor catalog callers', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/background/runtime/routing/authorization';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/owned.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/background-owned-route.test.ts`,
+      `${root}/background-owned.matrix.test.ts`,
+      `${root}/background-owned.query.test.ts`,
+      `${root}/background-owned.wakeup.test.ts`,
+      `${root}/index.test.ts`,
+      `${root}/policy-registry.test.ts`,
+    ])
   );
 });
 

@@ -8,6 +8,7 @@ import {
   Move,
   Palette,
   Scaling,
+  Shapes,
   SlidersHorizontal,
   Sparkles,
 } from 'lucide-react';
@@ -25,6 +26,11 @@ interface TranslatedInspectorDescriptor {
 }
 
 const staticInspectorDescriptors = {
+  elements: {
+    Icon: Shapes,
+    subtitleKey: 'editor.elements.subtitle',
+    titleKey: 'editor.elements.title',
+  },
   ai: { Icon: Sparkles, subtitleKey: 'editor.ai.subtitle', titleKey: 'editor.ai.title' },
   'browser-frame': {
     Icon: Globe,

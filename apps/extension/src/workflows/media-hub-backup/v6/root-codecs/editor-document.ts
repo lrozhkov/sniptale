@@ -22,10 +22,11 @@ interface PortableEditorAssetPointer {
 
 export interface PortableEditorDocument extends Omit<
   PersistedEditorDocument,
-  'assets' | 'browserFrame' | 'frame' | 'sourceImage'
+  'assets' | 'browserFrame' | 'frame' | 'sourceImage' | 'vectorDefinitions'
 > {
   assets: Array<PortableEditorAssetPointer & { role: string }>;
   sourceImage: PortableEditorAssetPointer;
+  vectorDefinitions?: Record<string, PortableEditorAssetPointer>;
   frame: Omit<PersistedEditorDocument['frame'], 'backgroundImage'> & {
     backgroundImage: PortableEditorAssetPointer | null;
   };
@@ -84,8 +85,12 @@ export function encodePortableEditorDocument(args: {
     browserFrame: storedBrowserFrame,
     frame: storedFrame,
     sourceImage: storedSourceImage,
+    vectorDefinitions: storedVectorDefinitions,
     ...documentMetadata
-  } = args.document;
+  } = {
+    ...args.document,
+    vectorDefinitions: args.document.version === 5 ? args.document.vectorDefinitions : undefined,
+  };
   const { backgroundImage, ...frame } = storedFrame;
   const browserFrame = storedBrowserFrame
     ? (() => {
@@ -98,6 +103,16 @@ export function encodePortableEditorDocument(args: {
     : undefined;
   return {
     ...documentMetadata,
+    ...(storedVectorDefinitions
+      ? {
+          vectorDefinitions: Object.fromEntries(
+            Object.entries(storedVectorDefinitions).map(([id, value]) => [
+              id,
+              objectPointer(value.assetId, args.objectsByAssetId),
+            ])
+          ),
+        }
+      : {}),
     assets: args.document.assets.map(({ assetId, role }) => ({
       ...objectPointer(assetId, args.objectsByAssetId),
       role,
@@ -160,6 +175,7 @@ export function decodePortableEditorDocument(args: {
     browserFrame: portableBrowserFrame,
     frame: portableFrame,
     sourceImage,
+    vectorDefinitions,
     ...metadata
   } = args.document;
   const restorePointer = (value: unknown) => {
@@ -168,6 +184,14 @@ export function decodePortableEditorDocument(args: {
     }
     return assetPointer(value['objectId'], args.assetsByObjectId);
   };
+  let restoredVectorDefinitions: Record<string, { assetId: string }> | undefined;
+  if (vectorDefinitions !== undefined) {
+    if (!isRecord(vectorDefinitions))
+      throw new Error('Portable editor vector definitions are invalid.');
+    restoredVectorDefinitions = Object.fromEntries(
+      Object.entries(vectorDefinitions).map(([id, value]) => [id, restorePointer(value)])
+    );
+  }
   const { backgroundImage, ...frame } = portableFrame;
   let browserFrame: Record<string, unknown> | undefined;
   if (portableBrowserFrame !== undefined) {
@@ -190,6 +214,7 @@ export function decodePortableEditorDocument(args: {
   if (!raster.valid) throw new Error('Portable editor raster metadata is invalid.');
   const restored = {
     ...metadata,
+    ...(restoredVectorDefinitions ? { vectorDefinitions: restoredVectorDefinitions } : {}),
     assets: assets.map((asset: unknown) => {
       if (!isRecord(asset) || typeof asset['role'] !== 'string') {
         throw new Error('Portable editor document asset is invalid.');

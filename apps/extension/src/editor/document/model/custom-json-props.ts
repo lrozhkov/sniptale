@@ -3,6 +3,7 @@ import { EDITOR_RASTER_BINARY_FIELDS } from '../../../features/editor/document/r
 export const CUSTOM_JSON_PROPS = [
   ...EDITOR_RASTER_BINARY_FIELDS,
   'sniptaleRasterState',
+  'sniptaleVectorElement',
   'sniptaleId',
   'sniptaleType',
   'sniptaleLabel',

@@ -78,6 +78,14 @@ function encodeEditorSnapshot(
     if (key === 'canvasJson' && typeof value === 'string') {
       return encodeCanvasHistoryValue(JSON.parse(value) as unknown, assets, tokens);
     }
+    if (key === 'vectorDefinitions' && isRecord(value)) {
+      return Object.fromEntries(
+        Object.entries(value).map(([id, definition]) => [
+          id,
+          internHistoryValue(JSON.stringify(definition), assets, tokens),
+        ])
+      );
+    }
     if (key === 'richShapes' && Array.isArray(value))
       return poolObjectVersions(value, assets, tokens);
     return encodeSharedValue(value, key, assets, tokens);
@@ -119,6 +127,14 @@ function decodeEditorSnapshot(value: string, assets?: EditorHistoryAssets): unkn
   const document = JSON.parse(value) as unknown;
   if (!assets || !isRecord(document)) return document;
   restoreSharedFields(document, DOCUMENT_POOLED_FIELDS, assets);
+  const definitions = document['vectorDefinitions'];
+  if (isRecord(definitions)) {
+    for (const [id, token] of Object.entries(definitions)) {
+      if (typeof token !== 'string') continue;
+      const pooled = assets.byToken.get(token);
+      if (pooled !== undefined) definitions[id] = JSON.parse(pooled) as unknown;
+    }
+  }
   if (Array.isArray(document['richShapes'])) {
     const shapes = restoreObjectVersions(document['richShapes'], assets);
     restoreSharedFields(shapes, CANVAS_POOLED_FIELDS, assets, true);

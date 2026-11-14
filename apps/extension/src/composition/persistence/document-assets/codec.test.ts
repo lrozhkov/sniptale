@@ -1,24 +1,6 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { getDocumentAssetCodecMocks } from './codec.test-support';
+import { expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
-
-const mocks = vi.hoisted(() => ({
-  nextId: 0,
-  readAssetFile: vi.fn(),
-  writeBlobToAsset: vi.fn(),
-  discardPreparedAsset: vi.fn(async () => undefined),
-}));
-
-vi.mock('../assets', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../assets')>()),
-  discardPreparedAsset: mocks.discardPreparedAsset,
-  readAssetFile: mocks.readAssetFile,
-  writeBlobToAsset: mocks.writeBlobToAsset,
-}));
-
-vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
-  blobToDataUrl: vi.fn(async (blob: Blob) => `data:${blob.type};base64,${btoa(await blob.text())}`),
-}));
 
 import {
   hydratePersistedEditorDocument,
@@ -27,24 +9,7 @@ import {
 } from './codec';
 import { parsePersistedEditorDocument } from './parser';
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mocks.nextId = 0;
-  mocks.discardPreparedAsset.mockReset().mockResolvedValue(undefined);
-  mocks.writeBlobToAsset.mockImplementation(async (blob: Blob) => {
-    const assetId = `asset-${++mocks.nextId}`;
-    return {
-      ref: {
-        assetId,
-        createdAt: 1,
-        location: { kind: 'opfs', objectKey: `objects/${assetId}` },
-        mimeType: blob.type,
-        sha256: null,
-        size: blob.size,
-      },
-    };
-  });
-});
+const mocks = getDocumentAssetCodecMocks();
 
 it('extracts all supported editor raster fields into immutable asset slots', async () => {
   const document = createEditorDocumentFixture();

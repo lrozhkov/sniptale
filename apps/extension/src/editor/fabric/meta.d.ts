@@ -5,6 +5,7 @@ import type { BlurSettings } from '../../features/highlighter/contracts';
 import type { EditorGradientColorStop } from '../../features/editor/document/gradient';
 import type { EditorRasterEffect } from '../../features/editor/document/effects';
 import type { EditorRichShapeDocumentObject } from '../../features/editor/document/rich-shape';
+import type { EditorVectorInstance } from '../../features/editor/document/vector-element';
 import type {
   StepBadgeAlphabet,
   StepBadgeSizeLevel,
@@ -98,6 +99,7 @@ declare module 'fabric' {
     sniptaleEffects?: EditorRasterEffect[];
     sniptaleRichShape?: EditorRichShapeDocumentObject;
     sniptaleRichShapeCatalogId?: string;
+    sniptaleVectorElement?: EditorVectorInstance;
     sniptaleFrameAnnotationRevision?: number;
     sniptaleFrameAnnotationJson?: string;
     sniptaleDrawingJson?: string;

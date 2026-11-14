@@ -15,22 +15,38 @@ export function syncSourceStateFromObject(
 
   const displayWidth = object.getScaledWidth();
   const displayHeight = object.getScaledHeight();
+  const id = object.sniptaleId ?? source.id;
+  const left = object.left ?? source.left;
+  const top = object.top ?? source.top;
+  const visible = object.visible !== false;
+  const locked = Boolean(object.sniptaleLocked);
+  if (
+    source.id === id &&
+    source.left === left &&
+    source.top === top &&
+    source.displayWidth === displayWidth &&
+    source.displayHeight === displayHeight &&
+    source.visible === visible &&
+    source.locked === locked
+  )
+    return source;
+
   const base = source.compositionBase;
   const resized =
     Math.abs(displayWidth - source.displayWidth) > 0.001 ||
     Math.abs(displayHeight - source.displayHeight) > 0.001;
   return {
     ...source,
-    id: object.sniptaleId ?? source.id,
-    left: object.left ?? source.left,
-    top: object.top ?? source.top,
+    id,
+    left,
+    top,
     displayWidth,
     displayHeight,
     ...(base && resized
       ? { compositionBase: { ...base, sourceWidth: displayWidth, sourceHeight: displayHeight } }
       : {}),
-    visible: object.visible !== false,
-    locked: Boolean(object.sniptaleLocked),
+    visible,
+    locked,
   };
 }
 

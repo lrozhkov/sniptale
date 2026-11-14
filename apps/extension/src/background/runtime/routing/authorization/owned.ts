@@ -1,3 +1,4 @@
+import { getVectorCatalogCallerKey } from '../../../vector-catalog/route';
 import { getSimplifyCallerKey } from '../../../simplify/route';
 import { parseSyncProductRequest } from '../../../../contracts/messaging/contracts/runtime/sync-product';
 import { isSyncProductSenderAllowed } from '../../../sync-connection/product-route';
@@ -58,6 +59,8 @@ type BackgroundOwnedAuthorizationDispatcher = {
 };
 
 export const backgroundOwnedAuthorizationBindings = {
+  'vector-catalog': (request) =>
+    getVectorCatalogCallerKey(request.sender) ? AUTHORIZED : reject('unauthorized'),
   'page-launch-preferences': authorizePageLaunchPreferencesRoute,
   'aggregate-promotion': authorizeAggregatePromotionRoute,
   'ai-secret-unlock': authorizeAiSecretUnlockRoute,

@@ -1,3 +1,4 @@
+import { computeEditorVectorDefinitionDigest } from '../../../features/editor/document/vector-element';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -101,7 +102,7 @@ let currentSession: {
   updatedAt: number;
 };
 
-async function archive(workspace?: unknown, transport = false): Promise<Blob> {
+async function archive(workspace?: unknown, transport = false, definition?: Blob): Promise<Blob> {
   const output = createArchiveMemorySink();
   const writer = createArchiveWriter(output.sink);
   const metadata = {
@@ -122,9 +123,25 @@ async function archive(workspace?: unknown, transport = false): Promise<Blob> {
     size: rootJson.size,
     path: createInternalObjectSegments('root-metadata', 'root.json').join('/'),
   };
-  const archiveDescriptor = transport
-    ? { ...descriptor, objectCount: 2, totalBytes: descriptor.totalBytes + rootJson.size }
-    : descriptor;
+  const definitionObject = definition
+    ? {
+        objectId: 'object-vector',
+        filename: 'vector.json',
+        mimeType: 'application/json',
+        size: definition.size,
+        path: createInternalObjectSegments('object-vector', 'vector.json').join('/'),
+      }
+    : undefined;
+  const objects = [
+    object,
+    ...(transport ? [rootObject] : []),
+    ...(definitionObject ? [definitionObject] : []),
+  ];
+  const archiveDescriptor = {
+    ...descriptor,
+    objectCount: objects.length,
+    totalBytes: objects.reduce((sum, item) => sum + item.size, 0),
+  };
   await writer.addText('_sniptale/manifest.json', '{}');
   await writer.addText(catalogPath, `${JSON.stringify(archiveDescriptor)}\n`);
   await writer.addText(
@@ -134,11 +151,12 @@ async function archive(workspace?: unknown, transport = false): Promise<Blob> {
       metadata: transport
         ? { payloadObjectId: rootObject.objectId, faviconObjectIds: [] }
         : metadata,
-      objects: transport ? [object, rootObject] : [object],
+      objects,
     })
   );
   await writer.addBlob(object.path, new Blob(['media']));
   if (transport) await writer.addBlob(rootObject.path, rootJson);
+  if (definitionObject && definition) await writer.addBlob(definitionObject.path, definition);
   await writer.close();
   return output.blob();
 }
@@ -639,3 +657,120 @@ it.each(
     expect(publisher.publish).not.toHaveBeenCalled();
   }
 });
+
+it.each([false, true])(
+  'admits stored v5 through the ZIP restore entry and refuses missing definitions before staging: %s',
+  async (missing) => {
+    const definition = {
+      version: 1 as const,
+      id: '',
+      viewBox: { minX: 0, minY: 0, width: 24, height: 24 },
+      svg: '<svg height="24" id="v1" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><rect color="#000000" fill="#ff0000" height="19" id="v2" stroke="none" width="20" x="1" y="2"></rect></svg>',
+      slots: [
+        {
+          id: 'c0',
+          kind: 'explicit-color' as const,
+          originalColor: '#ff0000',
+          bindings: [{ nodeId: 'v2', attribute: 'fill' as const }],
+        },
+      ],
+      capabilities: { palette: true, strokeScale: false },
+      provenance: {
+        sourceId: 'local',
+        prefix: null,
+        name: null,
+        author: null,
+        authorUrl: null,
+        license: null,
+        licenseUrl: null,
+      },
+    };
+    definition.id = await computeEditorVectorDefinitionDigest(definition);
+    const canvasJson = JSON.stringify({
+      objects: [
+        {
+          type: 'Group',
+          objects: [],
+          sniptaleType: 'vector-element',
+          sniptaleVectorElement: {
+            version: 1,
+            definitionId: definition.id,
+            overrides: { colors: { c0: '#0000ff' }, strokeScale: 1 },
+          },
+        },
+      ],
+    });
+    const document = encodePortableEditorDocument({
+      document: {
+        ...createPersistedEditorDocumentFixture(createEditorDocumentFixture(), 'source'),
+        version: 5,
+        vectorDefinitions: { [definition.id]: { assetId: 'local-vector' } },
+        canvasJson,
+        assets: [
+          { assetId: 'source', role: 'source-image' },
+          { assetId: 'local-vector', role: `vector:${definition.id}` },
+        ],
+      },
+      objectsByAssetId: new Map([
+        ['source', object.objectId],
+        ['local-vector', 'object-vector'],
+      ]),
+    });
+    const file = await archive(
+      { aggregateId: 'one', createdAt: 1, updatedAt: 1, document },
+      true,
+      missing ? undefined : new Blob([JSON.stringify(definition)], { type: 'application/json' })
+    );
+    mocks.verify.mockResolvedValue({
+      inspection: {
+        manifest: {
+          layout: 'library-folders-v5',
+          sharedObjects: [],
+          catalogs: [{ path: catalogPath }],
+        },
+      },
+      session: currentSession,
+    });
+    const publisher = {
+      profile: 'media:library-item',
+      publish: vi.fn(async () => {
+        currentSession = {
+          ...currentSession,
+          committedRoots: ['media:library-item:one'],
+          currentRoot: null,
+        };
+        return {
+          conflicted: false,
+          imported: true,
+          retainedAssetIds: ['restored-source', 'restored-vector'],
+        };
+      }),
+    };
+    const operation = restoreMediaHubBackupV6({
+      file,
+      operationId: 'restore-1',
+      publishers: [publisher],
+    });
+    if (missing) {
+      await expect(operation).rejects.toThrow();
+      expect(mocks.stage).not.toHaveBeenCalled();
+      expect(mocks.createJournal).not.toHaveBeenCalled();
+      expect(publisher.publish).not.toHaveBeenCalled();
+    } else {
+      await expect(operation).resolves.toMatchObject({ status: 'completed' });
+      expect(mocks.stage).toHaveBeenCalledOnce();
+      expect(publisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          envelope: expect.objectContaining({
+            metadata: expect.objectContaining({
+              workspace: expect.objectContaining({ document }),
+            }),
+            objects: expect.arrayContaining([
+              expect.objectContaining({ objectId: 'object-vector', mimeType: 'application/json' }),
+            ]),
+          }),
+        })
+      );
+    }
+  }
+);

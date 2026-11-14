@@ -1,3 +1,4 @@
+import type { EditorVectorDefinition } from './vector-element';
 import type { LinearGradient } from '@sniptale/foundation/paint';
 import type { WindowHeader } from '@sniptale/runtime-contracts/window-header';
 import type { BorderPreset } from '../../highlighter/contracts';
@@ -37,6 +38,7 @@ export type EditorObjectType =
   | 'browser-frame'
   | 'meta-stamp'
   | 'rich-shape'
+  | 'vector-element'
   | 'group';
 
 type BrowserFrameCanvasMode = 'resize' | 'keep-size';
@@ -137,9 +139,11 @@ interface EditorDocumentBase {
   compositionBase?: EditorCompositionBase;
   canvasJson: string;
   richShapes?: EditorRichShapeDocumentObject[];
+  vectorDefinitions?: Record<string, EditorVectorDefinition>;
 }
 
-export type EditorDocument = EditorDocumentBase & ({ version: 2 } | { version: 3 });
+export type EditorDocument = EditorDocumentBase &
+  ({ version: 2 } | { version: 3 } | { version: 4 });
 
 export interface EditorLayerChild {
   effects?: EditorRasterEffect[];

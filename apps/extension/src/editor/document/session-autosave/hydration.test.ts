@@ -18,7 +18,11 @@ describe('image document hydration ownership', () => {
       await new Promise<void>((resolve) => {
         release = resolve;
       });
-      return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+      return {
+        revision: 1,
+        documentAssetsByVectorDefinitionId: new Map(),
+        documentAssetsByRuntimeUrl: new Map(),
+      };
     });
     const active = autosave
       .saveNow(() => createDocument('acquired'))
@@ -198,4 +202,114 @@ it('adopts prepared resource ownership only on commit and preserves disabled aut
   );
   autosave.dispose();
   expect(releaseTarget).toHaveBeenCalledOnce();
+});
+
+function vectorAsset(assetId: string) {
+  return {
+    assetId,
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+    mimeType: 'application/json',
+    sha256: null,
+    size: 12,
+  };
+}
+
+it('retains a later admitted vector definition across an older save ACK', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  const first = new Map([['definition-first', vectorAsset('first')]]);
+  const later = new Map([
+    ['definition-later', vectorAsset('later')],
+    ['definition-first', vectorAsset('recreated-backing')],
+  ]);
+  autosave.adoptVectorAssets(first);
+  let acknowledge: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(async (input) => {
+    await new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    return {
+      revision: 1,
+      documentAssetsByRuntimeUrl: new Map(),
+      documentAssetsByVectorDefinitionId: input.reusableAssetsByVectorDefinitionId,
+    };
+  });
+  const saving = autosave.saveNow(() => createDocument('first capture'));
+  await vi.advanceTimersByTimeAsync(0);
+  autosave.adoptVectorAssets(later);
+  acknowledge();
+  await saving;
+  await autosave.saveNow(() => createDocument('later capture'));
+  expect(commitWorkspaceMock.mock.calls[0]?.[0].reusableAssetsByVectorDefinitionId).toEqual(first);
+  expect(commitWorkspaceMock.mock.calls[1]?.[0].reusableAssetsByVectorDefinitionId).toEqual(
+    new Map([...first, ...later])
+  );
+  autosave.dispose();
+});
+
+it('reuses reopened vector refs on the first save and on retry after refusal', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  const refs = new Map([['definition-restored', vectorAsset('restored')]]);
+  const hydration = autosave.beginHydration(() => true);
+  autosave.adoptPreparedDocument({
+    aggregateId: 'restored',
+    revision: 4,
+    sourceUrl: null,
+    sourceTitle: null,
+    documentAssetsByVectorDefinitionId: refs,
+  });
+  hydration.finish(true);
+  commitWorkspaceMock.mockRejectedValueOnce(new Error('publication refused'));
+  await expect(autosave.saveNow(() => createDocument('first attempt'))).rejects.toThrow(
+    'publication refused'
+  );
+  await autosave.saveNow(() => createDocument('retry'));
+  expect(commitWorkspaceMock.mock.calls[0]?.[0].reusableAssetsByVectorDefinitionId).toEqual(refs);
+  expect(commitWorkspaceMock.mock.calls[1]?.[0].reusableAssetsByVectorDefinitionId).toEqual(refs);
+  autosave.dispose();
+});
+
+it('rejects delayed vector ACKs after discard and recreation of the same context identity', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  const previous = new Map([['old-definition', vectorAsset('old')]]);
+  autosave.adoptVectorAssets(previous);
+  let acknowledge: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(async () => {
+    await new Promise<void>((resolve) => {
+      acknowledge = resolve;
+    });
+    return {
+      revision: 1,
+      documentAssetsByRuntimeUrl: new Map(),
+      documentAssetsByVectorDefinitionId: previous,
+    };
+  });
+  const saving = autosave
+    .saveNow(() => createDocument('old capture'))
+    .catch((error: unknown) => error);
+  await vi.advanceTimersByTimeAsync(0);
+  await autosave.discardDraft();
+  activate(autosave);
+  const replacement = new Map([['new-definition', vectorAsset('replacement')]]);
+  autosave.adoptVectorAssets(replacement);
+  acknowledge();
+  expect(await saving).toEqual(
+    expect.objectContaining({ message: 'Editor document changed while waiting to save.' })
+  );
+  await autosave.saveNow(() => createDocument('recreated context'));
+  expect(commitWorkspaceMock.mock.calls[1]?.[0].reusableAssetsByVectorDefinitionId).toEqual(
+    replacement
+  );
+  activate(autosave);
+  await autosave.saveNow(() => createDocument('fresh context'));
+  expect(commitWorkspaceMock.mock.calls[2]?.[0].reusableAssetsByVectorDefinitionId).toEqual(
+    new Map()
+  );
+  autosave.dispose();
 });

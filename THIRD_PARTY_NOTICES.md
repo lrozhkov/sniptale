@@ -278,6 +278,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `b4f9adb7c568904834d0dd6cc98d16c390d21ca32fc17ae7a267715269bd5529`
 - Repository/source: https://github.com/vercel/ai
 
+### `@antfu/install-pkg` 2.1.0
+
+- Installed path: `node_modules/@antfu/install-pkg`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@antfu/install-pkg/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt`](LICENSES/dependencies/@antfu__install-pkg-2.1.0.txt)
+- License text SHA-256: `67cd5e903c1f908edfa27c25606fa806ce629d9a8ddb7d83019d9fd1f83f7fde`
+- Repository/source: https://github.com/antfu-collective/install-pkg.git
+
 ### `@fontsource/marck-script` 5.3.0
 
 - Installed path: `node_modules/@fontsource/marck-script`
@@ -327,6 +339,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License storage: `generated-copy`
 - Redistributed license text: [`LICENSES/dependencies/@iconify__types-2.0.0.txt`](LICENSES/dependencies/@iconify__types-2.0.0.txt)
 - License text SHA-256: `045ce74712fc613fdd74d1c55f5140a08d623836ff2aca44132b38d68fbc67ad`
+- Repository/source: https://github.com/iconify/iconify.git
+
+### `@iconify/utils` 3.1.7
+
+- Installed path: `node_modules/@iconify/utils`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/@iconify/utils/license.txt`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/@iconify__utils-3.1.7.txt`](LICENSES/dependencies/@iconify__utils-3.1.7.txt)
+- License text SHA-256: `a86793ac023162ce98b91899601c15f6712f44943163c4f92a0a4bf89152b3bf`
 - Repository/source: https://github.com/iconify/iconify.git
 
 ### `@noble/hashes` 2.4.0
@@ -557,6 +581,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - License text SHA-256: `809e66de579fb7d92503848bbe6d1f348f4f6521a71e5d294fe7cc0c87a3b4ff`
 - Repository/source: https://github.com/calvinmetcalf/immediate.git
 
+### `import-meta-resolve` 4.2.0
+
+- Installed path: `node_modules/import-meta-resolve`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/import-meta-resolve/license`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/import-meta-resolve-4.2.0.txt`](LICENSES/dependencies/import-meta-resolve-4.2.0.txt)
+- License text SHA-256: `8770a1a4b69ee722636643e81340ce4a8f0b8415b1c568487edc9062338bfcc7`
+- Repository/source: wooorm/import-meta-resolve
+
 ### `inherits` 2.0.4
 
 - Installed path: `node_modules/inherits`
@@ -685,6 +721,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt`](LICENSES/dependencies/ollama-ai-provider-v2-4.0.1.txt)
 - License text SHA-256: `c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4`
 - Repository/source: https://github.com/nordwestt/ollama-ai-provider-v2.git
+
+### `package-manager-detector` 1.9.0
+
+- Installed path: `node_modules/package-manager-detector`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/package-manager-detector/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/package-manager-detector-1.9.0.txt`](LICENSES/dependencies/package-manager-detector-1.9.0.txt)
+- License text SHA-256: `05c365176db3cc00e951c44b921c809c75b8e99d2d724f7daf00381e26fb0850`
+- Repository/source: https://github.com/antfu-collective/package-manager-detector.git
 
 ### `pako` 1.0.11
 
@@ -853,6 +901,18 @@ The font files remain under OFL-1.1. The rest of Sniptale is not relicensed by t
 - Redistributed license text: [`LICENSES/dependencies/string_decoder-1.1.1.txt`](LICENSES/dependencies/string_decoder-1.1.1.txt)
 - License text SHA-256: `11f2aafb37d06b3ee5bdaf06e9811141d0da05263c316f3d627f45c20d43261b`
 - Repository/source: https://github.com/nodejs/string_decoder.git
+
+### `tinyexec` 1.3.1
+
+- Installed path: `node_modules/tinyexec`
+- Declared license expression: `MIT`
+- Selected license: `MIT`
+- License source class: `installed-file`
+- License source: `node_modules/tinyexec/LICENSE`
+- License storage: `generated-copy`
+- Redistributed license text: [`LICENSES/dependencies/tinyexec-1.3.1.txt`](LICENSES/dependencies/tinyexec-1.3.1.txt)
+- License text SHA-256: `f95f668fe64081ddb4153b322e34fdd719b991285ed08177d5ad7133b7988d92`
+- Repository/source: https://github.com/tinylibs/tinyexec.git
 
 ### `tsdav` 2.5.0
 

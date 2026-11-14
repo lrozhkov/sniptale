@@ -1,3 +1,4 @@
+import { EditorElementsPanel } from '../../inspector/elements';
 import { ImageAIInspector } from '../../ai/inspector';
 import { createImageEditorSession, type ImageEditorSession } from '../../ai/session';
 import {
@@ -116,6 +117,8 @@ function EditorFloatingLayersPanelBody(props: {
       />
     );
   }
+
+  if (props.activeMode === 'elements') return <EditorElementsPanel />;
 
   if (props.activeMode === 'layers') {
     const layersPanelProps = createEditorInspectorLayersPanelProps(props.documentController);
@@ -261,8 +264,12 @@ export function EditorFloatingLayersPanel({
   });
   const handleSelectMode = (mode: EditorLayersPanelMode) => {
     if (mode === activeMode && documentController.inspector !== 'layer-effects') return;
-    if (mode === 'ai' || (activeMode === 'ai' && mode === 'layers')) {
-      documentController.setInspector(mode === 'layers' ? 'tool' : 'ai');
+    if (
+      mode === 'ai' ||
+      mode === 'elements' ||
+      ((activeMode === 'ai' || activeMode === 'elements') && mode === 'layers')
+    ) {
+      documentController.setInspector(mode === 'layers' ? 'tool' : mode);
       return;
     }
     if (mode === 'layers') {

@@ -11,6 +11,7 @@ export interface ImageWorkspaceEntry {
   sourceTitle: string | null;
   sourceUrl: string | null;
   updatedAt: number;
+  documentAssetsByVectorDefinitionId?: ReadonlyMap<string, AssetRef>;
   documentAssetsByRuntimeUrl?: ReadonlyMap<string, AssetRef>;
   releaseDocumentAssets?(): void;
 }

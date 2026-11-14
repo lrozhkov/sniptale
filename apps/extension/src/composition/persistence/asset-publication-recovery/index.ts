@@ -74,6 +74,7 @@ import {
 } from '../projects/asset-publication';
 import { scenarioAssetPublicationAdapter } from '../scenario/aggregate-mutations';
 import { scenarioHtmlPublicationAdapter } from '../scenario/export-artifacts';
+import { editorVectorPublicationAdapter } from '../vector-elements';
 import { imageWorkspacePublicationAdapter } from '../image-aggregates/mutations';
 import { webSnapshotPublicationAdapter } from '../web-snapshots/publication';
 export { auditDurableAssets, collectOrphanAssetObjects } from './audit';
@@ -583,6 +584,7 @@ async function recoverPublications(
             scenarioAssetPublicationAdapter,
             scenarioHtmlPublicationAdapter,
             imageWorkspacePublicationAdapter,
+            editorVectorPublicationAdapter,
             webSnapshotPublicationAdapter,
             syncReplicaPublicationAdapter,
           ],

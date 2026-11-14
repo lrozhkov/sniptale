@@ -17,6 +17,7 @@ import type { EditorCustomShapeDefinition } from '../../features/editor/document
 
 export type EditorInspector =
   | 'ai'
+  | 'elements'
   | 'none'
   | 'file'
   | 'tool'

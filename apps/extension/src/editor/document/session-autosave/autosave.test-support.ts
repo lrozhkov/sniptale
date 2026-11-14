@@ -1,3 +1,7 @@
+import type {
+  CommitImageWorkspaceInput,
+  CommitImageWorkspaceResult,
+} from '../../../composition/persistence/image-aggregates';
 import { afterEach, beforeEach, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../page-session/document.test-support';
 
@@ -63,14 +67,27 @@ vi.mock('../../../composition/persistence/image-workspaces', async (importOrigin
   recoverAndGetImageWorkspace: getWorkspaceMock,
 }));
 
+export function createWorkspaceCommitResult(
+  revision: number,
+  resources: Pick<
+    CommitImageWorkspaceInput,
+    'reusableAssetsByRuntimeUrl' | 'reusableAssetsByVectorDefinitionId'
+  > = {}
+): CommitImageWorkspaceResult {
+  return {
+    revision,
+    updatedAt: 10,
+    documentAssetsByVectorDefinitionId: resources.reusableAssetsByVectorDefinitionId ?? new Map(),
+    documentAssetsByRuntimeUrl: resources.reusableAssetsByRuntimeUrl ?? new Map(),
+  };
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
-  commitWorkspaceMock.mockImplementation(async (input) => ({
-    aggregateId: input.aggregateId,
-    documentAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl ?? new Map(),
-    revision: input.expectedRevision + 1,
-  }));
+  commitWorkspaceMock.mockImplementation(async (input) =>
+    createWorkspaceCommitResult(input.expectedRevision + 1, input)
+  );
 });
 
 afterEach(async () => {

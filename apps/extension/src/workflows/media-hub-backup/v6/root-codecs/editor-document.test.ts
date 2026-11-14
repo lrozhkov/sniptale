@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createPersistedEditorDocumentFixture } from '../../../../composition/persistence/document-assets/test-support';
 import { createEditorDocumentFixture } from '../../../../editor/document/page-session/document.test-support';
-import { decodePortableEditorDocument, encodePortableEditorDocument } from './editor-document';
+import {
+  assertPortableEditorDocument,
+  decodePortableEditorDocument,
+  encodePortableEditorDocument,
+} from './editor-document';
 
 const baseDocument = createPersistedEditorDocumentFixture(
   createEditorDocumentFixture(),
@@ -144,4 +148,116 @@ it('archives all retained slots and restores exact stored 4 crop metadata', () =
       assetsByObjectId: new Map([...objectsByAssetId].map(([asset, object]) => [object, asset])),
     })
   ).toThrow('invalid');
+});
+
+const vectorId = 'a'.repeat(64);
+const vectorCanvasJson = JSON.stringify({
+  objects: [
+    {
+      type: 'Group',
+      objects: [
+        { type: 'Rect', left: 3, top: 5, width: 10, height: 20 },
+        ...Array.from({ length: 2 }, (_, index) => ({
+          type: 'Group',
+          objects: [],
+          left: index * 30,
+          angle: index * 15,
+          sniptaleType: 'vector-element',
+          sniptaleVectorElement: {
+            version: 1,
+            definitionId: vectorId,
+            overrides: { colors: { c0: '#123456' }, strokeScale: 1 },
+          },
+        })),
+      ],
+    },
+  ],
+});
+const vectorDocument = {
+  ...baseDocument,
+  version: 5 as const,
+  vectorDefinitions: { [vectorId]: { assetId: 'vector-local' } },
+  assets: [
+    { assetId: 'source-local', role: 'source-image' },
+    { assetId: 'vector-local', role: `vector:${vectorId}` },
+  ],
+  canvasJson: vectorCanvasJson,
+};
+const vectorObjects = new Map([
+  ['source-local', 'object-source'],
+  ['vector-local', 'object-vector'],
+]);
+const vectorRestoredAssets = new Map([
+  ['object-source', 'restored-source'],
+  ['object-vector', 'restored-vector'],
+]);
+
+it('remaps stored v5 definitions once while preserving digest, palette and ordered nested instances', () => {
+  const portable = encodePortableEditorDocument({
+    document: vectorDocument,
+    objectsByAssetId: vectorObjects,
+  });
+  expect(portable).toMatchObject({
+    version: 5,
+    vectorDefinitions: { [vectorId]: { objectId: 'object-vector' } },
+  });
+  expect(portable.canvasJson).toBe(vectorCanvasJson);
+  expect(() => assertPortableEditorDocument(portable)).not.toThrow();
+  expect(JSON.stringify(portable)).not.toContain('assetId');
+  expect(JSON.stringify(portable)).not.toContain('vector-local');
+  const decoded = decodePortableEditorDocument({
+    document: portable,
+    assetsByObjectId: vectorRestoredAssets,
+  });
+  expect(decoded).toEqual({
+    ...vectorDocument,
+    sourceImage: { assetId: 'restored-source' },
+    vectorDefinitions: { [vectorId]: { assetId: 'restored-vector' } },
+    assets: [
+      { assetId: 'restored-source', role: 'source-image' },
+      { assetId: 'restored-vector', role: `vector:${vectorId}` },
+    ],
+  });
+});
+
+it('refuses missing or malformed portable v5 definition references before staging', () => {
+  expect(() =>
+    encodePortableEditorDocument({
+      document: vectorDocument,
+      objectsByAssetId: new Map([['source-local', 'object-source']]),
+    })
+  ).toThrow('missing from archive inventory');
+  const portable = encodePortableEditorDocument({
+    document: vectorDocument,
+    objectsByAssetId: vectorObjects,
+  });
+  for (const pointer of [{ objectId: 'missing-object' }, { assetId: 'vector-local' }, null]) {
+    expect(() =>
+      decodePortableEditorDocument({
+        document: { ...portable, vectorDefinitions: { [vectorId]: pointer } },
+        assetsByObjectId: vectorRestoredAssets,
+      })
+    ).toThrow();
+  }
+  expect(() =>
+    decodePortableEditorDocument({
+      document: {
+        ...portable,
+        vectorDefinitions: { ['b'.repeat(64)]: { objectId: 'object-vector' } },
+      },
+      assetsByObjectId: vectorRestoredAssets,
+    })
+  ).toThrow('invalid');
+  expect(() =>
+    decodePortableEditorDocument({
+      document: { ...portable, vectorDefinitions: undefined },
+      assetsByObjectId: vectorRestoredAssets,
+    })
+  ).toThrow('invalid');
+  expect(() =>
+    assertPortableEditorDocument({
+      ...portable,
+      assets: portable.assets.filter((asset) => asset.objectId !== 'object-vector'),
+    })
+  ).toThrow('missing from restore inventory');
 });

@@ -108,6 +108,7 @@ function createWorkspaceFixtureRows(id: string): Map<string, Map<string, unknown
       'image_workspaces',
       'aggregate_presentations',
       'thumbnails',
+      'editor_vector_library',
       'asset_owners',
       'asset_refs',
       'asset_operations',
@@ -124,6 +125,27 @@ function createWorkspaceFixtureRows(id: string): Map<string, Map<string, unknown
     ['video_workspace_history', new Map()],
     ['video_workspace_drafts', new Map()],
   ]);
+}
+
+const fixtureKeyFields = new Map<string, string | readonly string[]>([
+  ['recording_events', ['recordingId', 'eventStreamId', 'kind', 'entryId']],
+  ['sync_capture', 'key'],
+  ['sync_outbox', 'key'],
+  ['sync_connection', 'key'],
+  ['editor_vector_library', 'key'],
+  ['video_project_revisions', 'projectId'],
+  ['scenario_project_history', ['projectId', 'revision']],
+  ['scenario_project_units', ['projectId', 'unitId', 'revision']],
+  ['video_workspace_history', ['aggregateId', 'ordinal']],
+  ['recording_telemetry', 'recordingId'],
+  ['asset_owners', ['ownerKind', 'ownerId', 'role']],
+]);
+
+function fixtureWriteKey(name: string, value: Record<string, unknown>): unknown {
+  const fields = fixtureKeyFields.get(name);
+  if (typeof fields === 'string') return value[fields];
+  if (fields) return JSON.stringify(fields.map((field) => value[field]));
+  return value['aggregateId'] ?? value['id'] ?? value['operationId'] ?? value['assetId'];
 }
 
 /** Shared transactional fixture retains commit/abort and quota behavior. */
@@ -162,36 +184,7 @@ export function createReviewWorkspaceStoreFixture(failure: (storeName?: string) 
           const write = async (value: unknown, add: boolean) => {
             if (failure(name)) throw new DOMException('No space', 'QuotaExceededError');
             if (!isRecord(value)) throw new Error('Invalid fixture row');
-            const key =
-              name === 'recording_events'
-                ? JSON.stringify([
-                    value['recordingId'],
-                    value['eventStreamId'],
-                    value['kind'],
-                    value['entryId'],
-                  ])
-                : name === 'sync_capture' || name === 'sync_outbox' || name === 'sync_connection'
-                  ? value['key']
-                  : name === 'video_project_revisions'
-                    ? value['projectId']
-                    : name === 'scenario_project_history'
-                      ? JSON.stringify([value['projectId'], value['revision']])
-                      : name === 'scenario_project_units'
-                        ? JSON.stringify([value['projectId'], value['unitId'], value['revision']])
-                        : name === 'video_workspace_history'
-                          ? JSON.stringify([value['aggregateId'], value['ordinal']])
-                          : name === 'recording_telemetry'
-                            ? value['recordingId']
-                            : name === 'asset_owners'
-                              ? JSON.stringify([
-                                  value['ownerKind'],
-                                  value['ownerId'],
-                                  value['role'],
-                                ])
-                              : (value['aggregateId'] ??
-                                value['id'] ??
-                                value['operationId'] ??
-                                value['assetId']);
+            const key = fixtureWriteKey(name, value);
             if (typeof key !== 'string' || !key) throw new Error('Missing test row identity');
             if (add && store.has(key))
               throw new DOMException('Duplicate fixture row', 'ConstraintError');

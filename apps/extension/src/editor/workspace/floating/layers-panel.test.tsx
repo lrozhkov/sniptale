@@ -188,7 +188,28 @@ it('moves collapsed layers to the bottom-right toolbar without insert image acti
   expect(toolbar?.parentElement?.className).toContain('pointer-events-auto');
   expect(toolbar?.querySelector('[role="toolbar"]')?.className).toContain('flex-row');
   expect(container?.querySelector('[data-ui="mock.insert-image"]')).toBeNull();
-  expect(container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]')).toHaveLength(7);
+  const modes = container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]');
+  expect(Array.from(modes ?? [], (mode) => mode.getAttribute('data-ui'))).toEqual([
+    'editor.floating.layers.mode.layers',
+    'editor.floating.layers.mode.elements',
+    'editor.floating.layers.mode.frame',
+    'editor.floating.layers.mode.browser-frame',
+    'editor.floating.layers.mode.ai',
+    'editor.floating.layers.mode.meta',
+    'editor.floating.layers.mode.image-size',
+    'editor.floating.layers.mode.canvas-size',
+  ]);
+});
+
+it('opens Elements from the collapsed navigation without changing its mode identity', () => {
+  renderPanel({ collapsed: true, inspector: 'layers' });
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.mode.elements"]')
+      ?.click();
+  });
+  expect(mocks.setInspector).toHaveBeenCalledWith('elements');
+  expect(mocks.onExpand).toHaveBeenCalledOnce();
 });
 
 it('keeps collapsed modes visually inactive while preserving selection for expansion', () => {

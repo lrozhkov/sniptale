@@ -28,6 +28,7 @@ const groupableLayerTypes = new Set<EditorLayerItem['type']>([
   'pencil',
   'marker',
   'shape',
+  'vector-element',
   'simplify',
   'blur',
   'arrow',

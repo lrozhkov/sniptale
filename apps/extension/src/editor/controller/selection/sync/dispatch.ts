@@ -74,6 +74,7 @@ export function syncSelectionToolSettingsFromObject(
     case 'transparent-base':
     case 'browser-frame':
     case 'frame-annotation':
+    case 'vector-element':
     case 'group':
       break;
     case 'source-image':

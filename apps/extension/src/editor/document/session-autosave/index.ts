@@ -1,3 +1,4 @@
+import type { AssetRef } from '../../../composition/persistence/assets';
 import type { ImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import {
@@ -44,6 +45,8 @@ export interface EditorSessionAutosaveService {
   updateContext: (patch: Partial<Omit<ActiveEditorSessionContext, 'aggregateId'>>) => void;
   /** Adopt prepared resources only after a successful load under the hydration gate. */
   adoptPreparedDocument: (entry: PreparedEditorSessionDocument) => void;
+  /** Reuse definitions whose immutable bytes have completed durable publication. */
+  adoptVectorAssets: (refs: ReadonlyMap<string, AssetRef>) => void;
   restoreDraft: (
     aggregateId: string,
     isCurrent?: () => boolean
@@ -124,6 +127,13 @@ function createEditorSessionAutosaveActions(
     rebindAggregate: (context) => rebindAutosaveAggregate(state, context),
     updateContext: (patch) => updateAutosaveContext(state, patch),
     adoptPreparedDocument: (entry) => adoptPreparedAutosaveDocument(state, entry),
+    adoptVectorAssets: (refs) => {
+      if (!state.activeContext || state.hydration) return;
+      state.documentAssetsByVectorDefinitionId = new Map([
+        ...state.documentAssetsByVectorDefinitionId,
+        ...refs,
+      ]);
+    },
     restoreDraft: (aggregateId, isCurrent) => restoreAutosaveDraft(state, aggregateId, isCurrent),
     scheduleAutosave: (document) => queuePendingAutosave(state, document),
     setInteractionActive: (active) => {

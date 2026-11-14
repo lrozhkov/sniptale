@@ -1,4 +1,6 @@
 import type { CSSProperties } from 'react';
+import type { Canvas } from 'fabric';
+import type { EditorVectorClipboardAvailability } from '../../../controller/public-api/vector-element-clipboard';
 import type { EditorLayerItem } from '../../../../features/editor/document/types';
 
 export const EDITOR_CANVAS_CONTEXT_ZONE_DATA_UI = 'editor.canvas.context-zone';
@@ -55,9 +57,9 @@ export type CanvasContextMenuItem =
     };
 
 interface CanvasContextMenuCanvas {
-  findTarget?: (event: MouseEvent) => import('fabric').FabricObject | null;
-  getActiveObject?: () => import('fabric').FabricObject | null;
-  getActiveObjects?: () => import('fabric').FabricObject[];
+  findTarget?: Canvas['findTarget'];
+  getActiveObject?: Canvas['getActiveObject'];
+  getActiveObjects?: Canvas['getActiveObjects'];
 }
 
 export interface CanvasContextMenuController {
@@ -71,9 +73,12 @@ export interface CanvasContextMenuController {
   clearSelection: () => void;
   deleteSelection: () => void;
   duplicateSelection: () => Promise<void>;
+  copyVectorSelection: () => Promise<boolean>;
+  pasteVectorSelection: () => Promise<boolean>;
+  getVectorClipboardAvailability: () => EditorVectorClipboardAvailability;
   mergeSelectedLayers: () => Promise<void>;
   resetZoom: () => void;
-  selectLayer: (id: string) => void;
+  selectLayer: (id: string, options?: { focusViewport?: boolean }) => void;
   sendBackwardSelection: () => void;
   sendSelectionToBack: () => void;
   toggleLayerLock: (id: string) => void;

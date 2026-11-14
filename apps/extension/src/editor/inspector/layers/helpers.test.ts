@@ -1,8 +1,10 @@
+import type { EditorLayerItem } from '../../../features/editor/document/types';
 import { describe, expect, it } from 'vitest';
 import {
   canDeleteLayerSelection,
   canDuplicateLayerSelection,
   canMergeLayerSelection,
+  canGroupLayerSelection,
   canReorderLayerSelection,
   getLayerActionTitle,
 } from './helpers';
@@ -91,4 +93,28 @@ it('keeps nested selection commands available without treating the containing gr
   layers[0]!.locked = true;
   expect(canDeleteLayerSelection(layers as never)).toBe(false);
   expect(canDuplicateLayerSelection(layers as never)).toBe(false);
+});
+
+it('enables grouping actual vector layer types while retaining source and locked admission guards', () => {
+  const layer: EditorLayerItem = {
+    id: 'vector-1',
+    type: 'vector-element',
+    name: 'Vector 1',
+    typeLabel: 'Vector',
+    effectCount: 0,
+    effects: [],
+    previewColor: null,
+    previewDataUrl: null,
+    previewTransparent: true,
+    raster: false,
+    locked: false,
+    selected: true,
+    selectedCount: 2,
+    visible: true,
+  };
+  const other = { ...layer, id: 'vector-2' };
+  expect(canGroupLayerSelection([layer, other])).toBe(true);
+  expect(canGroupLayerSelection([layer])).toBe(false);
+  expect(canGroupLayerSelection([layer, { ...other, locked: true }])).toBe(false);
+  expect(canGroupLayerSelection([layer, { ...other, type: 'source-image' }])).toBe(false);
 });

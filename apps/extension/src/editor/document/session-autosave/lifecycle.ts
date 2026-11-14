@@ -29,6 +29,7 @@ export function activateAutosaveContext(
     state.releaseHydratedDocument?.();
     state.releaseHydratedDocument = null;
     state.documentAssetsByRuntimeUrl = new Map();
+    state.documentAssetsByVectorDefinitionId = new Map();
   }
   state.pendingDocument = null;
   state.lastWriteError = null;
@@ -72,6 +73,7 @@ export type PreparedEditorSessionDocument = Pick<
   | 'sourceUrl'
   | 'releaseDocumentAssets'
   | 'documentAssetsByRuntimeUrl'
+  | 'documentAssetsByVectorDefinitionId'
 >;
 
 /** Transfers hydrated resource ownership after the loaded canvas has been admitted. */
@@ -94,6 +96,7 @@ export function adoptPreparedAutosaveDocument(
   );
   state.releaseHydratedDocument = entry.releaseDocumentAssets ?? null;
   state.documentAssetsByRuntimeUrl = entry.documentAssetsByRuntimeUrl ?? new Map();
+  state.documentAssetsByVectorDefinitionId = new Map(entry.documentAssetsByVectorDefinitionId);
   setEditorSaveState('saved');
 }
 
@@ -131,6 +134,7 @@ export async function discardAutosaveDraft(
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();
+  state.documentAssetsByVectorDefinitionId = new Map();
   state.pendingDocument = null;
   state.lastWriteError = null;
   state.hasUnsavedChanges = false;
@@ -156,6 +160,7 @@ export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();
+  state.documentAssetsByVectorDefinitionId = new Map();
   state.pendingDocument = null;
   state.activeContext = null;
   state.contextGeneration += 1;

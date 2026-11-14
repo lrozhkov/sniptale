@@ -1,8 +1,9 @@
-import { FabricObject, Path, type Canvas, type SerializedObjectProps } from 'fabric';
+import { FabricObject, Group, Path, type Canvas, type SerializedObjectProps } from 'fabric';
 import { emptyCanvasJson } from '../core/helpers';
 import { CUSTOM_JSON_PROPS, isSourceObject, isUserObject } from '../../document/model';
 import { readEditorDrawingObject } from '../../drawing/object/metadata';
 import { isRichShapeObject } from '../../objects/rich-shape/guards';
+import { getEditorVectorAcceptedOpacity } from '../../objects/vector-elements/runtime';
 
 const EDITOR_DOCUMENT_JSON_PROPS = [
   ...CUSTOM_JSON_PROPS,
@@ -58,15 +59,52 @@ export function serializeEditorCanvasObject(
   object: FabricObject,
   properties: readonly string[] = EDITOR_DOCUMENT_JSON_PROPS
 ): SerializedObjectProps & { clipPath?: unknown; path?: unknown } {
+  return serializeCanonicalObject(object, properties, true);
+}
+
+function serializeCanonicalObject(
+  object: FabricObject,
+  properties: readonly string[],
+  compactDrawing: boolean
+): SerializedObjectProps & { clipPath?: unknown; path?: unknown } {
+  const vector = object.sniptaleType === 'vector-element';
   const drawing = readEditorDrawingObject(object);
   const compactPath =
-    (drawing?.kind === 'pencil' || drawing?.kind === 'marker') && object instanceof Path;
-  const serialize = compactPath ? FabricObject.prototype.toObject : object.toObject;
-  const serialized = serialize.call(object, [...properties]) as SerializedObjectProps & {
+    compactDrawing &&
+    (drawing?.kind === 'pencil' || drawing?.kind === 'marker') &&
+    object instanceof Path;
+  const base = vector || object instanceof Group || compactPath;
+  const serialized = (base ? FabricObject.prototype.toObject : object.toObject).call(object, [
+    ...properties,
+    ...(object instanceof Group ? ['subTargetCheck', 'interactive'] : []),
+  ]) as SerializedObjectProps & {
     clipPath?: unknown;
     path?: unknown;
+    objects?: unknown[];
+    layoutManager?: unknown;
   };
-  // The load owner rebuilds top-level paths from samples. Groups retain their full children.
+  if (vector) {
+    if (object instanceof Group) serialized.opacity = getEditorVectorAcceptedOpacity(object);
+    delete serialized.clipPath;
+    serialized.objects = [];
+  } else if (object instanceof Group) {
+    const layoutManager = object.layoutManager.toObject();
+    if (layoutManager.strategy !== 'fit-content' || object.includeDefaultValues)
+      serialized.layoutManager = layoutManager;
+    serialized.objects = object
+      .getObjects()
+      .filter((child) => !child.excludeFromExport)
+      .map((child) => {
+        const originalDefaults = child.includeDefaultValues;
+        child.includeDefaultValues = object.includeDefaultValues;
+        try {
+          return serializeCanonicalObject(child, properties, false);
+        } finally {
+          child.includeDefaultValues = originalDefaults;
+        }
+      });
+  }
+  // Only top-level canonical drawings are rebuilt by the existing load owner.
   if (compactPath) serialized.path = [['M', 0, 0]];
   return serialized;
 }

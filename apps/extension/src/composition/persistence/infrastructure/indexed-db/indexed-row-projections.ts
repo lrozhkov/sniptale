@@ -23,7 +23,10 @@ interface ProjectionDatabase {
     options?: IDBTransactionOptions
   ): Transaction;
 }
-const indexedStores: ReadonlySet<string> = new Set(REFERENCE_INDEX_STORES);
+const indexedStores: ReadonlySet<string> = new Set([
+  ...REFERENCE_INDEX_STORES,
+  'editor_vector_library',
+]);
 const workspaceStores: ReadonlySet<string> = new Set([
   WORKSPACE_HEAD_STORE,
   WORKSPACE_HISTORY_STORE,

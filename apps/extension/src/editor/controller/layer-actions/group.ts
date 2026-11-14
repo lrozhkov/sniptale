@@ -6,6 +6,7 @@ const GROUPABLE_TYPES = new Set([
   'pencil',
   'marker',
   'shape',
+  'vector-element',
   'simplify',
   'blur',
   'arrow',

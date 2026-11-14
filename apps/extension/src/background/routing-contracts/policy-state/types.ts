@@ -1,4 +1,5 @@
 export type PolicyStateId =
+  | 'vector-catalog-requests'
   | 'simplify-compute-sessions'
   | 'ai-settings-mutation-queue'
   | 'ai-secret-unlock-requests'

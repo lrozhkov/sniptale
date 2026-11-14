@@ -14,6 +14,7 @@ import {
   DIAGNOSTICS_EVENTS_STORE,
   DIAGNOSTICS_META_STORE,
   EDITOR_CUSTOM_SHAPES_STORE,
+  EDITOR_VECTOR_LIBRARY_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
   VIDEO_WORKSPACES_STORE,
@@ -127,6 +128,10 @@ function assertSynchronousMigrationStep(result: unknown, step: 'migrate' | 'vali
 }
 
 function createBetaBaseline(db: UpgradeDatabase): void {
+  const vectors = db.createObjectStore(EDITOR_VECTOR_LIBRARY_STORE, { keyPath: 'key' });
+  vectors.createIndex('kind', 'kind');
+  vectors.createIndex('definitionId', 'definitionId');
+  vectors.createIndex(ROW_REFERENCE_INDEX, ROW_REFERENCE_FIELD, { multiEntry: true });
   createStore(db, STORE_NAME, 'id', ['createdAt']);
   createStore(db, RECORDING_TELEMETRY_STORE, 'recordingId', ['updatedAt']);
   createStore(db, RECORDING_RECOVERY_SESSIONS_STORE, 'id', ['createdAt', 'recoveryId']);

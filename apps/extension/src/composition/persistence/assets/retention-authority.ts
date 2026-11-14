@@ -67,6 +67,7 @@ export async function collectDurableAssetSnapshot(
   const embeddedBinaryMetadata: string[] = [];
   const publishedProjectAssetIds = new Set<string>();
   for (const store of [
+    'editor_vector_library',
     STORE_NAME,
     PROJECT_ASSETS_STORE,
     PROJECT_EXPORTS_STORE,
