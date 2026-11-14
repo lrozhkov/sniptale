@@ -25,8 +25,11 @@ function vacant(
 export function canCloneReviewSelection(
   item: ReviewSelection,
   content: QuickEditAdvancedContent,
-  selections: readonly ReviewSelection[]
+  selections: readonly ReviewSelection[],
+  edits: readonly ReviewEdit[] = []
 ) {
+  if (item.kind === 'edit' && edits.some((edit) => edit.id === item.id && edit.kind === 'freeze'))
+    return false;
   if (item.kind === 'none' || item.kind === 'telemetry' || item.kind === 'webcam') return false;
   if (item.kind === 'cursor-focus')
     return !!content.cursorFocusPath?.segments.some((segment) =>
@@ -55,7 +58,7 @@ export function cloneReviewTimelineSelection(args: {
   const { selections, duration } = args;
   if (
     !selections.length ||
-    !selections.every((item) => canCloneReviewSelection(item, args.content, selections))
+    !selections.every((item) => canCloneReviewSelection(item, args.content, selections, args.edits))
   )
     return null;
   const next = structuredClone(args.content);
@@ -72,6 +75,7 @@ export function cloneReviewTimelineSelection(args: {
       case 'edit': {
         const source = edits.find((item) => item.id === selection.id);
         if (!source) return null;
+        if (source.kind === 'freeze') return null;
         const range = vacant(
           source.start,
           source.end - source.start,

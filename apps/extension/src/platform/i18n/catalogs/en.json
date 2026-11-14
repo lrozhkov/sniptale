@@ -35,6 +35,7 @@
   },
   "common": {
     "units": {
+      "seconds": "s",
       "count": "items",
       "hz": "Hz",
       "db": "dB",
@@ -7428,6 +7429,8 @@
       "saving": "Saving…",
       "zoomConnect": "Transition between focus regions",
       "exportPreciseEdits": "Frame-accurate edits",
+      "freezeFrame": "Freeze frame",
+      "freezeDuration": "Hold duration",
       "exportSection": "Export",
       "exportSettings": "Export settings",
       "exportCodec": "Codec",

@@ -76,7 +76,9 @@ type PreviewState = Pick<
   audio: Pick<EditorState['audio'], 'originalFeedback' | 'dismissOriginalFeedback'>;
   webcam: Pick<EditorState['webcam'], 'failed' | 'pending' | 'retry'> &
     NonNullable<StageProps['webcam']>['editor'];
-  timeline: Pick<EditorState['timeline'], 'sceneOutputTime' | 'resultDuration' | 'timeMap'>;
+  seekResult?: EditorState['seekResult'];
+  timeline: Pick<EditorState['timeline'], 'sceneOutputTime' | 'resultDuration' | 'timeMap'> &
+    Partial<Pick<EditorState['timeline'], 'readOutputTime'>>;
   editing: { exporter: Pick<EditorState['editing']['exporter'], 'phase'> };
   advanced: EditorState['advanced'];
   backgroundPreview?: EditorState['backgroundPreview'];
@@ -194,6 +196,11 @@ export function ReviewPreviewBinding({
         onPlay={() => state.beforeAction(state.play)}
         onSeek={(value) =>
           state.beforeAction(() => {
+            if (state.seekResult) {
+              state.setActiveSelection({ kind: 'none' });
+              state.seekResult(value);
+              return;
+            }
             const sourceTime = state.timeline.timeMap.timelineToSource(value);
             if (sourceTime !== null) {
               state.setActiveSelection({ kind: 'none' });
@@ -344,7 +351,8 @@ function ReviewPreviewStage({
               onPresentationActive: state.setPresentationActive,
               onPresentedTime: state.onPresentedTime,
               interacting: focusInteracting,
-              sourceToResult: state.timeline.timeMap.sourceToTimeline,
+              sourceToResult:
+                state.timeline.readOutputTime ?? state.timeline.timeMap.sourceToTimeline,
               onRaster: onPreviewRaster,
               onRendererStatus: onPreviewRendererStatus,
               sourceFrameRate: state.exporter.index?.frameRate,

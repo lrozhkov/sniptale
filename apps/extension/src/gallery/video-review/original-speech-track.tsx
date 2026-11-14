@@ -47,7 +47,6 @@ export function ReviewTextTrack(props: TextTrackProps) {
   const rowCount = Math.max(1, ...Array.from(rows.values(), (row) => row + 1));
   const metrics = reviewTrackMetrics(props.compact);
   const step = metrics.step;
-  const duration = Math.max(0.01, props.editor.projection.duration);
   return (
     <ReviewTrackRow
       track="text"
@@ -75,6 +74,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
       >
         {fragments.map((fragment) => {
           const range = props.editor.sourceInterval(fragment);
+          const left = props.editor.projection.display.sourceToDisplay(range.start);
+          const right = props.editor.projection.display.sourceToDisplay(range.end, 'end');
           return (
             <div
               key={fragment.id}
@@ -98,8 +99,8 @@ export function ReviewTextTrack(props: TextTrackProps) {
               style={{
                 top: (rows.get(fragment.id) ?? 0) * step + metrics.inset,
                 height: metrics.body,
-                left: `${(range.start / duration) * 100}%`,
-                width: `${(Math.max(0, range.end - range.start) / duration) * 100}%`,
+                left: `${(left / props.editor.projection.display.duration) * 100}%`,
+                width: `${(Math.max(0, right - left) / props.editor.projection.display.duration) * 100}%`,
               }}
               onKeyDown={(event) => {
                 if (props.busy || (event.key !== 'Enter' && event.key !== ' ')) return;
@@ -209,7 +210,11 @@ function useReviewTextTrackGesture(props: TextTrackProps) {
     const sourceAnchor = current.edge === 'end' ? sourceRange.end : sourceRange.start;
     const freeDelta =
       base.timeDomain === 'source'
-        ? ((event.clientX - current.x) / current.width) * duration
+        ? props.editor.projection.focus.delta(
+            props.editor.projection.focus.source(base.start),
+            event.clientX - current.x,
+            current.width
+          )
         : props.editor.projection.delta(sourceAnchor, event.clientX - current.x, current.width);
     const delta = textResizeDelta(props.editor, current, freeDelta, event.altKey, snap);
     const shift = Math.max(-base.start, Math.min(limit - base.end, delta));

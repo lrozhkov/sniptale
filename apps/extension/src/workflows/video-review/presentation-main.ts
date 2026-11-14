@@ -4,7 +4,7 @@ import { readPreviewSourceLeadingSampleTime } from '../video/preview-source';
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink, type InputAudioTrack } from 'mediabunny';
 import type { PresentationCandidate } from '../../features/video/review/presentation-sequence';
 import type { ReviewEdit } from '../../features/video/review/types';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { buildReviewTimeMap, reviewSegmentSourceTime } from '../../features/video/review/timeline';
 import type { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import type { CanvasCommentExport } from '../../features/video/review/comments';
 import type { ReviewClickCue } from '../../features/video/review/click-animation';
@@ -312,6 +312,15 @@ class PresentationMain {
       (part) => localTime >= part.resultStart && localTime < part.resultEnd
     );
     if (!Number.isFinite(localTime) || !segment) throw new Error('Invalid main source clock');
+    if (segment.kind === 'freeze') {
+      const sourceTime = reviewSegmentSourceTime(segment, localTime);
+      return {
+        sampleTime: sourceTime,
+        sourceTime,
+        resultTime: this.args.fragmentOffset + localTime,
+        localTime,
+      };
+    }
     const firstTick = Math.ceil(segment.sourceStart * this.resolution) / this.resolution;
     const lastTick = (Math.ceil(segment.sourceEnd * this.resolution) - 1) / this.resolution;
     const requested = segment.sourceStart + (localTime - segment.resultStart) * segment.rate;

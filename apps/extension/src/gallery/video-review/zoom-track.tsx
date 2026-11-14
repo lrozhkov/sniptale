@@ -41,8 +41,8 @@ function focusSourceSpan(
   if (!range) return undefined;
   return (
     range.sourceAnchor ?? {
-      start: projection?.source(range.start) ?? range.start,
-      end: projection?.source(range.end, 'end') ?? range.end,
+      start: projection?.rawSource(range.start) ?? range.start,
+      end: projection?.rawSource(range.end, 'end') ?? range.end,
     }
   );
 }
@@ -445,10 +445,10 @@ function reviewZoomBlockPresentation(
   const authored = !!anchor;
   const sourceDuration = projection?.duration ?? duration;
   const left = authored
-    ? anchor.start / sourceDuration
+    ? (projection?.focus.position(anchor.start) ?? anchor.start / sourceDuration)
     : (projection?.position(range.start) ?? range.start / duration);
   const right = authored
-    ? anchor.end / sourceDuration
+    ? (projection?.focus.position(anchor.end, 'end') ?? anchor.end / sourceDuration)
     : (projection?.position(range.end, 'end') ?? range.end / duration);
   const kindLabel = translate(
     region.effect === '3d'
@@ -489,8 +489,8 @@ function projectFocusDrag(
   const anchored = (region: QuickEditZoomRegion) => {
     if (!projection) return region;
     const source = region.sourceAnchor ?? {
-      start: projection.source(region.start),
-      end: projection.source(region.end, 'end'),
+      start: projection.rawSource(region.start),
+      end: projection.rawSource(region.end, 'end'),
     };
     return { ...region, start: source.start, end: source.end };
   };
@@ -516,8 +516,8 @@ function projectFocusDrag(
     start: next.start,
     end: next.end,
   };
-  const start = projection.output(sourceAnchor.start);
-  const end = projection.output(sourceAnchor.end);
+  const start = projection.output(projection.focus.source(sourceAnchor.start));
+  const end = projection.output(projection.focus.source(sourceAnchor.end, 'end'));
   return {
     ...(start < end ? { start, end } : { start: props.region.start, end: props.region.end }),
     sourceAnchor,
@@ -566,9 +566,14 @@ function ReviewZoomRegionBlock(
       id: region.id,
       x: event.clientX,
       sourceAtPointer:
+        props.projection?.display.displayToSource(
+          ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
+            event.currentTarget.parentElement!.getBoundingClientRect().width) *
+            props.projection.display.duration
+        ) ??
         ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
           event.currentTarget.parentElement!.getBoundingClientRect().width) *
-        (props.projection?.duration ?? duration),
+          duration,
       width: event.currentTarget.parentElement!.getBoundingClientRect().width,
       edge: edge === 'start' || edge === 'end' ? edge : 'move',
       range: props.range,

@@ -184,6 +184,7 @@ export type ReviewInspectorNavigation = ReturnType<typeof useReviewInspectorNavi
 /** Timeline commands use the same exclusive third context as direct inspector navigation. */
 export function reviewTimelineInspectorCommands(args: {
   video: { current: Pick<HTMLVideoElement, 'pause'> | null };
+  pause?: (() => void) | undefined;
   select(selection: ReviewSelection): void;
   navigation: Pick<ReviewInspectorNavigation, 'setSection' | 'shown'>;
   selectedTextId: string | undefined;
@@ -191,7 +192,7 @@ export function reviewTimelineInspectorCommands(args: {
   requestExport(update: (current: number) => number): void;
 }) {
   const clearSelection = () => {
-    args.video.current?.pause();
+    (args.pause ?? (() => args.video.current?.pause()))();
     args.select({ kind: 'none' });
   };
   return {
@@ -203,7 +204,7 @@ export function reviewTimelineInspectorCommands(args: {
     onSelectAnnotationEffect: (id: string) => args.select({ kind: 'annotation-effect', id }),
     exportActive: args.navigation.shown === 'export',
     onSelectText: (id: string) => {
-      args.video.current?.pause();
+      (args.pause ?? (() => args.video.current?.pause()))();
       args.select({ kind: 'text', id });
       args.navigation.setSection('selected');
     },

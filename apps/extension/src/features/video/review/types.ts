@@ -46,6 +46,14 @@ export type ReviewEdit = ReviewEditRange &
   (
     | { kind: 'cut'; transition?: CompositionJoinSettings }
     | { kind: 'speed'; rate: ReviewSpeedRate; audio: 'speed' | 'mute' }
+    | {
+        kind: 'freeze';
+        /** Added project seconds; the original source interval stays empty. */
+        duration: number;
+        /** Exact original decoded frame interval, independent of preview raster size. */
+        frameTime: number;
+        frameDuration: number;
+      }
   );
 
 export interface ReviewDocument {

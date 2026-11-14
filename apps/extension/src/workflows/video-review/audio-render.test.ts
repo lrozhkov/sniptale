@@ -92,7 +92,7 @@ class TestAudioBuffer {
   }
 }
 
-function installAudioContext() {
+function installAudioContext(silenceWithoutSources = false) {
   const windows: {
     input?: TestAudioBuffer;
     frames: number;
@@ -172,7 +172,8 @@ function installAudioContext() {
           length: this.frames,
           sampleRate: this.rate,
         });
-        result.getChannelData(0).fill(0.5, 960);
+        if (!silenceWithoutSources || this.window.sources?.length)
+          result.getChannelData(0).fill(0.5, 960);
         return result;
       }
     }
@@ -185,11 +186,11 @@ function installAudioContext() {
   };
 }
 
-async function audioFixture() {
+async function audioFixture(silenceWithoutSources = false) {
   audioMock.packets = [];
   audioMock.samples.mockReset();
   audioMock.encode.mockReset();
-  const context = installAudioContext();
+  const context = installAudioContext(silenceWithoutSources);
   const input = new Input({
     source: new BlobSource(
       new Blob([await readFile('tooling/test/e2e/fixtures/review-vp8-opus.webm')])
@@ -917,3 +918,37 @@ it.each([1, 1.5])(
     }
   }
 );
+
+it('renders inserted hold time as silence without decoding or stretching the held original audio', async () => {
+  const fixture = await audioFixture(true);
+  audioMock.samples.mockClear();
+  try {
+    let frames = 0;
+    for await (const sample of renderReviewAudio(
+      fixture.track,
+      {
+        kind: 'freeze',
+        sourceStart: 1,
+        sourceEnd: 1,
+        resultStart: 1,
+        resultEnd: 1.05,
+        rate: 0,
+        freezeId: 'hold',
+        frameTime: 0.98,
+        frameDuration: 0.04,
+      },
+      false,
+      new AbortController().signal
+    )) {
+      const data = new Float32Array(sample.numberOfFrames);
+      sample.copyTo(data, { planeIndex: 0, format: 'f32-planar' });
+      expect(data.every((value) => value === 0)).toBe(true);
+      frames += sample.numberOfFrames;
+    }
+    expect(frames).toBe(2400);
+    expect(audioMock.samples).not.toHaveBeenCalled();
+    expect(fixture.windows.every((window) => !window.sources?.length)).toBe(true);
+  } finally {
+    fixture.cleanup();
+  }
+});

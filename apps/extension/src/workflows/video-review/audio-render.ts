@@ -79,7 +79,8 @@ export async function* renderReviewAudio(
   const renderer = clipRenderer ?? createReviewAudioClipRenderer();
   let original: { renderer: AudioProcessingRenderer; start: number } | undefined;
   try {
-    const sink = track ? new AudioSampleSink(track) : null;
+    const held = segment.kind === 'freeze';
+    const sink = track && !held ? new AudioSampleSink(track) : null;
     const sourceRate = track ? await track.getSampleRate() : outputRate;
     const channels = track ? await track.getNumberOfChannels() : 2;
     if (track && sink && exportAudio?.originalProcessing) {
@@ -129,7 +130,7 @@ export async function* renderReviewAudio(
       };
     }
     const tempo =
-      !original && segment.rate !== 1
+      !original && !held && segment.rate !== 1
         ? createReviewTempo(sourceRate, channels, segment.rate)
         : undefined;
     let frame = Math.round(segment.resultStart * outputRate);
@@ -146,7 +147,7 @@ export async function* renderReviewAudio(
         segment,
         frame,
         count,
-        muted,
+        muted: muted || held,
         signal,
         clipRenderer: renderer,
         ...(original ? { original } : {}),

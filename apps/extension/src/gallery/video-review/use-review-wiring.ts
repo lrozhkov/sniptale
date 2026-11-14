@@ -83,6 +83,7 @@ export function useReviewEditorWiring(args: {
   run(action: () => Promise<unknown>): Promise<unknown>;
   composer: ReturnType<typeof useReviewComposer>;
   video: RefObject<HTMLVideoElement | null>;
+  pause?: (() => void) | undefined;
   seek(value: number, snap?: boolean): void;
   setTimelineSelection(value: import('../../features/video/review/types').ReviewAnchor): void;
   setCutting(cutting: false): void;
@@ -106,6 +107,7 @@ export function useReviewEditorWiring(args: {
     time: args.time,
     playbackRange: args.playbackRange,
     video: args.video,
+    pause: args.pause,
     seek: args.seek,
     setSelection: args.setTimelineSelection,
     setSelected: args.clearAnnotation,
@@ -158,7 +160,7 @@ export function useReviewEditorWiring(args: {
     beforeAction: args.beforeAction,
     select: args.setActiveSelection,
     seek: args.seek,
-    pause: () => args.video.current?.pause(),
+    pause: args.pause ?? (() => args.video.current?.pause()),
   });
   const { cursorFocusPath, cursorFocusKeys } = useReviewCursorFocus(args);
   const removeSelection = useReviewSelectionLifecycle({
@@ -235,7 +237,7 @@ export function useReviewEditorWiring(args: {
     moveHistory: history.run,
     removeSelection,
     exporter: prepareReviewExporter(args.exporter, args.run, history.flush, () =>
-      args.video.current?.pause()
+      (args.pause ?? (() => args.video.current?.pause()))()
     ),
   };
 }
@@ -313,7 +315,7 @@ async function resetReviewEditor(
   canvasComments: ReturnType<typeof useCanvasComments>,
   cancelAnnotationTool: () => void
 ) {
-  args.video.current?.pause();
+  (args.pause ?? (() => args.video.current?.pause()))();
   await args.advancedState.flush();
   await canvasComments.flushTexts();
   await args.session.reset();

@@ -61,6 +61,38 @@ export function parseVoiceoverSegments(value: unknown): ReviewTimeSegment[] | nu
     )
       return null;
     const kind = raw['kind'];
+    if (kind === 'freeze') {
+      if (
+        raw['sourceStart'] !== sourceEnd ||
+        raw['sourceEnd'] !== sourceEnd ||
+        raw['resultStart'] !== resultEnd ||
+        raw['resultEnd'] <= resultEnd ||
+        raw['resultEnd'] - resultEnd > 600 ||
+        raw['rate'] !== 0 ||
+        typeof raw['freezeId'] !== 'string' ||
+        !raw['freezeId'].length ||
+        raw['freezeId'].length > 128 ||
+        !number(raw['frameTime']) ||
+        !number(raw['frameDuration']) ||
+        raw['frameDuration'] <= 0 ||
+        (sourceEnd !== 0 && raw['frameTime'] > sourceEnd) ||
+        raw['frameTime'] + raw['frameDuration'] < sourceEnd - 1e-6
+      )
+        return null;
+      result.push({
+        sourceStart: sourceEnd,
+        sourceEnd,
+        resultStart: resultEnd,
+        resultEnd: raw['resultEnd'],
+        rate: 0,
+        kind,
+        freezeId: raw['freezeId'],
+        frameTime: raw['frameTime'],
+        frameDuration: raw['frameDuration'],
+      });
+      resultEnd = raw['resultEnd'];
+      continue;
+    }
     if (kind !== 'cut' && kind !== 'speed' && kind !== 'keep') return null;
     if (
       raw['sourceStart'] !== sourceEnd ||

@@ -464,3 +464,40 @@ it('keeps original speed-mute separate from the configured DSP snapshot', () => 
   expect(entries[1]!.audioProcessing).toEqual(original.audioProcessing);
   expect(entries[1]!.audioProcessing).not.toBe(original.audioProcessing);
 });
+
+it('never schedules original DSP audio for a held frame', () => {
+  const edits = [
+    {
+      id: 'hold',
+      kind: 'freeze' as const,
+      start: 2,
+      end: 2,
+      requestedStart: 2,
+      requestedEnd: 2,
+      duration: 2,
+      frameTime: 2,
+      frameDuration: 0.04,
+    },
+  ];
+  const entries = buildQuickEditOriginalAudioPlan({
+    sourceId: 'recording:source',
+    edits,
+    segments: buildReviewTimeMap(4, edits),
+    original: {
+      volume: 1,
+      muted: false,
+      audioProcessing: { version: 1, bypassed: false, effects: [] },
+    },
+  });
+  expect(
+    entries.map((entry) => [
+      entry.timelineStart,
+      entry.duration,
+      entry.sourceOffset,
+      entry.playbackRate,
+    ])
+  ).toEqual([
+    [0, 2, 0, 1],
+    [4, 2, 2, 1],
+  ]);
+});

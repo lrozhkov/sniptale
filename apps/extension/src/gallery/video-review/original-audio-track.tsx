@@ -65,10 +65,11 @@ export function ReviewOriginalAudioTrack(props: {
     (time: number) => originalAudioGainAt(playback, time, props.edits),
     [playback, props.edits]
   );
-  const rectStyle = (start: number, end: number) => ({
-    left: `${(start / duration) * 100}%`,
-    width: `${((end - start) / duration) * 100}%`,
-  });
+  const rectStyle = (start: number, end: number) => {
+    const left = props.projection?.focus.position(start) ?? start / duration;
+    const right = props.projection?.focus.position(end, 'end') ?? end / duration;
+    return { left: `${left * 100}%`, width: `${(right - left) * 100}%` };
+  };
   return (
     <ReviewTrackRow
       track="originalAudio"
@@ -115,6 +116,7 @@ export function ReviewOriginalAudioTrack(props: {
               compact={props.compact}
               key={range.id}
               range={range}
+              projection={props.projection}
               row={rows.get(range.id) ?? 0}
               duration={duration}
               preview={preview}
@@ -206,6 +208,7 @@ function OriginalAudioControls(props: {
 function ReviewOriginalGainBlock(props: {
   compact?: boolean | undefined;
   range: QuickEditOriginalAudioRange;
+  projection?: ReviewTrackProjection | undefined;
   row: number;
   duration: number;
   preview: Drag | null;
@@ -216,6 +219,8 @@ function ReviewOriginalGainBlock(props: {
   const { range, preview } = props;
   const start = preview?.id === range.id ? preview.from : range.start;
   const end = preview?.id === range.id ? preview.to : range.end;
+  const left = props.projection?.focus.position(start) ?? start / props.duration;
+  const right = props.projection?.focus.position(end, 'end') ?? end / props.duration;
   return (
     <button
       type="button"
@@ -235,8 +240,8 @@ function ReviewOriginalGainBlock(props: {
           props.row * reviewTrackMetrics(props.compact).step +
           reviewTrackMetrics(props.compact).inset,
         height: reviewTrackMetrics(props.compact).body,
-        left: `${(start / props.duration) * 100}%`,
-        width: `${((end - start) / props.duration) * 100}%`,
+        left: `${left * 100}%`,
+        width: `${(right - left) * 100}%`,
       }}
       onClick={(event) => {
         event.stopPropagation();
@@ -270,9 +275,12 @@ function originalAudioPointerTime(
   snap: ReviewTimelineSnap = snapTimelineTime
 ) {
   const rect = event.currentTarget.getBoundingClientRect();
+  const displayTime =
+    ((event.clientX - rect.left) / Math.max(1, rect.width)) *
+    (props.projection?.display.duration ?? duration);
   const time = Math.max(
     0,
-    Math.min(duration, ((event.clientX - rect.left) / Math.max(1, rect.width)) * duration)
+    Math.min(duration, props.projection?.display.displayToSource(displayTime) ?? displayTime)
   );
   if (event.altKey || drag?.edge === 'move') return time;
   const candidates = [

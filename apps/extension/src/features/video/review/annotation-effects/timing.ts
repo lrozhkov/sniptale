@@ -19,6 +19,20 @@ export function projectReviewAnnotationEffect(
   let duration = 0;
   for (const segment of segments) {
     if (segment.kind === 'cut') continue;
+    if (segment.kind === 'freeze') {
+      const source = segment.frameTime ?? segment.sourceStart;
+      if (annotation.start <= source && source < annotation.end) {
+        slices.push({
+          sourceStart: source,
+          sourceEnd: source,
+          start: segment.resultStart,
+          end: segment.resultEnd,
+          offset: duration,
+        });
+        duration += segment.resultEnd - segment.resultStart;
+      }
+      continue;
+    }
     const sourceStart = Math.max(annotation.start, segment.sourceStart);
     const sourceEnd = Math.min(annotation.end, segment.sourceEnd);
     if (sourceEnd <= sourceStart) continue;

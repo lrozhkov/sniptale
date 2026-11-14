@@ -252,7 +252,14 @@ export function ReviewCursorMotionTrack({
         }}
       >
         {editor.motions.map((m) => (
-          <CursorMotionPill key={m.id} motion={m} editor={editor} busy={busy} compact={compact} />
+          <CursorMotionPill
+            key={m.id}
+            motion={m}
+            editor={editor}
+            busy={busy}
+            compact={compact}
+            projection={projection}
+          />
         ))}
         <ReviewTrackCuts projection={projection} />
       </div>
@@ -264,8 +271,10 @@ function CursorMotionPill({
   editor,
   busy,
   compact,
+  projection,
 }: {
   motion: CursorMotion;
+  projection: ReviewTrackProjection;
   editor: ReviewCursorMotionEditor;
   busy: boolean;
   compact: boolean;
@@ -304,6 +313,12 @@ function CursorMotionPill({
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
+  const pointPosition = (at: number) => {
+    const start = projection.display.sourceToDisplay(m.start);
+    const end = projection.display.sourceToDisplay(m.end, 'end');
+    const time = projection.display.sourceToDisplay(m.start + at * (m.end - m.start));
+    return ((time - start) / Math.max(0.001, end - start)) * 100;
+  };
   return (
     <div
       role="button"
@@ -323,8 +338,8 @@ function CursorMotionPill({
       style={{
         top: reviewTrackMetrics(compact).inset,
         height: reviewTrackMetrics(compact).body,
-        left: `${(range.start / editor.duration) * 100}%`,
-        width: `${((range.end - range.start) / editor.duration) * 100}%`,
+        left: `${projection.focus.position(range.start) * 100}%`,
+        width: `${(projection.focus.position(range.end, 'end') - projection.focus.position(range.start)) * 100}%`,
       }}
       onClick={() => editor.choose(m.id)}
       onKeyDown={(e) => {
@@ -335,7 +350,11 @@ function CursorMotionPill({
         const d = drag.current;
         if (!d) return;
         e.stopPropagation();
-        const delta = ((e.clientX - d.x) / d.width) * editor.duration;
+        const delta = projection.focus.delta(
+          d.point ? m.start + (d.at ?? 0) * (m.end - m.start) : d.edge === 'end' ? d.end : d.start,
+          e.clientX - d.x,
+          d.width
+        );
         if (d.point) {
           const index = m.points.findIndex((p) => p.id === d.point);
           if (index <= 0 || index >= m.points.length - 1) return;
@@ -415,7 +434,9 @@ function CursorMotionPill({
               )}
               className="absolute top-1/2 z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border
                 border-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-surface-panel)]"
-              style={{ left: `${p.at * 100}%` }}
+              style={{
+                left: `${pointPosition(p.at)}%`,
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 editor.pickPoint(p.id, m.start + p.at * (m.end - m.start));

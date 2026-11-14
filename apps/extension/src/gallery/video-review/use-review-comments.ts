@@ -10,6 +10,7 @@ export function useReviewCommentActions(args: {
   time: number;
   playbackRange: ReviewPlaybackRange | null;
   video: RefObject<HTMLVideoElement | null>;
+  pause?: (() => void) | undefined;
   seek(value: number, snap?: boolean): void;
   setSelection(value: ReviewAnchor): void;
   setSelected(value: ReviewAnnotation | null): void;
@@ -20,7 +21,7 @@ export function useReviewCommentActions(args: {
 }) {
   const select = (annotation: ReviewAnnotation) => {
     args.setCutting(false);
-    args.video.current?.pause();
+    (args.pause ?? (() => args.video.current?.pause()))();
     args.setSelected(annotation);
     args.seek(
       annotation.anchor.kind === 'point' ? annotation.anchor.time : annotation.anchor.start,
@@ -31,7 +32,7 @@ export function useReviewCommentActions(args: {
   const add = (marker?: ReviewTelemetryMarker) => {
     if (args.busy || args.exporterPhase !== 'idle' || !args.canStart()) return;
     args.setCutting(false);
-    args.video.current?.pause();
+    (args.pause ?? (() => args.video.current?.pause()))();
     // Admission can finish a draft first; this render retains the requested source-time anchor.
     const anchor: ReviewAnchor = marker
       ? { kind: 'point', time: marker.start }

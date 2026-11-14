@@ -57,7 +57,7 @@ export function anchorReviewVoiceover(
   const tempo = clip.tempo ?? 1;
   const anchors: QuickEditVoiceoverAnchor[] = [];
   for (const segment of map) {
-    if (segment.kind === 'cut') continue;
+    if (segment.kind === 'cut' || segment.kind === 'freeze') continue;
     const start = Math.max(clip.timelineStart, segment.resultStart);
     const end = Math.min(clip.timelineStart + clip.duration / tempo, segment.resultEnd);
     if (end <= start) continue;
@@ -173,7 +173,7 @@ export function projectReviewVoiceoverAnchors(
   const { sourceAnchor: _anchor, ...recording } = clip;
   const slices = anchors.flatMap((anchor, anchorIndex) =>
     map.flatMap((part) => {
-      if (part.kind === 'cut') return [];
+      if (part.kind === 'cut' || part.kind === 'freeze') return [];
       const start = Math.max(anchor.start, part.sourceStart);
       const end = Math.min(anchor.end, part.sourceEnd);
       if (end <= start) return [];

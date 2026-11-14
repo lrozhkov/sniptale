@@ -234,18 +234,19 @@ export function ReviewTrackCuts({
 }: {
   projection?: import('./track-projection').ReviewTrackProjection | undefined;
 }) {
-  return projection?.cuts.map((cut) => (
-    <div
-      key={cut.sourceStart}
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-y-0 z-10 bg-[var(--sniptale-color-surface-panel)]
-        opacity-80 border-x border-dashed border-[var(--sniptale-color-border-soft)]"
-      style={{
-        left: `${(cut.sourceStart / projection.duration) * 100}%`,
-        width: `${((cut.sourceEnd - cut.sourceStart) / projection.duration) * 100}%`,
-      }}
-    />
-  ));
+  return projection?.cuts.map((cut) => {
+    const left = projection.focus.position(cut.sourceStart);
+    const right = projection.focus.position(cut.sourceEnd, 'end');
+    return (
+      <div
+        key={cut.sourceStart}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 z-10 bg-[var(--sniptale-color-surface-panel)]
+          opacity-80 border-x border-dashed border-[var(--sniptale-color-border-soft)]"
+        style={{ left: `${left * 100}%`, width: `${(right - left) * 100}%` }}
+      />
+    );
+  });
 }
 
 /** Timeline density is a view preference, separate from enabled/editing state. */

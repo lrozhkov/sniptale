@@ -344,10 +344,12 @@ function ReviewAudioClipBlock(props: ReviewAudioClipBlockProps) {
     >
       {props.pieces.map((piece, index) => {
         const left = piece
-          ? piece.sourceStart / (props.projection?.duration ?? props.duration)
+          ? (props.projection?.focus.position(piece.sourceStart) ??
+            piece.sourceStart / props.duration)
           : start;
         const right = piece
-          ? piece.sourceEnd / (props.projection?.duration ?? props.duration)
+          ? (props.projection?.focus.position(piece.sourceEnd, 'end') ??
+            piece.sourceEnd / props.duration)
           : end;
         return (
           <div
@@ -419,9 +421,14 @@ function reviewAudioClipGesture(
         edge: edge === 'start' || edge === 'end' ? edge : 'move',
         x: event.clientX,
         sourceAtPointer:
+          props.projection?.display.displayToSource(
+            ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
+              event.currentTarget.parentElement!.getBoundingClientRect().width) *
+              props.projection.display.duration
+          ) ??
           ((event.clientX - event.currentTarget.parentElement!.getBoundingClientRect().left) /
             event.currentTarget.parentElement!.getBoundingClientRect().width) *
-          (props.projection?.duration ?? props.duration),
+            props.duration,
         width: event.currentTarget.parentElement!.getBoundingClientRect().width,
         moved: false,
         pointerId: event.pointerId,
@@ -583,22 +590,27 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
             lane={lane.key}
             label={translate(lane.label)}
             clips={props.audio[lane.key]}
-            voiceoverSegments={lane.key === 'voiceover' ? props.audio.voiceoverSegments : undefined}
+            voiceoverSegments={props.audio.voiceoverSegments}
             assets={props.assets}
             waveforms={props.waveforms}
             projection={
-              lane.key === 'voiceover' && props.audio.voiceoverSegments
-                ? undefined
+              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
+              props.audio.voiceoverSegments
+                ? props.projection
+                  ? { ...props.projection, ...props.projection.focus }
+                  : undefined
                 : props.projection
             }
             cutsProjection={props.projection}
             snapTimes={
-              lane.key === 'voiceover' && props.audio.voiceoverSegments
+              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
+              props.audio.voiceoverSegments
                 ? props.snapTimes?.map((time) => props.projection?.source(time) ?? time)
                 : props.snapTimes
             }
             duration={
-              lane.key === 'voiceover' && props.audio.voiceoverSegments
+              props.audio[lane.key].some((clip) => clip.sourceAnchor) &&
+              props.audio.voiceoverSegments
                 ? props.audio.voiceoverSegments.at(-1)!.sourceEnd
                 : props.duration
             }
@@ -716,7 +728,8 @@ function useAudioLaneDrop(props: {
               : 0;
           drop(
             file,
-            props.projection?.output(sourceTime) ?? Math.max(0, Math.min(time, props.duration))
+            props.projection?.output(props.projection.display.displayToSource(sourceTime)) ??
+              Math.max(0, Math.min(time, props.duration))
           );
         },
       }

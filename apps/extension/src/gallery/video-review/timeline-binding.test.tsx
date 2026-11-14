@@ -5,7 +5,6 @@ import {
 } from '../../features/video/review/document';
 import { withReviewTrackEnabled } from '../../features/video/review/advanced/track-controls';
 // @vitest-environment jsdom
-import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -21,12 +20,35 @@ import { translate, getCurrentLocale } from '../../platform/i18n';
 import type { EffectBundleCatalogEntry } from '../../features/video/project/effect-bundle/catalog';
 
 const catalogFixture = await vi.hoisted(async (): Promise<EffectBundleCatalogEntry> => {
-  const { readFileSync } = await import('node:fs');
   const { createHash } = await import('node:crypto');
-  const source = readFileSync(
-    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
-    'utf8'
-  );
+  // This suite tests admission and gestures; production Lottie rendering has separate proof.
+  const source = JSON.stringify({
+    format: 'sniptale-animation',
+    version: 1,
+    id: 'sniptale-title',
+    label: { en: 'Title', ru: 'Заголовок' },
+    controls: [{ id: 'title', kind: 'text', defaultValue: 'Fixture title', group: 'content' }],
+    resources: [],
+    bindings: [{ kind: 'text', slot: 'title', control: 'title' }],
+    animation: {
+      v: '5.12.2',
+      w: 640,
+      h: 360,
+      fr: 30,
+      ip: 0,
+      op: 90,
+      ddd: 0,
+      assets: [],
+      layers: [],
+      slots: {
+        title: { p: { a: 0, k: [{ t: 0, s: { t: 'Fixture title', f: 'Golos', s: 28 } }] } },
+      },
+    },
+  });
+  const { parseAnimationTemplateSource } =
+    await import('@sniptale/runtime-contracts/animation-template');
+  const accepted = parseAnimationTemplateSource(source);
+  if (!accepted.ok) throw new Error(JSON.stringify(accepted.diagnostics));
   const hash = createHash('sha256').update(source).digest('hex');
   return {
     packId: 'catalog',
@@ -92,10 +114,8 @@ vi.mock('../../workflows/video-review/media-index', async (original) => ({
 }));
 
 function resource(id: string, zoom = false, legacyActionsDisabled = false): LoadedReview {
-  const source = readFileSync(
-    'apps/extension/public/video-effects/animations/title.sniptale-animation.json',
-    'utf8'
-  );
+  const source = catalogFixture.documents[0]!.source;
+  if (typeof source !== 'string') throw new Error('Missing retained fixture source.');
   const hash = createHash('sha256').update(source).digest('hex');
   const snapshotId = `effect:${hash}`;
   const instance: ReviewAnnotationEffect = {

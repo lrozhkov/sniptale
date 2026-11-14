@@ -840,3 +840,142 @@ it('does not rebuild animation membership on playhead ticks and refreshes change
   });
   expect(host.querySelector('[data-animated="true"]')).toBeNull();
 });
+
+it('keeps source selection and comment identities while inserted time expands the visible lane', () => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 1,
+    end: 1,
+    requestedStart: 1,
+    requestedEnd: 1,
+    duration: 2,
+    frameTime: 0.98,
+    frameDuration: 0.04,
+  };
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: 2.5,
+    end: 3,
+    requestedStart: 2.5,
+    requestedEnd: 3,
+  };
+  const note = { id: 'note', text: 'After hold', anchor: { kind: 'point' as const, time: 3.5 } };
+  const onSeekResult = vi.fn();
+  const { host, props } = renderTimeline({
+    edits: [freeze, cut],
+    annotations: [note],
+    onSeekResult,
+    resultTime: 2,
+    playbackRange: { start: 0.5, end: 3.5 },
+    boundaries: [0, 1, 4],
+    snapTimes: [3],
+    zoomAnchor: 3,
+  });
+  const block = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.freezeBlock"]'
+  )!;
+  expect(block).not.toBeNull();
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(100 / 3);
+  act(() => block.querySelector<HTMLButtonElement>('button')!.click());
+  expect(onSeekResult).toHaveBeenCalledWith(1);
+  act(() => host.querySelector<HTMLButtonElement>('[title="After hold"]')!.click());
+  expect(props.onComment).toHaveBeenCalledWith(note);
+  const plane = planeWithMetrics(host);
+  dispatchPlane(plane, [{ type: 'pointerdown', x: 300 }]);
+  expect(props.onSeek).toHaveBeenCalledWith(2.5, undefined);
+  expect(props.onSelect).toHaveBeenCalledWith({ kind: 'point', time: 2.5 });
+  dispatchPlane(plane, [{ type: 'pointerup', x: 300 }]);
+  dispatchPlane(plane, [{ type: 'pointerdown', x: 100 }]);
+  expect(onSeekResult).toHaveBeenLastCalledWith(1.5);
+});
+
+it('keeps speed selection enabled after a freeze without activating another lane tool', async () => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 1,
+    end: 1,
+    requestedStart: 1,
+    requestedEnd: 1,
+    duration: 2,
+    frameTime: 0.98,
+    frameDuration: 0.04,
+  };
+  const speed = {
+    id: 'speed',
+    kind: 'speed' as const,
+    start: 2,
+    end: 3,
+    requestedStart: 2,
+    requestedEnd: 3,
+    rate: 2 as const,
+    audio: 'mute' as const,
+  };
+  const onEdit = vi.fn();
+  const onChangeEdit = vi.fn();
+  const { host } = renderTimeline({ edits: [freeze, speed], onEdit, onChangeEdit });
+  const button = host.querySelector<HTMLButtonElement>(
+    '[data-review-removal-key="edit:speed"] button'
+  )!;
+  expect(button.disabled).toBe(false);
+  act(() => button.click());
+  expect(onEdit).toHaveBeenCalledWith(speed);
+  const block = button.parentElement!;
+  vi.spyOn(block.parentElement!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 600, 48)
+  );
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  for (const [type, x] of [
+    ['pointerdown', 450],
+    ['pointermove', 350],
+    ['pointerup', 350],
+  ] as const) {
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    await act(async () => block.dispatchEvent(event));
+  }
+  expect(onChangeEdit).toHaveBeenCalledExactlyOnceWith(speed, { kind: 'range', start: 1, end: 2 });
+});
+
+it('resizes a freeze duration through the shared end handle without moving its source frame', async () => {
+  const freeze = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 1,
+    end: 1,
+    requestedStart: 1,
+    requestedEnd: 1,
+    duration: 2,
+    frameTime: 0.98,
+    frameDuration: 0.04,
+  };
+  const onFreezeDurationChange = vi.fn(async () => {});
+  const { host } = renderTimeline({ edits: [freeze], onFreezeDurationChange });
+  const block = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.freezeBlock"]')!;
+  vi.spyOn(block.parentElement!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 600, 48)
+  );
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  const handle = block.querySelector<HTMLButtonElement>('[data-edge="end"]')!;
+  for (const [type, x] of [
+    ['pointerdown', 300],
+    ['pointermove', 400],
+    ['pointerup', 400],
+  ] as const) {
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    await act(async () => (type === 'pointerdown' ? handle : block).dispatchEvent(event));
+  }
+  expect(onFreezeDurationChange).toHaveBeenCalledExactlyOnceWith(freeze, 3);
+  expect(freeze).toMatchObject({ start: 1, end: 1, frameTime: 0.98, duration: 2 });
+});

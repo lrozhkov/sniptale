@@ -1028,6 +1028,18 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
     ],
     diagnostic: 'Spatial focus project stores are unavailable.',
   }),
+  contractOnlyMigration({
+    domainVersions: [{ domainId: 'mediaLibrary', from: 36, to: 37 }],
+    fromDatabaseVersion: 58,
+    toDatabaseVersion: 59,
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_HISTORY_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    validationStores: [
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_HISTORY_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
+    ],
+    diagnostic: 'Freeze frame project stores are unavailable.',
+  }),
 ];
 
 function projectPrototypeAnimationPreferences(value: unknown) {

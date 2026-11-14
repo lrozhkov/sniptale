@@ -19,10 +19,11 @@ export function projectSourceVoiceoverPlacement(
   if (take.dormant || !take.sourceAnchor?.length || !reference.length) return [];
   const rate = normalizeClipPlaybackRate(placement.playbackRate ?? 1);
   const offset = placement.playbackWindow?.offset ?? 0;
-  const start = placement.sourceStart + offset * rate;
+  const holdAt = placement.playbackWindow?.holdAt ?? Infinity;
+  const start = placement.sourceStart + Math.min(offset, holdAt) * rate;
   const end =
     placement.sourceStart +
-    Math.min(placement.sourceDuration, (offset + placement.duration) * rate);
+    Math.min(placement.sourceDuration, Math.min(offset + placement.duration, holdAt) * rate);
   if (end <= start) return [];
   const normalized = retimeReviewVoiceover(take, occurrenceClock(reference, start, end, rate));
   return projectReviewVoiceoverAnchors(take, normalized.sourceAnchor ?? [], [

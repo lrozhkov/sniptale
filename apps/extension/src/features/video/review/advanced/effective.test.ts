@@ -927,3 +927,34 @@ it('prepares cursor observations for independent 3D while zoom following remains
   };
   expect(evaluateQuickEditCameraAtTime([zero], 2).spatial).toBeUndefined();
 });
+
+it('requires frame rendering for a freeze even when insertion is a packet-copy boundary', () => {
+  const advanced = createQuickEditAdvancedState();
+  const document = {
+    canvasComments: [],
+    edits: [
+      {
+        id: 'hold',
+        kind: 'freeze' as const,
+        start: 2,
+        end: 2,
+        requestedStart: 2,
+        requestedEnd: 2,
+        duration: 2,
+        frameTime: 2,
+        frameDuration: 0.04,
+      },
+    ],
+  };
+  const args = { advanced, document, videoCopyBoundaries: [0, 2, 4] };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'copy',
+    reasons: ['freeze-frame'],
+  });
+  expect(resolveQuickEditExportPlan({ ...args, videoRenderAvailable: false })).toMatchObject({
+    kind: 'unavailable',
+    reasons: ['video-encoder'],
+  });
+});

@@ -85,8 +85,37 @@ function boundedRange(
 }
 
 /** Source-clock plates; overlap rows are disposable and never change compositing order. */
-export function ReviewAnnotationEffectsTrack(props: TrackProps) {
-  const snapTimelineTime = useReviewTimelineSnap();
+export function ReviewAnnotationEffectsTrack(incoming: TrackProps) {
+  const display = incoming.projection?.display;
+  const props: TrackProps = display
+    ? {
+        ...incoming,
+        duration: display.duration,
+        time: display.sourceToDisplay(incoming.time),
+        instances: incoming.instances.map((item) => ({
+          ...item,
+          start: display.sourceToDisplay(item.start),
+          end: display.sourceToDisplay(item.end, 'end'),
+        })),
+        snapTimes: incoming.snapTimes.map((time) => display.sourceToDisplay(time)),
+        onPreview: (range) =>
+          incoming.onPreview({
+            start: display.displayToSource(range.start),
+            end: display.displayToSource(range.end),
+          }),
+        onPlace: (range, anchor) =>
+          incoming.onPlace?.(
+            {
+              start: display.displayToSource(range.start),
+              ...(range.end === undefined ? {} : { end: display.displayToSource(range.end) }),
+            },
+            anchor
+          ),
+      }
+    : incoming;
+  const snapTimelineTime = useReviewTimelineSnap(
+    display ? { output: display.sourceToDisplay, fromDisplay: (time) => time } : undefined
+  );
   const locale = useAppLocale();
   const drag = useRef<Drag | null>(null);
   const latest = useRef(props);
@@ -211,6 +240,7 @@ export function ReviewAnnotationEffectsTrack(props: TrackProps) {
     >
       <div
         data-ui="gallery.videoReview.annotationEffectsLane"
+        data-review-snap-domain="display"
         tabIndex={props.drawing && !props.busy ? 0 : undefined}
         aria-label={
           props.drawing ? translate('gallery.videoReview.annotationEffectsDraw') : undefined

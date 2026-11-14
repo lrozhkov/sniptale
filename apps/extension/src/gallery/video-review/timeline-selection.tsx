@@ -3,8 +3,8 @@ import { useReviewResizeBoundary } from './timeline-resize-guide';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
-import { useRef, useState } from 'react';
-import { Film, Scissors, Gauge } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import { Film, Scissors, Gauge, Snowflake } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import { reviewTimeLabel } from './controls';
@@ -19,6 +19,8 @@ type SelectionProps = {
   rangeEnabled?: boolean;
   drawingRange?: Extract<ReviewAnchor, { kind: 'range' }> | null | undefined;
   drawingKind?: 'cut' | 'speed' | undefined;
+  sourceInsertions?: ReactNode;
+  snapClock?: { output(time: number): number; fromDisplay?(time: number): number } | undefined;
   duration: number;
   time: number;
   selection: ReviewAnchor;
@@ -77,6 +79,7 @@ export function ReviewSourceLane(props: SelectionProps) {
         {props.edits?.map((edit) => (
           <ReviewEditBlock key={edit.id} {...props} onSnap={setGuide} edit={edit} />
         ))}
+        {props.sourceInsertions}
         <ReviewCommentMarkers {...props} />
       </div>
     </ReviewTrackRow>
@@ -94,11 +97,11 @@ type EditDrag = {
   pointerId: number;
 };
 
-function ReviewEditBlock(
+export function ReviewEditBlock(
   props: SelectionProps & { edit: ReviewEdit; onSnap(guide: number | null): void }
 ) {
   const { edit, duration, onSnap } = props;
-  const snap = useReviewTimelineSnap();
+  const snap = useReviewTimelineSnap(props.snapClock);
   const [preview, setPreview] = useState<{ start: number; end: number } | null>(null);
   const [dragEdge, setDragEdge] = useState<'start' | 'end' | 'move' | null>(null);
   const drag = useRef<EditDrag | null>(null);
@@ -128,13 +131,20 @@ function ReviewEditBlock(
   const selected = props.selectedEditId === edit.id;
   return (
     <div
-      data-ui="gallery.videoReview.editBlock"
+      data-ui={
+        edit.kind === 'freeze' ? 'gallery.videoReview.freezeBlock' : 'gallery.videoReview.editBlock'
+      }
       data-review-removal-key={`edit:${edit.id}`}
+      data-review-snap-domain="display"
       data-review-snap-start={edit.start}
       data-review-snap-end={edit.end}
       data-cut-suppressed={covered.length ? 'true' : 'false'}
       title={caption}
-      className={`absolute rounded border text-xs ${position} ${reviewTimelineItemTone(selected, edit.kind)}`}
+      className={[
+        'absolute rounded border text-xs',
+        position,
+        reviewTimelineItemTone(selected, edit.kind === 'freeze' ? 'neutral' : edit.kind),
+      ].join(' ')}
       data-drag-edge={dragEdge ?? undefined}
       style={{
         left: percent(range.start, duration),
@@ -149,6 +159,10 @@ function ReviewEditBlock(
           target instanceof Element
             ? target.closest('[data-edge]')?.getAttribute('data-edge')
             : null;
+        if (edit.kind === 'freeze' && edge !== 'end') {
+          (props.beforeAction ?? ((action) => action()))(() => props.onEdit?.(edit));
+          return;
+        }
         setDragEdge(edge === 'start' || edge === 'end' ? edge : 'move');
         drag.current = {
           admission: deferReviewGesture(props.beforeAction, () => props.onEdit?.(edit)),
@@ -216,31 +230,42 @@ function ReviewEditBlock(
         aria-label={caption}
         disabled={props.rangeEnabled === false}
         aria-pressed={selected}
-        className="absolute inset-0 flex cursor-grab items-center justify-center gap-1
-            overflow-hidden px-3 active:cursor-grabbing disabled:cursor-default"
+        className={`absolute inset-0 flex cursor-grab items-center justify-center gap-1
+            overflow-hidden active:cursor-grabbing disabled:cursor-default
+            ${edit.kind === 'freeze' ? 'px-0' : 'px-3'}`}
         onClick={(event) => {
           if (event.detail === 0)
             (props.beforeAction ?? ((action) => action()))(() => props.onEdit?.(edit));
         }}
       >
         <ReviewTimelineLabel
-          icon={edit.kind === 'cut' ? <Scissors size={12} /> : <Gauge size={12} />}
+          icon={
+            edit.kind === 'freeze' ? (
+              <Snowflake size={12} />
+            ) : edit.kind === 'cut' ? (
+              <Scissors size={12} />
+            ) : (
+              <Gauge size={12} />
+            )
+          }
           name={name}
           value={value}
         />
       </button>
       <ReviewSpeedCutMasks edit={edit} cuts={covered} />
-      {(['start', 'end'] as const).map((edge) => (
-        <ReviewEditEdge
-          key={edge}
-          edge={edge}
-          disabled={props.rangeEnabled === false}
-          duration={duration}
-          edit={edit}
-          boundaries={props.boundaries}
-          onChangeEdit={props.onChangeEdit}
-        />
-      ))}
+      {(['start', 'end'] as const)
+        .filter((edge) => edit.kind !== 'freeze' || edge === 'end')
+        .map((edge) => (
+          <ReviewEditEdge
+            key={edge}
+            edge={edge}
+            disabled={props.rangeEnabled === false}
+            duration={duration}
+            edit={edit}
+            boundaries={props.boundaries}
+            onChangeEdit={props.onChangeEdit}
+          />
+        ))}
     </div>
   );
 }
@@ -256,7 +281,7 @@ function hasReviewEditOverlap(edit: ReviewEdit, edits: readonly ReviewEdit[] | u
 /** Source-lane cut/speed geometry keeps both edit kinds selectable during an overlap. */
 function reviewEditPresentation(edit: ReviewEdit, edits: readonly ReviewEdit[] | undefined) {
   const { name, value, label } = reviewEditCaption(edit);
-  const overlap = hasReviewEditOverlap(edit, edits);
+  const overlap = edit.kind !== 'freeze' && hasReviewEditOverlap(edit, edits);
   const covered =
     edit.kind === 'speed'
       ? (edits?.filter(
@@ -301,7 +326,11 @@ function ReviewSpeedCutMasks(props: { edit: ReviewEdit; cuts: readonly ReviewEdi
 /** One complete caption feeds the tooltip, accessible label and responsive visible parts. */
 function reviewEditCaption(edit: ReviewEdit) {
   const name = translate(
-    edit.kind === 'cut' ? 'gallery.videoReview.cutLabel' : 'gallery.videoReview.speedMode'
+    edit.kind === 'freeze'
+      ? 'gallery.videoReview.freezeFrame'
+      : edit.kind === 'cut'
+        ? 'gallery.videoReview.cutLabel'
+        : 'gallery.videoReview.speedMode'
   );
   const value =
     edit.kind === 'speed' ? `${edit.rate < 0.25 ? `1/${1 / edit.rate}` : edit.rate}×` : undefined;
@@ -337,7 +366,7 @@ function ReviewEditEdge(props: {
           ? Math.max(
               0,
               Math.min(
-                props.duration,
+                props.edit.kind === 'freeze' ? props.edit.start + 600 : props.duration,
                 props.edit[props.edge] + (event.key === 'ArrowRight' ? step : -step)
               )
             )

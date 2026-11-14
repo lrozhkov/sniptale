@@ -143,6 +143,7 @@ function audioInput(args: Args, prepared: Preparation, renderer: Renderer): Pres
       track: renderer.audioTracks.main,
       segments: prepared.segments,
       isOriginalMuted: (segment) =>
+        segment.kind === 'freeze' ||
         args.edits.some(
           (edit) =>
             edit.kind === 'speed' &&

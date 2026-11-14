@@ -491,7 +491,8 @@ function parseAudioState(value: unknown, allowOriginalSpeech: boolean): QuickEdi
   if (
     segments === null ||
     (voiceover.some((clip) => clip.sourceAnchor) && !segments) ||
-    music.some((clip) => clip.sourceAnchor || clip.tempo !== undefined)
+    (music.some((clip) => clip.sourceAnchor) && !segments) ||
+    music.some((clip) => clip.tempo !== undefined)
   )
     return null;
   const timing = {
@@ -530,6 +531,15 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
 }
 
 function parseAdvancedContentFields(raw: Record<string, unknown>): QuickEditAdvancedContent | null {
+  if (
+    isRecord(raw['audio']) &&
+    Array.isArray(raw['audio']['music']) &&
+    raw['audio']['music'].some(
+      (clip: unknown) => isRecord(clip) && clip['sourceAnchor'] !== undefined
+    ) &&
+    !supportsAdvancedSchema(raw['schemaVersion'], 34)
+  )
+    return null;
   const sourceFilters =
     raw['sourceFilters'] === undefined
       ? undefined
@@ -765,7 +775,7 @@ function supportsAdvancedSchema(version: unknown, firstHistorical: number): bool
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
     [
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
-      27, 28, 29, 30, 31, 32,
+      27, 28, 29, 30, 31, 32, 33,
     ].some((known) => known >= firstHistorical && version === known)
   );
 }

@@ -177,7 +177,10 @@ export function resolveQuickEditEffectiveState(
         ...clip,
         volume: clip.volume * (state.audio.laneVolumes?.voiceover ?? 1),
       })),
-    music: (features.musicApplied ? state.audio.music : [])
+    music: projectReviewVoiceover(
+      features.musicApplied ? state.audio.music : [],
+      state.audio.voiceoverSegments
+    )
       .filter((clip) => !clip.dormant)
       .filter((clip) => {
         const last = state.audio.voiceoverSegments?.at(-1);
@@ -376,6 +379,7 @@ export type QuickEditExportReason =
   | 'presentation'
   | 'canvas-size'
   | 'precise-edits'
+  | 'freeze-frame'
   | 'cut-transition'
   | 'transition-frames'
   | 'zoom'
@@ -426,6 +430,16 @@ export function resolveQuickEditExportPlan(args: {
   const transitions = args.document.edits.some((edit) => edit.kind === 'cut' && edit.transition);
   const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (transitions) visual.push('cut-transition');
+  if (
+    args.document.edits.some(
+      (edit) =>
+        edit.kind === 'freeze' &&
+        !args.document.edits.some(
+          (cut) => cut.kind === 'cut' && cut.start <= edit.start && edit.start < cut.end
+        )
+    )
+  )
+    visual.push('freeze-frame');
   const features = resolveQuickEditEffectiveFeatures(args.advanced);
   const effective = resolveQuickEditEffectiveState(args.advanced);
   const audio: QuickEditExportReason[] = [];

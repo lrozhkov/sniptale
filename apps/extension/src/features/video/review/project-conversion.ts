@@ -393,7 +393,11 @@ export function planReviewProjectConversion(args: {
                               ? 27
                               : 26;
   const sceneVersion = minimumConvertedSceneSchemaVersion(scene);
-  const minimumVersion = sceneVersion > contentVersion ? sceneVersion : contentVersion;
+  const compositionVersion = sceneVersion > contentVersion ? sceneVersion : contentVersion;
+  const minimumVersion =
+    timeline.videoClips.some((clip) => clip.playbackWindow) && compositionVersion < 43
+      ? 43
+      : compositionVersion;
   let project: VideoProject = {
     ...structuredClone(args.seed),
     version: args.seed.version > minimumVersion ? args.seed.version : minimumVersion,

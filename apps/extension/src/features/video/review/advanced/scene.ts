@@ -666,9 +666,15 @@ export function sampleQuickEditFocusAtTime(
       return { from: region, to: next, progress, phase: 'link' };
     }
     if (timelineTime < region.start || timelineTime >= region.end) continue;
-    const scaled = fitQuickEditZoomTransitions(region, region.end - region.start);
-    const entering = linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter');
-    const exiting = linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit');
+    const clock = region.phaseClock;
+    const scaled = clock
+      ? { ...region, start: 0, end: clock.duration, enter: clock.enter, exit: clock.exit }
+      : fitQuickEditZoomTransitions(region, region.end - region.start);
+    const phaseTime = clock
+      ? clock.offset + (timelineTime - region.start) * clock.rate
+      : timelineTime;
+    const entering = linkedPrevious ? 1 : cameraProgress(scaled, phaseTime, 'enter');
+    const exiting = linkedNext ? 1 : cameraProgress(scaled, phaseTime, 'exit');
     return {
       from: null,
       to: region,

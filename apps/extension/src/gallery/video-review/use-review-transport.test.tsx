@@ -15,6 +15,7 @@ const bridge = vi.hoisted(() => ({
   video: { current: null as HTMLVideoElement | null },
   options: undefined as Parameters<typeof useReviewPlayback>[0] | undefined,
   play: vi.fn(),
+  pause: vi.fn(),
   preparePlayback: vi.fn(async () => true),
   startPlayback: vi.fn(),
   stopPlayback: vi.fn(),
@@ -22,7 +23,14 @@ const bridge = vi.hoisted(() => ({
 vi.mock('./use-playback', () => ({
   useReviewPlayback(options: Parameters<typeof useReviewPlayback>[0]) {
     bridge.options = options;
-    return { video: bridge.video, time: 0, playing: false, seekRevision: 0, play: bridge.play };
+    return {
+      video: bridge.video,
+      time: 0,
+      playing: false,
+      seekRevision: 0,
+      play: bridge.play,
+      pause: bridge.pause,
+    };
   },
 }));
 vi.mock('./use-review-audio-runtime', () => ({
@@ -45,6 +53,7 @@ function mount(
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   bridge.preparePlayback.mockResolvedValue(true);
   bridge.video.current = document.createElement('video');
+  bridge.pause.mockImplementation(() => bridge.video.current?.pause());
   const snapshot = { workspace: structuredClone(workspace), draft: null };
   const session = createVideoReviewSession(snapshot);
   const root = createRoot(document.createElement('div'));
@@ -172,4 +181,15 @@ it('passes authored timing and independent lane gates to the owned archive sound
   } finally {
     create.mockRestore();
   }
+});
+
+it('stops the logical project clock when audio fails while native video is already held', () => {
+  const mounted = mount();
+  const nativePause = vi.spyOn(bridge.video.current!, 'pause').mockImplementation(() => {});
+  expect(bridge.video.current!.paused).toBe(true);
+  bridge.options!.onFailure();
+  expect(bridge.stopPlayback).toHaveBeenCalledOnce();
+  expect(bridge.pause).toHaveBeenCalledOnce();
+  expect(nativePause).toHaveBeenCalledOnce();
+  expect(mounted.failure).toHaveBeenCalledOnce();
 });

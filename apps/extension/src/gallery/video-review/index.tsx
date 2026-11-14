@@ -325,6 +325,7 @@ function ReviewEditor({
                 {...reviewTimelineTextCommands(state)}
                 {...reviewTimelineInspectorCommands({
                   video: state.video,
+                  pause: state.pause,
                   select: state.setActiveSelection,
                   navigation,
                   selectedTextId: state.text.selectedId,
@@ -425,6 +426,10 @@ function ReviewEditor({
                 cursorFocusKeys={state.cursorFocusKeys}
                 {...historyCommands}
                 onComment={state.selectComment}
+                onSeekResult={(time) => {
+                  state.seekResult(time);
+                  liveSeek.commit(state.video.current?.currentTime ?? state.time);
+                }}
                 onSeek={(time, snap) => {
                   state.seek(time, snap);
                   liveSeek.commit(state.video.current?.currentTime ?? time);

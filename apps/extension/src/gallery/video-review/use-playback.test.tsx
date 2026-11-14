@@ -864,3 +864,110 @@ it('keeps urgent seek and pause ahead of a pending presented-time transition', (
     test.dispose();
   }
 });
+
+it('holds the original sample while project time plays, pauses, resumes and is removed', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let now = 0,
+    paused = true,
+    sequence = 0;
+  const callbacks = new Map<number, FrameRequestCallback>();
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    callbacks.set(++sequence, callback);
+    return sequence;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => callbacks.delete(id));
+  vi.spyOn(HTMLMediaElement.prototype, 'paused', 'get').mockImplementation(() => paused);
+  vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(3);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (
+    this: HTMLMediaElement
+  ) {
+    paused = true;
+    this.dispatchEvent(new Event('pause'));
+  });
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(async function (
+    this: HTMLMediaElement
+  ) {
+    paused = false;
+    this.dispatchEvent(new Event('play'));
+  });
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewPlayback>;
+  const hold = {
+    id: 'hold',
+    kind: 'freeze' as const,
+    start: 4,
+    end: 4,
+    requestedStart: 4,
+    requestedEnd: 4,
+    duration: 2,
+    frameTime: 3.98,
+    frameDuration: 0.04,
+  };
+  let edits = [hold];
+  function Harness() {
+    hook = useReviewPlayback({
+      duration: 12,
+      edits,
+      boundaries: () => undefined,
+      onSeek() {},
+      onFailure() {},
+      original: { muted: false, volume: 1 },
+    });
+    return (
+      <video
+        ref={hook.video}
+        onPlay={() => hook.setPlaying(true)}
+        onPause={() => hook.setPlaying(false)}
+      />
+    );
+  }
+  const tick = (time: number) =>
+    act(() => {
+      now = time;
+      const batch = [...callbacks.values()];
+      callbacks.clear();
+      batch.forEach((callback) => callback(time));
+    });
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.seek(3.9, false));
+    await act(async () => hook.play());
+    hook.video.current!.currentTime = 4.01;
+    tick(100);
+    tick(200);
+    tick(800);
+    expect(hook.playing).toBe(true);
+    expect(paused).toBe(true);
+    expect(hook.video.current!.currentTime).toBe(3.98);
+    expect(hook.readResultTime()).toBeCloseTo(4.6);
+    act(() => hook.pause());
+    tick(1200);
+    expect(hook.readResultTime()).toBeCloseTo(4.6);
+    await act(async () => hook.play());
+    tick(1200);
+    tick(2800);
+    expect(hook.readResultTime()).toBeNull();
+    expect(paused).toBe(false);
+    act(() => hook.pause());
+    act(() => hook.setPlaybackRange({ start: 4, end: 7 }));
+    await act(async () => hook.play());
+    tick(2900);
+    tick(3000);
+    tick(3200);
+    expect(hook.readResultTime()).toBeCloseTo(4.2);
+    act(() => hook.pause());
+    act(() => hook.seekResult(5));
+    expect(hook.playbackRange).toEqual({ start: 4, end: 7 });
+    expect(hook.readResultTime()).toBe(5);
+    edits = [];
+    act(() => root.render(<Harness />));
+    expect(hook.readResultTime()).toBeNull();
+    expect(hook.playing).toBe(false);
+    expect(hook.video.current!.currentTime).toBe(4);
+  } finally {
+    act(() => root.unmount());
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});

@@ -52,6 +52,10 @@ export function reconcileReviewFocus(args: {
       if (!anchor) return { ...region, dormant: true };
       const visible = next.flatMap((part) => {
         if (part.kind === 'cut') return [];
+        if (part.kind === 'freeze')
+          return anchor.start <= part.sourceStart && part.sourceStart < anchor.end
+            ? [{ start: part.resultStart, end: part.resultEnd }]
+            : [];
         const start = Math.max(anchor.start, part.sourceStart);
         const end = Math.min(anchor.end, part.sourceEnd);
         return end > start
@@ -119,18 +123,32 @@ export function projectReviewFocus(
           },
         ]
   );
+  const inserted = map.some((part) => part.kind === 'freeze');
   const visible = active.map((region) => {
     const anchor = region.sourceAnchor;
     if (!anchor) return [region];
     const spans = projectSourceFocusPhases(
       { sourceStart: anchor.start, sourceEnd: anchor.end, enter: region.enter, exit: region.exit },
       sourceSpans,
-      { splitAtRates: !!region.border || region.effect === '3d' }
+      { splitAtRates: inserted || !!region.border || region.effect === '3d' }
     );
     return spans.map((span, index) => {
       const { linkTo: _linkTo, linkEasing: _linkEasing, ...withoutLink } = region;
       return {
         ...withoutLink,
+        ...(inserted
+          ? {
+              phaseClock: {
+                offset: span.sourceStart - anchor.start,
+                rate: span.rate,
+                duration: anchor.end - anchor.start,
+                enter: active.some((other) => other.linkTo === region.id)
+                  ? { type: 'none' as const, duration: 0 }
+                  : region.enter,
+                exit: region.linkTo ? { type: 'none' as const, duration: 0 } : region.exit,
+              },
+            }
+          : {}),
         ...(region.effect === '3d'
           ? {
               spatialClock: {

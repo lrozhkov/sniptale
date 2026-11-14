@@ -79,6 +79,9 @@ export function planReviewProjectCamera(args: {
       sourceStart: primary.sourceStart,
       sourceDuration: primary.sourceDuration,
       playbackRate: primary.playbackRate ?? 1,
+      ...(primary.playbackWindow
+        ? { playbackWindow: structuredClone(primary.playbackWindow) }
+        : {}),
       groupId,
       linkMode: 'LINKED',
       muted: true,

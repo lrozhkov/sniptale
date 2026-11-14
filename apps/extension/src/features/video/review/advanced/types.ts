@@ -20,7 +20,7 @@ export type { QuickEditVoiceoverAnchor } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 33;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 34;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -107,6 +107,14 @@ export interface QuickEditZoomRegion {
   effect?: '3d';
   /** Derived source clock for a cut/rate slice; storage admission drops this field. */
   spatialClock?: { offset: number; rate: number; duration: number };
+  /** Derived phase clock for inserted time; storage admission drops this field. */
+  phaseClock?: {
+    offset: number;
+    rate: number;
+    duration: number;
+    enter: QuickEditZoomTransition;
+    exit: QuickEditZoomTransition;
+  };
   spatialMotion?: import('../../project/motion/spatial').CameraSpatialMotion;
 
   cameraFollow?: import('../../project/camera/cursor-policy').CameraFollowSettings;

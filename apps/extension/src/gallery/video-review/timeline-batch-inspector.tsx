@@ -68,7 +68,9 @@ export function ReviewTimelineBatchInspector({
     );
   const cloneable =
     complete &&
-    selections.every((item) => canCloneReviewSelection(item, state.advanced, selections));
+    selections.every((item) =>
+      canCloneReviewSelection(item, state.advanced, selections, state.snapshot.document.edits)
+    );
   const mutableAudio = complete && selections.every((item) => item.kind === 'audio');
   const disabled = pending || state.busy || state.editing.exporter.phase !== 'idle';
   const apply = async (operation: 'remove' | 'mute' | 'clone') => {

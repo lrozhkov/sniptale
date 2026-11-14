@@ -1,3 +1,4 @@
+import { useReviewFreezePlayback } from './use-freeze-playback';
 import { createReviewPlaybackPresentationClock } from './playback-presentation-clock';
 import {
   createReviewPlaybackRange,
@@ -30,7 +31,7 @@ interface ReviewPlaybackProps {
 }
 
 /** Owns source-time playback; the persisted original-audio gate and rate live here. */
-export function useReviewPlayback(props: ReviewPlaybackProps) {
+export function useReviewSourcePlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
   const [playheadClock] = useState(() =>
     createReviewPlaybackPresentationClock(
@@ -331,4 +332,9 @@ function usePlaybackFrames(
       node?.removeEventListener('pause', paused);
     };
   }, [playing, video, tick]);
+}
+
+/** One source transport with an explicit clock for inserted hold intervals. */
+export function useReviewPlayback(props: ReviewPlaybackProps) {
+  return useReviewFreezePlayback(useReviewSourcePlayback(props), props.edits, props.duration);
 }

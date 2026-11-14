@@ -1,3 +1,4 @@
+import { betaV59Fixture } from './fixtures/beta-v59';
 import { afterEach, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 import { SUPPORTED_BETA_DATABASE_FIXTURES } from './fixtures';
@@ -822,4 +823,36 @@ it('refuses missing project stores before admitting the audio contract-only migr
     )
   ).toThrow('Audio processing project stores');
   expect(mutate).not.toHaveBeenCalled();
+});
+
+it('adds freeze admission without rewriting or deleting any retained row or source object', async () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find(
+    (fixture) => fixture.databaseVersion === 58
+  )!;
+  const target = betaV59Fixture;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+  expect(target.domainVersions).toEqual({ ...source.domainVersions, mediaLibrary: 37 });
+  const migration = DATABASE_MIGRATIONS.find((step) => step.fromDatabaseVersion === 58)!;
+  expect(migration.toDatabaseVersion).toBe(59);
+  expect(migration.risk).toBe('additive');
+  expect(migration.backupCoverage).toBe('none');
+  expect(await migration.estimateAdditionalBytes()).toBe(64 * 1024);
+  const mutate = vi.fn(() => {
+    throw new Error('Retained data must not be touched');
+  });
+  const database = {
+    objectStoreNames: { contains: (name: string) => source.stores.some((store) => store === name) },
+    createObjectStore: mutate,
+    deleteObjectStore: mutate,
+  };
+  const transaction = { objectStore: mutate, abort: mutate };
+  expect(migration.migrate(database, transaction)).toBeUndefined();
+  await migration.validate(database, transaction);
+  expect(mutate).not.toHaveBeenCalled();
+  expect(buildDatabaseMigrationPlan(59, 58)).toBeNull();
+  const { expectedDigest, ...input } = target;
+  expect(createHash('sha256').update(canonicalize(input)).digest('hex')).toBe(expectedDigest);
 });

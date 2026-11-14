@@ -90,9 +90,22 @@ export function reviewTrackItems(args: {
         start: edit.start,
         end: edit.end,
         label: translate(
-          edit.kind === 'cut' ? 'gallery.videoReview.cutLabel' : 'gallery.videoReview.speedMode'
+          edit.kind === 'freeze'
+            ? 'gallery.videoReview.freezeFrame'
+            : edit.kind === 'cut'
+              ? 'gallery.videoReview.cutLabel'
+              : 'gallery.videoReview.speedMode'
         ),
-        detail: edit.kind === 'speed' ? `${number(edit.rate)}×` : '',
+        detail:
+          edit.kind === 'freeze'
+            ? formatNumber(
+                edit.duration,
+                { style: 'unit', unit: 'second', unitDisplay: 'short', maximumFractionDigits: 2 },
+                args.locale
+              )
+            : edit.kind === 'speed'
+              ? `${number(edit.rate)}×`
+              : '',
         selection: { kind: 'edit' as const, id: edit.id },
         timelineKey: `edit:${edit.id}`,
         removable: true,

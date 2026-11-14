@@ -192,6 +192,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         ) : (
           (props.trackTools ?? reviewTrackToolHint(track, props.trackHasActions))
         )}
+        {track === 'source' ? props.trackTools : null}
         {track === 'annotationEffects' &&
         features.annotationEffectsTrackVisible &&
         props.annotationTool ? (

@@ -1,5 +1,90 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'review-inserted-time-contract',
+    productionFile: 'apps/extension/src/features/video/review/time-segment.ts',
+    reason:
+      'Timeline, lane and export tests cover source/result intervals and held source samples.',
+    testFiles: [
+      'apps/extension/src/features/video/review/timeline.test.ts',
+      'apps/extension/src/features/video/review/document.test.ts',
+      'apps/extension/src/features/video/review/freeze-ripple.test.ts',
+      'apps/extension/src/features/video/review/voiceover-edits.test.ts',
+      'apps/extension/src/features/video/review/project-timeline.test.ts',
+      'apps/extension/src/workflows/video-review/render-schedule.test.ts',
+      'apps/extension/src/workflows/video-review/audio-render.test.ts',
+    ],
+  },
+  {
+    owner: 'review-authored-contract',
+    productionFile: 'apps/extension/src/features/video/review/types.ts',
+    reason:
+      'History, validation, conversion and persistence test authored review operations and time maps.',
+    testFiles: [
+      'apps/extension/src/features/video/review/timeline.test.ts',
+      'apps/extension/src/features/video/review/document.test.ts',
+      'apps/extension/src/features/video/review/freeze-ripple.test.ts',
+      'apps/extension/src/features/video/review/fragment.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.camera.test.ts',
+      'apps/extension/src/features/video/review/project-conversion.voiceover.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+    ],
+  },
+  {
+    owner: 'review-source-audio-anchor-admission',
+    productionFile: 'apps/extension/src/features/video/review/voiceover-validation.ts',
+    reason:
+      'Audio projection and advanced admission tests check retained sample anchors and source maps.',
+    testFiles: [
+      'apps/extension/src/features/video/review/voiceover-edits.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced.test.ts',
+      'apps/extension/src/features/video/review/advanced/advanced-state.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store-voiceover.test.ts',
+    ],
+  },
+  {
+    owner: 'review-comment-navigation',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-comments.ts',
+    reason: 'Mounted comment and selection tests check navigation and pause ownership.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-editing-tool-admission',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-editing.ts',
+    reason:
+      'Mounted editing, source admission and workspace CAS tests check history commands and refused writes.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/use-edits.test.tsx',
+      'apps/extension/src/workflows/video-review/freeze-frame.test.ts',
+      'apps/extension/src/composition/persistence/review-workspaces/store.test.ts',
+    ],
+  },
+  {
+    owner: 'review-result-clock-adapter',
+    productionFile: 'apps/extension/src/gallery/video-review/use-review-time.ts',
+    reason: 'Transport and mounted readouts test source/result clocks and pause or seek updates.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/use-playback.test.tsx',
+      'apps/extension/src/gallery/video-review/timeline-chrome.test.tsx',
+      'apps/extension/src/gallery/video-review/use-review-transport.test.tsx',
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'review-inserted-playback-clock',
+    productionFile: 'apps/extension/src/gallery/video-review/use-freeze-playback.ts',
+    reason:
+      'Controlled playback tests check held source, project time, pause, resume, loops and insertion removal.',
+    testFiles: ['apps/extension/src/gallery/video-review/use-playback.test.tsx'],
+  },
+  {
     owner: 'review-presented-clock',
     productionFile: 'apps/extension/src/gallery/video-review/playback-presentation-clock.ts',
     reason:

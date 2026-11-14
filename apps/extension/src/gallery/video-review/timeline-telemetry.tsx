@@ -201,6 +201,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
   return (
     <div
       data-ui="gallery.videoReview.historyStrip"
+      data-review-snap-domain="display"
       className="relative overflow-hidden"
       style={{ height }}
     >

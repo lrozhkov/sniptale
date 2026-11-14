@@ -53,6 +53,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     run,
     canStart,
     video,
+    pause,
     time,
     seek,
     play,
@@ -80,6 +81,7 @@ export function useReviewEditorState(resource: LoadedReview) {
     beforeAction: core.beforeAction,
     playbackRange: core.playbackRange,
     video,
+    pause,
     seek,
     setTimelineSelection: setSelection,
     setCutting: cuts.setCutting,
@@ -237,7 +239,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     time: timeline.time,
     selection: base.activeSelection,
     select: base.setActiveSelection,
-    pause: () => timeline.video.current?.pause(),
+    pause: timeline.pause,
     seek: (time) => timeline.seek(time, false),
     allowed: () =>
       !base.busy &&
@@ -251,7 +253,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     settings: base.advanced.watermark,
     flushAdvanced: base.advancedState.flush,
     stageSettings: base.advancedState.setWatermark,
-    pause: () => timeline.video.current?.pause(),
+    pause: timeline.pause,
     allowed: () =>
       !base.busy &&
       !presentationPending.current &&
@@ -263,7 +265,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     settings: base.advanced.presentation,
     flushAdvanced: base.advancedState.flush,
     stageSettings: base.advancedState.setPresentation,
-    pause: () => timeline.video.current?.pause(),
+    pause: timeline.pause,
     allowed: () =>
       !base.busy &&
       !webcam.pending &&
@@ -288,7 +290,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     flush: base.advancedState.flush,
     beforeAction: base.beforeAction,
     performAction: base.performAction,
-    pause: () => timeline.video.current?.pause(),
+    pause: timeline.pause,
     select: base.setActiveSelection,
     allowed: () =>
       !base.actionBusy &&
@@ -481,6 +483,8 @@ function useReviewEditorTimeline(
   };
   const {
     video,
+    pause,
+    seekResult,
     time,
     onTime,
     playing,
@@ -536,11 +540,14 @@ function useReviewEditorTimeline(
     activeSelection,
     setActiveSelection,
     sourceDuration: source.duration,
+    sourceTime: time,
+    file: resource.file,
     timelineSelection: selection,
     exporter,
     edits: snapshot.document.edits,
-    pause: () => video.current?.pause(),
+    pause,
     seek,
+    seekResult,
     setTimelineSelection: setSelection,
     onInvalid: () => setMessage(translate('gallery.videoReview.invalidEditRange')),
     session,
@@ -551,6 +558,8 @@ function useReviewEditorTimeline(
   return {
     actionSoundPreview,
     video,
+    pause,
+    seekResult,
     time,
     onTime,
     playbackRange,

@@ -17,6 +17,7 @@ export type ReviewTimelineSnap = (
 ) => { time: number; candidate: number | null };
 type ReviewMagnetTarget = {
   time: number;
+  displayTime?: number;
   y: number;
   priority?: number;
   element?: HTMLElement;
@@ -30,7 +31,7 @@ type Snapshot = {
   bypass: boolean;
   distance?: number | undefined;
 };
-type Clock = { output(time: number): number };
+type Clock = { output(time: number): number; fromDisplay?(time: number): number };
 const Context = createContext<{ current: Snapshot | null } | null>(null);
 
 /** Within one pixel of the closest endpoint, prefer the nearest row, then the upper row. */
@@ -91,7 +92,13 @@ function showTarget(snapshot: Snapshot, target?: ReviewMagnetTarget | null) {
 }
 
 /** Snapshot authored endpoint attributes once per gesture; drag updates do not traverse the scene. */
-export function ReviewTimelineMagnets({ children }: { children: ReactNode }) {
+export function ReviewTimelineMagnets({
+  children,
+  sourceTime,
+}: {
+  children: ReactNode;
+  sourceTime?: ((display: number) => number) | undefined;
+}) {
   const current = useRef<Snapshot | null>(null);
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
@@ -136,10 +143,17 @@ export function ReviewTimelineMagnets({ children }: { children: ReactNode }) {
         node.dataset['reviewSnapEnd'],
       ].entries()) {
         if (value === undefined || !value.trim()) continue;
-        const time = Number(value);
+        const valueTime = Number(value);
+        const time =
+          sourceTime && node.closest('[data-review-snap-domain="display"]')
+            ? sourceTime(valueTime)
+            : valueTime;
         if (Number.isFinite(time) && time >= 0)
           targets.push({
             time,
+            ...(node.closest('[data-review-snap-domain="display"]')
+              ? { displayTime: valueTime }
+              : {}),
             y,
             priority,
             element: node,
@@ -200,7 +214,12 @@ export function useReviewTimelineSnap(clock?: Clock): ReviewTimelineSnap {
       const shared = snapshot.targets
         .map((target) => ({
           ...target,
-          time: clock ? clock.output(target.time) : target.time,
+          time:
+            target.displayTime !== undefined && clock?.fromDisplay
+              ? clock.fromDisplay(target.displayTime)
+              : clock
+                ? clock.output(target.time)
+                : target.time,
         }))
         .filter((target) => !bounds || (target.time >= bounds.start && target.time <= bounds.end));
       const target = snapshot.bypass

@@ -35,6 +35,7 @@
   },
   "common": {
     "units": {
+      "seconds": "с",
       "count": "шт.",
       "hz": "Гц",
       "db": "дБ",
@@ -7428,6 +7429,8 @@
       "saving": "Сохранение…",
       "zoomConnect": "Переход между фокусировками",
       "exportPreciseEdits": "Точный монтаж",
+      "freezeFrame": "Стоп-кадр",
+      "freezeDuration": "Длительность стоп-кадра",
       "exportSection": "Экспорт",
       "exportSettings": "Настройки экспорта",
       "exportCodec": "Кодек",

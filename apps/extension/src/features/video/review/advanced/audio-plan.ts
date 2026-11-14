@@ -79,7 +79,7 @@ export function buildQuickEditOriginalAudioPlan(args: {
 }): QuickEditAudioPlanEntry[] {
   if (!args.original.audioProcessing) return [];
   return args.segments
-    .filter((segment) => segment.kind !== 'cut')
+    .filter((segment) => segment.kind !== 'cut' && segment.kind !== 'freeze')
     .map((segment) => ({
       lane: 'original',
       clipId: `original:${segment.sourceStart}:${segment.sourceEnd}:${segment.rate}`,

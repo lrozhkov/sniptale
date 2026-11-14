@@ -184,6 +184,7 @@ function segmentAudioMuted(
   exportAudio: ReviewExportClipPlan | undefined
 ): boolean {
   return (
+    segment.kind === 'freeze' ||
     !!exportAudio?.originalMuted ||
     edits.some(
       (edit) =>

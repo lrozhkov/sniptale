@@ -41,6 +41,7 @@ export function clampNumber(value: number, min?: number, max?: number): number {
 }
 
 export function resolveCompactUnitLabel(unit: CompactInspectorUnit = ''): string {
+  if (unit === 's') return translate('common.units.seconds');
   if (unit === 'db') return translate('common.units.db');
   if (unit === 'semitones') return translate('common.units.semitones');
   if (unit === 'hz') return translate('common.units.hz');

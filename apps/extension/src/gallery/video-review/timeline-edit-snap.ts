@@ -72,6 +72,11 @@ function freeReviewEditDragRange(args: {
   const { current, edge, duration } = args;
   const delta = (args.deltaPx / args.widthPx) * duration;
   const length = current.end - current.start;
+  if (edge === 'end' && current.kind === 'freeze')
+    return {
+      start: current.start,
+      end: Math.max(current.start + 0.04, Math.min(current.start + 600, current.end + delta)),
+    };
   if (edge === 'end')
     return { start: current.start, end: Math.max(0, Math.min(duration, current.end + delta)) };
   const start = Math.max(

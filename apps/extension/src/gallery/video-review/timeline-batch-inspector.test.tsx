@@ -98,74 +98,93 @@ it('copies edits through accepted history and refuses unavailable or separately 
   }
 });
 
-it('removes a mixed edit selection and unregisters Delete on dismissal or incomplete selection', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  const advanced = createQuickEditAdvancedState();
-  const documentState = {
-    advancedContent: createQuickEditAdvancedContent(),
-    edits: [
-      { id: 'a', kind: 'cut', start: 0, end: 1 },
-      { id: 'b', kind: 'speed', start: 2, end: 3, rate: 2 },
-    ] as ReviewEdit[],
-  };
-  const group = {
-    keys: ['edit:a', 'edit:b'],
-    clear: vi.fn(),
-    captureModified: () => false,
-    deleteAction: { current: null as (() => void) | null },
-  };
-  const commit = vi.fn(async (operation) => {
-    if (operation.target === 'edit')
-      documentState.edits = documentState.edits.filter((edit) => edit.id !== operation.before.id);
-  });
-  const state = {
-    advanced,
-    snapshot: { document: documentState },
-    projected: { markers: [] },
-    cursorFocusKeys: [],
-    busy: false,
-    editing: { exporter: { phase: 'idle' } },
-    canStart: () => true,
-    flushAdvanced: vi.fn(),
-    run: async (action: () => Promise<void>) => action(),
-    session: { getSnapshot: () => ({ document: documentState }), commit },
-    setMessage: vi.fn(),
-  } as unknown as Parameters<typeof ReviewTimelineBatchInspector>[0]['state'];
-  const render = () =>
-    act(() =>
-      root.render(
-        <ReviewTimelineMultiSelectionContext value={group}>
-          <ReviewTimelineBatchInspector state={state} duration={4} />
-        </ReviewTimelineMultiSelectionContext>
-      )
-    );
-  try {
-    render();
-    expect(group.deleteAction.current).not.toBeNull();
-    await act(async () => group.deleteAction.current!());
-    expect(documentState.edits).toEqual([]);
-    expect(group.clear).toHaveBeenCalledOnce();
-    group.keys = ['edit:missing', 'edit:also-missing'];
-    render();
-    expect(group.deleteAction.current).toBeNull();
-    await act(async () =>
-      host
-        .querySelector<HTMLButtonElement>(
-          '[aria-label="gallery.videoReview.timelineSelectionClear"]'
-        )!
-        .click()
-    );
-    expect(group.clear).toHaveBeenCalledTimes(2);
-  } finally {
-    act(() => root.unmount());
-    expect(group.deleteAction.current).toBeNull();
-    host.remove();
-    vi.unstubAllGlobals();
+it.each(['cut', 'freeze'] as const)(
+  'removes a mixed %s selection and unregisters Delete on dismissal or incomplete selection',
+  async (kind) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const advanced = createQuickEditAdvancedState();
+    const documentState = {
+      advancedContent: createQuickEditAdvancedContent(),
+      edits: [
+        kind === 'freeze'
+          ? {
+              id: 'a',
+              kind: 'freeze',
+              start: 0,
+              end: 0,
+              requestedStart: 0,
+              requestedEnd: 0,
+              duration: 2,
+              frameTime: 0,
+              frameDuration: 0.04,
+            }
+          : { id: 'a', kind: 'cut', start: 0, end: 1 },
+        { id: 'b', kind: 'speed', start: 2, end: 3, rate: 2 },
+      ] as ReviewEdit[],
+    };
+    const group = {
+      keys: ['edit:a', 'edit:b'],
+      clear: vi.fn(),
+      captureModified: () => false,
+      deleteAction: { current: null as (() => void) | null },
+    };
+    const commit = vi.fn(async (operation) => {
+      if (operation.target === 'edit')
+        documentState.edits = documentState.edits.filter((edit) => edit.id !== operation.before.id);
+    });
+    const state = {
+      advanced,
+      snapshot: { document: documentState },
+      projected: { markers: [] },
+      cursorFocusKeys: [],
+      busy: false,
+      editing: { exporter: { phase: 'idle' } },
+      canStart: () => true,
+      flushAdvanced: vi.fn(),
+      run: async (action: () => Promise<void>) => action(),
+      session: { getSnapshot: () => ({ document: documentState }), commit },
+      setMessage: vi.fn(),
+    } as unknown as Parameters<typeof ReviewTimelineBatchInspector>[0]['state'];
+    const render = () =>
+      act(() =>
+        root.render(
+          <ReviewTimelineMultiSelectionContext value={group}>
+            <ReviewTimelineBatchInspector state={state} duration={4} />
+          </ReviewTimelineMultiSelectionContext>
+        )
+      );
+    try {
+      render();
+      if (kind === 'freeze')
+        expect(
+          host.querySelector('[aria-label="gallery.videoReview.timelineSelectionClone"]')
+        ).toBeNull();
+      expect(group.deleteAction.current).not.toBeNull();
+      await act(async () => group.deleteAction.current!());
+      expect(documentState.edits).toEqual([]);
+      expect(group.clear).toHaveBeenCalledOnce();
+      group.keys = ['edit:missing', 'edit:also-missing'];
+      render();
+      expect(group.deleteAction.current).toBeNull();
+      await act(async () =>
+        host
+          .querySelector<HTMLButtonElement>(
+            '[aria-label="gallery.videoReview.timelineSelectionClear"]'
+          )!
+          .click()
+      );
+      expect(group.clear).toHaveBeenCalledTimes(2);
+    } finally {
+      act(() => root.unmount());
+      expect(group.deleteAction.current).toBeNull();
+      host.remove();
+      vi.unstubAllGlobals();
+    }
   }
-});
+);
 
 it('copies cursor groups and preserves the accepted document when space is unavailable', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

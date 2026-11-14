@@ -36,7 +36,12 @@ export function ReviewTimelineCloneScope({
     selection.kind !== 'cursor-motion' &&
     selection.kind !== 'zoom' &&
     selection.kind !== 'annotation-effect' &&
-    canCloneReviewSelection(selection, state.advanced, [selection]);
+    canCloneReviewSelection(
+      selection,
+      state.advanced,
+      [selection],
+      state.session.getSnapshot().document.edits
+    );
   const disabled = pending || state.busy || state.editing.exporter.phase !== 'idle';
   const copy = async () => {
     if (!available || disabled || !state.canStart()) return;

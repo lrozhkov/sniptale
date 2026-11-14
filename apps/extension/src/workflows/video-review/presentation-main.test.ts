@@ -972,3 +972,37 @@ it('keeps the common outer fade plan in a sparse hover composition', async () =>
   expect(io.prepare.mock.calls.at(-1)![0]).toMatchObject({ outerFadePlan: planned.plan });
   frame.release();
 });
+
+it('decodes the persisted original frame throughout inserted time, including an EOF hold', async () => {
+  const args = fixture();
+  args.edits = [
+    {
+      id: 'hold',
+      kind: 'freeze',
+      start: 1,
+      end: 1,
+      requestedStart: 1,
+      requestedEnd: 1,
+      duration: 2,
+      frameTime: 0.98,
+      frameDuration: 0.04,
+    },
+    {
+      id: 'eof',
+      kind: 'freeze',
+      start: 3,
+      end: 3,
+      requestedStart: 3,
+      requestedEnd: 3,
+      duration: 2,
+      frameTime: 2.96,
+      frameDuration: 0.04,
+    },
+  ];
+  const owner = await open(args);
+  for (const time of [1, 2, 2.99, 3, 5, 6.99]) {
+    const frame = await owner.renderAtTime(time);
+    frame.release();
+  }
+  expect(io.times).toEqual([0.98, 0.98, 0.98, 1, 2.96, 2.96]);
+});

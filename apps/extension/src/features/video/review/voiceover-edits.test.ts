@@ -502,3 +502,41 @@ it('keeps exact source boundaries when a text-sized take ends one ULP after a Sp
     12
   );
 });
+
+it('inserts silence without losing crossing voiceover samples and restores them on removal', () => {
+  const recording = anchorReviewVoiceover(clip, original);
+  const before = structuredClone(recording);
+  const hold: ReviewEdit = {
+    id: 'hold',
+    kind: 'freeze',
+    start: 4,
+    end: 4,
+    requestedStart: 4,
+    requestedEnd: 4,
+    duration: 2,
+    frameTime: 4,
+    frameDuration: 1 / 30,
+  };
+  const map = buildReviewTimeMap(12, [hold]);
+  expect(parseVoiceoverSegments(map)).toEqual(map);
+  expect(projectReviewVoiceover([recording], map)).toMatchObject([
+    { timelineStart: 3, duration: 1, sourceOffset: 2 },
+    { timelineStart: 6, duration: 3, sourceOffset: 3 },
+  ]);
+  expect(reviewVoiceoverNativeTime(recording, 5, map)).toBeNull();
+  expect(reviewVoiceoverNativeTime(recording, 6, map)).toBe(3);
+  expect(projectReviewVoiceover([recording], original)).toMatchObject([clip]);
+  expect(recording).toEqual(before);
+  for (const change of [
+    { rate: 1 },
+    { sourceEnd: 4.1 },
+    { frameTime: 5 },
+    { frameDuration: 0 },
+    { freezeId: '' },
+    { resultEnd: 4 },
+  ]) {
+    const invalid = structuredClone(map);
+    Object.assign(invalid[1]!, change);
+    expect(parseVoiceoverSegments(invalid)).toBeNull();
+  }
+});

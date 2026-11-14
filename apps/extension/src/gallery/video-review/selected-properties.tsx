@@ -405,6 +405,33 @@ function SelectedEdit(
 ) {
   const { editing, advanced, resource, busy } = props;
   const selected = editing.selected!;
+  if (selected.kind === 'freeze')
+    return (
+      <div className="space-y-3">
+        <ReviewFreezeDuration
+          duration={selected.duration}
+          disabled={busy}
+          onChange={(value) => {
+            void editing.changeSelectedFreezeDuration(value);
+          }}
+        />
+        <ReviewInspectorSections
+          sections={[
+            reviewInspectorActions(
+              <ReviewButton
+                label={translate('gallery.videoReview.deleteSelected')}
+                className={reviewDeleteButtonClassName}
+                disabled={busy}
+                onClick={() => void editing.remove()}
+              >
+                <Trash2 size={15} aria-hidden />
+                <span>{translate('gallery.videoReview.deleteSelected')}</span>
+              </ReviewButton>
+            ),
+          ]}
+        />
+      </div>
+    );
   return (
     <div className="space-y-3">
       <ReviewInterval start={selected.start} end={selected.end} />
@@ -678,9 +705,11 @@ export function reviewSelectionLabel(
     );
   if (selection.kind === 'edit' && state.editing.selected)
     return translate(
-      state.editing.selected.kind === 'cut'
-        ? 'gallery.videoReview.cutLabel'
-        : 'gallery.videoReview.speedMode'
+      state.editing.selected.kind === 'freeze'
+        ? 'gallery.videoReview.freezeFrame'
+        : state.editing.selected.kind === 'cut'
+          ? 'gallery.videoReview.cutLabel'
+          : 'gallery.videoReview.speedMode'
     );
   return undefined;
 }
@@ -829,4 +858,28 @@ function useSelectedCursorAvailability(
     available: inline || (ready && completed.available),
     pending: !inline && !!project && !!interval && !ready,
   };
+}
+
+function ReviewFreezeDuration(props: {
+  duration: number;
+  disabled: boolean;
+  onChange(value: number): void;
+}) {
+  const [value, setValue] = useState(props.duration);
+  useEffect(() => setValue(props.duration), [props.duration]);
+  return (
+    <NumericRow
+      label={translate('gallery.videoReview.freezeDuration')}
+      unit="s"
+      value={value}
+      min={0.04}
+      max={600}
+      step={0.01}
+      precision={3}
+      scrub={{ min: 0.5, max: 30, step: 0.5 }}
+      disabled={props.disabled}
+      onPreviewValue={setValue}
+      onCommitValue={props.onChange}
+    />
+  );
 }

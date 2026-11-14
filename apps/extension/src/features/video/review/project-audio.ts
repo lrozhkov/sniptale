@@ -207,7 +207,7 @@ export function planReviewProjectAudio(args: {
         lane === 'voiceover' ? args.application.voiceoverApplied : args.application.musicApplied,
     });
     for (const [index, clip] of audio[lane].entries()) {
-      const whole = lane === 'voiceover' && (!!clip.sourceAnchor?.length || clip.dormant === true);
+      const whole = !!clip.sourceAnchor?.length || (lane === 'voiceover' && clip.dormant === true);
       const field = whole
         ? undefined
         : ((['sourceAnchor'] as const).find((key) => clip[key] !== undefined) ??
@@ -345,8 +345,9 @@ function convertSourceTake(args: {
         field: 'source-binding',
       },
     };
+  const identity = lane === 'voiceover' ? `${index}` : `${lane}:${index}`;
   const take = structuredClone(clip);
-  take.id = `${args.input.operationId}:take:${index}`;
+  take.id = `${args.input.operationId}:take:${identity}`;
   take.assetId = asset.id;
   const replacementIssue = rebindReplacementAssets({
     replacements: take.transcript?.replacements ?? [],
@@ -375,7 +376,7 @@ function convertSourceTake(args: {
   const originalInstance = target?.kind === 'source' ? target.sourceInstanceId : undefined;
   const admitted = parseVideoProjectSourceVoiceoverDocuments([
     {
-      id: `${args.input.operationId}:source-voiceover:${index}`,
+      id: `${args.input.operationId}:source-voiceover:${identity}`,
       binding: structuredClone(binding),
       trackId: track.id,
       reference: structuredClone(args.audio.voiceoverSegments ?? source.reference),

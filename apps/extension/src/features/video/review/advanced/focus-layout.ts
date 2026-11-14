@@ -17,7 +17,7 @@ export function quickEditFocusType(
 
 /** Authored intervals continue reserving source frames when a cut hides them. */
 function quickEditFocusInterval(region: QuickEditZoomRegion) {
-  return region.spatialClock ? region : (region.sourceAnchor ?? region);
+  return region.spatialClock || region.phaseClock ? region : (region.sourceAnchor ?? region);
 }
 
 /** Resolve compatible neighbors without crossing any active focus interval. */

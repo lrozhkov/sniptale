@@ -35,6 +35,8 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { Snowflake } from 'lucide-react';
+import { ReviewButton, reviewTextButtonClassName } from './controls';
 import { createTrackProjection, type ReviewTrackProjection } from './track-projection';
 import { ReviewTimeline } from './timeline';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
@@ -95,6 +97,8 @@ type TimelineBindingProps = {
   zoomAnchor?: number | null | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   editing: Omit<Editing, 'cutting' | 'exporter'> & {
+    addFreeze?(): void;
+    freezing?: boolean;
     cutting: Editing['cutting'];
     exporter: Exporter;
   };
@@ -142,6 +146,7 @@ type TimelineBindingProps = {
   selectedObject: boolean;
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number, snap?: boolean): void;
+  onSeekResult?(value: number): void;
   onPlay(): void;
   onOpenHistory?(): void;
   onOpenExport(): void;
@@ -180,7 +185,25 @@ function ReviewTimelineToolsBinding(
         onAddNote={props.onAddNote}
         selectedTrack={props.selectedTrack}
         trackHasActions={props.trackHasActions}
-        trackTools={props.trackTools}
+        trackTools={
+          props.selectedTrack === 'source' && props.advanced.ui.mode === 'advanced' ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.freezeFrame')}
+              className={reviewTextButtonClassName}
+              disabled={props.busy || props.editing.freezing}
+              onClick={() =>
+                (props.beforeAction ?? ((action) => action()))(
+                  () => void props.editing.addFreeze?.()
+                )
+              }
+            >
+              <Snowflake size={15} aria-hidden />
+              <span>{translate('gallery.videoReview.freezeFrame')}</span>
+            </ReviewButton>
+          ) : (
+            props.trackTools
+          )
+        }
         beforeAction={props.beforeAction}
         originalAudioEditor={props.audio}
         rulerRange={props.playbackRange ? range : undefined}
@@ -286,7 +309,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     onOpenAudio: props.onOpenMusic,
   });
   return (
-    <ReviewTimelineMagnets>
+    <ReviewTimelineMagnets sourceTime={projection.display.displayToSource}>
       <ReviewTrackControlsProvider
         value={{
           ui: props.advanced.ui,
@@ -306,6 +329,9 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         }}
       >
         <ReviewTimeline
+          resultTime={props.outputTime}
+          resultDuration={props.resultDuration}
+          onSeekResult={props.onSeekResult}
           onHoverTime={props.onHoverTime}
           onHoverIntent={props.onHoverIntent}
           onHistoryRange={props.onHistoryRange}
@@ -508,6 +534,9 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
           navigationRevision={props.navigationRevision}
           selection={reviewTimelineSourceSelection(props)}
           edits={props.edits}
+          onFreezeDurationChange={(edit, duration) =>
+            props.editing.changeFreezeDuration(edit, duration)
+          }
           onEdit={props.editing.select}
           selectedEditId={props.editing.selected?.id}
           annotations={props.annotations}

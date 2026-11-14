@@ -213,6 +213,7 @@ export function applyReviewOperation(
   const previousEnd: Record<'cut' | 'speed', number> = { cut: 0, speed: 0 };
   let removed = 0;
   for (const edit of ordered) {
+    if (edit.kind === 'freeze') continue;
     if (edit.start < previousEnd[edit.kind]) throw new ReviewHistoryError('edit-overlap');
     previousEnd[edit.kind] = edit.end;
     if (edit.kind === 'cut') removed += edit.end - edit.start;
@@ -256,6 +257,13 @@ export function applyReviewOperation(
       audio: {
         ...advancedContent.audio,
         voiceoverSegments: buildReviewTimeMap(source.duration, edits),
+        music: advancedContent.audio.music.map((clip) =>
+          clip.sourceAnchor ||
+          operation.before?.kind === 'freeze' ||
+          operation.after?.kind === 'freeze'
+            ? anchorReviewVoiceover(clip, previous)
+            : clip
+        ),
         voiceover: advancedContent.audio.voiceover.map((clip) => {
           const anchored = anchorReviewVoiceover(clip, previous);
           return operation.normalizeVoiceoverTempo

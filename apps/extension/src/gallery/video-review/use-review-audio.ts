@@ -133,7 +133,7 @@ function createReviewAudioClipActions(
     discrete = false
   ) => args.setAudio((audio) => ({ ...audio, [lane]: patch(audio[lane]) }), discrete);
   const laneDuration = (lane: ReviewAudioLane) =>
-    lane === 'voiceover' && args.audio.voiceoverSegments
+    args.audio[lane].some((clip) => clip.sourceAnchor) && args.audio.voiceoverSegments
       ? args.audio.voiceoverSegments.at(-1)!.sourceEnd
       : args.timelineDuration;
   const updateClip = (
@@ -173,7 +173,7 @@ function createReviewAudioClipActions(
           clip,
           timelineStart,
           laneDuration(lane),
-          lane === 'voiceover' ? args.audio.voiceoverSegments : undefined
+          args.audio.voiceoverSegments
         )
       ),
     trimClip: (
@@ -190,7 +190,7 @@ function createReviewAudioClipActions(
           timelineTime,
           laneDuration(lane),
           assetDuration ?? args.assets.get(clip.assetId)?.duration,
-          lane === 'voiceover' ? args.audio.voiceoverSegments : undefined
+          args.audio.voiceoverSegments
         )
       ),
     patchClip: (

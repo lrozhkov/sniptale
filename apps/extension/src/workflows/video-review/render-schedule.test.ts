@@ -89,3 +89,28 @@ it('selects bounded sample windows on the same output clock without allocating t
   expect(sped.flatMap((window) => window.timestamps)).toHaveLength(30);
   expect(sped[0]!.sourceTimes[0]).toBe(2.5);
 });
+
+it('uses the original VFR frame PTS for every output frame of an inserted hold', () => {
+  const windows = reviewRenderFrameSchedule(
+    3,
+    [
+      {
+        id: 'hold',
+        kind: 'freeze',
+        start: 1,
+        end: 1,
+        requestedStart: 1,
+        requestedEnd: 1,
+        duration: 2,
+        frameTime: 0.98,
+        frameDuration: 0.04,
+      },
+    ],
+    30
+  );
+  expect(windows[1]!.sourceTimes).toEqual(Array(60).fill(0.98));
+  expect(windows[1]!.timestamps[0]).toBe(1);
+  expect(windows[1]!.timestamps.at(-1)).toBeCloseTo(3 - 1 / 30);
+  expect(windows[2]!.timestamps[0]).toBe(3);
+  expect(windows[2]!.sourceTimes[0]).toBe(1);
+});

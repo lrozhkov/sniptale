@@ -44,11 +44,15 @@ export function useReviewTransport(args: {
   const playbackAudio = useRef<ReturnType<typeof useReviewEditorAudioRuntime> | null>(null);
   function failTransport(reason?: ReviewActionAudioUnavailable['reason']) {
     playbackAudio.current?.stopPlayback();
-    video.current?.pause();
+    pause();
     args.onTransportFailure(reason);
   }
   const {
     video,
+    pause,
+    seekResult,
+    readResultTime,
+    heldResultTime,
     time,
     onTime,
     playing,
@@ -79,7 +83,7 @@ export function useReviewTransport(args: {
     onRecovered: args.onTransportRecovered,
     onInvalidRange: args.onInvalidRange,
   });
-  const timeline = useReviewTimeMap(source, args.edits, time);
+  const timeline = useReviewTimeMap(source, args.edits, time, heldResultTime, readResultTime);
   const actionPlan = useMemo(
     () =>
       buildReviewActionAudioPlan({
@@ -154,7 +158,7 @@ export function useReviewTransport(args: {
     playing: playing && !args.silent,
     silent: args.silent ?? false,
     outputTime: timeline.sceneOutputTime,
-    sourceToResult: timeline.toOutputTime,
+    sourceToResult: timeline.readOutputTime,
     seekRevision,
     originalAudio: args.originalAudio,
     originalSource: {
@@ -173,6 +177,8 @@ export function useReviewTransport(args: {
   playbackAudio.current = actionSoundPreview;
   return {
     actionSoundPreview,
+    pause,
+    seekResult,
     video,
     time,
     onTime,
@@ -183,9 +189,10 @@ export function useReviewTransport(args: {
     onPresentedTime,
     seek,
     play: async () => {
-      if (video.current?.paused && !args.silent) {
+      const active = playing || video.current?.paused === false;
+      if (!active && !args.silent) {
         if (!(await actionSoundPreview.preparePlayback())) return;
-      } else if (!video.current?.paused) actionSoundPreview.stopPlayback();
+      } else if (active) actionSoundPreview.stopPlayback();
       play();
     },
     timeline,

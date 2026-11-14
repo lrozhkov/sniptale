@@ -235,3 +235,28 @@ it('copies cursor intervals as an atomic group with fresh point identities and r
   expect(cloneReviewTimelineSelection({ content, edits: [], selections, duration: 2 })).toBeNull();
   expect(content).toEqual(before);
 });
+
+it('does not create a second insertion when a freeze is included in copy selection', () => {
+  const edits = [
+    {
+      id: 'hold',
+      kind: 'freeze' as const,
+      start: 4,
+      end: 4,
+      requestedStart: 4,
+      requestedEnd: 4,
+      duration: 2,
+      frameTime: 3.98,
+      frameDuration: 0.04,
+    },
+  ];
+  expect(
+    cloneReviewTimelineSelection({
+      content: createQuickEditAdvancedContent(),
+      edits,
+      selections: [{ kind: 'edit', id: 'hold' }],
+      duration: 10,
+    })
+  ).toBeNull();
+  expect(edits).toHaveLength(1);
+});

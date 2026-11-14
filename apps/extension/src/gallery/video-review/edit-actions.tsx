@@ -48,6 +48,7 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   'camera-follow': 'gallery.videoReview.cameraFollowConflict',
   presentation: 'gallery.videoReview.presentation',
   'precise-edits': 'gallery.videoReview.exportPreciseEdits',
+  'freeze-frame': 'gallery.videoReview.freezeFrame',
   'cut-transition': 'gallery.videoReview.cutTransition',
   'transition-frames': 'gallery.videoReview.cutTransitionFramesUnavailable',
   zoom: 'gallery.videoReview.exportBlockerZoom',
