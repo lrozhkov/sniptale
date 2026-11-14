@@ -222,6 +222,7 @@ export function useReviewPreviewInspector(props: {
     preferences,
     setRendererStatus,
     setRaster,
+    raster,
     inspector: (
       <ReviewPreviewSettingsBinding
         {...props}

@@ -6723,6 +6723,7 @@
       "previewFailed": "Could not render preview",
       "previewNativeFrameRate": "Video frame rate",
       "previewPresentedFrameRate": "Preview presentation rate",
+      "liveSeek": "Preview on hover",
       "previewSettings": "Preview settings",
       "previewSection": "Preview settings",
       "previewResolution": "Resolution",

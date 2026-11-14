@@ -2,7 +2,7 @@ import type { PreviewRendererStatus } from '../../features/video/preview/prefere
 import { useReviewZoomPreview } from './zoom-editor';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { resolveReviewCursorFocusPath } from '../../features/video/review/advanced/cursor-focus-path';
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
@@ -98,6 +98,7 @@ export function ReviewPreviewBinding({
   resource,
   state: sourceState,
   sceneActive,
+  previewOverlay,
   previewPreferences,
   onPreviewRaster,
   onPreviewRendererStatus,
@@ -107,6 +108,7 @@ export function ReviewPreviewBinding({
     Partial<Pick<LoadedReview, 'telemetry'>>;
   state: PreviewState;
   sceneActive: boolean;
+  previewOverlay?: ReactNode;
   previewPreferences?: QuickPreviewPreferences | undefined;
   onPreviewRendererStatus?: ((status: PreviewRendererStatus | null) => void) | undefined;
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
@@ -204,6 +206,7 @@ export function ReviewPreviewBinding({
             state={state}
             sceneActive={sceneActive}
             fullscreen={fullscreen}
+            previewOverlay={previewOverlay}
             focusInteracting={zoom.previewing}
             previewPreferences={previewPreferences}
             onPreviewRaster={onPreviewRaster}
@@ -245,6 +248,7 @@ function ReviewPreviewStage({
   resource,
   state,
   sceneActive,
+  previewOverlay,
   fullscreen,
   focusInteracting,
   previewPreferences,
@@ -255,6 +259,7 @@ function ReviewPreviewStage({
     Partial<Pick<LoadedReview, 'telemetry'>>;
   state: PreviewState;
   sceneActive: boolean;
+  previewOverlay?: ReactNode;
   fullscreen: boolean;
   focusInteracting: boolean;
   previewPreferences?: QuickPreviewPreferences | undefined;
@@ -268,6 +273,7 @@ function ReviewPreviewStage({
     !state.playing && !busy && state.editing.exporter.phase === 'idle' && !composer.annotation;
   return (
     <ReviewStageBinding
+      previewOverlay={previewOverlay}
       {...captionPreview}
       cursorMotions={features.cursorMotions}
       cursorPath={

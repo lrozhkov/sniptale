@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useCallback,
   useLayoutEffect,
   useRef,
   useState,
@@ -32,6 +33,7 @@ export type ReviewPlacementHints = Partial<
   Record<'source' | 'focus' | 'original', string | undefined>
 >;
 type HoverOptions = {
+  onPreview?: ((time: number | null) => void) | undefined;
   placementHints?: ReviewPlacementHints | undefined;
   busy: boolean;
   duration: number;
@@ -60,9 +62,15 @@ const rangeCursor = `url("data:image/svg+xml,${encodeURIComponent(cursorSvg)}") 
 /** Hover is advisory; pointer gestures keep their own capture and commit owner. */
 export function useReviewTimelineHover(options: HoverOptions) {
   const [hover, setHover] = useState<Hover | null>(null);
+  const { onPreview } = options;
+  const clear = useCallback(() => {
+    setHover(null);
+    onPreview?.(null);
+  }, [onPreview]);
   useEffect(
-    () => setHover(null),
+    () => clear(),
     [
+      clear,
       options.zoom,
       options.gutter,
       options.width,
@@ -78,7 +86,7 @@ export function useReviewTimelineHover(options: HoverOptions) {
     const bounds = event.currentTarget.getBoundingClientRect();
     const x = event.clientX - bounds.left;
     if (options.busy || x < options.gutter || x > bounds.width) {
-      setHover(null);
+      clear();
       return;
     }
     if (
@@ -88,6 +96,9 @@ export function useReviewTimelineHover(options: HoverOptions) {
       )
     ) {
       setHover(null);
+      options.onPreview?.(
+        event.buttons === 0 ? planeTime(event, options.duration, options.gutter) : null
+      );
       return;
     }
     const hit =
@@ -99,8 +110,11 @@ export function useReviewTimelineHover(options: HoverOptions) {
         options.sourceRangeTool,
         options.annotationEnabled
       );
-    if (hit === 'control' || hit === 'item') {
+    if (hit === 'item' || hit === 'control') {
       setHover(null);
+      options.onPreview?.(
+        event.buttons === 0 ? planeTime(event, options.duration, options.gutter) : null
+      );
       return;
     }
     const lane = hit === 'gap' ? 'seek' : hit;
@@ -109,6 +123,7 @@ export function useReviewTimelineHover(options: HoverOptions) {
       lane === 'source' && options.snapRangePreview && options.boundaries?.length
         ? nearestReviewBoundary(pointerTime, options.boundaries)
         : pointerTime;
+    options.onPreview?.(event.buttons === 0 ? time : null);
     setHover({
       time,
       pointerX: x,
@@ -128,7 +143,7 @@ export function useReviewTimelineHover(options: HoverOptions) {
   return {
     reason: blocked,
     move,
-    clear: () => setHover(null),
+    clear,
     cursor: blocked
       ? 'crosshair'
       : !options.busy &&

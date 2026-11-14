@@ -34,6 +34,7 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = ReviewCursorTimelineInteractions & {
+  onHoverTime?: ((time: number | null) => void) | undefined;
   onHistoryRange?: ((range: { start: number; end: number }) => void) | undefined;
   cursorArchiveAvailable?: boolean | undefined;
   sourceId?: string | undefined;
@@ -146,6 +147,7 @@ export function ReviewTimeline(props: TimelineProps) {
   });
   const plane = useReviewTimelinePlaneDrag({ ...props, gutter });
   const hover = useReviewTimelineHover({
+    onPreview: props.onHoverTime,
     placementHints: props.placementHints,
     busy: !!props.busy,
     duration: props.duration,

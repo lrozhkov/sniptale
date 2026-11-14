@@ -1,3 +1,5 @@
+import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { parseAnimationTemplateSource } from '@sniptale/runtime-contracts/animation-template';
@@ -953,4 +955,20 @@ it('streams the ordinary export schedule through one decoder without random per-
   owner.dispose();
   await closed.promise;
   for (const sample of io.samples) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('keeps the common outer fade plan in a sparse hover composition', async () => {
+  const settings = createNewWorkspacePresentationSettings();
+  const planned = planReviewPresentationSequence({
+    settings,
+    mainDuration: 3,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 30, denominator: 1 },
+  });
+  if (!planned.ok) throw new Error('Expected a valid fade plan');
+  const main = await open({ ...fixture(), fragmentOffset: 0, outerFadePlan: planned.plan });
+  const frame = await main.renderAtTime(0.1);
+  expect(io.prepare.mock.calls.at(-1)![0]).toMatchObject({ outerFadePlan: planned.plan });
+  frame.release();
 });

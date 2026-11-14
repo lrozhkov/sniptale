@@ -30,6 +30,8 @@ type Camera = Awaited<ReturnType<typeof createReviewWebcamRenderer>>;
 import type { ExportEnhancer } from '../../features/video/composition/export-enhancement/enhancer';
 
 export interface ReviewPresentationMainInput {
+  /** Advisory preview shares the existing global presentation envelope. */
+  outerFadePlan?: Scene['outerFadePlan'] | undefined;
   /** Frame consumers release endpoints after completion; sequential export can retain one pair. */
   transitionFrameRetention?: 'frame' | 'transition';
   renderer?: import('../../features/video/preview/preferences').VideoPreviewRenderer;
@@ -182,6 +184,7 @@ class PresentationMain {
     )
       throw new Error('Fragment overlays require the full document time map.');
     this.scene = {
+      ...(this.args.outerFadePlan ? { outerFadePlan: this.args.outerFadePlan } : {}),
       source,
       sourceFilters: effective.sourceFilters,
       ...(effective.canvas ? { canvas: effective.canvas } : {}),

@@ -65,6 +65,7 @@ type Editing = ReturnType<typeof useReviewEdits>;
 type Exporter = ReturnType<typeof useReviewExport>;
 
 type TimelineBindingProps = {
+  onHoverTime?: ((time: number | null) => void) | undefined;
   interactionEditor?: import('./interaction-editor').ReviewInteractionEditor;
   onInteractionAdded?(): void;
   cursorMotion?: ReviewCursorMotionEditor;
@@ -304,6 +305,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         }}
       >
         <ReviewTimeline
+          onHoverTime={props.onHoverTime}
           onHistoryRange={props.onHistoryRange}
           cursorArchiveAvailable={props.cursorArchiveAvailable}
           trackOrder={trackOrder.order}

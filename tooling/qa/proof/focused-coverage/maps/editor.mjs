@@ -620,8 +620,14 @@ action-feedback-click-fields.test.tsx',
   {
     owner: 'gallery-review-opening-and-feedback',
     productionFile: 'apps/extension/src/gallery/video-review/index.tsx',
-    reason: 'The modal integration suite exercises opening, retry, feedback and editor navigation.',
-    testFiles: ['apps/extension/src/gallery/video-review/review.test.tsx'],
+    reason:
+      'Mounted shell and selection suites cover opening, navigation, tools and transient preview controls.',
+    testFiles: [
+      'apps/extension/src/gallery/video-review/review.test.tsx',
+      'apps/extension/src/gallery/video-review/index.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection.integration.test.tsx',
+      'apps/extension/src/gallery/video-review/review-selection-tools.integration.test.tsx',
+    ],
   },
   {
     owner: 'gallery-review-opening-and-feedback',

@@ -6723,6 +6723,7 @@
       "previewFailed": "Не удалось отобразить превью",
       "previewNativeFrameRate": "Частота кадров видео",
       "previewPresentedFrameRate": "Частота отрисовки превью",
+      "liveSeek": "Предпросмотр при наведении",
       "previewSettings": "Настройки превью",
       "previewSection": "Настройки области просмотра",
       "previewResolution": "Разрешение",

@@ -53,7 +53,7 @@ import {
   type ReviewStageFocusPicker,
 } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject, type ReactNode } from 'react';
 import { projectVideoRegion } from '../../features/video/review/geometry';
 import type {
   CanvasComment,
@@ -90,6 +90,7 @@ type ReviewStageCommentBinding = {
 };
 
 type ReviewStageProps = {
+  previewOverlay?: ReactNode;
   cursorMotions?: import('../../features/video/project/cursor-motion').CursorMotion[] | undefined;
   cursorPath?: Omit<Parameters<typeof ReviewCursorPathOverlay>[0], 'width' | 'height'> | undefined;
   annotationEditing?: ReviewAnnotationEditing | undefined;
@@ -388,6 +389,7 @@ export function ReviewStage(props: ReviewStageProps) {
           captions={props.captions}
           onCaptionSelect={props.onCaptionSelect}
         />
+        {props.previewOverlay}
       </div>
     </div>
   );

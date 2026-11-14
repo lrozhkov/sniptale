@@ -1,3 +1,6 @@
+import { useReviewLiveSeek } from './use-live-seek';
+import { ScanLine } from 'lucide-react';
+import { ReviewButton, reviewIconButtonClassName } from './controls';
 import { resolveReviewTimelineSelection } from './timeline-batch-selection';
 import { ReviewInspectorToolbarNavigation } from './review-toolbar';
 import { ReviewSelectionActionsSurface } from './selection-actions';
@@ -160,6 +163,13 @@ function ReviewEditor({
     retryProject: state.retryAdvanced,
   });
   const previewPreferences = previewSettings.preferences;
+  const liveSeek = useReviewLiveSeek(
+    resource,
+    state,
+    previewPreferences.preferences,
+    previewSettings.raster,
+    state.playing || state.busy || state.editing.exporter.phase !== 'idle' || !editorReady
+  );
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const navigationState = useReviewEditorNavigation(state, voiceover.recording);
   const { navigation, requestExport, historyCommands, trackNavigation } = navigationState;
@@ -219,6 +229,15 @@ function ReviewEditor({
         >
           <div className="contents" inert={voiceover.recording}>
             <ReviewPreviewBinding
+              previewOverlay={
+                <canvas
+                  ref={liveSeek.canvas}
+                  hidden={!liveSeek.visible}
+                  data-ui="gallery.videoReview.liveSeekFrame"
+                  data-time={liveSeek.time ?? undefined}
+                  className="pointer-events-none absolute inset-0 z-30 h-full w-full"
+                />
+              }
               onOpenPreviewSettings={navigation.openPreview}
               previewPreferences={previewPreferences.preferences}
               onPreviewRaster={previewSettings.setRaster}
@@ -273,6 +292,7 @@ function ReviewEditor({
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              onHoverTime={liveSeek.hover}
               interactionEditor={state.interactionEditor}
               onInteractionAdded={() => navigation.setSection('selected')}
               cursorMotion={state.cursorMotion}
@@ -310,14 +330,26 @@ function ReviewEditor({
                 />
               }
               utilityControls={
-                <ReviewKeyboardHelp
-                  onBasicMode={
-                    features.mode === 'advanced' ? () => state.setMode('basic') : undefined
-                  }
-                  busy={busy || editing.exporter.phase !== 'idle'}
-                  onNewProject={projectCommands.newProject}
-                  onBackup={() => void state.run(() => backupReview(state, canvasComments))}
-                />
+                <>
+                  <ReviewButton
+                    label={translate('gallery.videoReview.liveSeek')}
+                    className={reviewIconButtonClassName}
+                    aria-pressed={liveSeek.enabled}
+                    disabled={!liveSeek.available || busy || editing.exporter.phase !== 'idle'}
+                    data-ui="gallery.videoReview.liveSeekToggle"
+                    onClick={() => liveSeek.setEnabled(!liveSeek.enabled)}
+                  >
+                    <ScanLine size={16} aria-hidden="true" />
+                  </ReviewButton>
+                  <ReviewKeyboardHelp
+                    onBasicMode={
+                      features.mode === 'advanced' ? () => state.setMode('basic') : undefined
+                    }
+                    busy={busy || editing.exporter.phase !== 'idle'}
+                    onNewProject={projectCommands.newProject}
+                    onBackup={() => void state.run(() => backupReview(state, canvasComments))}
+                  />
+                </>
               }
               editing={editing}
               edits={snapshot.document.edits}
