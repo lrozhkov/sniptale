@@ -426,7 +426,7 @@
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "f6a0ff3f5b758fcd621e267ae842789c9e0251bfba0359d2a4e43bf1f9aec9f7",
+      "sha256": "f0949d32352337da346893ba66f2695e8a26700f96bcd081d28fdfb15e9f61c4",
       "source": "THIRD_PARTY_NOTICES.md"
     },
     {
@@ -441,7 +441,7 @@
     },
     {
       "archivePath": "apps/extension/src/editor/raster-editing/vendor/provenance.json",
-      "sha256": "c0239eda3931b7b24d4be42ebeeeb24c3c38df5b5e55fafe9faed898a8f5fcba",
+      "sha256": "e7592eaf02c2f969948428beecae1edafde449ec5831bbd05d3d338d49ed233e",
       "source": "apps/extension/src/editor/raster-editing/vendor/provenance.json"
     },
     {
@@ -635,8 +635,8 @@
         "noticePath": "apps/extension/src/editor/raster-editing/vendor/NOTICE.txt",
         "noticeSha256": "180a6efecad16728850abc3a2c9e630eb445b16137e0e6ed8cee29673aed8a03",
         "provenancePath": "apps/extension/src/editor/raster-editing/vendor/provenance.json",
-        "provenanceSha256": "c0239eda3931b7b24d4be42ebeeeb24c3c38df5b5e55fafe9faed898a8f5fcba",
-        "modifications": "Sniptale extracts flood-fill, Bezier, and stamp-spacing algorithms with their required helpers. It adds typed source geometry, bounded reads, and row-safe growth. It adds immutable retained planes, independent hardness, Restore mode, selection clipping, and crop clipping. It removes upstream UI, Canvas, pressure, and history dependencies.",
+        "provenanceSha256": "e7592eaf02c2f969948428beecae1edafde449ec5831bbd05d3d338d49ed233e",
+        "modifications": "Sniptale extracts flood-fill, Bezier, and stamp-spacing algorithms with their required helpers. It adds typed source geometry, bounded reads, and row-safe growth. It adds immutable retained planes, independent hardness, Restore mode, selection clipping, and crop clipping. It removes upstream UI, Canvas, pressure, and history dependencies. It adds source-over paint with explicit color and opacity, and incremental preview patches.",
         "artifacts": [
           {
             "path": "apps/extension/src/editor/raster-editing/vendor/flood-fill.ts",
@@ -652,7 +652,7 @@
           },
           {
             "path": "apps/extension/src/editor/raster-editing/brush.ts",
-            "sha256": "f3b2eaeffa65134e2baeabb2108703f558d4614978dca4065649fdba0b2d16d1",
+            "sha256": "6b624bb84dcbc6346625edcedefb55e6250bab0114c4061330bcfc6b08802b89",
             "sourceUrl": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/klecks/brushes/eraser-brush.ts",
             "sourceSha256": "9aa231d02d555a3a13976a22ad74ce0f2f24c0e98e8e741c3f78971206dbb007"
           }

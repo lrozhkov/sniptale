@@ -5,6 +5,7 @@ import type { EditorLayerChild, EditorLayerItem } from '../../../features/editor
 import { getLayerIcon } from '../../chrome/tool-icons';
 import { EditorIconButton, cx } from '../../chrome/ui';
 import { LayerRow } from './row';
+import { useLayerPointerReorder } from './pointer-reorder';
 import { useEditorController } from '../../application/controller-context';
 import { LayerInsertImageControl } from './file-input';
 import { ACTIVE_LAYER_NAVIGATION_ICON_CLASS_NAME } from './header.constants';
@@ -38,10 +39,8 @@ const GROUP_CHILD_IDLE_CLASS_NAME =
 
 type EditorInspectorLayersListProps = {
   layers: EditorLayerItem[];
-  dragOverLayerId: string | null;
   setDraggedLayerId: React.Dispatch<React.SetStateAction<string | null>>;
   setDragOverLayerId: React.Dispatch<React.SetStateAction<string | null>>;
-  onDrop: (targetLayerId: string) => void;
   autoNavigateSelectedLayer?: boolean;
   onOpenLayerEffects: EditorLayerEffectsOpenHandler;
   listRef?: React.Ref<HTMLDivElement>;
@@ -227,10 +226,8 @@ function GroupChildRows(props: { layers: EditorLayerChild[]; autoNavigateSelecte
 
 export const EditorInspectorLayersList = React.memo(function EditorInspectorLayersList({
   layers,
-  dragOverLayerId,
   setDraggedLayerId,
   setDragOverLayerId,
-  onDrop,
   autoNavigateSelectedLayer = false,
   onOpenLayerEffects,
   listRef,
@@ -238,6 +235,16 @@ export const EditorInspectorLayersList = React.memo(function EditorInspectorLaye
   scrollable = false,
 }: EditorInspectorLayersListProps) {
   const locale = useAppLocale();
+  const controller = useEditorController();
+  const onMove = React.useCallback(
+    (ids: readonly string[], beforeId: string | null) =>
+      controller.reorderLayerBlock(ids, beforeId),
+    [controller]
+  );
+  const reorder = useLayerPointerReorder({ layers, onMove, setDraggedLayerId, setDragOverLayerId });
+  const dragBlocked = layers.some(
+    (layer) => layer.selected && !layer.reorderable && (layer.immutable || layer.locked)
+  );
   return (
     <div
       ref={listRef}
@@ -245,15 +252,16 @@ export const EditorInspectorLayersList = React.memo(function EditorInspectorLaye
       className={getListViewportClassName({ reserveScrollbarGutter, scrollable })}
     >
       {layers.length > 0 ? (
-        layers.map((layer) => (
-          <div key={layer.id}>
+        reorder.layers.map((layer) => (
+          <div key={layer.id} data-layer-reorder-row={layer.id}>
             <LayerRow
               layer={layer}
               locale={locale}
-              dragOverLayerId={dragOverLayerId}
-              setDraggedLayerId={setDraggedLayerId}
-              setDragOverLayerId={setDragOverLayerId}
-              onDrop={onDrop}
+              draggedLayerId={
+                reorder.draggingIds.includes(layer.id) ? layer.id : reorder.draggingId
+              }
+              dragBlocked={dragBlocked}
+              onPointerStart={reorder.start}
               autoNavigateSelectedLayer={autoNavigateSelectedLayer}
               onOpenLayerEffects={onOpenLayerEffects}
             />

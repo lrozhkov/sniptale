@@ -222,27 +222,26 @@ export function EditorFloatingLayersPanel({
   collapsed,
   documentController,
   hasImage,
-  heightRatio,
+  preferredHeight,
   preferenceError,
   onCollapse,
   onExpand,
-  onHeightRatioChange,
+  onHeightChange,
 }: {
   collapsed: boolean;
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
-  heightRatio: number | null;
+  preferredHeight: number | null;
   preferenceError: string | null;
   onCollapse: () => void;
   onExpand: () => void;
-  onHeightRatioChange: (heightRatio: number | null) => void;
+  onHeightChange: (preferredHeight: number | null) => void;
 }) {
   const scrollPositions = useRef(new Map<EditorLayersPanelMode, number>());
   const { height, startResize } = useResizableLayersPanelHeight({
-    defaultHeight:
-      documentController.inspector === 'layer-effects' ? 520 : LAYERS_PANEL_DEFAULT_HEIGHT,
-    heightRatio,
-    onHeightRatioChange,
+    defaultHeight: LAYERS_PANEL_DEFAULT_HEIGHT,
+    preferredHeight,
+    onHeightChange,
   });
   const editorController = useEditorController();
   const [aiSession] = useState(() =>

@@ -1,4 +1,10 @@
+// @vitest-environment jsdom
+
 import { beforeEach, expect, it, vi } from 'vitest';
+import { Canvas, FabricImage } from 'fabric';
+import { createRasterTargetAdapter } from '../../../raster-editing/adapters';
+import { createEditorRasterMetadata } from '../../../raster-editing/image-state';
+import { mountEditorRasterRuntime } from '../../../raster-editing/runtime';
 import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../../features/editor/document/constants';
 import type { EditorDocument } from '../../../../features/editor/document/types';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
@@ -426,3 +432,73 @@ it('propagates an undo application failure without an available history', async 
   await expect(undoEditorControllerSnapshot(controller)).rejects.toThrow('canvas load failed');
   expect(controller.applyDocument).toHaveBeenCalledOnce();
 });
+
+it.each(['undo', 'redo'] as const)(
+  'suspends pixel gestures during %s and restores editing on the replacement target',
+  async (direction) => {
+    const bitmap = document.createElement('canvas');
+    bitmap.width = bitmap.height = 4;
+    const metadata = createEditorRasterMetadata(bitmap.toDataURL(), 4, 4);
+    const makeImage = () => {
+      const image = new FabricImage(bitmap);
+      Object.assign(image, metadata, { sniptaleId: 'image', sniptaleType: 'image' });
+      return image;
+    };
+    const canvas = new Canvas(undefined, { width: 20, height: 20, renderOnAddRemove: false });
+    canvas.add(makeImage());
+    canvas.setActiveObject(canvas.getObjects()[0]!);
+    const adapter = createRasterTargetAdapter({
+      canvas: () => canvas,
+      frame: () => DEFAULT_EDITOR_FRAME_SETTINGS,
+      documentBounds: () => ({ x: 0, y: 0, width: 20, height: 20 }),
+      prepareObject: () => {},
+      commitNative: () => {},
+      publishBackground: async () => false,
+      flipObject: async () => {},
+    });
+    const runtime = mountEditorRasterRuntime({
+      canvas,
+      adapter,
+      createCompute: () => ({ run: vi.fn(), cancel: vi.fn(), dispose: vi.fn() }),
+    });
+    const original = createEditorDocument('original');
+    const edited = createEditorDocument('edited');
+    const history = new SnapshotHistory(JSON.stringify(original));
+    history.push(JSON.stringify(edited));
+    if (direction === 'redo') history.undo();
+    const actualHistory = await vi.importActual<typeof import('../../history')>('../../history');
+    mocks.undoSnapshot.mockImplementationOnce(actualHistory.undoEditorSnapshot);
+    mocks.redoSnapshot.mockImplementationOnce(actualHistory.redoEditorSnapshot);
+    const replacement = makeImage();
+    const applyDocument = vi.fn(async () => {
+      expect(runtime.getSnapshot()).toMatchObject({ editing: true, tool: 'erase', busy: true });
+      expect(runtime.beginGesture({ x: 1, y: 1 })).toBe(false);
+      canvas.discardActiveObject();
+      canvas.remove(...canvas.getObjects());
+      canvas.add(replacement);
+      runtime.refresh();
+      expect(runtime.getSnapshot()).toMatchObject({ editing: true, busy: true });
+    });
+    const publishHistoryDocument = vi.fn();
+    try {
+      runtime.enterEditing();
+      runtime.selectTool('erase');
+      await (direction === 'undo' ? undoEditorControllerSnapshot : redoEditorControllerSnapshot)({
+        canvas,
+        history,
+        applyDocument,
+        publishHistoryDocument,
+      });
+      expect(applyDocument).toHaveBeenCalledOnce();
+      expect(publishHistoryDocument).toHaveBeenCalledExactlyOnceWith(
+        direction === 'undo' ? original : edited
+      );
+      expect(history.getState()).toMatchObject({ index: direction === 'undo' ? 0 : 1, size: 2 });
+      expect(canvas.getActiveObject()).toBe(replacement);
+      expect(runtime.getSnapshot()).toMatchObject({ editing: true, tool: 'erase', busy: false });
+    } finally {
+      runtime.dispose();
+      await canvas.dispose();
+    }
+  }
+);

@@ -30,8 +30,11 @@ import {
 import { createToolPropertiesGroups } from './tool-properties-groups';
 import type { EditorFloatingDocumentController } from './document-bar';
 import type { FloatingToolbarGroup } from './canvas-toolbar-model';
-import { translate } from '../../../platform/i18n';
-import { EditorRasterTools } from './raster-tools';
+import {
+  EditorRasterProperties,
+  EditorRasterSelectionActions,
+  useRasterToolPropertiesDisclosure,
+} from './raster-tools';
 import { ToolPropertiesButton } from './tool-properties-button';
 
 const subscribeWithoutRuntime = () => () => undefined;
@@ -41,7 +44,7 @@ const TOOL_PROPERTIES_PAIR_CLASS_NAME = [
   'absolute z-40 flex w-max max-w-[calc(100vw-16px)] items-start gap-2 overflow-auto',
 ].join(' ');
 
-function useToolRailPlacement(enabled: boolean, activeTool: EditorTool) {
+function useToolRailPlacement(enabled: boolean, activeTool: string, centered: boolean) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<CSSProperties>();
 
@@ -51,8 +54,11 @@ function useToolRailPlacement(enabled: boolean, activeTool: EditorTool) {
     if (!enabled || !panel || !toolbar) return;
     const update = () => {
       const parent = panel.offsetParent?.getBoundingClientRect();
-      const anchor =
-        toolbar.querySelector(`[data-ui="editor.floating.tool-rail.${activeTool}"]`) ?? toolbar;
+      const anchor = centered
+        ? toolbar
+        : (toolbar.querySelector(`[data-ui="editor.raster.${activeTool}"]`) ??
+          toolbar.querySelector(`[data-ui="editor.floating.tool-rail.${activeTool}"]`) ??
+          toolbar);
       const position = resolveToolbarSurfacePlacement({
         anchor: anchor.getBoundingClientRect(),
         toolbar: toolbar.getBoundingClientRect(),
@@ -60,11 +66,16 @@ function useToolRailPlacement(enabled: boolean, activeTool: EditorTool) {
         width: panel.offsetWidth,
         height: panel.offsetHeight,
         placement: 'down',
+        align: centered ? 'center' : 'start',
       });
       setStyle({
         ...position,
-        left: position.left - (parent?.left ?? 0),
-        top: position.top - (parent?.top ?? 0),
+        left:
+          Math.round(position.left * window.devicePixelRatio) / window.devicePixelRatio -
+          (parent?.left ?? 0),
+        top:
+          Math.round(position.top * window.devicePixelRatio) / window.devicePixelRatio -
+          (parent?.top ?? 0),
       });
     };
     update();
@@ -76,7 +87,7 @@ function useToolRailPlacement(enabled: boolean, activeTool: EditorTool) {
       observer?.disconnect();
       window.removeEventListener('resize', update);
     };
-  }, [enabled, activeTool]);
+  }, [enabled, activeTool, centered]);
 
   return { panelRef, style };
 }
@@ -175,6 +186,22 @@ interface EditorFloatingToolPropertiesRailProps {
   selection: EditorToolbarSelectionState;
 }
 
+function getDrawingOptionsTool(type: string | null | undefined) {
+  if (type === null || type === undefined) return null;
+  switch (type) {
+    case 'pencil':
+    case 'marker':
+    case 'shape':
+    case 'arrow':
+    case 'simplify':
+    case 'blur':
+    case 'text':
+      return type;
+    default:
+      return null;
+  }
+}
+
 export function EditorFloatingToolPropertiesRail({
   activeTool,
   collapsedDrawingOptionsTool,
@@ -194,26 +221,8 @@ export function EditorFloatingToolPropertiesRail({
     inspector: documentController.inspector,
     selection,
   });
-  const selectedDrawingTool =
-    selection.selectedObjectType === 'pencil' ||
-    selection.selectedObjectType === 'marker' ||
-    selection.selectedObjectType === 'shape' ||
-    selection.selectedObjectType === 'arrow' ||
-    selection.selectedObjectType === 'simplify' ||
-    selection.selectedObjectType === 'blur' ||
-    selection.selectedObjectType === 'text'
-      ? selection.selectedObjectType
-      : null;
-  const activeDrawingTool =
-    activeTool === 'pencil' ||
-    activeTool === 'marker' ||
-    activeTool === 'shape' ||
-    activeTool === 'arrow' ||
-    activeTool === 'simplify' ||
-    activeTool === 'blur' ||
-    activeTool === 'text'
-      ? activeTool
-      : null;
+  const selectedDrawingTool = getDrawingOptionsTool(selection.selectedObjectType);
+  const activeDrawingTool = getDrawingOptionsTool(activeTool);
   const drawingOptionsTool =
     selectedDrawingTool ??
     (selection.selectedObjectsAreDrawing && selection.hasSelection ? 'selection' : null) ??
@@ -234,21 +243,38 @@ export function EditorFloatingToolPropertiesRail({
     rasterRuntime?.subscribe ?? subscribeWithoutRuntime,
     rasterRuntime?.getSnapshot ?? snapshotWithoutRuntime
   );
-  const rasterEnabled = Boolean(
+  const rasterDisclosure = useRasterToolPropertiesDisclosure();
+  const rasterTargetSelected = Boolean(
     rasterSnapshot?.available &&
     selection.selectedObjectCount === 1 &&
     (selection.selectedObjectType === 'image' ||
       selection.selectedObjectType === 'source-image' ||
       selection.selectedObjectType === 'background')
   );
-  const multipleImages =
-    selection.selectedObjectCount > 1 && layers.some((layer) => layer.selected && layer.raster);
+  const rasterEnabled = Boolean(
+    rasterTargetSelected &&
+    rasterSnapshot &&
+    (!rasterSnapshot.editing ||
+      (rasterSnapshot.tool !== null && rasterDisclosure?.collapsedTool !== rasterSnapshot.tool) ||
+      rasterSnapshot.error !== null)
+  );
+  const rasterActionsEnabled = Boolean(
+    rasterTargetSelected && rasterSnapshot?.editing && rasterSnapshot.selection !== 'none'
+  );
   const enabled =
-    standardPropertiesEnabled || drawingPropertiesEnabled || rasterEnabled || multipleImages;
+    standardPropertiesEnabled || drawingPropertiesEnabled || rasterEnabled || rasterActionsEnabled;
   const showSelectionActions = drawingPropertiesEnabled && selection.hasSelection;
   const selectedLayerCount = layers.filter((layer) => layer.selected).length;
   const canUngroup = canUngroupLayerSelection(layers);
-  const placement = useToolRailPlacement(enabled, activeTool);
+  const placement = useToolRailPlacement(
+    enabled,
+    rasterSnapshot?.editing && rasterSnapshot.tool
+      ? rasterSnapshot.tool === 'remove-color'
+        ? 'removeColor'
+        : rasterSnapshot.tool
+      : activeTool,
+    rasterEnabled && !rasterSnapshot?.editing
+  );
   const rootRef = useDismissToolProperties(() => setActiveGroupId(null));
 
   useEffect(() => {
@@ -273,17 +299,15 @@ export function EditorFloatingToolPropertiesRail({
             dataUi="editor.floating.raster-tools"
             className="min-w-0 max-w-full"
           >
-            <EditorRasterTools
-              runtime={rasterRuntime}
-              onOpenAdjustments={(targetId) =>
-                documentController.onOpenLayerEffects(targetId, 'adjustments', 'brightness')
-              }
-            />
+            <EditorRasterProperties runtime={rasterRuntime} />
           </FloatingChromeToolbar>
         ) : null}
-        {multipleImages ? (
-          <FloatingChromeToolbar>
-            <span className="px-2 text-xs">{translate('editor.raster.singleImage')}</span>
+        {rasterActionsEnabled && rasterRuntime ? (
+          <FloatingChromeToolbar
+            dataUi="editor.floating.raster-selection-actions"
+            className="shrink-0"
+          >
+            <EditorRasterSelectionActions runtime={rasterRuntime} />
           </FloatingChromeToolbar>
         ) : null}
         {(standardPropertiesEnabled || drawingPropertiesEnabled) &&

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { Canvas } from 'fabric';
 import { expect, it, vi } from 'vitest';
-import type { RasterTargetAdapter } from './adapters';
+import type { RasterTarget, RasterTargetAdapter } from './adapters';
+import type { BackgroundRasterCandidate } from '../controller/background/sync';
 import type { RasterComputeCommand, RasterComputeValue } from './compute';
 import {
   getEditorRasterRuntime,
@@ -539,6 +540,281 @@ it.each(['reply', 'failure'] as const)(
       expect(canvas.getActiveObjects()[0]?.flipX).toBe(true);
     } finally {
       requestSpy.mockRestore();
+      await fixture.dispose();
+    }
+  }
+);
+
+it.each([false, true])(
+  'retains editing across history replacement and recovered failure (failure=%s)',
+  async (failure) => {
+    const fixture = await backgroundRuntimeFixture();
+    const { FabricImage } = await import('fabric');
+    const { runtime, canvas, initial, bitmap, metadata } = fixture;
+    const replacement = new FabricImage(bitmap);
+    Object.assign(replacement, metadata, {
+      sniptaleId: initial.sniptaleId,
+      sniptaleType: 'background',
+      sniptaleRole: 'background',
+      sniptaleBackgroundMode: 'image',
+      sniptaleBackgroundImageData: initial.sniptaleBackgroundImageData,
+      sniptaleContentLocked: false,
+    });
+    try {
+      runtime.enterEditing();
+      runtime.selectTool('erase');
+      runtime.selectAll();
+      const snapshots: boolean[] = [];
+      const remove = runtime.subscribe(() => snapshots.push(runtime.getSnapshot().editing));
+      const restore = runtime.preserveEditingForHistory(async () => {
+        canvas.discardActiveObject();
+        canvas.remove(initial);
+        canvas.add(replacement);
+        runtime.setTool(null);
+        runtime.refresh();
+        expect(runtime.getSnapshot()).toMatchObject({ editing: true, tool: 'erase', busy: true });
+        expect(runtime.beginGesture({ x: 1, y: 1 })).toBe(false);
+        if (failure) throw new Error('history restored its previous document');
+      });
+      if (failure) await expect(restore).rejects.toThrow('history restored its previous document');
+      else await restore;
+      remove();
+      expect(snapshots).not.toContain(false);
+      expect(canvas.getActiveObject()).toBe(replacement);
+      expect(runtime.getSnapshot()).toMatchObject({
+        editing: true,
+        tool: 'erase',
+        selection: 'active',
+        busy: false,
+      });
+    } finally {
+      await fixture.dispose();
+    }
+  }
+);
+it('ends editing when history removes its target instead of selecting another layer', async () => {
+  const fixture = await backgroundRuntimeFixture();
+  try {
+    fixture.runtime.enterEditing();
+    fixture.runtime.selectTool('fill');
+    await fixture.runtime.preserveEditingForHistory(async () => {
+      fixture.canvas.discardActiveObject();
+      fixture.canvas.remove(fixture.initial);
+    });
+    expect(fixture.canvas.getActiveObjects()).toEqual([]);
+    expect(fixture.runtime.getSnapshot()).toMatchObject({
+      editing: false,
+      tool: null,
+      busy: false,
+    });
+  } finally {
+    await fixture.dispose();
+  }
+});
+it('does not reopen editing after explicit exit during a held history transition', async () => {
+  const fixture = await backgroundRuntimeFixture();
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  try {
+    fixture.runtime.enterEditing();
+    fixture.runtime.selectTool('erase');
+    const pending = fixture.runtime.preserveEditingForHistory(async () => {
+      await held;
+    });
+    fixture.runtime.finishEditing();
+    release();
+    await pending;
+    expect(fixture.canvas.getActiveObjects()).toEqual([]);
+    expect(fixture.runtime.getSnapshot()).toMatchObject({
+      editing: false,
+      tool: null,
+      busy: false,
+    });
+  } finally {
+    release();
+    await fixture.dispose();
+  }
+});
+it('does not override a newer selection while the history target hydrates', async () => {
+  const fixture = await backgroundRuntimeFixture();
+  const { FabricImage } = await import('fabric');
+  const other = new FabricImage(fixture.bitmap);
+  Object.assign(other, fixture.metadata, {
+    sniptaleId: 'another-image',
+    sniptaleType: 'image',
+    sniptaleContentLocked: false,
+  });
+  let release!: () => void, started!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const hydration = new Promise<void>((resolve) => {
+    started = resolve;
+  });
+  const hydrate = vi
+    .spyOn(fixture.adapter, 'hydrateTarget')
+    .mockImplementation(async (_signal, id) => {
+      if (id) {
+        started();
+        await held;
+      }
+    });
+  try {
+    fixture.runtime.enterEditing();
+    fixture.runtime.selectTool('erase');
+    const pending = fixture.runtime.preserveEditingForHistory(async () => {
+      fixture.canvas.discardActiveObject();
+      fixture.canvas.add(other);
+    });
+    await hydration;
+    fixture.canvas.setActiveObject(other);
+    release();
+    await pending;
+    expect(fixture.canvas.getActiveObject()).toBe(other);
+    expect(fixture.runtime.getSnapshot()).toMatchObject({
+      editing: false,
+      targetId: 'another-image',
+      tool: null,
+      busy: false,
+    });
+  } finally {
+    release();
+    hydrate.mockRestore();
+    await fixture.dispose();
+  }
+});
+
+function correctionCandidate(target: RasterTarget): BackgroundRasterCandidate {
+  return {
+    targetId: target.id,
+    expectedObject: target.identity,
+    metadata: target.metadata,
+    effects: [{ id: 'brightness', amount: 0.4, enabled: true }],
+    derivedImageData: target.metadata.sniptaleRasterOriginalData,
+    flipX: target.identity.flipX,
+    flipY: target.identity.flipY,
+  };
+}
+
+it('retains mode, tool and accepted mask through managed background correction replacement', async () => {
+  const fixture = await backgroundRuntimeFixture();
+  const { runtime, adapter, canvas, initial, events, history } = fixture;
+  try {
+    runtime.enterEditing();
+    runtime.selectTool('select');
+    runtime.beginGesture({ x: 0, y: 0 });
+    await runtime.endGesture({ x: 2, y: 4 });
+    let published = false;
+    await runtime.runCorrectionPreparation('background', async (signal) => {
+      const expected = adapter.resolveById('background');
+      if (!expected) throw new Error('Expected correction target');
+      published = await runtime.publishCorrection(expected, correctionCandidate(expected), signal);
+    });
+    expect(published).toBe(true);
+    expect(canvas.getActiveObject()).not.toBe(initial);
+    expect(canvas.getActiveObject()?.sniptaleEffects).toEqual([
+      { id: 'brightness', amount: 0.4, enabled: true },
+    ]);
+    expect(events).toEqual([
+      'selection:cleared',
+      'object:removed',
+      'object:added',
+      'selection:created',
+    ]);
+    expect(runtime.getSnapshot()).toMatchObject({
+      available: true,
+      editing: true,
+      targetId: 'background',
+      tool: 'select',
+      selection: 'active',
+      error: null,
+    });
+    expect(history).toHaveBeenCalledOnce();
+    await runtime.hideSelected();
+    expect(history).toHaveBeenCalledTimes(2);
+    expect(runtime.getSnapshot()).toMatchObject({
+      editing: true,
+      tool: 'select',
+      selection: 'active',
+    });
+  } finally {
+    await fixture.dispose();
+  }
+});
+
+it('retains accepted raster mode and target when managed correction publication is refused', async () => {
+  const fixture = await backgroundRuntimeFixture();
+  const { runtime, adapter, canvas, initial, refusal, history } = fixture;
+  try {
+    runtime.enterEditing();
+    runtime.selectTool('erase');
+    refusal.enabled = true;
+    let published = true;
+    await runtime.runCorrectionPreparation('background', async (signal) => {
+      const expected = adapter.resolveById('background');
+      if (!expected) throw new Error('Expected correction target');
+      published = await runtime.publishCorrection(expected, correctionCandidate(expected), signal);
+    });
+    expect(published).toBe(false);
+    expect(canvas.getActiveObject()).toBe(initial);
+    expect(runtime.getSnapshot()).toMatchObject({
+      editing: true,
+      targetId: 'background',
+      tool: 'erase',
+    });
+    expect(history).not.toHaveBeenCalled();
+  } finally {
+    await fixture.dispose();
+  }
+});
+
+it.each(['selection', 'same-id replacement', 'permission'] as const)(
+  'does not retain or reselect a managed correction target after external %s',
+  async (change) => {
+    const fixture = await backgroundRuntimeFixture();
+    const { runtime, adapter, canvas, initial, bitmap, history } = fixture;
+    const { FabricImage } = await import('fabric');
+    try {
+      runtime.enterEditing();
+      runtime.selectTool('erase');
+      const started = held<void>(),
+        release = held<void>();
+      let published = true;
+      const pending = runtime.runCorrectionPreparation('background', async (signal) => {
+        const expected = adapter.resolveById('background');
+        if (!expected) throw new Error('Expected correction target');
+        const candidate = correctionCandidate(expected);
+        started.resolve();
+        await release.promise;
+        published = await runtime.publishCorrection(expected, candidate, signal);
+      });
+      await started.promise;
+      let selected = initial;
+      if (change === 'permission') {
+        initial.sniptaleContentLocked = true;
+        runtime.refresh();
+      } else {
+        const next = new FabricImage(bitmap);
+        next.sniptaleId = change === 'selection' ? 'other-image' : 'background';
+        next.sniptaleType = change === 'selection' ? 'image' : 'background';
+        next.sniptaleRole = change === 'selection' ? 'annotation' : 'background';
+        next.sniptaleBackgroundMode = 'image';
+        next.sniptaleContentLocked = false;
+        Object.assign(next, fixture.metadata);
+        if (change === 'same-id replacement') canvas.remove(initial);
+        canvas.add(next);
+        canvas.setActiveObject(next);
+        selected = next;
+      }
+      release.resolve();
+      await pending;
+      expect(published).toBe(false);
+      expect(canvas.getActiveObject()).toBe(selected);
+      expect(runtime.getSnapshot().editing).toBe(false);
+      expect(history).not.toHaveBeenCalled();
+    } finally {
       await fixture.dispose();
     }
   }

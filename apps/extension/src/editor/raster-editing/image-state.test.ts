@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createRasterBrushStroke } from './brush';
 import { decodePngRgba, encodePngRgba } from '../../platform/media-utils/png-codec';
 import * as pngCodec from '../../platform/media-utils/png-codec';
 import {
@@ -9,6 +10,7 @@ import {
   RasterImageResourceLimitError,
 } from './image-state';
 import {
+  composeRasterPixels,
   fillRasterRegion,
   hideRasterRegion,
   paintRasterVisibility,
@@ -194,4 +196,33 @@ describe('retained raster byte adaptation', () => {
     );
     expect({ metadata, before, after }).toEqual(snapshot);
   });
+});
+
+it('round-trips painted alpha and color through the existing retained raster format', async () => {
+  const original = await png([255, 255, 255, 255, 20, 40, 60, 0, 0, 0, 0, 255]);
+  const metadata = createEditorRasterMetadata(original, 3, 1);
+  const before = await decodeEditorRasterPixels(metadata);
+  const stroke = createRasterBrushStroke({
+    planes: before,
+    geometry: {
+      width: 3,
+      height: 1,
+      crop: { x: 0, y: 0, width: 3, height: 1 },
+      sourceToScene: [1, 0, 0, 1, 0, 0],
+      periodic: false,
+    },
+    diameter: 4,
+    hardness: 1,
+    mode: 'paint',
+    color: [255, 0, 0, 255],
+    opacity: 0.5,
+  });
+  const after = stroke.finish({ x: 1.5, y: 0.5 }).planes;
+  const encoded = await encodeEditorRasterPixels(metadata, before, after);
+  const reopened = await decodeEditorRasterPixels(encoded.metadata);
+  expect(encoded.metadata.sniptaleRasterOriginalData).toBe(original);
+  expect([...composeRasterPixels(reopened)]).toEqual([
+    255, 128, 128, 255, 255, 0, 0, 128, 128, 0, 0, 255,
+  ]);
+  expect(composeRasterPixels(reopened)).toEqual(composeRasterPixels(after));
 });

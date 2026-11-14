@@ -75,8 +75,35 @@ function composePixel(
   if (result[target + 3] === 0) result.fill(0, target, target + 3);
 }
 
+/** Blend paint over the accepted visible pixel into a detached color plane. The stroke validates its inputs. */
+export function paintRasterColorPixel(
+  planes: RasterPixelData,
+  index: number,
+  result: Uint8ClampedArray,
+  color: Rgba,
+  coverage: number
+): void {
+  const p = index * 4;
+  composePixel(planes, index, result, p);
+  const sourceAlpha = (color[3] / 255) * coverage;
+  const destinationAlpha = result[p + 3]! / 255;
+  const alpha = sourceAlpha + destinationAlpha * (1 - sourceAlpha);
+  for (let c = 0; c < 3; c++)
+    result[p + c] =
+      alpha > 0
+        ? (color[c]! * sourceAlpha + result[p + c]! * destinationAlpha * (1 - sourceAlpha)) / alpha
+        : 0;
+  result[p + 3] = alpha * 255;
+}
+
 /** Compose independent RGBA bytes; base color, source alpha and visibility remain authoritative. */
 export function composeRasterPixels(planes: RasterPixelData): Uint8ClampedArray {
+  if (planes.visibility === null && planes.key === null) {
+    assertRasterPixelData(planes);
+    const result = planes.color.slice();
+    for (let p = 3; p < result.length; p += 4) if (result[p] === 0) result.fill(0, p - 3, p);
+    return result;
+  }
   return composeRasterRegion(planes, { x: 0, y: 0, width: planes.width, height: planes.height });
 }
 

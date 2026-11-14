@@ -25,7 +25,6 @@ const control = (surface: EditorSurface, name: string) =>
 
 async function parameter(surface: EditorSurface, name: string) {
   const target = control(surface, name);
-  if (!(await target.count())) await control(surface, 'parameters').click();
   await expect(target).toBeVisible();
   return target;
 }
@@ -36,6 +35,9 @@ async function selectSource(surface: EditorSurface, name = 'Source image') {
   await row.click();
   const permission = control(surface, 'allowContentEditing');
   if (await permission.count()) await permission.click();
+  await expect(control(surface, 'enter')).toBeVisible();
+  await control(surface, 'enter').click();
+  await expect(control(surface, 'cursor')).toHaveAttribute('aria-pressed', 'true');
   await expect(control(surface, 'fill')).toBeEnabled();
 }
 
@@ -225,14 +227,20 @@ async function embeddedDrag(
   from: [number, number],
   to: [number, number]
 ) {
-  await expect(control(surface, 'fill')).toBeEnabled();
+  await expect(surface.locator('[data-ui="editor.raster.toolbar"]')).toHaveAttribute(
+    'aria-busy',
+    'false'
+  );
   const a = await imagePoint(surface, ...from),
     b = await imagePoint(surface, ...to);
   await page.mouse.move(a.x, a.y);
   await page.mouse.down();
   await page.mouse.move(b.x, b.y, { steps: 5 });
   await page.mouse.up();
-  await expect(control(surface, 'fill')).toBeEnabled();
+  await expect(surface.locator('[data-ui="editor.raster.toolbar"]')).toHaveAttribute(
+    'aria-busy',
+    'false'
+  );
 }
 
 async function embeddedPixel(surface: FrameLocator, x: number, y: number) {
@@ -278,7 +286,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     await rasterDrag(page, [60, 85], [120, 85]);
     await expect.poll(() => rasterSourcePixel(page, 80, 85)).toEqual([0, 0, 0, 0]);
     await rasterControl(page, 'crop').click();
-    await rasterDrag(page, [30, 20], [300, 160]);
+    await rasterDrag(page, [0, 0], [30, 20]);
+    await rasterDrag(page, [320, 180], [300, 160]);
     await (await rasterParameter(page, 'applyCrop')).click();
     await expect
       .poll(async () => (await rasterDocument(page)).canvasJson)
@@ -342,8 +351,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     await expect
       .poll(async () => (await rasterDocument(reopened)).canvasJson)
       .toContain('"crop":{"x":0,"y":0,"width":320,"height":180}');
-    await rasterControl(reopened, 'erase').click();
-    await (await rasterParameter(reopened, 'restore')).click();
+    await rasterControl(reopened, 'restore').click();
     await rasterDrag(reopened, [60, 85], [120, 85]);
     await expect.poll(() => rasterSourcePixel(reopened, 80, 85)).toEqual([37, 99, 235, 255]);
     await rasterDrag(reopened, [10, 80], [25, 80]);
@@ -394,7 +402,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     await embeddedDrag(page, child, [175, 280], [230, 280]);
     await expect.poll(() => embeddedPixel(child, 200, 280)).toEqual([0, 0, 0, 0]);
     await control(child, 'crop').click();
-    await embeddedDrag(page, child, [10, 150], [930, 450]);
+    await embeddedDrag(page, child, [0, 0], [10, 150]);
+    await embeddedDrag(page, child, [960, 540], [930, 450]);
     await (await parameter(child, 'applyCrop')).click();
     await expect.poll(() => embeddedPixel(child, 650, 100)).toEqual([0, 0, 0, 0]);
     await apply.click();
@@ -424,8 +433,7 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
     await embeddedDrag(page, child, [1, 1], [959, 539]);
     await (await parameter(child, 'applyCrop')).click();
     await expect.poll(() => embeddedPixel(child, 650, 100)).toEqual(outsideCrop);
-    await control(child, 'erase').click();
-    await (await parameter(child, 'restore')).click();
+    await control(child, 'restore').click();
     await embeddedDrag(page, child, [175, 280], [230, 280]);
     await expect.poll(() => embeddedPixel(child, 200, 280)).toEqual(original);
     await embeddedDrag(page, child, [20, 280], [40, 280]);

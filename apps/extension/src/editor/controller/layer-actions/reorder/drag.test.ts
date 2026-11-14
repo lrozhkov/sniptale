@@ -81,3 +81,34 @@ it('blocks invalid, locked, and source-boundary drag reorders', () => {
   expect(reorderLayerObjects(canvas, 'source', 'target')).toBe(false);
   expect(canvas.moveObjectTo).not.toHaveBeenCalled();
 });
+
+it('moves a disjoint block in document order without changing its internal order', async () => {
+  const { reorderLayerBlockObjects } = await import('./drag');
+  const source = createObject('source', { sniptaleType: 'source-image' });
+  const a = createObject('a'),
+    b = createObject('b'),
+    c = createObject('c');
+  const canvas = createCanvas();
+  mocks.getLayerObjects.mockReturnValue([source, a, b, c]);
+  expect(reorderLayerBlockObjects(canvas, ['a', 'c'], 'source')).toBe(true);
+  expect(canvas.moveObjectTo.mock.calls.map(([object]) => object.sniptaleId)).toEqual([
+    'source',
+    'a',
+    'c',
+    'b',
+  ]);
+});
+it('refuses invalid block moves atomically and ignores unchanged orders', async () => {
+  const { reorderLayerBlockObjects } = await import('./drag');
+  const source = createObject('source', { sniptaleType: 'source-image' });
+  const a = createObject('a'),
+    b = createObject('b', { sniptaleLocked: true });
+  const canvas = createCanvas();
+  mocks.getLayerObjects.mockReturnValue([source, a, b]);
+  expect(reorderLayerBlockObjects(canvas, ['a', 'b'], 'source')).toBe(false);
+  expect(reorderLayerBlockObjects(canvas, ['a'], null)).toBe(false);
+  expect(reorderLayerBlockObjects(canvas, ['a'], 'source')).toBe(false);
+  expect(reorderLayerBlockObjects(canvas, ['missing'], 'source')).toBe(false);
+  expect(reorderLayerBlockObjects(canvas, ['a', 'a'], 'source')).toBe(false);
+  expect(canvas.moveObjectTo).not.toHaveBeenCalled();
+});

@@ -63,7 +63,9 @@
     "Initialized direction explicitly and added bounded-read assertions for strict TypeScript.",
     "Adapted eraser stamp spacing and synchronous finalization into brush.ts. Added local independent hardness, selection, crop, periodic clipping, Restore, and cumulative coverage.",
     "Kept draft planes separate from immutable accepted input planes. Removed upstream Canvas, history, pressure, and UI dependencies.",
-    "Clipped brush samples to the native render rectangle in continuous source coordinates before periodic wrapping."
+    "Clipped brush samples to the native render rectangle in continuous source coordinates before periodic wrapping.",
+    "Added source-over paint with an explicit color and opacity, while retaining erase and Restore modes.",
+    "Reused one preview bitmap and emitted dirty rectangle updates; retained cumulative stroke bounds for final publication."
   ],
   "wrapperPolicy": [
     "Validate source dimensions, RGBA data, binary selection, integer seed, tolerance, grow and contiguous before computation.",

@@ -44,6 +44,7 @@ declare global {
       } | null;
       getInteractionState: () => {
         historyIndex: number;
+        historyRevision: number;
         historyReady: boolean;
         historyMuted: number;
         frame: ReturnType<typeof useEditorStore.getState>['frame'];
@@ -185,6 +186,7 @@ function HarnessEditorDebugBridge() {
         const transform = controller.canvas?._currentTransform;
         return {
           historyIndex: useEditorStore.getState().history.index,
+          historyRevision: controller.history?.getRevision() ?? 0,
           historyReady: controller.history !== null,
           historyMuted: controller.historyMuted,
           frame: useEditorStore.getState().frame,

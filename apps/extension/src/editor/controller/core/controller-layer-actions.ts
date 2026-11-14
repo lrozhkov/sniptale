@@ -7,12 +7,14 @@ import {
   applyLayerEffectForController,
   applyLayerTransformationForController,
   mergeSelectedLayersForController,
+  rasterizeLayerForController,
   groupSelectedLayersForController,
   ungroupSelectedLayersForController,
   previewLayerEffectForController,
   removeLayerEffectForController,
   renameLayerForController,
   reorderLayerForController,
+  reorderLayerBlockForController,
   resetLayerEffectPreviewForController,
   resizeLayerForController,
   selectLayerForController,
@@ -27,6 +29,11 @@ export abstract class ImageEditorControllerLayerActions extends ImageEditorContr
   reorderLayer(draggedId: string, targetId: string) {
     flushEditorFreehandCompletion(this.canvas);
     reorderLayerForController(this.getControllerInstance(), draggedId, targetId);
+  }
+
+  reorderLayerBlock(ids: readonly string[], beforeId: string | null) {
+    flushEditorFreehandCompletion(this.canvas);
+    reorderLayerBlockForController(this.getControllerInstance(), ids, beforeId);
   }
 
   selectLayer(
@@ -61,6 +68,11 @@ export abstract class ImageEditorControllerLayerActions extends ImageEditorContr
   resizeLayer(id: string, width: number, height: number) {
     flushEditorFreehandCompletion(this.canvas);
     resizeLayerForController(this.getControllerInstance(), id, width, height);
+  }
+
+  async rasterizeLayer(id: string): Promise<boolean> {
+    flushEditorFreehandCompletion(this.canvas);
+    return rasterizeLayerForController(this.getControllerInstance(), id);
   }
 
   async mergeSelectedLayers() {

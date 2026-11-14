@@ -11,6 +11,7 @@ import {
   getRuntimeMessagesByType,
 } from '../extension-critical.helpers';
 import {
+  enterRasterEditing,
   rasterControl,
   rasterDocument,
   rasterSnapshot,
@@ -156,6 +157,7 @@ async function openFixture(
     return { before, after: { x: node.scrollLeft, y: node.scrollTop } };
   });
   expect(scroll.after).not.toEqual(scroll.before);
+  await enterRasterEditing(page);
   await expect.poll(() => workspace(page)).not.toBeNull();
   return await workspace(page);
 }
@@ -282,7 +284,8 @@ for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
       expect(await pngPixel(page, await canonical(page), 230, 80)).toEqual([0, 0, 0, 0]);
       await assertAccepted();
       await page.screenshot({ path: info.outputPath('crop-preview-visible.png'), fullPage: false });
-      await rasterControl(page, 'crop').click();
+      await rasterControl(page, 'cursor').click();
+      await rasterControl(page, 'erase').click();
       await rasterControl(page, 'adjustments').click();
       const amount = page.getByRole('textbox', { name: 'Amount', exact: true });
       await expect(amount).toBeVisible();

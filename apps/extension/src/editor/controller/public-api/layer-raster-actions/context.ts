@@ -74,7 +74,7 @@ export function createControllerLayerCorrectionContext(
           );
           if (!isCurrent() || !runtime.adapter.isCurrent(target)) return;
           if (!preview) {
-            const published = await runtime.adapter.publishCorrection(target, candidate, signal);
+            const published = await runtime.publishCorrection(target, candidate, signal);
             if (!published && isCurrent()) throw new Error('Raster correction publication refused');
             return;
           }

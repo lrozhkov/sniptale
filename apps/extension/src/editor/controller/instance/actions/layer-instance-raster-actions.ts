@@ -1,3 +1,4 @@
+import { rasterizeEditorControllerLayer } from '../../public-api/layer-raster-actions/transform';
 import { mergeEditorControllerSelectedLayers } from '../../public-api/layer-raster-actions/merge';
 import { resizeEditorControllerLayer } from '../../public-api/layer-raster-actions/resize';
 import type { EditorControllerInstance } from '../types';
@@ -15,4 +16,11 @@ export async function mergeSelectedLayersForController(
   controller: EditorControllerInstance
 ): Promise<void> {
   await mergeEditorControllerSelectedLayers(controller.getPublicApiAdapter());
+}
+
+export async function rasterizeLayerForController(
+  controller: EditorControllerInstance,
+  id: string
+): Promise<boolean> {
+  return rasterizeEditorControllerLayer(controller.getPublicApiAdapter(), id);
 }

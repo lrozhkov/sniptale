@@ -122,7 +122,10 @@ export function collectLayers(canvas: Canvas | null): EditorLayerItem[] {
       previewColor: resolveLayerPreviewColor(object),
       previewDataUrl: null,
       previewTransparent: isTransparentPreview(object),
-      raster: object.sniptaleType === 'image' || object.sniptaleType === 'source-image',
+      raster:
+        object.sniptaleType === 'image' ||
+        object.sniptaleType === 'source-image' ||
+        (isManagedBackgroundObject(object) && object.sniptaleBackgroundMode === 'image'),
       name:
         hasBrowserWindow && isSourceObject(object)
           ? getEditorObjectTypeLabel('browser-frame')

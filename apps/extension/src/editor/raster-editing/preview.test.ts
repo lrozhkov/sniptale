@@ -5,6 +5,7 @@ import type { RasterTarget } from './adapters';
 import { createNativeRasterGeometry } from './coordinates';
 import { createEditorRasterMetadata } from './image-state';
 import { createRasterPreview } from './preview';
+import { applyEditorRasterEffects } from '../controller/layer-effects/raster-effects';
 function bitmap(color: string) {
   const value = getEnv().document.createElement('canvas');
   value.width = value.height = 4;
@@ -113,9 +114,11 @@ it('disposes a late prepared background projection after cancellation and preser
   overlay.pixels(accepted, planes, {
     planes,
     coverage: new Uint8Array(16),
+    strokeBounds: null,
     dirtyBounds: { x: 0, y: 0, width: 4, height: 4 },
     pixels: planes.color,
   });
+  canvas.renderAll();
   overlay.clear();
   const dispose = vi.fn();
   resolve({ object: new Rect({ width: 4, height: 4 }), dispose });
@@ -124,6 +127,152 @@ it('disposes a late prepared background projection after cancellation and preser
   expect(dispose).toHaveBeenCalledOnce();
   canvas.renderAll();
   expect([...canvas.getContext().getImageData(30, 30, 1, 1).data]).toEqual([255, 0, 0, 255]);
+  overlay.dispose();
+  await canvas.dispose();
+});
+
+it('patches the bound bitmap without reinstalling the image for each pointer update', async () => {
+  const image = new FabricImage(bitmap('red'), {
+    left: 0,
+    top: 0,
+    originX: 'left',
+    originY: 'top',
+    scaleX: 10,
+    scaleY: 10,
+  });
+  const canvas = new Canvas(undefined, { width: 80, height: 80, renderOnAddRemove: false });
+  canvas.add(image);
+  const accepted = target(image);
+  const planes = {
+    width: 4,
+    height: 4,
+    color: new Uint8ClampedArray(64),
+    visibility: null,
+    key: null,
+  };
+  for (let i = 0; i < 16; i++) planes.color.set([255, 0, 0, 255], i * 4);
+  const setElement = vi.spyOn(FabricImage.prototype, 'setElement');
+  const overlay = createRasterPreview(canvas);
+  for (const x of [0, 3])
+    overlay.pixels(accepted, planes, {
+      planes,
+      coverage: new Uint8Array(16),
+      strokeBounds: { x: 0, y: 0, width: 4, height: 1 },
+      dirtyBounds: { x, y: 0, width: 1, height: 1 },
+      pixels: new Uint8ClampedArray([0, 0, 255, 255]),
+    });
+  expect(setElement).toHaveBeenCalledOnce();
+  canvas.renderAll();
+  expect([...canvas.getContext().getImageData(5, 5, 1, 1).data]).toEqual([0, 0, 255, 255]);
+  expect([...canvas.getContext().getImageData(35, 5, 1, 1).data]).toEqual([0, 0, 255, 255]);
+  expect([...canvas.toCanvasElement().getContext('2d')!.getImageData(5, 5, 1, 1).data]).toEqual([
+    255, 0, 0, 255,
+  ]);
+  overlay.dispose();
+  setElement.mockRestore();
+  await canvas.dispose();
+});
+
+it('refreshes correction filters once for the latest bitmap per native frame and cancels pending work', async () => {
+  const image = new FabricImage(bitmap('red'), {
+    left: 0,
+    top: 0,
+    originX: 'left',
+    originY: 'top',
+    scaleX: 10,
+    scaleY: 10,
+  });
+  applyEditorRasterEffects(image, [{ id: 'invert', enabled: true }]);
+  const canvas = new Canvas(undefined, { width: 80, height: 80, renderOnAddRemove: false });
+  canvas.add(image);
+  const accepted = target(image),
+    overlay = createRasterPreview(canvas);
+  const planes = {
+    width: 4,
+    height: 4,
+    color: new Uint8ClampedArray(64),
+    visibility: null,
+    key: null,
+  };
+  for (let i = 0; i < 16; i++) planes.color.set([255, 0, 0, 255], i * 4);
+  const filters = vi.spyOn(FabricImage.prototype, 'applyFilters');
+  const update = (x: number) =>
+    overlay.pixels(accepted, planes, {
+      planes,
+      coverage: new Uint8Array(16),
+      strokeBounds: { x: 0, y: 0, width: 4, height: 1 },
+      dirtyBounds: { x, y: 0, width: 1, height: 1 },
+      pixels: new Uint8ClampedArray([0, 0, 255, 255]),
+    });
+  update(0);
+  update(3);
+  expect(filters).not.toHaveBeenCalled();
+  canvas.renderAll();
+  expect(filters).toHaveBeenCalledOnce();
+  expect([...canvas.getContext().getImageData(5, 5, 1, 1).data]).toEqual([255, 255, 0, 255]);
+  expect([...canvas.getContext().getImageData(35, 5, 1, 1).data]).toEqual([255, 255, 0, 255]);
+  expect([...canvas.toCanvasElement().getContext('2d')!.getImageData(5, 5, 1, 1).data]).toEqual([
+    0, 255, 255, 255,
+  ]);
+  update(1);
+  overlay.clear();
+  canvas.renderAll();
+  expect(filters).toHaveBeenCalledOnce();
+  overlay.dispose();
+  filters.mockRestore();
+  await canvas.dispose();
+});
+
+it('refuses an old background projection when a newer patch arrives before the next frame', async () => {
+  const image = new FabricImage(bitmap('red'), { left: 20, top: 20 });
+  const canvas = new Canvas(undefined, { width: 80, height: 80, renderOnAddRemove: false });
+  canvas.add(image);
+  const accepted = { ...target(image), kind: 'background' as const };
+  type Prepared = { object: Rect; dispose: () => void };
+  let resolveFirst!: (value: Prepared) => void;
+  let resolveSecond!: (value: Prepared) => void;
+  const first = new Promise<Prepared>((resolve) => {
+    resolveFirst = resolve;
+  });
+  const second = new Promise<Prepared>((resolve) => {
+    resolveSecond = resolve;
+  });
+  const prepare = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(second);
+  const overlay = createRasterPreview(canvas, {
+    adapter: { preparePreview: prepare, isCurrent: () => true },
+  });
+  const planes = {
+    width: 4,
+    height: 4,
+    color: new Uint8ClampedArray(64).fill(255),
+    visibility: null,
+    key: null,
+  };
+  const update = () =>
+    overlay.pixels(accepted, planes, {
+      planes,
+      coverage: new Uint8Array(16),
+      strokeBounds: { x: 0, y: 0, width: 4, height: 4 },
+      dirtyBounds: { x: 0, y: 0, width: 1, height: 1 },
+      pixels: new Uint8ClampedArray([0, 0, 255, 255]),
+    });
+  update();
+  canvas.renderAll();
+  expect(prepare).toHaveBeenCalledOnce();
+  update();
+  const dispose = vi.fn();
+  resolveFirst({ object: new Rect({ width: 4, height: 4 }), dispose });
+  await first;
+  await Promise.resolve();
+  expect(dispose).toHaveBeenCalledOnce();
+  canvas.renderAll();
+  expect(prepare).toHaveBeenCalledTimes(2);
+  const disposeSecond = vi.fn();
+  resolveSecond({ object: new Rect({ width: 4, height: 4 }), dispose: disposeSecond });
+  await second;
+  await Promise.resolve();
+  overlay.clear();
+  expect(disposeSecond).toHaveBeenCalledOnce();
   overlay.dispose();
   await canvas.dispose();
 });

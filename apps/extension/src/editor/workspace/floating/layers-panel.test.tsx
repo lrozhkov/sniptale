@@ -45,19 +45,21 @@ let root: Root | null = null;
 let toolbar: HTMLDivElement | null = null;
 const initialViewport = useEditorStore.getState().viewport;
 
-const onHeightRatioChangeMock = vi.fn();
+const onHeightChangeMock = vi.fn();
 
 function renderPanel(
   options: {
     collapsed?: boolean;
-    heightRatio?: number | null;
+    preferredHeight?: number | null;
     preferenceError?: string | null;
     inspector?: string;
   } = {}
 ) {
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
+  if (!container) {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  }
   act(() => {
     root?.render(
       <EditorFloatingLayersPanel
@@ -70,11 +72,11 @@ function renderPanel(
           } as never
         }
         hasImage
-        heightRatio={options.heightRatio ?? null}
+        preferredHeight={options.preferredHeight ?? null}
         preferenceError={options.preferenceError ?? null}
         onCollapse={mocks.onCollapse}
         onExpand={mocks.onExpand}
-        onHeightRatioChange={onHeightRatioChangeMock}
+        onHeightChange={onHeightChangeMock}
       />
     );
   });
@@ -92,7 +94,7 @@ function createPointerEvent(type: string, init: { clientY?: number; pointerId: n
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.clearAllMocks();
-  onHeightRatioChangeMock.mockReset();
+  onHeightChangeMock.mockReset();
   Object.defineProperty(window, 'innerHeight', { configurable: true, value: 720 });
 });
 
@@ -116,7 +118,7 @@ it('stops at the map navigator boundary whether the navigator is open or closed'
     viewport: { ...initialViewport, canvasWidth: 1920, canvasHeight: 1080 },
   });
 
-  renderPanel({ heightRatio: 1 });
+  renderPanel({ preferredHeight: 875 });
   const panel = container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]');
   expect(panel?.style.height).toBe('495px');
 
@@ -138,7 +140,7 @@ it('renders resizable expanded layers panel with the current layers content', ()
   renderPanel();
 
   const panel = container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]');
-  expect(panel?.style.height).toBe('320px');
+  expect(panel?.style.height).toBe('516px');
   expect(
     container?.querySelector('[data-ui="editor.floating.layers.resize-handle"]')
   ).not.toBeNull();
@@ -166,14 +168,14 @@ it('resizes the expanded layers panel within viewport bounds', () => {
   const panel = container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]');
   expect(panel?.style.height).toBe('516px');
   expect(handle?.releasePointerCapture).toHaveBeenCalledWith(1);
-  expect(onHeightRatioChangeMock).toHaveBeenCalledWith(1);
+  expect(onHeightChangeMock).toHaveBeenCalledWith(516);
 });
 
-it('restores the expanded layers panel from a relative viewport height', () => {
-  renderPanel({ heightRatio: 0.5 });
+it('restores the expanded layers panel from a session pixel height', () => {
+  renderPanel({ preferredHeight: 350 });
 
   const panel = container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]');
-  expect(panel?.style.height).toBe('258px');
+  expect(panel?.style.height).toBe('350px');
 });
 
 it('moves collapsed layers to the bottom-right toolbar without insert image action', () => {
@@ -338,4 +340,38 @@ it('returns from AI to layers without clearing the fixed multi-selection', () =>
   );
   expect(mocks.setInspector).toHaveBeenCalledWith('tool');
   expect(mocks.editorController.clearSelection).not.toHaveBeenCalled();
+});
+
+it.each([
+  'tool',
+  'browser-frame',
+  'frame',
+  'canvas-size',
+  'meta',
+  'image-size',
+  'ai',
+  'layer-effects',
+])('uses the same 875px initial height in %s when the screen permits it', (inspector) => {
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 1400 });
+  renderPanel({ inspector });
+  expect(
+    container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]')?.style.height
+  ).toBe('875px');
+});
+it('restores the session height after collapse, mode switch and temporary viewport limits', () => {
+  renderPanel({ preferredHeight: 400 });
+  const height = () =>
+    container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]')?.style.height;
+  expect(height()).toBe('400px');
+  renderPanel({ preferredHeight: 400, collapsed: true });
+  expect(height()).toBeUndefined();
+  renderPanel({ preferredHeight: 400, inspector: 'ai' });
+  expect(height()).toBe('400px');
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 500 });
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(height()).toBe('296px');
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 900 });
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(height()).toBe('400px');
+  expect(onHeightChangeMock).not.toHaveBeenCalled();
 });

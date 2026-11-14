@@ -119,7 +119,8 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
   const runRasterLayerAction = createRasterLayerActionRunner(
     selectLayer,
     withHistoryMuted,
-    args.setInspector
+    args.setInspector,
+    () => args.controller.getRasterRuntime?.() ?? null
   );
   const openLayerEffects = createOpenLayerEffectsHandler(
     selectLayer,
@@ -128,7 +129,8 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
     args.openLayerEffects,
     args.syncActiveTool,
     args.setLayerEffectsCategory,
-    args.setInspector
+    args.setInspector,
+    () => args.controller.getRasterRuntime?.() ?? null
   );
   const layerEffectActions = createLayerEffectActionProps(
     args.controller,
@@ -235,12 +237,18 @@ function createSelectionActionHelpers(controller: ReturnType<typeof useEditorCon
 function createRasterLayerActionRunner(
   selectLayer: ReturnType<typeof useEditorController>['selectLayer'],
   withHistoryMuted: ReturnType<typeof useEditorController>['withHistoryMuted'],
-  setInspector: EditorInspectorStoreSlice['setInspector']
+  setInspector: EditorInspectorStoreSlice['setInspector'],
+  getRasterRuntime: ReturnType<typeof useEditorController>['getRasterRuntime']
 ) {
   return async (layerId: string, action: () => Promise<void>) => {
     const keepParameters = useEditorStore.getState().inspector === 'layer-effects';
+    const raster = getRasterRuntime()?.getSnapshot();
+    const preserveRaster = raster?.available && raster.editing && raster.targetId === layerId;
     withHistoryMuted(() => {
-      selectLayer(layerId, { focusViewport: false });
+      selectLayer(layerId, {
+        focusViewport: false,
+        ...(preserveRaster ? { preserveActiveTool: true } : {}),
+      });
       // Selection enters Select mode; parameter admission keeps its current panel.
       if (keepParameters) setInspector('layer-effects');
     });
@@ -256,7 +264,8 @@ function createOpenLayerEffectsHandler(
   openLayerEffects: EditorInspectorLocalState['openLayerEffects'],
   syncActiveTool: EditorInspectorStoreSlice['syncActiveTool'],
   setLayerEffectsCategory: EditorInspectorStoreSlice['setLayerEffectsCategory'],
-  setInspector: EditorInspectorStoreSlice['setInspector']
+  setInspector: EditorInspectorStoreSlice['setInspector'],
+  getRasterRuntime: ReturnType<typeof useEditorController>['getRasterRuntime']
 ) {
   return (
     layerId: string,
@@ -264,11 +273,16 @@ function createOpenLayerEffectsHandler(
     activeEffectId: EditorLayerEffectCommandId | null = null,
     options?: { focusViewport?: boolean }
   ) => {
+    const raster = getRasterRuntime()?.getSnapshot();
+    const preserveRaster = raster?.available && raster.editing && raster.targetId === layerId;
     withHistoryMuted(() => {
-      selectLayer(layerId, { focusViewport: options?.focusViewport ?? false });
+      selectLayer(layerId, {
+        focusViewport: options?.focusViewport ?? false,
+        ...(preserveRaster ? { preserveActiveTool: true } : {}),
+      });
     });
     syncActiveTool('select');
-    setControllerActiveTool('select');
+    if (!preserveRaster) setControllerActiveTool('select');
     openLayerEffects(layerId, category, activeEffectId);
     setLayerEffectsCategory(category);
     setInspector('layer-effects');

@@ -1,8 +1,10 @@
 export const EDITOR_OWNER_MAPPINGS = [
   {
     owner: 'editor-frame-annotation-export',
-    productionFile: 'apps/extension/src/editor/controller/public-api/document/frame-annotation-export.ts',
-    reason: 'Frame export tests prove ordered rendering, proxy restoration, format conversion, cancellation and stale results.',
+    productionFile:
+      'apps/extension/src/editor/controller/public-api/document/frame-annotation-export.ts',
+    reason:
+      'Frame export tests prove ordered rendering, proxy restoration, format conversion, cancellation and stale results.',
     testFiles: ['apps/extension/src/editor/frame-annotation/export.test.ts'],
   },
   {
@@ -883,6 +885,27 @@ action-feedback-click-fields.test.tsx',
     testFiles: [
       'apps/extension/src/editor/state/actions.test.ts',
       'apps/extension/src/editor/state/viewport-preview.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-controller-layer-publication',
+    productionFile: 'apps/extension/src/editor/controller/core/controller-layer-actions.ts',
+    reason:
+      'Real layer publication and Undo proof supplements the existing controller delegation contract.',
+    testFiles: [
+      'apps/extension/src/editor/controller/core/controller-layer-actions.test.ts',
+      'apps/extension/src/editor/controller/core/controller.instance-delegation.test.ts',
+    ],
+  },
+  {
+    owner: 'editor-controller-layer-selection',
+    productionFile: 'apps/extension/src/editor/controller/public-api/layer-selection-actions.ts',
+    reason: 'Block publication and existing selection callbacks share this public API boundary.',
+    testFiles: [
+      'apps/extension/src/editor/controller/core/controller-layer-actions.test.ts',
+      'apps/extension/src/editor/controller/public-api/layer-selection-actions.test.ts',
+      'apps/extension/src/editor/controller/public-api/actions.coverage.test.ts',
+      'apps/extension/src/editor/controller/public-api/actions.callbacks.coverage.test.ts',
     ],
   },
   {

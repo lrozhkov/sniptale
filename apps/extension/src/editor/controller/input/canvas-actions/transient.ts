@@ -11,6 +11,7 @@ interface CancelEditorTransientInteractionOptions {
   cropGuide: Rect | null;
   activeTool: string;
   preserveActiveTool?: boolean;
+  preserveSelection?: boolean;
   preservePendingSimplify?: boolean;
   clearCropSelection: () => void;
   switchToSelectTool: () => void;
@@ -68,7 +69,7 @@ export function cancelEditorTransientInteraction(
     canvas.exitSelectionGroup()
   ) {
     changed = true;
-  } else if (canvas.getActiveObjects().length > 0) {
+  } else if (!options.preserveSelection && canvas.getActiveObjects().length > 0) {
     canvas.discardActiveObject();
     changed = true;
   } else if (activeTool !== 'select' && !options.preserveActiveTool) {

@@ -8,10 +8,10 @@ import type {
   EditorFrameSettings,
 } from '../../../../apps/extension/src/features/editor/document/types';
 import {
+  enterRasterEditing,
   rasterControl,
   rasterDocument,
   rasterHistory,
-  rasterParameter,
   rasterSnapshot,
   rasterSourcePixel,
   sourceClientPoint,
@@ -193,7 +193,7 @@ async function fixture(
   await expect
     .poll(() => rasterSnapshot(page))
     .toMatchObject({ available: true, permission: 'allowed', targetId: 'raster-target' });
-  await expect(rasterControl(page, 'toolbar')).toBeVisible();
+  await enterRasterEditing(page);
   return sources;
 }
 
@@ -420,7 +420,7 @@ for (const [index, fit] of fits.entries()) {
         })
         .toBeGreaterThan(40);
       await page.screenshot({ path: info.outputPath('background-erased.png'), fullPage: false });
-      await (await rasterParameter(page, 'restore')).click();
+      await rasterControl(page, 'restore').click();
       await page.mouse.click(point.x, point.y);
       await expect.poll(() => rasterHistory(page)).toBe(history + 2);
       await expect
@@ -443,9 +443,7 @@ for (const [index, zoom] of [0.2, 1, 4].entries()) {
     }, info) => {
       await fixture(page, hostOrigin, viewport.size, kind);
       await page.evaluate((zoom) => window.__sniptaleEditorHarness!.setZoomLevel(zoom), zoom);
-      const row = page.getByRole('button', { name: 'Raster target', exact: true });
-      await row.hover();
-      await row.click();
+      await expect.poll(() => rasterSnapshot(page)).toMatchObject({ editing: true });
       const before = await nativeTarget(page),
         vector = await vectorJson(page),
         history = await rasterHistory(page);
@@ -472,7 +470,7 @@ for (const [index, zoom] of [0.2, 1, 4].entries()) {
         })
         .toBeGreaterThan(40);
       await page.screenshot({ path: info.outputPath('transformed-erased.png'), fullPage: false });
-      await (await rasterParameter(page, 'restore')).click();
+      await rasterControl(page, 'restore').click();
       await page.mouse.click(point.x, point.y);
       await expect.poll(() => rasterHistory(page)).toBe(history + 2);
       expect(await rasterSourcePixel(page, 32, 16)).toEqual([37, 99, 235, 255]);
@@ -499,7 +497,7 @@ test('managed tiled blurred background keeps rectangle selection for Hide, Resto
   await expect
     .poll(() => rasterSnapshot(page))
     .toMatchObject({ selection: 'active', tool: 'select', busy: false });
-  await (await rasterParameter(page, 'hideSelected')).click();
+  await page.keyboard.press('Delete');
   await expect.poll(() => rasterHistory(page)).toBe(history + 1);
   await expect
     .poll(() => rasterSnapshot(page))
@@ -517,8 +515,7 @@ test('managed tiled blurred background keeps rectangle selection for Hide, Resto
   expect(await retainedPixel(page, 'sniptaleRasterVisibilityData', 18, 16)).toEqual([
     255, 255, 255, 255,
   ]);
-  await rasterControl(page, 'erase').first().click();
-  await (await rasterParameter(page, 'restore')).click();
+  await rasterControl(page, 'restore').click();
   const center = await backgroundPoint(page, 'tile', 8, 32, 16);
   await page.mouse.click(center.x, center.y);
   await expect.poll(() => rasterHistory(page)).toBe(history + 2);
@@ -528,7 +525,7 @@ test('managed tiled blurred background keeps rectangle selection for Hide, Resto
   await expect
     .poll(() => retainedPixel(page, 'backgroundImageData', 28, 14))
     .toEqual([37, 99, 235, 255]);
-  await rasterControl(page, 'erase').first().click();
+  await rasterControl(page, 'erase').click();
   await page.mouse.click(center.x, center.y);
   await expect.poll(() => rasterHistory(page)).toBe(history + 3);
   await expect
@@ -554,3 +551,33 @@ test('managed tiled blurred background keeps rectangle selection for Hide, Resto
     fullPage: false,
   });
 });
+
+for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`managed image background opens row corrections without conversion ${viewport.name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await fixture(page, hostOrigin, viewport.size, 'background');
+    const row = page.locator('[data-editor-layer-id="raster-target"]').first();
+    await row.hover();
+    const settings = row.locator('[data-ui="editor.layers.image-settings"]');
+    await expect(settings).toBeDisabled();
+    await row.getByRole('button', { name: 'Unlock layer', exact: true }).click();
+    const history = await rasterHistory(page);
+    await row.hover();
+    await expect(settings).toBeEnabled();
+    await settings.click();
+    await expect(page.getByRole('textbox', { name: 'Amount', exact: true })).toBeVisible();
+    expect(await rasterHistory(page)).toBe(history);
+    expect(await nativeTarget(page)).toMatchObject({
+      sniptaleId: 'raster-target',
+      sniptaleType: 'background',
+    });
+    expect((await rasterDocument(page)).canvasJson).toContain('"sniptaleRole":"background"');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.screenshot({
+      path: info.outputPath('background-row-corrections.png'),
+      fullPage: false,
+    });
+  });
+}

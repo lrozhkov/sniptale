@@ -1,28 +1,41 @@
-import { useRef, useSyncExternalStore, type ReactNode } from 'react';
+import editIcon from '@iconify-icons/tabler/edit';
+import editOffIcon from '@iconify-icons/tabler/edit-off';
+import arrowsTransferIcon from '@iconify-icons/tabler/arrows-transfer-up-down';
+import arrowsMaximizeIcon from '@iconify-icons/tabler/arrows-maximize';
+import aspectRatioIcon from '@iconify-icons/tabler/aspect-ratio';
+import { Icon } from '@iconify/react';
+import { CanvasToolButtons } from '@sniptale/ui/canvas-tools';
+import { ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
+import {
+  createContext,
+  useContext,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import {
   Check,
+  MousePointer2,
   Copy,
-  Crop,
-  Eraser,
   FlipHorizontal2,
   FlipVertical2,
-  Lasso,
-  PaintBucket,
-  Scan,
   SlidersHorizontal,
-  SquareDashed,
-  SquarePlus,
-  SquareMinus,
-  Undo2,
-  WandSparkles,
+  SquareDashedX,
   X,
 } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductRange, ProductSelect } from '@sniptale/ui/product-form-controls';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import type { EditorRasterRuntime } from '../../raster-editing/runtime';
-import { RasterParametersPopover } from './raster-parameters-popover';
-import { DrawingColorOptions, DrawingOptionsDivider } from '../../../ui/drawing-tools/options';
+import {
+  rasterParameterIcons,
+  rasterSelectionIcons,
+  rasterToolIcons,
+} from '../../raster-editing/tool-icons';
+import { NumericValueField } from '../../chrome/ui';
+import { InspectorSurface } from '../../../ui/compact-inspector-controls/layout';
+import './raster-tools.css';
+import { CompactColorSelector } from '../../../ui/color-selector';
 
 type RasterSnapshot = ReturnType<EditorRasterRuntime['getSnapshot']>;
 type RasterMessage =
@@ -30,19 +43,40 @@ type RasterMessage =
 const message = (key: RasterMessage) => translate(`editor.raster.${key}`);
 const BUTTON_CLASS = 'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !p-0';
 
+const RasterPropertiesDisclosure = createContext<{
+  collapsedTool: RasterSnapshot['tool'];
+  setCollapsedTool: (tool: RasterSnapshot['tool']) => void;
+} | null>(null);
+
+/** Keep property disclosure separate from the canvas editing mode. */
+export function RasterToolPropertiesProvider({ children }: { children: ReactNode }) {
+  const [collapsedTool, setCollapsedTool] = useState<RasterSnapshot['tool']>(null);
+  return (
+    <RasterPropertiesDisclosure.Provider value={{ collapsedTool, setCollapsedTool }}>
+      {children}
+    </RasterPropertiesDisclosure.Provider>
+  );
+}
+
+/** Read presentation-only disclosure shared by the primary and property rails. */
+export function useRasterToolPropertiesDisclosure() {
+  return useContext(RasterPropertiesDisclosure);
+}
+
 function RasterButton(props: {
   name: RasterMessage;
   children: ReactNode;
   onClick: () => void;
   active?: boolean;
   disabled?: boolean;
+  hint?: string;
 }) {
   return (
     <ContentToolbarButton
       type="button"
-      tone="outline"
+      tone="property"
       className={BUTTON_CLASS}
-      title={message(props.name)}
+      title={[message(props.name), props.hint].filter(Boolean).join('\n')}
       aria-label={message(props.name)}
       aria-pressed={props.active}
       active={props.active ?? false}
@@ -55,29 +89,55 @@ function RasterButton(props: {
   );
 }
 
-function RasterRange(props: {
-  name: RasterMessage;
+function RasterGlyph({
+  icon,
+  size,
+}: {
+  icon: (typeof rasterToolIcons)[keyof typeof rasterToolIcons];
+  size: number;
+}) {
+  return (
+    <Icon
+      icon={icon}
+      ssr
+      aria-hidden
+      width={size}
+      height={size}
+      className="tabler-icon shrink-0"
+      style={{ display: 'block' }}
+    />
+  );
+}
+
+function RasterNumberField(props: {
+  name: 'tolerance' | 'grow' | 'brushSize' | 'hardness' | 'opacity';
   value: number;
   max: number;
   min?: number;
   onChange: (value: number) => void;
 }) {
+  const unit = props.name === 'brushSize' || props.name === 'grow' ? 'px' : '%';
   return (
-    <label className="flex shrink-0 items-center gap-2 text-xs text-[var(--sniptale-color-text-secondary)]">
-      <span>{message(props.name)}</span>
-      <ProductRange
-        className="!w-20"
-        aria-label={message(props.name)}
-        data-ui={`editor.raster.${props.name}`}
+    <InspectorSurface
+      data-ui={`editor.raster.${props.name}`}
+      title={message(props.name)}
+      className="editor-raster-numeric flex h-7 w-[104px] shrink-0 items-center gap-1"
+    >
+      <RasterGlyph icon={rasterParameterIcons[props.name]} size={16} />
+      <NumericValueField
+        className="min-w-0 flex-1"
+        label={message(props.name)}
+        value={props.value}
         min={props.min ?? 0}
         max={props.max}
-        value={props.value}
-        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
+        unit={unit}
+        precision={0}
+        step={1}
+        enterBehavior="blur"
+        onPreviewValue={props.onChange}
+        onCommitValue={props.onChange}
       />
-      <span className="w-8 text-right tabular-nums text-[var(--sniptale-color-text-primary)]">
-        {props.value}
-      </span>
-    </label>
+    </InspectorSurface>
   );
 }
 
@@ -90,78 +150,43 @@ function RasterParameters(props: { runtime: EditorRasterRuntime; snapshot: Raste
     tool === 'remove-color' ||
     (tool === 'select' && snapshot.selectionMethod === 'wand');
   return (
-    <div ref={boundaryRef} className="flex items-center gap-2">
+    <div ref={boundaryRef} className="flex flex-wrap items-center gap-2">
       {tool === 'select' ? (
         <>
           {(['rectangle', 'lasso', 'wand'] as const).map((method) => (
             <RasterButton
               key={method}
               name={method}
+              hint={message('selectionModifierHint')}
               active={snapshot.selectionMethod === method}
               onClick={() => runtime.setSelectionMethod(method)}
             >
-              {method === 'rectangle' ? (
-                <SquareDashed size={16} />
-              ) : method === 'lasso' ? (
-                <Lasso size={16} />
-              ) : (
-                <WandSparkles size={16} />
-              )}
+              <RasterGlyph icon={rasterSelectionIcons[method]} size={16} />
             </RasterButton>
           ))}
-          <DrawingOptionsDivider vertical={false} />
-          {(['new', 'add', 'subtract'] as const).map((mode) => (
-            <ContentToolbarButton
-              key={mode}
-              dataUi={`editor.raster.selectionMode.${mode}`}
-              tone="property"
-              className={BUTTON_CLASS}
-              aria-label={message(mode)}
-              active={snapshot.selectionMode === mode}
-              aria-pressed={snapshot.selectionMode === mode}
-              title={message(mode)}
-              onClick={() => runtime.setSelectionMode(mode)}
-            >
-              {mode === 'new' ? (
-                <SquareDashed aria-hidden size={16} />
-              ) : mode === 'add' ? (
-                <SquarePlus aria-hidden size={16} />
-              ) : (
-                <SquareMinus aria-hidden size={16} />
-              )}
-            </ContentToolbarButton>
-          ))}
-          <DrawingOptionsDivider vertical={false} />
-          <RasterButton name="clearSelection" onClick={() => runtime.clearSelection()}>
-            <X size={16} />
-          </RasterButton>
-          <RasterButton name="invertSelection" onClick={() => runtime.invertSelection()}>
-            <Scan size={16} />
-          </RasterButton>
-          <RasterButton name="selectAll" onClick={() => runtime.selectAll()}>
-            <SquareDashed size={16} />
-          </RasterButton>
         </>
       ) : null}
       {region ? (
         <>
-          <RasterRange
+          <RasterNumberField
             name="tolerance"
             value={settings.tolerance}
             max={100}
             onChange={(tolerance) => runtime.updateSettings({ tolerance })}
           />
-          <label className="flex shrink-0 items-center gap-1.5 text-xs">
-            <input
-              type="checkbox"
-              checked={settings.contiguous}
-              onChange={(event) =>
-                runtime.updateSettings({ contiguous: event.currentTarget.checked })
-              }
-            />
-            {message('contiguous')}
-          </label>
-          <RasterRange
+          <ContentToolbarButton
+            dataUi="editor.raster.contiguous"
+            tone="property"
+            className={BUTTON_CLASS}
+            title={message('contiguous')}
+            aria-label={message('contiguous')}
+            active={settings.contiguous}
+            aria-pressed={settings.contiguous}
+            onClick={() => runtime.updateSettings({ contiguous: !settings.contiguous })}
+          >
+            <RasterGlyph icon={rasterParameterIcons.contiguous} size={16} />
+          </ContentToolbarButton>
+          <RasterNumberField
             name="grow"
             value={settings.grow}
             max={32}
@@ -169,42 +194,31 @@ function RasterParameters(props: { runtime: EditorRasterRuntime; snapshot: Raste
           />
         </>
       ) : null}
-      {tool === 'fill' ? (
-        <DrawingColorOptions
-          colors={[settings.color]}
+      {tool === 'fill' || tool === 'brush' ? (
+        <CompactColorSelector
+          className="editor-raster-color"
+          pickerOnly
+          triggerVariant="swatch"
+          title={message('color')}
           floatingBoundaryRef={boundaryRef}
           floatingPlacement="auto"
-          vertical={false}
           allowAlpha
+          allowTransparent={false}
           label={message('color')}
           value={settings.color}
-          onSelect={(color) => runtime.updateSettings({ color })}
+          onChange={(color) => runtime.updateSettings({ color })}
         />
       ) : null}
-      {tool === 'erase' || tool === 'restore' ? (
+      {tool === 'brush' || tool === 'erase' || tool === 'restore' ? (
         <>
-          <RasterButton
-            name="erase"
-            active={tool === 'erase'}
-            onClick={() => runtime.setTool('erase')}
-          >
-            <Eraser size={16} />
-          </RasterButton>
-          <RasterButton
-            name="restore"
-            active={tool === 'restore'}
-            onClick={() => runtime.setTool('restore')}
-          >
-            <Undo2 size={16} />
-          </RasterButton>
-          <RasterRange
+          <RasterNumberField
             name="brushSize"
             value={settings.brushSize}
             min={1}
             max={512}
             onChange={(brushSize) => runtime.updateSettings({ brushSize })}
           />
-          <RasterRange
+          <RasterNumberField
             name="hardness"
             value={settings.hardness}
             max={100}
@@ -212,30 +226,41 @@ function RasterParameters(props: { runtime: EditorRasterRuntime; snapshot: Raste
           />
         </>
       ) : null}
+      {tool === 'brush' ? (
+        <RasterNumberField
+          name="opacity"
+          value={settings.opacity}
+          max={100}
+          onChange={(opacity) => runtime.updateSettings({ opacity })}
+        />
+      ) : null}
       {tool === 'crop' ? (
         <>
-          <label className="flex items-center gap-2 text-xs">
-            {message('cropRatio')}
-            <ProductSelect<RasterSnapshot['cropRatio']>
-              dataUi="editor.raster.cropRatio"
-              aria-label={message('cropRatio')}
-              title={message('cropRatio')}
-              value={snapshot.cropRatio}
-              onChange={(value) => runtime.setCropRatio(value)}
-              controlSize="sm"
-              containerClassName="!w-auto shrink-0"
-              className="!h-7 !min-h-7 !w-auto"
-              options={[
-                { value: 'free', label: message('freeRatio') },
-                { value: 'original', label: message('originalRatio') },
-                { value: '1:1', label: '1:1' },
-                { value: '4:3', label: '4:3' },
-                { value: '16:9', label: '16:9' },
-              ]}
-            />
-          </label>
+          <div
+            data-ui="editor.raster.cropRatio"
+            role="group"
+            aria-label={message('cropRatio')}
+            className="flex items-center gap-1"
+          >
+            <RasterButton
+              name="freeRatio"
+              active={snapshot.cropRatio === 'free'}
+              onClick={() => runtime.setCropRatio('free')}
+            >
+              <RasterGlyph icon={arrowsMaximizeIcon} size={16} />
+            </RasterButton>
+            <RasterButton
+              name="originalRatio"
+              active={snapshot.cropRatio === 'original'}
+              onClick={() => runtime.setCropRatio('original')}
+            >
+              <RasterGlyph icon={aspectRatioIcon} size={16} />
+            </RasterButton>
+          </div>
+          <ContentToolbarDivider className="!my-0 !h-5" />
           <RasterButton
             name="applyCrop"
+            hint="Enter"
             disabled={!snapshot.cropPending}
             onClick={() => {
               void runtime.applyCrop();
@@ -243,36 +268,8 @@ function RasterParameters(props: { runtime: EditorRasterRuntime; snapshot: Raste
           >
             <Check size={16} />
           </RasterButton>
-          <RasterButton name="cancelCrop" onClick={() => runtime.cancelCrop()}>
+          <RasterButton name="cancelCrop" hint="Esc" onClick={() => runtime.cancelCrop()}>
             <X size={16} />
-          </RasterButton>
-        </>
-      ) : null}
-      {snapshot.selection === 'active' ? (
-        <>
-          <RasterButton
-            name="fillSelected"
-            onClick={() => {
-              void runtime.fillSelected();
-            }}
-          >
-            <PaintBucket size={16} />
-          </RasterButton>
-          <RasterButton
-            name="hideSelected"
-            onClick={() => {
-              void runtime.hideSelected();
-            }}
-          >
-            <Eraser size={16} />
-          </RasterButton>
-          <RasterButton
-            name="copySelected"
-            onClick={() => {
-              void runtime.copySelected();
-            }}
-          >
-            <Copy size={16} />
           </RasterButton>
         </>
       ) : null}
@@ -280,100 +277,210 @@ function RasterParameters(props: { runtime: EditorRasterRuntime; snapshot: Raste
   );
 }
 
-/** Render selected-image controls from the runtime's small immutable snapshot. */
+/** Render exclusive raster tools in the existing primary toolbar. */
 export function EditorRasterTools(props: {
   runtime: EditorRasterRuntime;
-  onOpenAdjustments: (targetId: string) => void;
+  onOpenAdjustments?: (targetId: string) => void;
 }) {
   useAppLocale();
-  const snapshot = useSyncExternalStore(props.runtime.subscribe, props.runtime.getSnapshot);
-  if (!snapshot.available) return null;
-  const blocked = snapshot.permission !== 'allowed';
+  const { runtime } = props;
+  const disclosure = useRasterToolPropertiesDisclosure();
+  const snapshot = useSyncExternalStore(runtime.subscribe, runtime.getSnapshot);
+  if (!snapshot.editing) return null;
   const tools = [
-    {
-      tool: 'select',
-      name: 'select',
-      icon:
-        snapshot.selectionMethod === 'lasso'
-          ? Lasso
-          : snapshot.selectionMethod === 'wand'
-            ? WandSparkles
-            : SquareDashed,
-    },
-    { tool: 'fill', name: 'fill', icon: PaintBucket },
-    { tool: 'remove-color', name: 'removeColor', icon: WandSparkles },
-    { tool: 'erase', name: 'erase', icon: Eraser },
-    { tool: 'crop', name: 'crop', icon: Crop },
+    { tool: 'brush', name: 'brush' },
+    { tool: 'select', name: 'select' },
+    { tool: 'fill', name: 'fill' },
+    { tool: 'remove-color', name: 'removeColor' },
+    { tool: 'erase', name: 'erase' },
+    { tool: 'restore', name: 'restore' },
+    { tool: 'crop', name: 'crop' },
   ] as const;
   return (
     <div
       data-ui="editor.raster.toolbar"
-      aria-label={message('title')}
       title={snapshot.targetName}
-      className="flex min-w-0 items-center gap-1"
+      aria-busy={snapshot.busy}
+      className="contents"
     >
-      {blocked ? (
-        <>
-          <span className="max-w-64 text-xs">{message('contentLocked')}</span>
+      <CanvasToolButtons
+        dataUi="editor.raster"
+        actions={[
+          {
+            id: 'cursor',
+            label: message('cursor'),
+            icon: <MousePointer2 size={18} />,
+            active: snapshot.tool === null,
+            onSelect: () => runtime.selectTool(null),
+          },
+        ]}
+      />
+      <ContentToolbarDivider />
+      <CanvasToolButtons
+        dataUi="editor.raster"
+        actions={tools.map(({ tool, name }) => ({
+          id: name,
+          label:
+            tool === 'select'
+              ? `${message(name)}\n${message('selectionModifierHint')}`
+              : message(name),
+          icon: <RasterGlyph icon={rasterToolIcons[tool]} size={18} />,
+          active: snapshot.tool === tool,
+          onSelect: () => {
+            if (snapshot.tool === tool) {
+              disclosure?.setCollapsedTool(disclosure.collapsedTool === tool ? null : tool);
+              return;
+            }
+            if (runtime.getSnapshot().busy) return;
+            disclosure?.setCollapsedTool(null);
+            runtime.selectTool(tool);
+          },
+        }))}
+      />
+      <ContentToolbarDivider />
+      <CanvasToolButtons
+        dataUi="editor.raster"
+        actions={[
+          {
+            id: 'flipHorizontal',
+            label: message('flipHorizontal'),
+            icon: <FlipHorizontal2 size={18} />,
+            onSelect: () => {
+              if (!runtime.getSnapshot().busy) void runtime.flipHorizontal();
+            },
+          },
+          {
+            id: 'flipVertical',
+            label: message('flipVertical'),
+            icon: <FlipVertical2 size={18} />,
+            onSelect: () => {
+              if (!runtime.getSnapshot().busy) void runtime.flipVertical();
+            },
+          },
+          {
+            id: 'adjustments',
+            label: message('adjustments'),
+            icon: <SlidersHorizontal size={18} />,
+            onSelect: () => {
+              if (!runtime.getSnapshot().busy && snapshot.targetId)
+                props.onOpenAdjustments?.(snapshot.targetId);
+            },
+          },
+        ]}
+      />
+      <ContentToolbarDivider />
+      <ContentToolbarButton
+        dataUi="editor.raster.exit"
+        title={message('exitEditing')}
+        aria-label={message('exitEditing')}
+        onClick={() => runtime.finishEditing()}
+      >
+        <Icon icon={editOffIcon} ssr aria-hidden width={18} height={18} />
+      </ContentToolbarButton>
+    </div>
+  );
+}
+
+/** Commands for the accepted pixel mask have their own contextual strip. */
+export function EditorRasterSelectionActions({ runtime }: { runtime: EditorRasterRuntime }) {
+  useAppLocale();
+  const snapshot = useSyncExternalStore(runtime.subscribe, runtime.getSnapshot);
+  if (!snapshot.editing || snapshot.selection === 'none') return null;
+  const active = snapshot.selection === 'active';
+  return (
+    <div
+      data-ui="editor.raster.selection-actions"
+      aria-busy={snapshot.busy}
+      className="flex items-center gap-2"
+    >
+      <ContentToolbarButton
+        dataUi="editor.raster.invertSelection"
+        tone="utility"
+        className={BUTTON_CLASS}
+        title={message('invertSelection')}
+        aria-label={message('invertSelection')}
+        disabled={!active}
+        onClick={() => {
+          if (!runtime.getSnapshot().busy) runtime.invertSelection();
+        }}
+      >
+        <Icon icon={arrowsTransferIcon} ssr aria-hidden width={16} height={16} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        dataUi="editor.raster.copySelected"
+        tone="utility"
+        className={BUTTON_CLASS}
+        title={message('copySelected')}
+        aria-label={message('copySelected')}
+        disabled={!active}
+        onClick={() => {
+          if (!runtime.getSnapshot().busy) void runtime.copySelected();
+        }}
+      >
+        <Copy size={16} />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        dataUi="editor.raster.clearSelection"
+        tone="utility"
+        className={BUTTON_CLASS}
+        title={message('clearSelection')}
+        aria-label={message('clearSelection')}
+        onClick={() => {
+          if (!runtime.getSnapshot().busy) runtime.clearSelection();
+        }}
+      >
+        <SquareDashedX size={16} />
+      </ContentToolbarButton>
+    </div>
+  );
+}
+
+/** Show the entry command or the selected raster tool's properties below the primary rail. */
+export function EditorRasterProperties(props: { runtime: EditorRasterRuntime }) {
+  useAppLocale();
+  const { runtime } = props;
+  const disclosure = useRasterToolPropertiesDisclosure();
+  const snapshot = useSyncExternalStore(runtime.subscribe, runtime.getSnapshot);
+  if (!snapshot.available) return null;
+  const blocked = snapshot.permission !== 'allowed';
+  if (!snapshot.editing)
+    return (
+      <div className="flex w-64 max-w-full flex-wrap items-center gap-2">
+        {blocked ? (
+          <>
+            <span className="max-w-64 px-2 text-xs">{message('contentLocked')}</span>
+            <ContentToolbarButton
+              dataUi="editor.raster.allowContentEditing"
+              tone="utility"
+              className="!h-auto !min-h-7 !w-full !px-3 py-1 text-xs whitespace-normal"
+              onClick={() => runtime.allowContentEditing()}
+            >
+              {message('allowContentEditing')}
+            </ContentToolbarButton>
+          </>
+        ) : (
           <ContentToolbarButton
-            dataUi="editor.raster.allowContentEditing"
-            onClick={() => props.runtime.allowContentEditing()}
+            dataUi="editor.raster.enter"
+            tone="utility"
+            className="!h-7 !min-h-7 !w-full !px-3 gap-1.5 text-xs"
+            onClick={() => {
+              disclosure?.setCollapsedTool(null);
+              runtime.enterEditing();
+            }}
           >
-            {message('allowContentEditing')}
+            <Icon icon={editIcon} ssr aria-hidden width={16} height={16} />
+            <span>{message('edit')}</span>
           </ContentToolbarButton>
-        </>
-      ) : (
-        <fieldset disabled={snapshot.busy} className="contents">
-          {tools.map(({ tool, name, icon: Icon }) => (
-            <RasterButton
-              key={tool}
-              name={name}
-              active={snapshot.tool === tool || (tool === 'erase' && snapshot.tool === 'restore')}
-              onClick={() => {
-                props.runtime.setTool(snapshot.tool === tool ? null : tool);
-              }}
-            >
-              <Icon size={16} />
-            </RasterButton>
-          ))}
-          <span className="hidden min-[1500px]:contents">
-            <RasterParameters runtime={props.runtime} snapshot={snapshot} />
-          </span>
-          <span className="contents min-[1500px]:hidden">
-            <RasterParametersPopover
-              title={message('parameters')}
-              trigger={<SlidersHorizontal size={16} />}
-              triggerClassName={BUTTON_CLASS}
-            >
-              <RasterParameters runtime={props.runtime} snapshot={snapshot} />
-            </RasterParametersPopover>
-          </span>
-          <RasterButton
-            name="flipHorizontal"
-            onClick={() => {
-              void props.runtime.flipHorizontal();
-            }}
-          >
-            <FlipHorizontal2 size={16} />
-          </RasterButton>
-          <RasterButton
-            name="flipVertical"
-            onClick={() => {
-              void props.runtime.flipVertical();
-            }}
-          >
-            <FlipVertical2 size={16} />
-          </RasterButton>
-          <RasterButton
-            name="adjustments"
-            onClick={() => {
-              if (snapshot.targetId) props.onOpenAdjustments(snapshot.targetId);
-            }}
-          >
-            <SlidersHorizontal size={16} />
-          </RasterButton>
-        </fieldset>
-      )}
+        )}
+      </div>
+    );
+  if ((!snapshot.tool || disclosure?.collapsedTool === snapshot.tool) && !snapshot.error)
+    return null;
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-2" data-ui="editor.raster.properties">
+      <div role="group" aria-busy={snapshot.busy} className="contents">
+        <RasterParameters runtime={runtime} snapshot={snapshot} />
+      </div>
       {snapshot.busy ? (
         <span role="status" className="sr-only">
           {message('busy')}

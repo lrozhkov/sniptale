@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { useEditorController } from '../../application/controller-context';
-import { createLayerDropHandler } from './drop';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useLayerPanelHeight } from './height';
 import { useLayerPanelState } from './state';
 import type { EditorInspectorLayersPanelProps } from './types';
 
 export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
-  const controller = useEditorController();
   const state = useLayerPanelState({
     expanded: args.expanded,
     draggedLayerId: args.draggedLayerId,
@@ -38,16 +35,6 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
     list.addEventListener('scroll', remember, { passive: true });
     return () => list.removeEventListener('scroll', remember);
   }, [height.listRef, state.expanded, onScrollOffsetChange]);
-  const handleLayerDrop = useMemo(
-    () =>
-      createLayerDropHandler({
-        controller,
-        draggedLayerId: state.draggedLayerId,
-        setDraggedLayerId: state.setDraggedLayerId,
-        setDragOverLayerId: state.setDragOverLayerId,
-      }),
-    [controller, state.draggedLayerId, state.setDraggedLayerId, state.setDragOverLayerId]
-  );
   const openLayerEffects = useRef(args.onOpenLayerEffects);
   // Stable row events call only the handler from the latest committed panel render.
   useLayoutEffect(() => {
@@ -60,7 +47,6 @@ export function useLayerPanelView(args: EditorInspectorLayersPanelProps) {
 
   return {
     actions: {
-      handleLayerDrop,
       handleOpenLayerEffects,
       toggleAutoNavigateSelectedLayer: () =>
         state.setAutoNavigateSelectedLayer((enabled) => !enabled),

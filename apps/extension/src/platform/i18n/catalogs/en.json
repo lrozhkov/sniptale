@@ -2894,6 +2894,10 @@
       "groupLayers": "Group layers",
       "ungroupLayers": "Ungroup layers",
       "duplicateLayer": "Duplicate layer",
+      "dragLayer": "Drag layer",
+      "layerImageSettings": "Image adjustments",
+      "layerRasterizeAndAdjust": "Rasterize and open adjustments",
+      "layerRasterizeFailed": "Could not prepare layer adjustments. Click to retry.",
       "renameLayer": "Rename layer",
       "toggleLayerSelection": "Add layer to selection",
       "layerAutoNavigate": "Navigate to selected element",
@@ -3913,6 +3917,8 @@
       "restorePrompt": "Restore prompt"
     },
     "raster": {
+      "brush": "Brush",
+      "opacity": "Opacity",
       "title": "Image content",
       "select": "Pixel selection",
       "rectangle": "Rectangle selection",
@@ -3926,6 +3932,7 @@
       "new": "New selection",
       "add": "Add to selection",
       "subtract": "Subtract from selection",
+      "selectionModifierHint": "Shift: add · Ctrl: subtract",
       "clearSelection": "Clear pixel selection",
       "invertSelection": "Invert pixel selection",
       "selectAll": "Select all pixels",
@@ -3934,7 +3941,7 @@
       "copySelected": "Copy selection to a new layer",
       "tolerance": "Tolerance",
       "contiguous": "Contiguous area",
-      "grow": "Grow region",
+      "grow": "Expansion",
       "brushSize": "Brush size",
       "hardness": "Hardness",
       "color": "Fill color",
@@ -3951,7 +3958,10 @@
       "contentLocked": "Image content is locked. Allow editing to use these tools.",
       "singleImage": "Select one image to edit",
       "failed": "Could not apply the image edit. Try again.",
-      "busy": "Applying image edit…"
+      "busy": "Applying image edit…",
+      "edit": "Edit",
+      "exitEditing": "Exit image editing",
+      "cursor": "Cursor"
     }
   },
   "exportModal": {

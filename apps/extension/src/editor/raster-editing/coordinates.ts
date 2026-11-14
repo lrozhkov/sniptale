@@ -146,16 +146,26 @@ export function rasterCropBounds(
   end: SourcePoint,
   ratio: number | null
 ): PixelBounds | null {
-  const left = Math.max(0, Math.floor(Math.min(start.x, end.x))),
-    top = Math.max(0, Math.floor(Math.min(start.y, end.y)));
-  let right = Math.min(size.width, Math.ceil(Math.max(start.x, end.x))),
-    bottom = Math.min(size.height, Math.ceil(Math.max(start.y, end.y)));
+  if (start.x === end.x || start.y === end.y) return null;
+  const clamp = (value: number, max: number) => Math.max(0, Math.min(max, value));
+  const forwardX = end.x >= start.x,
+    forwardY = end.y >= start.y;
+  const anchorX = clamp(forwardX ? Math.floor(start.x) : Math.ceil(start.x), size.width);
+  const anchorY = clamp(forwardY ? Math.floor(start.y) : Math.ceil(start.y), size.height);
+  const edgeX = clamp(forwardX ? Math.ceil(end.x) : Math.floor(end.x), size.width);
+  const edgeY = clamp(forwardY ? Math.ceil(end.y) : Math.floor(end.y), size.height);
+  let width = Math.abs(edgeX - anchorX),
+    height = Math.abs(edgeY - anchorY);
   if (ratio) {
-    const width = Math.min(right - left, (bottom - top) * ratio);
-    right = left + Math.floor(width);
-    bottom = top + Math.floor(width / ratio);
+    width = Math.floor(Math.min(width, height * ratio));
+    height = Math.floor(width / ratio);
   }
-  return right > left && bottom > top
-    ? { x: left, y: top, width: right - left, height: bottom - top }
+  return width > 0 && height > 0
+    ? {
+        x: forwardX ? anchorX : anchorX - width,
+        y: forwardY ? anchorY : anchorY - height,
+        width,
+        height,
+      }
     : null;
 }

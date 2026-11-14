@@ -305,9 +305,14 @@ it('computes clamped integer source crop bounds with reversed corners and option
   const start = { x: 55.2, y: 48.8 },
     end = { x: 2.8, y: 3.2 };
   expect(rasterCropBounds(size, start, end, null)).toEqual({ x: 2, y: 3, width: 54, height: 46 });
-  expect(rasterCropBounds(size, start, end, 1)).toEqual({ x: 2, y: 3, width: 46, height: 46 });
-  expect(rasterCropBounds(size, start, end, 4 / 3)).toEqual({ x: 2, y: 3, width: 54, height: 40 });
-  expect(rasterCropBounds(size, start, end, 16 / 9)).toEqual({ x: 2, y: 3, width: 54, height: 30 });
+  expect(rasterCropBounds(size, start, end, 1)).toEqual({ x: 10, y: 3, width: 46, height: 46 });
+  expect(rasterCropBounds(size, start, end, 4 / 3)).toEqual({ x: 2, y: 9, width: 54, height: 40 });
+  expect(rasterCropBounds(size, start, end, 16 / 9)).toEqual({
+    x: 2,
+    y: 19,
+    width: 54,
+    height: 30,
+  });
   expect(rasterCropBounds(size, { x: -3, y: -4 }, { x: 100, y: 100 }, 80 / 60)).toEqual({
     x: 0,
     y: 0,
@@ -315,6 +320,7 @@ it('computes clamped integer source crop bounds with reversed corners and option
     height: 60,
   });
   expect(rasterCropBounds(size, { x: 5, y: 5 }, { x: 5, y: 5 }, null)).toBeNull();
+  expect(rasterCropBounds(size, { x: 5.5, y: 5.5 }, { x: 5.5, y: 5.5 }, null)).toBeNull();
   expect(start).toEqual({ x: 55.2, y: 48.8 });
   expect(end).toEqual({ x: 2.8, y: 3.2 });
 });

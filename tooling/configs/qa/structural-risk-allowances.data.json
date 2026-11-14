@@ -6859,10 +6859,10 @@
       "file": "apps/extension/src/editor/raster-editing/preview.ts",
       "symbol": "createRasterPreview",
       "owner": "extension:editor:raster-editing",
-      "reason": "tool-noise: Independent read-only inspection confirmed this exact body. One native preview lifetime owns render interception, accepted-render fallback, ancestor cache restoration, preparation, cancellation and disposal. Chrome drawing has a separate owner. Isolation, render failure and late disposal have deterministic proof. Fresh final architecture review must validate this binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any new independent authority, effect, recovery path or resource lifetime. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-13",
-      "astHash": "e09e2428b29663c21a9d120add7f10133303c62fdfb271cdea0028dc85c8912d",
+      "reason": "tool-noise: Read-only diagnosis inspected this exact native preview lifetime. Render interception, bound bitmap, queued frame refresh, revision cancellation and prepared-resource disposal share the same Canvas binding. Clear cancels queued refresh and obsolete preparation; disposal removes the frame listener and restores native rendering. Length triggers the metric without an independent lifetime. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent state authority, publisher, resource lifetime, recovery contract or fixture lifetime. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-14",
+      "astHash": "f843d0288ea59dae9582c1cd684f66b9eb0aaba0caac0bc638b04321843caf68",
       "signatureHash": "385bc776d69241205ce32f71e136c0de16ca3290004108cb5cfb6daa664d53a3"
     },
     {
@@ -6936,10 +6936,10 @@
       "file": "apps/extension/src/editor/raster-editing/session.ts",
       "symbol": "createRasterSession",
       "owner": "extension:editor:raster-editing",
-      "reason": "tool-noise: Independent read-only inspection confirmed this corrected session body. One editing generation owns target, selection, drafts, cancellation and publication. Invalid native revisions reuse the existing refresh owner only after disposal, generation and target admission. Late work cannot clear a newer job. Pure geometry and native preview have separate owners. The exact own-background receipt remains separate from stale cleanup. Fresh correction architecture review must validate this binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent authority, effect, recovery path or resource lifetime. Reassess if the observer expands beyond this exact synchronous replacement. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-13",
-      "astHash": "2c728ab52035cfca9321f4c9f73a4e6979c11da6111efb1c07268676d52935b9",
+      "reason": "tool-noise: Read-only diagnosis inspected this exact editing session factory. Target admission, gesture/crop drafts, history suspension, correction replacement and publication completion share one generation and cancellation owner. Pure geometry, computation and native publication have separate dependencies. Length triggers the metric without another lifetime. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent state authority, publisher, resource lifetime, recovery contract or fixture lifetime. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-14",
+      "astHash": "6f9b7e05c22b0a0cedab9b31d2c7ac517d403bd4c038fc8be7671eb1aea8e284",
       "signatureHash": "75a4dd75f00eab356f4fdf4706650b5371d2dbdebf09112f5d4ec0938c0c6317"
     },
     {
@@ -6958,10 +6958,10 @@
       "file": "tooling/qa/proof/focused-coverage/maps/editor.mjs",
       "symbol": "<file>",
       "owner": "tooling:qa:proof",
-      "reason": "tool-noise: This passive owner map adds one exact production-file to existing frame-export test binding. It changes discovery to execute the real consumer suite and adds no runtime code, effect, state receiver or competing test-selection authority. Score remains two, effects and state zero, cohesion one; splitting this exact mapping into a forwarding registry would distribute the same owner map. Fresh complete-candidate architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes. Reassess independent state receivers, writers, resource lifetimes, effect owners, recovery contracts or fixture lifetimes. Remove when the analyzer models this cohesive boundary.",
-      "reviewDate": "2026-11-13",
-      "astHash": "ad01319266ce2959b2bb00b11ea2103024731b7598436654e5bb8d42aa337168",
+      "reason": "tool-noise: Read-only diagnosis inspected this exact passive editor proof map. Two exact mappings retain controller delegation and public API consumers alongside layer publication and Undo proof when adjacent tests suppress directory fallback. Discovery remains in the existing resolver. The data adds no effect, state receiver or competing selection authority. File length triggers the metric. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent discovery authority, effect, state receiver, resource lifetime or fixture lifetime. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-14",
+      "astHash": "f89bf3a6eee82cf22debdb49bba59a38f9f1f343e3bd424a0154d0c9358c4cb0",
       "signatureHash": "7a13b18139e98ce0402d622cf6c65ce22d9078bec692f0278b4edb3280798ef8"
     },
     {
@@ -6969,11 +6969,11 @@
       "file": "apps/extension/src/editor/raster-editing/session.ts",
       "symbol": "<file>",
       "owner": "extension:editor:raster-editing",
-      "reason": "tool-noise: Independent read-only inspection confirmed this corrected session body. One editing generation owns target, selection, drafts, cancellation and publication. Invalid native revisions reuse the existing refresh owner only after disposal, generation and target admission. Late work cannot clear a newer job. Pure geometry and native preview have separate owners. The exact own-background receipt remains separate from stale cleanup. Fresh correction architecture review must validate this binding.",
-      "removalCondition": "Remove when the exact AST or signature changes. Reassess any independent authority, effect, recovery path or resource lifetime. Reassess if the observer expands beyond this exact synchronous replacement. Remove when the analyzer models this cohesive owner.",
-      "reviewDate": "2026-11-13",
-      "astHash": "cf189410d0debba2ab42e9c5b44f5f070949089cdef73078f384c44659ebf8bd",
-      "signatureHash": "d4b484584b54a446446e9a3dd1169f4701e82b5b113aa3d521c1a9522fff048f"
+      "reason": "tool-noise: Read-only diagnosis inspected this exact editing session. Target, selection, decoded pixels, gesture/crop drafts, history suspension and replacement receipt share one generation and cancellation owner. Managed correction reuses replacement admission and completion. Computation, geometry, native publication and presentation remain separate dependencies. Length and related session state trigger the metric without another authority. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent state authority, publisher, resource lifetime, recovery contract or fixture lifetime. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-14",
+      "astHash": "e7f2a07184addbac5fa87bffef8640533e2c1038542af6023900ff326cd72f76",
+      "signatureHash": "360d8a98897ea4415c85bde50ee0224ae2671f148321f3e4ac7bcf7289088b18"
     },
     {
       "rule": "structural-function-risk",
@@ -7117,6 +7117,50 @@
       "reviewDate": "2026-11-13",
       "astHash": "cf03d6f5d7e0e5496bd30aba9987f91bac54e6ff0566d28c5af0c0aa6439b724",
       "signatureHash": "cc733bf225495f29752598ec970964435042cbf31f74bf4820b6b589d9f8a07d"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/raster-editing/interaction.ts",
+      "symbol": "mountRasterInteraction",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Read-only diagnosis inspected this exact mounted Canvas interaction. Pointer capture, modifiers, cursor, crop Enter ownership, focus restoration, session subscription and DOM listeners share one mount and disposal operation. The function dispatches session commands and delegates crop geometry. Length triggers the metric without another document or resource authority. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent state authority, publisher, resource lifetime, recovery contract or fixture lifetime. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-14",
+      "astHash": "91fdd8d575794719a91bbf59345d64fe223ffd55aa104ea3bd9b8915d7a0c9a3",
+      "signatureHash": "9a2db23d2b4a0c2a4fcb40059877efb9b7c6f8a09b08cc4fe5245f6db9670bf9"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/editor/raster-editing/runtime.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:editor:raster-editing",
+      "reason": "tool-noise: Read-only diagnosis inspected this exact Canvas runtime proof. Background publication, history replacement and managed correction cases use the same runtime fixture, adapter, controlled ordering and cleanup. The correction candidate is passive data. File length alone triggers the metric; the added cases introduce no independent fixture or runtime owner. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent state authority, publisher, resource lifetime, recovery contract or fixture lifetime. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-14",
+      "astHash": "38c9c1dec237eed65ec71503b0ccd445f20462639d13fd67cca7c04c617f6b45",
+      "signatureHash": "0d3b0e85af1bd2c52d0ff57e73f27c18ab2a32f6d6b3ac669e92551e789ffa25"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/editor/inspector/layers/pointer-reorder.ts",
+      "symbol": "useLayerPointerReorder",
+      "owner": "extension:editor:inspector",
+      "reason": "tool-noise: Read-only diagnosis inspected this exact pointer reorder hook. Pointer admission, preview order, click suppression, edge scrolling, cancellation and listener cleanup share one gesture lifetime. Document mutation remains the injected release callback. Pure order projection and authoritative constraint comparison have separate operations in drop.ts. Length triggers the metric without an independent state or resource authority. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent state authority, publisher, resource lifetime, recovery contract or fixture lifetime. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-14",
+      "astHash": "97900128655db0cd9c80d0618d56fad0e478a9a1cc08ee461ba6b92f3b28af08",
+      "signatureHash": "7768824947bcb9fb04b1f77e70e52fdf050bea243ac1b6d58f2632c282108f56"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "tooling/test/e2e/extension-critical/extension-critical-image-design.spec.ts",
+      "symbol": "<file>",
+      "owner": "tooling:test:e2e",
+      "reason": "tool-noise: Read-only diagnosis inspected this exact image design proof. Updated layer actions follow their current user interactions. The list overflow case resizes its panel through the real handle before duplicating layers, preserving scroll assertions with the larger default height. These steps use the same page, image fixture, viewport matrix and screenshot owner. File length triggers the metric without another fixture lifetime. Final independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes. Reassess an independent discovery authority, effect, state receiver, resource lifetime or fixture lifetime. Remove when the analyzer models this cohesive scope.",
+      "reviewDate": "2026-11-14",
+      "astHash": "4672fd06010c204a7aad40df44d58514df1508fa09ea7b270d21caef1191b0cc",
+      "signatureHash": "a30ce1583bdefa2916cd1164a75d2b28240c71dde0f15be74742e4642e06b62e"
     }
   ]
 }

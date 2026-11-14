@@ -390,3 +390,12 @@ describe('bounded raster composition', () => {
     color.slice = slice;
   });
 });
+
+it('copies raw RGBA without aliasing and clears hidden RGB exactly like region composition', () => {
+  const source = planes(33, 44, 55, 0, 11, 22, 33, 128, 99, 88, 77, 255);
+  const output = composeRasterPixels(source);
+  expect(output).toEqual(composeRasterRegion(source, { x: 0, y: 0, width: 3, height: 1 }));
+  expect(output).toEqual(new Uint8ClampedArray([0, 0, 0, 0, 11, 22, 33, 128, 99, 88, 77, 255]));
+  output[4] = 200;
+  expect(source.color[4]).toBe(11);
+});

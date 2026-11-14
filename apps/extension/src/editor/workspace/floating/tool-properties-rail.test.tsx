@@ -57,7 +57,9 @@ vi.mock('../../drawing/options', async (importOriginal) => ({
 }));
 
 vi.mock('./raster-tools', () => ({
-  EditorRasterTools: (props: {
+  useRasterToolPropertiesDisclosure: () => null,
+  EditorRasterSelectionActions: () => <div data-ui="raster-selection-actions" />,
+  EditorRasterProperties: (props: {
     runtime: { setTool: (tool: string) => void };
     onBeforeToolChange?: () => void;
   }) => (
@@ -417,4 +419,88 @@ it('keeps the selected source when the raster tool callback activates Select', (
   expect(controller.canvas.getActiveObjects()).toEqual([source]);
   activeCanvasObjects = [];
   controller.getRasterRuntime.mockReturnValue(null);
+});
+
+it('centers the raster entry below the main toolbar instead of its Cursor button', () => {
+  const toolbar = document.createElement('div');
+  toolbar.dataset['ui'] = 'editor.floating.tool-rail';
+  toolbar.getBoundingClientRect = () => new DOMRect(400, 12, 400, 50);
+  const cursor = document.createElement('button');
+  cursor.dataset['ui'] = 'editor.floating.tool-rail.select';
+  cursor.getBoundingClientRect = () => new DOMRect(406, 18, 28, 28);
+  toolbar.append(cursor);
+  document.body.append(toolbar);
+  const width = vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(270);
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(42);
+  const snapshot = { available: true, editing: false };
+  controller.getRasterRuntime.mockReturnValue({
+    subscribe: () => () => undefined,
+    getSnapshot: () => snapshot,
+  } as never);
+  try {
+    renderRail({
+      activeTool: 'select',
+      selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType: 'image' },
+    });
+    const panel = container.querySelector<HTMLElement>(
+      '[data-ui="editor.floating.raster-tools"]'
+    )?.parentElement;
+    expect(panel?.style.left).toBe('465px');
+    expect(panel?.style.top).toBe('63px');
+  } finally {
+    width.mockRestore();
+    height.mockRestore();
+    toolbar.remove();
+    controller.getRasterRuntime.mockReturnValue(null);
+  }
+});
+
+it.each(['active', 'empty'] as const)(
+  'keeps the separate %s mask strip when Cursor has no properties',
+  (mask) => {
+    const snapshot = { available: true, editing: true, tool: null, error: null, selection: mask };
+    controller.getRasterRuntime.mockReturnValue({
+      subscribe: () => () => undefined,
+      getSnapshot: () => snapshot,
+    } as never);
+    try {
+      renderRail({
+        activeTool: 'select',
+        selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType: 'image' },
+      });
+      expect(container.querySelector('[data-ui="editor.floating.raster-tools"]')).toBeNull();
+      expect(
+        container.querySelector('[data-ui="editor.floating.raster-selection-actions"]')
+      ).not.toBeNull();
+      expect(container.querySelector('[data-ui="raster-selection-actions"]')).not.toBeNull();
+    } finally {
+      controller.getRasterRuntime.mockReturnValue(null);
+    }
+  }
+);
+
+it('omits the raster action strip when a selected image has no pixel mask', () => {
+  const snapshot = {
+    available: true,
+    editing: true,
+    tool: 'select',
+    error: null,
+    selection: 'none',
+  };
+  controller.getRasterRuntime.mockReturnValue({
+    subscribe: () => () => undefined,
+    getSnapshot: () => snapshot,
+  } as never);
+  try {
+    renderRail({
+      activeTool: 'select',
+      selection: { hasSelection: true, selectedObjectCount: 1, selectedObjectType: 'image' },
+    });
+    expect(container.querySelector('[data-ui="editor.floating.raster-tools"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-ui="editor.floating.raster-selection-actions"]')
+    ).toBeNull();
+  } finally {
+    controller.getRasterRuntime.mockReturnValue(null);
+  }
 });

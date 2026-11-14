@@ -156,8 +156,8 @@ function correctionRuntime() {
       prepareBackgroundCorrection: vi.fn(async () => candidate),
       prepareCorrectionPreview: vi.fn(async () => transient),
       prepareNativeCorrectionPreview: vi.fn(async () => transient),
-      publishCorrection: vi.fn(async () => true),
     },
+    publishCorrection: vi.fn(async () => true),
     runCorrectionPreparation: vi.fn(
       async (
         _id: string,
@@ -191,7 +191,7 @@ it('prepares exact-id background preview without publishing accepted state or hi
     expect.any(AbortSignal)
   );
   expect(runtime.showPreparedPreview).toHaveBeenCalledWith('background', runtime.transient);
-  expect(runtime.adapter.publishCorrection).not.toHaveBeenCalled();
+  expect(runtime.publishCorrection).not.toHaveBeenCalled();
   expect(runtime.target.identity.sniptaleEffects).toBe(accepted);
   expect(controller.commitHistory).not.toHaveBeenCalled();
   context.rasterCorrections?.reset();
@@ -205,7 +205,7 @@ it('publishes corrections once through the candidate owner and discards late pre
   const controller = { ...createMutationController(), canvas };
   const context = createControllerLayerCorrectionContext(controller);
   await context.rasterCorrections?.apply('background', (effects) => effects, false);
-  expect(runtime.adapter.publishCorrection).toHaveBeenCalledWith(
+  expect(runtime.publishCorrection).toHaveBeenCalledWith(
     runtime.target,
     runtime.candidate,
     expect.any(AbortSignal)
@@ -234,14 +234,14 @@ it('uses transient source/image corrections without mutating the accepted render
     expect.any(AbortSignal)
   );
   expect(runtime.adapter.prepareBackgroundCorrection).not.toHaveBeenCalled();
-  expect(runtime.adapter.publishCorrection).not.toHaveBeenCalled();
+  expect(runtime.publishCorrection).not.toHaveBeenCalled();
   expect(runtime.showPreparedPreview).toHaveBeenCalledWith('image-id', runtime.transient);
   expect(controller.commitHistory).not.toHaveBeenCalled();
 });
 
 it('preserves accepted effects and history when candidate publication is refused', async () => {
   const runtime = correctionRuntime();
-  runtime.adapter.publishCorrection.mockResolvedValue(false);
+  runtime.publishCorrection.mockResolvedValue(false);
   runtimeMocks.get.mockReturnValue(runtime);
   const canvas: Canvas = Object.create(Canvas.prototype);
   const controller = { ...createMutationController(), canvas };
@@ -308,7 +308,7 @@ it.each(['preview', 'remove'] as const)(
     refuse(new Error('Canvas closed during correction'));
     await Promise.resolve();
     expect(runtime.target.identity.sniptaleEffects).toBe(accepted);
-    expect(runtime.adapter.publishCorrection).not.toHaveBeenCalled();
+    expect(runtime.publishCorrection).not.toHaveBeenCalled();
     expect(runtime.showPreparedPreview).not.toHaveBeenCalled();
     expect(runtime.reportError).not.toHaveBeenCalled();
     expect(controller.commitHistory).not.toHaveBeenCalled();
@@ -343,7 +343,7 @@ it.each(['preview', 'remove'] as const)(
     await Promise.resolve();
     expect(runtime.target.identity.sniptaleEffects).toBe(accepted);
     expect(runtime.reportError).not.toHaveBeenCalled();
-    expect(runtime.adapter.publishCorrection).not.toHaveBeenCalled();
+    expect(runtime.publishCorrection).not.toHaveBeenCalled();
     expect(controller.commitHistory).not.toHaveBeenCalled();
   }
 );
@@ -367,7 +367,7 @@ it.each(['closed-canvas', 'unmounted-runtime'] as const)(
     expect(() => resetEditorControllerLayerEffectPreview(controller, 'background')).not.toThrow();
     expect(runtime.target.identity.sniptaleEffects).toBe(accepted);
     expect(runtime.reportError).not.toHaveBeenCalled();
-    expect(runtime.adapter.publishCorrection).not.toHaveBeenCalled();
+    expect(runtime.publishCorrection).not.toHaveBeenCalled();
     expect(controller.commitHistory).not.toHaveBeenCalled();
   }
 );

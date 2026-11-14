@@ -73,6 +73,7 @@ export function createRasterPreview(canvas: Canvas, options: RasterPreviewOption
     render: FabricObject['render'];
   } | null = null;
   let source: { target: RasterTarget; bitmap: HTMLCanvasElement } | null = null;
+  let pendingRefresh: { target: RasterTarget; bitmap: HTMLCanvasElement } | null = null;
   let native = false,
     disposed = false,
     sequence = 0,
@@ -101,6 +102,7 @@ export function createRasterPreview(canvas: Canvas, options: RasterPreviewOption
     }
   };
   function clear() {
+    pendingRefresh = null;
     sequence++;
     abort?.abort();
     abort = null;
@@ -179,23 +181,42 @@ export function createRasterPreview(canvas: Canvas, options: RasterPreviewOption
       }
     );
   }
+  const removeBefore = canvas.on('before:render', ({ ctx }) => {
+    if (ctx !== canvas.getContext() || !pendingRefresh) return;
+    const pending = pendingRefresh;
+    pendingRefresh = null;
+    if (source?.target !== pending.target) return;
+    if (pending.target.kind === 'background' && options.adapter) {
+      prepareBackground(pending.target, pending.bitmap);
+    } else if (
+      binding?.target === pending.target &&
+      isImage(binding.value.object) &&
+      pending.target.identity.sniptaleEffects?.length
+    ) {
+      try {
+        const image = binding.value.object;
+        image.removeTexture(image.cacheKey);
+        image.removeTexture(`${image.cacheKey}_filtered`);
+        applyEditorRasterEffects(image, [...pending.target.identity.sniptaleEffects]);
+      } catch (error) {
+        options.onError?.(error);
+      }
+    }
+  });
   return {
     install,
     clear,
     pixels(target: RasterTarget, before: RasterPixelData, draft: RasterBrushPreview) {
-      if (disposed) return;
+      if (disposed || !draft.dirtyBounds || !draft.pixels) return;
       const bitmap = ensureBitmap(target, before);
       if (!patchBitmap(bitmap, draft)) return;
       if (target.kind === 'background' && options.adapter) {
-        prepareBackground(target, bitmap);
-        return;
+        // Refuse older projections before the next frame can consume this patch.
+        sequence++;
+        abort?.abort();
+        abort = null;
       }
-      if (!binding || !isImage(binding.value.object)) return;
-      const image = binding.value.object,
-        crop = target.geometry.crop;
-      image.setElement(bitmap, { width: crop.width, height: crop.height });
-      image.set({ cropX: crop.x, cropY: crop.y });
-      applyEditorRasterEffects(image, [...(target.identity.sniptaleEffects ?? [])]);
+      pendingRefresh = { target, bitmap };
       dirtyAncestors(target.identity);
       canvas.requestRenderAll();
     },
@@ -219,6 +240,7 @@ export function createRasterPreview(canvas: Canvas, options: RasterPreviewOption
       if (disposed) return;
       clear();
       disposed = true;
+      removeBefore();
       canvas.renderCanvas = originalCanvasRender;
     },
   };

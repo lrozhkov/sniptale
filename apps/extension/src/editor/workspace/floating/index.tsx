@@ -9,6 +9,7 @@ import { EditorFloatingWorkspaceOverlays } from './overlays';
 import { EditorFloatingRightStack } from './right-stack';
 import { resolveFloatingSurfaceRoute } from './routes';
 import { EditorFloatingToolRail } from './tool-rail';
+import { RasterToolPropertiesProvider } from './raster-tools';
 import { EditorFloatingToolPropertiesRail } from './tool-properties-rail';
 import { EditorFloatingViewControls } from './view-controls';
 import { getFloatingWorkspaceEdgeInsetStyle, useFloatingWorkspaceEdgeInsets } from './edge-insets';
@@ -52,11 +53,11 @@ type FloatingLoadedSurfacesProps = {
   collapsedDrawingOptionsTool: EditorTool | null;
   hasImage: boolean;
   layersCollapsed: boolean;
-  layersHeightRatio: number | null;
+  layersHeight: number | null;
   layersPreferenceError: string | null;
   onCollapseLayers: () => void;
   onExpandLayers: () => void;
-  onLayersHeightRatioChange: (heightRatio: number | null) => void;
+  onLayersHeightChange: (preferredHeight: number | null) => void;
   setDismissedLeftDrawerTool: (tool: EditorTool | null) => void;
   surfaceRoute: ReturnType<typeof resolveFloatingSurfaceRoute>;
   toolbarProps: ReturnType<typeof useEditorToolbarController>;
@@ -67,11 +68,11 @@ function EditorFloatingLoadedSurfaces({
   collapsedDrawingOptionsTool,
   hasImage,
   layersCollapsed,
-  layersHeightRatio,
+  layersHeight,
   layersPreferenceError,
   onCollapseLayers,
   onExpandLayers,
-  onLayersHeightRatioChange,
+  onLayersHeightChange,
   setDismissedLeftDrawerTool,
   surfaceRoute,
   toolbarProps,
@@ -90,11 +91,11 @@ function EditorFloatingLoadedSurfaces({
         hasImage={hasImage}
         inspectorMeta={toolbarProps.inspectorMeta}
         layersCollapsed={layersCollapsed}
-        layersHeightRatio={layersHeightRatio}
+        layersHeight={layersHeight}
         layersPreferenceError={layersPreferenceError}
         onCollapseLayers={onCollapseLayers}
         onExpandLayers={onExpandLayers}
-        onLayersHeightRatioChange={onLayersHeightRatioChange}
+        onLayersHeightChange={onLayersHeightChange}
       />
       <EditorFloatingSelectionSurfaces
         collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
@@ -112,21 +113,21 @@ function EditorFloatingDockedPanels({
   hasImage,
   inspectorMeta,
   layersCollapsed,
-  layersHeightRatio,
+  layersHeight,
   layersPreferenceError,
   onCollapseLayers,
   onExpandLayers,
-  onLayersHeightRatioChange,
+  onLayersHeightChange,
 }: Pick<
   Parameters<typeof EditorFloatingLoadedSurfaces>[0],
   | 'documentController'
   | 'hasImage'
   | 'layersCollapsed'
-  | 'layersHeightRatio'
+  | 'layersHeight'
   | 'layersPreferenceError'
   | 'onCollapseLayers'
   | 'onExpandLayers'
-  | 'onLayersHeightRatioChange'
+  | 'onLayersHeightChange'
 > & {
   inspectorMeta: ReturnType<typeof useEditorToolbarController>['inspectorMeta'];
 }) {
@@ -135,12 +136,12 @@ function EditorFloatingDockedPanels({
       hasImage={hasImage}
       inspectorMeta={inspectorMeta}
       layersCollapsed={layersCollapsed}
-      layersHeightRatio={layersHeightRatio}
+      layersHeight={layersHeight}
       layersPreferenceError={layersPreferenceError}
       documentController={documentController}
       onCollapseLayers={onCollapseLayers}
       onExpandLayers={onExpandLayers}
-      onLayersHeightRatioChange={onLayersHeightRatioChange}
+      onLayersHeightChange={onLayersHeightChange}
     />
   );
 }
@@ -205,10 +206,10 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
   const edgeInsets = useFloatingWorkspaceEdgeInsets(hasImage);
   const {
     layersCollapsed,
-    layersHeightRatio,
+    layersHeight,
     layersPreferenceError,
     setLayersCollapsed,
-    setLayersHeightRatio,
+    setLayersHeight,
   } = useFloatingLayersPreferenceState();
   const documentController = useEditorInspectorSidebarController(hasImage);
   const { dismissedLeftDrawerTool, setDismissedLeftDrawerTool } = useDismissedLeftDrawer(
@@ -239,35 +240,40 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
   );
 
   return (
-    <FloatingChromeRoot
-      dataUi="editor.floating-workspace"
-      onWheel={(event) => event.stopPropagation()}
-      style={getFloatingWorkspaceEdgeInsetStyle(edgeInsets)}
-    >
-      {hasImage ? (
-        <ImageDocumentOperationsProvider hasImage={hasImage}>
-          <EditorFloatingDocumentBar {...toolbarProps} documentController={documentController} />
-          <EditorFloatingToolRail
-            {...railProps}
-            leftDrawerOpen={surfaceRoute.leftDrawer !== null}
-          />
-          <EditorFloatingWorkspaceOverlays documentController={documentController} />
-          <EditorFloatingLoadedSurfaces
-            collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
-            documentController={documentController}
-            hasImage={hasImage}
-            layersCollapsed={layersCollapsed}
-            layersHeightRatio={layersHeightRatio}
-            layersPreferenceError={layersPreferenceError}
-            onCollapseLayers={() => setLayersCollapsed(true)}
-            onExpandLayers={() => setLayersCollapsed(false)}
-            onLayersHeightRatioChange={setLayersHeightRatio}
-            setDismissedLeftDrawerTool={setDismissedLeftDrawerTool}
-            surfaceRoute={surfaceRoute}
-            toolbarProps={toolbarProps}
-          />
-        </ImageDocumentOperationsProvider>
-      ) : null}
-    </FloatingChromeRoot>
+    <RasterToolPropertiesProvider>
+      <FloatingChromeRoot
+        dataUi="editor.floating-workspace"
+        onWheel={(event) => event.stopPropagation()}
+        style={getFloatingWorkspaceEdgeInsetStyle(edgeInsets)}
+      >
+        {hasImage ? (
+          <ImageDocumentOperationsProvider hasImage={hasImage}>
+            <EditorFloatingDocumentBar {...toolbarProps} documentController={documentController} />
+            <EditorFloatingToolRail
+              {...railProps}
+              onOpenRasterAdjustments={(targetId) =>
+                documentController.onOpenLayerEffects(targetId, 'adjustments', 'brightness')
+              }
+              leftDrawerOpen={surfaceRoute.leftDrawer !== null}
+            />
+            <EditorFloatingWorkspaceOverlays documentController={documentController} />
+            <EditorFloatingLoadedSurfaces
+              collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
+              documentController={documentController}
+              hasImage={hasImage}
+              layersCollapsed={layersCollapsed}
+              layersHeight={layersHeight}
+              layersPreferenceError={layersPreferenceError}
+              onCollapseLayers={() => setLayersCollapsed(true)}
+              onExpandLayers={() => setLayersCollapsed(false)}
+              onLayersHeightChange={setLayersHeight}
+              setDismissedLeftDrawerTool={setDismissedLeftDrawerTool}
+              surfaceRoute={surfaceRoute}
+              toolbarProps={toolbarProps}
+            />
+          </ImageDocumentOperationsProvider>
+        ) : null}
+      </FloatingChromeRoot>
+    </RasterToolPropertiesProvider>
   );
 }

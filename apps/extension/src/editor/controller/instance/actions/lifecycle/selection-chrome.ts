@@ -14,6 +14,7 @@ import { isEditorHiddenEdgeControl } from '../../../document/interaction-border-
 import { readFrameAnnotationSnapshot } from '../../../../frame-annotation/proxy';
 import type { EditorMagnetManager } from '../../../magnet';
 import { mountSelectionVisibility } from './selection-visibility';
+import { getEditorRasterRuntime } from '../../../../raster-editing/runtime';
 import { mountProjectedSelection } from './projected-selection';
 import type { EditorLayerPresentationBounds } from '../../../../document/canvas-surface/render-region';
 
@@ -386,6 +387,40 @@ function appendGuides(
   }
 }
 
+function mountLayerListHover(
+  canvas: Canvas,
+  onHover: (object: FabricObject | undefined) => void,
+  onLeave: () => void
+): () => void {
+  let hovering = false;
+  const find = (objects: FabricObject[], id: string | undefined): FabricObject | undefined => {
+    for (const object of objects) {
+      if (object.sniptaleId === id) return object;
+      const nested = object instanceof Group ? find(object.getObjects(), id) : undefined;
+      if (nested) return nested;
+    }
+    return undefined;
+  };
+  const move = (event: PointerEvent) => {
+    if (event.buttons !== 0) return;
+    const marker =
+      event.target instanceof Element
+        ? event.target.closest<HTMLElement>('[data-editor-layer-id]')
+        : null;
+    if (!marker) {
+      if (hovering) {
+        hovering = false;
+        onLeave();
+      }
+      return;
+    }
+    hovering = true;
+    onHover(find(canvas.getObjects(), marker.dataset['editorLayerId']));
+  };
+  canvas.upperCanvasEl.ownerDocument.addEventListener('pointermove', move);
+  return () => canvas.upperCanvasEl.ownerDocument.removeEventListener('pointermove', move);
+}
+
 export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetManager): void {
   const container = canvas.upperCanvasEl.parentElement;
   if (!container) return;
@@ -428,6 +463,12 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     const width = canvas.getWidth();
     const height = canvas.getHeight();
     if (width <= 0 || height <= 0) return;
+    if (getEditorRasterRuntime(canvas)?.getSnapshot().tool === 'crop') {
+      if (selection.childNodes.length) selection.replaceChildren();
+      if (svg.childNodes.length !== 1 || svg.firstChild !== selection)
+        svg.replaceChildren(selection);
+      return;
+    }
     const activeObject = canvas.getActiveObject();
     const activeObjects = canvas.getActiveObjects?.() ?? [];
     const candidates =
@@ -486,37 +527,17 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     hoverTarget = object;
     render();
   };
-  let layerHovering = false;
-  const layerHover = (event: PointerEvent) => {
-    if (event.buttons !== 0) return;
-    const marker =
-      event.target instanceof Element
-        ? event.target.closest<HTMLElement>('[data-editor-layer-id]')
-        : null;
-    if (!marker) {
-      if (layerHovering) {
-        layerHovering = false;
-        clearPreview();
+  const disposeLayerHover = mountLayerListHover(
+    canvas,
+    (next) => {
+      if (next !== layerHoverTarget) {
+        layerHoverTarget = next;
+        previewSuspended = false;
+        render();
       }
-      return;
-    }
-    const find = (objects: FabricObject[]): FabricObject | undefined => {
-      for (const object of objects) {
-        if (object.sniptaleId === marker.dataset['editorLayerId']) return object;
-        const nested = object instanceof Group ? find(object.getObjects()) : undefined;
-        if (nested) return nested;
-      }
-      return undefined;
-    };
-    layerHovering = true;
-    const next = find(canvas.getObjects());
-    if (next !== layerHoverTarget) {
-      layerHoverTarget = next;
-      previewSuspended = false;
-      render();
-    }
-  };
-  canvas.upperCanvasEl.ownerDocument.addEventListener('pointermove', layerHover);
+    },
+    () => clearPreview()
+  );
   const projected =
     canvas instanceof EditorCanvas ? mountProjectedSelection(canvas, render, updateHover) : null;
   const clearPreview = () => {
@@ -547,7 +568,7 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
   const unsubscribe = canvas.on('after:render', render);
   mountedChrome.set(canvas, () => {
     disposeVisibility();
-    canvas.upperCanvasEl.ownerDocument.removeEventListener('pointermove', layerHover);
+    disposeLayerHover();
     Object.assign(canvas, originalMarquee);
     projected?.dispose();
     for (const unsubscribePreview of previewSubscriptions) unsubscribePreview();

@@ -1,3 +1,4 @@
+import { getEditorRasterRuntime } from '../../../raster-editing/runtime';
 import { cancelPendingEditorSimplify } from '../../../drawing/simplify-runtime';
 import type { EditorDocument } from '../../../../features/editor/document/types';
 import type { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
@@ -47,8 +48,17 @@ export async function undoEditorControllerSnapshot(
   controller: EditorDocumentHistoryController
 ): Promise<void> {
   return runEditorDocumentTransition(controller.canvas ?? controller.history, () =>
-    undoEditorControllerSnapshotInTurn(controller)
+    preserveRasterEditing(controller, () => undoEditorControllerSnapshotInTurn(controller))
   );
+}
+
+async function preserveRasterEditing(
+  controller: EditorDocumentHistoryController,
+  operation: () => Promise<void>
+): Promise<void> {
+  const runtime = getEditorRasterRuntime(controller.canvas);
+  if (runtime) await runtime.preserveEditingForHistory(operation);
+  else await operation();
 }
 
 async function undoEditorControllerSnapshotInTurn(
@@ -74,7 +84,7 @@ export async function redoEditorControllerSnapshot(
   controller: EditorDocumentHistoryController
 ): Promise<void> {
   return runEditorDocumentTransition(controller.canvas ?? controller.history, () =>
-    redoEditorControllerSnapshotInTurn(controller)
+    preserveRasterEditing(controller, () => redoEditorControllerSnapshotInTurn(controller))
   );
 }
 

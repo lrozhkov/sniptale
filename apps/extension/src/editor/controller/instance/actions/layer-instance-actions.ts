@@ -1,12 +1,14 @@
 export {
   renameLayerForController,
   reorderLayerForController,
+  reorderLayerBlockForController,
   selectLayerForController,
   toggleLayerLockForController,
   toggleLayerVisibilityForController,
 } from './layer-instance-list-actions';
 export {
   mergeSelectedLayersForController,
+  rasterizeLayerForController,
   resizeLayerForController,
 } from './layer-instance-raster-actions';
 export {

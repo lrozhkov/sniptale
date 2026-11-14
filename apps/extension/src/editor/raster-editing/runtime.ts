@@ -83,6 +83,46 @@ export function mountEditorRasterRuntime(options: EditorRasterRuntimeOptions) {
   const runtime = {
     ...session,
     adapter,
+    /** Keep the editing target through the queued document transition and its rollback. */
+    async preserveEditingForHistory(operation: () => Promise<void>) {
+      const restore = session.suspendForHistory();
+      try {
+        await operation();
+      } finally {
+        try {
+          if (restore?.isCurrent()) {
+            const selectionStillOnTarget = () => {
+              const selected = canvas.getActiveObjects();
+              return (
+                !selected.length ||
+                (selected.length === 1 && selected[0]?.sniptaleId === restore.targetId)
+              );
+            };
+            if (selectionStillOnTarget()) {
+              try {
+                await adapter.hydrateTarget(undefined, restore.targetId);
+              } catch {
+                // An unavailable target ends editing; the history result remains authoritative.
+              }
+              if (restore.isCurrent() && selectionStillOnTarget()) {
+                const next = adapter.resolveById(restore.targetId);
+                if (next?.permission === 'allowed') {
+                  canvas.setActiveObject(next.identity);
+                  canvas.requestRenderAll();
+                }
+              }
+            }
+          }
+        } finally {
+          restore?.complete();
+        }
+      }
+    },
+    finishEditing() {
+      session.exitEditing();
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+    },
     refresh,
     dispose() {
       if (disposed) return;

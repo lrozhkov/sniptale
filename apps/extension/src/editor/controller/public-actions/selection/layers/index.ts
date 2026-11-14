@@ -1,5 +1,5 @@
 export { renameEditorLayerById } from './rename';
-export { reorderEditorLayer } from './reorder';
+export { reorderEditorLayer, reorderEditorLayerBlock } from './reorder';
 export { selectEditorLayerById } from './select';
 export {
   resizeEditorLayerById,

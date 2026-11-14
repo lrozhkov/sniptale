@@ -153,11 +153,15 @@ it('preserves submitted Simplify work only for the window-blur route', () => {
   mocks.cancelInteractionMock.mockReturnValue({ changed: false, drawSession: null });
   cancelTransientInteractionForController(controller, 'window-blur');
   expect(mocks.cancelInteractionMock).toHaveBeenLastCalledWith(
-    expect.objectContaining({ preserveActiveTool: true, preservePendingSimplify: true })
+    expect.objectContaining({
+      preserveActiveTool: true,
+      preserveSelection: true,
+      preservePendingSimplify: true,
+    })
   );
   cancelTransientInteractionForController(controller);
   expect(mocks.cancelInteractionMock).toHaveBeenLastCalledWith(
-    expect.objectContaining({ preservePendingSimplify: false })
+    expect.objectContaining({ preserveSelection: false, preservePendingSimplify: false })
   );
 });
 

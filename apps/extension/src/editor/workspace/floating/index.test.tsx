@@ -90,12 +90,12 @@ vi.mock('./view-controls', () => ({
 vi.mock('./preferences', () => ({
   useFloatingLayersPreferenceState: () => ({
     layersCollapsed: mocks.layersPreference.collapsed,
-    layersHeightRatio: null,
+    layersHeight: null,
     layersPreferenceError: mocks.layersPreference.error,
     setLayersCollapsed: (collapsed: boolean) => {
       mocks.layersPreference.collapsed = collapsed;
     },
-    setLayersHeightRatio: vi.fn(),
+    setLayersHeight: vi.fn(),
   }),
 }));
 

@@ -2,6 +2,10 @@
 .sniptale-image-workspace {
   --sniptale-radius-floating-chrome: 4px;
 }
+.sniptale-image-workspace .sniptale-toolbar-root {
+  backdrop-filter: none;
+  background: rgb(from var(--sniptale-color-surface-panel) r g b / 1);
+}
 .sniptale-image-page {
   width: 100%;
   height: 100%;
@@ -33,7 +37,11 @@
   background: rgb(from var(--sniptale-color-surface-panel) r g b / 1);
 }
 .sniptale-image-workspace
-  :is([data-ui='editor.floating.tool-rail'], [data-ui='editor.floating.view-controls'])
+  :is(
+    [data-ui='editor.floating.tool-rail'],
+    [data-ui='editor.floating.view-controls'],
+    [data-ui='editor.raster.toolbar']
+  )
   > .sniptale-glass-toolbar-divider {
   margin-block: 0;
 }
@@ -45,4 +53,14 @@
 }
 .sniptale-image-workspace [data-ui='shared.ui.compact-inspector.numeric-stepper'] > button {
   justify-content: flex-end;
+}
+
+.sniptale-image-workspace canvas.upper-canvas[tabindex='-1']:focus {
+  outline: none;
+}
+
+html[data-editor-layer-dragging],
+html[data-editor-layer-dragging] * {
+  cursor: grabbing !important;
+  user-select: none !important;
 }

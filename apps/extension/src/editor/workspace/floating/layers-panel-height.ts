@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEven
 import { useEditorStore } from '../../state/useEditorStore';
 import { getPreviewSize } from '../viewport-preview/helpers';
 
-export const LAYERS_PANEL_DEFAULT_HEIGHT = 320;
+export const LAYERS_PANEL_DEFAULT_HEIGHT = 875;
 const LAYERS_PANEL_MIN_HEIGHT = 248;
 const VIEW_TOOLBAR_TOP_OFFSET = 12;
 const VIEW_TOOLBAR_HEIGHT_GUARD = 44;
@@ -19,7 +19,6 @@ const LAYERS_PANEL_TOP_GUARD =
   VIEW_TOOLBAR_MAP_POPOVER_HEIGHT_GUARD +
   VIEW_TOOLBAR_TO_LAYERS_GAP;
 const LAYERS_PANEL_BOTTOM_GAP = 12;
-const LAYERS_HEIGHT_RATIO_PRECISION = 10_000;
 
 function getMaxLayersPanelHeight(canvasWidth: number, canvasHeight: number) {
   if (typeof window === 'undefined') {
@@ -59,48 +58,39 @@ function clampLayersPanelHeight(value: number, canvasWidth: number, canvasHeight
 }
 
 function resolveLayersPanelHeight(
-  heightRatio: number | null,
+  preferredHeight: number | null,
   defaultHeight: number,
   canvasWidth: number,
   canvasHeight: number
 ) {
-  if (heightRatio === null) {
+  if (preferredHeight === null) {
     return clampLayersPanelHeight(defaultHeight, canvasWidth, canvasHeight);
   }
 
-  return clampLayersPanelHeight(
-    getMaxLayersPanelHeight(canvasWidth, canvasHeight) * heightRatio,
-    canvasWidth,
-    canvasHeight
-  );
-}
-
-function resolveLayersPanelHeightRatio(height: number, canvasWidth: number, canvasHeight: number) {
-  const maxHeight = getMaxLayersPanelHeight(canvasWidth, canvasHeight);
-  if (maxHeight <= 0) return 0;
-  const preciseRatio = (height / maxHeight) * LAYERS_HEIGHT_RATIO_PRECISION;
-  return Math.round(preciseRatio) / LAYERS_HEIGHT_RATIO_PRECISION;
+  return clampLayersPanelHeight(preferredHeight, canvasWidth, canvasHeight);
 }
 
 export function useResizableLayersPanelHeight(args: {
   defaultHeight: number;
-  heightRatio: number | null;
-  onHeightRatioChange: (heightRatio: number | null) => void;
+  preferredHeight: number | null;
+  onHeightChange: (preferredHeight: number | null) => void;
 }) {
-  const { heightRatio, onHeightRatioChange, defaultHeight } = args;
+  const { preferredHeight, onHeightChange, defaultHeight } = args;
   const canvasWidth = useEditorStore((state) => state.viewport.canvasWidth);
   const canvasHeight = useEditorStore((state) => state.viewport.canvasHeight);
   const [height, setHeight] = useState(() =>
-    resolveLayersPanelHeight(heightRatio, defaultHeight, canvasWidth, canvasHeight)
+    resolveLayersPanelHeight(preferredHeight, defaultHeight, canvasWidth, canvasHeight)
   );
 
   useEffect(() => {
-    setHeight(resolveLayersPanelHeight(heightRatio, defaultHeight, canvasWidth, canvasHeight));
-  }, [heightRatio, defaultHeight, canvasWidth, canvasHeight]);
+    setHeight(resolveLayersPanelHeight(preferredHeight, defaultHeight, canvasWidth, canvasHeight));
+  }, [preferredHeight, defaultHeight, canvasWidth, canvasHeight]);
 
   useEffect(() => {
     const handleResize = () =>
-      setHeight(resolveLayersPanelHeight(heightRatio, defaultHeight, canvasWidth, canvasHeight));
+      setHeight(
+        resolveLayersPanelHeight(preferredHeight, defaultHeight, canvasWidth, canvasHeight)
+      );
     const toolbar = document.querySelector<HTMLElement>(
       '[data-ui="editor.floating.view-controls"]'
     );
@@ -114,7 +104,7 @@ export function useResizableLayersPanelHeight(args: {
       observer?.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, [heightRatio, defaultHeight, canvasWidth, canvasHeight]);
+  }, [preferredHeight, defaultHeight, canvasWidth, canvasHeight]);
 
   const startResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -140,14 +130,14 @@ export function useResizableLayersPanelHeight(args: {
         if (target.hasPointerCapture(pointerId)) {
           target.releasePointerCapture(pointerId);
         }
-        onHeightRatioChange(resolveLayersPanelHeightRatio(nextHeight, canvasWidth, canvasHeight));
+        onHeightChange(nextHeight);
       };
 
       window.addEventListener('pointermove', handlePointerMove);
       window.addEventListener('pointerup', handlePointerUp);
       window.addEventListener('pointercancel', handlePointerUp);
     },
-    [height, onHeightRatioChange, canvasWidth, canvasHeight]
+    [height, onHeightChange, canvasWidth, canvasHeight]
   );
 
   return { height, startResize };

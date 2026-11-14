@@ -3,6 +3,7 @@ import {
   duplicateEditorSelection,
   nudgeEditorSelection,
   reorderEditorLayer,
+  reorderEditorLayerBlock,
   selectEditorLayerById,
 } from '../public-actions';
 import {
@@ -85,4 +86,19 @@ export function selectEditorControllerLayer(
   if (!selected) return;
   if (!preserveActiveTool) controller.switchToSelectTool();
   controller.setLastLayerSelectionAnchorId(id);
+}
+
+export function reorderEditorControllerLayerBlock(
+  controller: EditorControllerPublicApiAdapter,
+  ids: readonly string[],
+  beforeId: string | null
+): void {
+  reorderEditorLayerBlock({
+    canvas: controller.canvas,
+    ids,
+    beforeId,
+    sendFrameObjectsToBack: () => controller.sendFrameObjectsToBack(),
+    commitHistory: () => controller.commitHistory(),
+    syncRuntimeState: () => controller.syncRuntimeState(),
+  });
 }

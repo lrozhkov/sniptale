@@ -28,13 +28,11 @@ export function EditorInspectorLayersPanel(props: EditorInspectorLayersPanelProp
         listRef={panelView.refs.listRef}
         selectedObjectCount={props.selectedObjectCount}
         layers={props.layers}
-        dragOverLayerId={panelView.state.dragOverLayerId}
         autoNavigateSelectedLayer={panelView.state.autoNavigateSelectedLayer}
         reserveScrollbarGutter={panelView.layout.reserveScrollbarGutter}
         scrollable={panelView.layout.scrollable}
         setDraggedLayerId={panelView.state.setDraggedLayerId}
         setDragOverLayerId={panelView.state.setDragOverLayerId}
-        onDrop={panelView.actions.handleLayerDrop}
         onOpenLayerEffects={panelView.actions.handleOpenLayerEffects}
       />
     </LayerPanelFrame>

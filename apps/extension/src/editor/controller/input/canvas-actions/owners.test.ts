@@ -522,3 +522,31 @@ it('keeps a grouped bend at the scene pointer and restores its authored metadata
   expect(modified).not.toHaveBeenCalled();
   void canvas.dispose();
 });
+
+it('retains the accepted layer selection on focus loss while explicit cancellation clears it', async () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const layer = new Rect({ width: 20, height: 20 });
+  canvas.add(layer);
+  canvas.setActiveObject(layer);
+  const options = {
+    activeTool: 'select',
+    canvas,
+    clearCropSelection: vi.fn(),
+    cropGuide: null,
+    drawSession: null,
+    switchToSelectTool: vi.fn(),
+    syncRuntimeState: vi.fn(),
+    preserveActiveTool: true,
+    preserveSelection: true,
+  };
+  try {
+    expect(cancelEditorTransientInteraction(options).changed).toBe(false);
+    expect(canvas.getActiveObject()).toBe(layer);
+    expect(cancelEditorTransientInteraction({ ...options, preserveSelection: false }).changed).toBe(
+      true
+    );
+    expect(canvas.getActiveObject()).toBeUndefined();
+  } finally {
+    await canvas.dispose();
+  }
+});

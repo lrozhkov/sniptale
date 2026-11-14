@@ -63,7 +63,13 @@ for (const variant of [
       await nameInput.fill(longName);
       await nameInput.press('Enter');
       await page.getByText(longName, { exact: true }).hover();
-      await ui('editor.layers.effects-transformations').first().click();
+      await ui('editor.layers.image-settings').first().click();
+      await page
+        .getByRole('button', {
+          name: label('editor.toolbar.layerEffectsTransformations'),
+          exact: true,
+        })
+        .click();
       const parameters = ui('editor.floating.layer-effects-panel');
       const status = parameters.locator('[data-ui="shared.ui.compact-inspector.status-row"]');
       await expect(status).toBeVisible();
@@ -99,18 +105,21 @@ for (const variant of [
       });
       await expect(grid).toHaveAttribute('aria-pressed', 'false');
       await expect(size).toHaveCount(0);
-      await expect(
-        workspace.getByRole('button', { name: label('editor.compact.enableGridSnap'), exact: true })
-      ).toHaveCount(0);
+      const snap = workspace.getByRole('button', {
+        name: label('editor.compact.enableGridSnap'),
+        exact: true,
+      });
+      await expect(snap).toBeVisible();
+      await expect(snap).toHaveAttribute('aria-pressed', 'false');
       const row = ui('editor.workspace.background-default-row');
-      const makeDefault = row.getByRole('button', {
-        name: label('editor.compact.workspaceMakeDefault'),
+      const resetColor = row.getByRole('button', {
+        name: label('editor.compact.workspaceResetColor'),
         exact: true,
       });
       const colorField = row.locator('[data-ui="shared.ui.compact-inspector.color-field"]');
       const rowBox = (await row.boundingBox())!;
       const fieldBox = (await colorField.boundingBox())!;
-      const actionBox = (await makeDefault.boundingBox())!;
+      const actionBox = (await resetColor.boundingBox())!;
       // Labels can grow with locale and font; both targets must fit without overlapping.
       for (const box of [fieldBox, actionBox]) {
         expect(box.x).toBeGreaterThanOrEqual(rowBox.x - 1);
@@ -166,15 +175,13 @@ for (const variant of [
       await expect(grid).toHaveAttribute('aria-pressed', 'true');
       await size.fill('42');
       await size.press('Enter');
-      const snap = workspace.getByRole('button', {
-        name: label('editor.compact.enableGridSnap'),
-        exact: true,
-      });
       await snap.click();
       await expect(snap).toHaveAttribute('aria-pressed', 'true');
       await grid.click();
-      await expect(size).toHaveCount(0);
-      await expect(snap).toHaveCount(0);
+      await expect(grid).toHaveAttribute('aria-pressed', 'false');
+      await expect(size).toHaveValue('42');
+      await expect(snap).toBeVisible();
+      await expect(snap).toHaveAttribute('aria-pressed', 'true');
       await expect(grid).toBeFocused();
       await grid.click();
       await expect(size).toHaveValue('42');
@@ -216,7 +223,10 @@ for (const variant of [
       await group.locator('input[type="text"]').focus();
       await expect(slider.locator('input')).toHaveAttribute('tabindex', '0');
       await expect(group.locator('[data-padding-link="all"]')).toHaveCSS('border-top-width', '0px');
-      await page.screenshot({ path: testInfo.outputPath('image-inspector-HD.png') });
+      await page.screenshot({
+        path: testInfo.outputPath('image-inspector-HD.png'),
+        fullPage: false,
+      });
     } finally {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))

@@ -652,3 +652,25 @@ it('requires exactly one mapping target kind without treating JSON as covered co
     expect.objectContaining({ rule: 'focused-coverage-owner-mapping-non-coverage-production-file' })
   );
 });
+
+it('keeps existing layer contract proof when adjacent publication proof is added', async () => {
+  const { resolveLocalFocusedCoverageOwnerTests } =
+    await import('./focused-coverage-owner-tests.mjs');
+  const root = 'apps/extension/src/editor/controller';
+  expect(resolveLocalFocusedCoverageOwnerTests(`${root}/core/controller-layer-actions.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/core/controller-layer-actions.test.ts`,
+      `${root}/core/controller.instance-delegation.test.ts`,
+    ])
+  );
+  expect(
+    resolveLocalFocusedCoverageOwnerTests(`${root}/public-api/layer-selection-actions.ts`)
+  ).toEqual(
+    expect.arrayContaining([
+      `${root}/core/controller-layer-actions.test.ts`,
+      `${root}/public-api/layer-selection-actions.test.ts`,
+      `${root}/public-api/actions.coverage.test.ts`,
+      `${root}/public-api/actions.callbacks.coverage.test.ts`,
+    ])
+  );
+});

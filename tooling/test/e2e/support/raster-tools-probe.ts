@@ -68,9 +68,9 @@ export async function openRasterFixture(
   await sourceRow.hover();
   await sourceRow.click();
   await expect.poll(() => rasterSnapshot(page)).toMatchObject({ available: true });
-  await expect(rasterControl(page, 'toolbar')).toBeVisible();
   await expect.poll(() => rasterSnapshot(page)).toMatchObject({ permission: 'allowed' });
   await page.evaluate(() => window.__sniptaleEditorHarness!.setZoomLevel(1));
+  await enterRasterEditing(page);
 }
 
 /** Read native Fabric projection independently of the product's raster coordinate module. */
@@ -150,9 +150,16 @@ export async function rasterDrag(
   await expect.poll(() => rasterSnapshot(page)).toMatchObject({ busy: false, error: null });
 }
 
+/** Enter the selected image explicitly; control locators never change editor mode. */
+export async function enterRasterEditing(page: Page) {
+  await expect.poll(() => rasterSnapshot(page)).toMatchObject({ available: true, editing: false });
+  await rasterControl(page, 'enter').click();
+  await expect.poll(() => rasterSnapshot(page)).toMatchObject({ editing: true, tool: null });
+  await expect(rasterControl(page, 'cursor')).toBeVisible();
+}
+
 export async function rasterParameter(page: Page, name: string) {
   const control = rasterControl(page, name);
-  if (!(await control.count())) await rasterControl(page, 'parameters').click();
   await expect(control).toBeVisible();
   return control;
 }

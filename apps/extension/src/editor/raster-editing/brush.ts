@@ -7,26 +7,40 @@ import {
   type SelectionMask,
   type SourcePoint,
 } from './contracts';
-import { assertRasterPixelData, composeRasterRegion, type RasterPixelData } from './pixels';
+import {
+  assertRasterPixelData,
+  composeRasterRegion,
+  paintRasterColorPixel,
+  type RasterPixelData,
+} from './pixels';
 import { BezierLine } from './vendor/bezier-line';
 
 /** Disposable stroke projection. Pixels contain the packed dirty source window. */
 export interface RasterBrushPreview {
   readonly planes: RasterPixelData;
   readonly coverage: Uint8Array;
+  /** Bounds of all changed pixels in this stroke, including earlier updates. */
+  readonly strokeBounds: PixelBounds | null;
+  /** Bounds of pixels changed since the preceding add or finish call. */
   readonly dirtyBounds: PixelBounds | null;
   readonly pixels: Uint8ClampedArray | null;
 }
 
 /** Source-pixel diameter and independent hardness. Accepted input planes remain immutable. */
-interface RasterBrushOptions {
+type RasterBrushOptions = {
   readonly planes: RasterPixelData;
   readonly geometry: RasterSourceGeometry;
   readonly diameter: number;
   readonly hardness: number;
-  readonly mode: 'erase' | 'restore';
   readonly selection?: SelectionMask;
-}
+} & (
+  | { readonly mode: 'erase' | 'restore' }
+  | {
+      readonly mode: 'paint';
+      readonly color: readonly [number, number, number, number];
+      readonly opacity: number;
+    }
+);
 
 /** One synchronous gesture. Finish seals the final segment before its caller can commit. */
 export interface RasterBrushStroke {
@@ -41,8 +55,7 @@ function contains(bounds: PixelBounds, x: number, y: number): boolean {
   );
 }
 
-/** Adapted Klecks Bezier spacing/finalization with local soft coverage and visibility planes. */
-export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrushStroke {
+function validateBrushOptions(options: RasterBrushOptions): number {
   const { planes, geometry, diameter, hardness, mode } = options;
   assertRasterPixelData(planes);
   const count = assertRasterSize(geometry);
@@ -52,21 +65,48 @@ export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrus
     throw new RangeError('Brush diameter must be positive and bounded');
   if (!Number.isFinite(hardness) || hardness < 0 || hardness > 1)
     throw new RangeError('Brush hardness must be between zero and one');
-  if (mode !== 'erase' && mode !== 'restore') throw new TypeError('Invalid brush mode');
+  if (mode !== 'erase' && mode !== 'restore' && mode !== 'paint')
+    throw new TypeError('Invalid brush mode');
+  const paint = options.mode === 'paint' ? options.color : null;
+  const opacity = options.mode === 'paint' ? options.opacity : 1;
+  if (!Number.isFinite(opacity) || opacity < 0 || opacity > 1)
+    throw new RangeError('Brush opacity must be between zero and one');
+  if (
+    paint &&
+    (paint.length !== 4 ||
+      paint.some((value) => !Number.isInteger(value) || value < 0 || value > 255))
+  )
+    throw new RangeError('Brush color must contain integer byte channels');
   const selection = options.selection ?? null;
   assertSelectionMask(selection, count);
+  return count;
+}
+
+/** Adapted Klecks Bezier spacing/finalization with local soft coverage and visibility planes. */
+export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrushStroke {
+  const count = validateBrushOptions(options);
+  const { planes, geometry, diameter, hardness, mode } = options;
+  const paint = options.mode === 'paint' ? options.color : null;
+  const opacity = options.mode === 'paint' ? options.opacity : 1;
+  const selection = options.selection ?? null;
   const coverage = new Uint8Array(count);
   const visibility = planes.visibility?.slice() ?? new Uint8Array(count).fill(255);
-  const key = mode === 'restore' ? (planes.key?.slice() ?? null) : planes.key;
-  const draft: RasterPixelData = { ...planes, visibility, key };
+  const key = mode === 'restore' || mode === 'paint' ? (planes.key?.slice() ?? null) : planes.key;
+  const color = mode === 'paint' ? planes.color.slice() : planes.color;
+  const draft: RasterPixelData = { ...planes, color, visibility, key };
   const line = new BezierLine();
   const radius = diameter / 2;
   const spacing = Math.max(0.25, diameter * 0.1);
   let last: SourcePoint | null = null;
-  let dirty: PixelBounds | null = null;
+  let strokeBounds: PixelBounds | null = null;
+  let left = Infinity,
+    top = Infinity,
+    right = -Infinity,
+    bottom = -Infinity;
   let closed = false;
 
   function stamp(point: SourcePoint): void {
+    if (opacity === 0 || paint?.[3] === 0) return;
     const [a, b, c, d, e, f] = geometry.sourceToScene;
     for (let y = Math.floor(point.y - radius - 0.5); y <= Math.ceil(point.y + radius + 0.5); y++) {
       for (
@@ -114,27 +154,45 @@ export function createRasterBrushStroke(options: RasterBrushOptions): RasterBrus
         // Each pixel derives from accepted planes and cumulative coverage, never from a prior preview.
         coverage[index] = strength;
         const fraction = strength / 255;
-        const old = planes.visibility?.[index] ?? 255;
-        visibility[index] = Math.round(
-          mode === 'restore' ? old + (255 - old) * fraction : old * (1 - fraction)
-        );
-        if (mode === 'restore' && key !== null && planes.key !== null)
-          key[index * 4 + 3] = Math.round(planes.key[index * 4 + 3]! * (1 - fraction));
-        const left = Math.min(dirty?.x ?? px, px);
-        const top = Math.min(dirty?.y ?? py, py);
-        const right = Math.max(dirty ? dirty.x + dirty.width : px + 1, px + 1);
-        const bottom = Math.max(dirty ? dirty.y + dirty.height : py + 1, py + 1);
-        dirty = { x: left, y: top, width: right - left, height: bottom - top };
+        if (paint) {
+          paintRasterColorPixel(planes, index, color, paint, fraction * opacity);
+          visibility[index] = 255;
+          if (key) key[index * 4 + 3] = 0;
+        } else {
+          const old = planes.visibility?.[index] ?? 255;
+          visibility[index] = Math.round(
+            mode === 'restore' ? old + (255 - old) * fraction : old * (1 - fraction)
+          );
+          if (mode === 'restore' && key !== null && planes.key !== null)
+            key[index * 4 + 3] = Math.round(planes.key[index * 4 + 3]! * (1 - fraction));
+        }
+        left = Math.min(left, px);
+        top = Math.min(top, py);
+        right = Math.max(right, px + 1);
+        bottom = Math.max(bottom, py + 1);
       }
     }
   }
 
   function preview(): RasterBrushPreview {
+    const changed = Number.isFinite(left)
+      ? { x: left, y: top, width: right - left, height: bottom - top }
+      : null;
+    if (changed) {
+      const x = Math.min(strokeBounds?.x ?? left, left),
+        y = Math.min(strokeBounds?.y ?? top, top);
+      const r = Math.max(strokeBounds ? strokeBounds.x + strokeBounds.width : right, right);
+      const b = Math.max(strokeBounds ? strokeBounds.y + strokeBounds.height : bottom, bottom);
+      strokeBounds = { x, y, width: r - x, height: b - y };
+    }
+    left = top = Infinity;
+    right = bottom = -Infinity;
     return {
-      planes: dirty ? draft : planes,
+      planes: strokeBounds ? draft : planes,
       coverage,
-      dirtyBounds: dirty ? { ...dirty } : null,
-      pixels: dirty ? composeRasterRegion(draft, dirty) : null,
+      strokeBounds: strokeBounds ? { ...strokeBounds } : null,
+      dirtyBounds: changed,
+      pixels: changed ? composeRasterRegion(draft, changed) : null,
     };
   }
 

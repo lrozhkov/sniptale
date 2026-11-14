@@ -52,10 +52,8 @@ it('renders layer rows or empty state with stable scroll classes', () => {
   const rows = renderToStaticMarkup(
     <EditorInspectorLayersList
       layers={[{ id: 'layer-1' } as never]}
-      dragOverLayerId={null}
       setDraggedLayerId={vi.fn()}
       setDragOverLayerId={vi.fn()}
-      onDrop={vi.fn()}
       onOpenLayerEffects={vi.fn()}
       reserveScrollbarGutter
       scrollable
@@ -64,10 +62,8 @@ it('renders layer rows or empty state with stable scroll classes', () => {
   const empty = renderToStaticMarkup(
     <EditorInspectorLayersList
       layers={[]}
-      dragOverLayerId={null}
       setDraggedLayerId={vi.fn()}
       setDragOverLayerId={vi.fn()}
-      onDrop={vi.fn()}
       onOpenLayerEffects={vi.fn()}
     />
   );
@@ -91,10 +87,8 @@ it('shows members beneath a selected group without generating thumbnails', () =>
           ],
         } as never,
       ]}
-      dragOverLayerId={null}
       setDraggedLayerId={vi.fn()}
       setDragOverLayerId={vi.fn()}
-      onDrop={vi.fn()}
       onOpenLayerEffects={vi.fn()}
     />
   );
@@ -138,10 +132,8 @@ it('selects a child through its keyboard-accessible button while retaining paren
             ],
           } as never,
         ]}
-        dragOverLayerId={null}
         setDraggedLayerId={vi.fn()}
         setDragOverLayerId={vi.fn()}
-        onDrop={vi.fn()}
         onOpenLayerEffects={vi.fn()}
       />
     )

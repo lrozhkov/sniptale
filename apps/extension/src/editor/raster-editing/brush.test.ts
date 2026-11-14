@@ -36,7 +36,7 @@ it('stamps a click immediately with source-pixel diameter independent of scene t
   second.add({ x: 12.5, y: 10.5 });
   expect(second.finish().coverage).toEqual(final.coverage);
   expect(final.planes).toEqual(paintRasterVisibility(options.planes, final.coverage, false));
-  expect(final.pixels).toEqual(composeRasterRegion(final.planes, final.dirtyBounds!));
+  expect(first.pixels).toEqual(composeRasterRegion(first.planes, first.dirtyBounds!));
 });
 
 it('fills a fast long stroke with no gaps and freezes its final endpoint synchronously', () => {
@@ -171,4 +171,106 @@ it('refuses periodic samples outside the native render rectangle before wrapping
   const stroke = createRasterBrushStroke({ ...options, geometry, diameter: 2 });
   stroke.add({ x: 10.5, y: 5.5 });
   expect(stroke.finish().coverage.some((v) => v > 0)).toBe(false);
+});
+
+it('paints source-over with one opacity cap per stroke and preserves accepted planes', () => {
+  const options = fixture();
+  const stroke = createRasterBrushStroke({
+    ...options,
+    mode: 'paint',
+    color: [255, 0, 0, 255],
+    opacity: 0.5,
+  });
+  stroke.add({ x: 12.5, y: 10.5 });
+  stroke.add({ x: 12.5, y: 10.5 });
+  const result = stroke.finish();
+  const index = 10 * 40 + 12;
+  expect([...composeRasterRegion(result.planes, { x: 12, y: 10, width: 1, height: 1 })]).toEqual([
+    255, 128, 128, 255,
+  ]);
+  expect(options.planes.color.slice(index * 4, index * 4 + 4)).toEqual(
+    new Uint8ClampedArray([255, 255, 255, 255])
+  );
+  const next = createRasterBrushStroke({
+    ...options,
+    planes: result.planes,
+    mode: 'paint',
+    color: [255, 0, 0, 255],
+    opacity: 0.5,
+  });
+  const second = next.finish({ x: 12.5, y: 10.5 });
+  expect([...composeRasterRegion(second.planes, { x: 12, y: 10, width: 1, height: 1 })]).toEqual([
+    255, 64, 64, 255,
+  ]);
+});
+it('paints over composed visibility and removed colors without revealing hidden source pixels', () => {
+  const options = fixture(5, 5);
+  const visibility = new Uint8Array(25).fill(0);
+  const key = new Uint8ClampedArray(100).fill(255);
+  const before = { ...options.planes, visibility, key };
+  const stroke = createRasterBrushStroke({
+    ...options,
+    planes: before,
+    mode: 'paint',
+    color: [0, 0, 255, 255],
+    opacity: 0.5,
+    diameter: 2,
+  });
+  const result = stroke.finish({ x: 2.5, y: 2.5 });
+  expect([...composeRasterRegion(result.planes, { x: 2, y: 2, width: 1, height: 1 })]).toEqual([
+    0, 0, 255, 128,
+  ]);
+  expect(visibility[12]).toBe(0);
+  expect(key[51]).toBe(255);
+  expect(result.planes.visibility?.[12]).toBe(255);
+  expect(result.planes.key?.[51]).toBe(0);
+  expect(result.planes.visibility?.[0]).toBe(0);
+  expect(result.planes.key?.[3]).toBe(255);
+});
+it('does not paint outside selection and crop, and zero opacity leaves the source untouched', () => {
+  const options = fixture();
+  const selection = new Uint8Array(800);
+  selection[10 * 40 + 12] = 255;
+  const stroke = createRasterBrushStroke({
+    ...options,
+    selection,
+    mode: 'paint',
+    color: [0, 0, 255, 255],
+    opacity: 1,
+    diameter: 20,
+  });
+  const result = stroke.finish({ x: 12.5, y: 10.5 });
+  expect(result.planes.color[4 * (10 * 40 + 12) + 2]).toBe(255);
+  expect(result.planes.color[4 * (10 * 40 + 12)]).toBe(0);
+  expect(result.planes.color[4 * (10 * 40 + 13)]).toBe(255);
+  const empty = createRasterBrushStroke({
+    ...options,
+    mode: 'paint',
+    color: [0, 0, 0, 255],
+    opacity: 0,
+  });
+  expect(empty.finish({ x: 12.5, y: 10.5 }).planes).toBe(options.planes);
+});
+
+it('keeps long diagonal previews bounded to newly changed pixels and retains the complete final planes', () => {
+  const options = fixture(1000, 600);
+  const stroke = createRasterBrushStroke({ ...options, diameter: 8 });
+  const output = new Uint8ClampedArray(options.planes.color);
+  let bytes = 0;
+  const patch = (preview: ReturnType<typeof stroke.add>) => {
+    if (!preview.dirtyBounds || !preview.pixels) return;
+    const r = preview.dirtyBounds;
+    bytes += preview.pixels.byteLength;
+    for (let y = 0; y < r.height; y++)
+      output.set(
+        preview.pixels.subarray(y * r.width * 4, (y + 1) * r.width * 4),
+        ((r.y + y) * 1000 + r.x) * 4
+      );
+  };
+  for (let i = 0; i < 40; i++) patch(stroke.add({ x: 20 + i * 20, y: 20 + i * 10 }));
+  const final = stroke.finish();
+  patch(final);
+  expect(bytes).toBeLessThan(200_000);
+  const expected = composeRasterRegion(final.planes, { x: 0, y: 0, width: 1000, height: 600 });
+  expect(Buffer.compare(Buffer.from(output.buffer), Buffer.from(expected.buffer))).toBe(0);
 });

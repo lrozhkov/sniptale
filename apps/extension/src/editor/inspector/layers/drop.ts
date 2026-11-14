@@ -1,32 +1,39 @@
-import type React from 'react';
+import type { EditorLayerItem } from '../../../features/editor/document/types';
 
-type LayerDropController = {
-  reorderLayer: (draggedLayerId: string, targetLayerId: string) => void;
-};
-
-type LayerDragStateSetters = {
-  setDraggedLayerId: React.Dispatch<React.SetStateAction<string | null>>;
-  setDragOverLayerId: React.Dispatch<React.SetStateAction<string | null>>;
-};
-
-function clearLayerDragState(args: LayerDragStateSetters) {
-  args.setDraggedLayerId(null);
-  args.setDragOverLayerId(null);
+/** Projects a selected block into list order without moving it below a pinned source. */
+export function projectLayerDropOrder(
+  layers: readonly EditorLayerItem[],
+  order: readonly string[],
+  movingIds: readonly string[],
+  beforeId: string | null
+): string[] {
+  const rest = order.filter((id) => !movingIds.includes(id));
+  const fixedIndex = rest.findIndex((id) =>
+    layers.some((layer) => layer.id === id && layer.type === 'source-image' && !layer.reorderable)
+  );
+  let index = beforeId === null ? rest.length : rest.indexOf(beforeId);
+  if (fixedIndex >= 0) index = Math.min(index, fixedIndex);
+  const result = [...rest];
+  result.splice(Math.max(0, index), 0, ...movingIds);
+  return result;
 }
 
-export function createLayerDropHandler(
-  args: LayerDragStateSetters & {
-    controller: LayerDropController;
-    draggedLayerId: string | null;
-  }
-) {
-  return (targetLayerId: string) => {
-    if (!args.draggedLayerId || args.draggedLayerId === targetLayerId) {
-      clearLayerDragState(args);
-      return;
-    }
-
-    args.controller.reorderLayer(args.draggedLayerId, targetLayerId);
-    clearLayerDragState(args);
-  };
+/** A changed order, selection, or movement constraint invalidates an active gesture. */
+export function hasLayerReorderChanged(
+  previous: readonly EditorLayerItem[],
+  next: readonly EditorLayerItem[]
+): boolean {
+  return (
+    previous.length !== next.length ||
+    previous.some((layer, index) => {
+      const item = next[index];
+      return (
+        item?.id !== layer.id ||
+        item.locked !== layer.locked ||
+        item.selected !== layer.selected ||
+        item.immutable !== layer.immutable ||
+        item.reorderable !== layer.reorderable
+      );
+    })
+  );
 }

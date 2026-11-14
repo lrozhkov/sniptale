@@ -12,11 +12,9 @@ type LayerPanelBodyProps = {
   actionsRef: React.RefObject<HTMLDivElement | null>;
   autoNavigateSelectedLayer: boolean;
   bodyRef: React.RefObject<HTMLDivElement | null>;
-  dragOverLayerId: string | null;
   expanded: boolean;
   layers: EditorLayerItem[];
   listRef: React.RefObject<HTMLDivElement | null>;
-  onDrop: (targetLayerId: string) => void;
   onOpenLayerEffects: EditorInspectorLayersPanelProps['onOpenLayerEffects'];
   reserveScrollbarGutter: boolean;
   scrollable: boolean;
@@ -41,13 +39,11 @@ export function LayerPanelBody(props: LayerPanelBodyProps) {
       <EditorInspectorLayersList
         listRef={props.listRef}
         layers={props.layers}
-        dragOverLayerId={props.dragOverLayerId}
         autoNavigateSelectedLayer={props.autoNavigateSelectedLayer}
         reserveScrollbarGutter={props.reserveScrollbarGutter}
         scrollable={props.scrollable}
         setDraggedLayerId={props.setDraggedLayerId}
         setDragOverLayerId={props.setDragOverLayerId}
-        onDrop={props.onDrop}
         onOpenLayerEffects={props.onOpenLayerEffects}
       />
     </div>
