@@ -1,6 +1,6 @@
+// @vitest-environment jsdom
 import { createDrawingCleanup } from '../../features/drawing/public';
 import { createEditorDrawingBlurObject } from './object/blur';
-// @vitest-environment jsdom
 import { cancelEditorTransientInteraction } from '../controller/input/canvas-actions/transient';
 import { afterEach, expect, it, vi } from 'vitest';
 import { Canvas, FabricImage, Rect } from 'fabric';

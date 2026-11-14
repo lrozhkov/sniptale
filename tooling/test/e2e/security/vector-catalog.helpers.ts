@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Socket } from 'node:net';
 import { promisify } from 'node:util';
-import { expect, type BrowserContext, type Page } from '@playwright/test';
+import { expect, type BrowserContext, type Page, type ViewportSize } from '@playwright/test';
 import {
   acceptOptionalExtensionPermissionPrompt,
   denyOptionalExtensionPermissionPrompt,
@@ -13,7 +13,9 @@ import {
 
 const PREFIX = '/chosen/catalog/';
 /** Real HTTPS fixture for a chosen source. It never intercepts or impersonates the public API. */
-export async function startVectorCatalogSource(options: { downloadPair?: boolean } = {}) {
+export async function startVectorCatalogSource(
+  options: { downloadPair?: boolean; requestBudget?: boolean } = {}
+) {
   const directory = await mkdtemp(join(tmpdir(), 'sniptale-vector-catalog-'));
   const key = join(directory, 'key.pem'),
     cert = join(directory, 'cert.pem');
@@ -34,37 +36,100 @@ export async function startVectorCatalogSource(options: { downloadPair?: boolean
     '-out',
     cert,
   ]);
-  const requests: { pathname: string; cookie: boolean }[] = [];
+  const requests: { pathname: string; cookie: boolean; query: string }[] = [];
   const artworkRequests: string[][] = [];
+  const artworkKeys: string[][] = [];
+  const pendingArtwork: (() => void)[] = [];
+  let holdArtwork = !!options.requestBudget;
+  let activeArtwork = 0;
+  let maxActiveArtwork = 0;
+  const budgetNames = Array.from(
+    { length: 64 },
+    (_, index) => `item-${String(index).padStart(3, '0')}`
+  );
+  const budgetIds = budgetNames.map((name, index) => `${index % 2 ? 'other' : 'proof'}:${name}`);
   let secondArtworkSupported = false;
   const sockets = new Set<Socket>();
   const server = https.createServer(
     { key: await readFile(key), cert: await readFile(cert) },
     (request, response) => {
       const url = new URL(request.url ?? '/', 'https://127.0.0.1');
-      requests.push({ pathname: url.pathname, cookie: !!request.headers.cookie });
+      requests.push({
+        pathname: url.pathname,
+        cookie: !!request.headers.cookie,
+        query: url.search,
+      });
       response.setHeader('content-type', 'application/json');
       response.setHeader('access-control-allow-origin', '*');
       const info = {
         name: 'Proof elements',
-        total: options.downloadPair ? 2 : 1,
+        total: options.requestBudget ? 64 : options.downloadPair ? 2 : 1,
         author: { name: 'Test fixture' },
         license: { title: 'MIT', spdx: 'MIT' },
       };
       if (url.pathname === `${PREFIX}collections`)
-        return response.end(JSON.stringify({ proof: info }));
+        return response.end(
+          JSON.stringify({
+            proof: info,
+            ...(options.requestBudget ? { other: { ...info, name: 'Other elements' } } : {}),
+          })
+        );
       if (url.pathname === `${PREFIX}search`)
         return response.end(
-          JSON.stringify({ icons: ['proof:heart'], limit: 32, start: 0, total: 1 })
+          JSON.stringify(
+            options.requestBudget
+              ? {
+                  icons: budgetIds,
+                  limit: 64,
+                  start: 0,
+                  total: 64,
+                  collections: { proof: info, other: info },
+                }
+              : { icons: ['proof:heart'], limit: 32, start: 0, total: 1 }
+          )
         );
       if (url.pathname === `${PREFIX}collection`)
         return response.end(
           JSON.stringify({
-            prefix: 'proof',
-            uncategorized: options.downloadPair ? ['heart', 'repairable'] : ['heart'],
+            prefix: url.searchParams.get('prefix') ?? 'proof',
+            uncategorized: options.requestBudget
+              ? budgetNames
+              : options.downloadPair
+                ? ['heart', 'repairable']
+                : ['heart'],
             info,
           })
         );
+      if (
+        options.requestBudget &&
+        (url.pathname === `${PREFIX}proof.json` || url.pathname === `${PREFIX}other.json`)
+      ) {
+        const prefix = url.pathname.endsWith('/other.json') ? 'other' : 'proof';
+        const names = url.searchParams.get('icons')?.split(',') ?? [];
+        artworkRequests.push(names);
+        artworkKeys.push(names.map((name) => `${prefix}:${name}`));
+        activeArtwork += 1;
+        maxActiveArtwork = Math.max(maxActiveArtwork, activeArtwork);
+        const complete = () => {
+          activeArtwork -= 1;
+          response.end(
+            JSON.stringify({
+              prefix,
+              width: 24,
+              height: 24,
+              icons: Object.fromEntries(
+                names.map((name) => [
+                  name,
+                  { body: '<path fill="currentColor" d="M2 2h20v20H2z"/>' },
+                ])
+              ),
+            })
+          );
+        };
+        if (holdArtwork) pendingArtwork.push(complete);
+        else complete();
+        return;
+      }
       if (url.pathname === `${PREFIX}proof.json`) {
         const bodies: Record<string, { body: string }> = {
           heart: { body: '<path fill="currentColor" d="M2 2h20v20H2z"/>' },
@@ -108,6 +173,14 @@ export async function startVectorCatalogSource(options: { downloadPair?: boolean
     baseUrl: `${origin}${PREFIX}`,
     requests,
     artworkRequests,
+    artworkKeys,
+    get maxActiveArtwork() {
+      return maxActiveArtwork;
+    },
+    releaseArtwork() {
+      holdArtwork = false;
+      pendingArtwork.splice(0).forEach((complete) => complete());
+    },
     makeSecondArtworkSupported() {
       secondArtworkSupported = true;
     },
@@ -173,10 +246,11 @@ export async function readCatalogLibrarySnapshot(page: Page) {
 
 export async function openCatalogEditor(
   context: BrowserContext,
-  extensionId: string
+  extensionId: string,
+  viewport: ViewportSize = { width: 1280, height: 560 }
 ): Promise<Page> {
   const page = await context.newPage();
-  await page.setViewportSize({ width: 1280, height: 560 });
+  await page.setViewportSize(viewport);
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/editor/index.html`, {
     waitUntil: 'domcontentloaded',
   });

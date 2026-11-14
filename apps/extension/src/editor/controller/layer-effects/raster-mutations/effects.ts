@@ -40,11 +40,9 @@ export async function applyEditorLayerRasterEffect(
   );
 }
 
-export async function updateEditorLayerRasterEffect(
-  context: LayerMutationContext & {
-    effect: EditorRasterEffect;
-    id: string;
-  }
+async function changeExistingRasterEffects(
+  context: LayerMutationContext & { id: string },
+  updateEffects: (accepted: EditorRasterEffect[]) => EditorRasterEffect[]
 ): Promise<void> {
   const object = getRasterEffectObject(context.canvas, context.id);
   if (!context.canvas || !object) {
@@ -52,11 +50,7 @@ export async function updateEditorLayerRasterEffect(
   }
 
   if (object.sniptaleRole === 'background') {
-    await context.rasterCorrections?.apply(
-      context.id,
-      (accepted) => upsertEditorRasterEffect(accepted, context.effect),
-      false
-    );
+    await context.rasterCorrections?.apply(context.id, updateEffects, false);
     return;
   }
 
@@ -64,8 +58,19 @@ export async function updateEditorLayerRasterEffect(
   applyRasterEffectsToObject(
     context,
     object,
-    upsertEditorRasterEffect(object.sniptaleEffects ?? [], context.effect),
+    updateEffects(object.sniptaleEffects ?? []),
     context.canvas
+  );
+}
+
+export async function updateEditorLayerRasterEffect(
+  context: LayerMutationContext & {
+    effect: EditorRasterEffect;
+    id: string;
+  }
+): Promise<void> {
+  await changeExistingRasterEffects(context, (accepted) =>
+    upsertEditorRasterEffect(accepted, context.effect)
   );
 }
 
@@ -125,25 +130,7 @@ export async function removeEditorLayerRasterEffect(
     id: string;
   }
 ): Promise<void> {
-  const object = getRasterEffectObject(context.canvas, context.id);
-  if (!context.canvas || !object) {
-    return;
-  }
-
-  if (object.sniptaleRole === 'background') {
-    await context.rasterCorrections?.apply(
-      context.id,
-      (accepted) => accepted.filter((effect) => effect.id !== context.effectId),
-      false
-    );
-    return;
-  }
-
-  context.rasterCorrections?.reset();
-  applyRasterEffectsToObject(
-    context,
-    object,
-    (object.sniptaleEffects ?? []).filter((effect) => effect.id !== context.effectId),
-    context.canvas
+  await changeExistingRasterEffects(context, (accepted) =>
+    accepted.filter((effect) => effect.id !== context.effectId)
   );
 }

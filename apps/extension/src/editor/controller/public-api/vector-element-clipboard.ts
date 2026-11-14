@@ -3,6 +3,7 @@ import type { EditorVectorDefinition } from '../../../features/editor/document/v
 import { getMutableEditorSelection } from '../public-actions/selection/objects/active-selection';
 import { collectSelectionVectorDefinitions } from '../public-actions/selection/objects/vector-resources';
 import {
+  captureEditorVectorCommandContext,
   getEditorVectorInsertionPoint,
   switchToVectorSelectionCursor,
   type EditorVectorCommandContext,
@@ -91,22 +92,10 @@ export function createEditorVectorClipboard(
   async function pasteVectorSelection(position?: { x: number; y: number }): Promise<boolean> {
     cancelPreview();
     const payload = clipboard;
-    const { canvas, source, layerMutationToken: token } = controller;
-    if (
-      !payload ||
-      !canvas ||
-      !source ||
-      hasPendingEditorDocumentTransition(canvas) ||
-      (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))
-    )
-      return false;
-    const revision = getEditorDocumentTransitionRevision(canvas);
-    const current = () =>
-      controller.canvas === canvas &&
-      controller.source === source &&
-      controller.layerMutationToken === token &&
-      !hasPendingEditorDocumentTransition(canvas) &&
-      getEditorDocumentTransitionRevision(canvas) === revision;
+    if (!payload) return false;
+    const context = captureEditorVectorCommandContext(controller, position);
+    if (!context) return false;
+    const { canvas, current } = context;
     let prepared: PreparedVectorPaste | null = null;
     let accepted = false;
     payload.readers += 1;

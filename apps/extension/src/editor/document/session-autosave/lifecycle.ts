@@ -118,14 +118,7 @@ export async function restoreAutosaveDraft(
   return entry;
 }
 
-export async function discardAutosaveDraft(
-  state: EditorSessionAutosaveState,
-  _aggregateId?: string | null
-): Promise<void> {
-  state.hydration = null;
-  state.hydrationGeneration += 1;
-  state.lastCheckpointReceipt = null;
-  cancelPendingAutosaveRequest(state);
+function resetAutosaveDocumentState(state: EditorSessionAutosaveState): void {
   interruptImagePresentation(state);
   releaseAutosaveInteraction(state);
   retireAutosaveCheckpointEdit(state);
@@ -136,6 +129,17 @@ export async function discardAutosaveDraft(
   state.documentAssetsByRuntimeUrl = new Map();
   state.documentAssetsByVectorDefinitionId = new Map();
   state.pendingDocument = null;
+}
+
+export async function discardAutosaveDraft(
+  state: EditorSessionAutosaveState,
+  _aggregateId?: string | null
+): Promise<void> {
+  state.hydration = null;
+  state.hydrationGeneration += 1;
+  state.lastCheckpointReceipt = null;
+  cancelPendingAutosaveRequest(state);
+  resetAutosaveDocumentState(state);
   state.lastWriteError = null;
   state.hasUnsavedChanges = false;
   state.activeContext = null;
@@ -152,16 +156,7 @@ export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   state.hydration = null;
   state.hydrationGeneration += 1;
   state.coordinator?.dispose();
-  interruptImagePresentation(state);
-  releaseAutosaveInteraction(state);
-  retireAutosaveCheckpointEdit(state);
-  state.presentationPending = false;
-  state.presentationRetryAttempt = 0;
-  state.releaseHydratedDocument?.();
-  state.releaseHydratedDocument = null;
-  state.documentAssetsByRuntimeUrl = new Map();
-  state.documentAssetsByVectorDefinitionId = new Map();
-  state.pendingDocument = null;
+  resetAutosaveDocumentState(state);
   state.activeContext = null;
   state.contextGeneration += 1;
   state.presentationRetryPromise = null;

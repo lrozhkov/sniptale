@@ -230,7 +230,7 @@ export class BezierLine {
 
     //iterate over curve with spacing and callback
     const len = pointLine.getLength();
-    let tempSpacing = mix(this.lastSpacing!, spacing, clamp(this.lastDot / len, 0, 1));
+    let tempSpacing: number;
     let d = this.lastDot;
     for (; d <= len; d += tempSpacing) {
       tempSpacing = mix(this.lastSpacing!, spacing, clamp(d / len, 0, 1));

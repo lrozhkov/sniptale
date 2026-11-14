@@ -1,4 +1,4 @@
-import { useEffect, useState, type Ref, type PointerEvent, type UIEvent } from 'react';
+import { useEffect, useState, type RefObject, type PointerEvent, type UIEvent } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type {
   EditorVectorCatalogEntry,
@@ -96,6 +96,7 @@ function ElementResultsEmpty({
 }
 export function EditorElementsResults({
   resultsRef,
+  scrollRootRef,
   whole,
   dark,
   error,
@@ -105,7 +106,8 @@ export function EditorElementsResults({
   onManage,
   onScroll,
 }: {
-  resultsRef: Ref<HTMLDivElement>;
+  resultsRef: RefObject<HTMLDivElement | null>;
+  scrollRootRef: RefObject<HTMLDivElement | null>;
   whole: boolean;
   dark: boolean;
   error: boolean;
@@ -118,6 +120,55 @@ export function EditorElementsResults({
   const session = useEditorVectorLibrarySession(),
     state = useEditorVectorLibrarySnapshot();
   const [now, setNow] = useState(Date.now);
+  const previewScope = JSON.stringify([
+    state.settings?.baseUrl,
+    state.settings?.incarnation,
+    state.settings?.sourceGeneration,
+    state.tab,
+    state.query,
+    state.collection,
+    state.entries.slice(0, state.visibleCount).map((entry) => entry.key),
+  ]);
+  useEffect(() => {
+    const root = scrollRootRef.current;
+    const cards = Array.from(
+      resultsRef.current?.querySelectorAll<HTMLButtonElement>('[data-ui="editor.elements.card"]') ??
+        []
+    );
+    let active = true;
+    const visible = new Set<Element>();
+    const report = () =>
+      session.setVisibleEntries(
+        cards.flatMap((card) => {
+          const key = card.dataset['entryKey'];
+          return visible.has(card) && key ? [key] : [];
+        })
+      );
+    const observer =
+      root && typeof IntersectionObserver !== 'undefined'
+        ? new IntersectionObserver(
+            (changes) => {
+              if (!active) return;
+              for (const change of changes) {
+                if (change.isIntersecting) visible.add(change.target);
+                else visible.delete(change.target);
+              }
+              report();
+            },
+            { root, rootMargin: '72px 0px', threshold: 0 }
+          )
+        : null;
+    if (observer) cards.forEach((card) => observer.observe(card));
+    else {
+      cards.slice(0, 8).forEach((card) => visible.add(card));
+      report();
+    }
+    return () => {
+      active = false;
+      observer?.disconnect();
+      session.setVisibleEntries([]);
+    };
+  }, [session, resultsRef, scrollRootRef, previewScope]);
   useEffect(() => {
     if (state.retryAt === null) return;
     const timer = setTimeout(() => setNow(Date.now()), Math.max(0, state.retryAt - Date.now()) + 1);

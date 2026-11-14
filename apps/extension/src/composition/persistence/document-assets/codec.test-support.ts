@@ -4,12 +4,20 @@ const mocks = vi.hoisted(() => ({
   nextId: 0,
   readAssetFile: vi.fn(),
   writeBlobToAsset: vi.fn(),
-  discardPreparedAsset: vi.fn(async () => undefined),
+  discardPreparedAsset: vi.fn(async (_assetId: string) => undefined),
 }));
 
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
   discardPreparedAsset: mocks.discardPreparedAsset,
+  collectPreparedAssetCleanupFailures: async (assetIds: readonly string[]) => {
+    const results = await Promise.allSettled(
+      assetIds.map((assetId) => mocks.discardPreparedAsset(assetId))
+    );
+    return results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+  },
   readAssetFile: mocks.readAssetFile,
   writeBlobToAsset: mocks.writeBlobToAsset,
 }));

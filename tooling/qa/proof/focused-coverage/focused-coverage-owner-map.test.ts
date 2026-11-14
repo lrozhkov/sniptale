@@ -703,3 +703,19 @@ it('keeps existing layer contract proof when adjacent publication proof is added
     ])
   );
 });
+
+it('retains raster and vector resource publication proof for the document codec owner', async () => {
+  const module = await importOwnerMap();
+  const root = 'apps/extension/src/composition/persistence';
+  expect(module.resolveMappedCoverageOwnerTests(`${root}/document-assets/codec.ts`)).toEqual(
+    expect.arrayContaining([
+      `${root}/document-assets/codec.test.ts`,
+      `${root}/document-assets/codec.vector-elements.test.ts`,
+      `${root}/document-assets/ownership.test.ts`,
+      `${root}/image-aggregates/mutations.test.ts`,
+      `${root}/image-aggregates/mutations.reused-assets.test.ts`,
+      `${root}/image-aggregates/mutations.root-lifecycle.test.ts`,
+      `${root}/image-aggregates/mutations.vector-assets.test.ts`,
+    ])
+  );
+});

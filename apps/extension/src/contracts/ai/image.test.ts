@@ -204,3 +204,31 @@ it('admits only masks on the disclosed source grid and includes them in provider
     imageContextSchema.safeParse({ ...context, images: [], editRegion: undefined }).success
   ).toBe(false);
 });
+
+it('preserves exact approval limits and strict request-bound controls', () => {
+  for (const key of ['modelId', 'approvedProviderId', 'approvedModelCode']) {
+    for (const value of ['', ' ', ' leading', 'trailing ', 'x'.repeat(257), undefined])
+      expect(parseImageJobClientMessage({ ...start, [key]: value })).toBeNull();
+    expect(parseImageJobClientMessage({ ...start, [key]: 'x'.repeat(256) })).not.toBeNull();
+  }
+  for (const patch of [
+    { requestId: 'invalid' },
+    { approvedDestination: `sha256:${'a'.repeat(63)}` },
+    { approvedDestination: undefined },
+    { llmSessionToken: '' },
+    { llmSessionToken: 'x'.repeat(513) },
+    { llmSessionToken: undefined },
+    { unknown: true },
+  ])
+    expect(parseImageJobClientMessage({ ...start, ...patch })).toBeNull();
+  for (const llmSessionToken of ['x'.repeat(512), ' ']) {
+    const boundaryRequest = { ...start, llmSessionToken };
+    expect(parseImageJobClientMessage(boundaryRequest)).toEqual(boundaryRequest);
+  }
+  for (const type of ['cancel', 'keepalive']) {
+    const command = { type, requestId: uuid };
+    expect(parseImageJobClientMessage(command)).toEqual(command);
+    expect(parseImageJobClientMessage({ ...command, requestId: 'invalid' })).toBeNull();
+    expect(parseImageJobClientMessage({ ...command, unknown: true })).toBeNull();
+  }
+});

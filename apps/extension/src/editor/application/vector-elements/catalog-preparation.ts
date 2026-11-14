@@ -2,6 +2,8 @@ import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { EditorVectorDefinition } from '../../../features/editor/document/vector-element';
 import {
   isCatalogData,
+  EditorVectorCatalogError,
+  VECTOR_CATALOG_MAX_SEARCH_RESULTS,
   type CatalogOperation,
   type EditorVectorSourceToken,
 } from '../../../features/editor/vector-catalog';
@@ -67,7 +69,36 @@ function visibleNames(value: unknown): string[] {
 
 /** Owns advisory catalog preparation; the mounted session issues every view lifetime. */
 export class EditorVectorCatalogPreparation {
+  private readonly metadataRequests = new Map<string, Promise<Metadata>>();
+  private readonly manifestFailures = new Map<string, { until: number; error: unknown }>();
+  private attributionSource = '';
+  private readonly attribution = new Map<string, unknown>();
   constructor(private readonly dependencies: PreparationDependencies) {}
+
+  private sourceKey(source: EditorVectorSourceToken) {
+    return JSON.stringify(source);
+  }
+  private remember(source: EditorVectorSourceToken, entries: unknown) {
+    if (!this.dependencies.currentSource(source) || !isRecord(entries)) return;
+    const key = this.sourceKey(source);
+    if (key !== this.attributionSource) {
+      this.attribution.clear();
+      this.attributionSource = key;
+    }
+    for (const [prefix, info] of Object.entries(entries)) {
+      if (this.attribution.size >= 20_000) break;
+      if (
+        isRecord(info) &&
+        isCatalogData('collections', { [prefix]: { ...info, total: info['total'] ?? 0 } })
+      )
+        this.attribution.set(prefix, info);
+    }
+  }
+  private info(source: EditorVectorSourceToken, prefix: string) {
+    return this.sourceKey(source) === this.attributionSource
+      ? this.attribution.get(prefix)
+      : undefined;
+  }
 
   private cacheKey(
     source: EditorVectorSourceToken,
@@ -86,7 +117,7 @@ export class EditorVectorCatalogPreparation {
   definition(source: EditorVectorSourceToken, id: string) {
     return this.dependencies.definitions.get(this.definitionKey(source, id)) ?? null;
   }
-  async metadata(
+  private async readMetadata(
     operation: Extract<CatalogOperation, 'search' | 'collections' | 'collection'>,
     id: string,
     load: () => Promise<Metadata>
@@ -111,12 +142,48 @@ export class EditorVectorCatalogPreparation {
     await cache.put(key, result.data, result.source);
     return result;
   }
+  async metadata(
+    operation: Extract<CatalogOperation, 'search' | 'collections' | 'collection'>,
+    id: string,
+    load: () => Promise<Metadata>
+  ) {
+    if (operation === 'search') return this.readMetadata(operation, id, load);
+    const key = `${this.sourceKey(this.dependencies.source())}:${operation}:${id}`;
+    const failure = this.manifestFailures.get(key);
+    if (failure && failure.until > Date.now()) throw failure.error;
+    const pending = this.metadataRequests.get(key);
+    if (pending) return pending;
+    const request = this.readMetadata(operation, id, load)
+      .catch((error: unknown) => {
+        if (
+          operation === 'collection' &&
+          error instanceof EditorVectorCatalogError &&
+          ['network-failed', 'timeout', 'http-error', 'rate-limited', 'forbidden'].includes(
+            error.code
+          )
+        ) {
+          if (this.manifestFailures.size >= 32)
+            this.manifestFailures.delete(this.manifestFailures.keys().next().value!);
+          const cooldown =
+            error instanceof EditorVectorCatalogError ? (error.retryAfterSeconds ?? 30) : 30;
+          this.manifestFailures.set(key, {
+            until: Date.now() + Math.max(30, cooldown) * 1000,
+            error,
+          });
+        }
+        throw error;
+      })
+      .finally(() => this.metadataRequests.delete(key));
+    this.metadataRequests.set(key, request);
+    return request;
+  }
   async collections() {
     const result = await this.metadata('collections', 'all', () =>
       this.dependencies.catalog.collections()
     );
     if (!this.dependencies.currentSource(result.source)) return null;
     if (!isRecord(result.data)) throw new Error('Invalid vector collections response.');
+    this.remember(result.source, result.data);
     return Object.entries(result.data)
       .filter(([prefix, info]) => nameSyntax(prefix) && isRecord(info))
       .map(([prefix, info]) => ({
@@ -125,51 +192,69 @@ export class EditorVectorCatalogPreparation {
       }));
   }
   async collection(prefix: string, signal: AbortSignal) {
+    if (signal.aborted) throw new EditorVectorCatalogError('canceled');
     const result = await this.metadata('collection', prefix, () =>
-      this.dependencies.catalog.collection(prefix, signal)
+      this.dependencies.catalog.collection(prefix)
     );
+    if (signal.aborted) throw new EditorVectorCatalogError('canceled');
+    if (isRecord(result.data)) this.remember(result.source, { [prefix]: result.data['info'] });
     return { ...result, names: visibleNames(result.data) };
   }
-  async searchPage(query: string, prefix: string | undefined, start: number, signal: AbortSignal) {
+  async searchPage(
+    query: string,
+    prefix: string | undefined,
+    start: number,
+    signal: AbortSignal,
+    limit = 64
+  ) {
     const result =
       !query && prefix
         ? await this.collection(prefix, signal).then((collection) => ({
             source: collection.source,
             data: {
               icons: collection.names.slice(start, start + 64).map((name) => `${prefix}:${name}`),
+              collections: isRecord(collection.data) ? { [prefix]: collection.data['info'] } : {},
             },
           }))
         : await this.metadata(
             'search',
-            JSON.stringify({ query, prefix: prefix ?? '', start, limit: 64 }),
+            JSON.stringify({ query, prefix: prefix ?? '', start, limit }),
             () =>
               this.dependencies.catalog.search(
-                { query, start, limit: 64, ...(prefix ? { prefix } : {}) },
+                { query, start, limit, ...(prefix ? { prefix } : {}) },
                 signal
               )
           );
+    if (signal.aborted) throw new EditorVectorCatalogError('canceled');
     if (!isRecord(result.data)) throw new Error('Invalid vector search response.');
+    this.attribution.clear();
+    this.remember(result.source, result.data['collections']);
     const icons = [...new Set(stringArray(result.data['icons']))]
       .filter((id) => {
         const parts = id.split(':');
         return parts.length === 2 && parts.every(nameSyntax);
       })
-      .slice(0, 64);
+      .slice(0, Math.min(limit, VECTOR_CATALOG_MAX_SEARCH_RESULTS));
     return { source: result.source, icons };
   }
   async prepareRemote(prefix: string, names: string[], signal: AbortSignal) {
     const { catalog, admitNetwork, currentSource } = this.dependencies;
     admitNetwork();
     const result = await catalog.assets(prefix, names, signal);
+    if (signal.aborted) throw new EditorVectorCatalogError('canceled');
     if (!currentSource(result.source)) throw new Error('Superseded vector source.');
-    const metadata = await this.metadata('collection', prefix, () =>
-      catalog.collection(prefix, signal)
-    );
-    if (!currentSource(metadata.source)) throw new Error('Superseded vector source.');
-    const data =
-      isRecord(result.data) && isRecord(metadata.data) && isRecord(metadata.data['info'])
-        ? { ...result.data, info: metadata.data['info'] }
-        : result.data;
+    let info = this.info(result.source, prefix);
+    if (!info && isRecord(result.data) && isRecord(result.data['info'])) info = result.data['info'];
+    if (!info) {
+      await this.collections();
+      info = this.info(result.source, prefix);
+    }
+    if (!info && result.source.sourceId !== 'https://api.iconify.design/') {
+      const metadata = await this.collection(prefix, signal);
+      if (isRecord(metadata.data)) info = metadata.data['info'];
+    }
+    if (!currentSource(result.source)) throw new Error('Superseded vector source.');
+    const data = isRecord(result.data) && isRecord(info) ? { ...result.data, info } : result.data;
     return { set: parseEditorIconifySet(data), source: result.source };
   }
   private async cachedDefinition(source: EditorVectorSourceToken, entry: ArtworkEntry) {

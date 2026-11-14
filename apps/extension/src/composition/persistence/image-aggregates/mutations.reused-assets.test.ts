@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   createJournal: vi.fn(),
   deleteAssetObject: vi.fn(async (_assetId: string) => undefined),
   cancelPublication: vi.fn(),
-  discardPreparedAsset: vi.fn(async () => undefined),
+  discardPreparedAsset: vi.fn(async (_assetId: string) => undefined),
   initDB: vi.fn(),
   releaseProtection: vi.fn(async () => undefined),
   recoverStandalone: vi.fn(async () => 0),
@@ -40,6 +40,14 @@ vi.mock('../assets', async (importOriginal) => ({
   deleteAssetObject: mocks.deleteAssetObject,
   cancelAssetPublication: mocks.cancelPublication,
   discardPreparedAsset: mocks.discardPreparedAsset,
+  collectPreparedAssetCleanupFailures: async (assetIds: readonly string[]) => {
+    const results = await Promise.allSettled(
+      assetIds.map((assetId) => mocks.discardPreparedAsset(assetId))
+    );
+    return results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+  },
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
   readAssetFile: vi.fn(async () => new File(['original'], 'image.png', { type: 'image/png' })),
   recoverStandaloneAssetPublications: mocks.recoverStandalone,

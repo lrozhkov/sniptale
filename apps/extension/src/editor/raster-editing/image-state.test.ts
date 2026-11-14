@@ -129,12 +129,23 @@ describe('retained raster byte adaptation', () => {
     await expect(
       decodeEditorRasterPixels({ sniptaleRasterOriginalData: resource })
     ).rejects.toThrow('Invalid retained raster state');
-    await expect(
-      decodeEditorRasterPixels({
-        ...metadata,
-        sniptaleRasterOriginalData: 'https://example.com/image.png',
-      })
-    ).rejects.toThrow('Invalid retained raster state');
+    for (const field of [
+      'sniptaleRasterOriginalData',
+      'sniptaleRasterColorData',
+      'sniptaleRasterVisibilityData',
+      'sniptaleRasterKeyData',
+    ]) {
+      for (const source of [
+        'http://example.com/image.png',
+        'https://example.com/image.png',
+        'blob:https://example.com/image',
+        'file:///image.png',
+      ]) {
+        await expect(decodeEditorRasterPixels({ ...metadata, [field]: source })).rejects.toThrow(
+          'Invalid retained raster state'
+        );
+      }
+    }
     expect(() =>
       createEditorRasterMetadata(resource, 1, 1, { x: 1, y: 0, width: 1, height: 1 })
     ).toThrow();

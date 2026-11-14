@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     setFilter: vi.fn(),
     searchNow: vi.fn(async () => {}),
     setScroll: vi.fn(),
+    setVisibleEntries: vi.fn(),
     favorite: vi.fn(async () => true),
     used: vi.fn(async () => {}),
     showMore: vi.fn(),
@@ -190,6 +191,132 @@ describe('Elements placement portal recovery', () => {
   });
 });
 
+describe('Elements catalog visibility and source lifecycle', () => {
+  it('loads a bounded preview fallback when intersection observation is unavailable', async () => {
+    if (!mocks.snapshot) throw new Error('fixture');
+    const entry = mocks.snapshot.entries[0]!;
+    mocks.snapshot = {
+      ...mocks.snapshot,
+      entries: Array.from({ length: 64 }, (_, index) => ({ ...entry, key: `preview-${index}` })),
+    };
+    await renderPanel();
+    expect(mocks.api.setVisibleEntries).toHaveBeenLastCalledWith(
+      Array.from({ length: 8 }, (_, index) => `preview-${index}`)
+    );
+  });
+  it('observes visible cards against the scroll owner and rejects stale observations', async () => {
+    if (!mocks.snapshot) throw new Error('fixture');
+    const entry = mocks.snapshot.entries[0]!;
+    mocks.snapshot = {
+      ...mocks.snapshot,
+      entries: Array.from({ length: 64 }, (_, index) => ({ ...entry, key: `preview-${index}` })),
+    };
+    const observers: Observer[] = [];
+    class Observer {
+      readonly disconnect = vi.fn();
+      readonly observe = vi.fn();
+      constructor(
+        readonly callback: IntersectionObserverCallback,
+        readonly options: IntersectionObserverInit
+      ) {
+        observers.push(this);
+      }
+      emit(target: Element, isIntersecting: boolean) {
+        this.callback(
+          [
+            {
+              target,
+              isIntersecting,
+              boundingClientRect: new DOMRect(),
+              intersectionRatio: isIntersecting ? 1 : 0,
+              intersectionRect: new DOMRect(),
+              rootBounds: null,
+              time: 0,
+            },
+          ],
+          {
+            root: this.options.root ?? null,
+            rootMargin: '72px 0px',
+            scrollMargin: '0px',
+            thresholds: [0],
+            disconnect: this.disconnect,
+            observe: this.observe,
+            unobserve: vi.fn(),
+            takeRecords: () => [],
+          }
+        );
+      }
+    }
+    vi.stubGlobal('IntersectionObserver', Observer);
+    await renderPanel();
+    const observer = observers[0]!;
+    const cards = host.querySelectorAll('[data-ui="editor.elements.card"]');
+    expect(observer.options).toEqual({
+      root: host.querySelector('[data-ui="editor.elements.results"]'),
+      rootMargin: '72px 0px',
+      threshold: 0,
+    });
+    expect(observer.observe).toHaveBeenCalledTimes(64);
+    expect(mocks.api.setVisibleEntries).not.toHaveBeenCalled();
+    act(() => {
+      observer.emit(cards[2]!, true);
+      observer.emit(cards[0]!, true);
+    });
+    expect(mocks.api.setVisibleEntries).toHaveBeenLastCalledWith(['preview-0', 'preview-2']);
+    act(() => observer.emit(cards[0]!, false));
+    expect(mocks.api.setVisibleEntries).toHaveBeenLastCalledWith(['preview-2']);
+    mocks.snapshot = {
+      ...mocks.snapshot,
+      entries: mocks.snapshot.entries.map((item) => ({ ...item })),
+    };
+    await renderPanel();
+    expect(observers).toHaveLength(1);
+    mocks.snapshot = { ...mocks.snapshot, query: 'replacement' };
+    await renderPanel();
+    expect(observer.disconnect).toHaveBeenCalledOnce();
+    expect(observers).toHaveLength(2);
+    mocks.api.setVisibleEntries.mockClear();
+    act(() => observer.emit(cards[1]!, true));
+    expect(mocks.api.setVisibleEntries).not.toHaveBeenCalled();
+    act(() => root.render(null));
+    expect(observers[1]!.disconnect).toHaveBeenCalledOnce();
+    expect(mocks.api.setVisibleEntries).toHaveBeenLastCalledWith([]);
+  });
+  it('loads collections when a source is enabled once per source generation', async () => {
+    await renderPanel();
+    expect(mocks.api.loadCollections).not.toHaveBeenCalled();
+    if (!mocks.snapshot) throw new Error('fixture');
+    mocks.snapshot = {
+      ...mocks.snapshot,
+      settings: {
+        key: 'settings',
+        kind: 'settings',
+        incarnation: 'source',
+        revision: 1,
+        baseUrl: 'https://icons.example/',
+        networkEnabled: true,
+        disclosureAccepted: true,
+        sourceGeneration: 1,
+      },
+    };
+    await renderPanel();
+    await renderPanel();
+    expect(mocks.api.loadCollections).toHaveBeenCalledOnce();
+    mocks.snapshot = {
+      ...mocks.snapshot,
+      settings: { ...mocks.snapshot.settings!, sourceGeneration: 2 },
+    };
+    await renderPanel();
+    expect(mocks.api.loadCollections).toHaveBeenCalledTimes(2);
+    mocks.snapshot = {
+      ...mocks.snapshot,
+      settings: { ...mocks.snapshot.settings!, incarnation: 'replacement' },
+    };
+    await renderPanel();
+    expect(mocks.api.loadCollections).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe('Elements inspector interaction', () => {
   it('selects on click without inserting and inserts exactly once on Enter', async () => {
     await renderPanel();
@@ -251,16 +378,31 @@ describe('Elements inspector interaction', () => {
       disconnect = vi.fn();
     }
     vi.stubGlobal('ResizeObserver', Observer);
+    const intersectionRoots: (Element | Document | null | undefined)[] = [];
+    const disconnect = vi.fn();
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(_callback: IntersectionObserverCallback, options: IntersectionObserverInit) {
+          intersectionRoots.push(options.root);
+        }
+        observe(_target: Element) {}
+        disconnect = disconnect;
+      }
+    );
     await renderPanel();
     const panel = host.querySelector('[data-ui="editor.elements.panel"]'),
       results = host.querySelector('[data-ui="editor.elements.results"]');
     expect(panel?.className).toContain('overflow-y-auto');
     expect(results?.className).toContain('overflow-visible');
     expect(results?.className).not.toContain('overflow-y-auto');
+    expect(intersectionRoots.at(-1)).toBe(panel);
     available = 300;
     act(() => callbacks.forEach((callback) => callback()));
     expect(panel?.className).not.toContain('overflow-y-auto');
     expect(results?.className).toContain('overflow-y-auto');
+    expect(intersectionRoots.at(-1)).toBe(results);
+    expect(disconnect).toHaveBeenCalled();
     act(() => root.render(null));
     expect(
       observers.every((observer) => vi.mocked(observer.disconnect).mock.calls.length > 0)

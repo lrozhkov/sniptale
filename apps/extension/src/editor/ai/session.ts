@@ -35,7 +35,7 @@ import { openGeneratedImageDocument } from '../workflows/open-generated-image-do
 const MAX_STEPS_PER_OPERATION = 10;
 const MAX_SESSION_STEPS = 50;
 const MAX_SESSION_ENCODED_BYTES = 100 * 1024 * 1024;
-const failures = new Set<string>([
+const failures: readonly string[] = [
   ...IMAGE_JOB_FAILURE_CODES,
   'source-unavailable',
   'unsupported-selection',
@@ -53,7 +53,7 @@ const failures = new Set<string>([
   'source-not-prepared',
   'model-choice-required',
   'open-document-failed',
-]);
+];
 
 interface ImageSessionVariant {
   image: ImageRaster;
@@ -125,7 +125,9 @@ function initialState(): ImageSessionState {
   };
 }
 function failureCode(error: unknown): string {
-  return error instanceof Error && failures.has(error.message) ? error.message : 'invalid-request';
+  return error instanceof Error && failures.includes(error.message)
+    ? error.message
+    : 'invalid-request';
 }
 
 async function prepareImageReference(image: ImageRaster, minimumSide: number, signal: AbortSignal) {
@@ -164,6 +166,29 @@ function buildImageContext(
         }
       : {}),
   });
+}
+
+function assertSessionBudget(
+  steps: ImageSessionStep[],
+  source: EditorImageSnapshot | null,
+  references: ImageRaster[]
+) {
+  const rasters: string[] = [];
+  if (source?.raster) rasters.push(source.raster.dataUrl);
+  if (source?.captureRaster) rasters.push(source.captureRaster.dataUrl);
+  references.forEach((image) => rasters.push(image.dataUrl));
+  for (const step of steps) {
+    if (step.snapshot.captureRaster) rasters.push(step.snapshot.captureRaster.dataUrl);
+    step.context.images.forEach((image) => rasters.push(image.dataUrl));
+    if (step.context.editMask) rasters.push(step.context.editMask.image.dataUrl);
+    step.variants.forEach((variant) => {
+      if (variant) rasters.push(variant.image.dataUrl);
+    });
+  }
+  let bytes = 0;
+  for (const raster of rasters) bytes += raster.length;
+  if (bytes > MAX_SESSION_ENCODED_BYTES || steps.length > MAX_SESSION_STEPS)
+    throw new Error('session-limit');
 }
 
 /** Owns one temporary editor conversation. Document/history and API credentials have separate owners. */
@@ -235,24 +260,6 @@ export function createImageEditorSession(
       ...(region ? { region } : {}),
       signal,
     });
-  const assertBudget = (steps: ImageSessionStep[], source = state.source) => {
-    const rasters: string[] = [];
-    if (source?.raster) rasters.push(source.raster.dataUrl);
-    if (source?.captureRaster) rasters.push(source.captureRaster.dataUrl);
-    state.draft.references.forEach((image) => rasters.push(image.dataUrl));
-    for (const step of steps) {
-      if (step.snapshot.captureRaster) rasters.push(step.snapshot.captureRaster.dataUrl);
-      step.context.images.forEach((image) => rasters.push(image.dataUrl));
-      if (step.context.editMask) rasters.push(step.context.editMask.image.dataUrl);
-      step.variants.forEach((variant) => {
-        if (variant) rasters.push(variant.image.dataUrl);
-      });
-    }
-    let bytes = 0;
-    for (const raster of rasters) bytes += raster.length;
-    if (bytes > MAX_SESSION_ENCODED_BYTES || steps.length > MAX_SESSION_STEPS)
-      throw new Error('session-limit');
-  };
   const begin = (status: ImageSessionState['status']) => {
     if (active) return null;
     active = new AbortController();
@@ -266,6 +273,21 @@ export function createImageEditorSession(
     }
   };
   const stop = () => active?.abort();
+  const prepareCapturedSource = async (
+    source: EditorImageSnapshot,
+    size: { width: number; height: number } | null,
+    variant: ReturnType<typeof preparationVariant>,
+    key: string,
+    job: AbortController
+  ) => {
+    const prepared = await deps.prepare(source, size, variant, job.signal);
+    job.signal.throwIfAborted();
+    assertSessionBudget(state.steps, prepared, state.draft.references);
+    if (active === job) {
+      preparedKey = key;
+      publish({ source: prepared });
+    }
+  };
   const isApplied = (mode: 'add' | 'replace' | 'update') => {
     const choice = state.selected;
     const step = state.steps.find((entry) => entry.id === choice?.stepId);
@@ -308,13 +330,7 @@ export function createImageEditorSession(
       if (!job) return;
       attemptedPreparationKey = key;
       try {
-        const prepared = await deps.prepare(source, size, preparationVariant(), job.signal);
-        job.signal.throwIfAborted();
-        assertBudget(state.steps, prepared);
-        if (active === job) {
-          preparedKey = key;
-          publish({ source: prepared });
-        }
+        await prepareCapturedSource(source, size, preparationVariant(), key, job);
       } catch (error) {
         if (active === job)
           publish({
@@ -420,13 +436,7 @@ export function createImageEditorSession(
         publish({ source, selected: null, base: null, operationId: crypto.randomUUID() });
         const key = sourcePreparationKey(source, size, null);
         attemptedPreparationKey = key;
-        const prepared = await deps.prepare(source, size, undefined, job.signal);
-        job.signal.throwIfAborted();
-        assertBudget(state.steps, prepared);
-        if (active === job) {
-          preparedKey = key;
-          publish({ source: prepared });
-        }
+        await prepareCapturedSource(source, size, undefined, key, job);
       } catch (error) {
         if (active === job)
           publish({
@@ -515,7 +525,7 @@ export function createImageEditorSession(
           variants: [],
           applied: false,
         };
-        assertBudget([...state.steps, step]);
+        assertSessionBudget([...state.steps, step], state.source, state.draft.references);
         publish({ source, status: 'generating', steps: [...state.steps, step] });
         await deps.run({
           signal: job.signal,
@@ -541,7 +551,7 @@ export function createImageEditorSession(
               };
               return { ...entry, variants };
             });
-            assertBudget(steps);
+            assertSessionBudget(steps, state.source, state.draft.references);
             publish({
               steps,
               selected: { stepId: requestId, variant: message.variant },

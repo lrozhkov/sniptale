@@ -1,6 +1,6 @@
 import { isAIConnectionReason, type AIConnectionReason } from '../settings/ai-catalog';
 import { z } from 'zod';
-import { SHA256_DIGEST_PATTERN } from '@sniptale/runtime-contracts/protocol/digest';
+import { aiJobControlSchemas, aiJobRequestIdSchema, approvedAiStartSchema } from './job-command';
 import { readImageDataUrlDimensions } from '@sniptale/runtime-contracts/validation/data-url';
 import { estimateBase64DecodedBytes } from '@sniptale/runtime-contracts/validation/base64';
 
@@ -22,7 +22,7 @@ const id = z
   .min(1)
   .max(256)
   .refine((value) => value.trim() === value);
-const requestId = z.string().uuid();
+const requestId = aiJobRequestIdSchema;
 const imageSide = z.number().int().positive().max(16_384);
 const imageDataUrl = z.string().max(Math.ceil(IMAGE_JOB_LIMITS.maxImageBytes / 3) * 4 + 64);
 
@@ -138,25 +138,14 @@ const imageScopeSchema = z
   .strict();
 export type ImageJobScope = z.infer<typeof imageScopeSchema>;
 
-const startSchema = z
-  .object({
-    type: z.literal('start'),
-    requestId,
-    modelId: id,
-    approvedProviderId: id,
-    approvedDestination: z.string().regex(SHA256_DIGEST_PATTERN),
-    approvedModelCode: id,
-    llmSessionToken: z.string().min(1).max(512),
+const startSchema = approvedAiStartSchema
+  .extend({
     scope: imageScopeSchema,
     context: imageContextSchema,
   })
   .strict();
 export type ImageJobStart = z.infer<typeof startSchema>;
-const clientSchema = z.discriminatedUnion('type', [
-  startSchema,
-  z.object({ type: z.literal('cancel'), requestId }).strict(),
-  z.object({ type: z.literal('keepalive'), requestId }).strict(),
-]);
+const clientSchema = z.discriminatedUnion('type', [startSchema, ...aiJobControlSchemas]);
 export type ImageJobClientMessage = z.infer<typeof clientSchema>;
 
 export const IMAGE_JOB_FAILURE_CODES = [

@@ -8,7 +8,11 @@ import type {
   EditorVectorItem,
   EditorVectorSettings,
 } from '../../../composition/persistence/vector-elements';
-import { createEditorVectorLibrarySession, type EditorVectorCatalogPort } from './session';
+import {
+  createEditorVectorLibrarySession,
+  type EditorVectorCatalogPort,
+  type EditorVectorLibrarySession,
+} from './session';
 
 export function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -98,7 +102,7 @@ export function fixture() {
     generation: settings.sourceGeneration,
   };
   const catalog: EditorVectorCatalogPort = {
-    collections: vi.fn(async () => ({ source, data: {} })),
+    collections: vi.fn(async () => ({ source, data: { test: { name: 'Test', total: 1 } } })),
     search: vi.fn(async () => ({ source, data: { icons: [], start: 0, limit: 64 } })),
     collection: vi.fn(async () => ({ source, data: { prefix: 'test', info: { name: 'Test' } } })),
     assets: vi.fn(async () => ({
@@ -157,3 +161,14 @@ export function file(name: string, text: string) {
 }
 export const svg =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h10v10z"/></svg>';
+
+export async function reveal(session: EditorVectorLibrarySession) {
+  session.setVisibleEntries(session.getSnapshot().entries.map((entry) => entry.key));
+  await vi.waitFor(() => {
+    expectPrepared(session);
+  });
+}
+function expectPrepared(session: EditorVectorLibrarySession) {
+  if (session.getSnapshot().entries.some((entry) => !entry.definition && !entry.issue))
+    throw new Error('Artwork is still pending.');
+}

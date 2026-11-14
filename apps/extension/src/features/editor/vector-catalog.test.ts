@@ -96,3 +96,13 @@ it('bounds every result shape while leaving SVG semantics to the explicit editor
   );
   expect(isCatalogResponse({ success: false, error: 'private response body' })).toBe(false);
 });
+
+it('accepts the recommended expanded search page and rejects results above 999', () => {
+  const command = { requestId: 'request', source, operation: 'search', query: 'heart' };
+  expect(isCatalogCommand({ ...command, limit: 999 })).toBe(true);
+  expect(isCatalogCommand({ ...command, limit: 1000 })).toBe(false);
+  const data = { icons: Array.from({ length: 999 }, () => 'mdi:heart'), limit: 999, start: 0 };
+  expect(isCatalogData('search', data)).toBe(true);
+  expect(isCatalogData('search', { ...data, limit: 1000 })).toBe(false);
+  expect(isCatalogData('search', { ...data, icons: [...data.icons, 'mdi:heart'] })).toBe(false);
+});

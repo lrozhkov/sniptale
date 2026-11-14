@@ -101,6 +101,56 @@ interface DecodedRecording {
   last: string;
 }
 
+async function installSelectionRecordingSource(page: Page) {
+  await page.evaluate(() => {
+    const source = document.createElement('div');
+    source.id = 'selection-recording-source';
+    source.style.cssText = [
+      'position:fixed;inset:0;background:#f8f8f8;z-index:1;pointer-events:none;',
+      'color:#222;font:24px/28px sans-serif',
+    ].join('');
+    for (const [x, y] of [
+      [100, 70],
+      [1100, 490],
+    ]) {
+      const calibration = document.createElement('div');
+      calibration.style.cssText = [
+        `position:absolute;left:${x}px;top:${y}px;width:40px;height:20px;`,
+        `background:#00ff00`,
+      ].join('');
+      source.append(calibration);
+    }
+    for (let bit = 0; bit < 4; bit++) {
+      const marker = document.createElement('div');
+      marker.dataset['recordingStageBit'] = String(bit);
+      marker.style.cssText = [
+        `position:absolute;left:${100 + bit * 22}px;top:110px;width:18px;height:18px;`,
+        `background:#000`,
+      ].join('');
+      source.append(marker);
+    }
+    for (const [y, text] of [
+      [180, 'Private account\nContact details'],
+      [400, 'Pending private\nSensitive detail'],
+    ] as const) {
+      const target = document.createElement('div');
+      target.style.cssText = [
+        `position:absolute;left:790px;top:${y + 10}px;width:170px;height:65px;`,
+        `white-space:pre;background:#fff;filter:grayscale(1)`,
+      ].join('');
+      target.textContent = text;
+      source.append(target);
+    }
+    const stripes = document.createElement('div');
+    stripes.style.cssText = [
+      'position:absolute;left:810px;top:310px;width:140px;height:80px;',
+      'background:repeating-linear-gradient(90deg,#000 0 3px,#fff 3px 6px)',
+    ].join('');
+    source.append(stripes);
+    document.body.append(source);
+  });
+}
+
 async function decodeEveryRecordingFrame(
   popup: Page,
   recordingId: string,
@@ -115,20 +165,29 @@ async function decodeEveryRecordingFrame(
       resolveDir: process.cwd(),
       contents: `
     import { Input, BlobSource, ALL_FORMATS, VideoSampleSink, EncodedPacketSink } from 'mediabunny';
-    globalThis.inspectSelectionRecording = async ({ bytes, cssSize, workspace, textRoi, maskRoi, selectionColor }) => {
-      const input = new Input({ source: new BlobSource(new Blob([new Uint8Array(bytes)])), formats: ALL_FORMATS });
+    globalThis.inspectSelectionRecording = async ({
+      bytes, cssSize, workspace, textRoi, maskRoi, selectionColor
+    }) => {
+      const input = new Input({
+        source: new BlobSource(new Blob([new Uint8Array(bytes)])),
+        formats: ALL_FORMATS
+      });
       try {
         const track = await input.getPrimaryVideoTrack();
         if (!track) throw new Error('Saved recording has no video track');
         const width = track.displayWidth, height = track.displayHeight;
-        const canvas = new OffscreenCanvas(width, height), context = canvas.getContext('2d', { willReadFrequently: true });
+        const canvas = new OffscreenCanvas(width, height),
+          context = canvas.getContext('2d', { willReadFrequently: true });
         if (!context) throw new Error('Saved frame canvas unavailable');
         let sourceProjection = null;
         const frames = []; let first = '', last = '', resumed = null, maskOcclusion = null, packetCount = 0;
         const png = async () => {
           const blob = await canvas.convertToBlob({ type: 'image/png' });
           return new Promise((resolve, reject) => {
-            const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(blob);
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
           });
         };
         const inside = (x, y, box) => x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height;
@@ -148,7 +207,8 @@ async function decodeEveryRecordingFrame(
                 const stack = [green.values().next().value]; let count = 0, sumX = 0, sumY = 0;
                 green.delete(stack[0]);
                 while (stack.length) {
-                  const index = stack.pop(); count++; sumX += index % width + 0.5; sumY += Math.floor(index / width) + 0.5;
+                  const index = stack.pop(); count++; sumX += index % width + 0.5;
+                  sumY += Math.floor(index / width) + 0.5;
                   for (const neighbor of [index - 1, index + 1, index - width, index + width]) {
                     if (green.delete(neighbor)) stack.push(neighbor);
                   }
@@ -156,7 +216,8 @@ async function decodeEveryRecordingFrame(
                 components.push({ count, x: sumX / count, y: sumY / count });
               }
               const anchors = components.sort((a,b) => b.count - a.count).slice(0,2).sort((a,b) => a.x - b.x);
-              if (anchors.length !== 2 || anchors.some(anchor => anchor.count < 30)) throw new Error('Saved source calibration pixels missing');
+              if (anchors.length !== 2 || anchors.some(anchor => anchor.count < 30))
+                throw new Error('Saved source calibration pixels missing');
               const left = [anchors[0].x, anchors[0].y], right = [anchors[1].x, anchors[1].y];
               const scaleX = (right[0] - left[0]) / 1000, scaleY = (right[1] - left[1]) / 420;
               sourceProjection = { scaleX, scaleY, offsetX: left[0] - 120 * scaleX, offsetY: left[1] - 80 * scaleY };
@@ -167,9 +228,11 @@ async function decodeEveryRecordingFrame(
             let stage = 0;
             for (let bit = 0; bit < 4; bit++) if (pixels[at(108 + bit * 22, 118)] > 128) stage |= 1 << bit;
             let purple = 0, blue = 0, selectionRun = 0, ink = 0, simplifyInk = 0, blurMin = 255, blurMax = 0;
-            for (let y = Math.floor(workspace.y * scaleY + offsetY); y < (workspace.y + workspace.height) * scaleY + offsetY; y++) {
+            for (let y = Math.floor(workspace.y * scaleY + offsetY);
+              y < (workspace.y + workspace.height) * scaleY + offsetY; y++) {
               let rowRun = 0;
-              for (let x = Math.floor(workspace.x * scaleX + offsetX); x < (workspace.x + workspace.width) * scaleX + offsetX; x++) {
+              for (let x = Math.floor(workspace.x * scaleX + offsetX);
+                x < (workspace.x + workspace.width) * scaleX + offsetX; x++) {
                 const offset = (y * width + x) * 4, r = pixels[offset], g = pixels[offset+1], b = pixels[offset+2];
                 const cssX = (x - offsetX) / scaleX, cssY = (y - offsetY) / scaleY;
                 // Fixture ink is coral or neutral. These ranges retain antialiased service pixels
@@ -179,17 +242,21 @@ async function decodeEveryRecordingFrame(
                 if (blueRegion && b > 120 && b > g + 35 && b > r + 60) blue++;
                 // The native selection color comes from the actual theme; a neutral selection
                 // still paints a flat patch, unlike the sparse antialiasing of glyph edges.
-                if (inside(cssX, cssY, textRoi) && Math.abs(r - selectionColor[0]) <= 8 && Math.abs(g - selectionColor[1]) <= 8 && Math.abs(b - selectionColor[2]) <= 8) rowRun++;
+                if (inside(cssX, cssY, textRoi) && Math.abs(r - selectionColor[0]) <= 8 &&
+                  Math.abs(g - selectionColor[1]) <= 8 && Math.abs(b - selectionColor[2]) <= 8) rowRun++;
                 else rowRun = 0;
                 selectionRun = Math.max(selectionRun, rowRun);
                 if (r > 190 && g > 65 && g < 175 && b < 130) {
                   ink++;
                   if (cssX > 790 && cssX < 960 && cssY > 190 && cssY < 255) simplifyInk++;
                 }
-                if (cssX > 835 && cssX < 925 && cssY > 330 && cssY < 370) { blurMin = Math.min(blurMin, r); blurMax = Math.max(blurMax, r); }
+                if (cssX > 835 && cssX < 925 && cssY > 330 && cssY < 370) {
+                  blurMin = Math.min(blurMin, r); blurMax = Math.max(blurMax, r);
+                }
               }
             }
-            frames.push({ timestamp: sample.timestamp, stage, sourceProjection, purple, blue, selectionRun, ink, simplifyInk, blurRange: blurMax - blurMin });
+            frames.push({ timestamp: sample.timestamp, stage, sourceProjection, purple, blue,
+              selectionRun, ink, simplifyInk, blurRange: blurMax - blurMin });
             if (!first) first = await png();
             if (simplifyInk < 20 && !maskOcclusion) maskOcclusion = await png();
             if (stage === 9 && !resumed) resumed = await png();
@@ -245,40 +312,7 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
           },
         });
       }, DEFAULT_VIDEO_SETTINGS);
-      await page.evaluate(() => {
-        const source = document.createElement('div');
-        source.id = 'selection-recording-source';
-        source.style.cssText =
-          'position:fixed;inset:0;background:#f8f8f8;z-index:1;pointer-events:none;color:#222;font:24px/28px sans-serif';
-        for (const [x, y] of [
-          [100, 70],
-          [1100, 490],
-        ]) {
-          const calibration = document.createElement('div');
-          calibration.style.cssText = `position:absolute;left:${x}px;top:${y}px;width:40px;height:20px;background:#00ff00`;
-          source.append(calibration);
-        }
-        for (let bit = 0; bit < 4; bit++) {
-          const marker = document.createElement('div');
-          marker.dataset['recordingStageBit'] = String(bit);
-          marker.style.cssText = `position:absolute;left:${100 + bit * 22}px;top:110px;width:18px;height:18px;background:#000`;
-          source.append(marker);
-        }
-        for (const [y, text] of [
-          [180, 'Private account\nContact details'],
-          [400, 'Pending private\nSensitive detail'],
-        ] as const) {
-          const target = document.createElement('div');
-          target.style.cssText = `position:absolute;left:790px;top:${y + 10}px;width:170px;height:65px;white-space:pre;background:#fff;filter:grayscale(1)`;
-          target.textContent = text;
-          source.append(target);
-        }
-        const stripes = document.createElement('div');
-        stripes.style.cssText =
-          'position:absolute;left:810px;top:310px;width:140px;height:80px;background:repeating-linear-gradient(90deg,#000 0 3px,#fff 3px 6px)';
-        source.append(stripes);
-        document.body.append(source);
-      });
+      await installSelectionRecordingSource(page);
       await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
       await page.locator('[data-ui="content.toolbar.mode-option.video-recording"]').click();
       await tool(page, 'shape');

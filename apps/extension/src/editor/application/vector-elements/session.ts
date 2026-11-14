@@ -12,6 +12,7 @@ import type {
 } from '../../../composition/persistence/vector-elements/contracts';
 import {
   EditorVectorCatalogError,
+  VECTOR_CATALOG_MAX_SEARCH_RESULTS,
   type CatalogErrorCode,
   type EditorVectorSourceToken,
 } from '../../../features/editor/vector-catalog';
@@ -118,6 +119,16 @@ class MountedVectorLibrarySession {
   private readonly listeners = new Set<() => void>();
   readonly definitions = new Map<string, EditorVectorDefinition>();
   private disposed = false;
+  private readonly visibleKeys = new Set<string>();
+  private readonly previewInFlight = new Set<string>();
+  private activePreviewBatches = 0;
+  private expandedSearch: {
+    query: string;
+    prefix: string | undefined;
+    source: EditorVectorSourceToken;
+    icons: string[];
+  } | null = null;
+  private searchIntent: { key: string; promise: Promise<void> } | null = null;
   private revision = 0;
   private cacheUsageRevision = 0;
   private searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -162,6 +173,8 @@ class MountedVectorLibrarySession {
     clearTimeout(this.searchTimer);
     this.request?.abort();
     this.request = null;
+    this.visibleKeys.clear();
+    this.searchIntent = null;
   }
   currentSource = (source: EditorVectorSourceToken) =>
     Boolean(
@@ -319,7 +332,8 @@ class MountedVectorLibrarySession {
     icons: string[],
     source: EditorVectorSourceToken,
     start: number,
-    append: boolean
+    append: boolean,
+    hasMore = icons.length === 64
   ) {
     const incoming: EditorVectorCatalogEntry[] = icons.map((id) => ({
       key: id,
@@ -340,16 +354,88 @@ class MountedVectorLibrarySession {
     this.emit({
       entries,
       status: 'ready',
-      hasMore: icons.length === 64,
+      hasMore,
       remoteStart: start + icons.length,
       ...(append ? { visibleCount: Math.max(this.state.visibleCount + 64, entries.length) } : {}),
     });
     return entries;
   }
-  searchNow = async (explicit = false, append = false) => {
-    this.cancelSearch();
+  private drainPreviews() {
+    const controller = this.request;
+    if (
+      !controller ||
+      controller.signal.aborted ||
+      this.disposed ||
+      !this.state.settings?.networkEnabled ||
+      !this.state.settings.disclosureAccepted
+    )
+      return;
     const generation = this.revision;
-    const controller = new AbortController();
+    const source = this.sourceToken();
+    const isCurrent = () =>
+      !this.disposed && generation === this.revision && this.currentSource(source);
+    while (this.activePreviewBatches < 2) {
+      const desired = this.state.entries.filter(
+        (entry) =>
+          !entry.local &&
+          !entry.definition &&
+          !entry.issue &&
+          (this.visibleKeys.has(entry.key) || entry.key === this.state.selectedKey) &&
+          !this.previewInFlight.has(entry.key)
+      );
+      const first = desired[0];
+      if (!first) return;
+      const batch = desired.filter((entry) => entry.prefix === first.prefix).slice(0, 32);
+      batch.forEach((entry) => this.previewInFlight.add(entry.key));
+      this.activePreviewBatches++;
+      void this.preparation
+        .previews(source, batch, {
+          signal: controller.signal,
+          isCurrent,
+          prepared: (key, definition) => this.acceptPreview(key, definition),
+          refused: (key) => this.refusedPreview(key),
+          failed: (prefix, error) =>
+            this.failure(error, {
+              entries: this.state.entries.map((row) =>
+                row.prefix === prefix ? { ...row, issue: true } : row
+              ),
+            }),
+        })
+        .finally(() => {
+          batch.forEach((entry) => this.previewInFlight.delete(entry.key));
+          this.activePreviewBatches--;
+          this.drainPreviews();
+        });
+    }
+  }
+  /** Admit artwork only for visible cards and the explicitly selected card. */
+  setVisibleEntries = (keys: readonly string[]) => {
+    this.visibleKeys.clear();
+    keys.forEach((key) => this.visibleKeys.add(key));
+    this.drainPreviews();
+  };
+  searchNow = (explicit = false, append = false): Promise<void> => {
+    clearTimeout(this.searchTimer);
+    const page = this.pageRequest(explicit, append);
+    const key = JSON.stringify({
+      page,
+      tab: this.state.tab,
+      collection: this.state.collection,
+      query: this.state.query,
+      settings: this.state.settings,
+    });
+    if (this.searchIntent?.key === key) return this.searchIntent.promise;
+    const promise = this.runSearch(explicit, append);
+    this.searchIntent = { key, promise };
+    void promise.finally(() => {
+      if (this.searchIntent?.promise === promise) this.searchIntent = null;
+    });
+    return promise;
+  };
+  private runSearch = async (explicit: boolean, append: boolean) => {
+    if (!append) this.cancelSearch();
+    const generation = this.revision;
+    const controller = this.request ?? new AbortController();
     this.request = controller;
     const local = this.localEntries();
     if (!append) {
@@ -361,36 +447,45 @@ class MountedVectorLibrarySession {
     this.emit({ status: 'loading' });
     const isCurrent = () => !this.disposed && generation === this.revision;
     try {
-      const result = await this.preparation.searchPage(
-        page.query,
-        page.prefix,
-        page.start,
-        controller.signal
-      );
+      const expanded = append && page.query.length > 0;
+      const retained = this.expandedSearch;
+      const result =
+        expanded &&
+        retained?.query === page.query &&
+        retained.prefix === page.prefix &&
+        this.currentSource(retained.source)
+          ? retained
+          : await this.preparation.searchPage(
+              page.query,
+              page.prefix,
+              expanded ? 0 : page.start,
+              controller.signal,
+              expanded ? VECTOR_CATALOG_MAX_SEARCH_RESULTS : 64
+            );
       if (!isCurrent() || !this.currentSource(result.source)) return;
-      const entries = this.publishPage(result.icons, result.source, page.start, append);
-      await this.preparation.previews(result.source, entries, {
-        signal: controller.signal,
-        isCurrent,
-        prepared: (key, definition) => this.acceptPreview(key, definition),
-        refused: (key) => this.refusedPreview(key),
-        failed: (prefix, error) =>
-          this.failure(error, {
-            entries: this.state.entries.map((row) =>
-              row.prefix === prefix ? { ...row, issue: true } : row
-            ),
-          }),
-      });
+      if (expanded) this.expandedSearch = { ...result, query: page.query, prefix: page.prefix };
+      const icons = expanded ? result.icons.slice(page.start, page.start + 64) : result.icons;
+      this.publishPage(
+        icons,
+        result.source,
+        page.start,
+        append,
+        expanded ? page.start + icons.length < result.icons.length : icons.length === 64
+      );
+      this.drainPreviews();
     } catch (error) {
       if (isCurrent() && !controller.signal.aborted) this.failure(error, { status: 'error' });
     }
   };
   setQuery = (query: string) => {
+    if (query === this.state.query) return;
     this.cancelSearch();
+    this.expandedSearch = null;
     this.emit({ query, selectedKey: null, scrollTop: 0, visibleCount: 128 });
     this.searchTimer = setTimeout(() => void this.searchNow(), 350);
   };
   setFilter = (tab: EditorVectorLibraryTab, collection = this.state.collection) => {
+    if (tab !== this.state.tab || collection !== this.state.collection) this.expandedSearch = null;
     this.emit({ tab, collection, selectedKey: null, scrollTop: 0, visibleCount: 128 });
     void this.searchNow();
   };
@@ -504,6 +599,7 @@ class MountedVectorLibrarySession {
     this.emit({ selectedKey });
     const entry = this.state.entries.find((row) => row.key === selectedKey);
     if (entry?.local && !entry.definition) void this.warmLocal([entry], this.revision);
+    else this.drainPreviews();
   };
   setScroll = (scrollTop: number) => {
     if (scrollTop !== this.state.scrollTop) this.emit({ scrollTop });
@@ -561,6 +657,7 @@ export function createEditorVectorLibrarySession(dependencies: SessionDependenci
     used: session.used,
     select: session.select,
     setScroll: session.setScroll,
+    setVisibleEntries: session.setVisibleEntries,
     showMore: session.showMore,
     saveSettings: session.saveSettings,
     enableSource: session.enableSource,

@@ -307,3 +307,42 @@ it('admits bounded Review provider evidence and rejects private or malformed met
   for (const failureReason of ['PRIVATE_RESPONSE_BODY', { status: 402 }, 402])
     expect(parseReviewTextServerMessage({ ...failure, failureReason })).toBeNull();
 });
+
+it('preserves exact approval limits and strict request-bound controls', () => {
+  const request = {
+    type: 'start',
+    requestId: 'f204dbf4-fcc2-4d0d-964d-d623d6e00578',
+    modelId: 'model',
+    approvedProviderId: 'provider',
+    approvedModelCode: 'code',
+    approvedDestination: `sha256:${'a'.repeat(64)}`,
+    llmSessionToken: 'token',
+    context,
+    scope: { workspaceId: 'workspace', workspaceRevision: 1 },
+  };
+  for (const key of ['modelId', 'approvedProviderId', 'approvedModelCode']) {
+    for (const value of ['', ' ', ' leading', 'trailing ', 'x'.repeat(257), undefined])
+      expect(parseReviewTextClientMessage({ ...request, [key]: value })).toBeNull();
+    expect(parseReviewTextClientMessage({ ...request, [key]: 'x'.repeat(256) })).not.toBeNull();
+  }
+  for (const patch of [
+    { requestId: 'invalid' },
+    { approvedDestination: `sha256:${'a'.repeat(63)}` },
+    { approvedDestination: undefined },
+    { llmSessionToken: '' },
+    { llmSessionToken: 'x'.repeat(513) },
+    { llmSessionToken: undefined },
+    { unknown: true },
+  ])
+    expect(parseReviewTextClientMessage({ ...request, ...patch })).toBeNull();
+  for (const llmSessionToken of ['x'.repeat(512), ' ']) {
+    const boundaryRequest = { ...request, llmSessionToken };
+    expect(parseReviewTextClientMessage(boundaryRequest)).toEqual(boundaryRequest);
+  }
+  for (const type of ['cancel', 'keepalive']) {
+    const command = { type, requestId: request.requestId };
+    expect(parseReviewTextClientMessage(command)).toEqual(command);
+    expect(parseReviewTextClientMessage({ ...command, requestId: 'invalid' })).toBeNull();
+    expect(parseReviewTextClientMessage({ ...command, unknown: true })).toBeNull();
+  }
+});

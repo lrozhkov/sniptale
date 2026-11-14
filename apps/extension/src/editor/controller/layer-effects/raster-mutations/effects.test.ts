@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import type { EditorRasterEffect } from '../../../../features/editor/document/effects';
 
 const mocks = vi.hoisted(() => ({
   applyRasterEffectsToObject: vi.fn(),
@@ -104,4 +105,59 @@ it('routes background effects through prepared source corrections', async () => 
   expect(mocks.applyRasterEffectsToObject).not.toHaveBeenCalled();
   expect(mocks.previewEditorRasterEffects).not.toHaveBeenCalled();
   expect(object.sniptaleEffects).toBe(accepted);
+});
+
+it('updates and removes background effects from the accepted preparation input', async () => {
+  const accepted: EditorRasterEffect[] = [
+    { id: 'brightness', amount: 0.1, enabled: true },
+    { id: 'contrast', amount: 0.2, enabled: true },
+  ];
+  const snapshot = structuredClone(accepted);
+  const results: EditorRasterEffect[][] = [];
+  const context = {
+    ...createContext(),
+    rasterCorrections: {
+      apply: vi.fn(
+        async (_id: string, update: (effects: EditorRasterEffect[]) => EditorRasterEffect[]) => {
+          results.push(update(accepted));
+        }
+      ),
+      reset: vi.fn(),
+    },
+  };
+  mocks.getRasterEffectObject.mockReturnValue({
+    sniptaleRole: 'background',
+    sniptaleEffects: [],
+  });
+  await updateEditorLayerRasterEffect(context as never);
+  await removeEditorLayerRasterEffect(context as never);
+  expect(results).toEqual([[...accepted, context.effect], [accepted[1]]]);
+  expect(accepted).toEqual(snapshot);
+  expect(context.rasterCorrections.apply.mock.calls.map((call) => call[0])).toEqual([
+    'layer-1',
+    'layer-1',
+  ]);
+  expect(context.rasterCorrections.reset).not.toHaveBeenCalled();
+  expect(mocks.applyRasterEffectsToObject).not.toHaveBeenCalled();
+});
+
+it('resets native preview before updating or removing accepted effects', async () => {
+  const accepted = [{ id: 'contrast', amount: 0.2, enabled: true }];
+  const object = { sniptaleEffects: accepted };
+  const context = {
+    ...createContext(),
+    rasterCorrections: { apply: vi.fn(), reset: vi.fn() },
+  };
+  mocks.getRasterEffectObject.mockReturnValue(object);
+  await updateEditorLayerRasterEffect(context as never);
+  await removeEditorLayerRasterEffect(context as never);
+  expect(mocks.applyRasterEffectsToObject.mock.calls).toEqual([
+    [context, object, [...accepted, context.effect], context.canvas],
+    [context, object, accepted, context.canvas],
+  ]);
+  const resetOrder = context.rasterCorrections.reset.mock.invocationCallOrder;
+  const applyOrder = mocks.applyRasterEffectsToObject.mock.invocationCallOrder;
+  expect(resetOrder[0]).toBeLessThan(applyOrder[0]!);
+  expect(resetOrder[1]).toBeLessThan(applyOrder[1]!);
+  expect(context.rasterCorrections.apply).not.toHaveBeenCalled();
 });

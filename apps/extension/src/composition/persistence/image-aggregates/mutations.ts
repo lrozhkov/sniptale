@@ -55,7 +55,7 @@ import {
   completePhysicalDeleteOperation,
   createAssetPublicationJournal,
   cancelAssetPublication,
-  discardPreparedAsset,
+  collectPreparedAssetCleanupFailures,
   publishReadyJournalWithRetry,
   parseAssetRef,
   parseAssetOwner,
@@ -429,11 +429,8 @@ export async function commitImageWorkspace(
     };
   } catch (error) {
     if (!journalCreated) {
-      const cleanup = await Promise.allSettled(
-        preparedDocument.objects.map(({ ref }) => discardPreparedAsset(ref.assetId))
-      );
-      const failures = cleanup.flatMap((result) =>
-        result.status === 'rejected' ? [result.reason as unknown] : []
+      const failures = await collectPreparedAssetCleanupFailures(
+        preparedDocument.objects.map(({ ref }) => ref.assetId)
       );
       if (failures.length > 0) {
         throw new AggregateError([error, ...failures], 'Image workspace save cleanup failed.', {

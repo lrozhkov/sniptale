@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   runMutation: vi.fn(),
   initDB: vi.fn(),
   assetSequence: 0,
+  discardPreparedAsset: vi.fn(async (_assetId: string) => undefined),
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -41,7 +42,15 @@ vi.mock('../assets', async (importOriginal) => ({
     createdAt: 1,
     journalId: 'workspace-journal',
   })),
-  discardPreparedAsset: vi.fn(async () => undefined),
+  discardPreparedAsset: mocks.discardPreparedAsset,
+  collectPreparedAssetCleanupFailures: async (assetIds: readonly string[]) => {
+    const results = await Promise.allSettled(
+      assetIds.map((assetId) => mocks.discardPreparedAsset(assetId))
+    );
+    return results.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason as unknown] : []
+    );
+  },
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
   readAssetFile: vi.fn(
     async (_ref, filename) => new File(['immutable-original'], filename, { type: 'image/png' })

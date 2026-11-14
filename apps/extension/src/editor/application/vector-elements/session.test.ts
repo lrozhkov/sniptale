@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { computeEditorVectorDefinitionDigest } from '../../../features/editor/document/vector-element';
 import { EditorVectorCatalogError } from '../../../features/editor/vector-catalog';
 import { createEditorVectorLibrarySession, type EditorVectorCatalogPort } from './session';
-import { deferred, fixture, file, svg } from './session.test-support';
+import { deferred, fixture, file, svg, reveal } from './session.test-support';
 
 describe('vector catalog request lifetime', () => {
   it('never searches while offline or before consent and does not send an empty query', async () => {
@@ -11,6 +11,7 @@ describe('vector catalog request lifetime', () => {
     await f.session.refresh();
     f.session.setQuery('heart');
     await f.session.searchNow(true);
+    await reveal(f.session);
     expect(f.catalog.search).not.toHaveBeenCalled();
     f.setSettings({ networkEnabled: true, disclosureAccepted: true });
     f.session.setQuery('');
@@ -32,6 +33,7 @@ describe('vector catalog request lifetime', () => {
     const pending = f.session.searchNow(true);
     f.session.setQuery('new');
     await f.session.searchNow(true);
+    await reveal(f.session);
     old.resolve({ source: f.source, data: { icons: ['test:old'], start: 0, limit: 64 } });
     await pending;
     expect(f.session.getSnapshot().entries.map((row) => row.key)).toEqual(['test:new']);
@@ -58,12 +60,14 @@ describe('vector catalog cache admission', () => {
     await f.session.refresh();
     f.session.setQuery('heart');
     await f.session.searchNow(true);
+    await reveal(f.session);
     expect(f.catalog.assets).toHaveBeenCalledOnce();
     f.session.dispose();
     const restarted = createEditorVectorLibrarySession(f.dependencies);
     await restarted.refresh();
     restarted.setQuery('heart');
     await restarted.searchNow(true);
+    await reveal(restarted);
     expect(f.catalog.search).toHaveBeenCalledOnce();
     expect(f.catalog.assets).toHaveBeenCalledOnce();
     expect(f.cache.touch).toHaveBeenCalled();
@@ -88,6 +92,7 @@ describe('vector catalog cache admission', () => {
     await f.session.refresh();
     f.session.setQuery('heart');
     await f.session.searchNow(true);
+    await reveal(f.session);
     const definition = f.session.getSnapshot().entries[0]?.definition;
     if (!definition) throw new Error('Missing prepared fixture.');
     const forged = {
@@ -103,6 +108,7 @@ describe('vector catalog cache admission', () => {
     await restarted.refresh();
     restarted.setQuery('heart');
     await restarted.searchNow(true);
+    await reveal(restarted);
     expect(f.catalog.assets).toHaveBeenCalledTimes(2);
     expect(restarted.getSnapshot().entries[0]?.definition?.svg).not.toContain('<script');
     restarted.dispose();
@@ -115,9 +121,14 @@ describe('vector catalog pagination and retry', () => {
     f.catalog.search = vi.fn(async (input) => ({
       source: f.source,
       data: {
-        icons: input.start
-          ? ['test:icon0', 'test:last']
-          : Array.from({ length: 64 }, (_, index) => `test:icon${index}`),
+        icons:
+          input.limit === 999
+            ? [
+                ...Array.from({ length: 64 }, (_, index) => `test:icon${index}`),
+                'test:icon0',
+                'test:last',
+              ]
+            : Array.from({ length: 64 }, (_, index) => `test:icon${index}`),
         start: input.start ?? 0,
         limit: 64,
       },
@@ -134,11 +145,12 @@ describe('vector catalog pagination and retry', () => {
     await f.session.refresh();
     f.session.setQuery('heart');
     await f.session.searchNow(true);
+    await reveal(f.session);
     expect(f.catalog.search).toHaveBeenCalledOnce();
     expect(f.session.getSnapshot().hasMore).toBe(true);
     await f.session.loadMore();
     expect(f.catalog.search).toHaveBeenCalledTimes(2);
-    expect(vi.mocked(f.catalog.search).mock.calls[1]?.[0].start).toBe(64);
+    expect(vi.mocked(f.catalog.search).mock.calls[1]?.[0]).toMatchObject({ start: 0, limit: 999 });
     expect(f.session.getSnapshot().entries).toHaveLength(65);
     expect(f.session.getSnapshot().hasMore).toBe(false);
     f.session.dispose();
@@ -154,10 +166,12 @@ describe('vector catalog pagination and retry', () => {
       });
       f.session.setQuery('heart');
       await f.session.searchNow(true);
+      await reveal(f.session);
       expect(f.session.getSnapshot().status).toBe('error');
       expect(f.session.getSnapshot().errorCode).toBe('rate-limited');
       expect(f.session.getSnapshot().entries).toEqual([]);
       await f.session.searchNow(true);
+      await reveal(f.session);
       expect(f.catalog.search).toHaveBeenCalledOnce();
       vi.setSystemTime(Date.now() + 60001);
       f.catalog.search = vi.fn(async () => ({
@@ -165,6 +179,7 @@ describe('vector catalog pagination and retry', () => {
         data: { icons: [], start: 0, limit: 64 },
       }));
       await f.session.searchNow(true);
+      await reveal(f.session);
       expect(f.session.getSnapshot().status).toBe('ready');
       expect(f.session.getSnapshot().error).toBe(false);
       f.session.dispose();

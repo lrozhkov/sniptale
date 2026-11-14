@@ -255,6 +255,28 @@ describe('temporary assistant session', () => {
     await session.generate(model);
     expect(deps.run).toHaveBeenCalledTimes(11);
   });
+  it('retains fifty completed steps and refuses another task before paid dispatch', async () => {
+    const { session, deps } = setup();
+    for (let task = 0; task < 5; task++) {
+      session.newTask();
+      for (let step = 0; step < 10; step++) {
+        session.setDraft({ prompt: `Task ${task}, step ${step}` });
+        await session.generate(model);
+      }
+    }
+    const completed = session.getSnapshot().steps;
+    session.newTask();
+    session.setDraft({ prompt: 'One more task' });
+    await session.generate(model);
+    expect(deps.run).toHaveBeenCalledTimes(50);
+    expect(session.getSnapshot().steps).toBe(completed);
+    expect(session.getSnapshot().steps).toHaveLength(50);
+    expect(session.getSnapshot()).toMatchObject({
+      status: 'idle',
+      error: 'session-limit',
+      draft: { prompt: 'One more task' },
+    });
+  });
 });
 
 it('retains explicit parameters through repeated bootstrap and inspector remounts', () => {
@@ -324,6 +346,63 @@ it('retains captured pixels while preparing another size and refuses payment aft
   expect(session.sourceIsPrepared({ width: 1, height: 1 })).toBe(false);
   expect(session.getSnapshot().source?.captureRaster).toBe(image);
 });
+
+it.each(['refresh', 'resize'] as const)(
+  'excludes late prepared pixels after cancellation during %s',
+  async (entry) => {
+    const { session, deps, snapshot } = setup();
+    snapshot.intention = 'layers';
+    snapshot.raster = image;
+    snapshot.captureRaster = image;
+    session.setDraft({ intention: 'layers' });
+    const size = { width: 768, height: 768 };
+    if (entry === 'resize') await session.refreshSource(undefined, size);
+    const prepared = { ...snapshot, raster: variantImage(120) };
+    const result = Promise.withResolvers<EditorImageSnapshot>();
+    const entered = Promise.withResolvers<void>();
+    deps.prepare.mockImplementationOnce(() => {
+      entered.resolve();
+      return result.promise;
+    });
+    const target = { width: 1024, height: 1024 };
+    const flight =
+      entry === 'refresh'
+        ? session.refreshSource(undefined, target)
+        : session.prepareSource(target);
+    await entered.promise;
+    const source = session.getSnapshot().source;
+    session.stop();
+    result.resolve(prepared);
+    await flight;
+    expect(session.getSnapshot()).toMatchObject({ status: 'idle', error: 'cancelled' });
+    expect(session.getSnapshot().source).toBe(source);
+    expect(session.sourceIsPrepared(target)).toBe(false);
+    expect(deps.run).not.toHaveBeenCalled();
+  }
+);
+
+it.each([
+  ['refresh', 'output-too-small', 'output-too-small'],
+  ['resize', 'private preparation failure', 'invalid-request'],
+] as const)(
+  'classifies %s preparation failure without losing captured pixels',
+  async (entry, message, code) => {
+    const { session, deps, snapshot } = setup();
+    snapshot.intention = 'layers';
+    snapshot.raster = image;
+    snapshot.captureRaster = image;
+    session.setDraft({ intention: 'layers' });
+    if (entry === 'resize') await session.refreshSource();
+    deps.prepare.mockRejectedValueOnce(new Error(message));
+    const size = { width: 768, height: 768 };
+    if (entry === 'refresh') await session.refreshSource(undefined, size);
+    else await session.prepareSource(size);
+    expect(session.getSnapshot()).toMatchObject({ status: 'idle', error: code });
+    expect(session.getSnapshot().source?.captureRaster).toBe(image);
+    expect(session.sourceIsPrepared(size)).toBe(false);
+    expect(deps.run).not.toHaveBeenCalled();
+  }
+);
 
 it('fills absent parameters from the selected profile without resetting explicit choices', () => {
   const { session } = setup();

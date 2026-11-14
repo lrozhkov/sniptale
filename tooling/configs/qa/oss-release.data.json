@@ -451,7 +451,7 @@
     },
     {
       "archivePath": "THIRD_PARTY_NOTICES.md",
-      "sha256": "9bab7c3b8bceeaee673dc939bb8aaee5800177181df30506d10154607374ae3b",
+      "sha256": "3e31a8ca34acf5e3eae17553ea0c1eb3f9d30dd86a76b47a9bfed7b4235afd85",
       "source": "THIRD_PARTY_NOTICES.md"
     },
     {
@@ -466,7 +466,7 @@
     },
     {
       "archivePath": "apps/extension/src/editor/raster-editing/vendor/provenance.json",
-      "sha256": "e7592eaf02c2f969948428beecae1edafde449ec5831bbd05d3d338d49ed233e",
+      "sha256": "9c26643f25e139be15f954e8200cde51cfd036b1e97601ff797b9acc8b8f45cc",
       "source": "apps/extension/src/editor/raster-editing/vendor/provenance.json"
     },
     {
@@ -660,7 +660,7 @@
         "noticePath": "apps/extension/src/editor/raster-editing/vendor/NOTICE.txt",
         "noticeSha256": "180a6efecad16728850abc3a2c9e630eb445b16137e0e6ed8cee29673aed8a03",
         "provenancePath": "apps/extension/src/editor/raster-editing/vendor/provenance.json",
-        "provenanceSha256": "e7592eaf02c2f969948428beecae1edafde449ec5831bbd05d3d338d49ed233e",
+        "provenanceSha256": "9c26643f25e139be15f954e8200cde51cfd036b1e97601ff797b9acc8b8f45cc",
         "modifications": "Sniptale extracts flood-fill, Bezier, and stamp-spacing algorithms with their required helpers. It adds typed source geometry, bounded reads, and row-safe growth. It adds immutable retained planes, independent hardness, Restore mode, selection clipping, and crop clipping. It removes upstream UI, Canvas, pressure, and history dependencies. It adds source-over paint with explicit color and opacity, and incremental preview patches.",
         "artifacts": [
           {
@@ -671,7 +671,7 @@
           },
           {
             "path": "apps/extension/src/editor/raster-editing/vendor/bezier-line.ts",
-            "sha256": "b463812be6a435d2b6a25a9b5dc40a393d89a348a8ea65a24354c535cdaf1d14",
+            "sha256": "52cf50f07c10807a44b8b3b36a1738f0e5ee9b96a9bc1e1a4e7fe21efa7b6568",
             "sourceUrl": "https://github.com/bitbof/klecks/blob/b86ba7d0edb2c48ad21ca58aae4775fccf329632/src/app/script/bb/math/line.ts",
             "sourceSha256": "6336d91fcc70507bb67765310b7bbb3d6e77bbb316e0c0ff9fb443444c6815d0"
           },

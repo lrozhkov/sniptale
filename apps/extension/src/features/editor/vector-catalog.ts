@@ -6,6 +6,9 @@ export interface EditorVectorSourceToken {
   generation: number;
 }
 
+/** Iconify recommends an expanded metadata page to avoid repeated search scans. */
+export const VECTOR_CATALOG_MAX_SEARCH_RESULTS = 999;
+
 export type CatalogOperation = 'collections' | 'search' | 'collection' | 'assets' | 'check';
 interface CatalogCollectionInfo {
   name: string;
@@ -139,7 +142,8 @@ export function isCatalogCommand(value: unknown): value is CatalogCommand {
       value['query'].length <= 256 &&
       (value['prefix'] === undefined || catalogName(value['prefix'])) &&
       (value['start'] === undefined || integer(value['start'], 1_000_000)) &&
-      (value['limit'] === undefined || (integer(value['limit'], 64) && value['limit'] >= 32))
+      (value['limit'] === undefined ||
+        (integer(value['limit'], VECTOR_CATALOG_MAX_SEARCH_RESULTS) && value['limit'] >= 32))
     );
   if (!catalogName(value['prefix'])) return false;
   if (value['operation'] === 'collection') return true;
@@ -177,13 +181,13 @@ export function isCatalogData<K extends CatalogOperation>(
   if (operation === 'search')
     return (
       Array.isArray(value['icons']) &&
-      value['icons'].length <= 64 &&
+      value['icons'].length <= VECTOR_CATALOG_MAX_SEARCH_RESULTS &&
       value['icons'].every(
         (id) =>
           typeof id === 'string' && id.split(':').length === 2 && id.split(':').every(catalogName)
       ) &&
       integer(value['start'], 1_000_000) &&
-      integer(value['limit'], 64) &&
+      integer(value['limit'], VECTOR_CATALOG_MAX_SEARCH_RESULTS) &&
       value['limit'] >= 1 &&
       (value['total'] === undefined || integer(value['total'], 1_000_000))
     );

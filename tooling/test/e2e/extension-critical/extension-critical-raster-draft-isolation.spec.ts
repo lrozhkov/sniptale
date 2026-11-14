@@ -250,94 +250,98 @@ async function pngPixel(page: Page, dataUrl: string, x: number, y: number) {
 
 for (const viewport of PRIMARY_BROWSER_VIEWPORTS) {
   for (const grouped of [false, true]) {
-    test(`native raster drafts stay outside capture and storage ${grouped ? 'grouped' : 'single'} ${viewport.name}`, async ({
-      page,
-      hostOrigin,
-    }, info) => {
-      const record = await openFixture(page, hostOrigin, viewport.size, grouped);
-      if (!record) throw new Error('Initial durable workspace missing');
-      const accepted = await rasterDocument(page);
-      const rendered = await canonical(page);
-      expect(await pngPixel(page, rendered, 80, 85)).toEqual([37, 99, 235, 255]);
-      const assertAccepted = async () => {
-        expect((await rasterDocument(page)).canvasJson).toBe(accepted.canvasJson);
-        expect(await canonical(page)).toBe(rendered);
-        expect(await workspace(page, record.id)).toEqual(record);
-      };
-      await rasterControl(page, 'erase').click();
-      await expect.poll(() => rasterSnapshot(page)).toMatchObject({ busy: false });
-      const a = await sourceClientPoint(page, 60, 85),
-        b = await sourceClientPoint(page, 120, 85);
-      await page.mouse.move(a.x, a.y);
-      await page.mouse.down();
-      await page.mouse.move(b.x, b.y, { steps: 4 });
-      await expect.poll(() => nativePixel(page, 80, 85)).toEqual([0, 0, 0, 0]);
-      await assertAccepted();
-      await expect.poll(() => nativePixel(page, 80, 85)).toEqual([0, 0, 0, 0]);
-      await page.screenshot({ path: info.outputPath('held-brush-visible.png'), fullPage: false });
-      await page.keyboard.press('Escape');
-      await page.mouse.up();
-      await expect.poll(() => nativePixel(page, 80, 85)).toEqual([37, 99, 235, 255]);
-      await rasterControl(page, 'crop').click();
-      await expect.poll(() => rasterSnapshot(page)).toMatchObject({ busy: false, tool: 'crop' });
-      await expect.poll(() => nativePixel(page, 230, 80)).toEqual([244, 197, 66, 255]);
-      expect(await pngPixel(page, await canonical(page), 230, 80)).toEqual([0, 0, 0, 0]);
-      await assertAccepted();
-      await page.screenshot({ path: info.outputPath('crop-preview-visible.png'), fullPage: false });
-      await rasterControl(page, 'cursor').click();
-      await rasterControl(page, 'erase').click();
-      await rasterControl(page, 'adjustments').click();
-      const amount = page.getByRole('textbox', { name: 'Amount', exact: true });
-      await expect(amount).toBeVisible();
-      await amount.fill('0.7');
-      await expect.poll(() => nativePixel(page, 80, 85)).not.toEqual([37, 99, 235, 255]);
-      await assertAccepted();
-      await page.screenshot({
-        path: info.outputPath('correction-preview-visible.png'),
-        fullPage: false,
-      });
-      const clipboardPng = page.evaluate(
-        () =>
-          new Promise<string>((resolve, reject) => {
-            const write = navigator.clipboard.write.bind(navigator.clipboard);
-            navigator.clipboard.write = async (items) => {
-              try {
-                const item = items[0];
-                if (!item) throw new Error('Clipboard image missing');
-                const blob = await item.getType('image/png');
-                const dataUrl = await new Promise<string>((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onload = () =>
-                    typeof reader.result === 'string'
-                      ? resolve(reader.result)
-                      : reject(new Error('Clipboard bytes unavailable'));
-                  reader.onerror = () => reject(reader.error);
-                  reader.readAsDataURL(blob);
-                });
-                await write(items);
-                navigator.clipboard.write = write;
-                resolve(dataUrl);
-              } catch (error) {
-                reject(error);
-                throw error;
-              }
-            };
-          })
-      );
-      await page.locator('[data-ui="editor.floating.document-bar.copy-button"]').click();
-      await expect
-        .poll(() => page.evaluate(() => window.__sniptaleHarness!.getClipboardWrites().length))
-        .toBe(1);
-      expect(await pngPixel(page, await clipboardPng, 80, 85)).toEqual([37, 99, 235, 255]);
-      const saves = (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).length;
-      await page.locator('[data-ui="editor.floating.document-bar.save-button"]').click();
-      await expect
-        .poll(async () => (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).length)
-        .toBe(saves + 1);
-      const save = (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).at(-1)!;
-      if (typeof save['dataUrl'] !== 'string') throw new Error('Save omitted PNG bytes');
-      expect(await pngPixel(page, save['dataUrl'], 80, 85)).toEqual([37, 99, 235, 255]);
-      await assertAccepted();
-    });
+    test(
+      `native raster drafts stay outside capture and storage ${grouped ? 'grouped' : 'single'} ` +
+        viewport.name,
+      async ({ page, hostOrigin }, info) => {
+        const record = await openFixture(page, hostOrigin, viewport.size, grouped);
+        if (!record) throw new Error('Initial durable workspace missing');
+        const accepted = await rasterDocument(page);
+        const rendered = await canonical(page);
+        expect(await pngPixel(page, rendered, 80, 85)).toEqual([37, 99, 235, 255]);
+        const assertAccepted = async () => {
+          expect((await rasterDocument(page)).canvasJson).toBe(accepted.canvasJson);
+          expect(await canonical(page)).toBe(rendered);
+          expect(await workspace(page, record.id)).toEqual(record);
+        };
+        await rasterControl(page, 'erase').click();
+        await expect.poll(() => rasterSnapshot(page)).toMatchObject({ busy: false });
+        const a = await sourceClientPoint(page, 60, 85),
+          b = await sourceClientPoint(page, 120, 85);
+        await page.mouse.move(a.x, a.y);
+        await page.mouse.down();
+        await page.mouse.move(b.x, b.y, { steps: 4 });
+        await expect.poll(() => nativePixel(page, 80, 85)).toEqual([0, 0, 0, 0]);
+        await assertAccepted();
+        await expect.poll(() => nativePixel(page, 80, 85)).toEqual([0, 0, 0, 0]);
+        await page.screenshot({ path: info.outputPath('held-brush-visible.png'), fullPage: false });
+        await page.keyboard.press('Escape');
+        await page.mouse.up();
+        await expect.poll(() => nativePixel(page, 80, 85)).toEqual([37, 99, 235, 255]);
+        await rasterControl(page, 'crop').click();
+        await expect.poll(() => rasterSnapshot(page)).toMatchObject({ busy: false, tool: 'crop' });
+        await expect.poll(() => nativePixel(page, 230, 80)).toEqual([244, 197, 66, 255]);
+        expect(await pngPixel(page, await canonical(page), 230, 80)).toEqual([0, 0, 0, 0]);
+        await assertAccepted();
+        await page.screenshot({
+          path: info.outputPath('crop-preview-visible.png'),
+          fullPage: false,
+        });
+        await rasterControl(page, 'cursor').click();
+        await rasterControl(page, 'erase').click();
+        await rasterControl(page, 'adjustments').click();
+        const amount = page.getByRole('textbox', { name: 'Amount', exact: true });
+        await expect(amount).toBeVisible();
+        await amount.fill('0.7');
+        await expect.poll(() => nativePixel(page, 80, 85)).not.toEqual([37, 99, 235, 255]);
+        await assertAccepted();
+        await page.screenshot({
+          path: info.outputPath('correction-preview-visible.png'),
+          fullPage: false,
+        });
+        const clipboardPng = page.evaluate(
+          () =>
+            new Promise<string>((resolve, reject) => {
+              const write = navigator.clipboard.write.bind(navigator.clipboard);
+              navigator.clipboard.write = async (items) => {
+                try {
+                  const item = items[0];
+                  if (!item) throw new Error('Clipboard image missing');
+                  const blob = await item.getType('image/png');
+                  const dataUrl = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () =>
+                      typeof reader.result === 'string'
+                        ? resolve(reader.result)
+                        : reject(new Error('Clipboard bytes unavailable'));
+                    reader.onerror = () => reject(reader.error);
+                    reader.readAsDataURL(blob);
+                  });
+                  await write(items);
+                  navigator.clipboard.write = write;
+                  resolve(dataUrl);
+                } catch (error) {
+                  reject(error);
+                  throw error;
+                }
+              };
+            })
+        );
+        await page.locator('[data-ui="editor.floating.document-bar.copy-button"]').click();
+        await expect
+          .poll(() => page.evaluate(() => window.__sniptaleHarness!.getClipboardWrites().length))
+          .toBe(1);
+        expect(await pngPixel(page, await clipboardPng, 80, 85)).toEqual([37, 99, 235, 255]);
+        const saves = (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).length;
+        await page.locator('[data-ui="editor.floating.document-bar.save-button"]').click();
+        await expect
+          .poll(async () => (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).length)
+          .toBe(saves + 1);
+        const save = (await getRuntimeMessagesByType(page, MessageType.EXECUTE_SAVE)).at(-1)!;
+        if (typeof save['dataUrl'] !== 'string') throw new Error('Save omitted PNG bytes');
+        expect(await pngPixel(page, save['dataUrl'], 80, 85)).toEqual([37, 99, 235, 255]);
+        await assertAccepted();
+      }
+    );
   }
 }

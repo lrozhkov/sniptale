@@ -86,6 +86,29 @@ export function getEditorVectorInsertionPoint(controller: EditorVectorCommandCon
   };
 }
 
+/** Capture insertion admission and reject asynchronous results from a replaced document. */
+export function captureEditorVectorCommandContext(
+  controller: EditorVectorCommandContext,
+  position?: { x: number; y: number }
+) {
+  const { canvas, source, layerMutationToken: token } = controller;
+  if (
+    !canvas ||
+    !source ||
+    hasPendingEditorDocumentTransition(canvas) ||
+    (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))
+  )
+    return null;
+  const revision = getEditorDocumentTransitionRevision(canvas);
+  const current = () =>
+    controller.canvas === canvas &&
+    controller.source === source &&
+    controller.layerMutationToken === token &&
+    !hasPendingEditorDocumentTransition(canvas) &&
+    getEditorDocumentTransitionRevision(canvas) === revision;
+  return { canvas, source, current };
+}
+
 /** Validate, publish, and accept insertions; keep gesture state disposable and per canvas. */
 export function createEditorVectorCommands(
   controller: EditorVectorCommandContext,
@@ -97,21 +120,9 @@ export function createEditorVectorCommands(
     definitionValue: EditorVectorDefinition,
     position?: { x: number; y: number }
   ): Promise<boolean> {
-    const { canvas, source, layerMutationToken: token } = controller;
-    if (
-      !canvas ||
-      !source ||
-      hasPendingEditorDocumentTransition(canvas) ||
-      (position && (!Number.isFinite(position.x) || !Number.isFinite(position.y)))
-    )
-      return false;
-    const revision = getEditorDocumentTransitionRevision(canvas);
-    const current = () =>
-      controller.canvas === canvas &&
-      controller.source === source &&
-      controller.layerMutationToken === token &&
-      !hasPendingEditorDocumentTransition(canvas) &&
-      getEditorDocumentTransitionRevision(canvas) === revision;
+    const context = captureEditorVectorCommandContext(controller, position);
+    if (!context) return false;
+    const { canvas, source, current } = context;
     styles.cancelActive();
     const definition = await validateEditorVectorDefinition(definitionValue);
     if (!current()) return false;

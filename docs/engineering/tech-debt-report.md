@@ -4,8 +4,8 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 
 ## Registry summary
 
-- Classification: accepted-architecture=3, tool-noise=68.
-- Enforced source: codeql=6, gitleaks=62, license=1, scc=2.
+- Classification: accepted-architecture=4, tool-noise=73.
+- Enforced source: codeql=11, gitleaks=62, license=1, scc=3.
 
 ## Active decisions
 
@@ -80,3 +80,9 @@ This report is generated from `tooling/configs/qa/technical-debt.data.json`. Cha
 - `noise.gitleaks.webdav-clone-pair.1890` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
 - `noise.gitleaks.webdav-clone-pair.1927` — qa-webdav-evidence: A broad allowance could hide a new credential. Action: Keep only this exact historical fingerprint. Continue to block all worktree findings and new history findings. Review: 2027-04-29.
 - `noise.codeql.simplify-private-worker-message` — offscreen-simplify: A Window origin comparison would reject valid dedicated-worker port delivery. A broader allowance could hide a future public message ingress. Action: Keep only this exact reviewed private-worker finding. Recheck scope and source evidence on any drift. Review: 2027-02-09.
+- `noise.codeql.raster-private-worker-message` — editor/raster-editing: A broad exception could hide public message ingress. This decision covers only the private dedicated-worker port. Action: Retain only this exact reviewed finding. Recheck source evidence and authority on any drift. Review: 2027-05-14.
+- `noise.codeql.raster-validated-data-url-fetch` — editor/raster-editing: A broad exception could hide network requests. This decision covers only resources that pass bounded raster data URL validation. Action: Retain only this exact reviewed finding. Recheck source evidence and authority on any drift. Review: 2027-05-14.
+- `noise.codeql.archive-source-transformer` — composition/archive-transfer: A broad exception could hide unchecked source bytes. The native transformer checks chunk types and the declared size. Action: Retain only this exact reviewed finding. Recheck source evidence and authority on any drift. Review: 2027-05-14.
+- `noise.codeql.remote-integrity-transformer` — workflows/sync-transfer/remote-object-integrity: A broad exception could hide remote integrity errors. The native transformer checks the body size before digest admission. Action: Retain only this exact reviewed finding. Recheck source evidence and authority on any drift. Review: 2027-05-14.
+- `noise.codeql.webdav-metadata-transformer` — workflows/sync-transfer/webdav: A broad exception could hide unbounded XML. The native transformer enforces the metadata byte limit before parsing. Action: Retain only this exact reviewed finding. Recheck source evidence and authority on any drift. Review: 2027-05-14.
+- `accepted.scc.editor-controller-raster-composition` — apps/extension/src/editor: An owner-edge allowance could conceal new module cycles or changes to controller history, currentness and native publication authority. This record binds only the two exact owner edges and does not bind the 21 reviewed module imports. Action: Keep only the exact controller/raster owner composition. Reassess module imports, state/runtime authority and cycles on change. Preserve canonical module-cycle checks. Review: 2027-05-14.

@@ -61,6 +61,7 @@
     "Extracted BezierLine and PointLine with only their required Vec2 and scalar helpers into bezier-line.ts.",
     "Replaced the upstream vector type with SourcePoint and copyObj with a point copy.",
     "Initialized direction explicitly and added bounded-read assertions for strict TypeScript.",
+    "Removed the unused initial spacing calculation. Each loop iteration still calculates spacing before the callback and increment.",
     "Adapted eraser stamp spacing and synchronous finalization into brush.ts. Added local independent hardness, selection, crop, periodic clipping, Restore, and cumulative coverage.",
     "Kept draft planes separate from immutable accepted input planes. Removed upstream Canvas, history, pressure, and UI dependencies.",
     "Clipped brush samples to the native render rectangle in continuous source coordinates before periodic wrapping.",

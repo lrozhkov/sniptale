@@ -16,7 +16,7 @@ import type { EditorDocument } from '../../../features/editor/document/types';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import {
-  discardPreparedAsset,
+  collectPreparedAssetCleanupFailures,
   parseAssetRef,
   readAssetFile,
   writeBlobToAsset,
@@ -272,11 +272,8 @@ export async function preparePersistedEditorDocument(
       vectorAssetsByDefinitionId,
     };
   } catch (error) {
-    const cleanup = await Promise.allSettled(
-      objects.map(({ ref }) => discardPreparedAsset(ref.assetId))
-    );
-    const failures = cleanup.flatMap((result) =>
-      result.status === 'rejected' ? [result.reason as unknown] : []
+    const failures = await collectPreparedAssetCleanupFailures(
+      objects.map(({ ref }) => ref.assetId)
     );
     if (failures.length > 0) {
       throw new AggregateError(

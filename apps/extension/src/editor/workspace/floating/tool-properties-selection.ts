@@ -8,7 +8,6 @@ import type { FloatingToolbarGroup } from './canvas-toolbar-model';
 import { useRasterToolPropertiesDisclosure } from './raster-tools';
 const subscribeWithoutRuntime = () => () => undefined;
 const snapshotWithoutRuntime = () => null;
-const TOOLS_WITH_PROPERTIES = new Set<EditorTool>(['step']);
 function isToolPropertiesEnabled(args: {
   activeTool: EditorTool;
   groups: FloatingToolbarGroup[];
@@ -20,7 +19,7 @@ function isToolPropertiesEnabled(args: {
     args.hasImage &&
     args.inspector === 'tool' &&
     (!args.selection.hasSelection || args.activeTool === 'select') &&
-    TOOLS_WITH_PROPERTIES.has(args.activeTool) &&
+    args.activeTool === 'step' &&
     args.groups.length > 0
   );
 }

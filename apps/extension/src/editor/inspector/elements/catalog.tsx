@@ -115,6 +115,7 @@ export function EditorElementsGrid(props: {
                 : 'border-transparent',
             ].join(' ')}
             data-ui="editor.elements.card"
+            data-entry-key={entry.key}
             onClick={() => props.onSelect(entry)}
             onPointerDown={(event) => props.onPointerDown(event, entry)}
             onKeyDown={(event) => {

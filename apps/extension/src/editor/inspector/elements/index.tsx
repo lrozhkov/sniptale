@@ -26,13 +26,29 @@ function EditorElementsContent() {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
-    void session.refresh().then(() => {
-      if (session.getSnapshot().settings?.networkEnabled) void session.loadCollections();
-    });
+    void session.refresh();
     return () => {
       mounted.current = false;
     };
   }, [session]);
+  const collectionSource = useRef<string | null>(null);
+  useEffect(() => {
+    if (!state.settings?.networkEnabled) return;
+    const source = JSON.stringify([
+      state.settings.baseUrl,
+      state.settings.incarnation,
+      state.settings.sourceGeneration,
+    ]);
+    if (collectionSource.current === source) return;
+    collectionSource.current = source;
+    void session.loadCollections();
+  }, [
+    session,
+    state.settings?.baseUrl,
+    state.settings?.incarnation,
+    state.settings?.sourceGeneration,
+    state.settings?.networkEnabled,
+  ]);
   const openManagement = () => {
     if (mounted.current) setManage(true);
   };
@@ -59,6 +75,7 @@ function EditorElementsContent() {
       />
       <EditorElementsResults
         resultsRef={layout.results}
+        scrollRootRef={layout.whole ? layout.panel : layout.results}
         whole={layout.whole}
         dark={dark}
         error={placement.error}
