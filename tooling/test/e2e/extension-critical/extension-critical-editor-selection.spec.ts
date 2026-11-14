@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer';
 import type { Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { expect, test } from '../support/extension-fixture';
@@ -1005,5 +1006,220 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     await expect.poll(async () => Math.abs((await center()).x - target.x)).toBeLessThanOrEqual(1);
     await expect.poll(async () => Math.abs((await center()).y - target.y)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: info.outputPath('pencil-arrow-magnet.png'), fullPage: false });
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`nested lower pencil remains targetable through larger layers ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const bounds = await openTransformFixture(page, hostOrigin, size);
+    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    const initialIds = await page.evaluate(() =>
+      window.__sniptaleEditorHarness!.getCanvasObjects().map((object) => object['sniptaleId'])
+    );
+    await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+    await dragMarquee(page, { x: center.x, y: center.y - 22 }, { x: center.x, y: center.y + 22 });
+    await page.mouse.move(center.x + 75, center.y);
+    await page.mouse.down();
+    for (let step = 1; step <= 32; step++) {
+      const angle = (step / 32) * Math.PI * 2;
+      await page.mouse.move(center.x + Math.cos(angle) * 75, center.y + Math.sin(angle) * 65);
+    }
+    await page.mouse.up();
+    await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    const added = await page.evaluate(
+      (ids) =>
+        window
+          .__sniptaleEditorHarness!.getCanvasObjects()
+          .filter((object) => !ids.includes(object['sniptaleId'])),
+      initialIds
+    );
+    expect(added).toHaveLength(2);
+    const preview = page.locator('[data-ui="editor.canvas.selection-preview"] polygon');
+    const selectedRow = (id: unknown) =>
+      page
+        .locator(`[data-editor-layer-id="${id}"]`)
+        .locator(
+          '[data-ui="editor.layers.selection-toggle"], [data-ui="editor.layers.drag-handle"]'
+        );
+    await page.mouse.move(center.x, center.y);
+    await expect(preview).toHaveAttribute('data-layer-id', String(added[0]!['sniptaleId']));
+    await page.screenshot({
+      path: info.outputPath('hollow-pencil-lower-hover.png'),
+      fullPage: false,
+    });
+    await page.mouse.click(center.x, center.y);
+    await expect(selectedRow(added[0]!['sniptaleId'])).toHaveAttribute('aria-pressed', 'true');
+    await expect(selectedRow(added[1]!['sniptaleId'])).toHaveAttribute('aria-pressed', 'false');
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    await page.mouse.move(center.x + 75, center.y);
+    await expect(preview).toHaveAttribute('data-layer-id', String(added[1]!['sniptaleId']));
+    await page.mouse.click(center.x + 75, center.y);
+    await expect(selectedRow(added[1]!['sniptaleId'])).toHaveAttribute('aria-pressed', 'true');
+    await page.screenshot({
+      path: info.outputPath('hollow-pencil-upper-selected.png'),
+      fullPage: false,
+    });
+    await page.locator('[data-ui="editor.floating.tool-rail.shape"]').click();
+    await page.locator('[data-ui="content.toolbar.drawing-options.shape.kind-rectangle"]').click();
+    const fill = page.locator('[data-ui="content.toolbar.drawing-options.shape.fill-toggle"]');
+    if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
+    await dragMarquee(
+      page,
+      { x: center.x - 50, y: center.y - 35 },
+      { x: center.x + 50, y: center.y + 35 }
+    );
+    await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    const filled = await page.evaluate(() =>
+      window.__sniptaleEditorHarness!.getCanvasObjects().at(-1)!
+    );
+    await page.mouse.move(center.x, center.y);
+    await expect(preview).toHaveAttribute('data-layer-id', String(added[0]!['sniptaleId']));
+    await page.mouse.click(center.x, center.y);
+    await expect(selectedRow(added[0]!['sniptaleId'])).toHaveAttribute('aria-pressed', 'true');
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    await page.mouse.move(center.x + 35, center.y);
+    await expect(preview).toHaveAttribute('data-layer-id', String(filled['sniptaleId']));
+    await page.mouse.click(center.x + 35, center.y);
+    await expect(selectedRow(filled['sniptaleId'])).toHaveAttribute('aria-pressed', 'true');
+    await page.screenshot({
+      path: info.outputPath('nested-filled-free-area.png'),
+      fullPage: false,
+    });
+  });
+
+  test(`nested lower pencil remains targetable through opaque raster ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const bounds = await openTransformFixture(page, hostOrigin, size);
+    const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+    await dragMarquee(page, { x: center.x, y: center.y - 22 }, { x: center.x, y: center.y + 22 });
+    const lower = await page.evaluate(() =>
+      window.__sniptaleEditorHarness!.getCanvasObjects().at(-1)!
+    );
+    const opaque = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 720;
+      canvas.height = 240;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#38bdf8';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png');
+    });
+    const chooser = page.waitForEvent('filechooser');
+    await page
+      .getByRole('button', { name: translate('editor.toolbar.insertImage', 'en'), exact: true })
+      .click();
+    await (
+      await chooser
+    ).setFiles({
+      name: 'Opaque upper.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(opaque.split(',')[1]!, 'base64'),
+    });
+    await expect
+      .poll(() => page.evaluate(() => window.__sniptaleEditorHarness!.getCanvasObjects().length))
+      .toBe(3);
+    const upper = await page.evaluate(() =>
+      window.__sniptaleEditorHarness!.getCanvasObjects().at(-1)!
+    );
+    await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    const preview = page.locator('[data-ui="editor.canvas.selection-preview"] polygon');
+    await page.mouse.move(center.x, center.y);
+    await expect(preview).toHaveAttribute('data-layer-id', String(lower['sniptaleId']));
+    await page.screenshot({
+      path: info.outputPath('opaque-raster-lower-hover.png'),
+      fullPage: false,
+    });
+    await page.mouse.click(center.x, center.y);
+    await expect(
+      page
+        .locator(`[data-editor-layer-id="${lower['sniptaleId']}"]`)
+        .locator(
+          '[data-ui="editor.layers.selection-toggle"], [data-ui="editor.layers.drag-handle"]'
+        )
+    ).toHaveAttribute('aria-pressed', 'true');
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    await page.mouse.move(center.x + 200, center.y);
+    await expect(preview).toHaveAttribute('data-layer-id', String(upper['sniptaleId']));
+    await page.mouse.click(center.x + 200, center.y);
+    await expect(
+      page
+        .locator(`[data-editor-layer-id="${upper['sniptaleId']}"]`)
+        .locator(
+          '[data-ui="editor.layers.selection-toggle"], [data-ui="editor.layers.drag-handle"]'
+        )
+    ).toHaveAttribute('aria-pressed', 'true');
+    await page.screenshot({
+      path: info.outputPath('opaque-raster-free-area-selected.png'),
+      fullPage: false,
+    });
+  });
+
+  test(`raster first click retains border and first drag remains marquee ${name}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const bounds = await openTransformFixture(page, hostOrigin, size);
+    await page
+      .locator('[data-ui="editor.layers.list-viewport"]')
+      .getByRole('button', {
+        name: translate('editor.toolbar.unlockLayer', 'en'),
+        exact: true,
+      })
+      .click();
+    await page.locator('[data-ui="editor.floating.tool-rail.select"]').click();
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    const point = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+    const preview = page.locator('[data-ui="editor.canvas.selection-preview"] polygon');
+    await page.mouse.move(point.x, point.y);
+    await expect(preview).toHaveCount(1);
+    await page.evaluate(() => {
+      for (const type of ['mousedown', 'mouseup']) {
+        window.addEventListener(type, () => {
+          document.documentElement.setAttribute(
+            `data-proof-${type}`,
+            JSON.stringify({
+              preview: document.querySelectorAll(
+                '[data-ui="editor.canvas.selection-preview"] polygon'
+              ).length,
+              border: document.querySelectorAll(
+                '[data-ui="editor.canvas.selection-controls"] > polygon'
+              ).length,
+              handles: document.querySelectorAll(
+                '[data-ui="editor.canvas.selection-controls"] [data-control]'
+              ).length,
+            })
+          );
+        });
+      }
+    });
+    await page.mouse.down();
+    const down = JSON.parse((await page.locator('html').getAttribute('data-proof-mousedown'))!);
+    expect(down.preview + down.border).toBeGreaterThan(0);
+    expect(down.handles).toBe(0);
+    await expect(preview).toHaveCount(1);
+    await page.screenshot({ path: info.outputPath('raster-pending-border.png'), fullPage: false });
+    await page.mouse.up();
+    const up = JSON.parse((await page.locator('html').getAttribute('data-proof-mouseup'))!);
+    expect(up.border).toBeGreaterThan(0);
+    expect(up.handles).toBeGreaterThanOrEqual(8);
+    await page.screenshot({ path: info.outputPath('raster-click-controls.png'), fullPage: false });
+    await page.evaluate(() => window.__sniptaleEditorHarness!.clearSelection());
+    const before = await page.evaluate(() => window.__sniptaleEditorHarness!.getCanvasObjects());
+    await dragMarquee(page, point, { x: point.x + 45, y: point.y + 35 });
+    await expect(
+      page.locator('[data-ui="editor.canvas.selection-controls"] [data-control]')
+    ).toHaveCount(0);
+    expect(await page.evaluate(() => window.__sniptaleEditorHarness!.getCanvasObjects())).toEqual(
+      before
+    );
   });
 }

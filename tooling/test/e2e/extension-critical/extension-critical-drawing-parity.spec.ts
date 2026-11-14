@@ -1199,3 +1199,132 @@ for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
     }
   });
 }
+
+async function selectionChromeWidth(chrome: Locator) {
+  return chrome.evaluate((node) => {
+    if (!(node instanceof HTMLCanvasElement)) throw new Error('Selection canvas unavailable');
+    const data = node.getContext('2d')!.getImageData(0, 0, node.width, node.height).data;
+    let left = node.width;
+    let right = -1;
+    for (let offset = 3; offset < data.length; offset += 4) {
+      if (data[offset]! === 0) continue;
+      const x = ((offset - 3) / 4) % node.width;
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+    }
+    return right < left ? 0 : (right - left + 1) / (node.width / innerWidth);
+  });
+}
+
+for (const { name, size } of PRIMARY_BROWSER_VIEWPORTS) {
+  test(`nested lower pencil remains targetable through filled shapes across shared surfaces ${name}`, async ({
+    context,
+    extensionId,
+    hostOrigin,
+  }, info) => {
+    test.setTimeout(120000);
+    for (const mode of ['drawing', 'video-recording', 'crop']) {
+      const { page, popup } = await openDesignReview(context, extensionId, hostOrigin, size);
+      page.setDefaultTimeout(10000);
+      try {
+        await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+        await page
+          .locator(`[data-ui="content.toolbar.mode-option.${mode === 'crop' ? 'cursor' : mode}"]`)
+          .click();
+        if (mode === 'crop') {
+          if ((await page.locator('[data-ui="content.toolbar.timer-button"]').count()) === 0) {
+            await page.locator('[data-ui="content.toolbar.settings-button"]').click();
+            await page.locator('[data-ui="content.toolbar.settings.show-hidden-buttons"]').click();
+            await page.keyboard.press('Escape');
+          }
+          await page.locator('[data-ui="content.toolbar.timer-button"]').click();
+          await page
+            .locator('[data-ui="content.toolbar.timer-menu"]')
+            .getByText('No delay', { exact: true })
+            .click();
+          await page.locator('[data-ui="content.toolbar.capture-selection-button"]').click();
+          await page.mouse.move(200, 180);
+          await page.mouse.down();
+          await page.mouse.move(950, 440, { steps: 4 });
+          await page.mouse.up();
+          const drawingMode = page.locator('[data-ui="content.crop.mode.drawing"]');
+          if ((await drawingMode.getAttribute('data-active')) !== 'true') await drawingMode.click();
+        }
+        const scope = page.locator(
+          mode === 'crop'
+            ? '[data-ui="content.crop.drawing-slot"]'
+            : '[data-ui="content.toolbar.root"]'
+        );
+        const surface = page.locator(
+          mode === 'crop'
+            ? '[data-ui="content.crop.drawing-layer"]'
+            : '[data-ui="content.drawing.surface"]'
+        );
+        const chrome = surface
+          .filter({
+            has: page.locator('canvas.sniptale-drawing-canvas[tabindex="0"]'),
+          })
+          .locator('[data-ui="content.drawing.selection-chrome"]');
+        const crop =
+          mode === 'crop'
+            ? (await page.locator('.sniptale-selection-final-frame').boundingBox())!
+            : null;
+        const center = crop
+          ? { x: crop.x + crop.width / 2, y: crop.y + crop.height / 2 }
+          : { x: 600, y: mode === 'drawing' ? 260 : 300 };
+        await scope.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+        await page.mouse.move(center.x, center.y - 22);
+        await page.mouse.down();
+        await page.mouse.move(center.x, center.y + 22, { steps: 8 });
+        await page.mouse.up();
+        await page.mouse.move(center.x + 75, center.y);
+        await page.mouse.down();
+        for (let step = 1; step <= 32; step++) {
+          const angle = (step / 32) * Math.PI * 2;
+          await page.mouse.move(center.x + Math.cos(angle) * 75, center.y + Math.sin(angle) * 65);
+        }
+        await page.mouse.up();
+        const shapeTrigger = scope.locator('[data-ui="content.toolbar.drawing.shape"]');
+        await shapeTrigger.click();
+        if ((await shapeTrigger.getAttribute('aria-expanded')) !== 'true')
+          await shapeTrigger.click();
+        await page
+          .locator('[data-ui="content.toolbar.drawing-options.shape.kind-rectangle"]:visible')
+          .click();
+        const fill = page.locator(
+          '[data-ui="content.toolbar.drawing-options.shape.fill-toggle"]:visible'
+        );
+        if ((await fill.getAttribute('aria-pressed')) !== 'true') await fill.click();
+        await page.mouse.move(center.x - 100, center.y - 80);
+        await page.mouse.down();
+        await page.mouse.move(center.x + 100, center.y + 80, { steps: 8 });
+        await page.mouse.up();
+        await scope.locator('[data-ui="content.toolbar.drawing.select"]').click();
+        await page.mouse.click(center.x + 130, center.y + 90);
+        await page.mouse.move(center.x, center.y);
+        await expect.poll(() => selectionChromeWidth(chrome)).toBeGreaterThan(0);
+        await expect.poll(() => selectionChromeWidth(chrome)).toBeLessThan(60);
+        await page.screenshot({
+          path: info.outputPath(`${mode}-nested-filled-lower-hover.png`),
+          fullPage: false,
+        });
+        await page.mouse.click(center.x, center.y);
+        await expect.poll(() => selectionChromeWidth(chrome)).toBeGreaterThan(20);
+        await expect.poll(() => selectionChromeWidth(chrome)).toBeLessThan(90);
+        await page.screenshot({
+          path: info.outputPath(`${mode}-nested-filled-lower-selected.png`),
+          fullPage: false,
+        });
+        await page.mouse.click(center.x + 130, center.y + 90);
+        await page.mouse.move(center.x + 90, center.y);
+        await expect.poll(() => selectionChromeWidth(chrome)).toBeGreaterThan(190);
+        await page.mouse.click(center.x + 90, center.y);
+        await expect.poll(() => selectionChromeWidth(chrome)).toBeGreaterThan(140);
+        if (mode === 'crop') await page.keyboard.press('Escape');
+      } finally {
+        await page.close();
+        await popup.close();
+      }
+    }
+  });
+}

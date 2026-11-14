@@ -598,7 +598,7 @@ it.each([false, true])(
       scene.session.commitObject({
         id: 'upper',
         kind: 'rectangle',
-        bounds: { x: 90, y: 90, width: 100, height: 100 },
+        bounds: { x: 110, y: 90, width: 100, height: 100 },
         color: '#000',
         width: 2,
       });

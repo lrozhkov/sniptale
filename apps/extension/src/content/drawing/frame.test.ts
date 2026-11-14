@@ -574,3 +574,38 @@ it.each(['start', 'end'] as const)(
     );
   }
 );
+
+it('hovers a lower layer enclosed by a larger opaque upper layer', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  vi.mocked(renderDrawingHoverOutline).mockClear();
+  const lower = {
+    id: 'one',
+    kind: 'blur' as const,
+    bounds: { x: 80, y: 80, width: 40, height: 40 },
+  };
+  const upper = {
+    id: 'upper',
+    kind: 'rectangle' as const,
+    color: '#000',
+    fillColor: '#fff',
+    width: 4,
+    bounds: { x: 0, y: 0, width: 200, height: 200 },
+  };
+  drawDrawingFrame({
+    canvas: document.createElement('canvas'),
+    objects: [lower, upper],
+    selectedIds: [],
+    draft: null,
+    root: { kind: 'viewport', element: null },
+    showChrome: true,
+    renderObjects: false,
+    hoverPoint: { clientX: 100, clientY: 100 },
+  });
+  expect(renderDrawingHoverOutline).toHaveBeenCalledOnce();
+  expect(vi.mocked(renderDrawingHoverOutline).mock.calls[0]![1]).toEqual(lower);
+});

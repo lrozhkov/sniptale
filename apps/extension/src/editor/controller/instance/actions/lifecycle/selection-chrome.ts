@@ -1,4 +1,4 @@
-import { FabricObject, Group, IText, type Canvas, type Control } from 'fabric';
+import { FabricObject, Group, IText, type Canvas, type CanvasEvents, type Control } from 'fabric';
 import { resolveDrawingAlignmentFeedback } from '../../../../../features/drawing/public';
 import { readCanvasChromeColors } from '../../../../../ui/drawing-tools/selection-chrome';
 import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
@@ -20,6 +20,15 @@ import type { EditorLayerPresentationBounds } from '../../../../document/canvas-
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const CORNERS = ['tl', 'tr', 'br', 'bl'];
+const CHROME_REDRAW_EVENTS = [
+  'after:render',
+  'selection:created',
+  'selection:updated',
+  'selection:cleared',
+] as const;
+type ChromeRedrawEvent = CanvasEvents[(typeof CHROME_REDRAW_EVENTS)[number]] & {
+  ctx?: CanvasRenderingContext2D;
+};
 const mountedChrome = new WeakMap<Canvas, () => void>();
 const controlGeometry = new WeakMap<
   Control,
@@ -458,8 +467,8 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
   let hoverTarget: FabricObject | undefined;
   let previewSuspended = false;
   let layerHoverTarget: FabricObject | undefined;
-  const render = (event?: { ctx: CanvasRenderingContext2D }) => {
-    if (event && event.ctx !== canvas.getContext() && event.ctx !== canvas.contextTop) return;
+  const render = (event?: ChromeRedrawEvent) => {
+    if (event?.ctx && event.ctx !== canvas.getContext() && event.ctx !== canvas.contextTop) return;
     const width = canvas.getWidth();
     const height = canvas.getHeight();
     if (width <= 0 || height <= 0) return;
@@ -565,7 +574,7 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
         ]
       : [];
   window.addEventListener('blur', blurPreview);
-  const unsubscribe = canvas.on('after:render', render);
+  const redrawSubscriptions = CHROME_REDRAW_EVENTS.map((event) => canvas.on(event, render));
   mountedChrome.set(canvas, () => {
     disposeVisibility();
     disposeLayerHover();
@@ -573,7 +582,7 @@ export function mountEditorSelectionChrome(canvas: Canvas, magnet: EditorMagnetM
     projected?.dispose();
     for (const unsubscribePreview of previewSubscriptions) unsubscribePreview();
     window.removeEventListener('blur', blurPreview);
-    unsubscribe();
+    for (const unsubscribeRedraw of redrawSubscriptions) unsubscribeRedraw();
     svg.remove();
     for (const control of touchedControls) {
       const initial = controlGeometry.get(control);

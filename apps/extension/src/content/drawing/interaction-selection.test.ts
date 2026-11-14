@@ -132,7 +132,7 @@ function createOverlapSelectionSession(multi = false) {
   session.commitObject({
     id: 'upper',
     kind: 'rectangle',
-    bounds: { x: 250, y: 250, width: 150, height: 150 },
+    bounds: { x: 310, y: 250, width: 150, height: 150 },
     color: '#000',
     width: 2,
   });
@@ -380,3 +380,33 @@ it.each([false, true])(
     expect(scene.onDocumentCommit).toHaveBeenCalledOnce();
   }
 );
+
+it('selects a lower layer enclosed by a larger opaque upper layer without moving either', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.commitObject({
+    id: 'one',
+    kind: 'blur',
+    bounds: { x: 80, y: 80, width: 40, height: 40 },
+  });
+  session.commitObject({
+    id: 'upper',
+    kind: 'rectangle',
+    color: '#000',
+    fillColor: '#fff',
+    width: 4,
+    bounds: { x: 0, y: 0, width: 200, height: 200 },
+  });
+  session.setActiveTool('select');
+  session.setSelection([]);
+  const before = session.getSnapshot();
+  const started = beginDrawingPointer({
+    point: { x: 100, y: 100 },
+    snapshot: before,
+    timestamp: 0,
+  });
+  expect(started.draft).toMatchObject({ kind: 'marquee', clickObjectId: 'one' });
+  if (!started.draft) throw new Error('Expected click');
+  commitDrawingPointerDraft(session, started.draft);
+  expect(session.getSnapshot().selectedObjectIds).toEqual(['one']);
+  expect(session.getSnapshot().document).toEqual(before.document);
+});

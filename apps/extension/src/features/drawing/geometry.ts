@@ -297,15 +297,60 @@ export function hitTestDrawingObject(
   return true;
 }
 
+/** Tests strict containment of rectangular quads, including rotated and degenerate bounds. */
+export function isDrawingQuadStrictlyContained(
+  inner: readonly DrawingPoint[],
+  outer: readonly DrawingPoint[]
+): boolean {
+  if (
+    inner.length !== 4 ||
+    outer.length !== 4 ||
+    ![...inner, ...outer].every((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+  )
+    return false;
+  const containsQuad = (container: readonly DrawingPoint[], contained: readonly DrawingPoint[]) =>
+    contained.every(
+      (point) =>
+        pointInPolygon(point, container) ||
+        container.some(
+          (start, index) =>
+            distanceToSegment(point, start, container[(index + 1) % container.length]!) <= 1e-6
+        )
+    );
+  return containsQuad(outer, inner) && !containsQuad(inner, outer);
+}
+
+function getDrawingObjectQuad(object: DrawingObject): DrawingPoint[] {
+  const bounds = getDrawingObjectBounds(object);
+  const center = getDrawingBoundsCenter(bounds);
+  const rotation = getDrawingObjectRotation(object);
+  return [
+    { x: bounds.x, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y },
+    { x: bounds.x + bounds.width, y: bounds.y + bounds.height },
+    { x: bounds.x, y: bounds.y + bounds.height },
+  ].map((point) => rotateDrawingPoint(point, center, rotation));
+}
+
 export function hitTestDrawingDocument(
   objects: readonly DrawingObject[],
   point: DrawingPoint
 ): DrawingObject | null {
+  const hits: { object: DrawingObject; quad: DrawingPoint[] }[] = [];
   for (let index = objects.length - 1; index >= 0; index -= 1) {
     const object = objects[index]!;
-    if (hitTestDrawingObject(object, point)) return object;
+    if (hitTestDrawingObject(object, point))
+      hits.push({ object, quad: getDrawingObjectQuad(object) });
   }
-  return null;
+  return (
+    hits.find(
+      (candidate, index) =>
+        !hits.some(
+          (lower, lowerIndex) =>
+            lowerIndex > index && isDrawingQuadStrictlyContained(lower.quad, candidate.quad)
+        )
+    )?.object ?? null
+  );
 }
 
 /**

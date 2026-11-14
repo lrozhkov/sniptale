@@ -12,6 +12,7 @@ import {
   type Transform,
 } from 'fabric';
 import { CUSTOM_JSON_PROPS, isEditableObject } from '../model/index';
+import { isDrawingQuadStrictlyContained } from '../../../features/drawing/public';
 
 /** Visible bounds of a projected layer in Fabric scene coordinates. */
 export type EditorLayerPresentationBounds = {
@@ -113,30 +114,34 @@ export class EditorSelectionCanvas extends Canvas {
     }
     this.updateRasterSelectionDistance(event);
     const pending = this.rasterSelectionGesture;
-    this.rasterSelectionGesture = null;
     const click = pending && !pending.dragged && !this.marqueeCancelled;
     if (click) this._groupSelector = null;
-    super.__onMouseUp(event);
-    if (!click) return;
-    const eligible = (object: FabricObject) =>
-      this.getSelectionScopeObjects().includes(object) &&
-      object.visible &&
-      object.selectable &&
-      !object.sniptaleLocked;
-    if (!eligible(pending.target)) return;
-    const previous = pending.previous.filter(eligible);
-    const next = pending.additive
-      ? [...new Set([...previous, pending.target])]
-      : pending.toggle
-        ? previous.includes(pending.target)
-          ? previous.filter((object) => object !== pending.target)
-          : [...previous, pending.target]
-        : [pending.target];
-    this.discardActiveObject(event);
-    if (next.length === 1) this.setActiveObject(next[0]!, event);
-    else if (next.length > 1)
-      this.setActiveObject(new ActiveSelection(next, { canvas: this }), event);
-    this.requestRenderAll();
+    try {
+      // Keep the pending border until native release hands selection to the active object.
+      super.__onMouseUp(event);
+      if (!click) return;
+      const eligible = (object: FabricObject) =>
+        this.getSelectionScopeObjects().includes(object) &&
+        object.visible &&
+        object.selectable &&
+        !object.sniptaleLocked;
+      if (!eligible(pending.target)) return;
+      const previous = pending.previous.filter(eligible);
+      const next = pending.additive
+        ? [...new Set([...previous, pending.target])]
+        : pending.toggle
+          ? previous.includes(pending.target)
+            ? previous.filter((object) => object !== pending.target)
+            : [...previous, pending.target]
+          : [pending.target];
+      this.discardActiveObject(event);
+      if (next.length === 1) this.setActiveObject(next[0]!, event);
+      else if (next.length > 1)
+        this.setActiveObject(new ActiveSelection(next, { canvas: this }), event);
+      this.requestRenderAll();
+    } finally {
+      this.rasterSelectionGesture = null;
+    }
   }
 
   private updateRasterSelectionDistance(event: TPointerEvent): void {
@@ -417,6 +422,29 @@ export class EditorSelectionCanvas extends Canvas {
     };
   }
 
+  override searchPossibleTargets(
+    ...args: Parameters<Canvas['searchPossibleTargets']>
+  ): ReturnType<Canvas['searchPossibleTargets']> {
+    const [objects, pointer] = args;
+    if (!this.selection || this.skipTargetFind || this.isDrawingMode || this._currentTransform)
+      return super.searchPossibleTargets(...args);
+    const hits = objects.toReversed().flatMap((object) => {
+      if (!object.visible || !object.evented || !object.selectable || object.sniptaleLocked)
+        return [];
+      const hit = super.searchPossibleTargets([object], pointer);
+      return hit.target ? [{ hit, quad: object.getCoords() }] : [];
+    });
+    return (
+      hits.find(
+        (candidate, index) =>
+          !hits.some(
+            (lower, lowerIndex) =>
+              lowerIndex > index && isDrawingQuadStrictlyContained(lower.quad, candidate.quad)
+          )
+      )?.hit ?? { subTargets: [] }
+    );
+  }
+
   private presentationBounds: PresentationBoundsResolver | null = null;
 
   /** Undefined retains native bounds; null excludes a projected layer until its surface exists. */
@@ -472,6 +500,15 @@ export class EditorSelectionCanvas extends Canvas {
       object.selectable &&
       object.sniptaleLocked !== true &&
       isEditableObject(object);
+    const pending = this.rasterSelectionGesture;
+    if (
+      pending &&
+      !pending.dragged &&
+      eligible(pending.target) &&
+      this.getSelectionScopeObjects().includes(pending.target) &&
+      !this.getActiveObjects().includes(pending.target)
+    )
+      return [pending.target];
     if (marquee) {
       if (marquee.deltaX === 0 && marquee.deltaY === 0) return [];
       const candidates = new Set(
